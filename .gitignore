@@ -1,0 +1,35 @@
+node_modules
+/data/
+dist
+/trabajo/
+
+# La caché de OCR que deja el check de capturas al correr
+skills/.autoloop/checks/capturas/guardia/fuentes/
+
+# Lo que cada quien guarda solo en su copia: sus poses, su biblioteca de modelos 3D, lo que Sloth aprende de sus
+# videos, sus mediciones y el material que no es de Sloth (memes, referencias, ejemplos de clientes).
+/docs/reviews/
+/references/
+/skills/acelerar-skill/bancos/
+/skills/reel-collage/
+/skills/video-explicativo/huellas/
+/skills/video-explicativo/series/banco/
+/skills/video-explicativo/ejemplos/*/hoja-*.jpg
+/skills/invitacion-animada/ejemplos/*
+!/skills/invitacion-animada/ejemplos/LEEME.md
+/skills/video-documental/reference/edl/*
+!/skills/video-documental/reference/edl/LEEME.md
+/skills/video-documental/reference/reference-log.md
+/skills/video-el-diff/ejemplos/deepseek-*.md
+/skills/video-el-diff/plantilla/public/img/*
+!/skills/video-el-diff/plantilla/public/img/grano.png
+!/skills/video-el-diff/plantilla/public/img/LEEME.md
+/skills/modelos-3d/modelos/*
+!/skills/modelos-3d/modelos/moneda/
+!/skills/modelos-3d/modelos/icono-3d/
+/skills/video-documental/
+/skills/ideas-*/METODO.md
+# Las cards de lo de arriba, solo en esa copia (las lee el servidor; no van en la app que se vende).
+/cards.privado.json
+# Un repo aparte que comparta esta carpeta, para respaldar lo de arriba.
+/.privado.git/

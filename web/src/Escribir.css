@@ -1,0 +1,86 @@
+/*
+ * Donde se escribe en la comunidad (`Escribir.tsx`): una tarjeta cálida con un resplandor ámbar detrás, que se enciende
+ * al escribir. Compacto (al editar, en un modal), sin resplandor.
+ */
+.esc { position: relative; isolation: isolate; padding: 14px 16px 10px; border-radius: 18px; border: 1px solid var(--line); background: linear-gradient(180deg, var(--panel-2), var(--panel)); transition: border-color 0.2s, box-shadow 0.2s; }
+.esc::before { content: ''; position: absolute; inset: -56px -72px -32px; z-index: -1; pointer-events: none; background: radial-gradient(34% 50% at 30% 48%, var(--amber-tinte), transparent 70%), radial-gradient(22% 34% at 24% 44%, var(--amber-tinte), transparent 70%); opacity: 0.85; transition: opacity 0.3s; }
+.esc:focus-within { border-color: #4a4236; box-shadow: 0 0 0 4px var(--amber-tinte); }
+.esc:focus-within::before { opacity: 1; }
+.esc.soltando { border-color: var(--amber); border-style: dashed; box-shadow: 0 0 0 4px var(--amber-tinte); }
+.esc.compacto { padding: 12px 12px 8px 14px; border-radius: 12px; background: var(--panel-2); }
+.esc.compacto::before { display: none; }
+.esc-ico { width: 15px; height: 15px; flex: none; }
+
+.esc-titulo { display: block; width: 100%; margin: 0 0 6px; padding: 0; border: 0; outline: none; background: none; color: var(--text); font-size: 17px; font-weight: 700; letter-spacing: -0.01em; }
+.esc-titulo::placeholder { color: var(--muted); font-weight: 650; }
+.esc textarea { display: block; width: 100%; min-height: 26px; max-height: 320px; padding: 0; border: 0; outline: none; resize: none; background: none; color: var(--text); font-size: 15px; line-height: 1.55; }
+.esc textarea::placeholder { color: var(--muted); }
+
+/* Las capturas y el video, en miniatura con su ×; lo que aún sube, con un brillo que pasa. */
+.esc-fotos { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.esc-miniatura { position: relative; width: 72px; height: 72px; border-radius: 10px; border: 1px solid var(--line); overflow: hidden; background: var(--panel-2); }
+.esc-miniatura.video { width: 54px; height: 86px; }
+.esc-miniatura img, .esc-miniatura video { width: 100%; height: 100%; object-fit: cover; display: block; }
+.esc-miniatura button { position: absolute; top: 4px; right: 4px; width: 20px; height: 20px; display: grid; place-items: center; border-radius: 50%; background: rgba(15, 14, 12, 0.82); color: var(--text); font-size: 13px; line-height: 1; opacity: 0; transition: opacity 0.15s; }
+.esc-miniatura:hover button, .esc-miniatura button:focus-visible { opacity: 1; }
+.esc-miniatura button:hover { color: var(--bad); }
+.esc-play { position: absolute; left: 50%; top: 50%; width: 24px; height: 24px; margin: -12px 0 0 -12px; display: grid; place-items: center; border-radius: 50%; background: rgba(15, 14, 12, 0.72); color: var(--text); pointer-events: none; }
+.esc-play .esc-ico { width: 11px; height: 11px; margin-left: 2px; fill: currentColor; }
+.esc-miniatura.subiendo { background: linear-gradient(100deg, var(--panel-2) 30%, var(--line) 50%, var(--panel-2) 70%); background-size: 300% 100%; animation: esc-subiendo 1.2s steps(12) infinite; }
+.esc-miniatura.subiendo img { opacity: 0.45; }
+@keyframes esc-subiendo { from { background-position: 100% 0; } to { background-position: -50% 0; } }
+
+.esc-pie { display: flex; align-items: center; gap: 8px; margin-top: 12px; }
+.esc-adjuntar { display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 11px 0 9px; border-radius: 999px; color: var(--muted); font-size: 12.5px; font-weight: 600; white-space: nowrap; transition: color 0.15s, background 0.15s; }
+.esc-adjuntar:hover, .esc-adjuntar.on { background: var(--line); color: var(--text); }
+.esc.soltando .esc-adjuntar { color: var(--amber); }
+.esc-pista, .esc-error { flex: 1; min-width: 0; font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.esc-pista { opacity: 0; transition: opacity 0.2s; }
+.esc:focus-within .esc-pista { opacity: 1; }
+.esc-error { color: var(--bad); }
+.esc-cancelar { height: 32px; padding: 0 12px; border-radius: 999px; color: var(--muted); font-size: 12.5px; font-weight: 600; transition: color 0.15s, background 0.15s; }
+.esc-cancelar:hover { background: var(--panel-2); color: var(--text); }
+.esc-listo { display: inline-flex; align-items: center; gap: 7px; height: 34px; padding: 0 18px; border-radius: 999px; background: var(--amber); color: var(--sobre-ambar); font-size: 13.5px; font-weight: 700; white-space: nowrap; transition: background 0.15s, transform 0.15s, box-shadow 0.15s; }
+.esc-listo:hover:not(:disabled) { background: var(--amber-2); box-shadow: 0 6px 20px var(--amber-tinte); transform: translateY(-1px); }
+.esc-listo:disabled { background: var(--panel-2); color: var(--muted); opacity: 1; }
+
+/* Elegir uno de «Mis videos»: una rejilla de portadas que sale sobre el botón. */
+.esc-video { position: relative; }
+.esc-elegir { position: absolute; left: 0; bottom: calc(100% + 8px); z-index: 30; width: 420px; max-width: calc(100vw - 80px); padding: 10px; border-radius: 14px; border: 1px solid var(--line); background: var(--panel); box-shadow: 0 18px 48px rgba(0, 0, 0, 0.55); animation: esc-entra 0.16s ease-out; }
+.esc-elegir-titulo { margin: 2px 4px 8px; color: var(--muted); font-size: 11px; font-weight: 650; letter-spacing: 0.06em; text-transform: uppercase; }
+.esc-elegir-nada { margin: 6px 4px 8px; color: var(--muted); font-size: 13px; }
+.esc-elegir-nota { margin: -4px 4px 10px; color: var(--muted); font-size: 12px; line-height: 1.4; }
+.esc-elegir-lista { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; max-height: 320px; overflow-y: auto; }
+.esc-elegir-lista button { display: flex; flex-direction: column; gap: 4px; min-width: 0; padding: 4px; border-radius: 10px; text-align: left; transition: background 0.15s; }
+.esc-elegir-lista button:hover { background: var(--panel-2); }
+.esc-elegir-lista img { width: 100%; aspect-ratio: 16 / 9; object-fit: cover; border-radius: 7px; background: var(--panel-2); }
+.esc-elegir-lista button.vertical img { aspect-ratio: 9 / 16; }
+.esc-elegir-lista span { font-size: 11.5px; line-height: 1.3; color: var(--text); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+@keyframes esc-entra { from { opacity: 0; transform: translateY(6px); } }
+
+/* «Ayúdame a decirlo»: mientras Claude piensa, su símbolo gira. */
+.esc-ayuda { display: inline-flex; align-items: center; gap: 7px; height: 30px; padding: 0 12px 0 10px; border-radius: 999px; border: 1px solid var(--line); background: var(--panel); color: var(--text); font-size: 12.5px; font-weight: 600; white-space: nowrap; transition: border-color 0.15s, background 0.15s; }
+.esc-ayuda:hover:not(:disabled) { border-color: #4a4236; background: var(--panel-2); }
+.esc-ayuda.pensando { opacity: 1; color: var(--muted); }
+.esc-ayuda.pensando .marca-claude { animation: esc-gira 1.4s steps(12) infinite; }
+@keyframes esc-gira { to { transform: rotate(360deg); } }
+
+/* Lo que Claude entendió y lo que propone, con sus preguntas. */
+.esc-claude { margin-top: 12px; padding: 12px 14px 14px; border-radius: 12px; border: 1px solid var(--line); background: var(--bg); animation: esc-entra 0.3s cubic-bezier(0.2, 0.8, 0.2, 1); }
+.esc-claude-cabeza { display: flex; align-items: center; gap: 7px; color: var(--muted); font-size: 11px; font-weight: 650; letter-spacing: 0.06em; text-transform: uppercase; }
+.esc-claude-cerrar { width: 24px; height: 24px; margin: -4px -6px -4px auto; display: grid; place-items: center; border-radius: 7px; color: var(--muted); transition: background 0.15s, color 0.15s; }
+.esc-claude-cerrar:hover { background: var(--panel-2); color: var(--text); }
+.esc-claude-cerrar .esc-ico { width: 13px; height: 13px; }
+.esc-claude-entendi { margin: 8px 0 0; color: var(--muted); font-size: 13.5px; line-height: 1.55; }
+.esc-claude-propuesta { margin-top: 10px; padding: 10px 12px 12px; border-radius: 10px; border-left: 2px solid var(--amber); background: var(--panel-2); }
+.esc-claude-propuesta p { margin: 0; font-size: 14px; line-height: 1.55; white-space: pre-wrap; }
+.esc-usar { margin-top: 10px; height: 28px; padding: 0 13px; border-radius: 999px; background: var(--amber); color: var(--sobre-ambar); font-size: 12.5px; font-weight: 700; transition: background 0.15s; }
+.esc-usar:hover { background: var(--amber-2); }
+.esc-claude-preguntas { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; margin-top: 12px; }
+.esc-claude-preguntas span { color: var(--muted); font-size: 12px; }
+.esc-claude-preguntas button { padding: 6px 12px; border-radius: 10px; border: 1px dashed #4a4236; color: var(--text); font-size: 13px; line-height: 1.45; text-align: left; transition: border-color 0.15s, background 0.15s; }
+.esc-claude-preguntas button:hover { border-color: var(--amber); background: var(--amber-tinte); }
+
+@media (max-width: 720px) {
+  .esc-pista { display: none; }
+}

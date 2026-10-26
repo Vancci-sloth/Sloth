@@ -1,0 +1,27 @@
+/* El recordatorio, la clave y la cuenta gratis de la comunidad (Licencia.tsx). */
+.licencia-caja {
+  width: min(460px, 100%); display: flex; flex-direction: column; gap: 18px; padding: 28px;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 14px;
+}
+.licencia-caja header { display: flex; gap: 14px; align-items: flex-start; }
+.licencia-caja header img { width: 44px; height: 44px; flex: none; }
+.licencia-caja h1 { margin: 2px 0 6px; font-size: 20px; }
+.licencia-caja header p { margin: 0; color: var(--muted); font-size: 14px; line-height: 1.5; }
+.licencia-caja header b { color: var(--text); }
+.licencia-caja form { display: flex; flex-direction: column; gap: 12px; }
+.licencia-caja form > .ghost { align-self: flex-start; }
+.licencia-caja label { display: flex; flex-direction: column; gap: 6px; color: var(--muted); font-size: 13px; }
+.licencia-caja input { padding: 9px 12px; border-radius: 8px; background: var(--bg); border: 1px solid var(--line); outline: none; }
+.licencia-caja input:focus { border-color: var(--amber); }
+.licencia-caja p { margin: 0; }
+.licencia-espera { display: flex; align-items: center; gap: 10px; margin: 0; color: var(--muted); font-size: 14px; }
+.licencia-pie { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.licencia-caja a { color: var(--amber); }
+.licencia-privacidad { font-size: 11.5px; line-height: 1.5; }
+.modal.licencia-caja { width: min(460px, calc(100vw - 32px)); }
+.licencia-caja label.licencia-acepto { flex-direction: row; align-items: flex-start; gap: 8px; line-height: 1.45; }
+.licencia-acepto input { margin-top: 2px; }
+.licencia-unirse { margin: 40px auto 0; }
+
+/* Abajo de la barra lateral: el botón de la versión nueva (Actualizar.tsx). */
+.pie button.aviso-sloth { color: var(--amber); }

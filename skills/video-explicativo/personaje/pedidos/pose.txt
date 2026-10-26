@@ -1,0 +1,8 @@
+Use your built-in image_gen tool (do not draw with code). The attached photo is the channel's narrator: DESCRIBE AQUÍ AL PERSONAJE EN INGLÉS (el perro: «a real black-and-tan miniature dachshund in an orange hoodie with a gold cuban chain and a cigar»; uno propio: su descripcion.txt). Generate one image with image_gen that EDITS this exact character, then copy the PNG from $CODEX_HOME/generated_images/... into this working directory as pose_NOMBRE.png. Reply only with the file name.
+
+Rules:
+- It must stay a REAL PHOTOGRAPH of the SAME character: same face, features, colors, clothes and accessories, and anything they always carry (the dog: the cigar in the side of his mouth) unless the pose says otherwise. Photorealistic, crisp detail, same studio lighting. If the attached photo is an illustration, keep that exact illustration style instead.
+- Same framing as the attached photo: bust from mid-chest up, head about the same size and roughly in the same place, square image. Anything held stays fully inside the frame.
+- Plain pure white seamless background, no text anywhere, no other objects unless the pose asks for one.
+
+The pose: DESCRIBE AQUÍ LA POSE EN INGLÉS (p. ej. «holds up, with both hands or paws, a blank white rectangular cardboard sign in front of the chest, the sign faces the camera straight on and is completely blank. Serious, unimpressed look at the camera.»). Si sostiene algo donde el video va a dibujar encima, pídelo liso y de frente: «completely plain, no symbols, letters or engravings».

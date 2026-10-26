@@ -1,0 +1,9 @@
+[
+  { "nombre": "Protagonistas", "para": "Lo que el video sigue de principio a fin." },
+  { "nombre": "Objetos", "para": "Cosas que aparecen cuando se nombran." },
+  { "nombre": "Logos e íconos", "para": "Quién es quién, sin escribir su nombre." },
+  { "nombre": "Medidores", "para": "Una cantidad que sube y baja." },
+  { "nombre": "Flujos", "para": "Algo que pasa de un lado a otro." },
+  { "nombre": "Escenarios", "para": "Dónde pasa la historia; se queda de fondo." },
+  { "nombre": "Señales", "para": "Para agrupar, marcar o señalar." }
+]

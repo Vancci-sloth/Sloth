@@ -1,0 +1,60 @@
+# La app que se vende sale de la rama `venta`: cada push compila Sloth en Windows, Mac (Apple Silicon) y Linux, y publica
+# sus instaladores en el cobro (`npm run compilar` y `npm run publicar` en cada sistema), los que da sloth.vancci.org.
+# Cada push sale como versión nueva (scripts/version-venta.mjs, una sola vez para los tres), y la app instalada ofrece
+# «Actualizar a Sloth X» y baja solo lo que cambió (electron/main.ts).
+# Para publicar lo de main: `git push origin main:venta`. La llave para publicar es el secreto PUBLICAR del repo. La firma
+# de Apple, si está, va en los secretos CSC_LINK, CSC_KEY_PASSWORD, APPLE_ID, APPLE_APP_SPECIFIC_PASSWORD y APPLE_TEAM_ID
+# (docs/adr/0006-mac-y-linux.md); sin ellos, la de Mac sale sin firma.
+name: Publicar Sloth
+
+on:
+  push:
+    branches: [venta]
+  workflow_dispatch:
+
+# Una a la vez: dos publicaciones juntas se pisarían la versión.
+concurrency:
+  group: venta
+  cancel-in-progress: false
+
+jobs:
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+    steps:
+      - uses: actions/checkout@v5
+      - id: v
+        run: node scripts/version-venta.mjs >> "$GITHUB_OUTPUT"
+
+  publicar:
+    needs: version
+    strategy:
+      # Si uno falla, los otros publican igual: cada sistema tiene su propia última versión.
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          # El Node que viaja dentro de la app: el mismo con que se prueba en la computadora del dueño.
+          node-version: 24.18.0
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - run: node scripts/version-venta.mjs
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+      - run: npm run compilar
+        env:
+          SLOTH_TUYO: ${{ secrets.SLOTH_TUYO }}
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      - run: npm run publicar
+        env:
+          PUBLICAR: ${{ secrets.PUBLICAR }}

@@ -1,0 +1,130 @@
+/*
+ * «Modelos 3D»: la cabeza (título y buscador), la barra de tipos y orden, y la rejilla de carteles. Cada cartel es un
+ * foco cálido con el modelo encima (su foto tiene el fondo transparente), su tipo arriba y abajo, sobre una sombra, su
+ * nombre, para qué sirve y qué hace; al pasar el ratón, el giro tapa la foto y arriba sale su nombre para copiar. La ficha abre en grande sobre un velo, con el giro a la izquierda y los datos a la derecha.
+ */
+/* El fondo opaco no se ve (es el de la página), pero con él Chromium desplaza la rejilla ya pintada aunque la pantalla
+   esté al 100 o al 125 %; sin él, a esas escalas, la volvía a pintar en cada cuadro. */
+.m3d { height: 100%; width: 100%; overflow-y: auto; background: var(--bg); }
+.m3d > :not(.m3d-velo) { width: 100%; max-width: 1400px; margin-left: auto; margin-right: auto; padding-left: 48px; padding-right: 48px; }
+.m3d-cabeza { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; padding-top: 36px; }
+.m3d-cabeza h1 { margin: 2px 0 6px; font-size: 28px; font-weight: 700; letter-spacing: -0.02em; }
+.m3d-cabeza p { margin: 0; max-width: 560px; color: var(--muted); font-size: 13.5px; line-height: 1.5; }
+.m3d-antetitulo { font-size: 11px; font-weight: 650; letter-spacing: 0.08em; text-transform: uppercase; color: var(--amber); }
+.m3d-cuenta { margin-top: -4px; padding-bottom: 16px; font-size: 13px; color: var(--muted); }
+.m3d-cuenta strong { color: var(--text); font-weight: 600; }
+
+/* La barra: los tipos para filtrar (como los estilos de «Mis videos») y el orden. */
+.m3d-barra { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding-top: 24px; padding-bottom: 18px; }
+.m3d-tipos { display: flex; flex-wrap: wrap; gap: 6px; }
+.m3d-tipos button { display: inline-flex; align-items: center; gap: 7px; padding: 5px 13px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); font-size: 13px; font-weight: 600; transition: color 0.15s, border-color 0.15s, background 0.15s; }
+.m3d-tipos button:hover { color: var(--text); border-color: #4a4236; }
+.m3d-tipos button.on { color: var(--amber); border-color: var(--amber); background: var(--amber-tinte); }
+.m3d-tipos button span { font-size: 11px; font-variant-numeric: tabular-nums; opacity: 0.7; }
+.m3d-orden { flex-shrink: 0; display: flex; padding: 3px; border-radius: 999px; border: 1px solid var(--line); background: var(--panel); }
+.m3d-orden button { padding: 3px 11px; border-radius: 999px; color: var(--muted); font-size: 12px; font-weight: 600; transition: color 0.15s, background 0.15s; }
+.m3d-orden button:hover { color: var(--text); }
+.m3d-orden button.on { background: var(--panel-2); color: var(--text); }
+
+
+/* El buscador, como el de la barra, con su atajo. */
+.m3d-busca { flex-shrink: 0; width: 300px; display: flex; align-items: center; gap: 9px; padding: 0 12px; height: 38px; border-radius: 999px; border: 1px solid var(--line); background: var(--panel); color: var(--muted); transition: border-color 0.15s, background 0.15s; }
+.m3d-busca:focus-within { border-color: var(--amber); background: var(--panel-2); }
+.m3d-busca svg { width: 15px; height: 15px; flex: none; }
+.m3d-busca input { flex: 1; min-width: 0; border: 0; outline: none; background: none; color: var(--text); font-size: 13.5px; }
+.m3d-busca input::placeholder { color: var(--muted); }
+.m3d-busca button { width: 20px; height: 20px; display: grid; place-items: center; border-radius: 50%; font-size: 10px; color: var(--muted); }
+.m3d-busca button:hover { background: var(--line); color: var(--text); }
+.m3d-busca kbd { padding: 0 6px; border-radius: 5px; border: 1px solid var(--line); font-family: var(--mono); font-size: 11px; line-height: 18px; color: var(--muted); }
+
+/* La rejilla de carteles. Mientras se desplaza (`desplazando`, ver Modelos3D.tsx) no responde al ratón. Al pasarlo, solo
+   cambia lo que la tarjeta gráfica anima sola (posición, opacidad) y el borde: una sombra animada se repintaba en cada
+   cuadro, y sobre este fondo casi no se veía. */
+.m3d-rejilla { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 16px; padding-bottom: 40px; }
+.m3d.desplazando .m3d-rejilla { pointer-events: none; }
+.m3d-cartel { position: relative; aspect-ratio: 4 / 5; overflow: hidden; isolation: isolate; border-radius: 14px; border: 1px solid var(--line); background: var(--bg); text-align: left; transition: border-color 0.2s, transform 0.2s; }
+.m3d-cartel:hover { border-color: #4a4236; transform: translateY(-3px); }
+.m3d-cartel:focus-visible { outline: none; border-color: var(--amber); }
+/* El foco: una luz cálida desde arriba sobre el modelo, que se enciende un poco más al pasar el ratón. */
+.m3d-foco { position: absolute; inset: 0; z-index: -2; background: radial-gradient(75% 60% at 50% 40%, var(--panel-2), var(--panel) 55%, var(--bg) 100%); }
+.m3d-foco::after { content: ''; position: absolute; inset: 0; background: radial-gradient(55% 45% at 50% 40%, var(--amber-tinte), transparent 70%); opacity: 0; transition: opacity 0.25s; }
+.m3d-cartel:hover .m3d-foco::after, .m3d-ficha-escena .m3d-foco::after { opacity: 1; }
+.m3d-foto, .m3d-giro { position: absolute; left: 8%; top: 3%; width: 84%; aspect-ratio: 1; object-fit: contain; pointer-events: none; user-select: none; transition: opacity 0.2s, transform 0.35s; }
+/* La sombra del piso se desvanece hacia los bordes de la foto: sin esto se corta en seco. */
+.m3d-foto, .m3d-giro, .m3d-ficha-escena video, .m3d-ficha-escena img { mask-image: radial-gradient(closest-side, #000 72%, transparent); }
+.m3d-giro { opacity: 0; }
+.m3d-cartel.girando .m3d-giro { opacity: 1; }
+.m3d-cartel.girando .m3d-foto { opacity: 0; }
+.m3d-cartel:hover .m3d-foto { transform: scale(1.03); }
+.m3d-sin { position: absolute; inset: 0 0 25%; display: grid; place-items: center; color: var(--muted); font-size: 12.5px; }
+.m3d-cartel::after { content: ''; position: absolute; inset: 0; z-index: -1; pointer-events: none; background: linear-gradient(to top, rgba(15, 14, 12, 0.96), rgba(15, 14, 12, 0.7) 26%, transparent 48%); }
+.m3d-pie { position: absolute; left: 0; right: 0; bottom: 0; display: flex; flex-direction: column; gap: 2px; padding: 12px 15px 14px; }
+.m3d-pie strong { font-size: 15px; font-weight: 650; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.m3d-cartel:hover .m3d-pie strong { color: var(--amber-2); }
+.m3d-resumen { font-size: 12.5px; line-height: 1.4; color: var(--text); opacity: 0.85; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.m3d-hace { display: flex; align-items: center; gap: 5px; margin-top: 3px; font-size: 11.5px; color: var(--muted); }
+.m3d-hace span { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.m3d-hace svg { width: 12px; height: 12px; flex: none; color: var(--ok); }
+/* Su tipo, cuando no van agrupados; y su nombre para copiar, al pasar el ratón. */
+.m3d-tipo { position: absolute; top: 10px; left: 10px; padding: 2px 9px; border-radius: 999px; background: rgba(15, 14, 12, 0.72); border: 1px solid var(--line); color: var(--muted); font-size: 11px; font-weight: 600; transition: opacity 0.15s; }
+.m3d-copiar { position: absolute; top: 10px; right: 10px; max-width: calc(100% - 20px); display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px 3px 8px; border-radius: 999px; background: rgba(15, 14, 12, 0.82); border: 1px solid var(--line); color: var(--text); font-family: var(--mono); font-size: 11px; opacity: 0; transform: translateY(-3px); transition: opacity 0.15s, transform 0.15s, border-color 0.15s, color 0.15s; }
+.m3d-copiar span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.m3d-copiar svg { width: 12px; height: 12px; flex: none; }
+.m3d-cartel:hover .m3d-copiar, .m3d-copiar.hecho { opacity: 1; transform: none; }
+.m3d-copiar:hover { border-color: var(--amber); color: var(--amber); }
+.m3d-copiar.hecho { border-color: var(--ok); color: var(--ok); font-family: inherit; font-weight: 600; }
+
+/* Mientras llegan: carteles vacíos que respiran. */
+.m3d-esqueleto { pointer-events: none; background: linear-gradient(110deg, var(--panel) 30%, var(--panel-2) 50%, var(--panel) 70%) 0 0 / 300% 100%; animation: m3d-respira 1.4s steps(10) infinite; }
+@keyframes m3d-respira { from { background-position: 100% 0; } to { background-position: 0 0; } }
+
+.m3d-vacio { display: flex; flex-direction: column; align-items: center; gap: 8px; padding-top: 70px; padding-bottom: 70px; text-align: center; }
+.m3d-vacio svg { width: 40px; height: 40px; color: var(--amber); opacity: 0.8; margin-bottom: 6px; }
+.m3d-vacio strong { font-size: 16px; }
+.m3d-vacio p { margin: 0 0 8px; color: var(--muted); font-size: 13.5px; }
+.m3d-boton { flex-shrink: 0; padding: 6px 14px; border-radius: 999px; border: 1px solid var(--line); color: var(--text); font-size: 12.5px; font-weight: 600; transition: border-color 0.15s, color 0.15s, background 0.15s; }
+.m3d-boton:hover { border-color: var(--amber); color: var(--amber); background: var(--amber-tinte); }
+
+/* La ficha. */
+.m3d-velo { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; padding: 32px; background: rgba(15, 14, 12, 0.78); backdrop-filter: blur(6px); animation: m3d-aparece 0.18s ease-out; }
+.m3d-ficha { position: relative; width: min(1000px, 100%); max-height: 100%; display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); overflow: hidden; border-radius: 18px; border: 1px solid var(--line); background: var(--panel); box-shadow: 0 30px 80px rgba(0, 0, 0, 0.6); animation: m3d-sube 0.22s ease-out; }
+@keyframes m3d-aparece { from { opacity: 0; } }
+@keyframes m3d-sube { from { opacity: 0; transform: translateY(10px) scale(0.98); } }
+.m3d-ficha-escena { position: relative; isolation: isolate; min-height: 440px; border-right: 1px solid var(--line); }
+.m3d-ficha-escena video, .m3d-ficha-escena img { position: absolute; inset: 4%; width: 92%; height: 92%; object-fit: contain; pointer-events: none; }
+.m3d-paso { position: absolute; top: 50%; translate: 0 -50%; width: 34px; height: 34px; display: grid; place-items: center; border-radius: 50%; border: 1px solid var(--line); background: rgba(15, 14, 12, 0.7); color: var(--muted); font-size: 20px; line-height: 1; opacity: 0; transition: opacity 0.2s, color 0.15s, border-color 0.15s; }
+.m3d-paso.izq { left: 14px; }
+.m3d-paso.der { right: 14px; }
+.m3d-ficha-escena:hover .m3d-paso { opacity: 1; }
+.m3d-paso:hover { color: var(--amber); border-color: var(--amber); }
+.m3d-ficha-texto { position: relative; min-width: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 16px; padding: 32px 32px 26px; }
+.m3d-ficha-texto h2 { margin: 0; font-size: 28px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.2; }
+.m3d-ficha-tipo { align-self: flex-start; margin-bottom: -8px; transition: color 0.15s; }
+.m3d-ficha-tipo:hover { color: var(--amber-2); text-decoration: underline; text-underline-offset: 3px; }
+.m3d-ficha-resumen { margin: 4px 0 0; font-size: 15px; color: var(--amber-2); }
+.m3d-bloque h3 { margin: 0 0 8px; font-size: 11px; font-weight: 650; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+.m3d-puede { margin: 0; padding: 0; list-style: none; display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 6px 14px; }
+.m3d-puede li { display: flex; align-items: center; gap: 8px; font-size: 13.5px; }
+.m3d-puede svg { width: 15px; height: 15px; flex: none; padding: 2px; border-radius: 50%; background: rgba(143, 193, 119, 0.14); color: var(--ok); }
+.m3d-cerrar { position: absolute; top: 16px; right: 16px; width: 30px; height: 30px; display: grid; place-items: center; border-radius: 50%; color: var(--muted); font-size: 13px; transition: background 0.15s, color 0.15s; }
+.m3d-cerrar:hover { background: var(--panel-2); color: var(--text); }
+.m3d-descripcion { margin: 0; font-size: 14.5px; line-height: 1.6; color: var(--text); }
+.m3d-etiquetas { display: flex; flex-wrap: wrap; gap: 6px; }
+.m3d-etiquetas button { padding: 3px 10px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); font-size: 12px; transition: border-color 0.15s, color 0.15s, background 0.15s; }
+.m3d-etiquetas button:hover { border-color: var(--amber); color: var(--amber); background: var(--amber-tinte); }
+.m3d-datos { margin: 2px 0 0; padding-top: 16px; border-top: 1px solid var(--line); display: grid; grid-template-columns: auto 1fr; gap: 9px 18px; font-size: 13px; }
+.m3d-datos dt { color: var(--muted); }
+.m3d-datos dd { margin: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.m3d-ficha code { padding: 1px 7px; border-radius: 6px; background: var(--panel-2); font-family: var(--mono); font-size: 12px; color: var(--amber-2); }
+.m3d-enlace { color: var(--amber); text-decoration: underline; text-decoration-color: rgba(232, 163, 61, 0.4); text-underline-offset: 3px; }
+.m3d-enlace:hover { text-decoration-color: var(--amber); }
+.m3d-usar { margin-top: auto; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 14px; border-radius: var(--radio); background: var(--bg); border: 1px solid var(--line); font-size: 12.5px; color: var(--muted); }
+
+@media (max-width: 860px) {
+  .m3d > :not(.m3d-velo) { padding-left: 20px; padding-right: 20px; }
+  .m3d-cabeza { flex-direction: column; align-items: stretch; }
+  .m3d-busca { width: 100%; }
+  .m3d-barra { flex-direction: column; align-items: flex-start; }
+  .m3d-ficha { grid-template-columns: 1fr; overflow-y: auto; }
+  .m3d-ficha-escena { min-height: 0; aspect-ratio: 1; border-right: 0; border-bottom: 1px solid var(--line); }
+}

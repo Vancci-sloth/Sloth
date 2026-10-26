@@ -1,0 +1,18 @@
+/* La tarjeta de un enlace, debajo del compositor del inicio. Con varios, compactas, en dos columnas y con scroll. */
+.enlaces { display: grid; gap: 6px; }
+.enlaces.varios { grid-template-columns: repeat(2, minmax(0, 1fr)); max-height: 128px; overflow-y: auto; }
+.enlaces:empty { display: none; }
+.enlace { display: flex; align-items: center; gap: 12px; min-width: 0; padding: 8px; border-radius: 12px; background: var(--panel); border: 1px solid var(--line); color: var(--text); text-decoration: none; transition: border-color 0.15s; }
+.enlaces:not(.varios) .enlace { justify-self: start; max-width: 100%; padding-right: 14px; }
+.enlace:hover { border-color: var(--amber); }
+.enlace img { flex: none; width: 96px; height: 54px; border-radius: 8px; object-fit: cover; background: var(--panel-2); }
+.enlace-texto { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.enlace-texto small, .enlace-texto strong { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.enlace-texto small { color: var(--muted); font-size: 11.5px; }
+.enlace-texto small:empty { display: none; }
+.enlace-texto strong { font-size: 13.5px; font-weight: 600; }
+.varios .enlace { gap: 8px; padding: 5px 8px 5px 5px; border-radius: 9px; }
+.varios .enlace img { width: 48px; height: 27px; border-radius: 5px; }
+.varios .enlace-texto { gap: 0; }
+.varios .enlace-texto small { font-size: 11px; }
+.varios .enlace-texto strong { font-size: 12.5px; }

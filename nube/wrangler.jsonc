@@ -1,0 +1,16 @@
+// La nube de Sloth (ver src/index.ts), en la cuenta de Cloudflare de Sloth. Se despliega con
+// `npm run nube -- deploy` desde la raíz (wrangler con la sesión de esa cuenta, ver scripts/nube.mjs); el secreto que
+// comparte con Sloth va con `npm run nube -- secret put SECRETO` y, del lado de Sloth, en SLOTH_NUBE_SECRETO.
+{
+  "name": "sloth-redes",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-10-01",
+  "workers_dev": true,
+  "observability": { "enabled": true },
+  // Cada minuto: así cada Reel sale en el minuto de su hora.
+  "triggers": { "crons": ["* * * * *"] },
+  "r2_buckets": [{ "binding": "VIDEOS", "bucket_name": "sloth-redes" }],
+  // Su dirección propia; la de workers.dev sigue atendiendo a las versiones que ya la tienen guardada.
+  "routes": [{ "pattern": "nube.sloth.vancci.org", "custom_domain": true }],
+  "vars": { "ORIGEN": "https://nube.sloth.vancci.org" }
+}

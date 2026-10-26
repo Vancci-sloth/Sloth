@@ -1,0 +1,21 @@
+/* La miniatura de una escena sin su cuadro renderizado: su primer cuadro, dibujado aquí. Su texto crece con él (cqw). */
+.cuadro { position: relative; container-type: inline-size; aspect-ratio: 16 / 9; display: grid; place-items: center; overflow: hidden; border-radius: 6px; background: var(--bg); border: 1px solid var(--line); }
+.cuadro-clip { color: var(--muted); display: grid; place-items: center; }
+.cuadro-clip .ico { width: 18cqw; height: 18cqw; }
+.recorte { position: relative; overflow: hidden; }
+.recorte-imagen { position: absolute; }
+.recorte-imagen img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: fill; }
+.recorte-imagen .caja, .recorte-imagen .marca { position: absolute; }
+.recorte-imagen .caja { border: 2px solid var(--bad); border-radius: 3px; }
+.recorte-imagen .marca { background: var(--amber); opacity: 0.35; }
+.cuadro-titular { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; padding: 6px; background: var(--panel-2); color: var(--text); font-weight: 800; font-size: 6cqw; line-height: 1.15; text-align: center; white-space: pre-line; }
+.cuadro-titular img { height: 32%; min-height: 0; }
+.cuadro-titular.fuego, .cuadro-titular.rojo { color: var(--bad); }
+.cuadro-titular.sol { color: var(--amber-2); }
+.cuadro-titular.verde { color: var(--ok); }
+.cuadro-meme { position: relative; height: 100%; }
+.cuadro-meme img { height: 100%; display: block; }
+.cuadro-meme span { position: absolute; transform: translate(-50%, -50%); padding: 1px 4px; border-radius: 3px; background: color-mix(in srgb, var(--bg) 75%, transparent); color: var(--text); font-size: 5.1cqw; font-weight: 700; white-space: nowrap; }
+.cuadro-tarjetas { position: absolute; inset: 0; display: flex; flex-direction: column; gap: 4px; padding: 3.4cqw; background: var(--panel-2); font-size: 5.4cqw; font-weight: 800; color: var(--text); }
+.cuadro-tarjetas > div { flex: 1; min-height: 0; display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 4px; }
+.cuadro-tarjetas > div > div { position: relative; display: grid; place-items: center; overflow: hidden; border-radius: 3px; background: var(--bg); }

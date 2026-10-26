@@ -1,0 +1,5 @@
+# Finales de línea LF en el repo y en la copia de trabajo, en todos los sistemas (ADR 0006). Con autocrlf, las
+# ediciones de los agentes cambiaban archivos enteros de LF a CRLF y el diff salía con miles de líneas.
+* text=auto eol=lf
+*.bat text eol=crlf
+*.cmd text eol=crlf

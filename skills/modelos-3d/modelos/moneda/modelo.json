@@ -1,0 +1,43 @@
+{
+  "nombre": "Moneda",
+  "resumen": "Moneda o medalla de dos caras",
+  "categoria": "Protagonistas",
+  "descripcion": "Una moneda, medalla o sello de metal con una cara de cada lado (dos imágenes) y el canto con estrías. Se voltea, se pone gris, lleva candado, brilla o se apaga, y se deshace en cubos del color de su cara que caen o vuelan a otro punto. Buen protagonista: un token, una marca, un premio.",
+  "hace": [
+    "se voltea",
+    "se rompe en cubos",
+    "brilla o se apaga",
+    "se pone gris",
+    "lleva candado"
+  ],
+  "etiquetas": [
+    "moneda",
+    "medalla",
+    "sello",
+    "token",
+    "protagonista",
+    "dinero",
+    "precio",
+    "cara",
+    "candado",
+    "romper",
+    "pixeles",
+    "cubos",
+    "crypto"
+  ],
+  "exporta": [
+    "Moneda",
+    "EstadoMoneda",
+    "Rota"
+  ],
+  "usa": [
+    "icono-3d"
+  ],
+  "iconos": [
+    "lock-simple"
+  ],
+  "cuadro": 0,
+  "origen": "Berachain",
+  "creado": "2026-10-17",
+  "actualizado": "2026-10-17"
+}

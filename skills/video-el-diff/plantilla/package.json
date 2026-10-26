@@ -1,0 +1,26 @@
+{
+  "name": "el-diff-episodio",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "studio": "remotion studio src/index.ts"
+  },
+  "dependencies": {
+    "@remotion/cli": "4.0.532",
+    "@remotion/google-fonts": "4.0.532",
+    "@remotion/media": "4.0.532",
+    "@remotion/player": "4.0.532",
+    "@remotion/web-renderer": "4.0.532",
+    "esbuild": "0.28.1",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "remotion": "4.0.532"
+  },
+  "devDependencies": {
+    "@types/react": "^19.3.0",
+    "typescript": "^7.0.2"
+  },
+  "allowScripts": {
+    "esbuild@0.28.1": true
+  }
+}

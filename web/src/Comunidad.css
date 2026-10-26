@@ -1,0 +1,272 @@
+/*
+ * «Comunidad», como la de Skool en la paleta de Sloth: el feed al centro (el compositor, las secciones, «Comienza aquí»
+ * y las publicaciones) y a la derecha la tarjeta de la comunidad, que se queda a la vista al bajar. Una publicación se
+ * abre sobre un velo, con sus comentarios.
+ */
+.com { position: relative; height: 100%; width: 100%; overflow-y: auto; overflow-x: hidden; }
+.com-rejilla { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 28px; align-items: start; width: 100%; max-width: 1100px; margin: 0 auto; padding: 36px 32px 64px; }
+.com-ico { width: 15px; height: 15px; flex: none; }
+
+.com-cabeza { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; }
+.com-cabeza h1 { margin: 2px 0 0; font-size: 28px; font-weight: 700; letter-spacing: -0.02em; }
+
+/* La campana y sus avisos: un panel que sale debajo, a la derecha. */
+.com-avisos { position: relative; }
+.com-campana { position: relative; width: 40px; height: 40px; display: grid; place-items: center; border-radius: 12px; border: 1px solid var(--line); background: var(--panel); color: var(--muted); transition: color 0.15s, border-color 0.15s, background 0.15s; }
+.com-campana:hover, .com-campana.on { color: var(--text); border-color: #4a4236; background: var(--panel-2); }
+.com-campana .com-ico { width: 18px; height: 18px; }
+.com-campana-cuenta { position: absolute; top: -6px; right: -6px; min-width: 19px; height: 19px; padding: 0 5px; display: grid; place-items: center; border-radius: 999px; border: 2px solid var(--bg); background: var(--amber); color: var(--sobre-ambar); font-size: 10.5px; font-weight: 750; font-variant-numeric: tabular-nums; }
+.com-avisos-panel { position: absolute; top: calc(100% + 8px); right: 0; z-index: 40; width: 380px; max-width: calc(100vw - 48px); padding: 8px; border-radius: 14px; border: 1px solid var(--line); background: var(--panel); box-shadow: 0 18px 48px rgba(0, 0, 0, 0.55); animation: com-sube 0.16s ease-out; }
+.com-avisos-titulo { margin: 4px 8px 6px; color: var(--muted); font-size: 11px; font-weight: 650; letter-spacing: 0.06em; text-transform: uppercase; }
+.com-avisos-nada { margin: 6px 8px 10px; color: var(--muted); font-size: 13px; line-height: 1.5; }
+.com-avisos-lista { display: flex; flex-direction: column; max-height: 420px; overflow-y: auto; }
+.com-avisos-lista button { display: flex; align-items: flex-start; gap: 10px; padding: 9px 8px; border-radius: 10px; text-align: left; transition: background 0.15s; }
+.com-avisos-lista button:hover { background: var(--panel-2); }
+.com-avisos-lista button.nuevo { background: var(--amber-tinte); }
+.com-avisos-lista .com-cara { width: 32px; height: 32px; font-size: 13px; }
+.com-aviso-texto { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; font-size: 13px; line-height: 1.45; color: var(--text); }
+.com-aviso-texto strong { font-weight: 650; }
+.com-aviso-texto em { font-style: normal; color: var(--muted); overflow-wrap: anywhere; }
+.com-aviso-texto time { color: var(--muted); font-size: 11.5px; }
+.com-aviso-punto { width: 8px; height: 8px; flex: none; margin-top: 6px; border-radius: 50%; background: var(--amber); }
+.com-antetitulo { font-size: 11px; font-weight: 650; letter-spacing: 0.08em; text-transform: uppercase; color: var(--amber); }
+
+/* Las caras: la foto, el logo de Sloth (el creador sin foto) o la inicial. */
+.com-cara { width: 40px; height: 40px; flex: none; display: grid; place-items: center; border-radius: 50%; object-fit: cover; background: var(--panel-2); border: 1px solid var(--line); color: var(--amber); font-size: 16px; font-weight: 700; line-height: 1; user-select: none; }
+.com-cara.sloth img { width: 72%; height: 72%; }
+.com-cara.chica { width: 26px; height: 26px; font-size: 11px; border: 2px solid var(--panel); }
+.com-cara.grande { width: 48px; height: 48px; font-size: 19px; }
+.com-nombre { display: inline-flex; align-items: center; gap: 7px; min-width: 0; font-size: 14px; font-weight: 650; color: var(--text); }
+.com-creador { padding: 1px 7px; border-radius: 999px; background: var(--amber-tinte); color: var(--amber); font-size: 10.5px; font-weight: 700; letter-spacing: 0.02em; }
+.com-meta { display: flex; flex-wrap: wrap; gap: 5px; color: var(--muted); font-size: 12.5px; }
+
+/* Escribe algo: cerrado, una fila con tu cara; abierto, el compositor con quién publica y dónde. */
+.com-escribe { display: flex; align-items: center; gap: 12px; width: 100%; margin-top: 22px; padding: 12px 16px; border-radius: 16px; border: 1px solid var(--line); background: linear-gradient(180deg, var(--panel-2), var(--panel)); color: var(--muted); font-size: 16px; text-align: left; transition: border-color 0.2s, box-shadow 0.2s; }
+.com-escribe:hover:not(:disabled) { border-color: #4a4236; box-shadow: 0 0 0 4px var(--amber-tinte); color: var(--text); }
+.com-nueva { margin-top: 22px; }
+.com-nueva-cabeza { display: flex; align-items: center; gap: 10px; margin: 0 0 10px 2px; color: var(--muted); font-size: 13px; }
+.com-nueva-cabeza .com-cara { width: 30px; height: 30px; font-size: 12px; }
+.com-nueva-cabeza strong { color: var(--text); font-weight: 650; }
+.com-nueva-seccion { color: var(--amber); font-weight: 650; }
+/* Dónde se publica, en el pie del compositor. */
+.com-elegir { position: relative; display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 10px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); font-size: 12.5px; font-weight: 600; cursor: pointer; transition: border-color 0.15s, color 0.15s; }
+.com-elegir:hover { border-color: #4a4236; color: var(--text); }
+.com-elegir .com-ico { width: 13px; height: 13px; }
+.com-elegir select { appearance: none; padding: 0 2px 0 0; border: 0; outline: none; background: none; color: var(--text); font-size: 12.5px; font-weight: 600; cursor: pointer; }
+.com-elegir select option { background: var(--panel); color: var(--text); }
+
+/* Las secciones: píldoras; la elegida, en ámbar. */
+.com-secciones { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 22px; }
+.com-secciones button { display: inline-flex; align-items: center; gap: 7px; height: 36px; padding: 0 16px; border-radius: 999px; border: 1px solid var(--line); background: var(--panel); color: var(--muted); font-size: 13.5px; font-weight: 600; transition: color 0.15s, background 0.15s, border-color 0.15s; }
+.com-secciones button:hover { color: var(--text); border-color: #4a4236; }
+.com-secciones button.on { background: var(--amber); border-color: var(--amber); color: var(--sobre-ambar); }
+.com-secciones .com-ico { width: 14px; height: 14px; }
+
+/* Comienza aquí: un anillo con lo que llevas y los pasos. */
+.com-bienvenida { margin-top: 18px; border-radius: 14px; border: 1px solid var(--line); background: var(--panel); overflow: hidden; }
+.com-bienvenida header { display: flex; align-items: center; gap: 12px; padding: 13px 14px 13px 16px; border-bottom: 1px solid var(--line); }
+.com-bienvenida header strong { flex: 1; font-size: 15px; font-weight: 650; }
+.com-avance { width: 26px; height: 26px; flex: none; transform: rotate(-90deg); }
+.com-avance circle { fill: none; stroke: var(--line); stroke-width: 3; }
+.com-avance circle.hecho { stroke: var(--ok); stroke-linecap: round; transition: stroke-dasharray 0.4s; }
+.com-paso { display: flex; align-items: center; gap: 12px; width: 100%; padding: 10px 16px; color: var(--amber); font-size: 14px; font-weight: 550; text-align: left; transition: background 0.15s; }
+.com-paso:hover:not(:disabled) { background: var(--panel-2); }
+.com-paso:disabled { opacity: 1; color: var(--muted); text-decoration: line-through; text-decoration-color: var(--line); }
+.com-paso-marca { width: 22px; height: 22px; flex: none; display: grid; place-items: center; border-radius: 50%; border: 2px solid var(--line); }
+.com-paso.hecho .com-paso-marca { border-color: var(--ok); background: var(--ok); color: var(--bg); }
+.com-paso-marca .com-ico { width: 12px; height: 12px; stroke-width: 3.5; }
+
+.com-error { display: flex; align-items: center; gap: 10px; margin-top: 16px; padding: 9px 10px 9px 14px; border-radius: 10px; border: 1px solid rgba(224, 108, 85, 0.35); background: rgba(224, 108, 85, 0.1); color: var(--bad); font-size: 13px; }
+.com-error button { margin-left: auto; padding: 3px 11px; border-radius: 999px; color: var(--text); font-size: 12.5px; font-weight: 600; }
+.com-error button:hover { background: rgba(224, 108, 85, 0.15); }
+.com-cargando { margin-top: 40px; text-align: center; color: var(--muted); }
+.com-cargando.chico { margin: 8px 0; font-size: 13px; text-align: left; }
+
+.com-vacio { display: flex; flex-direction: column; align-items: center; gap: 6px; margin-top: 56px; text-align: center; }
+.com-vacio strong { font-size: 16px; font-weight: 650; }
+.com-vacio p { margin: 0; max-width: 360px; color: var(--muted); font-size: 13.5px; line-height: 1.5; }
+.com-vacio-logo { position: relative; width: 92px; height: 92px; display: grid; place-items: center; margin-bottom: 10px; }
+.com-vacio-logo::before { content: ''; position: absolute; inset: -30px; border-radius: 50%; background: radial-gradient(closest-side, var(--amber-tinte), transparent); animation: com-respira 4s steps(12) infinite; }
+.com-vacio-logo img { position: relative; width: 64px; height: 64px; }
+@keyframes com-respira { 50% { transform: scale(1.12); opacity: 0.7; } }
+
+/* El feed: una tarjeta por publicación. La fijada lleva el borde ámbar. */
+.com-feed { display: flex; flex-direction: column; gap: 14px; margin-top: 18px; }
+.com-post { position: relative; padding: 16px 18px 12px; border-radius: 14px; border: 1px solid var(--line); background: var(--panel); cursor: pointer; transition: border-color 0.2s, box-shadow 0.2s, transform 0.2s; }
+.com-post:hover { border-color: #4a4236; box-shadow: 0 12px 30px rgba(0, 0, 0, 0.35); }
+.com-post:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
+.com-post.fijada { border-color: rgba(232, 163, 61, 0.45); box-shadow: 0 0 0 3px var(--amber-tinte); }
+.com-post.nueva { animation: com-entra 0.4s cubic-bezier(0.2, 0.8, 0.2, 1), com-destello 1.8s ease-out; }
+@keyframes com-entra { from { opacity: 0; transform: translateY(-10px) scale(0.985); } }
+@keyframes com-destello { from { border-color: var(--amber); box-shadow: 0 0 0 1px var(--amber), 0 0 28px var(--amber-tinte); } }
+
+.com-post-cabeza { display: flex; align-items: center; gap: 12px; }
+.com-post-quien { display: flex; flex-direction: column; gap: 1px; min-width: 0; flex: 1; }
+.com-fijada { display: inline-flex; align-items: center; gap: 5px; color: var(--amber); font-size: 12.5px; font-weight: 650; white-space: nowrap; }
+.com-fijada .com-ico { width: 13px; height: 13px; }
+.com-estado { display: inline-flex; align-items: center; gap: 6px; padding: 2px 10px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); font-size: 11.5px; font-weight: 600; white-space: nowrap; }
+.com-estado .com-ico { width: 11px; height: 11px; stroke-width: 3; }
+.com-estado .dot { width: 6px; height: 6px; box-shadow: none; }
+.com-estado.haciendo { border-color: transparent; background: var(--amber-tinte); color: var(--amber); }
+.com-estado.hecha { border-color: transparent; background: rgba(143, 193, 119, 0.13); color: var(--ok); }
+
+.com-post-cuerpo { display: flex; gap: 16px; margin-top: 12px; }
+.com-post-textos { flex: 1; min-width: 0; }
+.com-post-textos h3 { margin: 0 0 4px; font-size: 18px; font-weight: 700; letter-spacing: -0.01em; line-height: 1.3; overflow-wrap: anywhere; }
+.com-post-textos p { margin: 0; color: var(--text); opacity: 0.86; font-size: 14.5px; line-height: 1.55; white-space: pre-line; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.com-post-textos p.solo { opacity: 1; font-size: 15px; -webkit-line-clamp: 4; }
+.com-post-portada { position: relative; width: 132px; height: 96px; flex: none; overflow: hidden; border-radius: 10px; border: 1px solid var(--line); background: var(--panel-2); }
+.com-post-portada.vertical { width: 76px; height: 116px; }
+.com-post-portada img, .com-post-portada video { width: 100%; height: 100%; object-fit: cover; display: block; }
+.com-play { position: absolute; left: 50%; top: 50%; width: 34px; height: 34px; margin: -17px 0 0 -17px; display: grid; place-items: center; border-radius: 50%; background: rgba(15, 14, 12, 0.72); color: var(--text); pointer-events: none; }
+.com-play .com-ico { width: 14px; height: 14px; margin-left: 2px; fill: currentColor; }
+.com-mas-fotos { position: absolute; right: 5px; bottom: 5px; padding: 1px 7px; border-radius: 999px; background: rgba(15, 14, 12, 0.8); font-size: 11px; font-weight: 700; }
+
+.com-post-pie { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 14px; margin-top: 12px; color: var(--muted); font-size: 13px; }
+.com-gusta { display: inline-flex; align-items: center; gap: 6px; height: 30px; margin-left: -8px; padding: 0 9px; border-radius: 999px; color: var(--muted); font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; transition: color 0.15s, background 0.15s; }
+.com-gusta:hover { background: var(--panel-2); color: var(--text); }
+.com-gusta.on { color: var(--amber); }
+.com-gusta.on .com-ico { fill: var(--amber-tinte); }
+.com-cuenta { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.com-caras-pie { display: inline-flex; }
+.com-caras-pie .com-cara + .com-cara { margin-left: -7px; }
+.com-ultimo { font-size: 12.5px; }
+.com-ultimo.nuevo { color: var(--amber); font-weight: 650; }
+
+.com-mas { align-self: center; height: 34px; padding: 0 18px; border-radius: 999px; border: 1px solid var(--line); color: var(--text); font-size: 13px; font-weight: 600; transition: background 0.15s, border-color 0.15s; }
+.com-mas:hover:not(:disabled) { background: var(--panel-2); border-color: #4a4236; }
+
+/* La tarjeta de la comunidad, a la derecha: portada, qué es, sus números, caras y tu perfil. */
+.com-lado { position: sticky; top: 36px; }
+.com-comunidad { overflow: hidden; border-radius: 16px; border: 1px solid var(--line); background: var(--panel); }
+.com-comunidad-portada { position: relative; height: 140px; display: grid; place-items: center; background: radial-gradient(60% 80% at 50% 60%, var(--amber-tinte), transparent 70%), linear-gradient(180deg, var(--panel-2), var(--panel)); border-bottom: 1px solid var(--line); }
+.com-comunidad-portada img { width: 76px; height: 76px; filter: drop-shadow(0 6px 24px var(--amber-tinte)); }
+.com-comunidad-cuerpo { padding: 16px 18px 18px; }
+.com-comunidad-cuerpo h2 { margin: 0 0 6px; font-size: 18px; font-weight: 700; letter-spacing: -0.01em; }
+.com-comunidad-cuerpo > p { margin: 0; color: var(--muted); font-size: 13.5px; line-height: 1.55; }
+.com-numeros { display: grid; grid-template-columns: repeat(3, 1fr); margin: 16px 0 0; padding: 14px 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); text-align: center; }
+.com-numeros div + div { border-left: 1px solid var(--line); }
+.com-numeros strong { display: block; font-size: 19px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.com-numeros span { color: var(--muted); font-size: 12px; }
+.com-caras { display: flex; flex-wrap: wrap; margin-top: 14px; padding-left: 7px; }
+.com-caras .com-cara { margin-left: -7px; width: 30px; height: 30px; }
+.com-perfil { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; height: 38px; margin-top: 16px; border-radius: 10px; border: 1px solid var(--line); color: var(--text); font-size: 13.5px; font-weight: 650; transition: background 0.15s, border-color 0.15s; }
+.com-perfil:hover:not(:disabled) { background: var(--panel-2); border-color: #4a4236; }
+.com-perfil .com-cara.chica { width: 22px; height: 22px; border-width: 1px; }
+
+/* Botones chicos: los iconos de una publicación y los del creador. */
+.com-icono { width: 30px; height: 30px; flex: none; display: grid; place-items: center; border-radius: 8px; color: var(--muted); transition: background 0.15s, color 0.15s; }
+.com-icono:hover { background: var(--panel-2); color: var(--text); }
+.com-icono.on { color: var(--amber); }
+.com-icono.peligro:hover { background: rgba(224, 108, 85, 0.13); color: var(--bad); }
+.com-boton { display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 12px; border-radius: 999px; color: var(--muted); font-size: 12.5px; font-weight: 600; transition: color 0.15s, background 0.15s; }
+.com-boton .com-ico { width: 13px; height: 13px; }
+.com-boton:hover:not(:disabled) { background: var(--panel-2); color: var(--text); }
+.com-boton.vivo, .com-boton.fuerte { background: var(--amber-tinte); color: var(--amber); }
+.com-boton.vivo:hover, .com-boton.fuerte:hover { background: var(--amber); color: var(--sobre-ambar); }
+.com-boton .dot { width: 6px; height: 6px; box-shadow: none; }
+.com-boton.ok { color: var(--ok); }
+.com-boton.ok:hover { background: rgba(143, 193, 119, 0.13); color: var(--ok); }
+.com-hacer { display: inline-flex; align-items: center; gap: 7px; height: 30px; padding: 0 14px 0 8px; border-radius: 999px; background: var(--amber); color: var(--sobre-ambar); font-size: 12.5px; font-weight: 700; transition: background 0.15s, transform 0.15s, box-shadow 0.15s; }
+.com-hacer img { width: 20px; height: 20px; }
+.com-hacer:hover:not(:disabled) { background: var(--amber-2); transform: translateY(-1px); box-shadow: 0 6px 18px var(--amber-tinte); }
+
+/* Una publicación abierta, sobre un velo. */
+.com-velo { position: fixed; inset: 0; z-index: 70; display: grid; place-items: start center; padding: 40px 24px; overflow-y: auto; background: rgba(15, 14, 12, 0.72); backdrop-filter: blur(3px); animation: com-velo 0.15s ease-out; }
+@keyframes com-velo { from { opacity: 0; } }
+.com-abierta { position: relative; width: min(760px, 100%); padding: 22px 26px 18px; border-radius: 18px; border: 1px solid var(--line); background: linear-gradient(180deg, var(--panel-2), var(--panel) 160px); box-shadow: 0 30px 80px rgba(0, 0, 0, 0.6); animation: com-sube 0.22s cubic-bezier(0.2, 0.8, 0.2, 1); }
+@keyframes com-sube { from { opacity: 0; transform: translateY(12px) scale(0.99); } }
+.com-cerrar { position: absolute; top: 14px; right: 14px; }
+.com-abierta > .com-post-cabeza { padding-right: 36px; }
+.com-acciones { display: flex; gap: 2px; }
+.com-abierta > .esc { margin-top: 16px; }
+.com-abierta-titulo { margin: 18px 0 0; font-size: 24px; font-weight: 700; letter-spacing: -0.015em; line-height: 1.25; overflow-wrap: anywhere; }
+.com-abierta-texto { margin: 10px 0 0; font-size: 15px; line-height: 1.65; white-space: pre-wrap; overflow-wrap: anywhere; }
+.com-abierta-texto a, .com-comentario-texto a { color: var(--amber); text-decoration: none; border-bottom: 1px solid var(--amber-tinte); }
+.com-abierta-texto a:hover, .com-comentario-texto a:hover { border-bottom-color: var(--amber); }
+.com-video { display: block; width: 100%; max-height: 70vh; margin-top: 16px; border-radius: 12px; border: 1px solid var(--line); background: #000; }
+.com-video.vertical { width: auto; height: min(70vh, 640px); aspect-ratio: 9 / 16; margin-left: auto; margin-right: auto; }
+.com-fotos { display: grid; gap: 6px; margin-top: 14px; }
+.com-fotos.n1 { display: flex; }
+.com-fotos.n2 { grid-template-columns: repeat(2, 1fr); }
+.com-fotos.n3 { grid-template-columns: repeat(3, 1fr); }
+.com-fotos button { display: block; overflow: hidden; border-radius: 10px; border: 1px solid var(--line); background: var(--panel-2); cursor: zoom-in; transition: border-color 0.15s; }
+.com-fotos button:hover { border-color: var(--amber); }
+.com-fotos img { display: block; width: 100%; aspect-ratio: 4 / 3; object-fit: cover; }
+.com-fotos.n1 img { width: auto; max-width: 100%; max-height: 420px; aspect-ratio: auto; }
+.com-creador-barra { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 16px; padding: 10px; border-radius: 12px; border: 1px dashed #4a4236; }
+.com-creador-barra .com-boton { max-width: 100%; }
+.com-abierta-pie { display: flex; align-items: center; gap: 16px; margin-top: 16px; padding: 10px 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); color: var(--muted); font-size: 13px; }
+.com-gusta.grande { margin-left: -6px; font-size: 13.5px; }
+.com-confirmar { margin: 0 0 8px; font-size: 13.5px; line-height: 1.5; color: var(--text); }
+
+/* Los comentarios y donde se comenta. */
+.com-comentarios { display: flex; flex-direction: column; gap: 14px; margin-top: 16px; }
+.com-comentario { display: flex; gap: 10px; }
+.com-comentario > .com-cara { width: 32px; height: 32px; font-size: 13px; }
+.com-comentario-columna { flex: 1; min-width: 0; }
+.com-comentario-cuerpo { padding: 8px 12px 10px; border-radius: 12px; background: var(--panel-2); }
+.com-comentario-cabeza { display: flex; align-items: center; gap: 8px; min-height: 22px; }
+.com-comentario-cabeza .com-nombre { font-size: 13px; }
+.com-comentario-cabeza time { color: var(--muted); font-size: 12px; }
+.com-comentario-iconos { display: flex; margin: -2px -6px -2px auto; opacity: 0; transition: opacity 0.15s; }
+.com-comentario:hover .com-comentario-iconos, .com-comentario-iconos:focus-within { opacity: 1; }
+.com-comentario-iconos .com-icono { width: 24px; height: 24px; }
+.com-comentario-iconos .com-ico { width: 13px; height: 13px; }
+/* Debajo del globo: me gusta y «Responder». */
+.com-comentario-pie { display: flex; flex-wrap: wrap; align-items: center; gap: 2px; margin: 2px 0 0 4px; }
+.com-gusta.chico { height: 26px; margin-left: 0; padding: 0 8px; font-size: 12px; }
+.com-gusta.chico .com-ico { width: 13px; height: 13px; }
+.com-responder { display: inline-flex; align-items: center; gap: 5px; height: 26px; padding: 0 8px; border-radius: 999px; color: var(--muted); font-size: 12px; font-weight: 600; transition: color 0.15s, background 0.15s; }
+.com-responder:hover { background: var(--panel-2); color: var(--text); }
+.com-responder .com-ico { width: 13px; height: 13px; }
+/* Las respuestas, sangradas bajo su comentario, con una raya que las une. */
+.com-conversacion { display: flex; flex-direction: column; gap: 10px; }
+.com-respuestas { display: flex; flex-direction: column; gap: 10px; margin-left: 16px; padding-left: 26px; border-left: 2px solid var(--line); }
+.com-comentario.respuesta > .com-cara, .com-respuestas .com-comentar > .com-cara { width: 26px; height: 26px; font-size: 11px; }
+.com-respuestas .com-comentar { grid-template-columns: 26px minmax(0, 1fr); }
+/* Lo reportado, que solo ve el creador. */
+.com-reportada { padding: 1px 8px; border-radius: 999px; background: rgba(224, 108, 85, 0.13); color: var(--bad); font-size: 11px; font-weight: 650; white-space: nowrap; }
+.com-comentario-texto { margin: 2px 0 0; font-size: 14px; line-height: 1.55; white-space: pre-wrap; overflow-wrap: anywhere; }
+.com-comentar { display: grid; grid-template-columns: 32px minmax(0, 1fr); gap: 4px 10px; align-items: center; }
+.com-comentar > .com-cara { width: 32px; height: 32px; font-size: 13px; }
+.com-comentar-caja { display: flex; align-items: flex-end; gap: 6px; padding: 5px 5px 5px 14px; border-radius: 18px; border: 1px solid var(--line); background: var(--bg); transition: border-color 0.15s, box-shadow 0.15s; }
+.com-comentar-caja:focus-within { border-color: #4a4236; box-shadow: 0 0 0 3px var(--amber-tinte); }
+.com-comentar-caja textarea { flex: 1; min-height: 26px; max-height: 200px; margin: 3px 0; padding: 0; border: 0; outline: none; resize: none; background: none; color: var(--text); font-size: 14px; line-height: 1.5; }
+.com-comentar-caja textarea::placeholder { color: var(--muted); }
+.com-enviar { width: 28px; height: 28px; flex: none; display: grid; place-items: center; border-radius: 50%; background: var(--amber); color: var(--sobre-ambar); transition: background 0.15s; }
+.com-enviar:hover:not(:disabled) { background: var(--amber-2); }
+.com-enviar:disabled { background: var(--panel-2); color: var(--muted); opacity: 1; }
+.com-enviar .com-ico { width: 14px; height: 14px; stroke-width: 2.6; }
+.com-comentar-error { grid-column: 2; color: var(--bad); font-size: 12.5px; }
+
+/* Tu perfil. */
+.com-caja { width: min(440px, 100%); margin-top: 12vh; padding: 22px 22px 16px; border-radius: 18px; border: 1px solid var(--line); background: linear-gradient(180deg, var(--panel-2), var(--panel) 140px); box-shadow: 0 30px 80px rgba(0, 0, 0, 0.6); animation: com-sube 0.22s cubic-bezier(0.2, 0.8, 0.2, 1); }
+.com-caja h2 { margin: 0 0 4px; font-size: 18px; font-weight: 700; }
+.com-caja > p { margin: 0; color: var(--muted); font-size: 13.5px; }
+.com-perfil-foto { display: flex; align-items: center; gap: 14px; margin-top: 18px; }
+.com-perfil-foto > button { border-radius: 50%; transition: box-shadow 0.15s; }
+.com-perfil-foto > button:hover { box-shadow: 0 0 0 4px var(--amber-tinte); }
+.com-perfil-foto > button.subiendo { opacity: 0.5; }
+.com-perfil-foto .com-cara.grande { width: 64px; height: 64px; font-size: 24px; }
+.com-perfil-foto > div { display: flex; flex-wrap: wrap; gap: 4px; }
+.com-perfil-nombre { display: block; width: 100%; margin-top: 16px; padding: 10px 14px; border-radius: 12px; border: 1px solid var(--line); outline: none; background: var(--bg); color: var(--text); font-size: 15px; transition: border-color 0.15s, box-shadow 0.15s; }
+.com-perfil-nombre:focus { border-color: #4a4236; box-shadow: 0 0 0 3px var(--amber-tinte); }
+.com-caja-pie { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
+/* Reportar: los motivos, como opciones. */
+.com-motivos { display: flex; flex-direction: column; gap: 4px; margin-top: 14px; }
+.com-motivos button { display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-radius: 10px; border: 1px solid var(--line); color: var(--text); font-size: 14px; text-align: left; transition: border-color 0.15s, background 0.15s; }
+.com-motivos button:hover { border-color: #4a4236; }
+.com-motivos button.on { border-color: var(--amber); background: var(--amber-tinte); }
+.com-motivo-marca { width: 16px; height: 16px; flex: none; border-radius: 50%; border: 2px solid var(--line); }
+.com-motivos button.on .com-motivo-marca { border: 5px solid var(--amber); }
+.com-detalle { resize: none; font-size: 14px; line-height: 1.5; margin-top: 10px; }
+
+@media (max-width: 1080px) {
+  .com-rejilla { grid-template-columns: minmax(0, 1fr); max-width: 760px; }
+  .com-lado { display: none; }
+}
+@media (max-width: 720px) {
+  .com-rejilla { padding: 24px 18px 48px; }
+  .com-post-portada { width: 96px; height: 72px; }
+}

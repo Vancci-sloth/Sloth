@@ -1,0 +1,39 @@
+/* Cambios de Sloth: una línea discreta, con el detalle acotado para conservar espacio para el chat. */
+.sloth-cambios { margin: 0 4px 8px; border: 1px solid var(--line); border-radius: var(--radio); background: var(--panel); font-size: 12px; }
+.sloth-cambios-barra { display: flex; align-items: center; gap: 10px; padding: 7px 10px; }
+.sloth-cambios-toggle { display: flex; flex: 1; align-items: center; flex-wrap: wrap; gap: 7px; text-align: left; color: var(--muted); }
+.sloth-cambios-toggle:hover { color: var(--text); }
+.sloth-cambios-revertir { flex: none; color: var(--muted); border-radius: 6px; padding: 2px 6px; }
+.sloth-cambios-revertir:hover:not(:disabled) { color: var(--amber); background: var(--amber-tinte); }
+.sloth-cambios-detalle { border-top: 1px solid var(--line); }
+.sloth-cambios-vistas { padding: 8px 10px 0; display: flex; }
+.sloth-cambios-ayuda { margin: 8px 10px; }
+.sloth-cambios-git { display: flex; flex-direction: column; gap: 8px; padding: 10px; border-top: 1px solid var(--line); }
+.sloth-cambios-git input { min-width: 0; width: 100%; border: 1px solid var(--line); border-radius: 7px; padding: 6px 9px; background: var(--panel-2); font-size: 12px; }
+.sloth-cambios-git input:focus-visible { outline: 1px solid var(--amber); }
+.sloth-cambios-git-acciones { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.sloth-cambios-git-acciones button { padding: 5px 9px; border: 1px solid var(--line); border-radius: 7px; }
+.sloth-cambios-git-acciones button:hover:not(:disabled) { background: var(--amber-tinte); border-color: var(--amber); color: var(--amber); }
+.sloth-cambios-aviso { color: var(--ok); }
+.sloth-cambios-git-acciones .sloth-git-auto { color: var(--amber); background: var(--amber-tinte); }
+.sloth-git-documentacion { margin: 8px 10px; }
+.sloth-git-documentacion summary { color: var(--muted); cursor: pointer; }
+.sloth-git-documentacion pre { max-height: 200px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; font: 11.5px/1.6 var(--mono); }
+.sloth-cambios-detalle > select { display: block; width: calc(100% - 20px); margin: 8px 10px; padding: 4px 6px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel-2); font-size: 12px; }
+.sloth-cambios-archivos { max-height: 240px; overflow: auto; }
+.sloth-diff-archivo + .sloth-diff-archivo { border-top: 1px solid var(--line); }
+.sloth-diff-archivo summary { display: flex; align-items: center; gap: 8px; padding: 7px 10px; cursor: pointer; }
+.sloth-diff-archivo summary::before { content: '▸'; color: var(--muted); }
+.sloth-diff-archivo[open] summary::before { content: '▾'; }
+.sloth-diff-archivo summary:hover { background: var(--panel-2); }
+.sloth-diff-ruta { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--mono); font-size: 11.5px; }
+.sloth-diff-mas { color: var(--ok); font-family: var(--mono); font-size: 11px; white-space: nowrap; }
+.sloth-diff-menos { color: var(--bad); font-family: var(--mono); font-size: 11px; white-space: nowrap; }
+.sloth-diff-codigo { margin: 0; padding: 8px 10px; overflow-x: auto; border-top: 1px solid var(--line); background: var(--bg); font: 11.5px/1.65 var(--mono); tab-size: 2; }
+.sloth-diff-codigo > span { display: block; min-width: max-content; }
+.sloth-diff-codigo .sumada { color: var(--ok); background: color-mix(in srgb, var(--ok) 8%, transparent); }
+.sloth-diff-codigo .quitada { color: var(--bad); background: color-mix(in srgb, var(--bad) 8%, transparent); }
+.sloth-diff-codigo .ubicacion { color: var(--amber); }
+.sloth-diff-archivo p, .sloth-cambios > p { margin: 6px 10px; }
+.sloth-cambios-error { margin: 0 4px 8px; }
+.sloth-cambios button:focus-visible, .sloth-cambios select:focus-visible, .sloth-cambios summary:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }

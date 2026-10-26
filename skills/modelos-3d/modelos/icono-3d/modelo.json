@@ -1,0 +1,36 @@
+{
+  "nombre": "Ícono 3D",
+  "resumen": "Cualquier ícono o logo en relieve",
+  "categoria": "Logos e íconos",
+  "descripcion": "Cualquier ícono de Phosphor o logo en SVG, extruido en plástico brillante, de 1 de alto. Para una idea con un símbolo claro (escudo, persona, alerta, candado, apretón de manos) o una marca en SVG.",
+  "hace": [
+    "se extruye cualquier ícono",
+    "un logo de muchas piezas con capa casi nula (el zorro de MetaMask)",
+    "se pone gris"
+  ],
+  "etiquetas": [
+    "ícono",
+    "svg",
+    "logo",
+    "phosphor",
+    "símbolo",
+    "escudo",
+    "persona",
+    "usuario",
+    "alerta",
+    "candado"
+  ],
+  "exporta": [
+    "Icono3D"
+  ],
+  "usa": [],
+  "iconos": [
+    "shield-check",
+    "user",
+    "warning"
+  ],
+  "cuadro": 0,
+  "origen": "Berachain",
+  "creado": "2026-10-17",
+  "actualizado": "2026-10-17"
+}

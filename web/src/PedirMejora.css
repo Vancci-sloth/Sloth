@@ -1,0 +1,53 @@
+/*
+ * «Pedir una mejora»: el botón con el símbolo de Claude de los hilos (en el encabezado, junto a «Citar» y en cada error),
+ * la caja que abre, sobre un velo, y el aviso de que quedó anotada. El símbolo va en su color de marca; lo demás, con la
+ * paleta de Sloth.
+ */
+.marca-claude { width: 14px; height: 14px; flex: none; }
+
+/* El botón de los hilos. Al pasar el ratón, el símbolo gira un poco. */
+.pedir-mejora { display: inline-flex; align-items: center; gap: 6px; padding: 4px 11px 4px 9px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); font-size: 12.5px; font-weight: 600; white-space: nowrap; transition: color 0.15s, border-color 0.15s, background 0.15s; }
+.pedir-mejora:hover { color: var(--text); border-color: #4a4236; background: var(--panel-2); }
+.pedir-mejora .marca-claude { transition: transform 0.35s cubic-bezier(0.2, 0.8, 0.2, 1); }
+.pedir-mejora:hover .marca-claude { transform: rotate(45deg) scale(1.12); }
+/* En el encabezado del hilo, solo el símbolo, redondo. */
+.pedir-mejora.solo { width: 30px; height: 30px; flex: none; justify-content: center; padding: 0; }
+.pedir-mejora.solo .marca-claude { width: 16px; height: 16px; }
+/* En la línea de un turno que falló: compacto, entre el error y su raya. */
+.turn-end .pedir-mejora { padding: 1px 9px 1px 7px; font-size: 11.5px; color: var(--muted); }
+.turn-end .pedir-mejora .marca-claude { width: 12px; height: 12px; }
+
+/* Junto a «Citar»: los dos en una barra que flota sobre lo elegido. */
+.cite-bar { position: fixed; z-index: 20; display: flex; gap: 4px; }
+.cite-bar .cite-btn { position: static; }
+.cite-btn svg.marca-claude { stroke: none; }
+
+/* La caja, con el mismo resplandor del compositor de Mejoras. */
+.pm-velo { position: fixed; inset: 0; z-index: 70; display: grid; place-items: center; padding: 24px; background: rgba(15, 14, 12, 0.72); backdrop-filter: blur(3px); animation: pm-velo 0.15s ease-out; }
+.pm-caja { position: relative; isolation: isolate; width: min(620px, 100%); max-height: calc(100vh - 48px); overflow-y: auto; padding: 20px 20px 14px; border-radius: 18px; border: 1px solid var(--line); background: linear-gradient(180deg, var(--panel-2), var(--panel) 140px); box-shadow: 0 30px 80px rgba(0, 0, 0, 0.6); animation: pm-entra 0.22s cubic-bezier(0.2, 0.8, 0.2, 1); }
+.pm-cabeza { display: flex; align-items: flex-start; gap: 12px; }
+.pm-cabeza > div { flex: 1; min-width: 0; }
+.pm-cabeza h2 { margin: 1px 0 3px; font-size: 17px; font-weight: 700; letter-spacing: -0.01em; }
+.pm-cabeza p { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.45; }
+.pm-marca { position: relative; width: 38px; height: 38px; flex: none; display: grid; place-items: center; border-radius: 11px; background: var(--bg); border: 1px solid var(--line); }
+.pm-marca::after { content: ''; position: absolute; inset: -14px; z-index: -1; border-radius: 50%; background: radial-gradient(closest-side, var(--amber-tinte), transparent); }
+.pm-marca .marca-claude { width: 21px; height: 21px; }
+.pm-cerrar { width: 30px; height: 30px; flex: none; display: grid; place-items: center; border-radius: 8px; color: var(--muted); transition: background 0.15s, color 0.15s; }
+.pm-cerrar:hover { background: var(--panel-2); color: var(--text); }
+.pm-cerrar .ico { width: 16px; height: 16px; }
+.pm-desde { margin-top: 16px; padding: 10px 12px; border-radius: 12px; border: 1px solid var(--line); background: var(--bg); }
+.pm-desde-titulo { display: flex; align-items: center; gap: 6px; min-width: 0; color: var(--muted); font-size: 12px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pm-desde-titulo .ico { width: 13px; height: 13px; flex: none; color: var(--amber); }
+.pm-desde blockquote { margin: 8px 0 0; padding-left: 10px; border-left: 2px solid var(--amber); color: var(--text); font-size: 13px; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; max-height: 7.6em; overflow-y: auto; }
+.pm-caja .esc { margin-top: 12px; }
+/* Sin la pista de Enter: no cabe junto a los botones, y el de anotar ya lo dice. */
+.pm-caja .esc-pista { visibility: hidden; }
+
+/* El aviso de que quedó anotada, abajo a la derecha. */
+.pm-aviso { position: fixed; right: 24px; bottom: 24px; z-index: 70; display: inline-flex; align-items: center; gap: 8px; padding: 7px 7px 7px 14px; border-radius: 999px; border: 1px solid var(--line); background: var(--panel-2); box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5); color: var(--ok); font-size: 13px; font-weight: 600; animation: pm-entra 0.25s ease-out; }
+.pm-aviso .ico { width: 14px; height: 14px; stroke-width: 3; }
+.pm-aviso button { padding: 4px 12px; border-radius: 999px; background: var(--amber); color: var(--sobre-ambar); font-size: 12.5px; font-weight: 700; transition: background 0.15s; }
+.pm-aviso button:hover { background: var(--amber-2); }
+
+@keyframes pm-velo { from { opacity: 0; } }
+@keyframes pm-entra { from { opacity: 0; transform: translateY(8px) scale(0.98); } }

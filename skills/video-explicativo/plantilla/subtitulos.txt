@@ -1,0 +1,1 @@
+# Una frase por renglón. *negrita*, [caja de selección], {Icono}palabra (nombre de Phosphor o imagen de public, nunca emoji), visto=dicho_con_guiones.

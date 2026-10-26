@@ -1,0 +1,25 @@
+Use your built-in image_gen tool (do not draw with code). The attached photo is the channel mascot: a real black-and-tan miniature dachshund in an orange hoodie with a gold cuban chain and a cigar. For EACH item below, generate one image that EDITS this exact dog (one image_gen call per item), then copy each PNG from $CODEX_HOME/generated_images/... into this working directory with the file name given. Reply only with the list of files.
+
+Rules for the pose images (1 to 13):
+- It must stay a REAL PHOTOGRAPH of the SAME dog: same face markings, coat, ears, eye color, orange hoodie, gold chain, cigar. Photorealistic, crisp fur, same studio lighting.
+- Same framing as the attached photo: bust from mid-chest up, head about the same size and roughly in the same place, square image.
+- Plain pure white seamless background, no text, no other objects unless the item asks for one.
+- Keep the cigar in the side of the mouth unless the item says otherwise.
+
+1. pose_ladea.png: head tilted to one side, curious and confused, one ear slightly raised.
+2. pose_reojo.png: side-eye: head facing the camera but eyes looking hard to the side, suspicious and unimpressed.
+3. pose_susto.png: shocked: eyes wide open, ears up, mouth open, the cigar falling out of his mouth.
+4. pose_triste.png: sad puppy eyes looking up at the camera, ears down, the cigar drooping down.
+5. pose_tapa.png: one front paw raised covering his eyes, like a facepalm.
+6. pose_pata.png: one front paw raised toward the camera with the paw pads visible, like a "stop" gesture, serious look.
+7. pose_feliz.png: very happy, mouth open in a big doggy smile with the tongue out, eyes squinting, cigar still in the corner of the mouth.
+8. pose_lentes.png: wearing black pixelated 8-bit "deal with it" meme sunglasses, extra smug.
+9. pose_arriba.png: looking up and to his right (the viewer's left), as if reading something above him.
+10. pose_lado.png: head turned to look toward the viewer's right, as if looking at something next to him.
+11. pose_acostado.png: lying flat on his belly with his chin resting on his front paws, defeated, cigar still in his mouth, looking at the camera. Wider framing so the whole front of the body fits.
+12. pose_celular.png: sitting behind a modern smartphone that he holds upright between his front paws, the screen faces the camera and is plain dark grey with nothing on it, looking proudly at the camera.
+13. pose_ladra.png: barking loudly at the camera, mouth wide open, the cigar held in the gap of his teeth on the side.
+
+Meme images (14 and 15), photorealistic, vertical 4:5, same dog:
+14. meme_esta_bien.png: a parody of the "This is fine" meme: the same dog sitting calmly at a small wooden table with a coffee mug in front of him, inside a room that is engulfed in flames, smoke near the ceiling, he looks relaxed and smug.
+15. meme_no_stonks.png: a parody of the "Stonks" meme: the same dog wearing a navy business suit and tie (no hoodie), in a dark glowing 3D void with a huge red stock-market arrow crashing downward behind him, he looks at the camera unimpressed.

@@ -1,0 +1,12 @@
+Use your built-in image_gen tool (do not draw with code). The attached photo is the channel mascot: a real black-and-tan miniature dachshund in an orange hoodie with a gold cuban chain and a cigar. For EACH item below, generate one image that EDITS this exact dog (one image_gen call per item), then copy each PNG from $CODEX_HOME/generated_images/... into this working directory with the file name given. Reply only with the list of files.
+
+Rules for every image:
+- It must stay a REAL PHOTOGRAPH of the SAME dog: same face markings, coat, ears, eye color, orange hoodie, gold chain, cigar in the side of the mouth. Photorealistic, crisp fur, same studio lighting.
+- Same framing as the attached photo: bust from mid-chest up, head about the same size and roughly in the same place, square image. The held object must stay fully inside the frame.
+- Plain pure white seamless background, no text anywhere.
+
+1. pose_moneda.png: he holds up, with both front paws, one big thick GOLD COIN in front of his chest, the flat face of the coin facing the camera straight on. The coin face is completely plain and smooth polished gold with NO symbols, letters or engravings. The coin is about as wide as his head. Proud look at the camera.
+2. pose_cartel.png: he holds up, with both front paws, a blank white rectangular cardboard sign (landscape, about as wide as his shoulders) in front of his chest, the sign faces the camera straight on and is completely blank and white. Serious, unimpressed look at the camera.
+3. pose_lupa.png: he holds a classic magnifying glass in one front paw up in front of one eye, that eye looks huge through the lens, like a detective investigating. Looking at the camera.
+4. pose_llave.png: he holds up a big shiny old-fashioned GOLD KEY in one front paw next to his face, showing it to the camera, smug look.
+5. pose_billetes.png: he holds a thick fan of US dollar bills in one front paw next to his face, showing them off, smug rich look at the camera.

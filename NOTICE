@@ -1,0 +1,9 @@
+Sloth
+Copyright 2026 Vancci (https://vancci.org)
+
+Sloth includes third-party components under their own licenses, among them Remotion
+(https://www.remotion.dev/license), which is free for individuals and small teams and requires a paid company license
+for larger organizations.
+
+The 3D emoji in skills/video-el-diff/plantilla/public/emoji are Fluent Emoji by Microsoft
+(https://github.com/microsoft/fluentui-emoji), under the MIT License.

@@ -1,0 +1,48 @@
+/* La línea de tiempo del estudio, en todas las fases: arriba su barra (qué se puede hacer y el zoom); los nombres de las
+   pistas fijos a la izquierda; las pistas se desplazan. Su alto es el mismo en todos los estilos, para que el marco no se
+   mueva. */
+.linea { position: relative; display: grid; grid-template-columns: 76px minmax(0, 1fr); grid-template-rows: 28px auto; border-top: 1px solid var(--line); background: var(--panel); user-select: none; }
+.linea-barra { grid-column: 1 / -1; display: flex; align-items: center; gap: 4px; min-width: 0; padding: 0 8px 0 12px; border-bottom: 1px solid var(--line); font-size: 11.5px; }
+.linea-titulo { flex: none; margin-right: 8px; font-weight: 650; color: var(--text); }
+.linea-ayuda { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.linea-barra button { flex: none; display: grid; place-items: center; width: 24px; height: 22px; border-radius: 5px; color: var(--muted); }
+.linea-barra button:hover:not(:disabled) { color: var(--text); background: var(--panel-2); }
+.linea-barra button .ico { width: 14px; height: 14px; }
+.linea-nombres, .linea-pistas { display: grid; grid-template-rows: 22px 54px 46px; }
+.linea-nombres { padding-bottom: 8px; border-right: 1px solid var(--line); font-size: 10.5px; font-weight: 650; letter-spacing: 0.05em; text-transform: uppercase; color: var(--muted); }
+.linea-nombres > span { display: flex; align-items: center; padding-left: 12px; }
+/* Con fondo propio: así va en su capa y no se repinta entera a cada cuadro al desplazarla. */
+.linea-scroll { position: relative; overflow-x: auto; overflow-y: hidden; padding-bottom: 8px; background: var(--panel); touch-action: none; }
+.linea-pistas { position: relative; min-width: 100%; }
+.pista { position: relative; }
+.regla { position: relative; border-bottom: 1px solid var(--line); overflow: hidden; }
+.regla span { position: absolute; top: 4px; padding-left: 4px; border-left: 1px solid var(--line); font-size: 10.5px; color: var(--muted); font-family: var(--mono); line-height: 14px; white-space: nowrap; }
+
+/* Las escenas: su número y su nombre, o su miniatura. La elegida para pedir un cambio, en ámbar; donde trabaja el agente, con un halo. */
+.pista-vacia { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); white-space: nowrap; }
+.clip { position: absolute; top: 5px; bottom: 5px; display: flex; align-items: center; overflow: hidden; border-radius: 5px; background: var(--panel-2); border: 1px solid var(--line); cursor: pointer; transition: border-color 0.15s, background 0.15s; animation: etapa-entra 0.3s ease-out; }
+.clip:nth-child(even) { background: color-mix(in srgb, var(--panel-2) 70%, var(--line)); }
+.clip:hover { border-color: var(--muted); }
+.clip.elegida { border-color: var(--amber); background: color-mix(in srgb, var(--amber) 30%, var(--panel-2)); }
+.clip.agente { border-color: var(--amber-2); box-shadow: 0 0 0 2px var(--amber-tinte); }
+.clip-texto { min-width: 0; padding: 0 6px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 11px; color: var(--muted); }
+.clip-texto b { color: var(--text); font-weight: 650; }
+.clip.elegida .clip-texto { color: var(--amber-2); }
+.clip > img, .clip > .cuadro { flex: none; height: 100%; width: auto; aspect-ratio: 16 / 9; object-fit: cover; border: 0; border-radius: 0; }
+
+/* Las piezas: una barra por cada tramo en que se ve, en carriles. La elegida, en ámbar. */
+.pista-piezas { border-bottom: 1px solid var(--line); }
+.pieza { position: absolute; height: 13px; padding: 0 5px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; border-radius: 3px; background: var(--panel-2); border: 1px solid var(--line); font-size: 10px; line-height: 11px; color: var(--muted); cursor: pointer; animation: etapa-entra 0.3s ease-out; }
+.pieza:hover { border-color: var(--muted); color: var(--text); }
+.pieza.elegida { border-color: var(--amber); background: color-mix(in srgb, var(--amber) 30%, var(--panel-2)); color: var(--amber-2); }
+
+/* La onda de lo que suena: un lienzo del ancho de la vista, que se mueve con ella. */
+.pista-audio { overflow: hidden; color: var(--amber); }
+.pista-audio canvas { position: absolute; top: 4px; bottom: 4px; height: calc(100% - 8px); pointer-events: none; }
+
+/* El tramo marcado, el segundo bajo el ratón y el cabezal. */
+.linea-rango { position: absolute; top: 22px; bottom: 0; background: var(--amber-tinte); border-left: 1px solid var(--amber); border-right: 1px solid var(--amber); pointer-events: none; }
+.linea-fantasma { position: absolute; top: 0; bottom: 0; width: 1px; background: color-mix(in srgb, var(--text) 30%, transparent); pointer-events: none; }
+.linea-fantasma span { position: absolute; top: 3px; left: 5px; padding: 0 5px; border-radius: 4px; background: var(--bg); border: 1px solid var(--line); font-size: 10.5px; line-height: 15px; white-space: nowrap; color: var(--text); }
+.cabezal { position: absolute; left: 0; top: 0; bottom: 0; width: 2px; margin-left: -1px; background: var(--amber-2); pointer-events: none; will-change: transform; }
+.cabezal::before { content: ''; position: absolute; top: 0; left: -4px; border: 5px solid transparent; border-top-color: var(--amber-2); }

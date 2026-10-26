@@ -1,0 +1,82 @@
+/* El estudio de video: el mismo marco para cualquier video, de cualquier estilo. Arriba las cinco fases; al centro la
+   elegida; abajo la línea de tiempo; a la derecha, siempre, el chat. */
+.session.estudio {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) clamp(340px, 30vw, 460px);
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  grid-template-areas: 'head head' 'fases chat' 'centro chat' 'linea chat';
+}
+.estudio > .session-head { grid-area: head; }
+.estudio > .session-head .picker-menu { left: auto; right: 0; }
+.estudio-fases { grid-area: fases; }
+.estudio-centro { grid-area: centro; min-width: 0; min-height: 0; }
+.estudio > .linea { grid-area: linea; }
+.estudio-chat { grid-area: chat; min-height: 0; display: flex; flex-direction: column; background: var(--panel); border-left: 1px solid var(--line); --fondo-chat: var(--panel); }
+.estudio-chat .timeline-inner { padding: 20px 18px 24px; }
+.estudio-chat .session-composer { padding: 0 16px 16px; max-width: none; }
+
+/* Las cinco fases, con su punto de estado. Una sin etapas en este estilo se ve apagada, pero está. */
+.estudio-fases { display: flex; align-items: center; gap: 2px; min-width: 0; padding: 8px 12px; border-bottom: 1px solid var(--line); overflow-x: auto; }
+.fase { display: flex; align-items: center; gap: 7px; padding: 5px 10px; border-radius: 8px; font-size: 12.5px; color: var(--muted); white-space: nowrap; transition: background 0.15s, color 0.15s; }
+.fase:hover:not(:disabled) { color: var(--text); background: var(--panel-2); }
+.fase.vista { color: var(--text); background: var(--panel-2); }
+/* La del agente, cuando miras otra: pulsarla vuelve a seguirlo. */
+.fase.agente { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--amber) 45%, transparent); }
+.fase:disabled { opacity: 0.35; }
+.fase-sep { flex: none; width: 10px; height: 1px; background: var(--line); }
+.fase-punto { flex: none; width: 7px; height: 7px; border-radius: 50%; border: 1px solid var(--muted); }
+.fase.hecha .fase-punto { background: var(--ok); border-color: var(--ok); }
+.fase.saltada .fase-punto { border-style: dashed; }
+.fase.en-curso .fase-punto { background: var(--amber); border-color: var(--amber); animation: pulse 1.2s steps(5) infinite; }
+.fase.en-pausa .fase-punto, .fase.espera .fase-punto, .fase.recibido .fase-punto { border-color: var(--amber); box-shadow: 0 0 0 3px var(--amber-tinte); }
+.estudio-error { margin-left: auto; padding-left: 12px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+
+/* Una fase que no es Video: sus etapas una tras otra, en una columna centrada cómoda de leer. */
+.estudio-fase { position: relative; overflow-y: auto; }
+.estudio-columna { max-width: 760px; margin: 0 auto; padding: 22px 28px 40px; display: flex; flex-direction: column; }
+.estudio-etapa { display: flex; flex-direction: column; gap: 12px; padding-bottom: 28px; }
+.estudio-etapa + .estudio-etapa { padding-top: 24px; border-top: 1px solid var(--line); }
+.estudio-fase audio, .monitor-etapa audio { width: 100%; }
+/* Una imagen o un video solo (una portada vertical) no pasa del alto de la pantalla. */
+.estudio-columna .etapa-rejilla img, .estudio-columna .etapa-rejilla video { max-height: 70vh; object-fit: contain; }
+.estudio-columna .etapa-rejilla.c2 img, .estudio-columna .etapa-rejilla.c3 img { object-fit: cover; }
+.estudio-cargando { display: grid; place-items: center; font-size: 13px; }
+
+/* La fase Video: el monitor, lo más grande que quepa en la forma del video (`--ratio`), y su barra de transporte. */
+.estudio-video { display: flex; flex-direction: column; animation: etapa-entra 0.4s ease-out; }
+.escenario { flex: 1; min-height: 0; display: flex; padding: 16px 16px 10px; }
+.monitor-caja { flex: 1; min-width: 0; min-height: 0; display: grid; place-items: center; container-type: size; }
+.monitor { --ratio: 1.7778; position: relative; width: min(100cqw, 100cqh * var(--ratio)); aspect-ratio: var(--ratio); overflow: hidden; border-radius: 8px; background: #000; border: 1px solid var(--line); }
+.monitor > video, .monitor > iframe { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; border: 0; }
+.monitor > video { cursor: pointer; }
+/* La versión nueva carga detrás de la que se ve, y la reemplaza ya pintada. */
+.monitor > iframe.monitor-nuevo { opacity: 0; pointer-events: none; }
+.monitor-vacio { position: absolute; inset: 0; display: grid; place-items: center; padding: 16px; text-align: center; font-size: 13px; pointer-events: none; }
+.monitor-play { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 54px; height: 54px; display: grid; place-items: center; border-radius: 50%; background: color-mix(in srgb, var(--bg) 70%, transparent); color: var(--text); opacity: 0; transition: opacity 0.15s; pointer-events: none; }
+.monitor-play .ico { width: 22px; height: 22px; margin-left: 3px; }
+.monitor:hover .monitor-play { opacity: 1; }
+.monitor-aviso { position: absolute; top: 10px; right: 10px; display: flex; align-items: center; gap: 7px; padding: 4px 10px; border-radius: 999px; background: color-mix(in srgb, var(--bg) 82%, transparent); border: 1px solid var(--line); font-size: 11.5px; color: var(--muted); pointer-events: none; animation: etapa-entra 0.2s ease-out; }
+.monitor-error { margin: 0 16px 6px; padding: 5px 10px; border-radius: 7px; border: 1px solid color-mix(in srgb, var(--bad) 45%, transparent); background: color-mix(in srgb, var(--bad) 10%, transparent); color: var(--bad); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+
+/* La barra de transporte: saltar de escena, reproducir, el reloj, la escena en curso, y a la derecha sonido, bucle y velocidad. */
+.transporte { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; padding: 4px 16px 10px; }
+.transporte-play { width: 34px; height: 34px; border-radius: 50%; background: var(--amber); color: var(--sobre-ambar); display: grid; place-items: center; }
+.transporte-play .ico { width: 15px; height: 15px; }
+.transporte-play:hover:not(:disabled) { background: var(--amber-2); }
+.transporte-boton { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 7px; color: var(--muted); }
+.transporte-boton .ico { width: 15px; height: 15px; }
+.transporte-boton:hover:not(:disabled) { color: var(--text); background: var(--panel-2); }
+.transporte-boton.on { color: var(--amber-2); background: var(--amber-tinte); }
+.transporte-reloj { margin-left: 4px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.transporte-escena { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.transporte-velocidad { display: flex; gap: 1px; padding: 2px; border-radius: 8px; background: var(--panel-2); }
+.transporte-velocidad button { padding: 2px 7px; border-radius: 6px; font-size: 11.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.transporte-velocidad button:hover { color: var(--text); }
+.transporte-velocidad button.on { background: var(--line); color: var(--text); }
+.monitor-cual { padding: 3px 6px; border-radius: 7px; background: var(--panel-2); border: 1px solid var(--line); font-size: 12.5px; }
+/* El render quedó viejo: cambió una de sus entradas después de él. */
+.render-viejo { color: var(--amber-2); }
+
+/* Mientras aún no hay avance, el sitio de la línea de tiempo, del mismo alto. */
+.estudio > .linea:empty { min-height: 150px; border-top: 1px solid var(--line); background: var(--panel); }
+

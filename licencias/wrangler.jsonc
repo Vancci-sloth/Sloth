@@ -1,0 +1,38 @@
+// El cobro de Sloth (ver src/index.ts), en la cuenta de Cloudflare de Sloth, como la nube. Se
+// despliega con `npm run licencias -- deploy` desde la raíz. Los secretos van con `npm run licencias -- secret put X`:
+// MP_ACCESS_TOKEN (producción de «Sloth pruebas», la app de la vendedora de prueba), MP_ACCESS_TOKEN_PRODUCCION (producción
+// de la aplicación «Sloth» real), MP_WEBHOOK_SECRET (la clave secreta de los webhooks de la real),
+// FIRMA (la llave privada Ed25519 en PKCS8 y base64; la pública va en server/licencia.ts) y PUBLICAR (la llave de
+// `npm run publicar`, que también está en %APPDATA%\sloth\licencias\publicar.txt). La base de datos se crea con
+// `npm run licencias -- d1 migrations apply sloth-licencias --remote`. El instalador vive en el bucket DESCARGAS.
+{
+  "name": "sloth-licencias",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-10-01",
+  // workers.dev sigue para las apps de antes, que llaman ahí; las nuevas, a api.sloth.vancci.org (zona vancci.org de esta cuenta).
+  "workers_dev": true,
+  "routes": [{ "pattern": "api.sloth.vancci.org", "custom_domain": true }],
+  "observability": { "enabled": true },
+  // Cada mañana (9:00 de la Ciudad de México): el aviso de los cobros que vienen.
+  "triggers": { "crons": ["0 15 * * *"] },
+  "d1_databases": [{ "binding": "DB", "database_name": "sloth-licencias", "database_id": "0de2b337-32cc-474e-bcb4-14cac3181a5e" }],
+  "r2_buckets": [{ "binding": "DESCARGAS", "bucket_name": "sloth-descargas" }],
+  "vars": {
+    // Con cuál de los dos tokens cobra. Al pasar a `produccion`, borra las suscripciones de prueba (no existen en la
+    // cuenta real) sin tocar los lugares gratis, que son de personas de verdad:
+    // DELETE FROM licencias WHERE plan != 'gratis' AND modo = 'prueba'; DELETE FROM equipos WHERE clave NOT IN (SELECT clave FROM licencias);
+    "MP_MODO": "produccion",
+    "ORIGEN": "https://api.sloth.vancci.org",
+    // GRATIS: los lugares gratis de por vida que se dieron cuando Sloth se vendía (ya no se dan). El apoyo cuesta lo mismo
+    // para todos, en pesos e IVA incluido; las FUNDADORES primeras personas que apoyan (hasta FUNDADORES_HASTA si se pone,
+    // una fecha ISO) son fundadoras. Cada suscripción conserva su monto aunque estos cambien. Solo cuentan las pagadas de
+    // verdad (modo produccion), no las de prueba.
+    "GRATIS": 25,
+    "FUNDADORES": 25,
+    "PRECIO_MENSUAL": 299,
+    "PRECIO_ANUAL": 2990,
+    // Los correos salen de un dominio verificado en Resend (con su RESEND_API_KEY como secreto) y se responden en soporte@vancci.org.
+    "CORREO_DE": "Sloth <avisos@vancci.org>",
+    "CORREO_RESPUESTA": "soporte@vancci.org"
+  }
+}

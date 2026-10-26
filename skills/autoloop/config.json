@@ -1,0 +1,7 @@
+{
+  "command": "node --test --test-reporter=tap \".autoloop/checks/**/*.test.mjs\"",
+  "score": "^# pass (\\d+)",
+  "better": "higher",
+  "done": "^# fail 0$",
+  "timeoutMin": 10
+}

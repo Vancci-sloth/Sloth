@@ -1,0 +1,128 @@
+/*
+ * La barra lateral: Nuevo chat, Buscar, los hilos por fechas (los lotes plegados en una fila) y Archivados al final;
+ * abajo, Opciones y Reiniciar backend. Los títulos de sección se ven como los grupos de Opciones.
+ */
+
+.sidebar { display: flex; flex-direction: column; background: var(--panel); border-right: 1px solid var(--line); min-height: 0; }
+.brand { display: flex; align-items: center; gap: 10px; padding: 16px 16px 12px; font-weight: 700; font-size: 15px; letter-spacing: -0.01em; }
+.brand img { width: 26px; height: 26px; }
+
+/* Las dos de arriba son filas como las de los hilos, con su icono en la misma columna. */
+.new-chat, .buscar { display: flex; align-items: center; gap: 9px; height: 34px; margin: 0 8px 2px; padding: 0 8px; border-radius: 8px; text-align: left; transition: background 0.15s, color 0.15s; }
+.new-chat { color: var(--text); font-weight: 600; }
+.new-chat:hover, .new-chat.active { background: var(--panel-2); }
+.new-chat-icon { width: 18px; height: 18px; flex: none; display: grid; place-items: center; border: 1px solid var(--line); border-radius: 5px; font-size: 14px; line-height: 1; color: var(--amber); }
+.new-chat-icon .ico { width: 12px; height: 12px; stroke-width: 2.2; }
+/* comunidad: los avisos sin leer, a la derecha de «Comunidad»; plegada, un punto sobre su icono. */
+.nav-cuenta { min-width: 18px; height: 18px; margin-left: auto; padding: 0 5px; display: grid; place-items: center; border-radius: 999px; background: var(--amber); color: var(--sobre-ambar); font-size: 10.5px; font-weight: 750; font-variant-numeric: tabular-nums; }
+.buscar { margin-bottom: 4px; color: var(--muted); cursor: text; }
+.buscar:hover { background: var(--panel-2); }
+.buscar:focus-within { background: var(--panel-2); box-shadow: inset 0 0 0 1px var(--line); color: var(--text); }
+.buscar svg { width: 18px; height: 15px; flex: none; }
+.buscar input { flex: 1; min-width: 0; padding: 0; background: none; border: 0; outline: none; font-size: 13px; }
+.buscar input::placeholder { color: var(--muted); }
+.buscar kbd { flex: none; padding: 0 5px; border: 1px solid var(--line); border-radius: 5px; font: 10.5px/16px var(--mono); color: var(--muted); }
+.buscar:focus-within kbd { display: none; }
+.buscar-x { flex: none; width: 18px; height: 18px; display: grid; place-items: center; border-radius: 5px; font-size: 11px; color: var(--muted); }
+.buscar-x:hover { background: var(--line); color: var(--text); }
+
+.sessions { flex: 1; overflow-y: auto; padding: 0 8px 10px; }
+/* Hoy, Ayer, Esta semana, Antes. Archivados es uno que se abre, con cuántos hay. */
+.barra-seccion { display: flex; align-items: center; gap: 6px; width: 100%; padding: 14px 8px 5px; color: var(--muted); font-size: 11px; font-weight: 650; letter-spacing: 0.07em; text-transform: uppercase; text-align: left; }
+button.barra-seccion { transition: color 0.15s; }
+button.barra-seccion:hover { color: var(--text); }
+.barra-seccion.archivados::after, .lote-row::after { content: ''; flex: none; width: 5px; height: 5px; margin: 0 3px 0 1px; border-right: 1.5px solid; border-bottom: 1.5px solid; opacity: 0.6; transform: rotate(-45deg); transition: transform 0.15s; }
+.barra-seccion.archivados.on::after, .lote-row.abierto::after { transform: rotate(45deg); }
+.barra-vacio { margin: 18px 8px; color: var(--muted); font-size: 12.5px; }
+
+.session-row { display: flex; align-items: center; gap: 9px; width: 100%; padding: 7px 8px; border-radius: 8px; text-align: left; color: var(--muted); transition: background 0.12s, color 0.12s; }
+.session-row:hover { background: var(--panel-2); color: var(--text); }
+.session-row.active { background: var(--panel-2); color: var(--text); box-shadow: inset 2px 0 0 var(--amber); }
+.session-row.archived { opacity: 0.6; }
+.session-row.selected { background: var(--amber-tinte); color: var(--text); }
+.session-icon { width: 18px; flex: none; display: grid; place-items: center; }
+.session-title { flex: 1; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 13px; }
+.check { width: 15px; height: 15px; flex: none; display: grid; place-items: center; border: 1px solid var(--line); border-radius: 4px; font-size: 11px; line-height: 1; }
+.session-row.selected .check { background: var(--amber); border-color: var(--amber); color: var(--sobre-ambar); }
+/* Un borrador: lo que se dejó escrito en un hilo nuevo. La × para tirarlo sale al pasar el ratón, en lugar de la etiqueta. */
+.draft-row { cursor: pointer; }
+/* La etiqueta entra sola, un instante después de la fila: se enfoca y crece un poco desde la derecha. */
+.draft-tag { flex: none; padding: 1px 6px; border-radius: 999px; background: var(--amber-tinte); color: var(--amber); font-size: 10.5px; transform-origin: right center; animation: tag-in 0.42s cubic-bezier(0.2, 0.8, 0.2, 1) 0.08s backwards; }
+@keyframes tag-in { from { opacity: 0; transform: translateX(4px) scale(0.86); filter: blur(3px); } }
+.draft-x { display: none; flex: none; width: 18px; height: 18px; place-items: center; border-radius: 5px; font-size: 11px; color: var(--muted); }
+.draft-x:hover { background: var(--line); color: var(--bad); }
+.draft-row:hover .draft-tag { display: none; }
+.draft-row:hover .draft-x { display: grid; }
+
+/* Un lote: una fila con cuántos videos lleva, que se abre en sus hilos, un poco hacia dentro y con una línea que los agrupa. */
+.lote-row .session-title { color: var(--text); }
+.barra-seccion .cuantos, .lote-cuenta { flex: none; padding: 0 6px; border-radius: 999px; background: var(--panel-2); color: var(--muted); font-size: 10.5px; font-weight: 600; letter-spacing: 0; font-variant-numeric: tabular-nums; }
+.session-row:hover .lote-cuenta, .session-row.active .lote-cuenta { background: var(--line); }
+.lote-videos { margin-left: 16px; padding-left: 4px; border-left: 1px solid var(--line); }
+/* Si «Seguir» falla, el porqué baja a su propia línea. */
+.lote-pausa { display: flex; flex-wrap: wrap; align-items: center; gap: 0 8px; padding: 0 8px 4px 36px; }
+.lote-pausa .ghost { padding: 2px 4px; color: var(--amber); }
+
+/* Abajo: Opciones y Reiniciar backend, como filas con su icono. */
+.pie { display: flex; flex-direction: column; gap: 1px; padding: 8px; border-top: 1px solid var(--line); }
+.pie button { display: flex; align-items: center; gap: 9px; height: 32px; padding: 0 8px; border-radius: 8px; color: var(--muted); font-size: 13px; text-align: left; transition: background 0.15s, color 0.15s; }
+.pie button:hover:not(:disabled), .pie button.on { background: var(--panel-2); color: var(--text); }
+.pie svg { width: 18px; height: 15px; flex: none; }
+.pie .reconectando { color: var(--amber); opacity: 1; }
+.pie .reconectando svg { animation: spin 1s steps(12) infinite; }
+.pie .bad, .pie .pie-nota { padding: 2px 8px; overflow-wrap: anywhere; }
+
+/* Renombrar en línea: el campo ocupa el sitio del título, en su fila o en la cabecera del hilo (`Renombrar.tsx`). */
+.renombrar { flex: 1; min-width: 0; padding: 1px 6px; margin: -2px 0; border-radius: 6px; background: var(--bg); border: 1px solid var(--amber); outline: none; font-size: 13px; }
+.renombrar.mal { border-color: var(--bad); }
+.session-row.renombrando { background: var(--panel-2); color: var(--text); }
+.session-head .renombrar { flex: 0 1 420px; margin: -3px 0; padding: 2px 8px; font-size: inherit; font-weight: 650; }
+/* El lápiz de la cabecera, discreto hasta que pasas por encima. */
+.lapiz { flex: none; width: 24px; height: 24px; margin-left: -6px; display: grid; place-items: center; border-radius: 6px; color: var(--muted); opacity: 0.6; transition: opacity 0.15s, background 0.15s, color 0.15s; }
+.lapiz:hover, .lapiz:focus-visible { opacity: 1; background: var(--panel-2); color: var(--text); }
+.lapiz svg { width: 14px; height: 14px; }
+
+/* Un video: bajo el título, en qué fase va y una barra fina con las etapas que lleva (`Barra.tsx`). */
+.session-row:has(.session-texto) { padding-block: 5px; }
+.session-texto { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.session-texto .session-title { line-height: 1.4; }
+.avance { display: flex; align-items: center; gap: 8px; font-size: 11px; line-height: 1.35; color: var(--muted); }
+.avance-texto { flex: none; max-width: 75%; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.avance-barra { flex: 1; min-width: 20px; height: 3px; border-radius: 99px; background: var(--line); overflow: hidden; }
+.avance-barra span { display: block; height: 100%; border-radius: inherit; background: var(--amber); transition: width 0.4s ease; }
+.avance.espera { color: var(--amber); }
+.avance.hecho { color: var(--ok); }
+
+/* Arriba: el logo, que abre un chat nuevo, y el botón que pliega la barra (Ctrl+B). */
+.brand-fila { display: flex; align-items: center; }
+.brand-fila .brand { flex: 1; min-width: 0; }
+.plegar { flex: none; width: 28px; height: 28px; margin-right: 10px; display: grid; place-items: center; border-radius: 7px; color: var(--muted); transition: background 0.15s, color 0.15s; }
+.plegar:hover { background: var(--panel-2); color: var(--text); }
+.plegar svg { width: 17px; height: 17px; }
+
+/*
+ * Plegada: una columna de iconos, cada uno con su nombre al pasar el ratón. Los textos se esconden con `font-size: 0` (los
+ * iconos llevan su propio tamaño): una entrada nueva de la barra se pliega igual sin tocar nada. Las secciones quedan en
+ * una raya, y el punto de cada hilo (trabajando, terminó) va sobre su icono.
+ */
+.app.plegada { grid-template-columns: 56px 1fr; }
+.plegada .select-bar { left: 70px; }
+.plegada .brand-fila { flex-direction: column; }
+.plegada .brand { justify-content: center; gap: 0; padding: 14px 0 6px; font-size: 0; }
+.plegada .plegar { margin: 0 0 6px; }
+.plegada .new-chat, .plegada .buscar { justify-content: center; gap: 0; padding: 0; font-size: 0; }
+.plegada .new-chat { position: relative; }
+.plegada .nav-cuenta { position: absolute; top: 4px; right: 10px; min-width: 8px; width: 8px; height: 8px; padding: 0; margin: 0; font-size: 0; }
+.plegada .buscar { cursor: pointer; }
+.plegada .buscar input, .plegada .buscar kbd, .plegada .buscar-x { display: none; }
+.plegada .sessions { scrollbar-width: none; }
+.plegada .barra-seccion { width: auto; height: 1px; margin: 8px 6px; padding: 0; overflow: hidden; background: var(--line); font-size: 0; }
+.plegada .barra-seccion::after, .plegada .lote-row::after { display: none; }
+.plegada .session-row { position: relative; justify-content: center; padding: 8px 0; }
+.plegada :is(.session-title, .session-texto, .draft-tag, .draft-x, .check, .lote-cuenta, .renombrar, .barra-vacio, .lote-pausa) { display: none; }
+.plegada .session-row .dot { position: absolute; top: 4px; right: 4px; }
+.plegada .lote-videos { margin-left: 3px; padding-left: 2px; }
+.plegada .pie button, .plegada .pie .aviso-redes { justify-content: center; gap: 0; padding: 0; font-size: 0; }
+/* Un fallo del pie (el servidor no compila) queda en un punto rojo, que lo dice al pasar el ratón. */
+.plegada .pie .bad { align-self: center; width: 7px; height: 7px; margin: 6px 0; padding: 0; border-radius: 50%; background: var(--bad); font-size: 0; }
+.plegada .pie .pie-nota { display: none; }

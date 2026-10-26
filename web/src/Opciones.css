@@ -1,0 +1,105 @@
+/*
+ * Opciones: grupos con un título pequeño y un panel de filas. Cada fila es una cosa: su logo, su nombre con una línea
+ * debajo (que a veces se abre o despliega) y, a la derecha, su estado y lo que se puede hacer con ella.
+ */
+
+.opciones { padding: 56px 48px 72px; max-width: 720px; width: 100%; margin: 0 auto; overflow-y: auto; display: flex; flex-direction: column; gap: 26px; }
+.opciones h1 { margin: 0; font-size: 30px; font-weight: 700; letter-spacing: -0.02em; }
+.opciones-titulo { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.opciones-titulo-acciones { display: flex; align-items: center; gap: 10px; }
+.opciones > .ghost { align-self: flex-start; margin-bottom: -20px; }
+
+.grupo { display: flex; flex-direction: column; gap: 8px; }
+.grupo-titulo { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 26px; padding: 0 4px; }
+.grupo-titulo h2 { margin: 0; color: var(--muted); font-size: 11.5px; font-weight: 650; letter-spacing: 0.07em; text-transform: uppercase; }
+.grupo-nota { margin: 0; padding: 0 4px; color: var(--muted); font-size: 12px; }
+
+.panel { display: flex; flex-direction: column; background: var(--panel-2); border: 1px solid var(--line); border-radius: var(--radio); text-align: left; }
+.panel a { color: var(--amber); }
+.item + .item { border-top: 1px solid var(--line); }
+.fila { display: flex; align-items: center; gap: 10px; min-height: 46px; padding: 8px 16px; }
+.fila-nombre { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.fila-nombre strong { font-size: 13.5px; font-weight: 600; }
+.fila-nombre > span { color: var(--muted); font-size: 12px; }
+.fila-nombre > span.falta { color: var(--amber); }
+.una-linea { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* Una fila entera que se pulsa: la de las herramientas plegadas. */
+.fila-boton { width: 100%; text-align: left; border-radius: calc(var(--radio) - 1px); transition: background 0.15s; }
+.fila-boton:hover { background: var(--panel); }
+.fila-boton:hover .resumen { color: var(--text); }
+.fila-boton:focus-visible { outline: 1px solid var(--amber); outline-offset: -1px; }
+/* Lo que se abre debajo de una fila: un campo para pegar algo, los pasos para conseguirlo, un error. Con logo, se alinea con el nombre. */
+.fila-extra { display: flex; flex-direction: column; gap: 8px; margin: 0; padding: 0 16px 14px; }
+.item:has(> .fila > .logo) > .fila-extra { padding-left: 60px; }
+.fila-extra p { margin: 0; }
+.requisito-error { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 120px; overflow-y: auto; }
+
+/* El logo de cada cosa (`Logos.tsx`), en su cuadrito. Los chicos van apilados en la fila de las herramientas plegadas. */
+.logo { flex: none; display: grid; place-items: center; width: 34px; height: 34px; border-radius: 9px; background: var(--bg); box-shadow: inset 0 0 0 1px var(--line); color: var(--muted); font-weight: 700; }
+.logo svg { width: 19px; height: 19px; overflow: visible; }
+.logo img { width: 24px; height: 24px; }
+.logo.chico { width: 26px; height: 26px; border-radius: 7px; font-size: 11px; box-shadow: 0 0 0 2px var(--panel-2); }
+.logo.chico svg { width: 14px; height: 14px; }
+.logo.chico img { width: 18px; height: 18px; }
+.logos { flex: none; display: flex; padding-right: 4px; }
+.logos .logo + .logo { margin-left: -5px; }
+/* Los colores de cada marca, solo en su logo. Los demás van sobre el fondo de Sloth. */
+.logo-claude { background: #d97757; box-shadow: none; }
+.logo-codex { background: #000; box-shadow: none; }
+.logo-ffmpeg { background: #007808; box-shadow: none; }
+.logo-paquetes { background: #3775a9; box-shadow: none; }
+.logo-instagram { background: radial-gradient(circle at 30% 107%, #fdf497 0%, #fdf497 5%, #fd5949 45%, #d6249f 60%, #285aeb 90%); box-shadow: none; }
+.logo.chico:is(.logo-claude, .logo-codex, .logo-ffmpeg, .logo-paquetes, .logo-instagram) { box-shadow: 0 0 0 2px var(--panel-2); }
+
+/* La línea de debajo del nombre cuando se abre (las herramientas) o despliega (la cuenta de Claude). */
+.resumen, .sub .picker-trigger { align-self: flex-start; display: inline-flex; align-items: center; gap: 6px; height: auto; margin-left: -6px; padding: 1px 6px; border-radius: 6px; color: var(--muted); font-size: 12px; transition: color 0.15s, background 0.15s; }
+.resumen::after { content: ''; width: 5px; height: 5px; margin: -3px 1px 0; border-right: 1.5px solid; border-bottom: 1.5px solid; transform: rotate(45deg); opacity: 0.7; transition: transform 0.15s; }
+.resumen:hover, .resumen.on, .sub .picker-trigger:hover:not(:disabled), .sub.open .picker-trigger { color: var(--text); background: var(--panel); }
+.resumen.on::after { margin-top: 3px; transform: rotate(-135deg); }
+.sub { align-self: flex-start; }
+.sub .picker-trigger svg { width: 11px; height: 11px; }
+.grupo-titulo .resumen { margin: 0; }
+
+/* El estado, con un punto: verde si está bien, ámbar si te toca hacer algo, gris si no está. */
+.estado { display: inline-flex; align-items: center; gap: 7px; flex-shrink: 0; max-width: 50%; color: var(--text); font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.estado::before { content: ''; flex: none; width: 7px; height: 7px; border-radius: 50%; background: var(--ok); }
+.estado.falta { color: var(--amber); }
+.estado.falta::before { background: var(--amber); }
+.estado.moviendo { color: var(--amber); }
+.estado.moviendo::before { background: var(--amber); animation: pulse 1.2s steps(5) infinite; }
+.estado.apagado { color: var(--muted); }
+.estado.apagado::before { background: var(--line); box-shadow: inset 0 0 0 1px var(--muted); }
+
+/* A la derecha: el ámbar para lo que falta hacer, el de borde para lo que se cambia, y un desplegable con el estado por cara. */
+.panel .primary { padding: 6px 14px; font-size: 12.5px; border-radius: 8px; flex-shrink: 0; }
+.boton { flex-shrink: 0; padding: 5px 12px; border-radius: 8px; border: 1px solid var(--line); color: var(--text); font-size: 12.5px; font-weight: 600; transition: border-color 0.15s, color 0.15s; }
+.boton:hover:not(:disabled) { border-color: var(--amber); color: var(--amber); }
+.grupo-titulo .boton { padding: 3px 10px; font-size: 12px; }
+.acciones .picker-trigger { height: 30px; padding: 0 8px 0 10px; }
+.acciones .picker-menu { left: auto; right: 0; }
+.acciones .estado { max-width: 200px; }
+
+.opcion-fila { display: flex; align-items: center; gap: 10px; }
+.opcion-fila input { flex: 1; min-width: 0; padding: 7px 11px; border-radius: 8px; background: var(--panel); border: 1px solid var(--line); outline: none; }
+.opcion-fila input:focus { border-color: var(--amber); }
+.opcion-fila .ghost { flex-shrink: 0; }
+/* En el aviso del hilo nuevo, `.new-head p` pinta todo de gris: el error sigue en rojo. */
+.panel .bad { color: var(--bad); }
+
+/* Un interruptor con su nombre a la izquierda: pulsar el nombre también lo cambia. */
+.con-interruptor { flex: none; display: inline-flex; align-items: center; gap: 7px; color: var(--muted); font-size: 12.5px; cursor: pointer; }
+.con-interruptor + .con-interruptor { margin-left: 6px; }
+/* Un interruptor: apagado, la bolita gris a la izquierda; encendido, el fondo ámbar y la bolita a la derecha. */
+.interruptor { flex: none; position: relative; width: 34px; height: 20px; border-radius: 999px; background: var(--line); transition: background 0.15s; }
+.interruptor span { position: absolute; top: 3px; left: 3px; width: 14px; height: 14px; border-radius: 50%; background: var(--muted); transition: transform 0.15s, background 0.15s; }
+.interruptor.on { background: var(--amber); }
+.interruptor.on span { transform: translateX(14px); background: var(--sobre-ambar); }
+
+/* Los límites del plan de Claude, debajo de la cuenta: una barra por ventana, verde con holgura, ámbar si se acerca, roja casi al tope. */
+.limites { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px 24px; padding-top: 2px; font-size: 12px; }
+.limite { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.limite-nombre { display: flex; justify-content: space-between; gap: 8px; font-variant-numeric: tabular-nums; }
+.limite-barra { height: 5px; border-radius: 99px; background: var(--line); overflow: hidden; }
+.limite-barra span { display: block; height: 100%; border-radius: inherit; background: var(--ok); }
+.limite-barra.alto span { background: var(--amber); }
+.limite-barra.lleno span { background: var(--bad); }

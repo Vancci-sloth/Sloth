@@ -1,0 +1,62 @@
+# Comprueba lo que llegaría a la app instalada antes de publicar desde venta.
+# Usa el empaquetado real en los tres sistemas; deja los archivos en el runner.
+name: Comprobar Sloth
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: comprobar-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  comprobar:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24.18.0
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      # Las pruebas de YouTube generan videos y extraen sus fotogramas con FFmpeg.
+      - name: Instalar FFmpeg en Windows
+        if: runner.os == 'Windows'
+        run: choco install ffmpeg --yes --no-progress
+      - name: Instalar FFmpeg en Mac
+        if: runner.os == 'macOS'
+        run: brew install ffmpeg
+        env:
+          HOMEBREW_NO_AUTO_UPDATE: '1'
+      - name: Instalar FFmpeg en Linux
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes ffmpeg
+      - run: ffmpeg -version
+      - run: npm test
+      # La sintaxis de los scripts de las skills; sin videos hechos, las plantillas se saltan.
+      - run: npm run comprobar-skills
+      # compilar incluye el typecheck y comprueba los paquetes que llevará el servidor.
+      - run: npm run compilar -- --sin-instalador
+        env:
+          SLOTH_TUYO: ${{ secrets.SLOTH_TUYO }}
+          # Reproduce también los secretos vacíos que GitHub entrega cuando faltan.
+          # Mac usa la firma ad hoc; esta comprobación no necesita credenciales.
+          CSC_LINK: ''
+          CSC_KEY_PASSWORD: ''
+          APPLE_ID: ''
+          APPLE_APP_SPECIFIC_PASSWORD: ''
+          APPLE_TEAM_ID: ''

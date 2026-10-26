@@ -1,0 +1,231 @@
+/* La sección Ideas: una columna que se lee de arriba abajo, en el orden del método. */
+.ideas { width: 100%; max-width: 980px; margin: 0 auto; padding: 40px 48px 64px; overflow-y: auto; display: flex; flex-direction: column; gap: 16px; }
+.main:has(.ideas) { overflow-y: auto; }
+.ideas-head h1 { font-size: 26px; font-weight: 700; letter-spacing: -0.02em; margin: 0 0 6px; }
+.ideas-head p { margin: 0; max-width: 720px; font-size: 13.5px; }
+
+.ideas-canales { display: flex; flex-wrap: wrap; gap: 6px; }
+.ideas-canal { display: inline-flex; align-items: center; gap: 7px; padding: 6px 14px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); font-size: 13px; font-weight: 600; transition: color 0.15s, border-color 0.15s, background 0.15s; }
+.ideas-canal:hover { color: var(--text); border-color: #4a4236; }
+.ideas-canal.on { color: var(--amber); border-color: var(--amber); background: var(--amber-tinte); }
+.ideas-canal.mas { border-style: dashed; }
+/* Los logos de TikTok e Instagram (`Logos.tsx`), más chicos que en Opciones: van en una pastilla, una ficha o una portada. */
+.ideas .logo.chico { display: inline-grid; vertical-align: -3px; width: 16px; height: 16px; border-radius: 4px; }
+.ideas .logo.chico svg { width: 10px; height: 10px; }
+.perfil .logo.chico, .tabla .logo.chico { margin-right: 4px; }
+
+/* El formulario del canal */
+.canal-form { gap: 12px; }
+.segmento.formato { align-self: flex-start; font-size: 13px; }
+.segmento.formato button { padding: 4px 14px; }
+.copiar { display: flex; flex-wrap: wrap; gap: 6px; }
+.campo { display: flex; flex-direction: column; gap: 4px; }
+.campo > span { font-size: 12.5px; font-weight: 600; }
+.campo input, .campo textarea { padding: 8px 11px; border-radius: var(--radio); background: var(--panel); border: 1px solid var(--line); outline: none; resize: vertical; }
+.campo input:focus, .campo textarea:focus { border-color: var(--amber); }
+.fichas { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; padding: 5px 6px; border-radius: var(--radio); background: var(--panel); border: 1px solid var(--line); }
+.fichas:focus-within { border-color: var(--amber); }
+.fichas .tag { display: inline-flex; align-items: center; gap: 4px; padding: 2px 4px 2px 9px; border-radius: 999px; background: var(--panel-2); border: 1px solid var(--line); font-size: 12.5px; }
+.fichas .tag button { width: 18px; height: 18px; border-radius: 50%; font-size: 10px; color: var(--muted); }
+.fichas .tag button:hover { color: var(--bad); }
+.fichas input { flex: 1; min-width: 160px; padding: 3px 5px; border: 0 !important; background: none !important; outline: none; }
+
+/* La entrevista: la invitación en el formulario, el «No sé» de cada campo y la barra de cómo va */
+.entrevista-invita { display: flex; align-items: center; gap: 14px; padding: 12px 14px; border-radius: var(--radio); border: 1px dashed var(--amber); background: var(--amber-tinte); }
+.entrevista-invita > div { flex: 1; display: flex; flex-direction: column; gap: 2px; }
+.entrevista-invita strong { font-size: 13.5px; }
+.campo-titulo { display: flex; align-items: baseline; gap: 10px; }
+.no-se { font-size: 12px; font-weight: 500; color: var(--amber); padding: 0; }
+.no-se:hover:not(:disabled) { color: var(--amber-2); text-decoration: underline; }
+.entrevista-barra { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-radius: var(--radio); border: 1px solid var(--line); background: var(--panel); font-size: 13px; }
+.entrevista-barra.espera { border-color: var(--amber); }
+.entrevista-barra.trabajando { border-color: var(--amber); }
+.entrevista-barra.lista { border-color: rgba(143, 193, 119, 0.45); }
+
+/* El perfil */
+.perfil dl { display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; margin: 2px 0 0; font-size: 13px; }
+.perfil dt { color: var(--muted); }
+.perfil dd { margin: 0; display: flex; flex-wrap: wrap; gap: 4px; align-items: baseline; }
+.perfil-acciones { display: flex; gap: 12px; }
+.perfil-acciones .peligro:hover { color: var(--bad); }
+.perfil .carpeta { margin-top: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ficha { display: inline-block; padding: 1px 9px; border-radius: 999px; background: var(--panel); border: 1px solid var(--line); font-size: 12px; }
+.ficha.boton { color: var(--muted); transition: color 0.15s, border-color 0.15s; }
+.ficha.boton:hover, .ficha.boton.on { color: var(--amber); border-color: var(--amber); }
+
+/* Tus videos: cómo le fue a cada uno, quién te ve y el diagnóstico */
+.tus-videos-tabla .num.bien { color: var(--ok); font-weight: 650; }
+.tus-videos-tabla .num.mal { color: var(--bad); }
+.tus-videos-tabla tr.privado td { opacity: 0.55; }
+.tus-videos-tabla .titulo-video { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.tus-videos-tabla .llegaron { font-size: 12.5px; white-space: nowrap; }
+.audiencia { display: grid; grid-template-columns: auto 1fr; gap: 4px 14px; margin: 0; font-size: 13px; }
+.audiencia dt { color: var(--muted); }
+.audiencia dd { margin: 0; }
+.diagnostico { max-height: 560px; overflow-y: auto; padding: 12px 16px; border-radius: var(--radio); background: var(--panel-2); border: 1px solid var(--line); font-size: 13.5px; }
+
+/* Los cuatro pasos del canal */
+.ideas-pasos { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.ideas-pasos li { display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-radius: var(--radio); border: 1px solid var(--line); min-width: 0; }
+.ideas-pasos li > span:last-child { display: flex; flex-direction: column; min-width: 0; }
+.ideas-pasos strong { font-size: 13px; }
+.ideas-pasos small { color: var(--muted); font-size: 11.5px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.ideas-paso-n { flex: none; width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; font-size: 11.5px; font-weight: 700; border: 1px solid var(--line); color: var(--muted); }
+.ideas-pasos li.ok .ideas-paso-n { background: var(--ok); border-color: var(--ok); color: var(--sobre-ambar); }
+.ideas-pasos li.on { border-color: var(--amber); }
+.ideas-pasos li.on .ideas-paso-n { border-color: var(--amber); color: var(--amber); animation: pulse 1.2s steps(5) infinite; }
+
+/* Investigación e ideas */
+.ideas-bloque { display: flex; flex-direction: column; gap: 10px; padding: 16px 18px; border-radius: 14px; background: var(--panel); border: 1px solid var(--line); }
+.ideas-bloque-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.ideas-bloque-head h2 { margin: 0; font-size: 17px; font-weight: 650; }
+.ideas-bloque p { margin: 0; }
+.primary.chico { padding: 5px 12px; font-size: 12.5px; }
+
+.trabajo { display: flex; flex-direction: column; gap: 8px; padding: 10px 12px; border-radius: var(--radio); background: var(--panel-2); border: 1px solid var(--line); }
+.trabajo.trabajando { border-color: var(--amber); }
+.trabajo.error { border-color: var(--bad); }
+.trabajo-estado { display: flex; align-items: center; gap: 10px; }
+.trabajo-estado strong { font-size: 13.5px; }
+.barra { height: 5px; border-radius: 99px; background: var(--panel); overflow: hidden; }
+.barra span { display: block; height: 100%; border-radius: inherit; background: var(--amber); transition: width 0.4s ease; }
+.registro { list-style: none; margin: 0; padding: 0; max-height: 260px; overflow-y: auto; display: flex; flex-direction: column; gap: 3px; }
+.registro li { display: grid; grid-template-columns: 20px 1fr auto; gap: 8px; align-items: baseline; font-size: 12.5px; animation: aparece 0.25s ease-out; }
+.registro-icono { text-align: center; font-size: 12px; }
+.registro-texto { min-width: 0; overflow-wrap: anywhere; }
+.registro-texto small { display: block; color: var(--muted); font-size: 11.5px; }
+.registro li.error .registro-texto { color: var(--bad); }
+.registro li.pausa .registro-texto { color: var(--amber); }
+.registro li.info .registro-texto { color: var(--muted); }
+@keyframes aparece { from { opacity: 0; transform: translateY(3px); } }
+
+.pestanas { align-self: flex-start; scroll-margin-top: 16px; }
+.filtro-activo { display: flex; align-items: center; gap: 10px; padding: 7px 10px; border-radius: var(--radio); background: var(--amber-tinte); color: var(--amber-2); }
+.filtro-activo span { flex: 1; }
+.enlace { color: var(--text); text-align: left; }
+.enlace:hover { color: var(--amber-2); }
+.tabla-wrap { display: flex; flex-direction: column; gap: 8px; }
+.filtros { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.filtros select { padding: 3px 6px; border-radius: 7px; background: var(--panel-2); border: 1px solid var(--line); }
+.filtros label { display: inline-flex; align-items: center; gap: 5px; color: var(--muted); cursor: pointer; }
+.tabla { width: 100%; border-collapse: collapse; font-size: 13px; }
+.tabla th { text-align: left; font-size: 11px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); padding: 4px 8px; border-bottom: 1px solid var(--line); }
+.tabla td { padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+.tabla tr:hover td { background: var(--panel-2); }
+.tabla a { color: var(--text); text-decoration: none; }
+.tabla a:hover { color: var(--amber-2); }
+.tabla .num { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.tabla .num.x, .x { color: var(--amber); font-weight: 700; }
+.celda-mini { width: 104px; }
+.celda-mini img { display: block; width: 96px; aspect-ratio: 16 / 9; object-fit: cover; border-radius: 6px; background: var(--panel-2); }
+.celda-portada { width: 52px; }
+.celda-portada a { display: block; }
+/* La portada 9:16 de un video vertical; si no se bajó, queda el hueco. */
+.portada { position: relative; display: block; flex: none; width: 44px; aspect-ratio: 9 / 16; border-radius: 6px; overflow: hidden; background: var(--panel-2); }
+.ideas .portada img { display: block; width: 100%; height: 100%; aspect-ratio: auto; object-fit: cover; border-radius: 0; }
+.portada .logo { position: absolute; left: 3px; bottom: 3px; }
+.titulo-video { font-weight: 600; }
+.texto-vertical { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+/* Lo que dice un video al principio: en YouTube son unos 30 s, cortados a dos líneas (entero en su `title`). */
+.dice { margin-top: 2px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.destacados summary { cursor: pointer; width: fit-content; }
+.destacados ul { margin: 4px 0 0; padding-left: 16px; display: flex; flex-direction: column; gap: 3px; }
+/* Las cuentas de investigación: una línea por red. */
+.cuentas-investigacion { display: flex; flex-direction: column; gap: 4px; }
+.cuenta-red { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+/* Búsquedas: en vertical, la frase una vez y una fila por red; el grupo se ilumina entero. */
+.busquedas .frase td[rowspan] { vertical-align: top; }
+.busquedas .frase tr:not(:last-child) td:not([rowspan]) { border-bottom-color: transparent; }
+.tabla.busquedas tr:hover td { background: none; }
+.tabla.busquedas .frase:hover td { background: var(--panel-2); }
+.busqueda-red { white-space: nowrap; }
+.celda-barra { width: 30%; }
+.barra-h { display: block; height: 8px; border-radius: 99px; background: var(--amber); opacity: 0.75; min-width: 2px; }
+.idea-marca { display: inline-block; margin-left: 4px; padding: 0 6px; border-radius: 999px; border: 1px solid var(--line); font-size: 10.5px; color: var(--muted); }
+.idea-marca.mal { color: var(--bad); border-color: rgba(224, 108, 85, 0.45); }
+/* Lo que funciona en otro idioma y aún no existe en español: lo que está por traerse. */
+.idea-marca.hueco { color: var(--amber); border-color: var(--amber); }
+/* Temas: una fila por tema; al abrirlo, sus videos debajo, sin el realce de la fila. */
+.tabla.temas tbody.abierto tr:first-child td { border-bottom-color: transparent; }
+.tabla.temas tr.tema-videos:hover td { background: none; }
+.tema-donde { white-space: nowrap; }
+.tema-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 18px; padding-bottom: 4px; }
+.tema-cols > div { min-width: 0; }
+
+/* Proponer */
+.proponer { display: flex; gap: 10px; }
+.proponer input { flex: 1; min-width: 0; padding: 8px 12px; border-radius: var(--radio); background: var(--panel-2); border: 1px solid var(--line); outline: none; }
+.proponer input:focus { border-color: var(--amber); }
+.mini-etapas { list-style: none; display: flex; gap: 6px; margin: 0; padding: 0; }
+.mini-etapas li { padding: 2px 10px; border-radius: 999px; border: 1px solid var(--line); font-size: 12px; color: var(--muted); }
+.mini-etapas li.ok { color: var(--ok); border-color: rgba(143, 193, 119, 0.4); }
+.mini-etapas li.on { color: var(--amber); border-color: var(--amber); }
+.idea-vivo { display: flex; align-items: baseline; gap: 12px; }
+.vivo-ahora { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; color: var(--amber-2); }
+.razon { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.razon-texto { max-height: 420px; overflow-y: auto; padding: 12px 16px; border-radius: var(--radio); background: var(--panel-2); border: 1px solid var(--line); font-size: 13.5px; }
+
+/* Las vueltas anteriores */
+.anteriores { display: flex; flex-direction: column; gap: 12px; }
+.vuelta { display: flex; flex-direction: column; gap: 4px; padding: 10px 12px; border-radius: var(--radio); background: var(--panel-2); border: 1px solid var(--line); }
+.vuelta-idea { display: flex; align-items: center; gap: 12px; padding: 5px 0; border-top: 1px solid var(--line); font-size: 13px; }
+.vuelta-idea > span:first-child { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.vuelta-idea small { font-size: 11.5px; }
+
+/* Una idea */
+.idea { display: flex; flex-direction: column; gap: 10px; padding: 14px 16px; border-radius: 12px; background: var(--panel-2); border: 1px solid var(--line); }
+.idea.elegida { border-color: var(--amber); }
+.idea.descartada { opacity: 0.6; }
+.idea-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+.idea-top h3 { margin: 2px 0 0; font-size: 16.5px; line-height: 1.3; }
+.idea-n { display: inline-grid; place-items: center; width: 18px; height: 18px; margin-right: 6px; border-radius: 50%; background: var(--amber-tinte); color: var(--amber); font-size: 11px; font-weight: 700; }
+.idea-rango { flex: none; font-family: var(--mono); font-size: 11.5px; color: var(--muted); white-space: nowrap; }
+.idea-rango strong { color: var(--text); }
+.idea-hilos { display: flex; flex-direction: column; gap: 2px; }
+.idea-estado { display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--amber); }
+.idea-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.idea-caja { padding: 9px 11px; border-radius: 9px; background: var(--panel); font-size: 13px; min-width: 0; }
+.idea-caja p { margin: 0 0 6px; }
+.caja-l { font-size: 10.5px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; color: var(--muted); margin-bottom: 5px; }
+.evidencia { display: flex; gap: 8px; align-items: center; padding: 3px; margin: 0 -3px; border-radius: 7px; color: var(--text); text-decoration: none; }
+.evidencia:hover { background: var(--panel-2); }
+.evidencia img { flex: none; width: 72px; aspect-ratio: 16 / 9; object-fit: cover; border-radius: 5px; }
+.evidencia .portada { width: 36px; border-radius: 5px; }
+.evidencia > span { display: flex; flex-direction: column; min-width: 0; }
+.evidencia-t { font-size: 12.5px; font-weight: 600; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.evidencia-dice { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.evidencia.falta { color: var(--bad); font-size: 12px; }
+.titulos { margin: 0; padding-left: 18px; }
+.titulos li { margin-bottom: 5px; }
+.titulos small { display: block; color: var(--muted); font-size: 11.5px; }
+.cuatro-p { display: grid; grid-template-columns: auto 1fr; gap: 3px 10px; margin: 0; }
+.cuatro-p dt { color: var(--amber); font-family: var(--mono); font-size: 11.5px; padding-top: 1px; }
+.cuatro-p dd { margin: 0; }
+.idea-porque { font-size: 13px; }
+.idea-porque p { margin: 0 0 4px; }
+.riesgo { color: var(--bad); }
+.idea-esquema .md { margin-top: 6px; padding: 10px 14px; border-radius: 9px; background: var(--panel); font-size: 13.5px; max-height: 480px; overflow-y: auto; }
+.idea-acciones { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding-top: 4px; border-top: 1px solid var(--line); }
+.idea-acciones-fin { margin-left: auto; display: flex; gap: 14px; }
+.btn-card { display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px; border-radius: 8px; border: 1px solid var(--line); font-size: 12.5px; transition: border-color 0.15s, color 0.15s; }
+.btn-card:hover { border-color: var(--amber); color: var(--amber-2); }
+.btn-card.sugerido { border-color: var(--amber); background: var(--amber-tinte); }
+
+/* El feed simulado */
+.modal.feed { width: min(900px, calc(100vw - 40px)); max-height: calc(100vh - 60px); overflow-y: auto; }
+.feed-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-top: 14px; }
+.feed-tile { display: flex; flex-direction: column; gap: 4px; color: var(--text); text-decoration: none; font-size: 12.5px; min-width: 0; }
+.feed-tile strong { font-size: 13px; line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.feed-thumb { width: 100%; aspect-ratio: 16 / 9; object-fit: cover; border-radius: 9px; background: var(--panel-2); }
+.feed-tile.tuyo .feed-thumb { outline: 2px solid var(--amber); outline-offset: 2px; }
+.feed-thumb.concepto { display: grid; place-items: center; padding: 10px; text-align: center; font-size: 11.5px; color: var(--muted); background: var(--panel-2); border: 1px dashed var(--amber); overflow: hidden; }
+/* El feed de TikTok: portadas 9:16, cinco por fila. */
+.feed-grid.vertical { grid-template-columns: repeat(5, 1fr); }
+.feed-grid.vertical .feed-thumb { width: 100%; aspect-ratio: 9 / 16; }
+
+@media (max-width: 900px) {
+  .ideas { padding: 28px 22px 48px; }
+  .ideas-pasos, .idea-cols { grid-template-columns: 1fr 1fr; }
+  .feed-grid { grid-template-columns: 1fr 1fr; }
+  .feed-grid.vertical { grid-template-columns: repeat(3, 1fr); }
+}

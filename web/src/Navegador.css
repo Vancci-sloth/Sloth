@@ -1,0 +1,27 @@
+/* El navegador de cada hilo: una barra como la de un navegador y, debajo, la caja donde la ventana pone la página. A la
+   derecha del chat; en el estudio, en el centro. */
+.navegador { display: flex; flex-direction: column; min-width: 0; min-height: 0; background: var(--panel); }
+.session-cuerpo > .navegador { flex: 0 0 clamp(380px, 48%, 980px); border-left: 1px solid var(--line); }
+.estudio > .navegador { grid-area: centro; }
+.navegador-barra { position: relative; display: flex; align-items: center; gap: 2px; padding: 6px 8px; border-bottom: 1px solid var(--line); }
+/* Mientras carga, una línea ámbar quieta bajo la barra. */
+.navegador.cargando .navegador-barra::after { content: ''; position: absolute; left: 0; right: 0; bottom: -1px; height: 2px; background: var(--amber); opacity: 0.7; }
+.navegador-boton { flex: none; display: grid; place-items: center; width: 28px; height: 28px; border-radius: 7px; color: var(--muted); transition: background 0.15s, color 0.15s; }
+.navegador-boton:hover:not(:disabled) { background: var(--panel-2); color: var(--text); }
+.navegador-boton .ico { width: 15px; height: 15px; }
+.navegador-direccion { flex: 1; min-width: 0; margin: 0 4px; }
+.navegador-direccion input { width: 100%; height: 28px; padding: 0 10px; border-radius: 7px; background: var(--bg); border: 1px solid var(--line); outline: none; font-size: 12.5px; color: var(--muted); }
+.navegador-direccion input:focus { border-color: var(--amber); color: var(--text); }
+.navegador-agente { flex: none; display: inline-flex; align-items: center; gap: 6px; margin-right: 4px; padding: 2px 9px; border-radius: 999px; background: var(--amber-tinte); color: var(--amber); font-size: 11.5px; font-weight: 650; }
+.navegador-agente::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--amber); animation: pulse 1.2s steps(5) infinite; }
+.navegador-pagina { position: relative; flex: 1; min-height: 0; background: var(--bg); }
+.navegador-vacio { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; padding: 32px; text-align: center; }
+.navegador-vacio .ico { width: 28px; height: 28px; margin-bottom: 6px; color: var(--muted); }
+.navegador-vacio span { max-width: 340px; overflow-wrap: anywhere; }
+
+/* El globo del encabezado, redondo como el de pedir una mejora: ámbar mientras se ve, con un punto si el agente lo usa. */
+.boton-navegador { position: relative; flex: none; display: grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; border: 1px solid var(--line); color: var(--muted); transition: color 0.15s, border-color 0.15s, background 0.15s; }
+.boton-navegador:hover { color: var(--text); background: var(--panel-2); }
+.boton-navegador.on { color: var(--amber); border-color: color-mix(in srgb, var(--amber) 45%, var(--line)); background: var(--amber-tinte); }
+.boton-navegador .ico { width: 15px; height: 15px; }
+.boton-navegador.agente:not(.on)::after { content: ''; position: absolute; top: 1px; right: 1px; width: 7px; height: 7px; border-radius: 50%; background: var(--amber); box-shadow: 0 0 0 2px var(--bg); }

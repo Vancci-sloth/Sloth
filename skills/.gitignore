@@ -1,0 +1,5 @@
+synced/
+.trash/
+node_modules/
+__pycache__/
+*.pyc

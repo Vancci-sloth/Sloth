@@ -1,0 +1,11 @@
+/* Lo elegido en el video, encima del campo del chat: su etiqueta y, si es un elemento, lo que más se pide. */
+.referencia { display: flex; flex-direction: column; gap: 6px; padding: 0 2px 8px; animation: etapa-entra 0.2s ease-out; }
+.referencia-fila { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; min-width: 0; }
+.referencia-chip { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; padding: 3px 4px 3px 9px; border-radius: 8px; border: 1px solid var(--amber); background: var(--amber-tinte); color: var(--amber-2); font-size: 12.5px; }
+.referencia-chip .ico { flex: none; width: 14px; height: 14px; }
+.referencia-nombre { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.referencia-chip button { flex: none; display: grid; place-items: center; width: 20px; height: 20px; border-radius: 5px; color: var(--amber-2); }
+.referencia-chip button:hover { background: var(--amber-tinte); color: var(--text); }
+.referencia-chip button .ico { width: 13px; height: 13px; }
+.referencia-sugerencia { padding: 3px 10px; border-radius: 999px; border: 1px solid var(--line); background: var(--panel-2); color: var(--muted); font-size: 12px; }
+.referencia-sugerencia:hover { color: var(--text); border-color: var(--muted); }

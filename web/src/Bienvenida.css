@@ -1,0 +1,20 @@
+.modal.bienvenida { width: min(640px, calc(100vw - 32px)); max-height: calc(100vh - 48px); overflow-y: auto; padding: 26px 28px 20px; }
+.bienvenida header { display: flex; gap: 16px; align-items: flex-start; margin-bottom: 18px; }
+.bienvenida header img { width: 48px; height: 48px; flex: none; }
+.bienvenida header h2 { margin: 2px 0 6px; font-size: 20px; }
+.bienvenida header p { margin: 0; color: var(--muted); font-size: 14px; line-height: 1.5; }
+.bienvenida .paso { display: flex; gap: 14px; padding: 14px 0; border-top: 1px solid var(--line); }
+.bienvenida .paso-n {
+  flex: none; display: grid; place-items: center; width: 26px; height: 26px; border-radius: 50%;
+  background: var(--amber-tinte); color: var(--amber); font-size: 13px; font-weight: 650;
+}
+.bienvenida .paso.hecho .paso-n { background: transparent; border: 1.5px solid var(--ok); color: var(--ok); }
+.bienvenida .paso-n .ico { width: 14px; height: 14px; }
+.bienvenida .paso-cuerpo { flex: 1; min-width: 0; }
+.bienvenida .paso-cuerpo strong { display: block; margin: 3px 0 4px; font-size: 14.5px; }
+.bienvenida .paso-texto { color: var(--muted); font-size: 13.5px; line-height: 1.55; }
+.bienvenida .paso-texto b { color: var(--text); }
+.bienvenida .paso-texto .panel { margin-top: 10px; }
+.bienvenida .anclar { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; margin-top: 10px; }
+.bienvenida .anclar p { margin: 0; }
+.bienvenida .modal-actions { justify-content: space-between; border-top: 1px solid var(--line); padding-top: 16px; margin-top: 4px; }

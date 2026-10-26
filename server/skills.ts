@@ -1,0 +1,75 @@
+import { existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, symlinkSync, unlinkSync } from 'node:fs'
+import { homedir } from 'node:os'
+import { join } from 'node:path'
+import type { Card, Serie } from '../shared/types.ts'
+import type { SkillRef } from './agent.ts'
+import { guardar } from './disco.ts'
+
+const ROOT = join(homedir(), '.claude', 'skills')
+
+/**
+ * La app que se vende trae sus skills en `<app>/skills`, y Claude las busca en ~/.claude/skills: enlaza ahí, con una unión
+ * como la del repo, cada una que falte. Las que ya están no se tocan, que pueden ser del usuario; solo se rehace la unión
+ * que apunta a una carpeta que ya no existe (Sloth se movió de sitio).
+ */
+export function enlazarSkills(app: string) {
+  mkdirSync(ROOT, { recursive: true })
+  for (const nombre of readdirSync(join(app, 'skills'))) {
+    const destino = join(ROOT, nombre)
+    if (existsSync(destino)) continue
+    try {
+      try {
+        if (lstatSync(destino).isSymbolicLink()) unlinkSync(destino)
+      } catch { /* No había nada. */ }
+      symlinkSync(join(app, 'skills', nombre), destino, 'junction')
+    } catch (error) {
+      console.error(`No se pudo enlazar la skill ${nombre} en ${ROOT}: ${error instanceof Error ? error.message : error}`)
+    }
+  }
+}
+
+/** La skill, si está instalada. `undefined` si no. */
+export function skillRef(name: string): SkillRef | undefined {
+  const path = join(ROOT, name, 'SKILL.md')
+  return existsSync(path) ? { name, path } : undefined
+}
+
+/** Las series de una skill: cada `series/<id>.md` de su carpeta, con el título de su primera línea `# `. */
+export function seriesDe(skill: string): Serie[] {
+  const dir = join(ROOT, skill, 'series')
+  if (!existsSync(dir)) return []
+  return readdirSync(dir)
+    .filter((f) => f.endsWith('.md'))
+    .map((f) => ({ id: f.slice(0, -3), nombre: /^# (.+)$/m.exec(readFileSync(join(dir, f), 'utf8'))?.[1].trim() ?? f.slice(0, -3) }))
+    .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'))
+}
+
+export function readCards(file: string, appDir: string): Card[] {
+  const cards = JSON.parse(readFileSync(file, 'utf8')) as Partial<Card>[]
+  // Sin `cwd`, la card trabaja dentro de Sloth, en su propia carpeta. Una etapa sin `muestra` enseña lo de `listo`.
+  return cards.map((c) => ({
+    ...c,
+    cwd: (c.cwd ?? `{app}/trabajo/${c.id}`).replace('{app}', appDir),
+    ...(c.etapas ? { etapas: c.etapas.map((e) => ({ ...e, muestra: e.muestra ?? e.listo })) } : {})
+  }) as Card)
+}
+
+/** Copia la card justo después de la original, con un id libre (`<id>-2`, `<id>-3`…). La skill es la misma. */
+export function duplicateCard(file: string, id: string): string {
+  const cards = JSON.parse(readFileSync(file, 'utf8')) as Partial<Card>[]
+  const i = cards.findIndex((c) => c.id === id)
+  if (i < 0) throw new Error('No existe esa card')
+  let n = 2
+  while (cards.some((c) => c.id === `${id}-${n}`)) n++
+  const copy = { ...cards[i], id: `${id}-${n}`, title: `${cards[i].title} (copia)` }
+  cards.splice(i + 1, 0, copy)
+  guardar(file, JSON.stringify(cards, null, 2) + '\n')
+  return copy.id
+}
+
+/** Quita la card de cards.json. La skill y los hilos que se hicieron con ella se quedan. */
+export function removeCard(file: string, id: string) {
+  const cards = JSON.parse(readFileSync(file, 'utf8')) as Partial<Card>[]
+  if (!cards.some((c) => c.id === id)) throw new Error('No existe esa card')
+  guardar(file, JSON.stringify(cards.filter((c) => c.id !== id), null, 2) + '\n')
+}

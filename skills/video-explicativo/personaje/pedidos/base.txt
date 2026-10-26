@@ -1,0 +1,8 @@
+Use your built-in image_gen tool (do not draw with code). Generate one image with image_gen, then copy the PNG from $CODEX_HOME/generated_images/... into this working directory as perro.png. Reply only with the file name.
+
+The image: the narrator of a short-video channel, DESCRIBE AQUÍ AL PERSONAJE EN INGLÉS (lo que pidió el usuario: quién o qué es, su ropa, sus colores, algo que lo distinga). Si va una foto con -i: «based on the attached photo: the same face and features, it must be clearly recognizable».
+
+Rules:
+- A REAL PHOTOGRAPH, photorealistic, crisp detail, soft studio lighting (unless the user asked for an illustration: then a clean illustration in that style, and every later pose keeps it).
+- Bust from mid-chest up, facing the camera, head centered in the upper half, square image. Neutral, confident expression, mouth closed.
+- Plain pure white seamless background, no text, no other objects.

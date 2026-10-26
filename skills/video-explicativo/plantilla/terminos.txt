@@ -1,0 +1,1 @@
+# Nombres que el transcriptor tiene que reconocer, uno por renglón (los del tema: personas, marcas, lugares, términos técnicos).

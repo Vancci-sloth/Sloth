@@ -1,0 +1,164 @@
+[
+  {
+    "id": "sloth",
+    "title": "Sloth",
+    "description": "Mejora esta app desde dentro: pídele un cambio y míralo aparecer.",
+    "cwd": "{app}",
+    "icon": "/icon.svg"
+  },
+  {
+    "id": "video-el-diff",
+    "title": "El Diff",
+    "description": "Tu noticiero en vertical para TikTok, con tu nombre, tu sello y tu despedida: le das un enlace o un tema, te escribe el guion, grabas tu voz y arma el episodio, o un short.",
+    "skill": "video-el-diff",
+    "icon": "noticiero",
+    "videos": [
+      "C:/dev/el-diff-*",
+      "C:/dev/video-explicado"
+    ],
+    "horizontal": true,
+    "etapas": [
+      {
+        "nombre": "Fuentes",
+        "listo": "fuentes/tema/transcripcion.txt",
+        "muestra": "fuentes/tema/video.mp4",
+        "fase": "idea"
+      },
+      {
+        "nombre": "Material",
+        "listo": "material.md",
+        "muestra": "{material.md,fuentes/material/**/*.{png,jpg,jpeg,webp}}",
+        "fase": "idea"
+      },
+      {
+        "nombre": "Guion",
+        "listo": "guion.md",
+        "copiar": true,
+        "fase": "guion"
+      },
+      {
+        "nombre": "Tu voz",
+        "listo": "public/voz/narracion.wav",
+        "espera": "Graba el guion (con el celular basta) y súbelo aquí o mándalo por el chat.",
+        "fase": "sonido"
+      },
+      {
+        "nombre": "Escenas",
+        "listo": "guion.json",
+        "fase": "video"
+      },
+      {
+        "nombre": "Revisión",
+        "listo": "revision/hoja_95_*.png",
+        "fase": "video"
+      },
+      {
+        "nombre": "Video",
+        "listo": "out/el-diff-final.mp4",
+        "fase": "video"
+      },
+      {
+        "nombre": "Portada",
+        "listo": "portada.png",
+        "fase": "entrega"
+      }
+    ],
+    "editor": {
+      "guion": "guion.json",
+      "linea": "src/timeline.json",
+      "video": "out/el-diff-final.mp4",
+      "cuadros": "revision/{id}_95.jpg",
+      "vivo": "vivo/index.html",
+      "entradas": [
+        "guion.json",
+        "src/**",
+        "public/**"
+      ]
+    },
+    "modelos": {
+      "principal": {
+        "model": "claude-opus-5-5",
+        "effort": "high"
+      },
+      "tareas": [
+        {
+          "nombre": "captura",
+          "para": "Capturas de las páginas y tuits",
+          "model": "sonnet",
+          "effort": "medium",
+          "medido": "Pasada 3: lo mismo que high por un 40-45 % menos; low capturó el canal equivocado"
+        },
+        {
+          "nombre": "pantalla",
+          "para": "Mapa de lo que se ve en el video del tema",
+          "model": "sonnet",
+          "effort": "high",
+          "medido": "Pasada 3: el único que no se salta lo que dura poco ni lo que solo se lee con OCR"
+        },
+        {
+          "nombre": "revisión",
+          "para": "Revisión de las hojas de cada escena",
+          "model": "sonnet",
+          "effort": "high",
+          "medido": "Pasada 3: medium falló un defecto en una de tres corridas"
+        },
+        {
+          "nombre": "escenas",
+          "para": "Armar el video: escenas, revisión y render (fase 2)",
+          "model": "opus",
+          "effort": "medium",
+          "medido": "Sin medir en esta skill: elegido el 19 de octubre para bajar el tiempo (Opus 5.5 en medium rinde como Opus 5 en high, según Anthropic)"
+        }
+      ]
+    }
+  },
+  {
+    "id": "video-explicativo",
+    "title": "Video explicativo",
+    "description": "Un vertical que explica cualquier tema en el tiempo que necesite: un solo mundo 3D que la cámara recorre sin cortes, el texto palabra por palabra y tu personaje abajo (el perro salchicha, uno tuyo o ninguno). Tú grabas la voz y el cierre lleva a donde quieras.",
+    "skill": "video-explicativo",
+    "icon": "pizarra",
+    "videos": [
+      "C:/dev/explicado-*"
+    ],
+    "etapas": [
+      {
+        "nombre": "Investigación",
+        "listo": "fuentes/investigacion.md",
+        "fase": "idea"
+      },
+      {
+        "nombre": "Guion",
+        "listo": "guion.md",
+        "copiar": true,
+        "fase": "guion"
+      },
+      {
+        "nombre": "Tu voz",
+        "listo": "fuentes/voz/original.wav",
+        "espera": "Graba el guion (con el celular basta) y súbelo aquí o mándalo por el chat.",
+        "fase": "sonido"
+      },
+      {
+        "nombre": "Voz lista",
+        "listo": "fuentes/voz/rapida.wav",
+        "fase": "sonido"
+      },
+      {
+        "nombre": "Revisión",
+        "listo": "revision/borrador-*.png",
+        "fase": "video"
+      },
+      {
+        "nombre": "Video",
+        "listo": "out/!(render*|borrador*|_*).mp4",
+        "fase": "video"
+      },
+      {
+        "nombre": "Portada",
+        "listo": "{portada.png,portada/*.png}",
+        "fase": "entrega"
+      }
+    ]
+  }
+]

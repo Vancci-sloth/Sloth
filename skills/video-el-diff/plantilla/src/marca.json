@@ -1,0 +1,13 @@
+{
+  "nombre": "El Noticiero",
+  "logo": ["EL", "NOTICIERO"],
+  "sello": "EL NOTICIERO",
+  "lema": ["noticias aburridas", "noticias, rápido"],
+  "tema": "",
+  "despedida": "Esto ha sido El Noticiero, gracias por ver.",
+  "despedida_rotulo": "gracias por ver",
+  "invitacion": "Si te sirvió, sígueme para no perderte el próximo. Nos vemos.",
+  "invitacion_rotulo": ["sígueme", "para el próximo"],
+  "voz_studio": "",
+  "aprendido": ""
+}

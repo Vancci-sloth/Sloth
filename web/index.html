@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" href="/icon.svg" />
+    <title>Sloth</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module">
+      // Si un cambio a medias rompió un import, la app no llega a montarse y Vite ya no la recarga: sus actualizaciones
+      // son de módulos que nunca cargaron. Con la página vacía, el siguiente cambio la recarga entera.
+      import.meta.hot?.on('vite:beforeUpdate', () => {
+        if (!document.getElementById('root').hasChildNodes()) location.reload()
+      })
+    </script>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

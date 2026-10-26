@@ -1,0 +1,100 @@
+{
+  "poses": {
+    "normal": {
+      "cerrada": "perro/normal.webp",
+      "abierta": "perro/normal-abierta.webp"
+    },
+    "acostado": {
+      "cerrada": "perro/acostado.webp",
+      "abierta": "perro/acostado-abierta.webp"
+    },
+    "arriba": {
+      "cerrada": "perro/arriba.webp",
+      "abierta": "perro/arriba-abierta.webp"
+    },
+    "billetes": {
+      "cerrada": "perro/billetes.webp",
+      "abierta": "perro/billetes-abierta.webp"
+    },
+    "cartel": {
+      "cerrada": "perro/cartel.webp",
+      "abierta": "perro/cartel-abierta.webp"
+    },
+    "celular": {
+      "cerrada": "perro/celular.webp",
+      "abierta": "perro/celular-abierta.webp"
+    },
+    "feliz": {
+      "cerrada": "perro/feliz.webp"
+    },
+    "ladea": {
+      "cerrada": "perro/ladea.webp",
+      "abierta": "perro/ladea-abierta.webp"
+    },
+    "lado": {
+      "cerrada": "perro/lado.webp",
+      "abierta": "perro/lado-abierta.webp"
+    },
+    "ladra": {
+      "cerrada": "perro/ladra.webp"
+    },
+    "lentes": {
+      "cerrada": "perro/lentes.webp",
+      "abierta": "perro/lentes-abierta.webp"
+    },
+    "llave": {
+      "cerrada": "perro/llave.webp",
+      "abierta": "perro/llave-abierta.webp"
+    },
+    "lupa": {
+      "cerrada": "perro/lupa.webp",
+      "abierta": "perro/lupa-abierta.webp"
+    },
+    "moneda": {
+      "cerrada": "perro/moneda.webp",
+      "abierta": "perro/moneda-abierta.webp"
+    },
+    "pata": {
+      "cerrada": "perro/pata.webp",
+      "abierta": "perro/pata-abierta.webp"
+    },
+    "reojo": {
+      "cerrada": "perro/reojo.webp",
+      "abierta": "perro/reojo-abierta.webp"
+    },
+    "susto": {
+      "cerrada": "perro/susto.webp"
+    },
+    "tapa": {
+      "cerrada": "perro/tapa.webp",
+      "abierta": "perro/tapa-abierta.webp"
+    },
+    "triste": {
+      "cerrada": "perro/triste.webp",
+      "abierta": "perro/triste-abierta.webp"
+    }
+  },
+  "anclas": {
+    "celular": {
+      "x": 0.5117,
+      "y": 0.738,
+      "ancho": 0.2167,
+      "alto": 0.428,
+      "radio": 0.02
+    },
+    "moneda": {
+      "x": 0.508,
+      "y": 0.686,
+      "ancho": 0.284,
+      "alto": 0.284,
+      "radio": 0.142
+    },
+    "cartel": {
+      "x": 0.511,
+      "y": 0.739,
+      "ancho": 0.54,
+      "alto": 0.27,
+      "radio": 0
+    }
+  }
+}

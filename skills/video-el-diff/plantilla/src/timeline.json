@@ -1,0 +1,8 @@
+{
+ "fps": 30,
+ "duracion": 3,
+ "parrafos": [],
+ "beats": [
+  {"id": "b01", "inicio": 0, "fin": 3, "palabras": [], "v": {"tipo": "logo", "fecha": "PLANTILLA"}}
+ ]
+}
