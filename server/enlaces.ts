@@ -23,14 +23,14 @@ const PRIVADAS = new BlockList()
 for (const [red, bits] of [['0.0.0.0', 8], ['10.0.0.0', 8], ['100.64.0.0', 10], ['127.0.0.0', 8], ['169.254.0.0', 16], ['172.16.0.0', 12], ['192.168.0.0', 16]] as const) PRIVADAS.addSubnet(red, bits, 'ipv4')
 for (const [red, bits] of [['::', 128], ['::1', 128], ['fc00::', 7], ['fe80::', 10]] as const) PRIVADAS.addSubnet(red, bits, 'ipv6')
 const privada = (ip: string) => {
-  const v4 = /^::ffff:(d+.d+.d+.d+)$/i.exec(ip)?.[1] // una IPv4 escrita como IPv6
+  const v4 = /^::ffff:(\d+\.\d+\.\d+\.\d+)$/i.exec(ip)?.[1] // una IPv4 escrita como IPv6
   return v4 ? PRIVADAS.check(v4, 'ipv4') : PRIVADAS.check(ip, isIP(ip) === 6 ? 'ipv6' : 'ipv4')
 }
 
 /** Si la dirección es `http(s)` y todas las IP de su host son de internet. */
-async function publica(u: URL): Promise<boolean> {
+export async function publica(u: URL): Promise<boolean> {
   if (u.protocol !== 'http:' && u.protocol !== 'https:') return false
-  const host = u.hostname.replace(/^[|]$/g, '')
+  const host = u.hostname.replace(/^\[|\]$/g, '')
   const ips = isIP(host) ? [host] : (await lookup(host, { all: true, verbatim: true }).catch(() => [])).map((a) => a.address)
   return ips.length > 0 && !ips.some(privada)
 }

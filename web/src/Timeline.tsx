@@ -1,7 +1,8 @@
-import { Fragment, memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { Fragment, memo, type ReactNode, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { AgentEvent } from '../../shared/types'
 import { useEventos } from './eventos'
 import { Icon } from './Composer'
+import { Icono } from './Iconos'
 import { DESIGN, DESIGN_ICON, LINK, LINK_ICON, linkParts, pedirMejora, QUOTE, QUOTE_EVENT, QUOTE_ICON, quoteText, THREAD, THREAD_ICON, threadIconOf } from './etiquetas'
 import { MarcaClaude } from './Logos'
 import { imageUrl, Thumbs } from './Images'
@@ -604,12 +605,12 @@ export function Thinking({ text, nested = '' }: { text: string; nested?: string 
 }
 
 /** Las herramientas que de verdad llegan (14.959 llamadas en los hilos de Sloth). Las demás llevan el engranaje. */
-const ICONS: Record<string, string> = {
+const ICONS: Record<string, ReactNode> = {
   Bash: '›_',
   PowerShell: '›_',
   Read: '◔',
-  Write: '✎',
-  Edit: '✎',
+  Write: <Icono de="lapiz" />,
+  Edit: <Icono de="lapiz" />,
   Grep: '⌕',
   WebSearch: '◍',
   WebFetch: '◍',
