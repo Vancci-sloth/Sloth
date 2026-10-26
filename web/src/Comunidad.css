@@ -252,6 +252,9 @@
 .com-perfil-foto > div { display: flex; flex-wrap: wrap; gap: 4px; }
 .com-perfil-nombre { display: block; width: 100%; margin-top: 16px; padding: 10px 14px; border-radius: 12px; border: 1px solid var(--line); outline: none; background: var(--bg); color: var(--text); font-size: 15px; transition: border-color 0.15s, box-shadow 0.15s; }
 .com-perfil-nombre:focus { border-color: #4a4236; box-shadow: 0 0 0 3px var(--amber-tinte); }
+/* Solo los Fundadores: salir en los créditos de la página */
+.com-creditos { display: flex; align-items: flex-start; gap: 8px; margin-top: 12px; color: var(--muted); font-size: 13.5px; line-height: 1.45; cursor: pointer; }
+.com-creditos input { margin-top: 2px; accent-color: var(--amber); }
 .com-caja-pie { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
 /* Reportar: los motivos, como opciones. */
 .com-motivos { display: flex; flex-direction: column; gap: 4px; margin-top: 14px; }
@@ -270,3 +273,16 @@
   .com-rejilla { padding: 24px 18px 48px; }
   .com-post-portada { width: 96px; height: 72px; }
 }
+
+/* Vota qué sigue: el roadmap de sloth.vancci.org, debajo de la comunidad */
+.com-votar { margin-top: 16px; padding: 16px; border: 1px solid var(--line); border-radius: 16px; background: var(--panel); }
+.com-votar h3 { margin: 0 0 4px; font-size: 15px; }
+.com-votar > p { margin: 0 0 12px; color: var(--muted); font-size: 12.5px; line-height: 1.45; }
+.com-votar ul { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.com-votar li button { display: grid; gap: 6px; width: 100%; padding: 9px 11px; border: 1px solid var(--line); border-radius: 10px; background: none; color: var(--text); font: inherit; font-size: 13px; text-align: left; cursor: pointer; transition: border-color 0.15s; }
+.com-votar li button:hover { border-color: #4a4236; }
+.com-votar li button.on { border-color: var(--amber); background: var(--amber-tinte); }
+.com-votar-fila { display: flex; justify-content: space-between; gap: 10px; }
+.com-votar-fila b { color: var(--muted); font-variant-numeric: tabular-nums; }
+.com-votar li button.on .com-votar-fila b { color: var(--amber); }
+.com-votar-barra { height: 4px; border-radius: 99px; background: linear-gradient(90deg, var(--amber) var(--parte, 0%), var(--panel-2) 0); }

@@ -20,14 +20,24 @@
  *   `{motivo}` y `/revisada` (el creador quita sus reportes).
  * - `POST /comunidad/c/<id>/borrar`, `/megusta`, `/reportar` y `/revisada`: lo mismo para un comentario.
  * - `GET /comunidad/avisos` (`?cuenta`: solo cuántos sin leer) y `POST /comunidad/avisos/leidos`.
- * - `POST /comunidad/perfil` `{nombre?, foto?}`.
+ * - `POST /comunidad/roadmap` `{meta}`: tu voto de qué sigue (uno por miembro; el de un Fundador vale dos). Da la votación.
+ * - `POST /comunidad/perfil` `{nombre?, foto?, creditos?}`: `creditos`, solo un Fundador (sale en `GET /creditos`).
  * - `PUT /comunidad/archivo`, con el archivo de cuerpo y su `content-type`: una imagen o un video (sus primeros
  *   segundos, que recorta `server/comunidad.ts`; el entero se enlaza en el texto). Da su llave.
  */
-import type { AdjuntoComunidad, Autor, AvisoComunidad, CategoriaComunidad, ComentarioComunidad, FeedComunidad, PublicacionComunidad } from '../../shared/types.ts'
+import type { AdjuntoComunidad, Autor, AvisoComunidad, CategoriaComunidad, ComentarioComunidad, FeedComunidad, PublicacionComunidad, RoadmapComunidad } from '../../shared/types.ts'
 import { CLAVE, EQUIPO, type Env, type Fila, Rechazo, cuerpo, iguales, json, letras, servir, vigencia } from './index.ts'
 
 export const CATEGORIAS: CategoriaComunidad[] = ['general', 'hice', 'ayuda', 'mejoras', 'anuncios']
+
+/** Las metas del roadmap que se votan: las mismas de sloth.vancci.org («Lo que viene»). Si cambian allá, cambian aquí. */
+export const METAS = [
+  { id: 'firma', titulo: 'Sloth firmada por Apple' },
+  { id: 'youtube', titulo: 'Publicar en YouTube' },
+  { id: 'meta', titulo: 'Publicar en Instagram y Facebook' },
+  { id: 'tiktok', titulo: 'Publicar en TikTok' },
+  { id: 'tienda', titulo: 'La tienda de estilos' }
+]
 /** La clave del creador en `miembros`. */
 const CREADOR = 'admin'
 const PAGINA = 20
@@ -63,6 +73,8 @@ interface Miembro {
   foto: string | null
   creado: string
   visto: string
+  /** 1: un Fundador que quiere salir en los créditos de sloth.vancci.org. */
+  creditos: number
   /** No es columna: la calcula `INSIGNIA` al leerlo. */
   insignia?: Autor['insignia'] | null
 }
@@ -109,6 +121,14 @@ export async function comunidad(req: Request, env: Env, url: URL): Promise<Respo
   if (ruta === '/comunidad' && req.method === 'GET') return json(await feed(env, yo, url))
   if (ruta === '/comunidad/publicar' && req.method === 'POST') return json(await publicar(env, yo, await cuerpo(req)))
   if (ruta === '/comunidad/perfil' && req.method === 'POST') return json(await perfil(env, yo, await cuerpo(req)))
+  if (ruta === '/comunidad/roadmap' && req.method === 'POST') {
+    const meta = String((await cuerpo(req)).meta ?? '')
+    if (!METAS.some((m) => m.id === meta)) throw new Rechazo(400, 'Esa meta no está en el roadmap.')
+    await env.DB.prepare('INSERT INTO votos (miembro, meta, creado) VALUES (?, ?, ?) ON CONFLICT (miembro) DO UPDATE SET meta = excluded.meta, creado = excluded.creado')
+      .bind(yo.id, meta, new Date().toISOString())
+      .run()
+    return json(await roadmap(env, yo))
+  }
   if (ruta === '/comunidad/avisos' && req.method === 'GET') return json(await avisos(env, yo, url.searchParams.has('cuenta')))
   if (ruta === '/comunidad/avisos/leidos' && req.method === 'POST') {
     await env.DB.prepare('UPDATE avisos SET leido = 1 WHERE para = ? AND leido = 0').bind(yo.id).run()
@@ -239,10 +259,11 @@ async function feed(env: Env, yo: Miembro, url: URL): Promise<FeedComunidad> {
   const filas = pubs.results as unknown as Guardada[]
   const n = cuentas.results[0] as { miembros: number; activos: number; publicaciones: number; comentarios: number; avisos: number }
   return {
-    yo: { ...autor(env, yo), publicaciones: n.publicaciones, comentarios: n.comentarios },
+    yo: { ...autor(env, yo), creditos: !!yo.creditos, publicaciones: n.publicaciones, comentarios: n.comentarios },
     miembros: n.miembros,
     activos: n.activos,
     avisos: n.avisos,
+    roadmap: await roadmap(env, yo),
     publicaciones: await armar(env, yo, filas.slice(0, PAGINA)),
     mas: filas.length > PAGINA
   }
@@ -588,9 +609,26 @@ async function perfil(env: Env, yo: Miembro, c: Record<string, unknown>): Promis
     foto = typeof c.foto === 'string' && LLAVE.test(c.foto) && IMAGEN.test(c.foto) ? c.foto : null
     if (c.foto && !foto) throw new Rechazo(400, 'La foto debe ser una imagen.')
   }
-  await env.DB.prepare('UPDATE miembros SET nombre = ?, foto = ? WHERE id = ?').bind(nombre, foto, yo.id).run()
+  if (c.creditos === true && yo.insignia !== 'fundador') throw new Rechazo(403, 'Los créditos de la página son de los Fundadores.')
+  const creditos = c.creditos === undefined ? yo.creditos : c.creditos === true ? 1 : 0
+  await env.DB.prepare('UPDATE miembros SET nombre = ?, foto = ?, creditos = ? WHERE id = ?').bind(nombre, foto, creditos, yo.id).run()
   if (yo.foto && yo.foto !== foto) await quitarArchivos(env, [yo.foto])
-  return autor(env, { ...yo, nombre, foto })
+  return { ...autor(env, { ...yo, nombre, foto }), creditos: !!creditos }
+}
+
+/** La votación del roadmap, como la ve `yo`: los votos de cada meta (el de un Fundador vale dos) y el suyo. */
+async function roadmap(env: Env, yo: Miembro): Promise<RoadmapComunidad> {
+  const { results } = await env.DB.prepare(`SELECT v.miembro, v.meta, ${INSIGNIA} FROM votos v JOIN miembros m ON m.id = v.miembro`).all<{ miembro: string; meta: string; insignia: string | null }>()
+  const votos = new Map<string, number>()
+  for (const v of results) votos.set(v.meta, (votos.get(v.meta) ?? 0) + (v.insignia === 'fundador' ? 2 : 1))
+  const mio = results.find((v) => v.miembro === yo.id)?.meta
+  return { metas: METAS.map((m) => ({ ...m, votos: votos.get(m.id) ?? 0 })), ...(mio ? { mio } : {}) }
+}
+
+/** Los nombres de los Fundadores que pidieron salir en los créditos de sloth.vancci.org, del primero al último. */
+export async function creditos(env: Env): Promise<string[]> {
+  const { results } = await env.DB.prepare(`SELECT m.nombre, ${INSIGNIA} FROM miembros m WHERE m.creditos = 1 AND m.nombre != '' ORDER BY m.creado`).all<Pick<Miembro, 'nombre' | 'insignia'>>()
+  return results.filter((m) => m.insignia === 'fundador').map((m) => m.nombre)
 }
 
 /** El tipo de un archivo y su llave nueva, si se acepta y no pesa de más. */

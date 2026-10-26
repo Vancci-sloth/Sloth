@@ -503,7 +503,12 @@ function actualizaciones() {
     anotar('La descarga no avanza: se empieza otra')
     bajada.cancel()
   }, REINTENTO)
-  const revisar = () => autoUpdater.checkForUpdates().catch(() => {})
+  const revisar = async () => {
+    // Quien apoya recibe lo nuevo antes: el cobro lo reconoce por su clave y esta computadora, que da el servidor.
+    const c = (await fetch(`${URL_SLOTH}/api/licencia/credencial`).then((r) => r.json()).catch(() => ({}))) as { clave?: string; equipo?: string }
+    autoUpdater.requestHeaders = c.clave && c.equipo ? { 'x-sloth-clave': c.clave, 'x-sloth-equipo': c.equipo } : null
+    await autoUpdater.checkForUpdates().catch(() => {})
+  }
   primera = revisar()
   setInterval(revisar, CADA)
 }

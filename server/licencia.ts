@@ -161,6 +161,8 @@ export function licencia(app: string) {
         escribir()
         return enviar(res, 200, estado())
       }
+      // Para la ventana de Electron, al buscar la versión nueva: quien apoya la recibe antes (licencias/, `ANTICIPO`).
+      if (ruta === '/api/licencia/credencial' && metodo === 'GET') return enviar(res, 200, credencial() ?? {})
       // Con Stripe: el enlace a su portal, donde se cambia la tarjeta.
       if (ruta === '/api/licencia/pago' && metodo === 'POST') {
         if (!a.clave) throw new Rechazo(400, 'No hay una suscripción en esta computadora.')

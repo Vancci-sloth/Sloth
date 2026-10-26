@@ -29,9 +29,12 @@ ramas ni bloquea por sí solo un push a `venta`.
 3. Tras verificar la cuenta de GitHub indicada en `AGENTS.md`, `git push origin main:venta` inicia
    `.github/workflows/venta.yml`. Genera una versión común, compila los tres instaladores con `npm run compilar` y los
    sube al cobro con `npm run publicar`. No hace falta compilar localmente para publicar.
+   Quien apoya recibe cada versión 7 días antes (`ANTICIPO` en `licencias/`): los demás siguen con la anterior en la app,
+   en `/version` y en `/descargar`. Un arreglo urgente sale para todos de inmediato con `[para todos]` en el mensaje del
+   último commit que llega a `venta`, o con la opción `para_todos` al correr el workflow a mano.
 4. Comprueba los tres jobs y la versión que ofrece el cobro: `/version`, `/version?so=mac` y `/version?so=linux` en
-   `https://api.sloth.vancci.org`. Verifica también los metadatos de `/actualizaciones/latest.yml`,
-   `latest-mac.yml` y `latest-linux.yml`, y los enlaces de descarga de cada sistema.
+   `https://api.sloth.vancci.org` (sin apoyo, durante sus 7 días, dicen la anterior). Verifica también los metadatos
+   de `/actualizaciones/latest.yml`, `latest-mac.yml` y `latest-linux.yml`, y los enlaces de descarga de cada sistema.
 
 La llave `PUBLICAR` del workflow autoriza la subida. Los secretos de Apple y el comportamiento sin firma están en
 [ADR 0006](../adr/0006-mac-y-linux.md). La comprobación de empaquetado no demuestra que la app abra y funcione en una

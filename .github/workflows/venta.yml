@@ -4,13 +4,19 @@
 # «Actualizar a Sloth X» y baja solo lo que cambió (electron/main.ts).
 # Para publicar lo de main: `git push origin main:venta`. La llave para publicar es el secreto PUBLICAR del repo. La firma
 # de Apple, si está, va en los secretos CSC_LINK, CSC_KEY_PASSWORD, APPLE_ID, APPLE_APP_SPECIFIC_PASSWORD y APPLE_TEAM_ID
-# (docs/adr/0006-mac-y-linux.md); sin ellos, la de Mac sale sin firma.
+# (docs/adr/0006-mac-y-linux.md); sin ellos, la de Mac sale sin firma. Quien apoya recibe cada versión 7 días antes; un
+# arreglo urgente sale para todos de inmediato con `[para todos]` en el mensaje del commit, o con esa opción a mano.
 name: Publicar Sloth
 
 on:
   push:
     branches: [venta]
   workflow_dispatch:
+    inputs:
+      para_todos:
+        description: 'Para todos de inmediato (un arreglo urgente), sin los 7 días de quien apoya'
+        type: boolean
+        default: false
 
 # Una a la vez: dos publicaciones juntas se pisarían la versión.
 concurrency:
@@ -58,3 +64,4 @@ jobs:
       - run: npm run publicar
         env:
           PUBLICAR: ${{ secrets.PUBLICAR }}
+          PARA_TODOS: ${{ (inputs.para_todos || contains(github.event.head_commit.message, '[para todos]')) && '1' || '' }}

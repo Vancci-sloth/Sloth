@@ -1,5 +1,5 @@
-import { type DragEvent, useEffect, useLayoutEffect, useRef, useState } from 'react'
-import type { AdjuntoComunidad, Autor, AvisoComunidad, CategoriaComunidad, ComentarioComunidad, FeedComunidad, OrigenMejora, PublicacionComunidad, SessionMeta } from '../../shared/types'
+import { type CSSProperties, type DragEvent, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import type { AdjuntoComunidad, Autor, AvisoComunidad, CategoriaComunidad, ComentarioComunidad, FeedComunidad, OrigenMejora, PublicacionComunidad, RoadmapComunidad, SessionMeta } from '../../shared/types'
 import { VENTA } from '../../shared/venta'
 import { api, ErrorApi } from './api'
 import { Confirm } from './Confirm'
@@ -412,6 +412,7 @@ export function Comunidad({ sessions, onHilo, onHacer }: { sessions: SessionMeta
               </button>
             </div>
           </div>
+          {feed && <Votar roadmap={feed.roadmap} fundador={feed.yo.insignia === 'fundador'} onVoto={(roadmap) => setFeed((f) => f && { ...f, roadmap })} />}
         </aside>
       </div>
 
@@ -1261,8 +1262,50 @@ function fraseDe(a: AvisoComunidad) {
 }
 
 /** Tu nombre y tu foto: así te ven en la comunidad. */
+/** Qué sigue en el roadmap de sloth.vancci.org: un voto por persona, que se puede cambiar; el de un Fundador vale dos. */
+function Votar({ roadmap, fundador, onVoto }: { roadmap: RoadmapComunidad; fundador: boolean; onVoto(r: RoadmapComunidad): void }) {
+  const [enviando, setEnviando] = useState('')
+  const [error, setError] = useState('')
+  const mas = Math.max(1, ...roadmap.metas.map((m) => m.votos))
+
+  async function votar(meta: string) {
+    if (enviando || meta === roadmap.mio) return
+    setEnviando(meta)
+    setError('')
+    try {
+      onVoto(await api<RoadmapComunidad>('/api/comunidad/roadmap', { meta }))
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setEnviando('')
+    }
+  }
+
+  return (
+    <div className="com-votar">
+      <h3>Vota qué sigue</h3>
+      <p>{fundador ? 'Eres Fundador: tu voto vale dos.' : 'Un voto por persona; el de un Fundador vale dos.'} Puedes cambiarlo cuando quieras.</p>
+      <ul>
+        {roadmap.metas.map((m) => (
+          <li key={m.id}>
+            <button className={m.id === roadmap.mio ? 'on' : ''} disabled={!!enviando} aria-pressed={m.id === roadmap.mio} onClick={() => void votar(m.id)}>
+              <span className="com-votar-fila">
+                <span>{m.titulo}</span>
+                <b>{m.votos}</b>
+              </span>
+              <span className="com-votar-barra" style={{ '--parte': `${(m.votos / mas) * 100}%` } as CSSProperties} />
+            </button>
+          </li>
+        ))}
+      </ul>
+      {error && <p className="bad small">{error}</p>}
+    </div>
+  )
+}
+
 function Perfil({ yo, onListo, onCerrar }: { yo: Yo; onListo(a: Autor): void; onCerrar(): void }) {
   const [nombre, setNombre] = useState(yo.nombre)
+  const [creditos, setCreditos] = useState(!!yo.creditos)
   // `undefined`: la foto que ya tenías; `null`: sin foto; o la nueva.
   const [foto, setFoto] = useState<{ llave: string; url: string } | null | undefined>(undefined)
   const [subiendo, setSubiendo] = useState(false)
@@ -1298,7 +1341,13 @@ function Perfil({ yo, onListo, onCerrar }: { yo: Yo; onListo(a: Autor): void; on
     setOcupado(true)
     setError('')
     try {
-      onListo(await api<Autor>('/api/comunidad/perfil', { nombre: nombre.trim(), ...(foto !== undefined ? { foto: foto?.llave ?? null } : {}) }))
+      onListo(
+        await api<Autor>('/api/comunidad/perfil', {
+          nombre: nombre.trim(),
+          ...(foto !== undefined ? { foto: foto?.llave ?? null } : {}),
+          ...(yo.insignia === 'fundador' ? { creditos } : {})
+        })
+      )
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
       setOcupado(false)
@@ -1336,6 +1385,12 @@ function Perfil({ yo, onListo, onCerrar }: { yo: Yo; onListo(a: Autor): void; on
           onChange={(e) => setNombre(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && void guardar()}
         />
+        {yo.insignia === 'fundador' && (
+          <label className="com-creditos">
+            <input type="checkbox" checked={creditos} onChange={(e) => setCreditos(e.target.checked)} />
+            <span>Salir con este nombre en los créditos de los Fundadores, en sloth.vancci.org</span>
+          </label>
+        )}
         {error && <p className="bad small">{error}</p>}
         <div className="com-caja-pie">
           <button className="esc-cancelar" onClick={onCerrar}>

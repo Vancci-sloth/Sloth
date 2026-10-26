@@ -27,7 +27,8 @@
  * Linux, con `?so=mac` y `?so=linux` (también en `/version`). Está en R2
  * (`DESCARGAS`) y lo sube `npm run publicar` por partes, con `PUBLICAR`: pesa más de lo que aceptan wrangler (300 MiB)
  * y una petición a un Worker (100 MB). `ultima.json` dice cuál es la última. Y las actualizaciones de la app instalada
- * (electron-updater): `GET /actualizaciones/latest.yml` dice cuál es la nueva, y de su instalador baja solo los pedazos
+ * (electron-updater): `GET /actualizaciones/latest.yml` dice cuál es la nueva (quien apoya la recibe `ANTICIPO` antes:
+ * a los demás se les sigue dando la anterior, que se guarda en `anterior/` al publicar), y de su instalador baja solo los pedazos
  * que cambiaron, con el mapa de bloques de cada versión (`.blockmap`). Se quedan los mapas de todas y los dos últimos
  * instaladores.
  *
@@ -37,7 +38,7 @@
  *
  * Y la comunidad (`/comunidad/*`, en `comunidad.ts`), de quien tiene una licencia activa.
  */
-import { comunidad } from './comunidad.ts'
+import { comunidad, creditos } from './comunidad.ts'
 import { firmaDeStripe, leerStripe, portalStripe, sesionStripe, stripe, suscripcionStripe, type Lectura, type SuscripcionStripe } from './stripe.ts'
 
 export interface Env {
@@ -156,13 +157,15 @@ export function instaladorDe(archivo: string): Sistema | undefined {
   return tipo === '.exe' ? 'windows' : tipo?.endsWith('.dmg') ? 'mac' : tipo?.endsWith('.AppImage') ? 'linux' : undefined
 }
 /** De cada tipo de archivo (el .exe, el .dmg y el .zip de Mac, el AppImage) se quedan el último y el de antes en R2, por si alguien lo está bajando al publicar. */
-const INSTALADORES = 2
+const INSTALADORES = 3
 /** La versión de los términos que acepta el cliente: la fecha de su «Última actualización» (sloth.vancci.org/terminos). */
 const TERMINOS = /^\d{4}-\d{2}-\d{2}$/
+/** Cuánto antes que los demás recibe lo nuevo quien apoya. */
+const ANTICIPO = 7 * DIA
 /** Se avisa del cobro cuando faltan esto o menos días: el cron corre cada mañana, así que el aviso llega con 6 o 7. */
 const AVISO = 7 * DIA
 /** Lo que la página de Sloth llama desde el navegador. */
-const PUBLICAS = new Set(['/precio', '/version', '/suscribir'])
+const PUBLICAS = new Set(['/precio', '/version', '/suscribir', '/creditos'])
 /** Quién vende, al pie de cada correo (art. 76 Bis III de la LFPC): su nombre, domicilio y contacto están en los términos de la página, no aquí. */
 const PROVEEDOR = 'Sloth, de Vancci · Quién vende, su domicilio y su contacto: https://sloth.vancci.org/terminos'
 
@@ -172,6 +175,8 @@ interface Ultima {
   version: string
   bytes: number
   publicado: string
+  /** Desde cuándo la recibe todo el mundo; antes, solo quien apoya. Sin él (las de antes), ya es de todos. */
+  todos?: string
 }
 
 export class Rechazo extends Error {
@@ -204,12 +209,15 @@ export default {
 async function atender(req: Request, env: Env, ctx: ExecutionContext, url: URL): Promise<Response> {
   try {
     if (req.method === 'GET' && url.pathname === '/precio') return json(await precios(env))
-    if (req.method === 'GET' && url.pathname === '/version') return json(await ultima(env, sistema(url.searchParams.get('so'))))
+    // Los Fundadores que pidieron salir en los créditos de la página.
+    if (req.method === 'GET' && url.pathname === '/creditos') return json({ fundadores: await creditos(env) })
+    if (req.method === 'GET' && url.pathname === '/version') return json(await ultimaPara(req, env, sistema(url.searchParams.get('so'))))
     if ((req.method === 'GET' || req.method === 'HEAD') && url.pathname === '/descargar') {
       const so = sistema(url.searchParams.get('so'))
+      const u = await ultimaPara(req, env, so)
       // La de Mac aún no va firmada por Apple: antes de bajarla, cómo se abre la primera vez.
-      if (so === 'mac' && !url.searchParams.has('visto')) return avisoMac(await ultima(env, so))
-      return await descargar(req, env, so)
+      if (so === 'mac' && !url.searchParams.has('visto')) return avisoMac(u)
+      return servir(req, env, u.archivo, u.bytes, { 'content-disposition': `attachment; filename="${u.archivo}"` })
     }
     if ((req.method === 'GET' || req.method === 'HEAD') && url.pathname.startsWith('/actualizaciones/')) return await actualizaciones(req, env, url)
     if (url.pathname.startsWith('/publicar/')) return await publicar(req, env, url)
@@ -236,17 +244,45 @@ async function ultima(env: Env, so: Sistema = 'windows'): Promise<Ultima> {
 }
 
 /** El instalador de la última versión de `so`, con `Range` para que el navegador pueda retomar una descarga cortada. */
-async function descargar(req: Request, env: Env, so: Sistema): Promise<Response> {
-  const { archivo, bytes } = await ultima(env, so)
-  return servir(req, env, archivo, bytes, { 'content-disposition': `attachment; filename="${archivo}"` })
+/** Si `u` ya es de todos (`todos` pasó o no lo tiene). */
+export const deTodos = (u: Pick<Ultima, 'todos'>, ahora = Date.now()) => !u.todos || ahora >= Date.parse(u.todos)
+
+/**
+ * Si quien pregunta apoya hoy: la app manda su clave y su computadora (`x-sloth-clave`, `x-sloth-equipo`), y la clave
+ * es de un apoyo mensual o anual vigente en esa computadora.
+ */
+async function apoya(req: Request, env: Env): Promise<boolean> {
+  const clave = (req.headers.get('x-sloth-clave') ?? '').replace(/\s+/g, '').toUpperCase()
+  const equipo = req.headers.get('x-sloth-equipo') ?? ''
+  if (!CLAVE.test(clave) || !EQUIPO.test(equipo)) return false
+  const f = await env.DB.prepare("SELECT l.estado, l.pagado_hasta FROM licencias l JOIN equipos e ON e.clave = l.clave WHERE l.clave = ? AND e.equipo = ? AND l.plan IN ('mensual', 'anual')")
+    .bind(clave, equipo)
+    .first<Pick<Fila, 'estado' | 'pagado_hasta'>>()
+  return !!f && vigencia(f, Date.now()).activa
+}
+
+/** La versión que le toca a quien pregunta: la última, o la anterior si la última todavía es solo de quien apoya. */
+async function ultimaPara(req: Request, env: Env, so: Sistema): Promise<Ultima> {
+  const u = await ultima(env, so)
+  if (deTodos(u) || (await apoya(req, env))) return u
+  return (await env.DESCARGAS.get(`anterior/${ULTIMAS[so]}`))?.json<Ultima>() ?? u
 }
 
 /** Lo que pide electron-updater: `latest.yml`, que nunca se guarda en caché, y los instaladores y sus mapas por pedazos. */
 async function actualizaciones(req: Request, env: Env, url: URL): Promise<Response> {
   const archivo = decodeURIComponent(url.pathname.slice('/actualizaciones/'.length))
-  const cabeza = publicable(archivo) ? await env.DESCARGAS.head(archivo) : null
+  if (!publicable(archivo)) throw new Rechazo(404, 'No existe')
+  const yml = AL_DIA.test(archivo)
+  let llave = archivo
+  // latest.yml: a quien no apoya, el de la anterior mientras la última sea solo de quien apoya.
+  if (yml) {
+    const so: Sistema = archivo.includes('-mac') ? 'mac' : archivo.includes('-linux') ? 'linux' : 'windows'
+    const u = await env.DESCARGAS.get(ULTIMAS[so])
+    if (u && !deTodos(await u.json<Ultima>()) && !(await apoya(req, env)) && (await env.DESCARGAS.head(`anterior/${archivo}`))) llave = `anterior/${archivo}`
+  }
+  const cabeza = await env.DESCARGAS.head(llave)
   if (!cabeza) throw new Rechazo(404, 'No existe')
-  return servir(req, env, archivo, cabeza.size, AL_DIA.test(archivo) ? { 'content-type': 'text/yaml; charset=utf-8', 'cache-control': 'no-store' } : {})
+  return servir(req, env, llave, cabeza.size, yml ? { 'content-type': 'text/yaml; charset=utf-8', 'cache-control': 'no-store' } : {})
 }
 
 /** Un archivo de `DESCARGAS`, entero o el pedazo que pide `Range`. */
@@ -296,7 +332,17 @@ async function publicar(req: Request, env: Env, url: URL): Promise<Response> {
     return json(await subida.uploadPart(n, req.body))
   }
   if (req.method === 'POST' && url.pathname === '/publicar/fin') {
-    const { partes, version } = (await cuerpo(req)) as { partes: R2UploadedPart[]; version: string }
+    const { partes, version, paraTodos } = (await cuerpo(req)) as { partes: R2UploadedPart[]; version: string; paraTodos?: boolean }
+    // Una versión nueva: la que había pasa a `anterior/` (su ultima.json y su latest.yml, que aún no se reemplaza: va al
+    // final), salvo que aún fuera solo de quien apoya; entonces la anterior sigue siendo la de antes.
+    const so = instaladorDe(archivo)
+    const previa = so ? await (await env.DESCARGAS.get(ULTIMAS[so]))?.json<Ultima>() : undefined
+    if (so && previa && previa.version !== String(version) && deTodos(previa)) {
+      const yml = { windows: 'latest.yml', mac: 'latest-mac.yml', linux: 'latest-linux.yml' }[so]
+      const actual = await env.DESCARGAS.get(yml)
+      await env.DESCARGAS.put(`anterior/${ULTIMAS[so]}`, JSON.stringify(previa), { httpMetadata: { contentType: 'application/json' } })
+      if (actual) await env.DESCARGAS.put(`anterior/${yml}`, await actual.arrayBuffer(), { httpMetadata: { contentType: 'text/yaml; charset=utf-8' } })
+    }
     const obj = await subida.complete(partes)
     const tipo = BINARIO.exec(archivo)?.groups?.tipo
     if (tipo) {
@@ -304,9 +350,12 @@ async function publicar(req: Request, env: Env, url: URL): Promise<Response> {
       const viejos = iguales.sort((a, b) => b.uploaded.getTime() - a.uploaded.getTime()).slice(INSTALADORES)
       if (viejos.length) await env.DESCARGAS.delete(viejos.map((o) => o.key))
     }
-    const so = instaladorDe(archivo)
     if (!so) return json({ archivo, bytes: obj.size })
-    const u: Ultima = { archivo, version: String(version), bytes: obj.size, publicado: new Date().toISOString() }
+    // La misma versión otra vez (se volvió a publicar) conserva cuándo salió; una nueva es de quien apoya `ANTICIPO`.
+    const misma = previa?.version === String(version)
+    const publicado = misma ? previa.publicado : new Date().toISOString()
+    const todos = paraTodos ? undefined : misma ? previa.todos : new Date(Date.parse(publicado) + ANTICIPO).toISOString()
+    const u: Ultima = { archivo, version: String(version), bytes: obj.size, publicado, ...(todos ? { todos } : {}) }
     await env.DESCARGAS.put(ULTIMAS[so], JSON.stringify(u), { httpMetadata: { contentType: 'application/json' } })
     return json(u)
   }

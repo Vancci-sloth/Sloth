@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { createHmac } from 'node:crypto'
 import test from 'node:test'
-import { faltaAvisar, firmaDeMercadoPago, instaladorDe, rangoDe, tarifa, vigencia } from './index.ts'
+import { deTodos, faltaAvisar, firmaDeMercadoPago, instaladorDe, rangoDe, tarifa, vigencia } from './index.ts'
 
 const SECRETO = 'secreto-de-prueba'
 const firmar = (manifiesto: string) => createHmac('sha256', SECRETO).update(manifiesto).digest('hex')
@@ -73,4 +73,11 @@ test('reconoce el instalador de cada sistema, y nada más pasa por la última ve
   assert.equal(instaladorDe('Sloth-0.3.4-mac-arm64.dmg.blockmap'), undefined)
   assert.equal(instaladorDe('latest-mac.yml'), undefined)
   assert.equal(instaladorDe('Sloth-0.3.4-linux-x86_64.AppImage/../x'), undefined)
+})
+
+test('una versión nueva es de quien apoya hasta su fecha `todos`; las de antes, sin ella, ya son de todos', () => {
+  const ahora = Date.parse('2026-11-01T12:00:00Z')
+  assert.equal(deTodos({}, ahora), true)
+  assert.equal(deTodos({ todos: '2026-11-05T12:00:00Z' }, ahora), false)
+  assert.equal(deTodos({ todos: '2026-11-01T12:00:00Z' }, ahora), true)
 })

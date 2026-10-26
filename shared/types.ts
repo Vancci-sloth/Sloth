@@ -987,6 +987,8 @@ export interface Autor {
   creador?: boolean
   /** Fundador (de las primeras personas que apoyaron, para siempre) o Apoya (mientras apoya). */
   insignia?: 'fundador' | 'apoya'
+  /** Solo en tu perfil: si sales en los créditos de sloth.vancci.org (los Fundadores que lo piden). */
+  creditos?: boolean
 }
 
 /** Una imagen o un video de una publicación. `llave` es su nombre en la comunidad y `url`, de donde se carga. */
@@ -1055,6 +1057,12 @@ export interface AvisoComunidad {
 }
 
 /** `GET /api/comunidad`: quién eres, los números de la comunidad y una página del feed. */
+/** La votación de qué sigue en el roadmap: cada meta con sus votos (el de un Fundador vale dos) y la que votaste. */
+export interface RoadmapComunidad {
+  metas: { id: string; titulo: string; votos: number }[]
+  mio?: string
+}
+
 export interface FeedComunidad {
   /** Con lo que llevas hecho, para «Comienza aquí». */
   yo: Autor & { publicaciones: number; comentarios: number }
@@ -1064,6 +1072,7 @@ export interface FeedComunidad {
   activos: number
   /** Tus avisos sin leer. */
   avisos: number
+  roadmap: RoadmapComunidad
   publicaciones: PublicacionComunidad[]
   /** Hay otra página. */
   mas: boolean
