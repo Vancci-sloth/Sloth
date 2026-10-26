@@ -19,8 +19,8 @@
     "publicar": "node scripts/publicar.mjs"
   },
   "dependencies": {
-    "@anthropic-ai/claude-agent-sdk": "^0.3.306",
-    "@openai/codex": "^0.162.1",
+    "@anthropic-ai/claude-agent-sdk": "^0.3.311",
+    "@openai/codex": "^0.164.0",
     "@playwright/mcp": "0.0.83",
     "@vitejs/plugin-react": "^6.1.2",
     "marked": "^18.1.0",
