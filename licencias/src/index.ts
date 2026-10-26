@@ -261,10 +261,14 @@ async function apoya(req: Request, env: Env): Promise<boolean> {
   return !!f && vigencia(f, Date.now()).activa
 }
 
-/** La versión que le toca a quien pregunta: la última, o la anterior si la última todavía es solo de quien apoya. */
+/**
+ * La versión que le toca a quien pregunta: la última, o la anterior si la última todavía es solo de quien apoya. Con la
+ * llave de publicar, siempre la última: de ella sale el número de la siguiente (scripts/version-venta.mjs).
+ */
 async function ultimaPara(req: Request, env: Env, so: Sistema): Promise<Ultima> {
   const u = await ultima(env, so)
-  if (deTodos(u) || (await apoya(req, env))) return u
+  const publica = !!env.PUBLICAR && iguales(req.headers.get('authorization') ?? '', `Bearer ${env.PUBLICAR}`)
+  if (deTodos(u) || publica || (await apoya(req, env))) return u
   return (await env.DESCARGAS.get(`anterior/${ULTIMAS[so]}`))?.json<Ultima>() ?? u
 }
 

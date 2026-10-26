@@ -32,6 +32,8 @@ jobs:
       - uses: actions/checkout@v5
       - id: v
         run: node scripts/version-venta.mjs >> "$GITHUB_OUTPUT"
+        env:
+          PUBLICAR: ${{ secrets.PUBLICAR }}
 
   publicar:
     needs: version
