@@ -35,6 +35,13 @@ function cliente() {
   return rpc
 }
 
+/** Cierra el proceso que lee la cuenta, para poder reemplazar Codex al actualizarlo. El siguiente uso lo abre otra vez. */
+export function cerrarCuentaCodex() {
+  clearTimeout(reloj)
+  rpc?.close()
+  rpc = undefined
+}
+
 function descansar() {
   clearTimeout(reloj)
   if (!login && !leyendoLimites && !lectura) reloj = setTimeout(() => rpc?.close(), 60_000).unref()

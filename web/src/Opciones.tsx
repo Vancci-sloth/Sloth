@@ -346,12 +346,9 @@ function AvisoClaude({ onFalta }: { onFalta?(falta?: boolean): void }) {
  */
 function CuentaCodex({ aviso = false, onFalta }: { aviso?: boolean; onFalta?(falta?: boolean): void }) {
   const c = useCuenta(true, 'codex')
-  const [version, setVersion] = useState<VersionClaude | null>(null)
+  const version = useVersion('codex', !aviso)
   const falta = c.cuenta ? !c.cuenta.conectada : undefined
   useEffect(() => onFalta?.(falta), [falta])
-  useEffect(() => {
-    if (!aviso) api<VersionClaude>('/api/codex/version').then(setVersion, () => {})
-  }, [])
   if (aviso && !falta) return null
   const cuenta = c.cuenta
   const url = cuenta?.conectando?.url
@@ -391,7 +388,7 @@ function CuentaCodex({ aviso = false, onFalta }: { aviso?: boolean; onFalta?(fal
             <span>Opcional. Con tu cuenta de ChatGPT, Sloth hace las imágenes de los videos: portadas y personajes. Sin ella, los videos salen sin imágenes generadas. Se autoriza en el navegador.</span>
           )}
         </div>
-        {version?.instalada && <span className="estado">{version.instalada}</span>}
+        {version.estado}
         {cuenta?.conectando ? (
           <span className="estado moviendo">Esperando al navegador…</span>
         ) : (
@@ -405,6 +402,7 @@ function CuentaCodex({ aviso = false, onFalta }: { aviso?: boolean; onFalta?(fal
       {url && <p className="fila-extra small"><a href={url} target="_blank" rel="noreferrer">Abrir inicio de sesión de ChatGPT ↗</a>. Vuelve aquí después de autorizar.</p>}
       {!aviso && cuenta?.conectada && <Limites proveedor="codex" />}
       {c.error && <p className="bad small fila-extra">{c.error}</p>}
+      {version.aviso}
     </div>
   )
   return aviso ? <section className="panel cuenta-aviso">{contenido}</section> : contenido
@@ -570,46 +568,50 @@ function EstadoRequisito({ r }: { r: Requisito }) {
 /** Instalado y con otra versión a la que se puede actualizar. */
 export const atrasado = (p: VersionClaude) => !!p.instalada && !!p.ultima && p.instalada !== p.ultima
 
-/** Claude Code: con qué cuenta trabaja, qué versión tiene y el botón para ponerlo al día, como en T3 Code. */
-function Agentes() {
-  const c = useCuenta(true)
+/**
+ * La versión de un agente (`estado`, a la derecha de su fila), con «Actualizar» si hay otra, como en T3 Code, y debajo
+ * (`aviso`) el reinicio o el error. Claude reinicia Sloth y la página se recarga sola cuando vuelve; Codex no lo necesita:
+ * se vuelve a preguntar su versión.
+ */
+function useVersion(de: 'claude' | 'codex', mirar = true) {
   const [p, setVersion] = useState<VersionClaude | null>(null)
   const [ocupado, setOcupado] = useState(false)
   const [reinicia, setReinicia] = useState(false)
   const [error, setError] = useState('')
+  const pedir = () => api<VersionClaude>(`/api/${de}/version`).then(setVersion, (e) => setError(e.message))
 
   useEffect(() => {
-    api<VersionClaude>('/api/claude/version').then(setVersion, (e) => setError(e.message))
+    if (mirar) void pedir()
   }, [])
 
   function actualizar() {
     setOcupado(true)
     setError('')
-    // Sloth se reinicia y la página se recarga sola cuando vuelve.
-    api<{ reinicia: true }>('/api/claude/actualizar', {})
-      .then(() => setReinicia(true))
+    api<{ reinicia: boolean }>(`/api/${de}/actualizar`, {})
+      .then((r) => (r.reinicia ? setReinicia(true) : pedir()))
       .catch((e) => setError(e.message))
       .finally(() => setOcupado(false))
   }
 
-  /** La versión a la derecha de la fila, y «Actualizar» si hay otra. */
-  function version() {
-    if (!p) return <span className="muted small">{error ? '' : 'Buscando versión…'}</span>
-    if (!p.instalada) return <span className="estado apagado">No está instalado</span>
-    if (!atrasado(p))
-      return (
-        <span className="estado" title={p.ultima ? 'Es la última versión' : 'No se pudo ver si hay otra versión'}>
-          {p.instalada}
-        </span>
-      )
-    return (
+  let estado: ReactNode
+  if (!mirar) estado = null
+  else if (!p) estado = <span className="muted small">{error ? '' : 'Buscando versión…'}</span>
+  else if (!p.instalada) estado = <span className="estado apagado">No está instalado</span>
+  else if (!atrasado(p))
+    estado = (
+      <span className="estado" title={p.ultima ? 'Es la última versión' : 'No se pudo ver si hay otra versión'}>
+        {p.instalada}
+      </span>
+    )
+  else
+    estado = (
       <>
         <span className="estado falta">
           {p.instalada} → {p.ultima}
         </span>
         <button
           className="primary"
-          title="Sloth se reinicia solo; los hilos siguen donde iban. No se puede con un agente trabajando."
+          title={`${de === 'claude' ? 'Sloth se reinicia solo; los hilos siguen donde iban.' : 'Los hilos siguen donde iban.'} No se puede con un agente trabajando.`}
           disabled={ocupado || reinicia}
           onClick={actualizar}
         >
@@ -617,8 +619,19 @@ function Agentes() {
         </button>
       </>
     )
-  }
+  const aviso = (
+    <>
+      {reinicia && <p className="small fila-extra">Sloth se está reiniciando con la versión nueva…</p>}
+      {error && <p className="bad small fila-extra">{error}</p>}
+    </>
+  )
+  return { estado, aviso }
+}
 
+/** Claude Code: con qué cuenta trabaja, qué versión tiene y el botón para ponerlo al día. */
+function Agentes() {
+  const c = useCuenta(true)
+  const version = useVersion('claude')
   const cuenta = c.cuenta
   return (
     <>
@@ -652,7 +665,7 @@ function Agentes() {
               <span className="falta">Sin cuenta: Sloth trabaja con tu cuenta de Claude (Pro o Max)</span>
             )}
           </div>
-          {version()}
+          {version.estado}
           {cuenta && !cuenta.conectada && !cuenta.conectando && (
             <button className="primary" disabled={c.ocupado} onClick={c.conectar}>
               {c.ocupado ? 'Abriendo el navegador…' : 'Conectar con Claude'}
@@ -662,10 +675,9 @@ function Agentes() {
         <Autorizando c={c} />
         {/* Con una llave de API no hay plan ni límites: se paga por uso. */}
         {cuenta?.conectada && cuenta.plan && <Limites proveedor="claude" />}
-        {reinicia && <p className="small fila-extra">Sloth se está reiniciando con la versión nueva…</p>}
         {c.error && <p className="bad small fila-extra">{c.error}</p>}
+        {version.aviso}
       </div>
-      {error && <p className="bad small fila-extra">{error}</p>}
     </>
   )
 }

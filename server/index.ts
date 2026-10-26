@@ -15,7 +15,7 @@ import { listaDeArchivos, mensajeCommit } from './git-mensaje.ts'
 import { codexModels } from './codex.ts'
 import { proveedorDe } from '../shared/providers.ts'
 import { paraMandar } from '../shared/historial.ts'
-import { conectandoCodex, conectarCodex, cuentaCodex, limitesCodex } from './cuenta-codex.ts'
+import { cerrarCuentaCodex, conectandoCodex, conectarCodex, cuentaCodex, limitesCodex } from './cuenta-codex.ts'
 import { conectando, conectarClaude, cuentaClaude, limitesClaude } from './cuenta.ts'
 import { copiando, destinoApi, destinoValido, guardarCopias, TRAS_EL_TURNO } from './destino.ts' // guardar en
 import { enlacesApi } from './enlaces.ts' // tarjeta de los enlaces
@@ -38,7 +38,7 @@ import { Sessions } from './sessions.ts'
 import { eventosEnVivo } from './eventos-en-vivo.ts'
 import { duplicateCard, enlazarSkills, readCards, removeCard, seriesDe, skillRef } from './skills.ts'
 import { estaticos } from './estaticos.ts'
-import { actualizar, versionClaude, versionCodex } from './version.ts'
+import { actualizar, type Agente, version } from './version.ts'
 
 const APP = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const PORT = Number(process.env.PORT ?? 4848)
@@ -149,11 +149,11 @@ function ocupado(): string | null {
   if (publicar?.ocupado()) return publicar.ocupado() // redes: una subida o un texto a medias
   if (subirLargos?.ocupado()) return subirLargos.ocupado()
   if (idear?.ocupado()) return idear.ocupado() // ideas: una investigación en curso
-  if (actualizando) return 'Se está actualizando Claude Code. Espera a que termine.'
+  if (actualizando) return actualizando
   return instalandoAlgo() ?? conectando() ?? conectandoCodex() ?? copiando()
 }
-/** Mientras «Actualizar Claude Code» corre npm install y el typecheck. */
-let actualizando = false
+/** Mientras «Actualizar» corre npm install y la comprobación: qué se está actualizando. */
+let actualizando: string | null = null
 
 /** Vuelve a levantar el servidor (lo hace scripts/start.mjs), con lo que haya cambiado. Los agentes se retoman al volver. */
 function reiniciar() {
@@ -270,10 +270,6 @@ async function api(req: IncomingMessage, res: ServerResponse, url: URL): Promise
     send(res, 200, await cuentaCodex())
     return true
   }
-  if (path === '/api/codex/version' && method === 'GET') {
-    send(res, 200, versionCodex(APP))
-    return true
-  }
   if (path === '/api/codex/conectar' && method === 'POST') {
     send(res, 200, await conectarCodex())
     pedirModelos()
@@ -325,25 +321,26 @@ async function api(req: IncomingMessage, res: ServerResponse, url: URL): Promise
     return true
   }
 
-  if (path === '/api/claude/version' && method === 'GET') {
-    send(res, 200, await versionClaude(APP))
-    return true
-  }
-
-  if (path === '/api/claude/actualizar' && method === 'POST') {
-    // Claude corre dentro de este servidor: se cierran sus procesos para reemplazarlo y luego se reinicia para cargarlo.
+  const ver = /^\/api\/(claude|codex)\/(version|actualizar)$/.exec(path)
+  if (ver?.[2] === 'version' && method === 'GET') return send(res, 200, await version(APP, ver[1] as Agente)), true
+  if (ver?.[2] === 'actualizar' && method === 'POST') {
+    // Se cierran los procesos del agente para reemplazarlo. Claude corre dentro de este servidor: luego se reinicia para
+    // cargarlo. Codex se abre otra vez en cada uso: basta con volver a pedir sus modelos.
+    const agente = ver[1] as Agente
     if (ocupado()) return send(res, 409, { error: ocupado() }), true
     sessions.closeAll()
-    actualizando = true
+    if (agente === 'codex') cerrarCuentaCodex()
+    actualizando = `Se está actualizando ${agente === 'claude' ? 'Claude Code' : 'Codex'}. Espera a que termine.`
     try {
-      await actualizar(APP)
+      await actualizar(APP, agente)
     } catch (error) {
       return send(res, 500, { error: error instanceof Error ? error.message : String(error) }), true
     } finally {
-      actualizando = false
+      actualizando = null
     }
-    send(res, 200, { reinicia: true })
-    setTimeout(reiniciar, 100)
+    send(res, 200, { reinicia: agente === 'claude' })
+    if (agente === 'claude') setTimeout(reiniciar, 100)
+    else pedirModelos()
     return true
   }
 
