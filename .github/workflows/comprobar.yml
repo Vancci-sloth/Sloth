@@ -42,9 +42,11 @@ jobs:
           HOMEBREW_NO_AUTO_UPDATE: '1'
       - name: Instalar FFmpeg en Linux
         if: runner.os == 'Linux'
+        # Si los servidores de Ubuntu se atoran, falla en minutos en vez de colgarse horas; reintenta cada descarga.
+        timeout-minutes: 10
         run: |
-          sudo apt-get update
-          sudo apt-get install --yes ffmpeg
+          sudo apt-get -o Acquire::Retries=3 update
+          sudo apt-get -o Acquire::Retries=3 install --yes ffmpeg
       - run: ffmpeg -version
       - run: npm test
       # La sintaxis de los scripts de las skills; sin videos hechos, las plantillas se saltan.
