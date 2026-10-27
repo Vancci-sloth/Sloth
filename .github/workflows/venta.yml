@@ -1,4 +1,4 @@
-# La app que se vende sale de la rama `venta`: cada push compila Sloth en Windows, Mac (Apple Silicon) y Linux, y publica
+# La app que se vende sale de la rama `venta`: cada push compila Sloth en Windows, Mac (Intel) y Linux, y publica
 # sus instaladores en el cobro (`npm run compilar` y `npm run publicar` en cada sistema), los que da sloth.vancci.org.
 # Cada push sale como versión nueva (scripts/version-venta.mjs, una sola vez para los tres), y la app instalada ofrece
 # «Actualizar a Sloth X» y baja solo lo que cambió (electron/main.ts).
@@ -41,7 +41,8 @@ jobs:
       # Si uno falla, los otros publican igual: cada sistema tiene su propia última versión.
       fail-fast: false
       matrix:
-        os: [windows-latest, macos-latest, ubuntu-latest]
+        # La de Mac, en Intel: abre en los Mac con i5/i7 y, con Rosetta, en los de Apple Silicon (docs/adr/0006).
+        os: [windows-latest, macos-15-intel, ubuntu-latest]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 60
     steps:

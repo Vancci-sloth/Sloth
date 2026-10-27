@@ -2,7 +2,8 @@
 
 Fecha: 2026-10-23
 
-Actualizado: 2026-10-24 (diálogo de carpetas, instalación de Python y OCR ya implementados).
+Actualizado: 2026-10-24 (diálogo de carpetas, instalación de Python y OCR ya implementados); 2026-10-27 (la de Mac
+pasa a Intel).
 
 ## Contexto
 
@@ -13,7 +14,7 @@ de Windows, y la firma de Apple.
 ## Decisión
 
 Cada push a `venta` compila y publica tres instaladores (`.github/workflows/venta.yml`), cada uno en su sistema, con la
-misma versión: el `.exe` de siempre, un `.dmg` para Mac con Apple Silicon (y su `.zip`, con el que se actualiza) y un
+misma versión: el `.exe` de siempre, un `.dmg` para Mac con Intel (y su `.zip`, con el que se actualiza) y un
 AppImage para Linux x64. El cobro los da en `/descargar`, `/descargar?so=mac` y `/descargar?so=linux`.
 
 - **Tus datos.** Un `.app` y un AppImage no se pueden escribir: el servidor viaja en `resources/sloth` y la app lo copia
@@ -41,7 +42,11 @@ AppImage para Linux x64. El cobro los da en `/descargar`, `/descargar?so=mac` y 
 
 - No se ha abierto en un Mac de verdad: la compilación de GitHub dice si arma, no si funciona. La de Linux se armó y se
   abrió en un Ubuntu 24.04 (en un contenedor), y ahí bajó sola FFmpeg, Python y los paquetes.
-- Mac Intel y Linux ARM quedan fuera: cada uno sería otra máquina en el flujo y otra fila en `latest-mac.yml`.
+- La de Mac es solo de Intel (x64), compilada en `macos-15-intel`: la de Apple Silicon no abría en los Mac con i5/i7, y
+  la de Intel sí abre en los de Apple Silicon, con Rosetta (macOS la instala la primera vez). Una sola de Mac evita
+  dos «últimas» en el cobro y dos `latest-mac.yml`. Cuando haga falta la nativa de ARM, será otra fila en el flujo y
+  en el cobro. GitHub retira sus máquinas Intel en agosto de 2027: antes hay que tener la de ARM o una universal.
+- Linux ARM queda fuera: sería otra máquina en el flujo.
 - El Diff lee con OCR las capturas sin texto: en Windows usa el del sistema; en Mac y Linux, RapidOCR
   (`skills/video-el-diff/plantilla/ubicar.py`). Sloth instala RapidOCR con los paquetes de El Diff fuera de Windows
   (`PAQUETES` en server/requisitos.ts). Las capturas de `pagina.mjs` que ya traen texto evitan el OCR.

@@ -67,7 +67,7 @@ Descarga la última versión para tu sistema y ábrela:
 | Sistema | Descarga | Nota |
 | --- | --- | --- |
 | **Windows** 10 u 11 | [Sloth para Windows](https://api.sloth.vancci.org/descargar) | Si dice «Windows protegió tu PC», da clic en *Más información* y luego en *Ejecutar de todas formas*. |
-| **Mac** con Apple Silicon (M1 o más nueva) | [Sloth para Mac](https://api.sloth.vancci.org/descargar?so=mac) | Aún sin la firma de Apple: la primera vez, ábrela desde *Configuración del Sistema → Privacidad y seguridad*. |
+| **Mac** con Intel (en M1 o más nueva, con Rosetta) | [Sloth para Mac](https://api.sloth.vancci.org/descargar?so=mac) | Aún sin la firma de Apple: la primera vez, ábrela desde *Configuración del Sistema → Privacidad y seguridad*. |
 | **Linux** | [Sloth para Linux](https://api.sloth.vancci.org/descargar?so=linux) | Es un AppImage: dale permiso de ejecutar y ábrelo. |
 
 Necesitas tu propia cuenta de **Claude Pro o Max** (con Max alcanza para varios videos). Opcional: tu cuenta de

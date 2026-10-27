@@ -908,7 +908,7 @@ async function gracias(env: Env, url: URL): Promise<Response> {
 <div class="clave"><code>${fila.clave}</code><button type="button" onclick="navigator.clipboard.writeText('${fila.clave}').then(()=>this.textContent='Copiada')">Copiar</button></div>
 ${correoAviso(escapar(fila.email))}
 <a class="boton" href="/descargar">Descargar Sloth para Windows</a>
-<p class="otros">También para <a href="/descargar?so=mac">Mac</a> (Apple Silicon) y <a href="/descargar?so=linux">Linux</a>.</p>
+<p class="otros">También para <a href="/descargar?so=mac">Mac</a> y <a href="/descargar?so=linux">Linux</a>.</p>
 <ol><li>Instálala. Si Windows dice «Windows protegió tu PC», da clic en <b>Más información</b> y luego en <b>Ejecutar de todas formas</b>.</li>
 <li>Ábrela y pega tu clave en Opciones: deja de salirte el recordatorio. Sirve en dos computadoras a la vez.</li>
 <li>Conecta tu cuenta de Claude, elige un estilo y escribe el tema.</li></ol>`
@@ -937,7 +937,7 @@ function avisoMac(u: Ultima): Response {
 <ol><li>Abre el archivo que se baja y arrastra <b>Sloth</b> a <b>Aplicaciones</b>.</li>
 <li>Ábrela. macOS dirá que no puede comprobarla: cierra ese aviso, ve a <b>Configuración del Sistema → Privacidad y seguridad</b> y pulsa <b>«Abrir de todos modos»</b>. Solo la primera vez.</li>
 <li>Cuando salga una versión nueva, Sloth te avisa y la bajas aquí otra vez, encima de la que tienes: tus videos y tus hilos se quedan.</li></ol>
-<p class="otros">Para Mac con Apple Silicon (M1 o más nueva).</p>`
+<p class="otros">Para Mac con Intel. En un Mac con M1 o más nuevo también abre: la primera vez, macOS pide instalar Rosetta.</p>`
   )
 }
 

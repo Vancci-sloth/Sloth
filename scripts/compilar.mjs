@@ -1,5 +1,5 @@
 // Compila Sloth para venderla. `npm run compilar` arma en dist/Sloth la app que se instala en otra computadora y la
-// mete en su instalador, en dist/instalador: Sloth-Setup-<versión>.exe en Windows, Sloth-<versión>-mac-arm64.dmg (y su
+// mete en su instalador, en dist/instalador: Sloth-Setup-<versión>.exe en Windows, Sloth-<versión>-mac-x64.dmg (y su
 // .zip, con el que se actualiza) en Mac y Sloth-<versión>-linux-x86_64.AppImage en Linux. Cada sistema se compila en el
 // suyo: lleva su Node y los paquetes de ese sistema (en GitHub, .github/workflows/venta.yml). Es una app de Electron
 // (electron/main.ts) y la empaqueta electron-builder; junto al instalador deja lo que usan las actualizaciones, sus mapas
@@ -288,7 +288,7 @@ const hechos = await empaquetar({
       icon: ICONO_PNG,
       category: 'public.app-category.video',
       artifactName: 'Sloth-${version}-mac-${arch}.${ext}',
-      // Sin certificado, firma ad hoc: sin ninguna, un Mac con Apple Silicon dice que Sloth «está dañada». Con ella, se
+      // Sin certificado, firma ad hoc: sin ninguna, macOS dice que Sloth «está dañada». Con ella, se
       // abre una vez desde Configuración → Privacidad y seguridad → «Abrir de todos modos».
       identity: MAC_FIRMADA ? undefined : '-',
       hardenedRuntime: MAC_FIRMADA,
