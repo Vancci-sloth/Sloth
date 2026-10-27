@@ -46,11 +46,12 @@
 
 /* Elegir uno de «Mis videos»: una rejilla de portadas que sale sobre el botón. */
 .esc-video { position: relative; }
-.esc-elegir { position: absolute; left: 0; bottom: calc(100% + 8px); z-index: 30; width: 420px; max-width: calc(100vw - 80px); padding: 10px; border-radius: 14px; border: 1px solid var(--line); background: var(--panel); box-shadow: 0 18px 48px rgba(0, 0, 0, 0.55); animation: esc-entra 0.16s ease-out; }
+/* En `body`, encima de todo (también del velo de una publicación abierta): MisVideosParaElegir le pone su lugar. */
+.esc-elegir { position: fixed; z-index: 80; width: 420px; max-width: calc(100vw - 80px); padding: 10px; border-radius: 14px; border: 1px solid var(--line); background: var(--panel); box-shadow: 0 18px 48px rgba(0, 0, 0, 0.55); animation: esc-entra 0.16s ease-out; }
 .esc-elegir-titulo { margin: 2px 4px 8px; color: var(--muted); font-size: 11px; font-weight: 650; letter-spacing: 0.06em; text-transform: uppercase; }
 .esc-elegir-nada { margin: 6px 4px 8px; color: var(--muted); font-size: 13px; }
 .esc-elegir-nota { margin: -4px 4px 10px; color: var(--muted); font-size: 12px; line-height: 1.4; }
-.esc-elegir-lista { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; max-height: 320px; overflow-y: auto; }
+.esc-elegir-lista { display: grid; grid-template-columns: repeat(4, 1fr); align-items: start; gap: 8px; max-height: min(420px, 55vh); overflow-y: auto; }
 .esc-elegir-lista button { display: flex; flex-direction: column; gap: 4px; min-width: 0; padding: 4px; border-radius: 10px; text-align: left; transition: background 0.15s; }
 .esc-elegir-lista button:hover { background: var(--panel-2); }
 .esc-elegir-lista img { width: 100%; aspect-ratio: 16 / 9; object-fit: cover; border-radius: 7px; background: var(--panel-2); }

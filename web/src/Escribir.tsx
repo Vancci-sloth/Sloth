@@ -1,4 +1,5 @@
-import { type MutableRefObject, type ReactNode, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { type CSSProperties, type MutableRefObject, type ReactNode, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { NOMBRE_AGENTE } from '../../shared/providers'
 import type { AdjuntoComunidad, AyudaMejora, OrigenMejora, VideoHecho, VideosDeTodos } from '../../shared/types'
 import { api } from './api'
@@ -355,32 +356,64 @@ function MisVideosParaElegir({ onElegir, onCerrar }: { onElegir(v: VideoHecho): 
   const [videos, setVideos] = useState<VideoHecho[] | null>(null)
   const [error, setError] = useState('')
   const caja = useRef<HTMLDivElement>(null)
+  // Donde está el botón «Video»: la caja se dibuja en `body`, encima de todo, y se coloca junto a él.
+  const marca = useRef<HTMLSpanElement>(null)
   useEffect(() => {
     api<VideosDeTodos>('/api/videos').then(
       (r) => setVideos(r.videos.slice(0, 60)),
       (e: Error) => setError(e.message)
     )
-    const fuera = (e: MouseEvent) => !caja.current?.parentElement?.contains(e.target as Node) && onCerrar()
+    const fuera = (e: MouseEvent) => {
+      const t = e.target as Node
+      if (!caja.current?.contains(t) && !marca.current?.parentElement?.contains(t)) onCerrar()
+    }
     addEventListener('mousedown', fuera)
     return () => removeEventListener('mousedown', fuera)
   }, [])
+  // Encima del botón si cabe; si no (el compositor de Comunidad está al principio de la página), debajo. Sigue al botón
+  // al desplazar la página.
+  const [lugar, setLugar] = useState<CSSProperties>({ visibility: 'hidden' })
+  useLayoutEffect(() => {
+    const colocar = () => {
+      const ancla = marca.current?.parentElement
+      const c = caja.current
+      if (!ancla || !c) return
+      const r = ancla.getBoundingClientRect()
+      const alto = c.offsetHeight
+      const left = Math.max(8, Math.min(r.left, innerWidth - c.offsetWidth - 8))
+      const top = r.top - alto - 8 >= 8 ? r.top - alto - 8 : Math.max(8, Math.min(r.bottom + 8, innerHeight - alto - 8))
+      setLugar({ left, top })
+    }
+    colocar()
+    addEventListener('scroll', colocar, true)
+    addEventListener('resize', colocar)
+    return () => {
+      removeEventListener('scroll', colocar, true)
+      removeEventListener('resize', colocar)
+    }
+  }, [videos, error])
   return (
-    <div ref={caja} className="esc-elegir" role="dialog" aria-label="Elige un video">
-      <div className="esc-elegir-titulo">Tus videos</div>
-      <p className="esc-elegir-nota">Se suben sus primeros 5 segundos. Para enseñarlo entero, pega su enlace en el texto.</p>
-      {error && <p className="esc-elegir-nada">{error}</p>}
-      {videos === null && !error && <p className="esc-elegir-nada">Cargando…</p>}
-      {videos?.length === 0 && <p className="esc-elegir-nada">Aún no terminas ningún video con Sloth.</p>}
-      {!!videos?.length && (
-        <div className="esc-elegir-lista">
-          {videos.map((v) => (
-            <button key={v.ruta} className={v.vertical ? 'vertical' : ''} title={v.titulo} onClick={() => onElegir(v)}>
-              <img src={`${v.src}&cuadro`} alt="" loading="lazy" />
-              <span>{v.titulo}</span>
-            </button>
-          ))}
-        </div>
+    <span ref={marca} hidden>
+      {createPortal(
+        <div ref={caja} className="esc-elegir" style={lugar} role="dialog" aria-label="Elige un video">
+          <div className="esc-elegir-titulo">Tus videos</div>
+          <p className="esc-elegir-nota">Se suben sus primeros 5 segundos. Para enseñarlo entero, pega su enlace en el texto.</p>
+          {error && <p className="esc-elegir-nada">{error}</p>}
+          {videos === null && !error && <p className="esc-elegir-nada">Cargando…</p>}
+          {videos?.length === 0 && <p className="esc-elegir-nada">Aún no terminas ningún video con Sloth.</p>}
+          {!!videos?.length && (
+            <div className="esc-elegir-lista">
+              {videos.map((v) => (
+                <button key={v.ruta} className={v.vertical ? 'vertical' : ''} title={v.titulo} onClick={() => onElegir(v)}>
+                  <img src={`${v.src}&cuadro`} alt="" loading="lazy" />
+                  <span>{v.titulo}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>,
+        document.body
       )}
-    </div>
+    </span>
   )
 }
