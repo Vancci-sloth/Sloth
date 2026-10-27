@@ -77,6 +77,9 @@ let avanzo = 0
 let fallos = 0
 /** La primera pregunta por la versión nueva: la interfaz la espera, o no la vería hasta su siguiente vuelta. */
 let primera: Promise<unknown> = Promise.resolve()
+/** Se cumple cuando el servidor ya escucha (`marcarListo`): antes no da la clave con que se pregunta por lo nuevo. */
+let avisarListo = () => {}
+const servidorListo = new Promise<void>((ok) => (avisarListo = ok))
 
 // Su propio nombre ante Windows: la ventana se junta con el acceso anclado y los avisos salen a nombre de Sloth.
 app.setAppUserModelId(SOLO_VENTANA ? 'Sloth.Dev' : 'Sloth.App')
@@ -349,6 +352,7 @@ function escribir(d: Buffer) {
 
 function marcarListo() {
   listo = true
+  avisarListo()
   void ventana?.loadURL(URL_SLOTH)
 }
 
@@ -499,7 +503,10 @@ function actualizaciones() {
     bajada.cancel()
   }, REINTENTO)
   const revisar = async () => {
-    // Quien apoya recibe lo nuevo antes: el cobro lo reconoce por su clave y esta computadora, que da el servidor.
+    // Quien apoya recibe lo nuevo antes: el cobro lo reconoce por su clave y esta computadora, que da el servidor. Al
+    // abrir Sloth, se espera a que arranque: sin la clave, la versión de quien apoya le llegaba 6 horas después. Si no
+    // arranca en 2 minutos, se pregunta igual: una versión nueva puede ser el arreglo.
+    await Promise.race([servidorListo, new Promise((ok) => setTimeout(ok, 120_000))])
     const c = (await fetch(`${URL_SLOTH}/api/licencia/credencial`).then((r) => r.json()).catch(() => ({}))) as { clave?: string; equipo?: string }
     autoUpdater.requestHeaders = c.clave && c.equipo ? { 'x-sloth-clave': c.clave, 'x-sloth-equipo': c.equipo } : null
     await autoUpdater.checkForUpdates().catch(() => {})
