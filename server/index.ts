@@ -30,7 +30,7 @@ import { redes } from './redes/index.ts' // redes
 import { youtube } from './youtube.ts'
 import { peticionDeConfianza } from './origen.ts'
 import { reinicioSolo } from './reinicio.ts'
-import { instalandoAlgo, instalar, pythonSlothEntero, requisitos } from './requisitos.ts'
+import { actualizarYtDlp, instalandoAlgo, instalar, pythonSlothEntero, requisitos } from './requisitos.ts'
 import { espacio } from './espacio.ts' // espacio en disco
 import { licencia } from './licencia.ts' // suscripción
 import { Sessions } from './sessions.ts'
@@ -651,4 +651,8 @@ server.listen(PORT, '127.0.0.1', () => {
   console.log(`Sloth en http://localhost:${PORT}`)
   // La primera copia de Sloth lee todo el repo; luego solo lo que cambió. Mejor ahora que al mandar el primer mensaje.
   if (!VENTA) setTimeout(() => cambiosSloth.calentar(), 3000)
+  // yt-dlp al día, una vez al día: se mira cada hora por si a esa hora trabajaba algo.
+  const ytDlp = () => void actualizarYtDlp(APP, () => !ocupado())
+  setTimeout(ytDlp, 30_000)
+  setInterval(ytDlp, 3_600_000).unref()
 })

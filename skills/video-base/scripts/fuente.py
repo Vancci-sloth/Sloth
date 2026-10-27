@@ -9,8 +9,9 @@ transcripcion.txt (con [m:ss] por segmento). Imprime título, canal, fecha y la 
 Si otro vídeo ya bajó ese video de YouTube, lo enlaza de ahí en vez de bajarlo (y su transcripción, aunque el video
 haya que bajarlo otra vez porque aquella copia quedó en 360p). Los vídeos de un lote bajan de YouTube de uno en uno.
 
-Si YouTube pide "Sign in to confirm you're not a bot" (pasó en octubre de 2026, y las cookies de Edge no se pueden
-descifrar), lo vuelve a intentar con el cliente `mweb` de yt-dlp, que sí pasa, pero sin PO token solo da 360p: avisa.
+Si YouTube pide "Sign in to confirm you're not a bot" (pasa desde octubre de 2026, y las cookies de Edge no se pueden
+descifrar), lo vuelve a intentar con el cliente `web_embedded` de yt-dlp, que da 1080p (como el fuente.py de El Diff), y
+si el video no deja insertarse, con `mweb`, que sin PO token solo da 360p: avisa.
 """
 
 import glob
@@ -29,6 +30,8 @@ YOUTUBE = re.compile(r"(?:youtube\.com/(?:watch\?(?:.*&)?v=|shorts/|live/|embed/
 PROYECTOS = [(PROCESOS.parents[1] / "trabajo").as_posix() + "/*/*/fuentes", "C:/dev/*/fuentes"]
 # Lo que no sirve para sacar clips ni cuadros: el formato 18 (640x360) que da el cliente mweb.
 MINIMO = 720
+# Los clientes de YouTube con que se reintenta, en orden. Probar más acabó en 429 el 8 de octubre de 2026.
+REINTENTOS = ("web_embedded", "mweb")
 
 
 def altura(carpeta: Path) -> int:
@@ -66,12 +69,14 @@ def bajar(url: str, carpeta: Path) -> None:
     with turno_youtube():
         r = sloth("-m", "yt_dlp", "-f", "bv*[height<=1080][ext=mp4]+ba[ext=m4a]/b[ext=mp4]/b", "--merge-output-format",
                   "mp4", "-o", "video.mp4", "--write-info-json", "--no-progress", url, cwd=carpeta)
-        if r.returncode == 0:
-            return
-        print("\n-- reintento con el cliente mweb de YouTube --")
-        sloth("-m", "yt_dlp", "--extractor-args", "youtube:player_client=mweb", "-f", "bv*[height<=1080]+ba/b",
-              "--merge-output-format", "mp4", "-o", "video.mp4", "--write-info-json", "--no-progress", url,
-              cwd=carpeta, check=True)
+        for cliente in REINTENTOS:
+            if r.returncode == 0:
+                return
+            print(f"\n-- reintento con el cliente {cliente} de YouTube --")
+            r = sloth("-m", "yt_dlp", "--extractor-args", f"youtube:player_client={cliente}", "-f", "bv*[height<=1080]+ba/b",
+                      "--merge-output-format", "mp4", "-o", "video.mp4", "--write-info-json", "--no-progress", url, cwd=carpeta)
+    if r.returncode:
+        sys.exit("yt-dlp no pudo bajar el video (arriba dice por qué).")
 
 
 def main() -> None:

@@ -1,5 +1,5 @@
 import { execFile, execFileSync, spawn } from 'node:child_process'
-import { chmodSync, createWriteStream, existsSync, mkdirSync, readdirSync, renameSync, rmSync, statSync, symlinkSync } from 'node:fs'
+import { chmodSync, createWriteStream, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs'
 import { copyFile, cp } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
@@ -179,6 +179,28 @@ export async function instalarPythonSloth(app: string, { raiz = PYTHONES, modelo
   mkdirSync(modelos, { recursive: true })
   return ejecutar(python, [...BANDERAS, '-c', BAJAR_MODELOS, modelos], join(app, 'python', 'procesos'), verPaso)
 }
+
+/**
+ * yt-dlp se pone al día una vez al día, cuando no trabaja nadie (`libre`): YouTube cambia seguido, y con el que dejó la
+ * instalación, que nunca se tocaba, la descarga acaba pidiendo «Sign in to confirm you're not a bot». Si falla, sigue
+ * el que había, y se vuelve a intentar la siguiente vez.
+ */
+export async function actualizarYtDlp(app: string, libre: () => boolean) {
+  const python = rutaPythonSloth()
+  const marca = join(app, 'data', 'yt-dlp.txt')
+  const hoy = new Date().toISOString().slice(0, 10)
+  if (!python || instalando || ytDlp || !libre() || (existsSync(marca) && readFileSync(marca, 'utf8') === hoy)) return
+  ytDlp = true
+  try {
+    await ejecutar(python, ['-E', '-s', '-X', 'utf8', '-m', 'pip', 'install', '--disable-pip-version-check', '--no-warn-script-location', '--upgrade', 'yt-dlp[default]'], app)
+    writeFileSync(marca, hoy)
+  } catch (e) {
+    console.error(`No se pudo poner al día yt-dlp: ${e instanceof Error ? e.message : e}`)
+  } finally {
+    ytDlp = false
+  }
+}
+let ytDlp = false
 
 /**
  * Lo que va haciendo la instalación en curso, en su fila en vez de «Descargando…»: el Python de Sloth baja gigas durante
@@ -464,7 +486,7 @@ function piezas(app: string, skill?: string): Pieza[] {
 let instalando: Pieza | null = null
 let cola: Pieza[] = []
 /** Si se está instalando algo: reiniciar el servidor mataría a winget o pip a la mitad. */
-export const instalandoAlgo = () => (instalando ? `Se está instalando ${instalando.nombre}. Espera a que termine.` : null)
+export const instalandoAlgo = () => (instalando ? `Se está instalando ${instalando.nombre}. Espera a que termine.` : ytDlp ? 'Se está poniendo al día yt-dlp. Espera a que termine.' : null)
 const fallos: Record<string, string> = {}
 /**
  * Por skill, la última vez que no había nada que bajar. Mirarlo son cinco procesos (ffmpeg, python…), y se miraba en
