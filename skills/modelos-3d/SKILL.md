@@ -97,5 +97,7 @@ exporta, qué modelos usa, sus íconos, de qué video salió) y saca su vista co
 `node_modules` del proyecto). **Mira la vista**: si no se entiende qué es, cambia la `Muestra` o el `--cuadro` y
 vuelve a guardar. Al mejorar uno, solo se pasa lo que cambió; `--hace` y `--etiquetas` se pasan enteros, con lo nuevo.
 
-Lo guardado queda en el repo de Sloth (`skills/modelos-3d`) sin commit: al entregar el video, dile al usuario qué
+La biblioteca es de cada quien y empieza vacía: la moneda y el ícono 3D que trae la plantilla del explicativo están
+en `plantilla/`, que `usar` encuentra y `buscar` no enseña (si mejoras uno y lo guardas, pasa a la biblioteca). Lo
+guardado queda en el repo de Sloth (`skills/modelos-3d`) sin commit: al entregar el video, dile al usuario qué
 modelos sumaste o mejoraste.

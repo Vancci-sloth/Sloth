@@ -293,7 +293,8 @@ async function prepararApp() {
 /**
  * Las skills viajan en resources\skills y se ponen en app\skills al estrenar cada versión, como hacía el instalador de
  * antes: lo que cada skill guarda de los tuyos (las huellas, el banco de temas, la biblioteca 3D) se queda. Los modelos
- * 3D del dueño de Sloth que traían las versiones de antes se van, menos los que cambiaste (`MODELOS_VIEJOS`).
+ * 3D del dueño de Sloth que traían las versiones de antes (la moneda incluida) se van, menos los que cambiaste
+ * (`MODELOS_VIEJOS`).
  */
 async function prepararSkills() {
   const marca = join(APP, 'data', 'skills.txt')

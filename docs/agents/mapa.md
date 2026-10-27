@@ -52,8 +52,9 @@ Este es el mapa:
   (`licencias/src/comunidad.ts`); cada quien entra con su cuenta gratis (o la clave de su apoyo) y tú, como creador, con la llave de `publicar.txt`.
   En su sección Mejoras, «Hacer con Sloth» abre esta card con `Mejora: <id>`; publicar una (la ven todos):
   `POST /api/mejoras {texto}`.
-- `server/modelos3d.ts` y `web/src/Modelos3D.tsx`: «Modelos 3D» enseña la biblioteca `skills/modelos-3d`, que llenan
-  los videos (solo se mira).
+- `server/modelos3d.ts` y `web/src/Modelos3D.tsx`: «Modelos 3D» enseña la biblioteca `skills/modelos-3d` que usan los
+  agentes (la de `~/.claude/skills`), que llenan los videos (solo se mira). Empieza vacía; la moneda de la plantilla
+  va en `modelos-3d/plantilla`, sin enseñarse.
 - `server/requisitos.ts`: lo que las skills necesitan fuera de Sloth. Cada card pide solo los paquetes de su skill
   (`PAQUETES` dice cuáles). Instala automáticamente el Python de Sloth en `%APPDATA%\youtube\piezas\python`,
   sus paquetes y los modelos; elige CUDA si hay una NVIDIA que lo aguante (`aguantaCuda`) y CPU si no. Una instalación

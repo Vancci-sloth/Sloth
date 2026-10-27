@@ -3,7 +3,7 @@ Crea el proyecto de un video en la carpeta `<nombre>`, tal cual (la de la línea
 `explicado-<tema>` fuera de Sloth): copia la plantilla de Remotion, la marca (el personaje con sus poses en
 public/perro, la foto y la red del cierre: `marca.py aplicar`), enlaza node_modules al que comparten todos los videos
 explicativos (espacio.py de video-base: antes cada uno copiaba el suyo, ~1 GB) y,
-de la biblioteca de modelos 3D (skills/modelos-3d), la moneda que la plantilla trae de protagonista. Al final empaqueta
+de skills/modelos-3d/plantilla, la moneda que la plantilla trae de protagonista. Al final empaqueta
 el proyecto una vez (render.cjs --empaqueta): el primer empaquetado de un proyecto tarda ~40 s y los siguientes ~10,
 así el primer borrador no los paga.
 
@@ -63,7 +63,7 @@ def main() -> None:
     # (en la carpeta de la card todos son de este estilo; en C:\dev, los `explicado-*`) o de npm ci.
     vecinos = [*(raiz.glob("*/node_modules") if raiz != DEV else []), *DEV.glob("explicado-*/node_modules")]
     enlazar_modulos(destino, "video-explicativo", SKILL / "plantilla", [p for p in vecinos if p.parent != destino])
-    # La protagonista de la plantilla, de la biblioteca (con los íconos que usa, que salen de node_modules).
+    # La protagonista de la plantilla, de modelos-3d/plantilla (con los íconos que usa, que salen de node_modules).
     subprocess.run([sys.executable, "-B", "-X", "utf8", str(MODELOS), "usar", "moneda"], cwd=destino, check=True, stdout=subprocess.DEVNULL)
     subprocess.run(["node", str(SKILL / "scripts" / "render.cjs"), "--empaqueta"], cwd=destino, check=True)
     print(f"listo: {destino}")

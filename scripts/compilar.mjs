@@ -51,14 +51,12 @@ const BASURA = new Set(['__pycache__', 'node_modules', '.git', '.cache'])
 /** Lo tuyo dentro de las skills, que se llena solo con los videos de cada cliente: tus huellas y tu banco de temas. */
 const TUYO = ['video-explicativo/huellas/registro.jsonl', 'video-explicativo/huellas/hojas', 'video-explicativo/series/banco'].map((r) => join(REPO, 'skills', r))
 /**
- * Tus modelos 3D también son tuyos: cada cliente hace los suyos. Solo va la moneda que trae de protagonista la plantilla
- * del explicativo (`nuevo.py`), con los que usa. Los que llevaban las versiones de antes los quita la app al actualizarse
- * (electron/modelos-viejos.ts).
+ * Tus modelos 3D también son tuyos: cada cliente empieza con la biblioteca vacía y hace los suyos. La moneda que trae de
+ * protagonista la plantilla del explicativo va aparte (`modelos-3d/plantilla`), sin enseñarse. Los que llevaban las
+ * versiones de antes los quita la app al actualizarse (electron/modelos-viejos.ts).
  */
 const MODELOS = join(REPO, 'skills', 'modelos-3d', 'modelos')
-const usa = (id) => [id, ...JSON.parse(readFileSync(join(MODELOS, id, 'modelo.json'), 'utf8')).usa.flatMap(usa)]
-const MODELOS_PLANTILLA = new Set(usa('moneda'))
-const limpio = (ruta) => !BASURA.has(basename(ruta)) && !TUYO.includes(ruta) && (dirname(ruta) !== MODELOS || MODELOS_PLANTILLA.has(basename(ruta)))
+const limpio = (ruta) => !BASURA.has(basename(ruta)) && !TUYO.includes(ruta) && dirname(ruta) !== MODELOS
 
 const paso = (texto) => console.log(`\n· ${texto}`)
 // Compilada desde un hilo de Sloth, heredaría el `development` de su Vite, y React saldría en modo desarrollo.

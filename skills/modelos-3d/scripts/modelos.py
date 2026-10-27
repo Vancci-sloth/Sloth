@@ -11,7 +11,8 @@ La biblioteca de modelos 3D: buscar uno antes de hacerlo, traerlo al proyecto y 
 Todo menos `buscar` se corre en la carpeta del proyecto (la que tiene package.json). Un modelo vive en el proyecto en
 src/modelos/<id>.tsx (con src/modelos/comun.tsx) y sus archivos en public/modelos/<id>/; en la biblioteca, en
 modelos/<id>/ con su modelo.json y su vista (vista.webp, la foto, y vista.webm, la cámara que se mece). Cada proyecto lleva su copia: guardar una versión nueva no rompe
-los videos ya hechos.
+los videos ya hechos. La biblioteca de cada quien empieza vacía: los que trae la plantilla del explicativo (la moneda, con
+lo que usa) están en plantilla/<id>/, que `usar` encuentra y `buscar` y Sloth no enseñan.
 """
 
 import argparse
@@ -27,6 +28,7 @@ from pathlib import Path
 
 BIBLIOTECA = Path(__file__).resolve().parent.parent
 MODELOS = BIBLIOTECA / "modelos"
+PLANTILLA = BIBLIOTECA / "plantilla"
 # Lo único que un modelo puede importar, además de comun y otros modelos: lo demás le llega por props.
 PERMITIDOS = re.compile(r"^(react|react-dom|three|three/.+|@react-three/fiber|remotion|@remotion/.+)$")
 ORDEN = ["nombre", "resumen", "categoria", "descripcion", "hace", "etiquetas", "exporta", "usa", "iconos", "cuadro", "origen", "creado", "actualizado"]
@@ -43,11 +45,16 @@ PIDE = {
 }
 
 
+def carpeta(id_: str) -> Path:
+    """Donde está el modelo: en la biblioteca o, si no, entre los de la plantilla."""
+    for base in (MODELOS, PLANTILLA):
+        if (base / id_ / "modelo.json").exists():
+            return base / id_
+    sys.exit(f"No hay «{id_}» en la biblioteca. Mira lo que hay: python -B -X utf8 {Path(__file__).name} buscar")
+
+
 def ficha(id_: str) -> dict:
-    ruta = MODELOS / id_ / "modelo.json"
-    if not ruta.exists():
-        sys.exit(f"No hay «{id_}» en la biblioteca. Mira lo que hay: python -B -X utf8 {Path(__file__).name} buscar")
-    return json.loads(ruta.read_text("utf-8"))
+    return json.loads((carpeta(id_) / "modelo.json").read_text("utf-8"))
 
 
 def todos() -> list[str]:
@@ -138,8 +145,8 @@ def usar(ids: list[str], pisa: bool = False, callado: bool = False) -> None:
     copia(BIBLIOTECA / "comun.tsx", src / "comun.tsx", pisa)
     for id_ in orden:
         m = ficha(id_)
-        copia(MODELOS / id_ / f"{id_}.tsx", src / f"{id_}.tsx", pisa)
-        archivos = MODELOS / id_ / "archivos"
+        copia(carpeta(id_) / f"{id_}.tsx", src / f"{id_}.tsx", pisa)
+        archivos = carpeta(id_) / "archivos"
         if archivos.exists():
             for a in archivos.rglob("*"):
                 if a.is_file():
@@ -209,7 +216,9 @@ def guardar(id_: str, dados: dict[str, str | None], cuadro: int | None, sin_vist
     iconos_ = sorted(p.stem for p in (raiz_ / "public" / "iconos").glob("*.svg") if f'"{p.stem}"' in texto)
 
     destino = MODELOS / id_
-    previo = json.loads((destino / "modelo.json").read_text("utf-8")) if (destino / "modelo.json").exists() else {}
+    # Uno de la plantilla que se mejora pasa a la biblioteca con su ficha.
+    previas = [b / id_ / "modelo.json" for b in (MODELOS, PLANTILLA) if (b / id_ / "modelo.json").exists()]
+    previo = json.loads(previas[0].read_text("utf-8")) if previas else {}
     faltan = [f"--{k}: {v}" for k, v in PIDE.items() if not dados.get(k) and not previo.get(k)]
     if faltan:
         sys.exit("\n  ".join(["Falta en su ficha:", *faltan]))

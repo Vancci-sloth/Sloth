@@ -1,1 +1,1 @@
-Codex y Claude Code al día: Codex 0.164 y Claude Code 2.1.311.
+Modelos 3D: tus modelos aparecen en su sección, y la biblioteca empieza vacía, solo con los que tú hagas.

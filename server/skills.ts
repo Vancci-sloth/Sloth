@@ -28,6 +28,15 @@ export function enlazarSkills(app: string) {
   }
 }
 
+/**
+ * La carpeta de la skill que usan los agentes (la de ~/.claude/skills), si está. Lo que una skill guarda al trabajar va
+ * ahí, que puede no ser `<app>/skills`: en la máquina del repo es el repo, o la de una instalación de antes.
+ */
+export function carpetaSkill(name: string): string | undefined {
+  const dir = join(ROOT, name)
+  return existsSync(dir) ? dir : undefined
+}
+
 /** La skill, si está instalada. `undefined` si no. */
 export function skillRef(name: string): SkillRef | undefined {
   const path = join(ROOT, name, 'SKILL.md')

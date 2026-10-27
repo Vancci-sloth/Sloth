@@ -36,7 +36,7 @@ import { espacio } from './espacio.ts' // espacio en disco
 import { licencia } from './licencia.ts' // suscripción
 import { Sessions } from './sessions.ts'
 import { eventosEnVivo } from './eventos-en-vivo.ts'
-import { duplicateCard, enlazarSkills, readCards, removeCard, seriesDe, skillRef } from './skills.ts'
+import { carpetaSkill, duplicateCard, enlazarSkills, readCards, removeCard, seriesDe, skillRef } from './skills.ts'
 import { estaticos } from './estaticos.ts'
 import { actualizar, type Agente, version } from './version.ts'
 
@@ -119,8 +119,8 @@ const previa = previas(join(APP, 'data', 'previas'), cards) // previas de las ca
 const { miniatura, cuadro } = miniaturas(join(APP, 'data', 'miniaturas')) // panel de etapas
 // Ideas para YouTube: investigar el nicho de un canal y que Claude proponga videos con evidencia.
 const idear = VENTA ? undefined : ideas(APP, sessions, broadcast, subirLargos?.lectura) // ideas
-// La biblioteca de modelos 3D que llenan los videos, para verla.
-const biblioteca3d = modelos3d(join(APP, 'skills', 'modelos-3d')) // modelos 3D
+// La biblioteca de modelos 3D que llenan los videos, para verla: la de la skill que usan los agentes, que es donde guardan.
+const biblioteca3d = modelos3d(carpetaSkill('modelos-3d') ?? join(APP, 'skills', 'modelos-3d')) // modelos 3D
 // El buscador propio de noticias de tecnología: lee sus fuentes en segundo plano y las skills buscan ahí.
 const noticias = radar(APP) // radar
 // La comunidad: lo que la gente hace con Sloth y cómo. Entra cada cliente con su licencia, y el creador con su llave,

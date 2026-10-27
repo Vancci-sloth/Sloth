@@ -2,7 +2,8 @@
  * Los modelos 3D del dueño de Sloth que las versiones hasta la 0.3.2 dejaban en la biblioteca de cada cliente
  * (`app\skills\modelos-3d\modelos`). Ya no van: cada quien hace los suyos, y `prepararSkills` (main.ts) quita estos. Por
  * cada uno, la huella de cada versión de su `<id>.tsx` que salió (sha256 con los saltos de línea en LF, 16 letras): si el
- * del cliente no es ninguna, lo cambió, ya es suyo y se queda. Sale de la historia de git hasta 94fb103, la 0.3.2.
+ * del cliente no es ninguna, lo cambió, ya es suyo y se queda. Sale de la historia de git hasta 94fb103, la 0.3.2. La
+ * moneda y el ícono 3D salieron un tiempo más: ahora la plantilla los trae aparte (`modelos-3d/plantilla`), sin enseñarlos.
  */
 export const MODELOS_VIEJOS: Record<string, string[]> = {
   alcancia: ["1028e9f717fd195d"],
@@ -33,6 +34,7 @@ export const MODELOS_VIEJOS: Record<string, string[]> = {
   frase: ["dc6b9e7d56989fc4"],
   horno: ["a6ec085e9dc8534d"],
   hotel: ["45769c9c2c66e632"],
+  "icono-3d": ["54e14e499d69ada4"],
   isla: ["1e575ff674cef899"],
   laptop: ["fb612aa9de824781"],
   letrero: ["31a3d5e6cd6b040d"],
@@ -43,6 +45,7 @@ export const MODELOS_VIEJOS: Record<string, string[]> = {
   marcador: ["0e4bde806a162a3a"],
   "mesa-boveda": ["6c115ba15b1834fd"],
   "mochila-reparto": ["5268c6b23278bd1e"],
+  moneda: ["3667d48fef32620d"],
   "mostrador-vidrio": ["9d75882e1bb30c0a"],
   palmera: ["2dbc506cfbd852c6"],
   panal: ["0e7fa7f0c24b8a33"],

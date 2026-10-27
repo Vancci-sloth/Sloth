@@ -24,9 +24,7 @@ skills/.autoloop/checks/capturas/guardia/fuentes/
 /skills/video-el-diff/plantilla/public/img/*
 !/skills/video-el-diff/plantilla/public/img/grano.png
 !/skills/video-el-diff/plantilla/public/img/LEEME.md
-/skills/modelos-3d/modelos/*
-!/skills/modelos-3d/modelos/moneda/
-!/skills/modelos-3d/modelos/icono-3d/
+/skills/modelos-3d/modelos/
 /skills/video-documental/
 /skills/ideas-*/METODO.md
 # Las cards de lo de arriba, solo en esa copia (las lee el servidor; no van en la app que se vende).
