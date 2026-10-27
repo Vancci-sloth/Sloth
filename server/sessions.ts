@@ -173,30 +173,13 @@ export class Sessions {
     this.save(meta)
   }
 
-  /** «Guardar en…»: dónde se copian sus videos terminados (`server/destino.ts`). Sin destino, no se copian. */
-  setDestino(id: string, destino?: string) {
-    const meta = this.metas.get(id)
-    if (!meta) return
-    meta.destino = destino
-    delete meta.copia
-    this.save(meta)
-  }
-
-  /** Cómo fue la última copia a su destino. Solo se guarda si cambió: se mira al acabar cada turno. */
-  setCopia(id: string, copia: SessionMeta['copia']) {
-    const meta = this.metas.get(id)
-    if (!meta || JSON.stringify(meta.copia) === JSON.stringify(copia)) return
-    meta.copia = copia
-    this.save(meta)
-  }
-
   /** Si hay un agente trabajando, en su turno o en segundo plano. Reiniciar el servidor lo cortaría. */
   anyRunning(): boolean {
     return [...this.metas.values()].some((m) => m.running || m.background?.length)
   }
 
-  /** Con `carpeta`, el hilo nace sabiendo dónde trabaja: la de su video, nuevo o que ya existe. Con `destino`, a dónde copia sus videos. */
-  create(input: { cardId: string; title: string; model: string; effort?: string; cwd: string; carpeta?: string; destino?: string }): SessionMeta {
+  /** Con `carpeta`, el hilo nace sabiendo dónde trabaja: la de su video, nuevo o que ya existe. */
+  create(input: { cardId: string; title: string; model: string; effort?: string; cwd: string; carpeta?: string }): SessionMeta {
     const now = Date.now()
     const meta: SessionMeta = { id: now.toString(36) + Math.random().toString(36).slice(2, 6), ...input, createdAt: now, updatedAt: now, running: false }
     this.metas.set(meta.id, meta)
@@ -247,7 +230,7 @@ export class Sessions {
    * Un lote: un hilo por video, todos esperando, con su primer mensaje ya a la vista. `repartir` los arranca en orden
    * mientras quepan en la máquina.
    */
-  crearLote(input: { cardId: string; model: string; effort?: string; cwd: string; destino?: string }, videos: { title: string; text: string; carpeta: string }[], skill?: SkillRef, images: string[] = []): SessionMeta[] {
+  crearLote(input: { cardId: string; model: string; effort?: string; cwd: string }, videos: { title: string; text: string; carpeta: string }[], skill?: SkillRef, images: string[] = []): SessionMeta[] {
     const lote = Date.now().toString(36)
     const metas = videos.map((v, i) => {
       const meta = this.create({ ...input, title: v.title })

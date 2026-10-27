@@ -170,7 +170,7 @@ export interface Avance {
    * `pausa`). `renders`: los videos renderizados de la fase Video, del más avanzado al primero.
    */
   monitor?: { motor?: { url: string; v: number; armando: boolean; error?: string }; vivo?: { url: string; t: number }; renders: Render[] }
-  /** Los videos terminados del hilo, los que se descargan y se copian a su `destino`. */
+  /** Los videos terminados del hilo, los que se descargan. */
   finales?: VideoFinal[]
 }
 
@@ -308,12 +308,6 @@ export interface SessionMeta {
   skill?: string
   /** El primer mensaje de un video del lote que aún no empieza: espera a que haya sitio en la máquina. */
   pendiente?: { text: string; images?: string[] }
-  /**
-   * «Guardar en…»: la carpeta del disco (ruta completa) donde se copian sus videos terminados al acabar cada turno
-   * (`server/destino.ts`). `copia` dice qué quedó copiado la última vez o por qué falló.
-   */
-  destino?: string
-  copia?: { archivos: string[]; error?: string }
 }
 
 export interface Lote {
@@ -1180,8 +1174,6 @@ export interface PuenteSloth {
   anclada(): Promise<boolean | null>
   /** Pide a Windows anclarla, que pregunta en su ventana. `windows`: Windows no dejó pedirlo. */
   anclar(): Promise<'anclada' | 'no' | 'windows'>
-  /** El diálogo de carpetas del sistema, que empieza en `desde`: la ruta elegida, o `null`. No está en las ventanas de antes. */
-  elegirCarpeta?(desde?: string): Promise<string | null>
   /** El navegador integrado de cada hilo. No está en una ventana de antes de que existiera. */
   navegador?: PuenteNavegador
 }

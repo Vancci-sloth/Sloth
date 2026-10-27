@@ -17,7 +17,6 @@ import { proveedorDe } from '../shared/providers.ts'
 import { paraMandar } from '../shared/historial.ts'
 import { cerrarCuentaCodex, conectandoCodex, conectarCodex, cuentaCodex, limitesCodex } from './cuenta-codex.ts'
 import { conectando, conectarClaude, cuentaClaude, limitesClaude } from './cuenta.ts'
-import { copiando, destinoApi, destinoValido, guardarCopias, TRAS_EL_TURNO } from './destino.ts' // guardar en
 import { enlacesApi } from './enlaces.ts' // tarjeta de los enlaces
 import { carpetaValida, carpetasApi, etapasApi, videosApi, videosDe } from './etapas.ts' // panel de etapas
 import { ideas } from './ideas/index.ts' // ideas
@@ -73,12 +72,7 @@ const cambiosSloth = new CambiosSloth(APP)
 const eventos = eventosEnVivo((sessionId, from, events) => broadcast({ type: 'events', sessionId, from, events }))
 const sessions = new Sessions(
   join(APP, 'data', 'sessions'),
-  (sessionId, from, events) => {
-    eventos(sessionId, from, events)
-    // «Guardar en…»: al acabar cada turno, sus videos terminados se copian a su destino. Con espera, y no antes: al
-    // arrancar, el cierre de un turno cortado llega aquí cuando `sessions` aún no existe.
-    if (events.some((e) => e.t === 'turn_end')) setTimeout(() => guardarCopias(sessions, cards(), sessionId), TRAS_EL_TURNO) // guardar en
-  },
+  eventos,
   (session) => broadcast({ type: 'session', session }),
   (sessionId) => broadcast({ type: 'removed', sessionId }),
   // Lo que va escribiendo un `Write` solo lo pintan el estudio y el panel de etapas: a los demás hilos no se les manda.
@@ -150,7 +144,7 @@ function ocupado(): string | null {
   if (subirLargos?.ocupado()) return subirLargos.ocupado()
   if (idear?.ocupado()) return idear.ocupado() // ideas: una investigación en curso
   if (actualizando) return actualizando
-  return instalandoAlgo() ?? conectando() ?? conectandoCodex() ?? copiando()
+  return instalandoAlgo() ?? conectando() ?? conectandoCodex()
 }
 /** Mientras «Actualizar» corre npm install y la comprobación: qué se está actualizando. */
 let actualizando: string | null = null
@@ -363,12 +357,11 @@ async function api(req: IncomingMessage, res: ServerResponse, url: URL): Promise
   }
 
   if (path === '/api/sessions' && method === 'POST') {
-    const input = await body<{ cardId: string; model: string; effort?: string; text: string; images?: string[]; carpeta?: string; destino?: string }>(req)
+    const input = await body<{ cardId: string; model: string; effort?: string; text: string; images?: string[]; carpeta?: string }>(req)
     const card = cards().find((c) => c.id === input.cardId)
     if (!card) return send(res, 404, { error: 'No existe esa card' }), true
     // Mientras Sloth hace commit o push, un hilo suyo no puede empezar: se dice antes de crearlo, o quedaba un hilo vacío.
     if (cambiosSloth.esSloth({ cardId: card.id, cwd: card.cwd })) cambiosSloth.comprobarInicio('')
-    const destino = input.destino && card.etapas?.length ? destinoValido(input.destino, card) : undefined // guardar en
     mkdirSync(card.cwd, { recursive: true })
     // «Continuar un video»: el hilo nace con su carpeta, que ya existe. Se lo dice el mensaje, en palabras: así vale para
     // cualquier skill sin tocarlas (El Diff la afina el usuario a mano), y pesa más que su paso de crear una carpeta nueva.
@@ -380,7 +373,7 @@ async function api(req: IncomingMessage, res: ServerResponse, url: URL): Promise
     const title = (titulo ?? input.text.split('\n')[0]).slice(0, 80) || (input.images?.length ? 'Imagen' : card.title)
     // Un video nuevo también nace con su carpeta, como los de un lote: la skill la crea con el nombre de la línea `Carpeta:`.
     const nueva = !sigue && card.etapas?.length ? carpetaDeVideo(card, title) : undefined // panel de etapas
-    const meta = sessions.create({ cardId: card.id, title, model: input.model, effort: input.effort, cwd: card.cwd, carpeta: sigue ?? nueva, destino })
+    const meta = sessions.create({ cardId: card.id, title, model: input.model, effort: input.effort, cwd: card.cwd, carpeta: sigue ?? nueva })
     const text = sigue
       ? `${input.text}\n\nContinúa el video que ya está en la carpeta «${sigue}»: trabaja ahí, no crees otra, mira qué hay y sigue desde lo que te pido.`
       : [input.text, nueva && `Carpeta: ${nueva}`].filter(Boolean).join('\n\n')
@@ -398,13 +391,12 @@ async function api(req: IncomingMessage, res: ServerResponse, url: URL): Promise
 
   // Un lote: un hilo por enlace, cada uno con su carpeta ya nombrada. Esperan su turno en `sessions`.
   if (path === '/api/lotes' && method === 'POST') {
-    const input = await body<{ cardId: string; model: string; effort?: string; text: string; enlaces: string[]; images?: string[]; destino?: string }>(req)
+    const input = await body<{ cardId: string; model: string; effort?: string; text: string; enlaces: string[]; images?: string[] }>(req)
     const card = cards().find((c) => c.id === input.cardId)
     if (!card?.lote) return send(res, 404, { error: 'Esa card no hace lotes' }), true
     const n = input.enlaces.length
     if (n < 2) return send(res, 400, { error: 'Un lote lleva al menos dos enlaces' }), true
     // Todos los videos del lote copian a la misma carpeta, cada uno con el nombre de la suya.
-    const destino = input.destino && card.etapas?.length ? destinoValido(input.destino, card) : undefined // guardar en
     mkdirSync(card.cwd, { recursive: true })
     const videos = carpetasDeLote(card, n).map((carpeta, i) => ({
       carpeta,
@@ -412,7 +404,7 @@ async function api(req: IncomingMessage, res: ServerResponse, url: URL): Promise
       text: [input.text, `Enlace: ${input.enlaces[i]}`, `Lote: video ${i + 1} de ${n}. Carpeta: ${carpeta}`].filter(Boolean).join('\n\n')
     }))
     const { cardId, model, effort } = input
-    const metas = sessions.crearLote({ cardId, model, effort, cwd: card.cwd, destino }, videos, card.skill ? skillRef(card.skill) : undefined, input.images)
+    const metas = sessions.crearLote({ cardId, model, effort, cwd: card.cwd }, videos, card.skill ? skillRef(card.skill) : undefined, input.images)
     send(res, 200, metas)
     return true
   }
@@ -424,11 +416,9 @@ async function api(req: IncomingMessage, res: ServerResponse, url: URL): Promise
     return true
   }
 
-  // Antes de cambiar la carpeta de un hilo («Haz otra versión», cambiar carpeta), «Guardar en…» copia lo que deja atrás.
-  if (await etapasApi(req, res, url, sessions, cards(), broadcast, miniatura, (id) => guardarCopias(sessions, cards(), id))) return true // panel de etapas
+  if (await etapasApi(req, res, url, sessions, cards(), broadcast, miniatura)) return true // panel de etapas
   if (await videosApi(req, res, url, sessions, cards(), publicar?.marcas, cuadro)) return true // panel de etapas; `publicar.marcas`, de redes
   if (carpetasApi(req, res, url, sessions, cards())) return true // panel de etapas
-  if (await destinoApi(req, res, url, sessions, cards())) return true // guardar en
   if (publicar && (await publicar.api(req, res, url))) return true // redes
   if (subirLargos && (await subirLargos.api(req, res, url))) return true // videos largos de YouTube
   if (await previa.api(req, res, url)) return true // previas de las cards

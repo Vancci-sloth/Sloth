@@ -18,7 +18,7 @@ import { cpSync, createWriteStream, existsSync, linkSync, mkdirSync, readdirSync
 import { cp } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
-import { app, BrowserWindow, dialog, ipcMain, Menu, nativeTheme, net, screen, session, shell, Tray, type OpenDialogOptions, type WebContents } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, Menu, nativeTheme, net, screen, session, shell, Tray, type WebContents } from 'electron'
 import { autoUpdater, CancellationToken } from 'electron-updater'
 import { guardar } from '../server/disco.ts'
 import { anclada, anclar } from './barra.ts'
@@ -110,12 +110,6 @@ else {
   })
   ipcMain.handle('anclada', () => anclada())
   ipcMain.handle('anclar', () => anclar())
-  // «Guardar en…» (web/src/Final.tsx): el diálogo de carpetas de cada sistema, encima de la ventana.
-  ipcMain.handle('elegir-carpeta', async (_e, desde?: string) => {
-    const opciones: OpenDialogOptions = { title: 'Dónde guardar los videos terminados', defaultPath: desde && existsSync(desde) ? desde : undefined, properties: ['openDirectory', 'createDirectory'] }
-    const r = await (ventana ? dialog.showOpenDialog(ventana, opciones) : dialog.showOpenDialog(opciones))
-    return r.canceled ? null : (r.filePaths[0] ?? null)
-  })
   void app.whenReady().then(iniciar)
 }
 

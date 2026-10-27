@@ -528,8 +528,7 @@ export async function etapasApi(
   sessions: Sessions,
   cards: Card[],
   avisar: Avisar,
-  miniatura: (file: string) => Promise<string>,
-  antesDeMover: (id: string) => Promise<void>
+  miniatura: (file: string) => Promise<string>
 ): Promise<boolean> {
   const m = /^\/api\/sessions\/([\w-]+)\/(etapas|archivo|carpeta|vivo|motor|onda|imagen|version)(?:\/(.+))?$/.exec(url.pathname)
   const metodos = m?.[2] === 'carpeta' ? ['GET', 'POST'] : m?.[2] === 'version' ? ['POST'] : ['GET']
@@ -595,7 +594,6 @@ export async function etapasApi(
     const pide = String((JSON.parse(text || '{}') as { carpeta?: string }).carpeta ?? '')
     const carpeta = carpetaValida(meta.cwd, pide)
     if (!carpeta) return json(res, 400, { error: `No hay una carpeta «${pide}» en ${meta.cwd}` })
-    await antesDeMover(meta.id)
     sessions.setCarpeta(meta.id, carpeta)
     avisar({ type: 'etapas', sessionId: meta.id })
     return json(res, 200, { actual: carpeta })
@@ -604,7 +602,6 @@ export async function etapasApi(
   if (m[2] === 'version') {
     if (!card?.etapas?.length || !carpetaDe(meta)) return json(res, 400, { error: 'Este hilo no tiene una carpeta de video propia' })
     if (meta.running || meta.background?.length || meta.pendiente) return json(res, 409, { error: 'El agente sigue con este video: espera a que termine.' })
-    await antesDeMover(meta.id) // la copia del video que acaba de terminar, antes de que el hilo deje su carpeta
     const { antes, nueva } = otraVersion(meta, sessions)
     sessions.steer(
       meta.id,

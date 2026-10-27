@@ -19,7 +19,6 @@ import { TarjetasEnlaces } from './Enlaces' // tarjeta de los enlaces
 import { esDeEstudio, Estudio } from './Estudio' // panel de etapas
 import { BotonNavegador, PanelNavegador, useNavegadorAbierto } from './Navegador' // navegador de cada hilo
 import { conReferencia, ReferenciaVideo } from './Referencia'
-import { GuardarEn, useDestino } from './Final' // guardar en
 import { useSoltar } from './Soltar'
 import { elegirModelos, lineaSubagentes, Modelos, type Avanzado } from './Modelos'
 import { MisVideos, Rejilla, VideoDe } from './MisVideos'
@@ -823,9 +822,6 @@ function NewSession(props: {
   const formatoEscrito = /^Formato: (vertical|horizontal)\s*$/m.exec(props.draft?.text ?? '')?.[1] as 'vertical' | 'horizontal' | undefined
   const formato = formatoEscrito ?? formatos[card.id] ?? 'vertical'
   const conFormato = !!card.horizontal && !continuar
-  // «Guardar en…»: la carpeta a la que se copian los videos terminados, la misma para todos los estilos de video.
-  const [destino, setDestino] = useDestino() // guardar en
-  const guardarEn = esDeEstudio(card) && destino ? { destino } : {}
   // Un archivo o un enlace soltado en cualquier parte del inicio va al mensaje.
   const soltar = useSoltar()
 
@@ -902,7 +898,6 @@ function NewSession(props: {
                 onCambio={(n) => setPorEnlace({ ...porEnlace, [card.id]: n === 'varios' })}
               />
             )}
-            {esDeEstudio(card) && <GuardarEn destino={destino} onCambio={setDestino} />}
           </>
         }
         vacio={!!laSerie}
@@ -921,11 +916,11 @@ function NewSession(props: {
           ]
           text = [text, ...pide].filter(Boolean).join('\n\n')
           if (porEnlace) {
-            const metas = await api<SessionMeta[]>('/api/lotes', { cardId: card.id, text, enlaces, images, ...choice, ...guardarEn })
+            const metas = await api<SessionMeta[]>('/api/lotes', { cardId: card.id, text, enlaces, images, ...choice })
             return props.onCreated(metas[0].id)
           }
           // Lo de seguir en esa carpeta lo escribe el servidor en el mensaje, después de comprobar que existe.
-          const meta = await api<SessionMeta>('/api/sessions', { cardId: card.id, text, images, ...choice, ...(continuar ? { carpeta: continuar } : {}), ...guardarEn })
+          const meta = await api<SessionMeta>('/api/sessions', { cardId: card.id, text, images, ...choice, ...(continuar ? { carpeta: continuar } : {}) })
           props.onCreated(meta.id)
         }}
       />

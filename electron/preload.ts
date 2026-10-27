@@ -11,7 +11,6 @@ const puente: PuenteSloth = {
   traer: () => ipcRenderer.send('traer'),
   anclada: () => ipcRenderer.invoke('anclada'),
   anclar: () => ipcRenderer.invoke('anclar'),
-  elegirCarpeta: (desde) => ipcRenderer.invoke('elegir-carpeta', desde),
   // El navegador integrado (navegador.ts).
   navegador: {
     ver: (hilo, caja) => ipcRenderer.send('navegador:ver', hilo, caja),

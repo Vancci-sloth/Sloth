@@ -27,9 +27,7 @@ AppImage para Linux x64. El cobro los da en `/descargar`, `/descargar?so=mac` y 
 - **Python de Sloth y sus modelos.** `server/requisitos.ts` instala un Python propio en
   `%APPDATA%/youtube/piezas/python`, sus paquetes de transcripción y los modelos. Elige CUDA si hay NVIDIA y CPU si no;
   si se corta, vuelve a instalar solo lo que falte. Ya no hace falta copiarlo de otra computadora.
-- **Lo de Windows en el servidor** tiene su par: el diálogo de carpetas lo abre Electron en los tres sistemas
-  (`elegir-carpeta` en electron/main.ts), sin instalar zenity ni kdialog. También tienen su par la Papelera (Finder,
-  `gio trash`), «abrir en su carpeta» (`open -R`, `xdg-open`), la ventana donde se autoriza Claude (Terminal o la
+- **Lo de Windows en el servidor** tiene su par: la Papelera (Finder, `gio trash`), «abrir en su carpeta» (`open -R`, `xdg-open`), la ventana donde se autoriza Claude (Terminal o la
   terminal de Linux), las llaves de Opciones (`%APPDATA%/sloth/variables.json`) y el id del equipo de la licencia.
 - **Firma de Apple.** Sin cuenta de desarrollador, la de Mac sale con firma ad hoc: se abre la primera vez desde
   Configuración → Privacidad y seguridad → «Abrir de todos modos», y «Actualizar» abre la descarga en el navegador
