@@ -182,3 +182,20 @@ test('Timeline: un subagente que no cambió es el mismo; el que trabaja, otro', 
   assert.notEqual(despues[2], antes[2])
   assert.equal(despues[2].kind === 'tool' && despues[2].subagente?.items.length, 1)
 })
+
+test('Timeline: un hilo de Codex de antes enseña cada subagente en una fila, no un paso por aviso', () => {
+  const aviso = (id: string, kind: string, hijo: string): AgentEvent => ({ t: 'tool', id, name: 'subAgentActivity', input: { type: 'subAgentActivity', kind, model: kind === 'started' ? 'gpt-6.1-terra' : null, reasoningEffort: null, agentThreadId: hijo, agentPath: `/root/${hijo}` } })
+  const items = buildTimeline([
+    { t: 'user', text: 'hola', at: 1 },
+    { t: 'turn_start', at: 1 },
+    aviso('t:1', 'started', 'escenas'),
+    { t: 'tool_update', id: 't:1', done: true, output: '' },
+    aviso('t:2', 'interacted', 'escenas'),
+    aviso('t:3', 'completed', 'escenas'),
+    { t: 'tool', id: 't:4', name: 'Agent', input: { tool: 'wait', prompt: null } },
+    { t: 'turn_end', at: 5, ok: true }
+  ])
+  const pasos = items.flatMap((i) => (i.kind === 'tool' ? [[i.name, i.subagente?.titulo, i.subagente?.estado]] : []))
+  assert.deepEqual(pasos, [['Agent', 'escenas', 'completed'], ['Agent', undefined, undefined]])
+  assert.equal(toolSummary('Agent', { tool: 'wait', prompt: null }).verb, 'Espera a sus subagentes')
+})

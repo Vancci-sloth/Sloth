@@ -250,3 +250,40 @@ test('un subagente mantiene ocupado el hilo hasta terminar, y Detener limpia el 
   await h.run.interrupt()
   assert.deepEqual(h.events.filter((e) => e.t === 'background').at(-1)!.tasks, [])
 })
+
+test('con el protocolo de ahora, cada subagente es una fila con su trabajo, su estado y su gasto', async () => {
+  const pedidas: string[] = []
+  const h = preparar(undefined, (modelo, uso) => (pedidas.push(modelo), uso.input + uso.cacheRead + uso.output))
+  const actividad = (id: string, kind: string, model: string | null = null) => {
+    const item = { id, type: 'subAgentActivity', kind, model, reasoningEffort: model && 'high', agentThreadId: 'hijo', agentPath: '/root/capturas' }
+    h.notify('item/started', { threadId: 'hilo', item })
+    h.notify('item/completed', { threadId: 'hilo', item })
+  }
+  const uso = (threadId: string, inputTokens: number) => h.notify('thread/tokenUsage/updated', { threadId, tokenUsage: { total: { inputTokens, outputTokens: 0, cachedInputTokens: 0, totalTokens: 0 }, last: { inputTokens, outputTokens: 0, cachedInputTokens: 0, totalTokens: 0 }, modelContextWindow: 1000 } })
+  h.run.send('Prueba')
+  await setImmediate()
+  actividad('a', 'started', 'gpt-hijo')
+  h.notify('item/agentMessage/delta', { threadId: 'hijo', turnId: 'otro', itemId: 'm', delta: 'Listas ' })
+  h.notify('item/completed', { threadId: 'hijo', turnId: 'otro', item: { id: 'm', type: 'agentMessage', text: 'Listas las capturas' } })
+  h.notify('item/started', { threadId: 'hijo', turnId: 'otro', item: { id: 'c', type: 'commandExecution', command: 'dir' } })
+  uso('hijo', 30)
+  uso('hilo', 100)
+  actividad('b', 'completed')
+  h.notify('turn/completed', { threadId: 'hijo', turn: { id: 'otro', status: 'completed' } })
+  // Le vuelve a escribir: trabaja otra vez, en la misma fila.
+  actividad('c', 'interacted')
+  assert.deepEqual(h.events.filter((e) => e.t === 'background').map((e) => e.tasks), [['capturas'], [], ['capturas']])
+  h.notify('turn/completed', { threadId: 'hilo', turn: { id: 'turno-1', status: 'completed' } })
+  assert.equal(h.events.filter((e) => e.t === 'tool' && e.name === 'Agent').length, 1)
+  assert.deepEqual(h.events.filter((e) => e.t === 'subagent').map((e) => e.status), ['running', 'completed', 'running'])
+  const fila = buildTimeline(h.events).find((i) => i.kind === 'tool')
+  assert.ok(fila?.kind === 'tool' && fila.subagente)
+  assert.deepEqual([fila.subagente.titulo, fila.subagente.modelo, fila.subagente.esfuerzo, fila.subagente.estado], ['capturas', 'gpt-hijo', 'high', 'running'])
+  assert.deepEqual(fila.subagente.items.map((i) => i.kind === 'text' ? i.text : i.kind), ['Listas las capturas', 'tool'])
+  // El gasto del subagente, con su modelo, va en el turno; su contexto no es el del hilo.
+  assert.deepEqual(pedidas, ['gpt-hijo', 'gpt-prueba'])
+  const fin = h.events.find((e) => e.t === 'turn_end')!
+  assert.deepEqual([fin.costUsd, fin.tokens?.input], [130, 130])
+  assert.equal(h.events.filter((e) => e.t === 'context').length, 1)
+  h.run.close()
+})

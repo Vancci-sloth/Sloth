@@ -109,11 +109,21 @@ function leer(a: Armado, e: AgentEvent, i: number) {
       break
     }
     case 'tool': {
-      const key = `tool:${e.id}`
-      const k = poner({ kind: 'tool', key, id: e.id, name: e.name, input: e.input, output: '', done: false, error: false, parent: e.parent })
+      let { id, name, input } = e
+      // Los hilos de Codex de antes guardaron cada aviso de un subagente (`subAgentActivity`) como un paso: el primero de
+      // cada uno es su fila, como la que hace ahora server/codex.ts, y los demás no se ven.
+      if (name === 'subAgentActivity') {
+        const s = (input ?? {}) as { agentThreadId?: string; agentPath?: string; model?: string | null; reasoningEffort?: string | null }
+        id = `subagente:${s.agentThreadId}`
+        if (donde.has(`tool:${id}`)) break
+        name = 'Agent'
+        input = { description: s.agentPath?.split('/').filter(Boolean).pop() || 'Subagente de Codex', model: s.model ?? undefined, effort: s.reasoningEffort ?? undefined }
+      }
+      const key = `tool:${id}`
+      const k = poner({ kind: 'tool', key, id, name, input, output: '', done: false, error: false, parent: e.parent })
       donde.set(key, k)
       a.abiertas.add(k)
-      if (lanzaSubagente(e.name, e.input)) a.lanzadores.push(k), a.idsLanzadores.add(e.id)
+      if (lanzaSubagente(name, input)) a.lanzadores.push(k), a.idsLanzadores.add(id)
       break
     }
     case 'tool_update': {
@@ -253,8 +263,13 @@ export function lineaDeSubagente(s: Subagente): string {
   return ultimo?.kind === 'text' ? llano(ultimo.text) : ''
 }
 
-/** Su modelo y su esfuerzo, como los pidió el agente: «Sonnet · medium». */
-export const modeloDeSubagente = (s: Subagente) => [s.modelo && s.modelo.charAt(0).toUpperCase() + s.modelo.slice(1), s.esfuerzo].filter(Boolean).join(' · ')
+/** Su modelo y su esfuerzo, como los pidió el agente: «Sonnet · medium», «GPT-6.1 Terra · high». */
+export const modeloDeSubagente = (s: Subagente) => [s.modelo && nombreDeModelo(s.modelo), s.esfuerzo].filter(Boolean).join(' · ')
+const mayuscula = (t: string) => t.charAt(0).toUpperCase() + t.slice(1)
+const nombreDeModelo = (m: string) => {
+  const gpt = /^gpt-([\d.]+)(?:-(.+))?$/i.exec(m)
+  return gpt ? [`GPT-${gpt[1]}`, ...(gpt[2]?.split('-') ?? []).map(mayuscula)].join(' ') : mayuscula(m)
+}
 
 /**
  * Las preguntas cerradas del agente: Sloth le pide (`server/claude.ts`) que las cierre con un bloque `<opciones>`, una
@@ -356,6 +371,18 @@ function reinicio(error: string): string | undefined {
   return /\bresets? (?:at )?([^·(\n]+)/i.exec(error)?.[1].trim() || undefined
 }
 
+/** Lo que hace Codex con sus subagentes, aparte de lanzarlos. */
+const CON_SUBAGENTES: Record<string, string> = {
+  wait: 'Espera a sus subagentes',
+  sendInput: 'Escribe al subagente',
+  sendMessage: 'Escribe al subagente',
+  followupTask: 'Le encarga más al subagente',
+  resumeAgent: 'Retoma un subagente',
+  closeAgent: 'Cierra un subagente',
+  interruptAgent: 'Detiene un subagente',
+  listAgents: 'Mira sus subagentes'
+}
+
 /** Una línea que dice qué hizo la herramienta, como en T3 Code: el verbo y su objeto. */
 export function toolSummary(name: string, input: any): { verb: string; detail: string } {
   const i = input ?? {}
@@ -379,6 +406,8 @@ export function toolSummary(name: string, input: any): { verb: string; detail: s
     case 'Skill':
       return { verb: 'Skill', detail: i.skill ?? i.name }
     case 'Agent':
+      // En Codex, `tool` dice qué hace con sus subagentes: solo `spawnAgent` lanza uno.
+      if (i.tool && i.tool !== 'spawnAgent') return { verb: CON_SUBAGENTES[i.tool] ?? 'Subagentes', detail: i.prompt?.slice(0, 120) ?? '' }
       return { verb: 'Subagente', detail: i.description ?? i.prompt?.slice(0, 120) ?? '' }
     case 'SendMessage':
       return { verb: 'Escribe al subagente', detail: i.summary ?? i.message ?? '' }
