@@ -35,7 +35,7 @@ import { espacio } from './espacio.ts' // espacio en disco
 import { licencia } from './licencia.ts' // suscripción
 import { Sessions } from './sessions.ts'
 import { eventosEnVivo } from './eventos-en-vivo.ts'
-import { carpetaSkill, duplicateCard, enlazarSkills, readCards, removeCard, seriesDe, skillRef } from './skills.ts'
+import { carpetaSkill, duplicateCard, enlazarSkills, enlazarSkillsCodex, readCards, removeCard, seriesDe, skillRef } from './skills.ts'
 import { estaticos } from './estaticos.ts'
 import { actualizar, type Agente, version } from './version.ts'
 
@@ -52,6 +52,8 @@ const RESTART = 75
 process.env.SLOTH_PROCESOS ??= join(APP, 'python', 'procesos')
 // La app que se vende trae sus skills: las enlaza en ~/.claude/skills, donde las busca Claude.
 if (VENTA) enlazarSkills(APP)
+// Y Codex las lee de esas mismas carpetas, no de copias suyas.
+enlazarSkillsCodex(APP)
 // Y su clave: la cuenta gratis de la comunidad o el apoyo, que quita el recordatorio. Sloth abre sin ella.
 const suscripcion = VENTA ? licencia(APP) : undefined // suscripción
 

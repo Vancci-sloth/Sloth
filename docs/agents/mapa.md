@@ -12,7 +12,8 @@ Este es el mapa:
 - `server/sessions.ts`: cada hilo es `data/sessions/<id>.json` (qué es) y `<id>.jsonl` (lo que pasó). Retoma la sesión
   del proveedor tras reiniciar, reparte los lotes según la máquina y cierra el proceso de un video del lote al acabar.
   `npm run hilo -- <id>` (`scripts/hilo.mjs`) resume un hilo desde esos archivos.
-- `cards.json`: las cards. `skill` es la carpeta en `~/.claude/skills`; `cwd`, donde trabaja (`{app}` es este repo; sin
+- `cards.json`: las cards. `skill` es la carpeta en `~/.claude/skills`, enlazada también en `~/.codex/skills` y
+  `~/.agents/skills` (`enlazarSkillsCodex`): Claude y Codex leen los mismos archivos. `cwd`, donde trabaja (`{app}` es este repo; sin
   él, `trabajo/<id>`, fuera de git). `etapas` es el avance, leído de los archivos del hilo (`server/etapas.ts`) con los
   globs `listo`. Los videos terminados son los de la etapa «Video» (los `_*` son a medias); `server/reglas-repo.test.ts`
   comprueba que ningún glob cuente un borrador.

@@ -1,4 +1,4 @@
-import { existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, symlinkSync, unlinkSync } from 'node:fs'
+import { existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, realpathSync, renameSync, statSync, symlinkSync, unlinkSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import type { Card, Serie } from '../shared/types.ts'
@@ -24,6 +24,41 @@ export function enlazarSkills(app: string) {
       symlinkSync(join(app, 'skills', nombre), destino, 'junction')
     } catch (error) {
       console.error(`No se pudo enlazar la skill ${nombre} en ${ROOT}: ${error instanceof Error ? error.message : error}`)
+    }
+  }
+}
+
+/**
+ * Codex no mira ~/.claude/skills: busca en las suyas (`$CODEX_HOME/skills` y `~/.agents/skills`), y si dos skills se
+ * llaman igual no gana ninguna. Cada skill de Sloth se enlaza en las dos a la misma de Claude, para que los dos agentes
+ * lean los mismos archivos y un cambio valga para ambos; Codex cuenta una sola vez lo que lleva al mismo sitio. Una copia
+ * suelta con el nombre de una skill de Sloth (la de una versión de antes) sale a `skills-viejas`, donde Codex ya no la ve.
+ */
+export function enlazarSkillsCodex(app: string, bases = [process.env.CODEX_HOME || join(homedir(), '.codex'), join(homedir(), '.agents')]) {
+  for (const base of bases) {
+    const carpeta = join(base, 'skills')
+    mkdirSync(carpeta, { recursive: true })
+    for (const nombre of readdirSync(join(app, 'skills'))) {
+      // También las que no son una skill sino lo que comparten (`video-base`), que las demás leen a su lado.
+      const de = carpetaSkill(nombre)
+      if (!de || !statSync(de).isDirectory()) continue
+      const destino = join(carpeta, nombre)
+      try {
+        const origen = realpathSync(de)
+        let enlace = false
+        try {
+          enlace = lstatSync(destino).isSymbolicLink()
+        } catch { /* No había nada. */ }
+        if (enlace && existsSync(destino) && realpathSync(destino) === origen) continue
+        if (enlace) unlinkSync(destino)
+        else if (existsSync(destino)) {
+          mkdirSync(join(base, 'skills-viejas'), { recursive: true })
+          renameSync(destino, join(base, 'skills-viejas', `${nombre}-${Date.now()}`))
+        }
+        symlinkSync(origen, destino, 'junction')
+      } catch (error) {
+        console.error(`No se pudo enlazar la skill ${nombre} en ${carpeta}: ${error instanceof Error ? error.message : error}`)
+      }
     }
   }
 }
