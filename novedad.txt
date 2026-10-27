@@ -1,1 +1,1 @@
-Si cambiaste una skill, su card te dice qué y la puedes volver a la original; lo tuyo queda en una copia.
+Sloth para Mac ya abre en los Mac con Intel (i5, i7); en los de M1 o más nuevos, con Rosetta.
