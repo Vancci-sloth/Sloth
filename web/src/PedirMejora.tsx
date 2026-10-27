@@ -1,17 +1,18 @@
 import { useEffect, useState } from 'react'
+import { NOMBRE_AGENTE, proveedorDe } from '../../shared/providers'
 import type { OrigenMejora, PublicacionComunidad, SessionMeta } from '../../shared/types'
 import { api } from './api'
 import { abrirPublicacion } from './Comunidad'
 import { Escribir } from './Escribir'
 import { MEJORA_EVENT } from './etiquetas'
 import { Icono } from './Iconos'
-import { MarcaClaude } from './Logos'
+import { MarcaAgente } from './Logos'
 import './PedirMejora.css'
 
 /**
- * «Pedir una mejora», desde cualquier hilo: el símbolo de Claude del encabezado, el que sale junto a «Citar» y el de cada
- * error lo abren (`pedirMejora` de etiquetas.ts) con el hilo y lo que pasó. Escribes lo que debería ser distinto, como te
- * salga, y «Ayúdame a decirlo» le pide a Claude que lo entienda con lo que pasaba en el hilo. Se publica en Mejoras de la
+ * «Pedir una mejora», desde cualquier hilo: el símbolo de su agente en el encabezado, el que sale junto a «Citar» y el de
+ * cada error lo abren (`pedirMejora` de etiquetas.ts) con el hilo y lo que pasó. Escribes lo que debería ser distinto, como
+ * te salga, y «Ayúdame a decirlo» le pide al agente del hilo (Claude o ChatGPT) que lo entienda con lo que pasaba en él. Se publica en Mejoras de la
  * comunidad, donde todos la ven; el hilo de donde salió no se publica (se queda en esta computadora, `server/comunidad.ts`).
  * Un aviso lleva a ella.
  */
@@ -39,6 +40,8 @@ export function PedirMejora({ sessions }: { sessions: SessionMeta[] }) {
     return () => clearTimeout(t)
   }, [anotada])
 
+  const modelo = origen && sessions.find((s) => s.id === origen.hilo)?.model
+  const agente = modelo ? proveedorDe(modelo) : 'claude'
   return (
     <>
       {origen && (
@@ -46,11 +49,11 @@ export function PedirMejora({ sessions }: { sessions: SessionMeta[] }) {
           <div className="pm-caja" role="dialog" aria-modal="true" aria-labelledby="pm-titulo">
             <header className="pm-cabeza">
               <span className="pm-marca">
-                <MarcaClaude />
+                <MarcaAgente de={agente} />
               </span>
               <div>
                 <h2 id="pm-titulo">Pedir una mejora</h2>
-                <p>Dilo como te salga: se publica en Mejoras de la comunidad, sin este hilo. Si no sabes cómo decirlo, Claude te ayuda con lo que pasó aquí.</p>
+                <p>Dilo como te salga: se publica en Mejoras de la comunidad, sin este hilo. Si no sabes cómo decirlo, {NOMBRE_AGENTE[agente]} te ayuda con lo que pasó aquí.</p>
               </div>
               <button className="pm-cerrar" title="Cerrar (Esc)" onClick={() => setOrigen(null)}>
                 <Icono de="cerrar" />
@@ -69,6 +72,7 @@ export function PedirMejora({ sessions }: { sessions: SessionMeta[] }) {
               accion="Publicar mejora"
               autoFocus
               ayuda
+              agente={agente}
               origen={origen}
               onListo={async ({ texto, adjuntos }) => {
                 const m = await api<PublicacionComunidad>('/api/mejoras', { texto, adjuntos, origen })

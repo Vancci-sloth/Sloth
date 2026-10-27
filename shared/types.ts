@@ -951,14 +951,14 @@ export interface Reinicio {
   error?: string
 }
 
-/** De dónde sale una mejora pedida desde un hilo (el símbolo de Claude): el hilo y lo que pasó (lo que elegiste, o el error). */
+/** De dónde sale una mejora pedida desde un hilo (el símbolo de su agente): el hilo y lo que pasó (lo que elegiste, o el error). */
 export interface OrigenMejora {
   hilo: string
   titulo: string
   cita?: string
 }
 
-/** Lo que Claude propone al ayudarte a decir algo (`POST /api/comunidad/redactar`). */
+/** Lo que el agente del hilo (o Claude, sin hilo) propone al ayudarte a decir algo (`POST /api/comunidad/redactar`). */
 export interface AyudaMejora {
   /** Lo que entendió que pasó o que quieres, en llano. */
   entendi: string

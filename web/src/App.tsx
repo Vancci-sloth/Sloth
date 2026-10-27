@@ -1,7 +1,7 @@
 import { memo, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { CANAL_CARD, IDEAS_CARD } from '../../shared/ideas' // ideas
 import type { AvanceCorto, Card, CarpetaDeVideo, Model, Previa, Reinicio, Serie, ServerPush, SessionMeta, VersionClaude, VideoHecho } from '../../shared/types'
-import { proveedorDe } from '../../shared/providers'
+import { NOMBRE_AGENTE, proveedorDe } from '../../shared/providers'
 import { VENTA } from '../../shared/venta'
 import { Ideas, textoAHtml } from './Ideas' // ideas
 import { atrasado, CuentaClaude, Opciones, Requisitos } from './Opciones'
@@ -27,7 +27,7 @@ import { Comunidad } from './Comunidad' // comunidad
 import { PedirMejora } from './PedirMejora' // comunidad
 import { Icono } from './Iconos'
 import { Bienvenida } from './Bienvenida'
-import { MarcaClaude } from './Logos'
+import { MarcaAgente } from './Logos'
 import { imageUrl } from './Images'
 import { YoutubeLote } from './YoutubeProgramar'
 import { CalendarioYoutube } from './YoutubeCalendario'
@@ -625,7 +625,7 @@ export function App() {
             }}
           />
         )}
-        {/* comunidad: «Pedir una mejora», que abre el símbolo de Claude de cualquier hilo y la publica en Mejoras. */}
+        {/* comunidad: «Pedir una mejora», que abre el símbolo del agente de cualquier hilo y la publica en Mejoras. */}
         <PedirMejora sessions={sessions} />
         {view.kind === 'videos' && (
           <ConNavegadorRedes>
@@ -1160,7 +1160,7 @@ const SessionView = memo(function SessionView({ id, session, card, models }: { i
   const onSubagente = useCallback((sub: string | null) => setAbierto(sub ? { sesion: id, id: sub } : null), [id])
   const fallo = useFallo(id)
   // El tiempo es lo que el agente pasó trabajando: la suma de cada turno, no lo que lleva abierta la sesión. Un turno sin
-  // costo (se cortó antes de que Claude lo diera, o fue el primero tras retomar el hilo) no suma: el total es entonces lo
+  // costo (se cortó antes de saberlo, o fue el primero tras retomar el hilo) no suma: el total es entonces lo
   // menos que costó.
   const totals = useResumen(id)
   // Un video del lote que espera su turno arranca con su propio mensaje: un clic no le manda otro.
@@ -1183,9 +1183,9 @@ const SessionView = memo(function SessionView({ id, session, card, models }: { i
       )}
       {totals.read > 0 && <span className="muted small">{compact(totals.read)} tokens leídos</span>}
       {totals.out > 0 && <span className="muted small">{compact(totals.out)} tokens escritos</span>}
-      {/* El símbolo de Claude: pide una mejora sobre este hilo. Solo el símbolo: el encabezado de un video va justo. */}
-      <button className="pedir-mejora solo" title="Pedir una mejora: ¿algo no salió como esperabas? Claude te ayuda a decirlo" aria-label="Pedir una mejora" onClick={() => pedirMejora({ hilo: session.id })}>
-        <MarcaClaude />
+      {/* El símbolo del agente del hilo: pide una mejora sobre él. Solo el símbolo: el encabezado de un video va justo. */}
+      <button className="pedir-mejora solo" title={`Pedir una mejora: ¿algo no salió como esperabas? ${NOMBRE_AGENTE[proveedorDe(session.model)]} te ayuda a decirlo`} aria-label="Pedir una mejora" onClick={() => pedirMejora({ hilo: session.id })}>
+        <MarcaAgente de={proveedorDe(session.model)} />
       </button>
       {extra}
       <BotonNavegador hilo={session.id} trabajando={trabaja} />

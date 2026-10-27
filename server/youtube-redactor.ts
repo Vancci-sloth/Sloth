@@ -30,7 +30,8 @@ export async function redactarYoutube(model: string, cwd: string, prompt: string
 }
 
 type Conectar = (notificar: (method: string, value: unknown) => void, salir: (error?: Error) => void, config: Record<string, unknown>) => Pick<CodexRpc, 'ready' | 'request' | 'close'>
-export async function redactarCodexYoutube(model: string, cwd: string, prompt: string, imagenes: string[], esquema?: Record<string, unknown>, conectar: Conectar = (notificar, salir, config) => new CodexRpc(notificar, salir, config), effort?: string) {
+/** `instruccion`: la de otro uso, como la ayuda de «Pedir una mejora» (server/comunidad.ts). */
+export async function redactarCodexYoutube(model: string, cwd: string, prompt: string, imagenes: string[], esquema?: Record<string, unknown>, conectar: Conectar = (notificar, salir, config) => new CodexRpc(notificar, salir, config), effort?: string, instruccion = INSTRUCCION) {
   let threadId = ''
   let texto = ''
   let terminar!: (texto: string) => void
@@ -55,7 +56,7 @@ export async function redactarCodexYoutube(model: string, cwd: string, prompt: s
     await rpc.ready
     const cuenta = await rpc.request<{ account: { type: string } | null }>('account/read', { refreshToken: false })
     if (cuenta.account?.type !== 'chatgpt') throw new Error('Conecta Codex en Opciones → Agentes para generar recomendaciones.')
-    const r = await rpc.request<{ thread: { id: string } }>('thread/start', { model: model.replace(/^codex:/, ''), modelProvider: 'openai', cwd, approvalPolicy: 'never', sandbox: 'read-only', ephemeral: true, developerInstructions: INSTRUCCION })
+    const r = await rpc.request<{ thread: { id: string } }>('thread/start', { model: model.replace(/^codex:/, ''), modelProvider: 'openai', cwd, approvalPolicy: 'never', sandbox: 'read-only', ephemeral: true, developerInstructions: instruccion })
     threadId = r.thread.id
     await rpc.request('turn/start', { threadId, input: [{ type: 'text', text: prompt, text_elements: [] }, ...imagenes.map((path) => ({ type: 'localImage', path }))], ...(esquema ? { outputSchema: esquema } : {}), ...(effort ? { effort } : {}) })
     return await listo

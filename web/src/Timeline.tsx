@@ -1,9 +1,10 @@
 import { Fragment, memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { NOMBRE_AGENTE } from '../../shared/providers'
 import type { AgentEvent } from '../../shared/types'
 import { useEventos } from './eventos'
 import { Icon } from './Composer'
 import { DESIGN, DESIGN_ICON, LINK, LINK_ICON, linkParts, pedirMejora, QUOTE, QUOTE_EVENT, QUOTE_ICON, quoteText, THREAD, THREAD_ICON, threadIconOf } from './etiquetas'
-import { MarcaClaude } from './Logos'
+import { MarcaAgente } from './Logos'
 import { imageUrl, Thumbs } from './Images'
 import { buildTimeline, compact, delHilo, duration, errorLlano, REINTENTAR, toolSummary, type Item, type Subagente } from './items'
 import { bloquesDeMarkdown } from './markdown'
@@ -182,7 +183,7 @@ export function Timeline({ running, background, sessionId, proveedor = 'claude',
   const onAbrir = useCallback((id: string | null) => alAbrir.current(id), [])
 
   // Como en T3 Code: al soltar el ratón sobre texto elegido de la conversación, sale «Citar» junto al final, y a su lado el
-  // símbolo de Claude, que pide una mejora sobre lo elegido.
+  // símbolo de su agente, que pide una mejora sobre lo elegido.
   function elegir() {
     const sel = getSelection()
     const text = sel?.toString().trim()
@@ -293,14 +294,14 @@ export function Timeline({ running, background, sessionId, proveedor = 'claude',
             {sessionId && (
               <button
                 className="cite-btn"
-                title="Pide una mejora a Sloth sobre esto; Claude te ayuda a decirla"
+                title={`Pide una mejora a Sloth sobre esto; ${NOMBRE_AGENTE[proveedor === 'codex' ? 'codex' : 'claude']} te ayuda a decirla`}
                 onClick={() => {
                   getSelection()?.removeAllRanges()
                   setCita(null)
                   pedirMejora({ hilo: sessionId, cita: cita.text })
                 }}
               >
-                <MarcaClaude />
+                <MarcaAgente de={proveedor} />
                 Pedir mejora
               </button>
             )}
@@ -511,7 +512,7 @@ const Row = memo(function Row({ item, sessionId, anidado, proveedor, onAbrir, on
       const datos = `${item.ms > 0 ? ` · ${duration(item.ms)}` : ''}${item.costUsd ? ` · $${item.costUsd.toFixed(2)}` : ''}`
       // Es lo que se sabe: el agente acabó su turno. El trabajo puede seguir esperando tu voz, una revisión o la exportación.
       if (item.ok) return <div className="turn-end">Turno terminado{datos}</div>
-      return <Fallo item={item} datos={datos} sessionId={sessionId} onResponder={onResponder} />
+      return <Fallo item={item} datos={datos} proveedor={proveedor} sessionId={sessionId} onResponder={onResponder} />
     }
     case 'info':
       return <div className="info">{item.text}</div>
@@ -549,10 +550,12 @@ function Respuestas({ opciones, onElegir }: { opciones: string[]; onElegir?(text
 /**
  * Un turno que acabó mal, dicho en llano; el error tal cual, al pasar el ratón. El último, con el hilo quieto
  * (`onResponder`), dice además qué hacer y deja «Reintentar», que le pide que siga donde se quedó. Todos llevan el símbolo
- * de Claude, que pide una mejora con el error para que no vuelva a pasar.
+ * del agente del hilo, que pide una mejora con el error para que no vuelva a pasar. El error habla de ese agente: con
+ * Codex, el plan y la cuenta son los de ChatGPT.
  */
-function Fallo({ item, datos, sessionId, onResponder }: { item: Extract<Item, { kind: 'turn_end' }>; datos: string; sessionId?: string; onResponder?(text: string): Promise<unknown> }) {
-  const e = errorLlano(item.error, item.caida)
+function Fallo({ item, datos, proveedor, sessionId, onResponder }: { item: Extract<Item, { kind: 'turn_end' }>; datos: string; proveedor: string; sessionId?: string; onResponder?(text: string): Promise<unknown> }) {
+  const agente = proveedor === 'codex' ? 'codex' : 'claude'
+  const e = errorLlano(item.error, item.caida, agente)
   const [enviando, setEnviando] = useState(false)
   const [fallo, setFallo] = useState('')
   return (
@@ -561,8 +564,8 @@ function Fallo({ item, datos, sessionId, onResponder }: { item: Extract<Item, { 
         {e.titulo}
         {datos}
         {sessionId && (
-          <button className="pedir-mejora" title="Pide una mejora para que esto no vuelva a pasar; Claude te ayuda a decirla" onClick={() => pedirMejora({ hilo: sessionId, cita: [e.titulo, item.error].filter((t, i): t is string => !!t && (i === 0 || !e.titulo.toLowerCase().includes(t.toLowerCase()))).join('\n') })}>
-            <MarcaClaude />
+          <button className="pedir-mejora" title={`Pide una mejora para que esto no vuelva a pasar; ${NOMBRE_AGENTE[agente]} te ayuda a decirla`} onClick={() => pedirMejora({ hilo: sessionId, cita: [e.titulo, item.error].filter((t, i): t is string => !!t && (i === 0 || !e.titulo.toLowerCase().includes(t.toLowerCase()))).join('\n') })}>
+            <MarcaAgente de={agente} />
             Pedir mejora
           </button>
         )}

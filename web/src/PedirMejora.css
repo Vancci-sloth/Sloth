@@ -1,26 +1,26 @@
 /*
- * «Pedir una mejora»: el botón con el símbolo de Claude de los hilos (en el encabezado, junto a «Citar» y en cada error),
+ * «Pedir una mejora»: el botón con el símbolo del agente de cada hilo (en el encabezado, junto a «Citar» y en cada error),
  * la caja que abre, sobre un velo, y el aviso de que quedó anotada. El símbolo va en su color de marca; lo demás, con la
  * paleta de Sloth.
  */
-.marca-claude { width: 14px; height: 14px; flex: none; }
+.marca-agente { width: 14px; height: 14px; flex: none; }
 
 /* El botón de los hilos. Al pasar el ratón, el símbolo gira un poco. */
 .pedir-mejora { display: inline-flex; align-items: center; gap: 6px; padding: 4px 11px 4px 9px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); font-size: 12.5px; font-weight: 600; white-space: nowrap; transition: color 0.15s, border-color 0.15s, background 0.15s; }
 .pedir-mejora:hover { color: var(--text); border-color: #4a4236; background: var(--panel-2); }
-.pedir-mejora .marca-claude { transition: transform 0.35s cubic-bezier(0.2, 0.8, 0.2, 1); }
-.pedir-mejora:hover .marca-claude { transform: rotate(45deg) scale(1.12); }
+.pedir-mejora .marca-agente { transition: transform 0.35s cubic-bezier(0.2, 0.8, 0.2, 1); }
+.pedir-mejora:hover .marca-agente { transform: rotate(45deg) scale(1.12); }
 /* En el encabezado del hilo, solo el símbolo, redondo. */
 .pedir-mejora.solo { width: 30px; height: 30px; flex: none; justify-content: center; padding: 0; }
-.pedir-mejora.solo .marca-claude { width: 16px; height: 16px; }
+.pedir-mejora.solo .marca-agente { width: 16px; height: 16px; }
 /* En la línea de un turno que falló: compacto, entre el error y su raya. */
 .turn-end .pedir-mejora { padding: 1px 9px 1px 7px; font-size: 11.5px; color: var(--muted); }
-.turn-end .pedir-mejora .marca-claude { width: 12px; height: 12px; }
+.turn-end .pedir-mejora .marca-agente { width: 12px; height: 12px; }
 
 /* Junto a «Citar»: los dos en una barra que flota sobre lo elegido. */
 .cite-bar { position: fixed; z-index: 20; display: flex; gap: 4px; }
 .cite-bar .cite-btn { position: static; }
-.cite-btn svg.marca-claude { stroke: none; }
+.cite-btn svg.marca-agente { stroke: none; }
 
 /* La caja, con el mismo resplandor del compositor de Mejoras. */
 .pm-velo { position: fixed; inset: 0; z-index: 70; display: grid; place-items: center; padding: 24px; background: rgba(15, 14, 12, 0.72); backdrop-filter: blur(3px); animation: pm-velo 0.15s ease-out; }
@@ -31,7 +31,7 @@
 .pm-cabeza p { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.45; }
 .pm-marca { position: relative; width: 38px; height: 38px; flex: none; display: grid; place-items: center; border-radius: 11px; background: var(--bg); border: 1px solid var(--line); }
 .pm-marca::after { content: ''; position: absolute; inset: -14px; z-index: -1; border-radius: 50%; background: radial-gradient(closest-side, var(--amber-tinte), transparent); }
-.pm-marca .marca-claude { width: 21px; height: 21px; }
+.pm-marca .marca-agente { width: 21px; height: 21px; }
 .pm-cerrar { width: 30px; height: 30px; flex: none; display: grid; place-items: center; border-radius: 8px; color: var(--muted); transition: background 0.15s, color 0.15s; }
 .pm-cerrar:hover { background: var(--panel-2); color: var(--text); }
 .pm-cerrar .ico { width: 16px; height: 16px; }

@@ -1,3 +1,4 @@
+import { NOMBRE_AGENTE } from '../../shared/providers'
 import type { AgentEvent } from '../../shared/types'
 
 /** Lo que se dibuja: los eventos de la sesión juntados en bloques. */
@@ -334,9 +335,11 @@ export const REINTENTAR = 'Sigue donde te quedaste.'
 
 /**
  * Un turno que acabó mal, en palabras de todos los días: qué pasó y qué hacer. `reintentar`: pedirle que siga puede
- * bastar. `tuyo`: lo detuviste tú, no es un fallo. El error tal cual se ve al pasar el ratón.
+ * bastar. `tuyo`: lo detuviste tú, no es un fallo. El error tal cual se ve al pasar el ratón. `agente`: el del hilo, que
+ * nombra el plan y la cuenta (con Codex, los de ChatGPT).
  */
-export function errorLlano(error = '', caida = false): { titulo: string; ayuda: string; reintentar: boolean; tuyo?: boolean } {
+export function errorLlano(error = '', caida = false, agente: 'claude' | 'codex' = 'claude'): { titulo: string; ayuda: string; reintentar: boolean; tuyo?: boolean } {
+  const nombre = NOMBRE_AGENTE[agente]
   // La caída la marca el servidor. Los hilos de antes de la marca traen la frase con que sessions.ts cierra el turno.
   if (caida || /^el servidor se cerró a mitad del turno/.test(error)) {
     return { titulo: 'Se cortó a mitad del trabajo', ayuda: 'Lo que ya hizo sigue en su carpeta. Pulsa «Reintentar» y sigue desde ahí.', reintentar: true }
@@ -344,16 +347,16 @@ export function errorLlano(error = '', caida = false): { titulo: string; ayuda: 
   if (/^lo detuviste/i.test(error)) return { titulo: 'Lo detuviste', ayuda: 'Dile qué cambiar, o pulsa «Reintentar» para que siga.', reintentar: true, tuyo: true }
   if (/hit your .*limit|usage limit|rate.?limit|out of usage|spend limit|credit balance|\b429\b/i.test(error)) {
     const cuando = reinicio(error)
-    return { titulo: 'Llegaste al límite de tu plan de Claude', ayuda: `${cuando ? `Se reinicia: ${cuando}.` : 'En Opciones ves cuándo se reinicia.'} Entonces pulsa «Reintentar».`, reintentar: true }
+    return { titulo: `Llegaste al límite de tu plan de ${nombre}`, ayuda: `${cuando ? `Se reinicia: ${cuando}.` : 'En Opciones ves cuándo se reinicia.'} Entonces pulsa «Reintentar».`, reintentar: true }
   }
   if (/\/login|not logged in|authenticat|oauth|\b401\b|invalid api key|credential/i.test(error)) {
-    return { titulo: 'Tu cuenta de Claude se desconectó', ayuda: 'Vuelve a conectarla en Opciones y pulsa «Reintentar».', reintentar: true }
+    return { titulo: `Tu cuenta de ${nombre} se desconectó`, ayuda: 'Vuelve a conectarla en Opciones y pulsa «Reintentar».', reintentar: true }
   }
   if (/ENOTFOUND|EAI_AGAIN|ECONNREFUSED|ECONNRESET|network|fetch failed|connection error|socket hang up/i.test(error)) {
     return { titulo: 'No hay conexión a internet', ayuda: 'Revisa la conexión y pulsa «Reintentar».', reintentar: true }
   }
   if (/overload|API Error:? 5\d\d|ETIMEDOUT|timed? ?out|service unavailable|internal server error|bad gateway/i.test(error)) {
-    return { titulo: 'Claude no respondió', ayuda: 'Suele ser pasajero: espera un momento y pulsa «Reintentar».', reintentar: true }
+    return { titulo: `${nombre} no respondió`, ayuda: 'Suele ser pasajero: espera un momento y pulsa «Reintentar».', reintentar: true }
   }
   if (/prompt is too long|too many tokens|context (window|length)/i.test(error)) {
     return { titulo: 'La conversación ya es demasiado larga', ayuda: 'Abre un hilo nuevo y cuéntale dónde se quedó este.', reintentar: false }
@@ -364,10 +367,19 @@ export function errorLlano(error = '', caida = false): { titulo: string; ayuda: 
   return { titulo: 'Se detuvo por un error', ayuda: `${error ? `El error dice: «${error.slice(0, 160)}». ` : ''}Pulsa «Reintentar» o cuéntale qué pasó.`, reintentar: true }
 }
 
-/** Cuándo se reinicia el límite, si el error lo dice: «· resets 5pm (America/Mexico_City)» o, en los de antes, «|<segundos>». */
+/**
+ * Cuándo se reinicia el límite, si el error lo dice. Claude: «· resets 5pm (America/Mexico_City)» o, en los de antes,
+ * «|<segundos>». ChatGPT: «try again at Oct 27th, 2026 1:12 AM.», en la hora de esta computadora.
+ */
 function reinicio(error: string): string | undefined {
+  const fecha = (d: Date) => d.toLocaleString('es-MX', { weekday: 'long', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' })
   const segundos = /\|(\d{10})\b/.exec(error)?.[1]
-  if (segundos) return new Date(Number(segundos) * 1000).toLocaleString('es-MX', { weekday: 'long', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' })
+  if (segundos) return fecha(new Date(Number(segundos) * 1000))
+  const chatgpt = /try again at (.+?)\.?\s*$/i.exec(error)?.[1]
+  if (chatgpt) {
+    const d = new Date(chatgpt.replace(/(\d)(st|nd|rd|th)\b/, '$1'))
+    return isNaN(d.getTime()) ? chatgpt : fecha(d)
+  }
   return /\bresets? (?:at )?([^·(\n]+)/i.exec(error)?.[1].trim() || undefined
 }
 

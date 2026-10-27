@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import type { AgentEvent } from '../../shared/types.ts'
-import { buildTimeline, partirOpciones, toolSummary, type EstadoSubagente, type Item, type Subagente } from './items.ts'
+import { buildTimeline, errorLlano, partirOpciones, toolSummary, type EstadoSubagente, type Item, type Subagente } from './items.ts'
 
 /** Como se armaba el hilo antes de leerlo por partes: todo de cero cada vez. Es la referencia. */
 function deCero(events: AgentEvent[]): Item[] {
@@ -198,4 +198,14 @@ test('Timeline: un hilo de Codex de antes enseña cada subagente en una fila, no
   const pasos = items.flatMap((i) => (i.kind === 'tool' ? [[i.name, i.subagente?.titulo, i.subagente?.estado]] : []))
   assert.deepEqual(pasos, [['Agent', 'escenas', 'completed'], ['Agent', undefined, undefined]])
   assert.equal(toolSummary('Agent', { tool: 'wait', prompt: null }).verb, 'Espera a sus subagentes')
+})
+
+test('errorLlano: el límite y la cuenta son los del agente del hilo, y con ChatGPT dice cuándo se reinicia', () => {
+  const limite = 'You’ve hit your usage limit. Upgrade to Pro (https://chatgpt.com/explore/pro), visit https://chatgpt.com/settings/usage to purchase more credits or try again at Oct 27th, 2026 1:12 AM.'
+  const codex = errorLlano(limite, false, 'codex')
+  assert.equal(codex.titulo, 'Llegaste al límite de tu plan de ChatGPT')
+  const hora = new Date('Oct 27, 2026 1:12 AM').toLocaleString('es-MX', { weekday: 'long', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' })
+  assert.equal(codex.ayuda, `Se reinicia: ${hora}. Entonces pulsa «Reintentar».`)
+  assert.equal(errorLlano('401 Unauthorized', false, 'codex').titulo, 'Tu cuenta de ChatGPT se desconectó')
+  assert.equal(errorLlano('API Error: 529 overloaded').titulo, 'Claude no respondió')
 })

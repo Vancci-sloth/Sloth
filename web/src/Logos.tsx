@@ -60,11 +60,14 @@ export function Logo({ de, nombre, chico }: { de: string; nombre?: string; chico
   )
 }
 
-/** El símbolo de Claude solo, sin cuadrito y en su color: el de «Pedir mejora», donde Claude te ayuda a decirla. */
-export function MarcaClaude() {
+/**
+ * El símbolo del agente del hilo solo, sin cuadrito: el de «Pedir mejora», donde ese agente te ayuda a decirla. El de
+ * Claude va en su color; el de OpenAI, en el del texto, como su marca.
+ */
+export function MarcaAgente({ de = 'claude' }: { de?: string }) {
   return (
-    <svg className="marca-claude" viewBox="0 0 24 24" aria-hidden="true">
-      <path d={TRAZOS.claude} fill="#d97757" />
+    <svg className="marca-agente" viewBox="0 0 24 24" aria-hidden="true">
+      <path d={TRAZOS[de === 'codex' ? 'codex' : 'claude']} fill={de === 'codex' ? 'currentColor' : '#d97757'} />
     </svg>
   )
 }

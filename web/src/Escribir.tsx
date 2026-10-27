@@ -1,8 +1,9 @@
 import { type MutableRefObject, type ReactNode, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { NOMBRE_AGENTE } from '../../shared/providers'
 import type { AdjuntoComunidad, AyudaMejora, OrigenMejora, VideoHecho, VideosDeTodos } from '../../shared/types'
 import { api } from './api'
 import { Icono as IconoBase, type NombreIcono } from './Iconos'
-import { MarcaClaude } from './Logos'
+import { MarcaAgente } from './Logos'
 import './Escribir.css'
 
 /**
@@ -10,8 +11,8 @@ import './Escribir.css'
  * (`PedirMejora.tsx`). Crece con el texto; Enter lo manda y Mayús+Enter es otra línea (en el título, Enter baja al texto).
  * Las capturas se pegan, se sueltan o se eligen, y suben a la comunidad en cuanto llegan (`/api/comunidad/archivo`); un
  * video se elige de «Mis videos» y suben sus primeros 5 segundos con su portada (`/api/comunidad/video`): el entero se
- * enlaza en el texto. «Ayúdame a decirlo» (el símbolo de Claude) le pide a Claude que entienda lo escrito y proponga cómo
- * decirlo; desde un hilo, con lo que pasaba en él.
+ * enlaza en el texto. «Ayúdame a decirlo» (el símbolo del agente) le pide al agente del hilo (sin hilo, Claude) que
+ * entienda lo escrito y proponga cómo decirlo; desde un hilo, con lo que pasaba en él.
  */
 
 export interface Escrito {
@@ -42,9 +43,11 @@ export function Escribir(props: {
   /** Lo que se suelta en la sección llega aquí. */
   subir?: MutableRefObject<((archivos: File[]) => void) | null>
   soltando?: boolean
-  /** Con el símbolo de Claude: «Ayúdame a decirlo». */
+  /** Con el símbolo de su agente: «Ayúdame a decirlo». */
   ayuda?: boolean
-  /** De qué hilo sale, para que Claude lea lo que pasaba. */
+  /** Quién ayuda: el agente del hilo de donde sale (sin hilo, Claude). */
+  agente?: 'claude' | 'codex'
+  /** De qué hilo sale, para que su agente lea lo que pasaba. */
   origen?: OrigenMejora
   /** Deja elegir uno de «Mis videos». */
   conVideo?: boolean
@@ -65,10 +68,12 @@ export function Escribir(props: {
   const [error, setError] = useState('')
   const [encima, setEncima] = useState(false)
   const [eligiendo, setEligiendo] = useState(false)
-  // Lo que propuso Claude y el texto que tenías entonces: si lo cambias (contestaste una pregunta), la propuesta ya no
+  // Lo que propuso el agente y el texto que tenías entonces: si lo cambias (contestaste una pregunta), la propuesta ya no
   // lo incluye y no se ofrece para reemplazarlo.
   const [propuesta, setPropuesta] = useState<(AyudaMejora & { base: string }) | null>(null)
   const [pensando, setPensando] = useState(false)
+  const agente = props.agente ?? 'claude'
+  const nombre = NOMBRE_AGENTE[agente]
   const ref = useRef<HTMLTextAreaElement | null>(null)
   const elegir = useRef<HTMLInputElement>(null)
 
@@ -138,7 +143,7 @@ export function Escribir(props: {
   const vacio = !titulo.trim() && !texto.trim() && !adjuntos.length
   const vigente = !!propuesta?.mejora && texto.trim() === propuesta.base
 
-  /** Claude lee lo escrito (y el hilo, si lo hay) y propone el texto; se usa con un clic. */
+  /** El agente lee lo escrito (y el hilo, si lo hay) y propone el texto; se usa con un clic. */
   async function pedirAyuda() {
     if (pensando || (!texto.trim() && !titulo.trim() && !props.origen)) return
     setPensando(true)
@@ -152,7 +157,7 @@ export function Escribir(props: {
       setPensando(false)
     }
   }
-  /** Una pregunta de Claude va al final de lo escrito, para contestarla ahí mismo. */
+  /** Una pregunta del agente va al final de lo escrito, para contestarla ahí mismo. */
   function contestar(pregunta: string) {
     setTexto((t) => `${t.trimEnd()}${t.trim() ? '\n\n' : ''}${pregunta} `)
     setPropuesta((p) => p && { ...p, preguntas: p.preguntas.filter((q) => q !== pregunta) })
@@ -262,7 +267,7 @@ export function Escribir(props: {
       {propuesta && (vigente || propuesta.preguntas.length > 0) && (
         <div className="esc-claude">
           <div className="esc-claude-cabeza">
-            <MarcaClaude /> Lo que entendí
+            <MarcaAgente de={agente} /> Lo que entendí
             <button className="esc-claude-cerrar" title="Descartar" onClick={() => setPropuesta(null)}>
               <Icono de="cerrar" />
             </button>
@@ -323,11 +328,11 @@ export function Escribir(props: {
           <button
             className={`esc-ayuda${pensando ? ' pensando' : ''}`}
             disabled={pensando || (!texto.trim() && !titulo.trim() && !props.origen)}
-            title={props.origen ? 'Claude lee lo que pasaba en el hilo y lo que escribiste, y te propone cómo decirlo' : 'Escribe aunque sea a medias: Claude te propone cómo decirlo'}
+            title={props.origen ? `${nombre} lee lo que pasaba en el hilo y lo que escribiste, y te propone cómo decirlo` : `Escribe aunque sea a medias: ${nombre} te propone cómo decirlo`}
             onClick={() => void pedirAyuda()}
           >
-            <MarcaClaude />
-            {pensando ? 'Claude está pensando…' : 'Ayúdame a decirlo'}
+            <MarcaAgente de={agente} />
+            {pensando ? `${nombre} está pensando…` : 'Ayúdame a decirlo'}
           </button>
         )}
         {error ? <span className="esc-error">{error}</span> : <span className="esc-pista">Enter para {props.accion.toLowerCase()} · Mayús+Enter, otra línea</span>}
