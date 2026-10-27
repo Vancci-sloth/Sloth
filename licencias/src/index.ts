@@ -20,8 +20,9 @@
  * El apoyo cuesta lo mismo para todos (`PRECIO_MENSUAL` o `PRECIO_ANUAL`). Las `FUNDADORES` primeras personas que apoyan
  * son fundadoras (`fundador`) para siempre: más beneficios que quien llega después. Cada suscripción conserva el monto
  * con que se creó.
- * Cuando Sloth se vendía, las primeras personas se unieron gratis de por vida (plan `gratis`, `GRATIS` como mucho): no
- * ven el recordatorio, como quien apoya. Ya no se dan.
+ * Cuando Sloth se vendía, las primeras personas se unieron gratis de por vida (plan `gratis`, `GRATIS` como mucho): son
+ * fundadoras como las primeras que apoyan (`esFundador`), con lo nuevo `ANTICIPO` antes y sin el recordatorio. Ya no se
+ * dan.
  *
  * También da el instalador: `GET /descargar` es la última versión, libre; la de Mac y la de
  * Linux, con `?so=mac` y `?so=linux` (también en `/version`). Está en R2
@@ -162,6 +163,13 @@ const INSTALADORES = 3
 const TERMINOS = /^\d{4}-\d{2}-\d{2}$/
 /** Cuánto antes que los demás recibe lo nuevo quien apoya. */
 const ANTICIPO = 7 * DIA
+/**
+ * Si una fila de `licencias` hace fundadora a su correo, para siempre: un apoyo de los primeros que se llegó a pagar, o
+ * un lugar gratis de por vida que sigue en pie. `t` es el nombre de la tabla en la consulta.
+ */
+export function esFundador(t: string) {
+  return `((${t}.fundador = 1 AND ${t}.autorizada IS NOT NULL) OR (${t}.plan = 'gratis' AND ${t}.estado = 'gratis'))`
+}
 /** Se avisa del cobro cuando faltan esto o menos días: el cron corre cada mañana, así que el aviso llega con 6 o 7. */
 const AVISO = 7 * DIA
 /** Lo que la página de Sloth llama desde el navegador. */
@@ -249,13 +257,13 @@ export const deTodos = (u: Pick<Ultima, 'todos'>, ahora = Date.now()) => !u.todo
 
 /**
  * Si quien pregunta apoya hoy: la app manda su clave y su computadora (`x-sloth-clave`, `x-sloth-equipo`), y la clave
- * es de un apoyo mensual o anual vigente en esa computadora.
+ * es de un apoyo mensual o anual vigente, o de un lugar gratis de por vida, en esa computadora.
  */
 async function apoya(req: Request, env: Env): Promise<boolean> {
   const clave = (req.headers.get('x-sloth-clave') ?? '').replace(/\s+/g, '').toUpperCase()
   const equipo = req.headers.get('x-sloth-equipo') ?? ''
   if (!CLAVE.test(clave) || !EQUIPO.test(equipo)) return false
-  const f = await env.DB.prepare("SELECT l.estado, l.pagado_hasta FROM licencias l JOIN equipos e ON e.clave = l.clave WHERE l.clave = ? AND e.equipo = ? AND l.plan IN ('mensual', 'anual')")
+  const f = await env.DB.prepare("SELECT l.estado, l.pagado_hasta FROM licencias l JOIN equipos e ON e.clave = l.clave WHERE l.clave = ? AND e.equipo = ? AND l.plan IN ('mensual', 'anual', 'gratis')")
     .bind(clave, equipo)
     .first<Pick<Fila, 'estado' | 'pagado_hasta'>>()
   return !!f && vigencia(f, Date.now()).activa
@@ -704,8 +712,8 @@ export function vigencia(f: Pick<Fila, 'estado' | 'pagado_hasta'>, ahora: number
 /** Lo que guarda Sloth: `datos` tal cual se firmó (un JSON en texto) y su firma. */
 async function firmada(env: Env, f: Fila, equipo: string, ahora: number): Promise<Response> {
   const { activa, hasta } = vigencia(f, ahora)
-  // Fundador para siempre: cualquier apoyo de su correo que entró entre los primeros y se llegó a pagar.
-  const fundador = !!(await env.DB.prepare('SELECT 1 FROM licencias WHERE email = ? AND fundador = 1 AND autorizada IS NOT NULL LIMIT 1').bind(f.email).first())
+  // Fundador para siempre: un apoyo de su correo que entró entre los primeros y se llegó a pagar, o su lugar gratis de por vida.
+  const fundador = !!(await env.DB.prepare(`SELECT 1 FROM licencias l WHERE l.email = ? AND ${esFundador('l')} LIMIT 1`).bind(f.email).first())
   const datos = JSON.stringify({
     clave: f.clave,
     equipo,

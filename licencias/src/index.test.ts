@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict'
 import { createHmac } from 'node:crypto'
 import test from 'node:test'
-import { deTodos, faltaAvisar, firmaDeMercadoPago, instaladorDe, rangoDe, tarifa, vigencia } from './index.ts'
+import { DatabaseSync } from 'node:sqlite'
+import { deTodos, esFundador, faltaAvisar, firmaDeMercadoPago, instaladorDe, rangoDe, tarifa, vigencia } from './index.ts'
 
 const SECRETO = 'secreto-de-prueba'
 const firmar = (manifiesto: string) => createHmac('sha256', SECRETO).update(manifiesto).digest('hex')
@@ -63,6 +64,22 @@ test('un lugar gratis abre siempre; quitado (cancelled, sin nada pagado), ya no'
   const ahora = Date.parse('2026-10-21T12:00:00Z')
   assert.deepEqual(vigencia({ estado: 'gratis', pagado_hasta: null }, ahora), { activa: true, hasta: ahora + 7 * 24 * 3600_000 })
   assert.deepEqual(vigencia({ estado: 'cancelled', pagado_hasta: null }, ahora), { activa: false, hasta: ahora })
+})
+
+test('son fundadoras para siempre los primeros apoyos pagados y los lugares gratis de por vida que siguen en pie', () => {
+  const db = new DatabaseSync(':memory:')
+  db.exec('CREATE TABLE licencias (id TEXT, plan TEXT, estado TEXT, fundador INTEGER, autorizada TEXT)')
+  const filas = [
+    ['primer-apoyo', 'mensual', 'cancelled', 1, '2026-09-01'],
+    ['apoyo-sin-pagar', 'mensual', 'pending', 1, null],
+    ['apoyo-de-despues', 'anual', 'authorized', 0, '2026-10-01'],
+    ['gratis-de-por-vida', 'gratis', 'gratis', 0, '2026-08-01'],
+    ['gratis-quitado', 'gratis', 'cancelled', 0, '2026-08-01'],
+    ['cuenta-gratis', 'cuenta', 'gratis', 0, '2026-10-01']
+  ]
+  for (const f of filas) db.prepare('INSERT INTO licencias VALUES (?, ?, ?, ?, ?)').run(...f)
+  const fundadoras = db.prepare(`SELECT l.id FROM licencias l WHERE ${esFundador('l')} ORDER BY l.id`).all().map((f) => f.id)
+  assert.deepEqual(fundadoras, ['gratis-de-por-vida', 'primer-apoyo'])
 })
 
 test('reconoce el instalador de cada sistema, y nada más pasa por la última versión', () => {

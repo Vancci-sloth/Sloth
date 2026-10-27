@@ -26,7 +26,7 @@
  *   segundos, que recorta `server/comunidad.ts`; el entero se enlaza en el texto). Da su llave.
  */
 import type { AdjuntoComunidad, Autor, AvisoComunidad, CategoriaComunidad, ComentarioComunidad, FeedComunidad, PublicacionComunidad, RoadmapComunidad } from '../../shared/types.ts'
-import { CLAVE, EQUIPO, type Env, type Fila, Rechazo, cuerpo, iguales, json, letras, servir, vigencia } from './index.ts'
+import { CLAVE, EQUIPO, esFundador, type Env, type Fila, Rechazo, cuerpo, iguales, json, letras, servir, vigencia } from './index.ts'
 
 export const CATEGORIAS: CategoriaComunidad[] = ['general', 'hice', 'ayuda', 'mejoras', 'anuncios']
 
@@ -194,11 +194,11 @@ async function quien(req: Request, env: Env): Promise<Miembro> {
 
 /**
  * La insignia del miembro `m`, por el correo de su clave: `fundador` si un apoyo suyo entró entre los primeros y se
- * pagó (para siempre), `apoya` mientras tenga uno pagado y sin vencer.
+ * pagó, o si tiene un lugar gratis de por vida (para siempre, `esFundador`), `apoya` mientras tenga uno pagado y sin vencer.
  */
-const INSIGNIA = `(SELECT CASE WHEN MAX(li.fundador = 1 AND li.autorizada IS NOT NULL) THEN 'fundador'
+const INSIGNIA = `(SELECT CASE WHEN MAX(${esFundador('li')}) THEN 'fundador'
   WHEN MAX(julianday(li.pagado_hasta) > julianday('now')) THEN 'apoya' END
-  FROM licencias li WHERE li.plan IN ('mensual', 'anual') AND li.modo = 'produccion'
+  FROM licencias li WHERE li.plan IN ('mensual', 'anual', 'gratis') AND li.modo = 'produccion'
   AND li.email = (SELECT lc.email FROM licencias lc WHERE lc.clave = m.clave)) AS insignia`
 
 const nuevoId = () => letras(12).toLowerCase()
