@@ -1,1 +1,1 @@
-Con Codex, cada card sigue la misma skill que con Claude, la de esta versión, y nunca una copia vieja.
+Si cambiaste una skill, su card te dice qué y la puedes volver a la original; lo tuyo queda en una copia.
