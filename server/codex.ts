@@ -6,9 +6,10 @@ import type { AgentOptions, AgentRun, SkillRef } from './agent.ts'
 import { OPCIONES } from './claude.ts'
 import { CodexRpc } from './codex-rpc.ts'
 import { navegadorAgente } from './navegador-agente.ts'
+import { costoCodex } from './precios.ts'
 
 /** Codex conserva los hilos en su almacén; Sloth conserva su id y traduce el protocolo al mismo AgentEvent de Claude. */
-export function startCodex(opts: AgentOptions, connect: Conectar = (notify, exit, config) => new CodexRpc(notify, exit, config)): AgentRun {
+export function startCodex(opts: AgentOptions, connect: Conectar = (notify, exit, config) => new CodexRpc(notify, exit, config), precio = costoCodex): AgentRun {
   let threadId = ''
   let turnId = ''
   let busy = false
@@ -16,6 +17,9 @@ export function startCodex(opts: AgentOptions, connect: Conectar = (notify, exit
   let serie = Promise.resolve()
   let antes: Tokens | undefined
   let total: Tokens | undefined
+  /** Los dólares del turno a precio de la API, petición a petición. `undefined` si falta alguna (sin precio o sin `antes`). */
+  let gastado: number | undefined
+  const modelo = opts.model.replace(/^codex:/, '')
   let errorTurno: string | undefined
   const textos = new Map<string, string>()
   const salidas = new Map<string, string>()
@@ -37,7 +41,7 @@ export function startCodex(opts: AgentOptions, connect: Conectar = (notify, exit
     busy = false
     turnId = ''
     const tokens = total && antes ? { input: total.input - antes.input, output: total.output - antes.output, cacheRead: total.cacheRead - antes.cacheRead } : undefined
-    emit({ t: 'turn_end', at: Date.now(), ok, error, caida, tokens })
+    emit({ t: 'turn_end', at: Date.now(), ok, error, caida, tokens, costUsd: tokens ? gastado : undefined })
   }
   const idDe = (id: string) => `${turnId}:${id}`
   const texto = (id: string, delta: string, thinking = false) => {
@@ -106,7 +110,14 @@ export function startCodex(opts: AgentOptions, connect: Conectar = (notify, exit
     }
     if (method === 'thread/tokenUsage/updated' && p.tokenUsage) {
       const u = p.tokenUsage
-      total = { input: u.total.inputTokens - u.total.cachedInputTokens, output: u.total.outputTokens, cacheRead: u.total.cachedInputTokens }
+      const nuevo = { input: u.total.inputTokens - u.total.cachedInputTokens, output: u.total.outputTokens, cacheRead: u.total.cachedInputTokens }
+      // Cada aviso es una petición: lo que subió desde el anterior, con la tarifa que toca a lo que leyó (`last`).
+      const previo = total ?? antes
+      if (busy && previo && gastado !== undefined) {
+        const c = precio(modelo, { input: nuevo.input - previo.input, cacheRead: nuevo.cacheRead - previo.cacheRead, output: nuevo.output - previo.output }, u.last.inputTokens)
+        gastado = c === undefined ? undefined : gastado + c
+      }
+      total = nuevo
       if (u.modelContextWindow) emit({ t: 'context', used: u.last.totalTokens, max: u.modelContextWindow })
     }
     if (method === 'error' && !p.willRetry) errorTurno = p.error?.message
@@ -126,7 +137,7 @@ export function startCodex(opts: AgentOptions, connect: Conectar = (notify, exit
     const account = await rpc.request<{ account: { type: string } | null }>('account/read', { refreshToken: false })
     if (account.account?.type !== 'chatgpt') throw new Error('Conecta tu cuenta de ChatGPT en Opciones → Agentes → Codex.')
     const r = await rpc.request<{ thread: { id: string } }>(opts.resume ? 'thread/resume' : 'thread/start', {
-      ...(opts.resume ? { threadId: opts.resume } : {}), model: opts.model.replace(/^codex:/, ''), modelProvider: 'openai', cwd: opts.cwd,
+      ...(opts.resume ? { threadId: opts.resume } : {}), model: modelo, modelProvider: 'openai', cwd: opts.cwd,
       approvalPolicy: 'never', sandbox: 'danger-full-access',
       developerInstructions: `${OPCIONES}\nLa interfaz y tus respuestas van en español. Haz las preguntas en mensajes normales, sin herramientas de preguntas interactivas. Las skills de Sloth están en ${join(homedir(), '.claude', 'skills')}. La skill invocada es siempre la de esa carpeta: si ves otra con el mismo nombre (en ${join(homedir(), '.codex', 'skills')} u otra), es una copia vieja y no se usa. Respeta la skill invocada y lee sus referencias cuando hagan falta.`
     })
@@ -173,6 +184,7 @@ ${text}` : text, text_elements: [] },
     }
     if (!busy) { busy = true; emit({ t: 'turn_start', at: Date.now() }) }
     antes = total ?? (opts.resume ? undefined : { input: 0, output: 0, cacheRead: 0 })
+    gastado = antes ? 0 : undefined
     textos.clear()
     salidas.clear()
     herramientas.clear()
@@ -191,6 +203,7 @@ ${text}` : text, text_elements: [] },
         await ready
         if (cerrado) return
         antes = total
+        gastado = antes ? 0 : undefined
         errorTurno = undefined
         await rpc.request('thread/compact/start', { threadId })
       })

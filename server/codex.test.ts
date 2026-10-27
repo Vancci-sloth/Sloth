@@ -6,7 +6,7 @@ import { startCodex } from './codex.ts'
 import { buildTimeline } from '../web/src/items.ts'
 
 /** Prueba el protocolo y las carreras entre turnos, sin gastar el plan ni tocar las credenciales del usuario. */
-function preparar(resume?: string) {
+function preparar(resume?: string, precio: Parameters<typeof startCodex>[2] = () => undefined) {
   const events: AgentEvent[] = []
   const pedidos: { method: string; params: Record<string, unknown> }[] = []
   const sesiones: string[] = []
@@ -39,7 +39,7 @@ function preparar(resume?: string) {
       },
       close() { exit() }
     }
-  })
+  }, precio)
   return { run, events, pedidos, sesiones, notify: (method: string, params: unknown) => notify(method, params), caer: () => exit(new Error('Se cayó Codex')), fallar: (method: string) => { fallo = method } }
 }
 
@@ -139,6 +139,42 @@ test('la salida de comandos se acumula y el uso de tokens cuenta solo el turno',
   h.notify('turn/completed', { threadId: 'hilo', turn: { id: 'turno-2', status: 'completed' } })
   assert.deepEqual(h.events.filter((e) => e.t === 'turn_end').at(-1)!.tokens, { input: 40, output: 10, cacheRead: 10 })
   h.run.close()
+})
+
+test('el costo del turno suma cada petición a precio de la API, con la tarifa de lo que leyó', async () => {
+  const pedidas: [string, number, number][] = []
+  // Un dólar por token, o diez si la petición leyó más de 1000: así cada cifra dice de dónde salió.
+  const h = preparar(undefined, (modelo, uso, leidos = 0) => {
+    pedidas.push([modelo, uso.input + uso.cacheRead + uso.output, leidos])
+    return (uso.input + uso.cacheRead + uso.output) * (leidos > 1000 ? 10 : 1)
+  })
+  const medir = (inputTokens: number, outputTokens: number, ultima: number) => h.notify('thread/tokenUsage/updated', { threadId: 'hilo', tokenUsage: { total: { inputTokens, outputTokens, cachedInputTokens: 0, totalTokens: 0 }, last: { inputTokens: ultima, outputTokens: 0, cachedInputTokens: 0, totalTokens: 0 }, modelContextWindow: null } })
+  h.run.send('Prueba')
+  await setImmediate()
+  medir(100, 10, 100)
+  medir(1500, 20, 1400)
+  h.notify('turn/completed', { threadId: 'hilo', turn: { id: 'turno-1', status: 'completed' } })
+  assert.deepEqual(pedidas, [['gpt-prueba', 110, 100], ['gpt-prueba', 1410, 1400]])
+  assert.equal(h.events.filter((e) => e.t === 'turn_end').at(-1)!.costUsd, 110 + 14100)
+  h.run.close()
+})
+
+test('sin precio del modelo, o sin saber desde dónde contó, el turno va sin costo', async () => {
+  const medir = (h: ReturnType<typeof preparar>, inputTokens: number) => h.notify('thread/tokenUsage/updated', { threadId: 'hilo', tokenUsage: { total: { inputTokens, outputTokens: 0, cachedInputTokens: 0, totalTokens: 0 }, last: { inputTokens, outputTokens: 0, cachedInputTokens: 0, totalTokens: 0 }, modelContextWindow: null } })
+  const sinPrecio = preparar()
+  sinPrecio.run.send('Prueba')
+  await setImmediate()
+  medir(sinPrecio, 100)
+  sinPrecio.notify('turn/completed', { threadId: 'hilo', turn: { id: 'turno-1', status: 'completed' } })
+  assert.equal(sinPrecio.events.find((e) => e.t === 'turn_end')!.costUsd, undefined)
+  sinPrecio.run.close()
+  const retomado = preparar('guardado', () => 1)
+  retomado.run.send('Prueba')
+  await setImmediate()
+  medir(retomado, 100)
+  retomado.notify('turn/completed', { threadId: 'hilo', turn: { id: 'turno-1', status: 'completed' } })
+  assert.equal(retomado.events.find((e) => e.t === 'turn_end')!.costUsd, undefined)
+  retomado.run.close()
 })
 
 test('una caída no deja el hilo trabajando ni cierra dos veces el turno', async () => {

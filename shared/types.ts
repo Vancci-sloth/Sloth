@@ -215,8 +215,8 @@ export type AgentEvent =
   | { t: 'tool_update'; id: string; output?: string; delta?: string; done?: boolean; error?: boolean }
   /**
    * `caida`: no lo cerró el modelo, se cayó el proceso del agente o el servidor. `costUsd` y `tokens` son lo que gastó el
-   * turno según el SDK, con los subagentes; faltan si no se sabe (se cortó antes de que el SDK lo diera, o es el primer
-   * turno tras retomar la sesión).
+   * turno según el SDK, con los subagentes (con Codex, sin ellos y a precio de la API: server/precios.ts); faltan si no se
+   * sabe (se cortó antes de que el SDK lo diera, es el primer turno tras retomar la sesión o el modelo no tiene precio).
    */
   | { t: 'turn_end'; at: number; ok: boolean; error?: string; costUsd?: number; tokens?: Tokens; caida?: boolean }
   | { t: 'info'; text: string }

@@ -1177,7 +1177,7 @@ const SessionView = memo(function SessionView({ id, session, card, models }: { i
       <span className="spacer" />
       {totals.ms > 0 && <span className="muted small">{duration(totals.ms)}</span>}
       {(totals.cost > 0 || totals.sinCosto > 0) && (
-        <span className="muted small" title={totals.sinCosto ? `Sin contar ${totals.sinCosto === 1 ? 'un turno' : `${totals.sinCosto} turnos`} sin costo: se cortaron antes de que Claude lo diera, o fueron el primero tras retomar el hilo` : undefined}>
+        <span className="muted small" title={totals.sinCosto ? `Sin contar ${totals.sinCosto === 1 ? 'un turno' : `${totals.sinCosto} turnos`} sin costo: se cortaron antes de saberlo, fueron el primero tras retomar el hilo o su modelo de Codex no tenía precio` : undefined}>
           {totals.sinCosto ? '≥ ' : ''}${totals.cost.toFixed(2)}
         </span>
       )}

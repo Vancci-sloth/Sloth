@@ -8,7 +8,8 @@ Este es el mapa:
 - `server/claude.ts`: Claude con `@anthropic-ai/claude-agent-sdk`, en streaming; la sesión sigue viva entre turnos y
   carga las skills y el CLAUDE.md del usuario. Lo traduce todo a `AgentEvent`, lo único que conoce la interfaz; otro
   proveedor sería otro adaptador que cumpla `AgentRun` (`server/agent.ts`).
-- `server/codex.ts`: adaptador de Codex; usa `server/codex-rpc.ts` y traduce sus mensajes al mismo `AgentEvent`.
+- `server/codex.ts`: adaptador de Codex; usa `server/codex-rpc.ts` y traduce sus mensajes al mismo `AgentEvent`. Su
+  costo es a precio de la API, con la tabla que `server/precios.ts` baja de LiteLLM con cada versión de Codex.
 - `server/sessions.ts`: cada hilo es `data/sessions/<id>.json` (qué es) y `<id>.jsonl` (lo que pasó). Retoma la sesión
   del proveedor tras reiniciar, reparte los lotes según la máquina y cierra el proceso de un video del lote al acabar.
   `npm run hilo -- <id>` (`scripts/hilo.mjs`) resume un hilo desde esos archivos.

@@ -204,7 +204,7 @@ export type Resumen = {
   out: number
   /** El tiempo que el agente pasó trabajando: la suma de cada turno, no lo que lleva abierta la sesión. */
   ms: number
-  /** Los turnos sin costo (se cortaron antes de que Claude lo diera, o fueron el primero tras retomar el hilo). */
+  /** Los turnos sin costo (se cortaron antes de saberlo, fueron el primero tras retomar el hilo o Codex sin precio). */
   sinCosto: number
   context?: { used: number; max: number }
   /** Sube con lo que puede cambiar los archivos de un hilo quieto: un turno que acaba, un aviso, el segundo plano. */

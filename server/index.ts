@@ -38,6 +38,7 @@ import { eventosEnVivo } from './eventos-en-vivo.ts'
 import { carpetaSkill, duplicateCard, enlazarSkills, enlazarSkillsCodex, readCards, removeCard, seriesDe, skillRef } from './skills.ts'
 import { estaticos } from './estaticos.ts'
 import { actualizar, type Agente, version } from './version.ts'
+import { cargarPreciosCodex } from './precios.ts'
 
 const APP = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const PORT = Number(process.env.PORT ?? 4848)
@@ -179,6 +180,8 @@ function pedirModelos() {
   })).finally(() => { cargandoModelos = false })
 }
 pedirModelos()
+// Codex no da dólares: sus precios de la API se bajan con cada versión de Codex (server/precios.ts).
+void cargarPreciosCodex(APP)
 
 /**
  * Las carpetas de un lote: `lote-1007-1530-01`, `-02`… (mes, día, hora y minuto, y el número del video), con el prefijo
@@ -336,7 +339,10 @@ async function api(req: IncomingMessage, res: ServerResponse, url: URL): Promise
     }
     send(res, 200, { reinicia: agente === 'claude' })
     if (agente === 'claude') setTimeout(reiniciar, 100)
-    else pedirModelos()
+    else {
+      pedirModelos()
+      void cargarPreciosCodex(APP)
+    }
     return true
   }
 
