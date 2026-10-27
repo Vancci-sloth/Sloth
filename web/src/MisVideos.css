@@ -19,3 +19,7 @@
 /* Al final de lo dibujado: cuando se acerca a la vista, entra otra tanda. */
 .mis-videos-fin { width: 100%; height: 1px; }
 .video-estilo { margin-right: 6px; }
+/* «Ritmo de publicación»: abre y cierra el panel de Ritmos.tsx. */
+.mis-ritmo { display: flex; align-items: center; gap: 6px; flex-shrink: 0; padding: 6px 14px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); font-size: 13px; font-weight: 600; transition: color 0.15s, border-color 0.15s; }
+.mis-ritmo .ico { width: 14px; height: 14px; }
+.mis-ritmo:hover, .mis-ritmo.on { color: var(--amber); border-color: var(--amber); }

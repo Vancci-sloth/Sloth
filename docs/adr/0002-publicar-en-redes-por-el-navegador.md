@@ -80,3 +80,17 @@ mismo relevo CDP que usan los agentes. Para iniciar sesión, Opciones → Redes 
 - La sesión de Edge no pasa a la app: hay que iniciar sesión una vez en ella.
 - Sin la ventana de Sloth (abierto en un navegador), sigue el Edge con `data/redes/perfil`. Una ventana de antes de este
   cambio, también, hasta que se reinicie: no anota `redes` en `data/navegador-integrado.json`.
+
+## Cambio del 2026-10-27: el ritmo lo eliges tú
+
+El usuario quería otro número de videos según la época (2, 4, 7 al día, o cada tantos días), así que el ritmo fijo se
+cambió por uno que se elige en «Mis videos» → Ritmo de publicación: cuántos videos, cada cuántos días, a qué hora el
+primero y cuántos minutos entre uno y otro. Es el mismo para TikTok e Instagram (un video sale a la vez en las dos);
+YouTube lleva el suyo. Vive en `data/redes/redes.json` (`ritmo`) y las cuentas, en `shared/ritmo.ts`.
+
+- Guardar un ritmo vale para lo que programes después. Lo ya programado se pasa al nuevo solo con «Pasar al ritmo
+  nuevo», que pide confirmar: tiene que ser una decisión, no un efecto de guardar.
+- Lo que se mueve conserva su orden y va a los primeros huecos libres. Un día que ya tiene más de los de ahora (de un
+  ritmo de antes) cuenta como lleno.
+- Instagram y YouTube cambian la hora de lo ya programado sin subir el video otra vez. TikTok no deja: lo que ya está
+  en su calendario (hasta 10 días) se queda a su hora; lo que aún espera en la cola de Sloth sí se mueve.

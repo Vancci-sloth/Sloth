@@ -33,7 +33,7 @@ Este es el mapa:
   usa lo último que eligió el usuario a mano. En «Avanzado» se elige cada uno.
 - La galería: al elegir un estilo, sus videos terminados ocupan el sitio de las cards (`videosApi` en `etapas.ts`);
   «Mis videos» (`MisVideos.tsx`) los junta todos. Cada card enseña de fondo el más nuevo (`server/previas.ts`).
-- `server/redes/` y `web/src/Redes.tsx`: los verticales terminados se programan, 5 al día de 12:00 a 16:00 (`RITMO`).
+- `server/redes/` y `web/src/Redes.tsx`: los verticales terminados se programan al ritmo que eliges en «Mis videos» (`web/src/Ritmos.tsx`, las cuentas en `shared/ritmo.ts`; YouTube lleva el suyo).
   TikTok va por su página (ADR 0002), en la página `redes` del navegador integrado, con su propio perfil (sin la ventana
   de Sloth, en un Edge con `data/redes/perfil`);
   Instagram, por la nube (`nube/`, un Worker de Cloudflare con R2 y un cron, ADR 0003), que publica con la computadora

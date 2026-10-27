@@ -1,0 +1,15 @@
+/* «Ritmo de publicación», en «Mis videos» (Ritmos.tsx): una fila por grupo de redes, con sus campos en una frase. */
+.ritmos { display: flex; flex-direction: column; gap: 12px; padding: 12px 14px; border: 1px solid var(--line); border-radius: var(--radio); background: var(--panel); }
+.ritmo { display: flex; flex-direction: column; gap: 8px; font-size: 13px; }
+.ritmo + .ritmo { border-top: 1px solid var(--line); padding-top: 12px; }
+.ritmo p { margin: 0; }
+.ritmo-cabeza { display: flex; align-items: center; gap: 8px; }
+.ritmo-cabeza strong { font-weight: 600; }
+.ritmo-campos { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; color: var(--muted); }
+.ritmo-campos input { padding: 4px 7px; border: 1px solid var(--line); border-radius: 7px; background: var(--panel-2); color: var(--text); font-variant-numeric: tabular-nums; color-scheme: dark; }
+.ritmo-campos input[type='number'] { width: 58px; }
+.ritmo-campos input:focus { outline: 1px solid var(--amber); outline-offset: 0; }
+.ritmo .primary { padding: 5px 14px; }
+.ritmo-campos .primary { margin-left: 6px; }
+.ritmo-aviso { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; padding: 8px 10px; border-radius: 8px; background: var(--amber-tinte); }
+.ritmo-hecho { color: var(--ok); }

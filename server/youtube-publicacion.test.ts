@@ -111,9 +111,11 @@ test('lee títulos y alternativas de la entrega, y ofrece portadas sin confundir
 
 test('el ritmo mantiene la hora local, respeta lunes/miércoles/viernes y evita fechas ocupadas', () => {
   const inicio = '2026-10-13T18:00'
-  const diario = fechasYoutube(inicio, 'diario', 3)
+  const ahora = new Date('2026-10-13T09:00').getTime()
+  const tuyo = { porDia: 1, cadaDias: 1, inicio: '2026-10-01', desde: '18:00', cadaMin: 60 }
+  const diario = fechasYoutube(inicio, 'tuyo', 3, [], tuyo, ahora)
   assert.deepEqual(diario.map(fechaLocalYoutube), ['2026-10-13T18:00', '2026-10-14T18:00', '2026-10-15T18:00'])
   const semanal = fechasYoutube(inicio, 'semana', 3)
   assert.deepEqual(semanal.map(fechaLocalYoutube), ['2026-10-14T18:00', '2026-10-16T18:00', '2026-10-19T18:00'])
-  assert.equal(fechaLocalYoutube(fechasYoutube(inicio, 'diario', 1, [diario[0]])[0]), '2026-10-14T18:00')
+  assert.equal(fechaLocalYoutube(fechasYoutube(inicio, 'tuyo', 1, [diario[0]], tuyo, ahora)[0]), '2026-10-14T18:00')
 })

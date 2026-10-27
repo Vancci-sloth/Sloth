@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import type { Model, VideoHecho } from '../../shared/types'
 import { proveedorDe } from '../../shared/providers'
 import type { BorradorYoutube, CatalogoYoutube, MiniaturaYoutube, VideoParaYoutube } from '../../shared/youtube'
+import { resumenRitmo } from '../../shared/ritmo'
 import { fechaLocalYoutube, fechasYoutube, type RitmoYoutube } from '../../shared/youtube-fechas'
 import { api } from './api'
 import './Youtube.css'
@@ -78,7 +79,7 @@ export function RevisionYoutube({ cardId, ruta, cerrar, onCambio }: { cardId?: s
   const [elegidos, setElegidos] = useState<Set<string>>(new Set())
   const [busqueda, setBusqueda] = useState('')
   const [filtro, setFiltro] = useState('todos')
-  const [ritmo, setRitmo] = useState<RitmoYoutube>('diario')
+  const [ritmo, setRitmo] = useState<RitmoYoutube>('tuyo')
   const [inicio, setInicio] = useState(() => { const d = new Date(); d.setDate(d.getDate() + 1); d.setHours(18, 0, 0, 0); return fechaLocalYoutube(d.toISOString()) })
   const [sucio, setSucio] = useState(false)
   const [ocupado, setOcupado] = useState(false)
@@ -93,8 +94,8 @@ export function RevisionYoutube({ cardId, ruta, cerrar, onCambio }: { cardId?: s
     if (ruta) r.videos = r.videos.filter((v) => rutaNormal(v.ruta) === rutaNormal(ruta))
     setCatalogo((antes) => ({ ...r, videos: r.videos.map((v) => ({ ...v, miniaturas: [...new Map([...(antes?.videos.find((a) => a.huella === v.huella)?.miniaturas ?? []), ...v.miniaturas].map((m) => [m.ruta, m])).values()] })) }))
     if (inicial) {
-      const ocupadas = r.videos.flatMap((v) => v.borrador.cuando || v.subida?.datos?.cuando ? [v.borrador.cuando ?? v.subida!.datos!.cuando!] : [])
-      const fechas = fechasYoutube(inicio, ritmo, r.videos.length, ocupadas)
+      const ocupadas = [...r.videos.flatMap((v) => v.borrador.cuando || v.subida?.datos?.cuando ? [v.borrador.cuando ?? v.subida!.datos!.cuando!] : []), ...r.ocupadas.map((o) => o.cuando)]
+      const fechas = fechasYoutube(inicio, ritmo, r.videos.length, ocupadas, r.ritmo)
       let n = 0
       setBorradores(Object.fromEntries(r.videos.map((v) => [v.huella, { ...v.borrador, cuando: v.borrador.cuando ?? fechas[n++] }])))
       setElegidos(new Set(r.videos.filter((v) => !bloqueado(v) && v.formato === 'horizontal').map((v) => v.huella)))
@@ -165,8 +166,10 @@ export function RevisionYoutube({ cardId, ruta, cerrar, onCambio }: { cardId?: s
     finally { guardando.current = false; setOcupado(false) }
   }
   function distribuir() {
-    const ocupadas = catalogo?.videos.flatMap((v) => !elegidos.has(v.huella) && (v.subida?.datos?.cuando || borradores[v.huella]?.cuando) ? [v.subida?.datos?.cuando ?? borradores[v.huella].cuando!] : []) ?? []
-    const fechas = fechasYoutube(inicio, ritmo, seleccionados.length, ocupadas)
+    // También las fechas del canal de videos que ya no están en el disco.
+    const ocupadas = [...catalogo?.videos.flatMap((v) => !elegidos.has(v.huella) && (v.subida?.datos?.cuando || borradores[v.huella]?.cuando) ? [v.subida?.datos?.cuando ?? borradores[v.huella].cuando!] : []) ?? [],
+      ...catalogo?.ocupadas.filter((o) => !elegidos.has(o.huella)).map((o) => o.cuando) ?? []]
+    const fechas = fechasYoutube(inicio, ritmo, seleccionados.length, ocupadas, catalogo?.ritmo)
     setBorradores((bs) => { const nuevos = { ...bs }; seleccionados.forEach((v, n) => { nuevos[v.huella] = { ...bs[v.huella], cuando: fechas[n] } }); return nuevos })
     setSucio(true)
   }
@@ -210,8 +213,8 @@ export function RevisionYoutube({ cardId, ruta, cerrar, onCambio }: { cardId?: s
           <button className="boton" disabled={ocupado} onClick={() => setElegidos(new Set(pendientes.map((v) => v.huella)))}>Seleccionar pendientes ({pendientes.length})</button>
           <button className="ghost" onClick={() => setElegidos(new Set())}>Quitar selección</button>
         </div>
-        <div className="youtube-herramientas"><label>Primera publicación<input aria-label="Primera publicación" type="datetime-local" value={inicio} onChange={(e) => setInicio(e.target.value)} /></label><label>Ritmo<select aria-label="Ritmo de publicación" value={ritmo} onChange={(e) => setRitmo(e.target.value as RitmoYoutube)}><option value="diario">Uno al día</option><option value="semana">Lunes, miércoles y viernes</option><option value="manual">Fechas a mano</option></select></label>
-          <button className="boton" disabled={ritmo === 'manual' || !seleccionados.length || ocupado || !inicio} onClick={distribuir}>Asignar fechas a la selección</button><span className="muted small">Hora local · {Intl.DateTimeFormat().resolvedOptions().timeZone}</span>
+        <div className="youtube-herramientas">{ritmo === 'semana' && <label>Primera publicación<input aria-label="Primera publicación" type="datetime-local" value={inicio} onChange={(e) => setInicio(e.target.value)} /></label>}<label>Ritmo<select aria-label="Ritmo de publicación" value={ritmo} onChange={(e) => setRitmo(e.target.value as RitmoYoutube)}><option value="tuyo">Tu ritmo{catalogo ? `: ${resumenRitmo(catalogo.ritmo)}` : ''}</option><option value="semana">Lunes, miércoles y viernes</option><option value="manual">Fechas a mano</option></select></label>
+          <button className="boton" disabled={ritmo === 'manual' || !seleccionados.length || ocupado || (ritmo === 'semana' && !inicio)} onClick={distribuir}>Asignar fechas a la selección</button><span className="muted small">Hora local · {Intl.DateTimeFormat().resolvedOptions().timeZone}</span>
         </div>
       </div>
       <div className="youtube-revision-lista">

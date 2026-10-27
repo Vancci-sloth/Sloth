@@ -1,3 +1,5 @@
+import type { Ritmo } from './types.ts'
+
 /** La conexión del canal y la subida de un video largo. Nunca se mandan tokens al navegador. */
 export interface CuentaYoutube {
   id: string
@@ -112,10 +114,15 @@ export interface CatalogoYoutube {
   conexion: ConexionYoutube
   videos: VideoParaYoutube[]
   verticales: number
+  /** Tu ritmo de YouTube, y las fechas que ya tiene el canal (también de videos que ya no están en el disco). */
+  ritmo: Ritmo
+  ocupadas: { huella: string; cuando: string }[]
 }
 
 export interface CalendarioYoutube {
   cuenta: CuentaYoutube | null
   publicaciones: { id: string; titulo: string; cuando: string }[]
   pendientes: number
+  /** El primer hueco libre de tu ritmo (`'2026-10-28 12:00'`, hora local): ahí va el siguiente. */
+  siguiente?: string
 }

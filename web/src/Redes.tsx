@@ -1,5 +1,6 @@
 import { type MouseEvent, type ReactNode, useEffect, useRef, useState } from 'react'
-import { type AvisoRedes as Aviso, type Borrador, type CalendarioRed as CalendarioRedTipo, type Card, type MarcasDeRedes, NAVEGADOR_REDES, type Publicacion, type Red, type RedesDelEstilo, type RedesEstilo, type RedId, type Ritmo, type TandaRedes, type VideoHecho } from '../../shared/types'
+import { type AvisoRedes as Aviso, type Borrador, type CalendarioRed as CalendarioRedTipo, type Card, type MarcasDeRedes, NAVEGADOR_REDES, type Publicacion, type Red, type RedesDelEstilo, type RedesEstilo, type RedId, type TandaRedes, type VideoHecho } from '../../shared/types'
+import { horasDelRitmo, resumenRitmo } from '../../shared/ritmo'
 import { api } from './api'
 import { encendido, notificar, sonar } from './avisos'
 import { Picker } from './Composer'
@@ -143,8 +144,8 @@ const PERFIL: Record<RedId, (usuario: string) => string> = {
 }
 
 /**
- * Una red: su logo, el ritmo (fijo) en una línea, la cuenta en un desplegable y, debajo, lo que tiene programado. TikTok
- * se conecta iniciando sesión en el navegador de la app, que se abre a la derecha (fuera de la ventana de Sloth, en Edge); una red con `token` (Instagram), pegando un token de su API, que
+ * Una red: su logo, el ritmo (se elige en «Mis videos») en una línea, la cuenta en un desplegable y, debajo, lo que
+ * tiene programado. TikTok se conecta iniciando sesión en el navegador de la app, que se abre a la derecha (fuera de la ventana de Sloth, en Edge); una red con `token` (Instagram), pegando un token de su API, que
  * Sloth prueba antes de guardarlo y renueva solo. Como las llaves, vive en las variables de tu usuario de Windows. Debajo,
  * lo que falló en ella y ya no está en el disco (`sinVideo`): sigue en la nube, y se reintenta o se quita desde aquí.
  */
@@ -190,7 +191,7 @@ function RedFila(props: { red: Red; conectando: 'abriendo' | 'app' | 'edge' | nu
         <Logo de={red.id} />
         <div className="fila-nombre">
           <strong>{red.nombre}</strong>
-          <span title={`Salen a las ${horas(red.ritmo).join(', ')}`}>{resumen(red.ritmo)}</span>
+          <span title={`Salen a las ${horasDelRitmo(red.ritmo).join(', ')}. Se cambia en «Mis videos» → Ritmo de publicación.`}>{resumenRitmo(red.ritmo)}</span>
         </div>
         {props.conectando ? (
           <span className="estado moviendo">{red.enEdge ? 'Entra con Google en la ventana de Edge…' : props.conectando === 'app' ? 'Inicia sesión en el navegador…' : props.conectando === 'edge' ? 'Inicia sesión en la ventana de Edge…' : 'Abriendo…'}</span>
@@ -345,23 +346,6 @@ function MontarNube(props: { onLista(): void; onCancelar(): void }) {
       {error && <p className="bad small">{error}</p>}
     </form>
   )
-}
-
-const dos = (n: number) => String(n).padStart(2, '0')
-
-/** A qué hora sale cada video del día. */
-function horas(r: Ritmo) {
-  const [h, m] = r.desde.split(':').map(Number)
-  return Array.from({ length: r.porDia }, (_, i) => {
-    const t = h * 60 + m + i * r.cadaMin
-    return `${dos(Math.floor(t / 60) % 24)}:${dos(t % 60)}`
-  })
-}
-
-/** `5 al día, de 12:00 a 16:00`. */
-function resumen(r: Ritmo) {
-  const hs = horas(r)
-  return r.porDia === 1 ? `1 al día, a las ${hs[0]}` : `${r.porDia} al día, de ${hs[0]} a ${hs[hs.length - 1]}`
 }
 
 /**
@@ -855,8 +839,8 @@ function Programar({ videos, redes, fijos = [], onClose, onHecho }: { videos: Vi
         <h2>Programar en {nombres(redes)}</h2>
         <p className="modal-body">
           {listos < marcados.length ? `Claude está escribiendo los textos… ${listos} de ${marcados.length}. ` : 'Cambia lo que quieras. '}
-          Marca solo los que quieras subir ahora: los demás siguen esperando. Cada uno va en el siguiente hueco libre del calendario de cada red (el ritmo está en ⚙
-          Opciones → Redes). Si un video ya va a otra red, lleva su mismo texto.
+          Marca solo los que quieras subir ahora: los demás siguen esperando. Cada uno va en el siguiente hueco libre del calendario de cada red (el ritmo se cambia en
+          «Mis videos» → Ritmo de publicación). Si un video ya va a otra red, lleva su mismo texto.
           {fijos.length > 0 && ` Los hashtags fijos del estilo ya van puestos.`}
         </p>
         <label className="programar-todos">

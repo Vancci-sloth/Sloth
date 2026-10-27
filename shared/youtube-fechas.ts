@@ -1,7 +1,12 @@
+import { fechaRitmo, huecos, RITMO_YOUTUBE } from './ritmo.ts'
+import type { Ritmo } from './types.ts'
 import type { CalendarioYoutube } from './youtube.ts'
 
-/** Fechas de YouTube en la zona de la computadora: setDate conserva la hora local al pasar por cambios de horario. */
-export type RitmoYoutube = 'diario' | 'semana' | 'manual'
+/**
+ * Fechas de YouTube en la zona de la computadora: setDate conserva la hora local al pasar por cambios de horario. `tuyo`
+ * es el ritmo que eliges en «Mis videos» (`Ritmo`), desde ahora; `semana`, lunes, miércoles y viernes desde `inicio`.
+ */
+export type RitmoYoutube = 'tuyo' | 'semana' | 'manual'
 
 export function fechaLocalYoutube(iso?: string): string {
   if (!iso || !Number.isFinite(Date.parse(iso))) return ''
@@ -9,21 +14,25 @@ export function fechaLocalYoutube(iso?: string): string {
   return new Date(d.getTime() - d.getTimezoneOffset() * 60_000).toISOString().slice(0, 16)
 }
 
-export function fechasYoutube(inicio: string, ritmo: RitmoYoutube, cantidad: number, ocupadas: string[] = []): string[] {
+export function fechasYoutube(inicio: string, ritmo: RitmoYoutube, cantidad: number, ocupadas: string[] = [], tuyo: Ritmo = RITMO_YOUTUBE, ahora = Date.now()): string[] {
+  if (ritmo === 'tuyo') return huecos(tuyo, cantidad, ocupadas.map((s) => fechaRitmo(new Date(s))), ahora + 10 * 60_000).map((f) => new Date(f.replace(' ', 'T')).toISOString())
   if (ritmo === 'manual' || !Number.isFinite(Date.parse(inicio))) return []
   const fecha = new Date(inicio)
   const tomadas = new Set(ocupadas.map((s) => new Date(s).toISOString().slice(0, 16)))
   const fechas: string[] = []
   for (let i = 0; fechas.length < cantidad && i < 10_000; i++, fecha.setDate(fecha.getDate() + 1)) {
-    if (ritmo === 'semana' && ![1, 3, 5].includes(fecha.getDay())) continue
+    if (![1, 3, 5].includes(fecha.getDay())) continue
     const iso = fecha.toISOString()
     if (!tomadas.has(iso.slice(0, 16))) fechas.push(iso)
   }
   return fechas
 }
 
-/** Días ocupados del canal completo: conserva hoy, usa la hora local y busca el primer día vacío desde mañana. */
-export function diasYoutube(publicaciones: CalendarioYoutube['publicaciones'], ahora = new Date()) {
+/**
+ * Días ocupados del canal completo: conserva hoy y usa la hora local. El siguiente es el primer hueco de tu ritmo
+ * (`siguienteHueco`, del servidor); sin él, el primer día vacío desde mañana.
+ */
+export function diasYoutube(publicaciones: CalendarioYoutube['publicaciones'], ahora = new Date(), siguienteHueco?: string) {
   const hoy = fechaLocalYoutube(ahora.toISOString()).slice(0, 10)
   const porDia = new Map<string, CalendarioYoutube['publicaciones']>()
   for (const p of publicaciones) {
@@ -37,7 +46,7 @@ export function diasYoutube(publicaciones: CalendarioYoutube['publicaciones'], a
   siguiente.setHours(12, 0, 0, 0)
   siguiente.setDate(siguiente.getDate() + 1)
   while (porDia.has(fechaLocalYoutube(siguiente.toISOString()).slice(0, 10))) siguiente.setDate(siguiente.getDate() + 1)
-  const libre = fechaLocalYoutube(siguiente.toISOString()).slice(0, 10)
+  const libre = siguienteHueco?.slice(0, 10) ?? fechaLocalYoutube(siguiente.toISOString()).slice(0, 10)
   const visibles = new Set<string>(diasOcupados)
   const dia = new Date(ahora)
   dia.setHours(12, 0, 0, 0)

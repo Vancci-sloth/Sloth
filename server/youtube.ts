@@ -2,7 +2,8 @@ import { createHash, randomBytes } from 'node:crypto'
 import { existsSync, mkdirSync, readFileSync, statSync } from 'node:fs'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { join, relative, resolve, isAbsolute } from 'node:path'
-import type { Card, Model, VideoHecho } from '../shared/types.ts'
+import { fechaRitmo, huecos, RITMO_YOUTUBE, validarRitmo } from '../shared/ritmo.ts'
+import type { Card, EstadoRitmo, Model, Ritmo, VideoHecho } from '../shared/types.ts'
 import type { BorradorYoutube, CalendarioYoutube, CatalogoYoutube, ConexionYoutube, CuentaYoutube, DatosYoutube, EstadoSubidaYoutube, VideoParaYoutube } from '../shared/youtube.ts'
 import { aLaPapelera, guardar, huella } from './disco.ts'
 import { folderOf, servir, videosDe } from './etapas.ts'
@@ -28,7 +29,9 @@ const PERMISOS = 'YOUTUBE_SCOPES'
 const SCOPES = 'https://www.googleapis.com/auth/youtube.upload https://www.googleapis.com/auth/youtube.readonly https://www.googleapis.com/auth/youtube.force-ssl'
 const TOKEN = 'https://oauth2.googleapis.com/token'
 type Credenciales = { leer(nombre: string): string; escribir(nombre: string, valor: string | null): void }
-type Datos = { cuenta: CuentaYoutube | null; subidas: Record<string, SubidaYoutube>; borradores: Partial<Record<string, BorradorYoutube>> }
+type Datos = { cuenta: CuentaYoutube | null; subidas: Record<string, SubidaYoutube>; borradores: Partial<Record<string, BorradorYoutube>>; ritmo?: Ritmo }
+/** Lo más pronto que «Pasar al ritmo nuevo» pone o mueve una fecha: YouTube pide que falten al menos dos minutos. */
+const MARGEN = 10 * 60_000
 
 export function youtube(app: string, sessions: Sessions, cards: () => Card[], retorno: string, credenciales: Credenciales = {
   leer: (nombre) => process.env[nombre] || leer(nombre), escribir
@@ -47,6 +50,28 @@ export function youtube(app: string, sessions: Sessions, cards: () => Card[], re
       }
     }
   } catch { roto = true }
+  /** Tu ritmo de YouTube (`Ritmo`), el que eliges en «Mis videos». */
+  const ritmo = () => {
+    try { return validarRitmo(datos.ritmo ?? {}, RITMO_YOUTUBE) } catch { return RITMO_YOUTUBE }
+  }
+  /** `'2026-10-27T18:00:00.000Z'` en la hora local del ritmo, `'2026-10-27 12:00'`, y de vuelta. */
+  const local = (iso: string) => fechaRitmo(new Date(iso))
+  const iso = (f: string) => new Date(f.replace(' ', 'T')).toISOString()
+  /** Lo del canal que tiene fecha, sin lo que falló: lo que ocupa el calendario. */
+  const conFecha = () => datos.cuenta ? Object.entries(datos.subidas).filter(([k, s]) => k.startsWith(`${datos.cuenta!.id}:`) && s.datos.cuando && s.estado !== 'error') : []
+  /**
+   * «Pasar al ritmo nuevo»: lo que aún espera o está programado, con su fecha aún lejos, va en el mismo orden a los primeros
+   * huecos del ritmo de ahora. Lo que se está subiendo y lo que ya salió se quedan, y cuentan como ocupados.
+   */
+  function reacomodo() {
+    const limite = Date.now() + MARGEN
+    const todas = conFecha()
+    const mueven = todas.filter(([k, s]) => k !== activa && (s.estado === 'cola' || s.estado === 'programado') && Date.parse(s.datos.cuando!) >= limite)
+      .sort(([, a], [, b]) => Date.parse(a.datos.cuando!) - Date.parse(b.datos.cuando!))
+    const nuevas = huecos(ritmo(), mueven.length, todas.filter((e) => !mueven.includes(e)).map(([, s]) => local(s.datos.cuando!)), limite).map(iso)
+    return mueven.flatMap(([k, s], i) => Date.parse(s.datos.cuando!) === Date.parse(nuevas[i]) ? [] : [{ k, s, cuando: nuevas[i] }])
+  }
+  const estadoRitmo = (): EstadoRitmo => ({ ritmo: ritmo(), conectada: !!datos.cuenta && conectado(), cambian: reacomodo().length, fijas: 0 })
   function guardarDatos() {
     mkdirSync(join(app, 'data'), { recursive: true })
     guardar(archivo, JSON.stringify(datos, null, 2))
@@ -166,7 +191,7 @@ export function youtube(app: string, sessions: Sessions, cards: () => Card[], re
       }))
       videos.push(...tanda.filter((v) => v !== null))
     }
-    return { conexion: estado(), videos, verticales }
+    return { conexion: estado(), videos, verticales, ritmo: ritmo(), ocupadas: conFecha().map(([k, s]) => ({ huella: k.slice(k.indexOf(':') + 1), cuando: s.datos.cuando! })) }
   }
   function fallo(subida: SubidaYoutube, e: unknown) {
     subida.estado = subida.id && !subida.datos.cuando ? 'terminado' : 'error'
@@ -178,13 +203,14 @@ export function youtube(app: string, sessions: Sessions, cards: () => Card[], re
     const s = datos.subidas[clave]
     activa = clave
     try {
-      const v = buscar(s.cardId, s.ruta)
-      if (s.huella !== huella(v.ruta)) throw new Error('El video cambió después de revisarlo. Esta versión no se subió: revisa la nueva antes de programar.')
-      if (enUso(v)) throw new Error('El agente todavía trabaja en la carpeta de este video. Reintenta cuando termine.')
+      // Ya subido, solo falta (o cambia) su fecha: no hace falta el archivo, que pudo irse a la Papelera.
+      const v = s.id ? undefined : buscar(s.cardId, s.ruta)
+      if (v && s.huella !== huella(v.ruta)) throw new Error('El video cambió después de revisarlo. Esta versión no se subió: revisa la nueva antes de programar.')
+      if (v && enUso(v)) throw new Error('El agente todavía trabaja en la carpeta de este video. Reintenta cuando termine.')
       s.estado = s.id ? 'preparando' : 'subiendo'
       delete s.error
       guardarDatos()
-      if (!s.id) await subirYoutube(v.ruta, s, token, guardarDatos)
+      if (v) await subirYoutube(v.ruta, s, token, guardarDatos)
       if (s.datos.cuando) {
         s.estado = 'preparando'
         guardarDatos()
@@ -253,7 +279,30 @@ export function youtube(app: string, sessions: Sessions, cards: () => Card[], re
         const publicaciones = new Map<string, CalendarioYoutube['publicaciones'][number]>()
         for (const s of delCanal) if (s.estado === 'programado' && s.id && s.datos.cuando && Number.isFinite(Date.parse(s.datos.cuando))) publicaciones.set(s.id, { id: s.id, titulo: s.datos.titulo, cuando: s.datos.cuando })
         const pendientes = delCanal.filter((s) => ['cola', 'subiendo', 'preparando'].includes(publico(s).estado) && s.datos.cuando && Date.parse(s.datos.cuando) > Date.now()).length
-        return json(res, 200, { cuenta: datos.cuenta, publicaciones: [...publicaciones.values()].sort((a, b) => Date.parse(a.cuando) - Date.parse(b.cuando)), pendientes } satisfies CalendarioYoutube)
+        const siguiente = huecos(ritmo(), 1, conFecha().map(([, s]) => local(s.datos.cuando!)), Date.now() + MARGEN)[0]
+        return json(res, 200, { cuenta: datos.cuenta, publicaciones: [...publicaciones.values()].sort((a, b) => Date.parse(a.cuando) - Date.parse(b.cuando)), pendientes, siguiente } satisfies CalendarioYoutube)
+      }
+      // Tu ritmo, en «Mis videos». Guardarlo vale para lo que programes después; lo ya programado se mueve solo con «Pasar
+      // al ritmo nuevo» (`reacomodar`), aparte para que sea a propósito: vuelve a la cola con su fecha nueva, y la cola solo
+      // le cambia el `publishAt` en YouTube, sin subirlo otra vez.
+      if (url.pathname === '/api/youtube/ritmo' && req.method === 'GET') return json(res, 200, estadoRitmo())
+      if (url.pathname === '/api/youtube/ritmo' && post) {
+        datos.ritmo = validarRitmo(await body(req), ritmo())
+        guardarDatos()
+        return json(res, 200, estadoRitmo())
+      }
+      if (url.pathname === '/api/youtube/reacomodar' && post) {
+        if (!puedeProgramar()) return json(res, 400, { error: 'Vuelve a conectar YouTube en Opciones para conceder el permiso de programar publicaciones.' })
+        const cambios = reacomodo()
+        for (const { k, s, cuando } of cambios) {
+          s.datos.cuando = cuando
+          if (s.estado === 'programado') s.estado = 'cola'
+          const b = datos.borradores[k.slice(k.indexOf(':') + 1)]
+          if (b) b.cuando = cuando
+        }
+        guardarDatos()
+        void seguir()
+        return json(res, 200, { ...estadoRitmo(), movidas: cambios.length })
       }
       if (url.pathname === '/api/youtube/catalogo' && req.method === 'GET') return json(res, 200, await catalogo(url.searchParams.get('cardId') ?? undefined))
       // Solo el MP4 ya confirmado en YouTube va a la Papelera. Se conservan la publicación y su registro para no subirlo otra vez.

@@ -228,6 +228,22 @@ test('OAuth comprueba el estado y el canal; solo sube finales y evita repetir un
   assert.deepEqual(JSON.parse(readFileSync(join(dir, 'data', 'youtube.json'), 'utf8')), antesLimpiar)
   assert.deepEqual(JSON.parse((await pedir('/calendario')).texto), calendarioCompleto)
   assert.equal(JSON.parse((await pedir('/catalogo')).texto).videos.filter((v: { formato: string }) => v.formato === 'horizontal').length, 1)
+  // Otro ritmo no mueve nada solo; «Pasar al ritmo nuevo» cambia la fecha en YouTube sin subir otra vez, aunque el
+  // archivo ya esté en la Papelera.
+  assert.equal((await pedir('/ritmo', { porDia: 3, cadaDias: 1, desde: '23:30', cadaMin: 30 })).status, 400)
+  const ritmo = JSON.parse((await pedir('/ritmo', { porDia: 2, cadaDias: 1, desde: '09:00', cadaMin: 60 })).texto)
+  assert.equal(ritmo.cambian, 2)
+  assert.deepEqual(JSON.parse((await pedir('/calendario')).texto).publicaciones, calendarioCompleto.publicaciones)
+  assert.equal(JSON.parse((await pedir('/reacomodar', {})).texto).movidas, 2)
+  await esperarCola()
+  const movidos = Object.values(JSON.parse(readFileSync(join(dir, 'data', 'youtube.json'), 'utf8')).subidas as Record<string, { id: string; estado: string; datos: { cuando: string } }>).filter((s) => s.estado === 'programado')
+  assert.equal(movidos.length, 2)
+  for (const s of movidos) {
+    assert.equal(Date.parse(remotos[s.id].publishAt!), Date.parse(s.datos.cuando))
+    assert.match(new Date(s.datos.cuando).toTimeString(), /^(09|10):00/)
+  }
+  assert.equal(JSON.parse((await pedir('/ritmo')).texto).cambian, 0)
+  assert.equal(insertados, 3)
   // Recuperarlo de la Papelera conserva el registro y no dispara una segunda subida.
   renameSync(join(dir, 'papelera-simulada.mp4'), subidos[0].ruta)
   assert.equal((await pedir('/subida', { ...datos, ruta: subidos[0].ruta })).status, 200)

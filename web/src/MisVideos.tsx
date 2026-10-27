@@ -5,6 +5,7 @@ import { Icon } from './Composer'
 import { compartirVideo } from './Comunidad'
 import { Confirm } from './Confirm'
 import { Icono } from './Iconos'
+import { Ritmos } from './Ritmos'
 import { abrirNavegador, BotonNavegador } from './Navegador'
 import { useDesplazando } from './desplazando'
 import { YoutubeBoton } from './Youtube'
@@ -31,6 +32,8 @@ export function MisVideos({ cards, sessions, estilo, onEstilo }: { cards: Card[]
   // El video de una carpeta de fuera, sin hilo que abrir, se ve en grande.
   const [viendo, setViendo] = useState<string | null>(null)
   const [eliminar, setEliminar] = useState(false) // redes
+  // El panel de «Ritmo de publicación», abierto o no.
+  const [ritmo, setRitmo] = useState(false)
   // redes: con un estado elegido en el resumen (los que faltan, los que fallaron…), solo esos.
   const [porEstado, setPorEstado] = useState<EstadoRedes | null>(null)
 
@@ -95,6 +98,9 @@ export function MisVideos({ cards, sessions, estilo, onEstilo }: { cards: Card[]
           </p>
         </div>
         <div className="mis-videos-acciones">
+          <button className={`mis-ritmo${ritmo ? ' on' : ''}`} aria-expanded={ritmo} title="Cuántos videos salen y cada cuántos días, en TikTok, Instagram y YouTube" onClick={() => setRitmo(!ritmo)}>
+            <Icono de="calendario" /> Ritmo de publicación
+          </button>
           {programados.length > 0 && (
             <button className="mis-eliminar" title="Los quita de tu disco, no de las redes" onClick={() => setEliminar(true)}>
               Eliminar los que ya se programaron ({programados.length})
@@ -117,6 +123,7 @@ export function MisVideos({ cards, sessions, estilo, onEstilo }: { cards: Card[]
       )}
       <ResumenRedes marcas={todos?.redes} videos={vistos} estado={enEstado.length ? porEstado : null} onEstado={setPorEstado} onCambio={otraVuelta} /> {/* redes */}
       {/* La app que se vende aún no publica: sin marcas de redes, lo de redes no se dibuja; lo de YouTube se quita aquí. */}
+      {ritmo && <Ritmos />}
       <YoutubeLote videos={vistos} cardId={filtro} />
       <CalendarioRedes marcas={todos?.redes} /> {/* redes */}
       <CalendarioYoutube />

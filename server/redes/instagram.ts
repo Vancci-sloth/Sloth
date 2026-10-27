@@ -3,6 +3,7 @@ import { closeSync, fstatSync, openAsBlob, openSync, readSync, rmSync } from 'no
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { promisify } from 'node:util'
+import { fechaRitmo } from '../../shared/ritmo.ts'
 import { huella } from '../disco.ts'
 import { leer } from '../opciones.ts'
 import type { ModuloRed } from './index.ts'
@@ -32,6 +33,7 @@ export const instagram: ModuloRed = {
   id: 'instagram',
   nombre: 'Instagram',
   enLaNube: true,
+  mueve: true,
 
   // `caduca` y `renovacion` llegan solo desde la versión de la nube que los da (ver nube/src/index.ts).
   async cuenta() {
@@ -48,16 +50,24 @@ export const instagram: ModuloRed = {
     // Un reintento puede ser de algo que ya llegó (se perdió la respuesta, o Sloth se cerró a la mitad). Si la nube lo
     // tiene y no falló, está programado o ya salió: subirlo y dejarlo otra vez lo publicaría dos veces. Con `media` ya
     // salió, aunque diga que falló (lo de después de publicar).
+    const caption = [p.texto, p.tags.map((x) => `#${x}`).join(' ')].filter(Boolean).join('\n\n')
     if (p.reintento) {
-      const ya = (await nube<{ ref: string; estado: string; media?: string }[]>('/publicaciones')).find((i) => i.ref === p.ref)
-      if (ya && (ya.estado !== 'error' || ya.media)) return
+      const ya = (await nube<{ ref: string; estado: string; media?: string; cuando: number }[]>('/publicaciones')).find((i) => i.ref === p.ref)
+      if (ya && (ya.estado !== 'error' || ya.media)) {
+        // Cambió de hora («Pasar al ritmo nuevo», `mueve`) y aún no sale: se deja otra vez con la nueva, sin subirlo. A
+        // pocos minutos de su hora se queda la que tenía: podría estar saliendo.
+        const cuando = enFecha(p.cuando)
+        if (ya.cuando === cuando) return
+        if (ya.media || ya.estado === 'publicado' || ya.cuando - Date.now() < 5 * 60000) return { cuando: fechaRitmo(new Date(ya.cuando)) }
+        await nube(`/publicaciones/${p.ref}`, { method: 'PUT', body: JSON.stringify({ caption, cuando }) })
+        return
+      }
     }
     // En un reintento el video puede estar ya arriba: no se sube otra vez. Si no, se sube el del disco, que tiene que ser
     // el mismo que se puso en la cola: el texto es de ese.
     const arriba = p.reintento && (await nube(`/videos/${p.ref}`, { method: 'HEAD' }).then(() => true, () => false))
     if (!arriba && huella(p.ruta) !== p.huella) throw new Error('La nube no tiene el video, y en el disco ya no está (o cambió): no se puede reintentar.')
     if (!arriba) await subir(p.ref, p.ruta)
-    const caption = [p.texto, p.tags.map((x) => `#${x}`).join(' ')].filter(Boolean).join('\n\n')
     await nube(`/publicaciones/${p.ref}`, { method: 'PUT', body: JSON.stringify({ caption, cuando: enFecha(p.cuando) }) })
   },
 

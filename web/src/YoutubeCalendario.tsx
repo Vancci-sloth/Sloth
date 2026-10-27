@@ -25,7 +25,7 @@ export function CalendarioYoutube() {
     return () => { vivo = false; clearInterval(t); removeEventListener('sloth-youtube', leer); removeEventListener('sloth-videos', leer) }
   }, [!!datos?.pendientes])
   if (!datos?.cuenta) return error ? <p className="bad small">No se pudo leer el calendario de YouTube: {error}</p> : null
-  const c = diasYoutube(datos.publicaciones, ahora)
+  const c = diasYoutube(datos.publicaciones, ahora, datos.siguiente)
   const salio = (p: { cuando: string }) => Date.parse(p.cuando) <= ahora.getTime()
   const deHoy = c.dias.find((d) => d.dia === c.hoy)?.publicaciones ?? []
   const salieron = deHoy.filter(salio).length
@@ -44,7 +44,7 @@ export function CalendarioYoutube() {
           return <span className="youtube-calendario-fecha" key={dia}>{salto && <span className="muted" title="Hay un salto entre estas fechas">…</span>}<span className={`calendario-dia${n ? ' lleno' : ''}`} title={detalle} aria-label={detalle}><span>{etiqueta}</span><span className="puntos">{Array.from({ length: Math.min(n || 1, 5) }, (_, j) => <i className={publicaciones[j] && salio(publicaciones[j]) ? 'salio' : n ? 'si' : ''} key={j} />)}{n > 5 && <span>+{n - 5}</span>}</span></span></span>
         })}
       </div>
-      <span className="calendario-texto"><strong>YouTube</strong>: {deHoy.length > 0 && <>hoy {salieron === deHoy.length ? (deHoy.length === 1 ? 'ya salió' : `ya salieron los ${deHoy.length}`) : `salieron ${salieron} de ${deHoy.length}`}. </>}{c.total ? <>{c.total} {c.total === 1 ? 'video programado' : 'videos programados'} hasta el <strong>{corta(c.ultimo!, c.hoy)}</strong>. </> : <>sin videos programados. </>}Próximo día libre (desde mañana): <strong className="hueco">{corta(c.siguiente, c.hoy)}</strong>.{datos.pendientes > 0 && <> {datos.pendientes} pendientes de subir.</>}</span>
+      <span className="calendario-texto"><strong>YouTube</strong>: {deHoy.length > 0 && <>hoy {salieron === deHoy.length ? (deHoy.length === 1 ? 'ya salió' : `ya salieron los ${deHoy.length}`) : `salieron ${salieron} de ${deHoy.length}`}. </>}{c.total ? <>{c.total} {c.total === 1 ? 'video programado' : 'videos programados'} hasta el <strong>{corta(c.ultimo!, c.hoy)}</strong>. </> : <>sin videos programados. </>}{datos.siguiente ? <>El siguiente va el <strong className="hueco">{corta(c.siguiente, c.hoy)}, a las {datos.siguiente.slice(11)}</strong>.</> : <>Próximo día libre (desde mañana): <strong className="hueco">{corta(c.siguiente, c.hoy)}</strong>.</>}{datos.pendientes > 0 && <> {datos.pendientes} pendientes de subir.</>}</span>
     </div>
     {error && <p className="bad small">No se pudo actualizar el calendario: {error}</p>}
   </div>

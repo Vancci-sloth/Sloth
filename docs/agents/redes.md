@@ -19,8 +19,12 @@ están en la cabecera de `scripts/redes.ts`: `nube` (lo que espera en el Worker 
 
 - Mover una ya programada es `quitar` y volver a programarla: la API no cambia la hora de una publicación.
 - Programar es `POST /api/redes/borradores` (los textos que escribe Claude) y después `POST /api/redes/programar`, con la
-  `cardId` y las rutas. Cada una cae en el siguiente hueco libre del `RITMO`.
-- Una hora fuera del `RITMO` (p. ej. hoy a las 17:00) no tiene API: `quitar` la que aún está en `cola`, parar el servidor,
+  `cardId` y las rutas. Cada una cae en el siguiente hueco libre del ritmo (`ritmo` en `data/redes/redes.json`).
+- El ritmo lo elige el usuario en «Mis videos» → Ritmo de publicación (`/api/redes/ritmo`; el de YouTube,
+  `/api/youtube/ritmo`). Cambiarlo no mueve lo ya programado: eso es `POST /api/redes/reacomodar`, que solo se hace si
+  el usuario lo pide. Mueve lo de la cola y lo de Instagram (otra vez a la nube con su `ref`, sin subir el video); lo
+  que ya está en TikTok se queda a su hora.
+- Una hora fuera del ritmo (p. ej. hoy a las 17:00) no tiene API: `quitar` la que aún está en `cola`, parar el servidor,
   poner en `data/redes/redes.json` su `estado: "cola"` y su `cuando`, y arrancarlo otra vez; la sube con esa hora.
 - La API está en `http://127.0.0.1:$PORT`. El puerto de la copia en que trabajas está en `$PORT`, y no siempre es 4848.
   La app instalada (la de venta) no trae redes: la cola vive en el Sloth del repo, que se arranca con

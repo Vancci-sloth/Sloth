@@ -7,7 +7,8 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 import { promisify } from 'node:util'
 import type { BrowserContext, Page } from 'playwright-core'
-import type { AvisoRedes, Borrador, CalendarioRed, Card, MarcasDeRedes, Publicacion, Red, RedesDelEstilo, RedesEstilo, RedId, Ritmo, ServerPush, TandaRedes, VideoHecho } from '../../shared/types.ts'
+import { huecos, RITMO_VERTICAL, tocaElDia, validarRitmo } from '../../shared/ritmo.ts'
+import type { AvisoRedes, Borrador, CalendarioRed, Card, EstadoRitmo, MarcasDeRedes, Publicacion, Red, RedesDelEstilo, RedesEstilo, RedId, Ritmo, ServerPush, TandaRedes, VideoHecho } from '../../shared/types.ts'
 import { aLaPapelera, guardar as guardarArchivo, huella } from '../disco.ts'
 import { folderOf, servir, videosDe } from '../etapas.ts'
 import type { Sessions } from '../sessions.ts'
@@ -18,10 +19,10 @@ import { tiktok } from './tiktok.ts'
 
 /**
  * Publicar en redes: los videos verticales terminados de cada estilo se programan en las redes, uno por hueco del
- * calendario (`Ritmo`), con «Programar los que faltan» y un texto que escribe Claude y que se puede cambiar. Lo hecho
- * vive en `data/redes/redes.json`. Cuando todo lo de una carpeta ya salió, se borra de ella lo que se rehace solo
- * (`liberar`), y «Eliminar los que ya se programaron», en «Mis videos», manda esos videos a la Papelera. Quitarlo es
- * borrar esta carpeta, `web/src/Redes.*` y las líneas marcadas «redes».
+ * calendario (`Ritmo`, el que eliges en «Mis videos»), con «Programar los que faltan» y un texto que escribe Claude y
+ * que se puede cambiar. Lo hecho vive en `data/redes/redes.json`. Cuando todo lo de una carpeta ya salió, se borra de
+ * ella lo que se rehace solo (`liberar`), y «Eliminar los que ya se programaron», en «Mis videos», manda esos videos a
+ * la Papelera. Quitarlo es borrar esta carpeta, `web/src/Redes.*` y las líneas marcadas «redes».
  */
 
 /** El navegador de las redes, que se abre al pedirlo: las que van por su API no lo piden, y no se abre una ventana de más. */
@@ -67,6 +68,11 @@ export interface ModuloRed {
   /** Quita de la red lo que se dejó con esa `ref`. Si falla, Sloth no la olvida: se puede volver a intentar. */
   quitar?(ref: string): Promise<void>
   /**
+   * Lo ya programado cambia de hora volviéndolo a programar con su `ref` (`reintento`), sin subir el video otra vez: «Pasar
+   * al ritmo nuevo» lo devuelve a la cola con la hora nueva. Sin esto (TikTok), lo que ya está en la red se queda a su hora.
+   */
+  mueve?: boolean
+  /**
    * Lo que pasó después de programarlo, por `ref`: si ya salió o si falló (con su error). La red lo publica sin Sloth, y
    * Sloth se entera al mirar.
    */
@@ -74,8 +80,6 @@ export interface ModuloRed {
 }
 
 const REDES: ModuloRed[] = [tiktok, instagram]
-/** El calendario de cada red: 5 al día, de 12:00 a 16:00, uno por hora. */
-const RITMO: Ritmo = { porDia: 5, desde: '12:00', cadaMin: 60 }
 /** Lo más pronto que se programa: las redes piden un margen. */
 const MARGEN = 20 * 60000
 const DIA = 24 * 3600000
@@ -87,12 +91,22 @@ const carpetaDeVideo = (ruta: string) => ruta.split(/[\\/]out[\\/]/)[0]
 const SALIO: Publicacion['estado'][] = ['programado', 'publicado']
 
 interface Datos {
+  /** El mismo en todas las redes: un video sale a la vez en TikTok y en Instagram. */
+  ritmo: Ritmo
   cuentas: Partial<Record<RedId, string | null>>
   estilos: Record<string, RedesDelEstilo>
   publicaciones: Publicacion[]
 }
 
 const execFileP = promisify(execFile)
+/** El ritmo de redes.json; si falta o no vale, el de siempre. */
+function ritmoGuardado(r: Partial<Ritmo> | undefined) {
+  try {
+    return validarRitmo(r ?? {}, RITMO_VERTICAL)
+  } catch {
+    return RITMO_VERTICAL
+  }
+}
 const dos = (n: number) => String(n).padStart(2, '0')
 const fecha = (d: Date) => `${d.getFullYear()}-${dos(d.getMonth() + 1)}-${dos(d.getDate())} ${dos(d.getHours())}:${dos(d.getMinutes())}`
 const enFecha = (s: string) => new Date(s.replace(' ', 'T')).getTime()
@@ -104,15 +118,15 @@ const limpiarTag = (t: string) => t.replace(/[^\p{L}\p{N}_]/gu, '')
 export function redes(app: string, sessions: Sessions, cards: () => Card[], avisar: (msg: ServerPush) => void) {
   const archivo = join(app, 'data', 'redes', 'redes.json')
   const fallos = join(app, 'data', 'redes', 'fallos')
-  let datos: Datos = { cuentas: {}, estilos: {}, publicaciones: [] }
+  let datos: Datos = { ritmo: RITMO_VERTICAL, cuentas: {}, estilos: {}, publicaciones: [] }
   // Si redes.json no se puede leer, no se sigue en blanco: todo saldría como sin programar, y se programaría otra vez lo
   // que ya estaba. Nada se programa ni se guarda (el archivo queda como está) hasta que se arregle y se reinicie.
   let roto = ''
   try {
     // Solo lo que se usa: lo de antes (el ritmo de cada red y `sinTexto`, del automático) se queda fuera y desaparece al
     // guardar.
-    const { cuentas, estilos, publicaciones } = existsSync(archivo) ? JSON.parse(readFileSync(archivo, 'utf8')) : datos
-    datos = { cuentas: cuentas ?? {}, estilos: estilos ?? {}, publicaciones: publicaciones ?? [] }
+    const { ritmo, cuentas, estilos, publicaciones } = existsSync(archivo) ? JSON.parse(readFileSync(archivo, 'utf8')) : datos
+    datos = { ritmo: ritmoGuardado(ritmo), cuentas: cuentas ?? {}, estilos: estilos ?? {}, publicaciones: publicaciones ?? [] }
   } catch (e) {
     roto = `data/redes/redes.json está dañado (${mensaje(e)}). Arréglalo o bórralo y reinicia; mientras, no se programa nada, para no repetir lo que ya estaba.`
     console.error(roto)
@@ -225,17 +239,34 @@ export function redes(app: string, sessions: Sessions, cards: () => Card[], avis
    * nunca deja uno vacío por delante.
    */
   function hueco(red: RedId, tomados = new Set<string>()): string {
-    const ocupados = new Set([...tomados, ...datos.publicaciones.filter((p) => p.red === red && p.cuando && p.estado !== 'error').map((p) => p.cuando)])
-    const [h, m] = RITMO.desde.split(':').map(Number)
-    const minimo = Date.now() + MARGEN
-    for (let d = 0; ; d++) {
-      for (let i = 0; i < RITMO.porDia; i++) {
-        const t = new Date()
-        t.setDate(t.getDate() + d)
-        t.setHours(h, m + i * RITMO.cadaMin, 0, 0)
-        if (t.getTime() >= minimo && !ocupados.has(fecha(t))) return fecha(t)
-      }
+    return huecos(datos.ritmo, 1, [...tomados, ...ocupadas(red)], Date.now() + MARGEN)[0]
+  }
+  /** Las horas que ya tiene una red, sin lo que falló (`sin`: lo que se va a mover). */
+  const ocupadas = (red: RedId, sin = new Set<Publicacion>()) =>
+    datos.publicaciones.filter((p) => p.red === red && p.cuando && p.estado !== 'error' && !sin.has(p)).map((p) => p.cuando!)
+
+  /**
+   * «Pasar al ritmo nuevo»: lo que aún no sale y se puede mover (lo de la cola; y lo programado en una red que `mueve`, con
+   * su hora aún lejos) va, en el mismo orden, a los primeros huecos del ritmo de ahora. Lo demás se queda donde está, y
+   * cuenta como ocupado. Devuelve cada una con su hora nueva, y cuántas ya programadas no se pueden mover (`fijas`).
+   */
+  function reacomodo() {
+    const limite = Date.now() + MARGEN
+    const cambios: { p: Publicacion; cuando: string }[] = []
+    let fijas = 0
+    for (const red of conectadas()) {
+      const suyas = datos.publicaciones.filter((p) => p.red === red.id && !quitando.has(p))
+      const mueven = suyas.filter((p) => p.estado === 'cola' || (p.estado === 'programado' && red.mueve && p.ref && p.cuando && enFecha(p.cuando) >= limite))
+      fijas += suyas.filter((p) => p.estado === 'programado' && !red.mueve && p.cuando && enFecha(p.cuando) >= limite).length
+      mueven.sort((a, b) => (a.cuando ?? '9').localeCompare(b.cuando ?? '9'))
+      const nuevas = huecos(datos.ritmo, mueven.length, ocupadas(red.id, new Set(mueven)), limite)
+      mueven.forEach((p, i) => p.cuando !== nuevas[i] && cambios.push({ p, cuando: nuevas[i] }))
     }
+    return { cambios, fijas }
+  }
+  function estadoRitmo(): EstadoRitmo {
+    const { cambios, fijas } = reacomodo()
+    return { ritmo: datos.ritmo, conectada: conectadas().length > 0, cambian: cambios.length, fijas }
   }
 
   /**
@@ -298,9 +329,11 @@ export function redes(app: string, sessions: Sessions, cards: () => Card[], avis
       for (const d = new Date(); ultimo; d.setDate(d.getDate() + 1)) {
         const dia = fecha(d).slice(0, 10)
         if (dia > ultimo) break
+        // Los días que no tocan, solo si tienen algo (de un ritmo de antes).
+        if (!tocaElDia(datos.ritmo, dia) && !porDia.has(dia)) continue
         dias.push({ dia, videos: (porDia.get(dia) ?? []).sort((a, b) => a.cuando.localeCompare(b.cuando)) })
       }
-      return { red: r.id, porDia: RITMO.porDia, dias, siguiente: hueco(r.id) }
+      return { red: r.id, porDia: datos.ritmo.porDia, dias, siguiente: hueco(r.id) }
     })
   }
 
@@ -669,7 +702,7 @@ export function redes(app: string, sessions: Sessions, cards: () => Card[], avis
           id: r.id,
           nombre: r.nombre,
           cuenta: datos.cuentas[r.id] ?? null,
-          ritmo: RITMO,
+          ritmo: datos.ritmo,
           token: !!r.token,
           sinSesion: sinSesion.has(r.id),
           enEdge: (enGoogle() && redDeLaApp() === r) || undefined,
@@ -732,6 +765,27 @@ export function redes(app: string, sessions: Sessions, cards: () => Card[], avis
       datos.estilos[card.id] = { tags: cambio.tags ? unirTags(cambio.tags, []) : a.tags }
       guardar()
       return json(res, 200, datos.estilos[card.id])
+    }
+
+    // El ritmo, en «Mis videos». Guardarlo vale para lo que programes después; lo que ya tiene hora se mueve solo con
+    // «Pasar al ritmo nuevo» (`reacomodar`), que es aparte para que sea a propósito.
+    if (path === '/api/redes/ritmo' && !post) return json(res, 200, estadoRitmo())
+    if (path === '/api/redes/ritmo' && post) {
+      try {
+        datos.ritmo = validarRitmo(await body<Partial<Ritmo>>(req), datos.ritmo)
+      } catch (err) {
+        return json(res, 400, { error: mensaje(err) })
+      }
+      guardar()
+      return json(res, 200, estadoRitmo())
+    }
+    // Lo programado que ya está en la red (Instagram) vuelve a la cola con su `ref`: la cola le cambia la hora allí.
+    if (path === '/api/redes/reacomodar' && post) {
+      const { cambios } = reacomodo()
+      for (const { p, cuando } of cambios) Object.assign(p, { cuando, estado: 'cola', t: Date.now() })
+      guardar()
+      seguir()
+      return json(res, 200, { ...estadoRitmo(), movidas: cambios.length })
     }
 
     // Los textos que propone Claude, para revisarlos antes de programar.

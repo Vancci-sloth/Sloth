@@ -360,11 +360,27 @@ export interface Enlace {
 /** Las redes donde Sloth programa los videos verticales terminados (`server/redes/`). Cada una es un módulo. */
 export type RedId = 'tiktok' | 'instagram'
 
-/** Cuántos videos salen al día, a qué hora el primero (`'12:00'`) y cuántos minutos después cada uno. Es fijo: `RITMO` en `server/redes/index.ts`. */
+/**
+ * El ritmo de publicación: `porDia` videos cada `cadaDias` días (contados desde `inicio`, `'2026-10-27'`), el primero a
+ * las `desde` (`'12:00'`) y cada uno `cadaMin` minutos después. Lo eliges en «Mis videos»; las cuentas, en `shared/ritmo.ts`.
+ */
 export interface Ritmo {
   porDia: number
+  cadaDias: number
+  inicio: string
   desde: string
   cadaMin: number
+}
+
+/** `GET /api/redes/ritmo` y `GET /api/youtube/ritmo`: el ritmo, y qué cambiaría «Pasar al ritmo nuevo». */
+export interface EstadoRitmo {
+  ritmo: Ritmo
+  /** Hay una cuenta conectada: sin ella no hay nada que programar, y no se enseña. */
+  conectada: boolean
+  /** Las publicaciones que aún no salen y cambiarían de hora. */
+  cambian: number
+  /** Las que ya están en una red que no deja cambiar su hora (TikTok): se quedan como están. */
+  fijas: number
 }
 
 /**
