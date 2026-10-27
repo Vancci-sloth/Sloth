@@ -116,6 +116,23 @@ export interface Serie {
   nombre: string
 }
 
+/** Un archivo de una skill que ya no es como lo trae Sloth (`server/originales.ts`): cambiado o, con `borrado`, quitado. */
+export interface CambioSkill {
+  skill: string
+  archivo: string
+  borrado?: boolean
+}
+
+/**
+ * `GET /api/cards/<id>/cambios`: lo que cambiaste en la skill de la card y en las bases que lee (video-base), y la copia
+ * más nueva de lo que tenías antes de volver a la original o de actualizar, si hay. Sin la original a mano (en el repo),
+ * `null`.
+ */
+export interface CambiosCard {
+  cambios: CambioSkill[]
+  copia?: string
+}
+
 /**
  * Una carpeta de video dentro del `cwd` de una card, para elegir a mano dónde trabaja un hilo. `hilo`: el título del que
  * la tiene, si se sabe.

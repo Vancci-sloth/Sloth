@@ -22,6 +22,7 @@ import { app, BrowserWindow, dialog, ipcMain, Menu, nativeTheme, net, screen, se
 import { autoUpdater, CancellationToken } from 'electron-updater'
 import { guardar } from '../server/disco.ts'
 import { anclada, anclar } from './barra.ts'
+import { archivos, huella, huellas, nombreCopia, respaldar } from '../server/originales.ts'
 import { MODELOS_VIEJOS } from './modelos-viejos.ts'
 import { iniciarNavegador, ventanaDelNavegador } from './navegador.ts'
 import type { ActualizacionSloth } from '../shared/types.ts'
@@ -291,12 +292,15 @@ async function prepararApp() {
  * Las skills viajan en resources\skills y se ponen en app\skills al estrenar cada versión, como hacía el instalador de
  * antes: lo que cada skill guarda de los tuyos (las huellas, el banco de temas, la biblioteca 3D) se queda. Los modelos
  * 3D del dueño de Sloth que traían las versiones de antes (la moneda incluida) se van, menos los que cambiaste
- * (`MODELOS_VIEJOS`).
+ * (`MODELOS_VIEJOS`). Lo que cambiaste en las skills se pisa, pero antes se copia a `data/skills-tuyas`
+ * (`respaldarCambios`).
  */
 async function prepararSkills() {
   const marca = join(APP, 'data', 'skills.txt')
   if (existsSync(marca) && readFileSync(marca, 'utf8') === app.getVersion()) return
+  respaldarCambios()
   await cp(join(process.resourcesPath, 'skills'), join(APP, 'skills'), { recursive: true })
+  guardar(join(APP, 'data', 'skills-originales.json'), JSON.stringify(huellas(join(process.resourcesPath, 'skills'))))
   // Las skills de las versiones de antes llevaban una bitácora que ya no se usa.
   for (const s of readdirSync(join(APP, 'skills'))) rmSync(join(APP, 'skills', s, 'BITACORA.md'), { force: true })
   const modelos = join(APP, 'skills', 'modelos-3d', 'modelos')
@@ -309,6 +313,29 @@ async function prepararSkills() {
     }
   }
   writeFileSync(marca, app.getVersion())
+}
+
+/**
+ * Antes de poner las skills de esta versión, lo que cambiaste en las de antes y que esta pisaría se copia a
+ * `data/skills-tuyas/<fecha> antes de la <versión>`. Es tuyo lo que no es como lo trajo su versión
+ * (`data/skills-originales.json`); viniendo de una sin esa lista, todo lo que esta pisaría con otra cosa, que puede ser
+ * tuyo. Si la copia falla, no se pisa nada (`prepararSkills` lo vuelve a intentar al abrir otra vez).
+ */
+function respaldarCambios() {
+  const nuevas = join(process.resourcesPath, 'skills')
+  let antes: Record<string, string> = {}
+  try {
+    antes = JSON.parse(readFileSync(join(APP, 'data', 'skills-originales.json'), 'utf8'))
+  } catch {
+    // Una versión de antes de la lista.
+  }
+  const cambios = archivos(nuevas).flatMap((r) => {
+    const f = join(APP, 'skills', r)
+    if (!existsSync(f)) return []
+    const h = huella(f)
+    return h === huella(join(nuevas, r)) || h === antes[r] ? [] : [{ skill: r.split('/')[0], archivo: r.slice(r.indexOf('/') + 1) }]
+  })
+  respaldar(cambios, (s) => join(APP, 'skills', s), join(APP, 'data', 'skills-tuyas', nombreCopia(`antes de la ${app.getVersion()}`)))
 }
 
 /**
@@ -333,7 +360,9 @@ function mudarPerfil() {
 function arrancar() {
   const node = WINDOWS ? join(RAIZ, 'node', 'node.exe') : join(process.resourcesPath, 'node', 'bin', 'node')
   // La ventana la pone este proceso, no start.mjs. Fuera de Windows, en su propio grupo, para cerrarlo con lo que lanzó.
-  const s = spawn(node, ['scripts/start.mjs', '--no-open'], { cwd: APP, stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true, detached: process.platform !== 'win32' })
+  // Con las skills como las trae esta versión, para «Volver a la original» (server/originales.ts).
+  const env = { ...process.env, SLOTH_SKILLS_ORIGINALES: join(process.resourcesPath, 'skills') }
+  const s = spawn(node, ['scripts/start.mjs', '--no-open'], { cwd: APP, env, stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true, detached: process.platform !== 'win32' })
   servidor = s
   s.stdout!.on('data', escribir)
   s.stderr!.on('data', escribir)

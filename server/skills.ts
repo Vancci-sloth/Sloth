@@ -1,9 +1,10 @@
 import { existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, realpathSync, renameSync, statSync, symlinkSync, unlinkSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
-import type { Card, Serie } from '../shared/types.ts'
+import type { Card, CambiosCard, Serie } from '../shared/types.ts'
 import type { SkillRef } from './agent.ts'
 import { guardar } from './disco.ts'
+import { cambiosDe, nombreCopia, respaldar, restaurar } from './originales.ts'
 
 const ROOT = join(homedir(), '.claude', 'skills')
 
@@ -76,6 +77,52 @@ export function carpetaSkill(name: string): string | undefined {
 export function skillRef(name: string): SkillRef | undefined {
   const path = join(ROOT, name, 'SKILL.md')
   return existsSync(path) ? { name, path } : undefined
+}
+
+/** En la app que se vende, las skills como las trae esta versión (`server/originales.ts`). En el repo no hay. */
+const ORIGINALES = process.env.SLOTH_SKILLS_ORIGINALES
+
+/**
+ * Las skills de una card que tienen original: la suya y las bases que nombra su SKILL.md (video-base, modelos-3d), que
+ * no son de ninguna card. Un cambio en video-base también cambia sus videos.
+ */
+function skillsDeCard(card: Card, todas: Card[]): string[] {
+  if (!ORIGINALES || !card.skill || !existsSync(join(ORIGINALES, card.skill))) return []
+  const deCards = new Set(todas.flatMap((c) => (c.skill ? [c.skill] : [])))
+  let texto = ''
+  try {
+    texto = readFileSync(join(ORIGINALES, card.skill, 'SKILL.md'), 'utf8')
+  } catch { /* Sin SKILL.md no nombra ninguna. */ }
+  const bases = readdirSync(ORIGINALES, { withFileTypes: true }).filter((d) => d.isDirectory() && !deCards.has(d.name) && texto.includes(d.name))
+  return [card.skill, ...bases.map((d) => d.name)]
+}
+
+/** Lo que cambiaste en las skills de una card y tu copia más nueva de ellas. `null` sin original con qué comparar. */
+export function cambiosDeCard(card: Card, todas: Card[], datos: string): CambiosCard | null {
+  if (!ORIGINALES) return null
+  const skills = skillsDeCard(card, todas)
+  const cambios = skills.flatMap((s) => {
+    const dir = carpetaSkill(s)
+    return dir ? cambiosDe(join(ORIGINALES, s), dir, s) : []
+  })
+  const tuyas = join(datos, 'skills-tuyas')
+  const copia = existsSync(tuyas)
+    ? readdirSync(tuyas).sort().reverse().find((c) => skills.some((s) => existsSync(join(tuyas, c, s))))
+    : undefined
+  return { cambios, ...(copia ? { copia: join(tuyas, copia) } : {}) }
+}
+
+/**
+ * Vuelve a la original las skills de una card, o solo `uno` de sus archivos. Lo que se pisa se copia antes a
+ * `data/skills-tuyas`, por si te arrepientes.
+ */
+export function volverAOriginal(card: Card, todas: Card[], datos: string, uno?: { skill: string; archivo: string }) {
+  const cambios = (cambiosDeCard(card, todas, datos)?.cambios ?? []).filter((c) => !uno || (c.skill === uno.skill && c.archivo === uno.archivo))
+  if (!ORIGINALES || !cambios.length) return
+  respaldar(cambios, (s) => carpetaSkill(s)!, join(datos, 'skills-tuyas', nombreCopia('antes de volver a la original')))
+  for (const s of new Set(cambios.map((c) => c.skill))) {
+    restaurar(join(ORIGINALES, s), carpetaSkill(s)!, cambios.filter((c) => c.skill === s).map((c) => c.archivo))
+  }
 }
 
 /** Las series de una skill: cada `series/<id>.md` de su carpeta, con el título de su primera línea `# `. */

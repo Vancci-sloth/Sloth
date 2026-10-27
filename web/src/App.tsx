@@ -13,6 +13,7 @@ import { TituloDeFila, useBarraPlegada, vistaDeLote, vistaDeVideo, type Plegado,
 import { Composer, Icon, Picker, type Choice, type Draft } from './Composer'
 import { designChipHtml, DESIGN, LINK, pedirMejora, threadIcons, threadRef } from './etiquetas'
 import { Confirm } from './Confirm'
+import { TusCambios } from './TusCambios'
 import { ActualizarSloth } from './Actualizar' // versiones nuevas
 import { CambiosSloth } from './CambiosSloth'
 import { TarjetasEnlaces } from './Enlaces' // tarjeta de los enlaces
@@ -973,6 +974,7 @@ function NewSession(props: {
           <span className="card-icon big"><Icon icon={card.icon ?? '✦'} /></span>
           <h1>{card.title}</h1>
           <p>{card.description}</p>
+          <TusCambios card={card} clave={hilos.map((s) => s.id + s.updatedAt).join()} />
         </div>
         <CuentaClaude model={choice?.model} onFalta={setSinCuenta} />
         {/* Las herramientas de video solo hacen falta en los estilos de video, y de los paquetes, los de su skill. */}

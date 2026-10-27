@@ -57,6 +57,9 @@ Este es el mapa:
 - `server/modelos3d.ts` y `web/src/Modelos3D.tsx`: «Modelos 3D» enseña la biblioteca `skills/modelos-3d` que usan los
   agentes (la de `~/.claude/skills`), que llenan los videos (solo se mira). Empieza vacía; la moneda de la plantilla
   va en `modelos-3d/plantilla`, sin enseñarse.
+- `server/originales.ts` y `web/src/TusCambios.tsx`: en la app que se vende, «Con tus cambios (N)» bajo la card dice qué
+  archivos de su skill (y de video-base) ya no son como los trae la versión, y vuelve a la original, entera o uno a uno.
+  Lo que se pisa, también al actualizar (`prepararSkills`), se copia antes a `data/skills-tuyas`.
 - `server/requisitos.ts`: lo que las skills necesitan fuera de Sloth. Cada card pide solo los paquetes de su skill
   (`PAQUETES` dice cuáles). Instala automáticamente el Python de Sloth en `%APPDATA%\youtube\piezas\python`,
   sus paquetes y los modelos; elige CUDA si hay una NVIDIA que lo aguante (`aguantaCuda`) y CPU si no. Una instalación

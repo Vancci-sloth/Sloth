@@ -35,7 +35,7 @@ import { espacio } from './espacio.ts' // espacio en disco
 import { licencia } from './licencia.ts' // suscripción
 import { Sessions } from './sessions.ts'
 import { eventosEnVivo } from './eventos-en-vivo.ts'
-import { carpetaSkill, duplicateCard, enlazarSkills, enlazarSkillsCodex, readCards, removeCard, seriesDe, skillRef } from './skills.ts'
+import { cambiosDeCard, carpetaSkill, duplicateCard, enlazarSkills, enlazarSkillsCodex, readCards, removeCard, seriesDe, skillRef, volverAOriginal } from './skills.ts'
 import { estaticos } from './estaticos.ts'
 import { actualizar, type Agente, version } from './version.ts'
 import { cargarPreciosCodex } from './precios.ts'
@@ -351,6 +351,21 @@ async function api(req: IncomingMessage, res: ServerResponse, url: URL): Promise
   if (ser && method === 'GET') {
     const skill = cards().find((c) => c.id === ser[1])?.skill
     return send(res, 200, skill ? seriesDe(skill) : []), true
+  }
+
+  // «Con tus cambios»: lo que el usuario (o su agente) cambió en la skill de una card, y volver a la original, entera o un
+  // archivo. Solo en la app que se vende, que trae la original (`server/originales.ts`).
+  const cam = /^\/api\/cards\/([\w-]+)\/(cambios|original)$/.exec(path)
+  if (cam) {
+    const todas = cards()
+    const card = todas.find((c) => c.id === cam[1])
+    if (!card) return send(res, 404, { error: 'No existe esa card' }), true
+    if (cam[2] === 'cambios' && method === 'GET') return send(res, 200, cambiosDeCard(card, todas, join(APP, 'data'))), true
+    if (cam[2] === 'original' && method === 'POST') {
+      const { skill, archivo } = await body<{ skill?: string; archivo?: string }>(req)
+      volverAOriginal(card, todas, join(APP, 'data'), skill && archivo ? { skill, archivo } : undefined)
+      return send(res, 200, cambiosDeCard(card, todas, join(APP, 'data'))), true
+    }
   }
 
   const c = /^\/api\/cards\/([\w-]+)\/(duplicate|delete)$/.exec(path)

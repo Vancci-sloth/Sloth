@@ -83,6 +83,17 @@ input, textarea, select { font: inherit; color: inherit; }
 .new-head { text-align: center; }
 .new-head h1 { margin: 2px 0; font-size: 26px; font-weight: 700; letter-spacing: -0.02em; }
 .new-head p { margin: 0; color: var(--muted); }
+/* «Con tus cambios (N)» (TusCambios.tsx): ámbar, que avisa sin alarmar. */
+.tus-cambios { margin-top: 8px; padding: 3px 11px; border-radius: 999px; border: 1px solid var(--amber); color: var(--amber); font-size: 12.5px; font-weight: 600; transition: background 0.15s; }
+.tus-cambios:hover { background: var(--amber-tinte); }
+.new-head .tus-cambios-listo { margin-top: 8px; font-size: 12.5px; }
+.tus-cambios-listo button, .tus-cambios-copia { color: var(--amber); font-size: inherit; }
+.tus-cambios-listo button:hover, .tus-cambios-copia:hover { text-decoration: underline; }
+.tus-cambios-lista { max-height: 240px; overflow-y: auto; margin: 12px 0 8px; padding: 0; list-style: none; }
+.tus-cambios-lista li { display: flex; align-items: center; gap: 6px; padding: 5px 0; border-bottom: 1px solid var(--line); }
+.tus-cambios-lista code { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tus-cambios-lista button { flex: none; padding: 2px 9px; border-radius: 999px; color: var(--muted); font-size: 12px; transition: background 0.15s, color 0.15s; }
+.tus-cambios-lista button:hover { background: var(--panel-2); color: var(--text); }
 .new-bottom .cuenta-aviso, .new-bottom .requisitos-aviso { border-color: var(--amber); }
 
 /* El estante: cada skill es un cartel. Con previa, su último video (quieto hasta pasar el ratón); sin ella, su icono y
