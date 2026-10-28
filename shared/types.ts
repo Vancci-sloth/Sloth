@@ -1266,3 +1266,9 @@ export interface Espacio {
   /** Lo que se acaba de borrar, al liberar. */
   liberado?: number
 }
+
+/**
+ * Con qué se transcribe la voz (`python/procesos/parakeet.py`): Whisper en una NVIDIA, o Parakeet en el procesador, con el
+ * alineador de torch (`parakeet`) o sin torch (`parakeet-solo`, en los Mac con Intel).
+ */
+export type MotorVoz = 'whisper' | 'parakeet' | 'parakeet-solo'

@@ -27,7 +27,11 @@ AppImage para Linux x64. El cobro los da en `/descargar`, `/descargar?so=mac` y 
   El Python del sistema no se usa: en Mac no está y en Ubuntu no deja instalar paquetes con pip.
 - **Python de Sloth y sus modelos.** `server/requisitos.ts` instala un Python propio en
   `%APPDATA%/youtube/piezas/python`, sus paquetes de transcripción y los modelos. Elige CUDA si hay NVIDIA y CPU si no;
-  si se corta, vuelve a instalar solo lo que falte. Ya no hace falta copiarlo de otra computadora.
+  si se corta, vuelve a instalar solo lo que falte. Ya no hace falta copiarlo de otra computadora. En un Mac con Apple
+  Silicon, la app (de Intel) corre con Rosetta, pero el Python y FFmpeg se bajan de ARM (`ARQUITECTURA`): corren nativos
+  y tienen torch. En un Mac con Intel no hay torch 2.8 (el último para Intel es el 2.2), así que su Python de Sloth va
+  sin torch: transcribe con Parakeet sin afinar los tiempos (`parakeet-solo`) y no tiene vectores (huellas compara por
+  palabras). No se ha probado en un Mac de verdad.
 - **Lo de Windows en el servidor** tiene su par: la Papelera (Finder, `gio trash`), «abrir en su carpeta» (`open -R`, `xdg-open`), la ventana donde se autoriza Claude (Terminal o la
   terminal de Linux), las llaves de Opciones (`%APPDATA%/sloth/variables.json`) y el id del equipo de la licencia.
 - **Firma de Apple.** Sin cuenta de desarrollador, la de Mac sale con firma ad hoc: se abre la primera vez desde

@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { Readable } from 'node:stream'
 import { pipeline } from 'node:stream/promises'
-import type { Requisito } from '../shared/types.ts'
+import type { MotorVoz as Motor, Requisito } from '../shared/types.ts'
 import { correr } from './version.ts'
 
 /**
@@ -71,8 +71,8 @@ const PYTHONES = join(process.env.APPDATA ?? '', 'youtube', 'piezas', 'python')
 /** El ejecutable dentro de un Python de python-build-standalone. */
 const EXE_PY = WINDOWS ? 'python.exe' : join('bin', 'python3')
 /** Los modelos de la transcripción y de los vectores, en una carpeta por modelo (`modelos_transcripcion.py`). */
-const MODELOS = join(process.env.APPDATA ?? '', 'youtube', 'modelos')
-const BANDERAS = ['-E', '-s', '-B', '-X', 'utf8']
+export const MODELOS = join(process.env.APPDATA ?? '', 'youtube', 'modelos')
+export const BANDERAS = ['-E', '-s', '-B', '-X', 'utf8']
 /** Fuera de Windows: lo que Sloth baja para las skills (Python, FFmpeg). `bin` va primero en el PATH (scripts/start.mjs). */
 const BAJADAS = join(process.env.APPDATA ?? '', 'sloth', 'piezas')
 const BAJADAS_BIN = join(BAJADAS, 'bin')
@@ -103,32 +103,50 @@ export async function pythonSlothEntero(app: string): Promise<string | null> {
   return falta && !falta.length ? dirname(dirname(WINDOWS ? python : dirname(python))) : null
 }
 
-/** Lo que tiene que poder importar el Python de Sloth. Sin uno, su instalación se cortó a medias. */
-const MODULOS_SLOTH = ['torch', 'whisperx', 'yt_dlp', 'transformers']
+/**
+ * Con qué transcribe la voz el Python de Sloth (`MotorVoz`): sin NVIDIA, Parakeet va unas cinco veces más rápido que
+ * Whisper en el procesador. Se elige al instalarlo y lo dice el nombre de su carpeta.
+ */
+export const motorDe = (carpeta: string): Motor => (/-cu\d+/.test(carpeta) ? 'whisper' : /-onnx-/.test(carpeta) ? 'parakeet-solo' : 'parakeet')
+
+/** El motor del Python de Sloth que se usa, o null si no hay. */
+export function motorSloth(): Motor | null {
+  const python = rutaPythonSloth()
+  return python ? motorDe(python.slice(PYTHONES.length)) : null
+}
 
 /**
- * Lo que le falta al Python de Sloth: módulos (`MODULOS_SLOTH`) y modelos de la transcripción en `MODELOS` (Whisper, que
- * usan todos, y `voxpopuli-es`, el alineador de la voz). Los modelos los mira `installed()` de
- * `python/procesos/modelos_transcripcion.py`, que sabe sus tamaños. `null` si no hay Python de Sloth o no se pudo mirar.
+ * Lo que le falta al Python de Sloth (`falta`: módulos y modelos sin los que no transcribe) y lo que lo haría más rápido
+ * (`mejora`: Parakeet, en uno sin NVIDIA que ya transcribe con Whisper), de `check()` de
+ * `python/procesos/modelos_transcripcion.py`, que sabe los tamaños de los modelos. `null` si no hay Python de Sloth o no
+ * se pudo mirar.
  */
-function faltaAlPythonSloth(app: string): Promise<string[] | null> {
+function revisarPythonSloth(app: string): Promise<{ falta: string[]; mejora: string[] } | null> {
   const python = rutaPythonSloth()
-  if (!python) return Promise.resolve(null)
-  const codigo =
-    `import sys,pathlib,importlib.util as u,modelos_transcripcion as m;` +
-    `print(','.join([x for x in sys.argv[2].split(',') if not u.find_spec(x)]+[x.name for x in m.needed('voxpopuli-es') if not x.installed(pathlib.Path(sys.argv[1]))]))`
+  const motor = motorSloth()
+  if (!python || !motor) return Promise.resolve(null)
+  const codigo = 'import sys,json,pathlib,modelos_transcripcion as m;print(json.dumps(m.check(pathlib.Path(sys.argv[1]),sys.argv[2])))'
   return new Promise((ok) =>
-    execFile(python, [...BANDERAS, '-c', codigo, MODELOS, MODULOS_SLOTH.join(',')], { cwd: join(app, 'python', 'procesos') }, (error, salida) =>
-      ok(error ? null : salida.trim().split(',').filter(Boolean))
-    )
+    execFile(python, [...BANDERAS, '-c', codigo, MODELOS, motor], { cwd: join(app, 'python', 'procesos'), windowsHide: true }, (error, salida) => {
+      try {
+        ok(error ? null : JSON.parse(salida.trim().split(/\r?\n/).pop()!))
+      } catch {
+        ok(null)
+      }
+    })
   )
 }
+
+const faltaAlPythonSloth = (app: string) => revisarPythonSloth(app).then((r) => r?.falta ?? null)
+
+/** Lo que haría más rápido al Python de Sloth (vacío si nada), o null si no hay o no se pudo mirar. */
+export const mejoraDelPythonSloth = (app: string) => revisarPythonSloth(app).then((r) => r?.mejora ?? null)
 
 /**
  * El Python de Sloth en una computadora nueva: un Python propio (python-build-standalone, sin tocar el del sistema) en
  * `PYTHONES`, con las versiones con que se hizo todo (3.12, torch 2.8, WhisperX 3.8.6), y sus modelos en `MODELOS`. Con
- * una NVIDIA, torch con CUDA; sin ella, el de CPU, y los procesos transcriben solos en el procesador (`int8`). Si se
- * corta, volver a pulsar sigue donde se quedó: pip y los modelos se saltan lo que ya está.
+ * una NVIDIA, torch con CUDA y Whisper; sin ella, el torch de CPU y Parakeet (`Motor`). Si se corta, volver a pulsar
+ * sigue donde se quedó: pip y los modelos se saltan lo que ya está.
  */
 const SISTEMA: Record<string, string> = {
   'win32-x64': 'x86_64-pc-windows-msvc',
@@ -137,47 +155,75 @@ const SISTEMA: Record<string, string> = {
   'linux-x64': 'x86_64-unknown-linux-gnu',
   'linux-arm64': 'aarch64-unknown-linux-gnu'
 }
-const PYTHON_STANDALONE = `https://github.com/astral-sh/python-build-standalone/releases/download/20261013/cpython-3.12.15%2B20261013-${SISTEMA[`${process.platform}-${process.arch}`] ?? SISTEMA['win32-x64']}-install_only.tar.gz`
+
+/**
+ * Para qué procesador se baja lo de fuera (Python, FFmpeg). La app de Mac es de Intel y en los Mac con Apple Silicon corre
+ * con Rosetta (`sysctl.proc_translated` vale 1): ahí se bajan los de ARM, que corren nativos y tienen torch (el de Intel
+ * dejó de salir en la 2.3).
+ */
+export const ARQUITECTURA = (() => {
+  if (process.platform !== 'darwin' || process.arch !== 'x64') return process.arch
+  try {
+    return execFileSync('sysctl', ['-n', 'sysctl.proc_translated'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim() === '1' ? 'arm64' : 'x64'
+  } catch {
+    return 'x64'
+  }
+})()
+/** Un Mac con Intel: no hay torch 2.8 para él, así que su Python de Sloth no lleva torch (`parakeet-solo`). */
+const SIN_TORCH = process.platform === 'darwin' && ARQUITECTURA === 'x64'
+const PYTHON_STANDALONE = `https://github.com/astral-sh/python-build-standalone/releases/download/20261013/cpython-3.12.15%2B20261013-${SISTEMA[`${process.platform}-${ARQUITECTURA}`] ?? SISTEMA['win32-x64']}-install_only.tar.gz`
 const TORCH = ['torch==2.8.0', 'torchaudio==2.8.0', 'torchvision==0.23.0']
 // `hf_xet` baja los modelos de Hugging Face más rápido; `deno` resuelve los retos de JavaScript de YouTube en yt-dlp.
 const PIP_SLOTH = ['whisperx==3.8.6', 'transformers==4.57.6', 'hf_xet', 'yt-dlp[default]', 'deno', 'scikit-learn']
-/** Baja lo que falte de los modelos: Whisper, el alineador de la voz y el de vectores (huellas.py). */
+const PARAKEET = 'onnx-asr[cpu]==0.12.0'
+const PIP_SIN_TORCH = [PARAKEET, 'huggingface_hub', 'hf_xet', 'yt-dlp[default]', 'deno']
+/** Baja lo que falte de los modelos del motor (`sys.argv[2]`): el suyo, el alineador de la voz y el de vectores (huellas.py), que pide torch. */
 const BAJAR_MODELOS = [
   'import sys,pathlib,modelos_transcripcion as m',
-  'from vectores import E5',
-  'd=pathlib.Path(sys.argv[1])',
-  "for x in [*m.needed('voxpopuli-es'),E5]:",
+  'd=pathlib.Path(sys.argv[1]); motor=sys.argv[2]',
+  "xs=m.needed('voxpopuli-es',motor)",
+  "if motor!='parakeet-solo':",
+  '  from vectores import E5; xs.append(E5)',
+  'for x in xs:',
   "  if not x.installed(d): print('Bajando',x.name,flush=True); x.download(d)"
 ].join('\n')
 
+/** WhisperX en la GPU ocupa unos 3 GB: con menos memoria que esta (en MiB), mejor Parakeet en el procesador. */
+const MEMORIA_CUDA = 3900
+
 /**
- * Si la NVIDIA aguanta el torch de CUDA 12.8 (`nvidia-smi --query-gpu=compute_cap,driver_version`, una línea por
- * tarjeta): cómputo 7.0 o más (de 2017 en adelante) y un controlador 528.33 o más nuevo. Con una más vieja, torch no la
- * usa y serían ~5 GB de más para nada: va el de CPU. Las cifras son las de la app de YouTube archivada.
+ * Si la NVIDIA aguanta el torch de CUDA 12.8 y Whisper (`nvidia-smi --query-gpu=compute_cap,driver_version,memory.total`,
+ * una línea por tarjeta): cómputo 7.0 o más (de 2017 en adelante), un controlador 528.33 o más nuevo y 4 GB de memoria
+ * (las MX450 y MX550 de las laptops traen 2). Con una que no, serían ~5 GB de más para nada: va el de CPU, con Parakeet.
+ * Las dos primeras cifras son las de la app de YouTube archivada.
  */
 export function aguantaCuda(salida: string): boolean {
   return salida.split(/\r?\n/).some((linea) => {
-    const [computo = '', controlador = ''] = linea.split(',').map((x) => x.trim())
+    const [computo = '', controlador = '', memoria = ''] = linea.split(',').map((x) => x.trim())
     const [mayor = 0, menor = 0] = controlador.split('.').map(Number)
-    return Number(computo) >= 7 && (mayor > 528 || (mayor === 528 && menor >= 33))
+    return Number(computo) >= 7 && (mayor > 528 || (mayor === 528 && menor >= 33)) && Number(memoria) >= MEMORIA_CUDA
   })
 }
 
 export async function instalarPythonSloth(app: string, { raiz = PYTHONES, modelos = MODELOS, cuda }: { raiz?: string; modelos?: string; cuda?: boolean } = {}) {
-  cuda ??= await correr('nvidia-smi --query-gpu=compute_cap,driver_version --format=csv,noheader,nounits', app).then(aguantaCuda, () => false)
-  const carpeta = join(raiz, `3.12.15-${cuda ? 'cu128' : 'cpu'}-sloth`)
+  cuda ??= await correr('nvidia-smi --query-gpu=compute_cap,driver_version,memory.total --format=csv,noheader,nounits', app).then(aguantaCuda, () => false)
+  const motor: Motor = cuda ? 'whisper' : SIN_TORCH ? 'parakeet-solo' : 'parakeet'
+  const carpeta = join(raiz, `3.12.15-${cuda ? 'cu128' : SIN_TORCH ? 'onnx' : 'cpu'}-sloth`)
   paso = 'Bajando Python'
   const python = await pythonStandalone(carpeta, app)
   paso = 'Preparando los paquetes'
   const pip = (...args: string[]) =>
     ejecutar(python, ['-E', '-s', '-X', 'utf8', '-m', 'pip', 'install', '--disable-pip-version-check', '--no-warn-script-location', ...args], app, verPaso)
-  // En Windows y Mac, el torch de PyPI es el de CPU (en Mac, con la GPU de Apple); en Linux, el de CUDA, que pesa gigas
-  // de más sin una NVIDIA: ahí va antes el de CPU.
-  const indice = cuda ? 'cu128' : process.platform === 'linux' ? 'cpu' : null
-  if (indice) await pip(...TORCH, '--index-url', `https://download.pytorch.org/whl/${indice}`)
-  await pip(...TORCH, ...PIP_SLOTH)
+  if (motor === 'parakeet-solo') await pip(...PIP_SIN_TORCH)
+  else {
+    // En Windows y Mac, el torch de PyPI es el de CPU (en Mac, con la GPU de Apple); en Linux, el de CUDA, que pesa gigas
+    // de más sin una NVIDIA: ahí va antes el de CPU.
+    const indice = cuda ? 'cu128' : process.platform === 'linux' ? 'cpu' : null
+    if (indice) await pip(...TORCH, '--index-url', `https://download.pytorch.org/whl/${indice}`)
+    await pip(...TORCH, ...PIP_SLOTH, ...(motor === 'parakeet' ? [PARAKEET] : []))
+  }
   mkdirSync(modelos, { recursive: true })
-  return ejecutar(python, [...BANDERAS, '-c', BAJAR_MODELOS, modelos], join(app, 'python', 'procesos'), verPaso)
+  return ejecutar(python, [...BANDERAS, '-c', BAJAR_MODELOS, modelos, motor], join(app, 'python', 'procesos'), verPaso)
 }
 
 /**
@@ -273,12 +319,12 @@ async function instalarFfmpeg(app: string) {
     if (process.platform === 'darwin') {
       for (const f of ['ffmpeg', 'ffprobe']) {
         const zip = join(aparte, `${f}.zip`)
-        await bajar(`https://ffmpeg.martin-riedl.de/redirect/latest/macos/${process.arch === 'arm64' ? 'arm64' : 'amd64'}/release/${f}.zip`, zip)
+        await bajar(`https://ffmpeg.martin-riedl.de/redirect/latest/macos/${ARQUITECTURA === 'arm64' ? 'arm64' : 'amd64'}/release/${f}.zip`, zip)
         await ejecutar('unzip', ['-o', zip, '-d', aparte], app)
       }
     } else {
       const tar = join(aparte, 'ffmpeg.tar.xz')
-      await bajar(`https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-n9.0-latest-linux${process.arch === 'arm64' ? 'arm64' : '64'}-gpl-9.0.tar.xz`, tar)
+      await bajar(`https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-n9.0-latest-linux${ARQUITECTURA === 'arm64' ? 'arm64' : '64'}-gpl-9.0.tar.xz`, tar)
       await ejecutar('tar', ['-xJf', tar, '-C', aparte, '--strip-components=2', '--wildcards', '*/bin/ffmpeg', '*/bin/ffprobe'], app)
     }
     for (const f of ['ffmpeg', 'ffprobe']) {
@@ -432,7 +478,7 @@ const PIEZAS: Pieza[] = [
   {
     id: 'python-sloth',
     nombre: 'Python de Sloth',
-    para: 'WhisperX y yt-dlp, con sus modelos: bajar y transcribir el video del tema y tu voz. Se baja una vez y ocupa unos 5 GB (unos 10 con una tarjeta NVIDIA).',
+    para: 'El transcriptor y yt-dlp, con sus modelos: bajar y transcribir el video del tema y tu voz (con una tarjeta NVIDIA, Whisper; sin ella, Parakeet, rápido en el procesador). Se baja una vez y ocupa unos 6 GB (unos 10 con NVIDIA).',
     mirar: async (app) => ((await faltaAlPythonSloth(app))?.length === 0 ? '' : null),
     falta: async (app) => {
       if (!rutaPythonSloth()) return undefined
@@ -537,6 +583,33 @@ export async function instalar(app: string, ids?: string[], skill?: string) {
   if (!instalando) void siguiente(app)
   return requisitos(app, false, skill)
 }
+
+/**
+ * Instala la mejora del Python de Sloth (Parakeet, `mejoraDelPythonSloth`) aunque ya cuente como listo: es su misma
+ * instalación, que se salta lo que ya está. La pide el aviso del hilo nuevo y Opciones → Tu equipo.
+ */
+export function instalarMejora(app: string) {
+  if (instalando?.id === MEJORA.id || cola.some((c) => c.id === MEJORA.id)) return
+  delete fallos[MEJORA.id]
+  cola.push(MEJORA)
+  if (!instalando) void siguiente(app)
+}
+
+/** La mejora va en la cola como una pieza más (pip no puede correr dos veces en el mismo Python), con su id y sus fallos. */
+const MEJORA: Pieza = {
+  id: 'mejora',
+  nombre: 'Parakeet',
+  para: 'Transcribe tu voz unas cinco veces más rápido en una computadora sin NVIDIA.',
+  mirar: async (app) => ((await mejoraDelPythonSloth(app))?.length === 0 ? '' : null),
+  instalar: (app) => instalarPythonSloth(app)
+}
+
+/** Cómo va la instalación de una pieza: si se instala o espera, en qué paso va y por qué falló la última vez. */
+export const instalacionDe = (id: string) => ({
+  estado: instalando?.id === id ? ('instalando' as const) : cola.some((c) => c.id === id) ? ('esperando' as const) : undefined,
+  paso: instalando?.id === id ? paso : undefined,
+  error: fallos[id]
+})
 
 async function siguiente(app: string) {
   const pieza = cola[0]

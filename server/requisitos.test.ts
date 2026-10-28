@@ -3,7 +3,7 @@ import { closeSync, existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, 
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { test } from 'node:test'
-import { aguantaCuda, elegirPython, moverPython, pasoDePip } from './requisitos.ts'
+import { aguantaCuda, elegirPython, motorDe, moverPython, pasoDePip } from './requisitos.ts'
 
 function carpetas() {
   const raiz = mkdtempSync(join(tmpdir(), 'sloth-mover-'))
@@ -42,13 +42,21 @@ test('dice en qué va pip: qué baja y cuánto pesa, y los modelos', () => {
   assert.equal(pasoDePip('Requirement already satisfied: numpy in c:\python'), undefined)
 })
 
-test('el torch de CUDA solo con una NVIDIA y un controlador que lo aguantan', () => {
-  assert.ok(aguantaCuda('8.6, 581.57'))
-  assert.ok(aguantaCuda('6.1, 560.94\n7.5, 528.33')) // dos tarjetas: basta una
-  assert.ok(!aguantaCuda('6.1, 581.57')) // una Pascal: el cu128 ya no la usa
-  assert.ok(!aguantaCuda('8.6, 528.24'))
+test('el torch de CUDA solo con una NVIDIA, un controlador y una memoria que lo aguantan', () => {
+  assert.ok(aguantaCuda('8.6, 581.57, 6144'))
+  assert.ok(aguantaCuda('6.1, 560.94, 4096\n7.5, 528.33, 4096')) // dos tarjetas: basta una
+  assert.ok(!aguantaCuda('6.1, 581.57, 8192')) // una Pascal: el cu128 ya no la usa
+  assert.ok(!aguantaCuda('8.6, 528.24, 6144'))
+  assert.ok(!aguantaCuda('7.5, 581.57, 2048')) // una MX450 de 2 GB: Whisper no cabe, va Parakeet
   assert.ok(!aguantaCuda('Field "compute_cap" is not a valid field to query.'))
   assert.ok(!aguantaCuda(''))
+})
+
+test('el motor de la voz sale de la carpeta del Python de Sloth', () => {
+  assert.equal(motorDe('3.12.15-cu128-sloth'), 'whisper')
+  assert.equal(motorDe('3.12.14-cu128-2e23ffa6'), 'whisper') // el de la app de YouTube archivada
+  assert.equal(motorDe('3.12.15-cpu-sloth'), 'parakeet')
+  assert.equal(motorDe('3.12.15-onnx-sloth'), 'parakeet-solo')
 })
 
 test('de varios Python de Sloth se usa el suyo y, entre iguales, el más nuevo', () => {
