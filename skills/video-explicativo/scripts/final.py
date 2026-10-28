@@ -15,7 +15,10 @@ Borrador (~1.5 min), en dos mitades para mirar la primera mientras se hace la se
 
 Final (~2 min):
 1. Renderiza con Remotion (render.cjs, que codifica mientras dibuja) directo a out/<carpeta>.mp4, que es lo que busca
-   la etapa «Video» de Sloth: H.264 crf 16 (preset slow), yuv420p y bt709. El 3D va con la tarjeta de video (ANGLE).
+   la etapa «Video» de Sloth: H.264 crf 14 (preset veryfast), yuv420p y bt709. El 3D va con la tarjeta de video
+   (ANGLE); si va por software, render.cjs lo avisa. Antes iba con slow y crf 16: con 300 cuadros del de Ledger (27 de
+   octubre), veryfast con crf 14 se ve igual (SSIM 0,9935 contra 0,9931, contra uno casi sin pérdida), tarda un 30 %
+   menos con 6 Chrome y con 2 (el codificador deja de quitarle procesador al dibujo) y pesa un 33 % más.
    Antes se renderizaba y se volvía a codificar con ffmpeg: medido en el de Celsius, directo tarda 36 s menos y se
    parece más a los cuadros sin comprimir (PSNR 45.7 contra 42.2).
 2. Pasa comprobar.mjs de video-base: tamaño, fps, sonoridad, pico, negros, arranque. Si algo sale con ✘, falla.
@@ -74,7 +77,7 @@ def borrador(raiz: Path, mitad: str | None) -> None:
 
 def final(raiz: Path) -> None:
     video = raiz / "out" / f"{raiz.name}.mp4"
-    render(raiz, video, "--crf=16", "--x264-preset=slow", "--pixel-format=yuv420p", "--color-space=bt709")
+    render(raiz, video, "--crf=14", "--x264-preset=veryfast", "--pixel-format=yuv420p", "--color-space=bt709")
     r = subprocess.run(["node", str(BASE / "comprobar.mjs"), str(video)], capture_output=True, text=True, encoding="utf8")
     print(r.stdout[-1500:])
     if r.returncode != 0 or "✘" in r.stdout:
