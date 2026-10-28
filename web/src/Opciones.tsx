@@ -1,4 +1,4 @@
-import { type ReactNode, useEffect, useState } from 'react'
+import { type ReactNode, useEffect, useRef, useState } from 'react'
 import { type CuentaClaude as Cuenta, type Opciones as Datos, type LimitesClaude, NAVEGADOR_REDES, type Requisito, type VersionClaude } from '../../shared/types'
 import { api } from './api'
 import { proveedorDe } from '../../shared/providers'
@@ -273,6 +273,13 @@ function useCuenta(fresco = false, proveedor = 'claude') {
     const id = setInterval(() => leer(), 2000)
     return () => clearInterval(id)
   }, [conectando])
+  // Al entrar, el inicio vuelve a mirar qué cuentas hay (`useSoloChatGPT`).
+  const antes = useRef<boolean>(undefined)
+  useEffect(() => {
+    if (!cuenta) return
+    if (antes.current === false && cuenta.conectada) dispatchEvent(new Event(CUENTA_CONECTADA))
+    antes.current = cuenta.conectada
+  }, [cuenta?.conectada])
 
   function pedir(ruta: string, datos: unknown) {
     setOcupado(true)
@@ -308,6 +315,31 @@ function Autorizando({ c }: { c: UsoCuenta }) {
  */
 export function CuentaClaude({ model, onFalta }: { model?: string; onFalta?(falta?: boolean): void }) {
   return proveedorDe(model ?? '') === 'codex' ? <CuentaCodex aviso onFalta={onFalta} /> : <AvisoClaude onFalta={onFalta} />
+}
+
+const CUENTA_CONECTADA = 'sloth-cuenta-conectada'
+
+/**
+ * Si está conectada la cuenta de ChatGPT y no la de Claude (`undefined` mientras no se sabe). Entonces un hilo nuevo va
+ * en ChatGPT: «Optimizado» se midió con Claude y no podría empezar. Se vuelve a mirar al conectar una cuenta aquí.
+ */
+export function useSoloChatGPT() {
+  const [solo, setSolo] = useState<boolean>()
+  useEffect(() => {
+    let vivo = true
+    const leer = () =>
+      Promise.all([api<Cuenta>('/api/claude/cuenta'), api<Cuenta>('/api/codex/cuenta')]).then(
+        ([claude, codex]) => vivo && setSolo(!claude.conectada && codex.conectada),
+        () => vivo && setSolo(false)
+      )
+    void leer()
+    addEventListener(CUENTA_CONECTADA, leer)
+    return () => {
+      vivo = false
+      removeEventListener(CUENTA_CONECTADA, leer)
+    }
+  }, [])
+  return solo
 }
 
 /** La cuenta de ChatGPT, solo si falta, como la de Claude: en la bienvenida. */
@@ -387,7 +419,7 @@ function CuentaCodex({ aviso = false, onFalta }: { aviso?: boolean; onFalta?(fal
               onChange={(que) => (que === 'uso' ? window.open('https://chatgpt.com/codex/settings/usage', '_blank', 'noreferrer') : conectar())}
             />
           ) : (
-            <span>Opcional. Con tu cuenta de ChatGPT, Sloth hace las imágenes de los videos: portadas y personajes. Sin ella, los videos salen sin imágenes generadas. Se autoriza en el navegador.</span>
+            <span>Sloth trabaja con tu cuenta de ChatGPT (Plus o Pro), y con ella hace las imágenes de los videos: portadas y personajes. Se autoriza en el navegador.</span>
           )}
         </div>
         {version.estado}

@@ -16,7 +16,7 @@ import { paraMandar } from '../shared/historial.ts'
 import { conectandoCodex, conectarCodex, cuentaCodex, limitesCodex } from './cuenta-codex.ts'
 import { conectando, conectarClaude, cuentaClaude, limitesClaude } from './cuenta.ts'
 import { enlacesApi } from './enlaces.ts' // tarjeta de los enlaces
-import { carpetaValida, carpetasApi, etapasApi, mismaCwd, videosApi, videosDe } from './etapas.ts' // panel de etapas
+import { etapasApi, mismaCwd, videosApi, videosDe } from './etapas.ts' // panel de etapas
 import { ideas } from './ideas/index.ts' // ideas
 import { modelos3d } from './modelos3d.ts' // modelos 3D
 import { miniaturas } from './miniaturas.ts' // panel de etapas
@@ -385,24 +385,18 @@ async function api(req: IncomingMessage, res: ServerResponse, url: URL): Promise
   }
 
   if (path === '/api/sessions' && method === 'POST') {
-    const input = await body<{ cardId: string; model: string; effort?: string; text: string; images?: string[]; carpeta?: string }>(req)
+    const input = await body<{ cardId: string; model: string; effort?: string; text: string; images?: string[] }>(req)
     const card = cards().find((c) => c.id === input.cardId)
     if (!card) return send(res, 404, { error: 'No existe esa card' }), true
     mkdirSync(card.cwd, { recursive: true })
-    // «Continuar un video»: el hilo nace con su carpeta, que ya existe. Se lo dice el mensaje, en palabras: así vale para
-    // cualquier skill sin tocarlas (El Diff la afina el usuario a mano), y pesa más que su paso de crear una carpeta nueva.
-    const sigue = input.carpeta ? carpetaValida(card.cwd, input.carpeta) : undefined // panel de etapas
-    if (input.carpeta && !sigue) return send(res, 400, { error: `No hay una carpeta «${input.carpeta}» en ${card.cwd}` }), true
     // Uno que sale de Ideas se llama como la idea (su línea `Título:`); los demás, como su primer mensaje, hasta que llegue
     // el título corto.
     const titulo = /^Título: (.+)$/m.exec(input.text)?.[1].trim()
     const title = (titulo ?? input.text.split('\n')[0]).slice(0, 80) || (input.images?.length ? 'Imagen' : card.title)
     // Un video nuevo también nace con su carpeta, como los de un lote: la skill la crea con el nombre de la línea `Carpeta:`.
-    const nueva = !sigue && card.etapas?.length ? carpetaDeVideo(card, title) : undefined // panel de etapas
-    const meta = sessions.create({ cardId: card.id, title, model: input.model, effort: input.effort, cwd: card.cwd, carpeta: sigue ?? nueva })
-    const text = sigue
-      ? `${input.text}\n\nContinúa el video que ya está en la carpeta «${sigue}»: trabaja ahí, no crees otra, mira qué hay y sigue desde lo que te pido.`
-      : [input.text, nueva && `Carpeta: ${nueva}`].filter(Boolean).join('\n\n')
+    const nueva = card.etapas?.length ? carpetaDeVideo(card, title) : undefined // panel de etapas
+    const meta = sessions.create({ cardId: card.id, title, model: input.model, effort: input.effort, cwd: card.cwd, carpeta: nueva })
+    const text = [input.text, nueva && `Carpeta: ${nueva}`].filter(Boolean).join('\n\n')
     sessions.send(meta.id, text, card.skill ? skillRef(card.skill) : undefined, input.images)
     // El primer mensaje recortado se cambia por un título corto cuando llega, como un renombrado. Nadie lo espera; si
     // falla, o mientras alguien le puso otro nombre, se queda el que tiene. Sin las líneas que añade la app.
@@ -444,7 +438,6 @@ async function api(req: IncomingMessage, res: ServerResponse, url: URL): Promise
 
   if (await etapasApi(req, res, url, sessions, cards(), broadcast, miniatura)) return true // panel de etapas
   if (await videosApi(req, res, url, sessions, cards(), publicar?.marcas, cuadro)) return true // panel de etapas; `publicar.marcas`, de redes
-  if (carpetasApi(req, res, url, sessions, cards())) return true // panel de etapas
   if (publicar && (await publicar.api(req, res, url))) return true // redes
   if (subirLargos && (await subirLargos.api(req, res, url))) return true // videos largos de YouTube
   if (await previa.api(req, res, url)) return true // previas de las cards

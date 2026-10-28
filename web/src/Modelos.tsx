@@ -13,6 +13,8 @@ import { Segmento } from './Segmento'
 
 /** Sin medir y sin nada elegido a mano, el hilo va en Opus con esfuerzo alto: lo mejor en las dos skills que se midieron. */
 const POR_DEFECTO: ModeloTarea = { model: 'claude-opus-5-5', effort: 'high' }
+/** Con ChatGPT y sin Claude, la card va en «Avanzado» con GPT-6.1 Terra en medio, mientras no elijas otro. */
+export const CON_CHATGPT: Avanzado = { principal: { model: 'codex:gpt-6.1-terra', effort: 'medium' }, tareas: {} }
 const SUBAGENTES = ['opus', 'sonnet', 'haiku']
 const ESFUERZOS = ['low', 'medium', 'high', 'xhigh']
 const NOMBRE: Record<string, string> = { opus: 'Opus', sonnet: 'Sonnet', haiku: 'Haiku' }
@@ -53,6 +55,8 @@ export function Modelos(props: {
   avanzado?: Avanzado
   choice?: Choice
   tareas: Tarea[]
+  /** Solo hay cuenta de ChatGPT: «Optimizado», medido con Claude, no se puede elegir. */
+  soloChatGPT?: boolean
   onAvanzado(a: Avanzado | undefined): void
 }) {
   const [open, setOpen] = useState(false)
@@ -91,7 +95,7 @@ export function Modelos(props: {
             label="Modo"
             valor={avanzado ? 'avanzado' : 'optimizado'}
             opciones={[
-              { id: 'optimizado', texto: 'Optimizado' },
+              { id: 'optimizado', texto: 'Optimizado', disabled: props.soloChatGPT, title: props.soloChatGPT ? 'Va con Claude: conecta tu cuenta en Opciones' : undefined },
               { id: 'avanzado', texto: 'Avanzado' }
             ]}
             onCambio={(modo) => (modo === 'optimizado' ? props.onAvanzado(undefined) : !avanzado && props.onAvanzado({ principal: choice, tareas: {} }))}
@@ -158,11 +162,13 @@ export function Modelos(props: {
             ))}
           </div>
           <p className="modelos-nota muted small">
-            {avanzado
-              ? 'Tus elecciones se quedan para esta card. «Optimizado» vuelve a lo medido o, si la skill no se ha medido, a lo último que elegiste.'
-              : tareas.length || principalMedido
-                ? 'Lo que medimos como mejor en cada tarea: misma calidad por menos tiempo y dinero. Pasa el ratón por «medido» para ver la prueba.'
-                : 'Esta skill aún no se ha medido: el hilo va en lo último que elegiste a mano (o en Opus high, si nunca elegiste), y sus subagentes, en lo que diga la skill.'}
+            {props.soloChatGPT
+              ? 'Con tu cuenta de ChatGPT, el hilo va en uno de sus modelos: GPT-6.1 Terra, si no eliges otro. «Optimizado» va con Claude: se puede elegir al conectar tu cuenta de Claude en Opciones.'
+              : avanzado
+                ? 'Tus elecciones se quedan para esta card. «Optimizado» vuelve a lo medido o, si la skill no se ha medido, a lo último que elegiste.'
+                : tareas.length || principalMedido
+                  ? 'Lo que medimos como mejor en cada tarea: misma calidad por menos tiempo y dinero. Pasa el ratón por «medido» para ver la prueba.'
+                  : 'Esta skill aún no se ha medido: el hilo va en lo último que elegiste a mano (o en Opus high, si nunca elegiste), y sus subagentes, en lo que diga la skill.'}
           </p>
         </div>
       )}

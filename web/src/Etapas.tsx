@@ -102,7 +102,7 @@ export function usePasos(avance: Avance | null, events: AgentEvent[], escritos: 
 }
 
 /** Las carpetas de video como opciones de un `Picker`: el nombre y, si se sabe, el hilo que la tiene. */
-export function opcionesDeCarpetas(carpetas: CarpetaDeVideo[]) {
+function opcionesDeCarpetas(carpetas: CarpetaDeVideo[]) {
   const corto = (s: string) => (s.length > 40 ? `${s.slice(0, 39)}…` : s)
   return carpetas.map((c) => ({ value: c.nombre, label: c.hilo && c.hilo !== c.nombre ? `${c.nombre} · ${corto(c.hilo)}` : c.nombre }))
 }

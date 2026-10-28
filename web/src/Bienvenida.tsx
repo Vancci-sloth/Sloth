@@ -61,28 +61,26 @@ export function Bienvenida() {
           <div>
             <h2>Te damos la bienvenida a Sloth</h2>
             <p>
-              Sloth hace videos verticales con Claude. Eliges un estilo, le das un tema o un enlace, y lo ves trabajar paso a
+              Sloth hace videos verticales con Claude o ChatGPT. Eliges un estilo, le das un tema o un enlace, y lo ves trabajar paso a
               paso: investiga, escribe el guion, te pide tu voz y arma el video.
             </p>
           </div>
         </header>
 
-        <Paso n={1} titulo="Conecta tu cuenta de Claude" hecho={claude}>
-          Sloth trabaja con tu plan de Claude (Pro o Max) y no te cobra aparte.
+        {/* Con una de las dos basta. Con ChatGPT, además, hace las imágenes de los videos. */}
+        <Paso n={1} titulo="Conecta tu cuenta de Claude o ChatGPT" hecho={claude || chatgpt}>
+          Sloth trabaja con tu plan de Claude (Pro o Max) o de ChatGPT (Plus o Pro) y no te cobra aparte. Con ChatGPT, además,
+          hace las imágenes de los videos: portadas y personajes.
           <CuentaClaude onFalta={(falta) => setClaude(falta === undefined ? undefined : !falta)} />
+          <CuentaChatGPT onFalta={(falta) => setChatgpt(falta === undefined ? undefined : !falta)} />
         </Paso>
         <Paso n={2} titulo="Prepara tu computadora" hecho={listo}>
           Los estilos usan unas herramientas (FFmpeg, Python…). Si falta alguna, aquí sale el botón para descargarla; tarda unos
           minutos y solo se hace una vez.
           <Requisitos onListo={setListo} />
         </Paso>
-        <Paso n={3} titulo="Conecta ChatGPT (opcional)" hecho={chatgpt}>
-          Con tu cuenta de ChatGPT, Sloth hace las imágenes de los videos: portadas y personajes. Sin ella, los videos salen
-          igual, pero sin imágenes generadas.
-          <CuentaChatGPT onFalta={(falta) => setChatgpt(falta === undefined ? undefined : !falta)} />
-        </Paso>
         {anclada !== null && (
-          <Paso n={4} titulo="Ten Sloth a mano (opcional)" hecho={anclada}>
+          <Paso n={3} titulo="Ten Sloth a mano (opcional)" hecho={anclada}>
             {anclada ? 'Sloth está anclada a la barra de tareas.' : 'Ánclala a la barra de tareas para abrirla con un clic.'}
             {!anclada && (
               <div className="anclar">
@@ -99,12 +97,12 @@ export function Bienvenida() {
             )}
           </Paso>
         )}
-        <Paso n={anclada === null ? 4 : 5} titulo="Haz tu primer video">
+        <Paso n={anclada === null ? 3 : 4} titulo="Haz tu primer video">
           Elige un estilo, escribe el tema o pega un enlace y pulsa <b>↑</b>. Cuando el guion está listo, Sloth te pide tu voz:
           grábalo con el celular y súbelo en la etapa «Tu voz». Luego arma el video y lo revisa. El Diff tarda de una a dos
           horas; el Video explicativo, unos 40 minutos. Cuando acaba, lo descargas desde el video o en «Mis videos».
         </Paso>
-        <Paso n={anclada === null ? 5 : 6} titulo="Lo que gasta">
+        <Paso n={anclada === null ? 4 : 5} titulo="Lo que gasta">
           Cada video usa una parte de los límites de tu plan, que ves en Opciones. Las cifras en dólares que salen en cada
           video dicen cuánto costaría pagado aparte, no lo que se te cobra. Un video gasta bastante: con el plan Pro el límite
           se acaba pronto, y con Max alcanza para varios.

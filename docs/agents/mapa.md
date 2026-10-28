@@ -30,8 +30,7 @@ Este es el mapa:
   cambio; un clic en el cuadro, una escena o un tramo va al chat como referencia (`Referencia.tsx`).
 - La carpeta del video: un hilo de video nace con su carpeta nombrada por Sloth, y el mensaje lleva la línea
   `Carpeta: <nombre>`, que leen las skills. Con `lote`, varios enlaces pueden ser un video cada uno
-  (`lote-MMDD-HHMM-NN`, ver `skills/video-base/LOTE.md`). «Continuar un video» y cambiar la carpeta desde el estudio
-  usan una que ya existe.
+  (`lote-MMDD-HHMM-NN`, ver `skills/video-base/LOTE.md`). Cambiar la carpeta desde el estudio usa una que ya existe.
 - `modelos` (`web/src/Modelos.tsx`): en «Optimizado», el modelo y el esfuerzo medidos para el hilo y sus subagentes
   (los de los subagentes van en la línea `Subagentes:`). Una card sin medir
   usa lo último que eligió el usuario a mano. En «Avanzado» se elige cada uno.

@@ -494,18 +494,6 @@ function reavisar(sessionId: string, cuando: number, avisar: Avisar) {
 }
 
 /**
- * `GET /api/cards/<id>/carpetas`: las carpetas de video de una card, para que un hilo nuevo siga una que ya existe
- * («Continuar un video»). Devuelve si atendió la petición.
- */
-export function carpetasApi(req: IncomingMessage, res: ServerResponse, url: URL, sessions: Sessions, cards: Card[]): boolean {
-  const m = /^\/api\/cards\/([\w-]+)\/carpetas$/.exec(url.pathname)
-  if (!m || req.method !== 'GET') return false
-  const card = cards.find((c) => c.id === m[1])
-  if (!card?.etapas?.length) return json(res, 404, { error: 'Esa card no tiene carpetas de video' })
-  return json(res, 200, carpetasDeVideo(card.cwd, sessions))
-}
-
-/**
  * `GET /api/sessions/<id>/etapas`, `GET /api/sessions/<id>/archivo?ruta=…`, `GET /api/sessions/<id>/vivo/<ruta>`,
  * `GET /api/sessions/<id>/motor` (y `/motor/motor.js`), `GET /api/sessions/<id>/onda?ruta=…`,
  * `GET`/`POST /api/sessions/<id>/carpeta` y `POST /api/sessions/<id>/version`.

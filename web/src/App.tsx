@@ -1,10 +1,10 @@
 import { memo, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { CANAL_CARD, IDEAS_CARD } from '../../shared/ideas' // ideas
-import type { AvanceCorto, Card, CarpetaDeVideo, Model, Previa, Serie, ServerPush, SessionMeta, VideoHecho } from '../../shared/types'
+import type { AvanceCorto, Card, Model, Previa, Serie, ServerPush, SessionMeta, VideoHecho } from '../../shared/types'
 import { NOMBRE_AGENTE, proveedorDe } from '../../shared/providers'
 import { VENTA } from '../../shared/venta'
 import { Ideas, textoAHtml } from './Ideas' // ideas
-import { CuentaClaude, Opciones, Requisitos } from './Opciones'
+import { CuentaClaude, Opciones, Requisitos, useSoloChatGPT } from './Opciones'
 import { api } from './api'
 import { eventos, useFallo, useResumen } from './eventos'
 import { useDesplazando } from './desplazando'
@@ -20,7 +20,7 @@ import { esDeEstudio, Estudio } from './Estudio' // panel de etapas
 import { BotonNavegador, PanelNavegador, useNavegadorAbierto } from './Navegador' // navegador de cada hilo
 import { conReferencia, ReferenciaVideo } from './Referencia'
 import { useSoltar } from './Soltar'
-import { elegirModelos, lineaSubagentes, Modelos, type Avanzado } from './Modelos'
+import { CON_CHATGPT, elegirModelos, lineaSubagentes, Modelos, type Avanzado } from './Modelos'
 import { AvisoEquipo } from './Equipo' // tu equipo
 import { MisVideos, Rejilla, VideoDe } from './MisVideos'
 import { Modelos3D } from './Modelos3D' // modelos 3D
@@ -31,7 +31,6 @@ import { Bienvenida } from './Bienvenida'
 import { MarcaAgente } from './Logos'
 import { YoutubeLote } from './YoutubeProgramar'
 import { CalendarioYoutube } from './YoutubeCalendario'
-import { opcionesDeCarpetas } from './Etapas' // panel de etapas
 import { avisarTanda, AvisoRedes, ConNavegadorRedes, usePublicar } from './Redes' // redes
 import { NombreDelHilo, Renombrar } from './Renombrar'
 import { Segmento } from './Segmento'
@@ -742,7 +741,9 @@ function NewSession(props: {
   // El modelo: «Optimizado» usa lo medido para esta card (el hilo y cada subagente) o, sin medir, lo último que elegiste
   // a mano; «Avanzado», lo que elegiste para ella.
   const [avanzados, setAvanzados] = useStored<Record<string, Avanzado>>('modelos', {})
-  const avanzado = avanzados[card.id]
+  // Con ChatGPT y sin Claude, lo medido no podría empezar: sin elección tuya, la card va en «Avanzado» con ChatGPT.
+  const soloChatGPT = useSoloChatGPT()
+  const avanzado = avanzados[card.id] ?? (soloChatGPT ? CON_CHATGPT : undefined)
   const { choice, tareas } = useMemo(() => elegirModelos(card.modelos, models, avanzado, lastChoice(models)), [card.modelos, models, avanzado])
   function cambiarModelos(a: Avanzado | undefined) {
     const { [card.id]: _, ...resto } = avanzados
@@ -780,23 +781,18 @@ function NewSession(props: {
   // ser las fuentes de un solo video. La card recuerda la última elección, para quien hace lotes siempre.
   const enlaces = enlacesDe(props.draft?.text ?? '')
   const [porEnlace, setPorEnlace] = useStored<Record<string, boolean>>('porEnlace', {})
-  // «Continuar un video»: el hilo nuevo sigue en una carpeta que ya existe (un episodio empezado) en vez de crear otra.
-  // Con una elegida no hay lote: es un solo video.
-  const carpetas = useCarpetas(card.etapas ? card : null, hilos) // panel de etapas
-  const [continuar, setContinuar] = useState('')
-  useEffect(() => setContinuar(''), [card.id])
   // Una serie de la skill (`skills/<skill>/series/`): sin escribir nada, el agente elige el tema y hace el video.
   const series = useSeries(card)
   const [serie, setSerie] = useState('')
   useEffect(() => setSerie(''), [card.id])
-  const laSerie = continuar ? undefined : series.find((s) => s.id === serie)
-  const lote = !continuar && !!card.lote && enlaces.length > 1 && !!porEnlace[card.id]
+  const laSerie = series.find((s) => s.id === serie)
+  const lote = !!card.lote && enlaces.length > 1 && !!porEnlace[card.id]
   // En los estilos que también hacen horizontales (El Diff), el formato del video: la skill hace solo ese. La card
   // recuerda el último; una idea de YouTube ya lo trae escrito en el mensaje (`Formato: horizontal`), y ese manda.
   const [formatos, setFormatos] = useStored<Record<string, 'vertical' | 'horizontal'>>('formato', {})
   const formatoEscrito = /^Formato: (vertical|horizontal)\s*$/m.exec(props.draft?.text ?? '')?.[1] as 'vertical' | 'horizontal' | undefined
   const formato = formatoEscrito ?? formatos[card.id] ?? 'vertical'
-  const conFormato = !!card.horizontal && !continuar
+  const conFormato = !!card.horizontal
   // Un archivo o un enlace soltado en cualquier parte del inicio va al mensaje.
   const soltar = useSoltar()
 
@@ -822,10 +818,10 @@ function NewSession(props: {
         onDraft={props.onDraft}
         bloqueo={sinCuenta ? 'Primero conecta tu cuenta (arriba)' : undefined}
         placeholder={card.skill ? `Qué quieres de /${card.skill}…` : 'Qué cambio quieres en Sloth…'}
-        modelos={<Modelos conf={card.modelos} models={models} avanzado={avanzado} choice={choice} tareas={tareas} onAvanzado={cambiarModelos} />}
+        modelos={<Modelos conf={card.modelos} models={models} avanzado={avanzado} choice={choice} tareas={tareas} soloChatGPT={soloChatGPT} onAvanzado={cambiarModelos} />}
         extra={
           <>
-            {series.length > 0 && !continuar && (
+            {series.length > 0 && (
               <Picker
                 label={laSerie ? laSerie.nombre : 'Sin serie'}
                 value={serie}
@@ -834,17 +830,6 @@ function NewSession(props: {
                   { label: 'Serie: elige sola el tema si no escribes uno', options: series.map((s) => ({ value: s.id, label: s.nombre })) }
                 ]}
                 onChange={setSerie}
-              />
-            )}
-            {carpetas.length > 0 && (
-              <Picker
-                label={continuar ? `Continuar ${continuar}` : 'Video nuevo'}
-                value={continuar}
-                groups={[
-                  { label: 'Empezar', options: [{ value: '', label: 'Video nuevo' }] },
-                  { label: 'Continuar un video', options: opcionesDeCarpetas(carpetas) }
-                ]}
-                onChange={setContinuar}
               />
             )}
             {conFormato && (
@@ -858,7 +843,7 @@ function NewSession(props: {
                 onCambio={(f) => setFormatos({ ...formatos, [card.id]: f })}
               />
             )}
-            {card.lote && enlaces.length > 1 && !continuar && (
+            {card.lote && enlaces.length > 1 && (
               <Segmento
                 label="Lote"
                 valor={lote ? 'varios' : 'uno'}
@@ -894,8 +879,7 @@ function NewSession(props: {
             const metas = await api<SessionMeta[]>('/api/lotes', { cardId: card.id, text, enlaces, images, ...choice })
             return props.onCreated(metas[0].id)
           }
-          // Lo de seguir en esa carpeta lo escribe el servidor en el mensaje, después de comprobar que existe.
-          const meta = await api<SessionMeta>('/api/sessions', { cardId: card.id, text, images, ...choice, ...(continuar ? { carpeta: continuar } : {}) })
+          const meta = await api<SessionMeta>('/api/sessions', { cardId: card.id, text, images, ...choice })
           props.onCreated(meta.id)
         }}
       />
@@ -929,7 +913,7 @@ function NewSession(props: {
         ) : (
           <section className="estante">
             <header>
-              <h2>Skills</h2>
+              <h2>Estilos</h2>
             </header>
             {fallo && <p className="bad small">{fallo}</p>}
             {/* Cada skill es un cartel: su último video si lo tiene y, si no, su icono y qué hace. Abajo, cuánto se usa. */}
@@ -944,7 +928,8 @@ function NewSession(props: {
           <p>{card.description}</p>
           <TusCambios card={card} clave={hilos.map((s) => s.id + s.updatedAt).join()} />
         </div>
-        <CuentaClaude model={choice?.model} onFalta={setSinCuenta} />
+        {/* Hasta saber qué cuentas hay no sale: el aviso de Claude no se asoma a quien solo tiene ChatGPT. */}
+        {soloChatGPT !== undefined && <CuentaClaude model={choice?.model} onFalta={setSinCuenta} />}
         {/* Las herramientas de video solo hacen falta en los estilos de video, y de los paquetes, los de su skill. */}
         {card.etapas && <Requisitos skill={card.skill} />}
         {composer}
@@ -1078,24 +1063,6 @@ function useTerminados(card: Card | null, hilos: SessionMeta[]) {
   }, [card?.id, clave, vuelta])
   return videos
 }
-
-/**
- * Las carpetas de video de una card, para «Continuar un video». Se vuelven a pedir cuando avanza uno de sus hilos, que es
- * cuando puede haber una nueva. Si falla (el servidor aún no conoce la ruta), no hay ninguna y la opción no sale.
- */
-function useCarpetas(card: Card | null, hilos: SessionMeta[]) {
-  const [carpetas, setCarpetas] = useState<CarpetaDeVideo[]>([])
-  const clave = hilos.map((s) => s.id + s.updatedAt).join()
-  useEffect(() => {
-    if (!card) return setCarpetas([])
-    let vivo = true
-    api<CarpetaDeVideo[]>(`/api/cards/${card.id}/carpetas`).then((c) => vivo && setCarpetas(c), () => vivo && setCarpetas([]))
-    return () => {
-      vivo = false
-    }
-  }, [card?.id, clave])
-  return carpetas
-} // panel de etapas
 
 /** Las series de la skill de una card (`GET /api/cards/<id>/series`). Si falla, no hay ninguna y no sale el selector. */
 function useSeries(card: Card) {
