@@ -23,4 +23,4 @@ programas, con tu usuario.
 
 - El servidor escucha solo en tu computadora (`localhost`).
 - La clave de apoyo llega firmada (Ed25519) por el cobro, y editar el archivo no la alarga.
-- Los datos de tu tarjeta los ven solo Mercado Pago o Stripe.
+- Los datos de tu tarjeta los ve solo Mercado Pago.

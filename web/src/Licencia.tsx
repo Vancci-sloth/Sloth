@@ -202,10 +202,7 @@ function Cabeza({ titulo, children }: { titulo: string; children: ReactNode }) {
   )
 }
 
-/**
- * En Opciones: el apoyo (o la cuenta gratis, o el lugar gratis), el próximo cobro, la clave, cambiar la tarjeta (con
- * Stripe), renovar (un año pagado de una vez) y cancelar.
- */
+/** En Opciones: el apoyo (o la cuenta gratis, o el lugar gratis), el próximo cobro, la clave, renovar (un año pagado de una vez) y cancelar. */
 export function SuscripcionOpciones() {
   const [l, setL] = useState<Licencia>()
   const [error, setError] = useState('')
@@ -218,8 +215,8 @@ export function SuscripcionOpciones() {
   }, [])
 
   if (!l) return <div className="fila"><span className="muted small">{error || 'Mirando…'}</span></div>
-  // Adónde se paga: el portal de Stripe o, con un año pagado de una vez, el pago del siguiente.
-  const pagar = () => api<{ enlace: string }>('/api/licencia/pago', {}).then((r) => window.open(r.enlace, '_blank'), (e) => setError(e.message))
+  // Un año pagado de una vez: el pago del siguiente.
+  const renovar = () => api<{ enlace: string }>('/api/licencia/pago', {}).then((r) => window.open(r.enlace, '_blank'), (e) => setError(e.message))
   const cada = l.plan === 'anual' ? 'al año' : 'al mes'
   const pagado = l.plan === 'mensual' || l.plan === 'anual'
   const titulo = `${l.plan === 'gratis' ? 'Gratis de por vida' : pagado ? `Apoyo ${l.plan}` : 'Sin apoyo'}${l.fundador ? ' · Fundador' : ''}`
@@ -248,7 +245,7 @@ export function SuscripcionOpciones() {
         </div>
         {/* Pagado de una vez: se renueva con la misma clave, también cuando ya se acabó. */}
         {l.estado === 'pagado' && (
-          <button className={apoya(l) ? 'ghost small' : 'primary small'} onClick={pagar}>
+          <button className={apoya(l) ? 'ghost small' : 'primary small'} onClick={renovar}>
             Renovar
           </button>
         )}
@@ -263,11 +260,6 @@ export function SuscripcionOpciones() {
               Ya apoyo
             </button>
           </>
-        )}
-        {l.pasarela === 'stripe' && (l.estado === 'authorized' || l.estado === 'paused') && (
-          <button className="ghost small" onClick={pagar}>
-            Cambiar tarjeta
-          </button>
         )}
         {l.estado === 'authorized' && (
           <button className="ghost small" onClick={() => setCancelando(true)}>

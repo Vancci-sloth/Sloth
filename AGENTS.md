@@ -27,7 +27,7 @@ Ahí están los repos, los comandos y cómo verificar cada despliegue.
 - La app que se vende es de Electron (`electron/main.ts`, ADR 0004) y sale de `npm run compilar`, para Windows, Mac y
   Linux (ADR 0006: lo de un sistema lleva su par en los otros); lo que solo sirve aquí
   se esconde con `VENTA` (`shared/venta.ts`). Es gratis; el apoyo mensual es opcional (`server/licencia.ts`) y lo cobra
-  `licencias/`, un Worker con Mercado Pago o Stripe. Las instrucciones de publicación están en
+  `licencias/`, un Worker con Mercado Pago. Las instrucciones de publicación están en
   `docs/agents/publicacion.md`.
 - Escribe los JSON con `guardar()` de `server/disco.ts` (temporal y reemplazo), no con `writeFileSync`.
 - El Markdown se dibuja con `web/src/markdown.ts`, que no deja pasar HTML: no uses `marked` directo.

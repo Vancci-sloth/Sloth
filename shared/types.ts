@@ -1169,16 +1169,14 @@ export interface Licencia {
   /** Lo que se cobra cada mes o cada año, en pesos. */
   monto?: number
   /**
-   * Como lo dice Mercado Pago (Stripe se traduce a estos): `pending` (sin pagar), `authorized`, `paused` o `cancelled`;
-   * `gratis`; o `pagado`, un año pagado de una vez que no se renueva solo.
+   * Como lo dice Mercado Pago: `pending` (sin pagar), `authorized`, `paused` o `cancelled`; `gratis`; o `pagado`, un
+   * año pagado de una vez que no se renueva solo.
    */
   estado?: string
   /** Hasta cuándo está pagada (ISO): el próximo cobro o, cancelada o pagada de una vez, cuando se cierra. */
   pagadaHasta?: string
   /** El folio de su cancelación, si la canceló. */
   folio?: string
-  /** `stripe` si se paga con Stripe (se cambia la tarjeta desde Sloth); sin él, con Mercado Pago. */
-  pasarela?: 'stripe'
   /** De las primeras personas que apoyaron: fundadora para siempre, aunque cancele. */
   fundador?: boolean
   error?: string

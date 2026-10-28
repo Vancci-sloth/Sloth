@@ -1,8 +1,8 @@
 /**
- * El cobro de Sloth: el apoyo mensual o anual con Mercado Pago o con Stripe, las cuentas gratis y la clave que revisa la app
+ * El cobro de Sloth: el apoyo mensual o anual con Mercado Pago, las cuentas gratis y la clave que revisa la app
  * (`server/licencia.ts`). Sloth es gratis: el apoyo es opcional y quita el recordatorio de la app. La página
- * (sloth.vancci.org) suscribe desde el navegador (`POST /suscribir`, que da el enlace de pago de Mercado Pago, o de Stripe
- * con `pasarela: 'stripe'`) y, pagada, `/gracias` enseña la clave y el instalador; la clave llega también por correo. La
+ * (sloth.vancci.org) suscribe desde el navegador (`POST /suscribir`, que da el enlace de pago de Mercado Pago) y,
+ * pagada, `/gracias` enseña la clave y el instalador; la clave llega también por correo. La
  * app crea una cuenta gratis con su `equipo` (`plan: 'gratis'`, que da una de plan `cuenta`) para entrar a la comunidad.
  * Al abrir y cada pocas horas, Sloth pregunta cómo va su clave (`POST /licencia`). La respuesta va firmada con `FIRMA`
  * (Ed25519): Sloth la guarda y, sin internet, vale hasta su `hasta` sin que se pueda alargar a mano.
@@ -18,12 +18,8 @@
  * pagar el siguiente (`/renovar`), con la misma clave. Lo pagado se lee de sus pagos (`/v1/payments/search`, por
  * `external_reference`), así que un aviso repetido no suma dos veces. Las suscripciones anuales de antes siguen igual.
  * Por eso el webhook de la aplicación «Sloth» en Mercado Pago lleva los temas de suscripciones y también «Pagos».
- *
- * Stripe (`stripe.ts`) es la otra forma de pagar, apagada: desde el 28 de octubre de 2026 la página solo ofrece Mercado
- * Pago (nadie llegó a pagar con Stripe), y esto queda por si vuelve. Acepta tarjetas de cualquier país, Apple Pay, Google
- * Pay y Link, según lo que se active en su panel. El precio va en pesos y, con Adaptive Pricing (también en su panel), quien paga desde fuera de
- * México lo ve y lo paga en su moneda. Igual que con Mercado Pago, cada aviso (`POST /webhook/stripe`) y cada revisión
- * vuelven a leer la suscripción de su API.
+ * Del 24 al 28 de octubre de 2026 también se pudo pagar con Stripe; nadie llegó a pagar y se quitó. De entonces queda
+ * la columna `stripe`, vacía.
  *
  * El apoyo cuesta lo mismo para todos (`PRECIO_MENSUAL` o `PRECIO_ANUAL`). Las `FUNDADORES` primeras personas que apoyan
  * son fundadoras (`fundador`) para siempre: más beneficios que quien llega después. Cada suscripción conserva el monto
@@ -49,7 +45,6 @@
  * Y la comunidad (`/comunidad/*`, en `comunidad.ts`), de quien tiene una licencia activa.
  */
 import { comunidad, creditos } from './comunidad.ts'
-import { firmaDeStripe, leerStripe, portalStripe, sesionStripe, stripe, suscripcionStripe, type Lectura, type SuscripcionStripe } from './stripe.ts'
 
 export interface Env {
   DB: D1Database
@@ -61,14 +56,6 @@ export interface Env {
   MP_ACCESS_TOKEN: string
   MP_ACCESS_TOKEN_PRODUCCION?: string
   MP_WEBHOOK_SECRET?: string
-  /** La llave secreta de Stripe: con `sk_live_` o `rk_live_` cobra de verdad; con `sk_test_`, en su modo de prueba. Sin ella, solo Mercado Pago. */
-  STRIPE_SECRET_KEY?: string
-  /** El secreto de firma (`whsec_…`) del webhook de Stripe. */
-  STRIPE_WEBHOOK_SECRET?: string
-  /** La configuración del portal del cliente de Stripe (`bpc_…`), donde cambia su tarjeta y ve sus recibos. */
-  STRIPE_PORTAL?: string
-  /** `1` cuando Stripe Tax está activo en la cuenta: el precio lleva el IVA desglosado, sin cambiar lo que se paga. */
-  STRIPE_IMPUESTOS?: string
   /** La llave privada Ed25519 en PKCS8 y base64. */
   FIRMA: string
   /** La dirección de este Worker, para la página a la que vuelve el cliente tras pagar. */
@@ -114,12 +101,17 @@ export interface Fila {
   folio: string | null
   cancelada: string | null
   avisado_para: string | null
-  /** El `MP_MODO` con que se creó (con Stripe, el de su llave). */
+  /** El `MP_MODO` con que se creó. */
   modo: string
-  /** Con Stripe: su sesión de pago (`cs_…`) y, pagada, su suscripción (`sub_…`). */
-  stripe: string | null
   /** Con un año pagado de una vez: el último pago de Checkout Pro que se abrió para ella. */
   preferencia: string | null
+}
+
+/** Lo que el cobro guarda de una suscripción o de los pagos del año. `hasta`: su próximo cobro o su fin, si se sabe. */
+export interface Lectura {
+  id: string
+  estado: Estado
+  hasta?: string
 }
 
 /** Cuántos se han unido: los lugares gratis tomados y las suscripciones pagadas alguna vez (de ellas, las de fundador). */
@@ -264,7 +256,6 @@ async function atender(req: Request, env: Env, ctx: ExecutionContext, url: URL):
     if (req.method === 'GET' && url.pathname === '/gracias') return await gracias(env, url)
     if (req.method === 'GET' && url.pathname === '/renovar') return await renovacion(env, url)
     if (req.method === 'POST' && url.pathname === '/webhook') return await webhook(req, env, ctx, url)
-    if (req.method === 'POST' && url.pathname === '/webhook/stripe') return await webhookStripe(req, env, ctx)
     if (req.method === 'POST' && url.pathname === '/suscribir') return await suscribir(env, await cuerpo(req))
     if (req.method === 'POST' && url.pathname === '/licencia') return await licencia(env, await cuerpo(req))
     if (req.method === 'POST' && url.pathname === '/cancelar') return await cancelar(env, await cuerpo(req))
@@ -414,8 +405,7 @@ async function precios(env: Env) {
             COUNT(CASE WHEN julianday(pagado_hasta) > julianday('now') THEN 1 END) AS apoyan
      FROM licencias WHERE plan IN ('mensual', 'anual') AND modo = 'produccion'`
   ).first<Cuenta>()
-  // `stripe`: si la página puede ofrecerlo (ya tiene sus llaves).
-  return { ...tarifa(c ?? { fundadores: 0, apoyan: 0 }, env), stripe: Boolean(env.STRIPE_SECRET_KEY && env.STRIPE_WEBHOOK_SECRET) }
+  return tarifa(c ?? { fundadores: 0, apoyan: 0 }, env)
 }
 
 /** El precio, el mismo para todos. `quedan`: los lugares de fundador que quedan; `apoyan`, para las metas del roadmap. */
@@ -430,9 +420,8 @@ export function tarifa(c: Cuenta, env: Tarifas, ahora = Date.now()) {
 }
 
 /**
- * Crea la suscripción mensual en Mercado Pago, o el pago del año (Checkout Pro), o con `pasarela: 'stripe'` la sesión
- * de pago de Stripe, pendiente de pago, y da el enlace donde el cliente paga. Desde la página, sin
- * `equipo`, nada más: la clave se ve en `/gracias` cuando se confirma el pago, nunca antes, porque cualquiera puede
+ * Crea la suscripción mensual en Mercado Pago, o el pago del año (Checkout Pro), pendiente de pago, y da el enlace
+ * donde el cliente paga. Desde la página, sin `equipo`, nada más: la clave se ve en `/gracias` cuando se confirma el pago, nunca antes, porque cualquiera puede
  * escribir el correo de otro. Desde la app de antes, con su `equipo`, también la clave, que espera el pago. Con `plan`
  * `gratis`, una cuenta gratis (solo desde la app): la clave, ya activa.
  */
@@ -447,16 +436,14 @@ async function suscribir(env: Env, c: Record<string, unknown>): Promise<Response
     throw new Rechazo(400, plan === 'gratis' ? 'Para unirte, acepta los términos.' : 'Para suscribirte, acepta el cobro automático y los términos.')
   const acepto = new Date().toISOString()
   if (plan === 'gratis') return unirse(env, email, equipo!, acepto, terminos)
-  const conStripe = c.pasarela === 'stripe'
-  if (conStripe && !env.STRIPE_SECRET_KEY) throw new Rechazo(503, 'El pago con Stripe todavía no está listo. Paga con Mercado Pago o intenta más tarde.')
   // Con una ya pagada, otra cobraría dos veces; con un lugar gratis de por vida, no hace falta. Con una cuenta, sí se apoya.
   await sinOtra(env, email, true)
   const p = await precios(env)
   // Un doble clic, o volver a abrir el pago: la misma suscripción pendiente de la última hora.
   const previa = await env.DB.prepare(
-    "SELECT * FROM licencias WHERE email = ? AND plan = ? AND estado = 'pending' AND enlace IS NOT NULL AND creada > ? AND (stripe IS NOT NULL) = ? ORDER BY creada DESC LIMIT 1"
+    "SELECT * FROM licencias WHERE email = ? AND plan = ? AND estado = 'pending' AND enlace IS NOT NULL AND creada > ? ORDER BY creada DESC LIMIT 1"
   )
-    .bind(email, plan, new Date(Date.now() - 3600_000).toISOString(), conStripe ? 1 : 0)
+    .bind(email, plan, new Date(Date.now() - 3600_000).toISOString())
     .first<Fila>()
   if (previa) {
     await env.DB.prepare('UPDATE licencias SET acepto = ?, terminos = ? WHERE id = ?').bind(acepto, terminos, previa.id).run()
@@ -482,20 +469,16 @@ async function suscribir(env: Env, c: Record<string, unknown>): Promise<Response
     folio: null,
     cancelada: null,
     avisado_para: null,
-    modo: conStripe ? (/^[sr]k_live_/.test(env.STRIPE_SECRET_KEY!) ? 'produccion' : 'prueba') : env.MP_MODO,
-    stripe: null,
+    modo: env.MP_MODO,
     preferencia: null
   }
   await env.DB.prepare('INSERT INTO licencias (id, clave, email, plan, monto, fundador, estado, creada, acepto, terminos, modo) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
     .bind(fila.id, fila.clave, email, plan, fila.monto, fila.fundador, fila.estado, fila.creada, acepto, terminos, fila.modo)
     .run()
-  // Dónde se paga y en qué columna queda: la sesión de Stripe, el pago del año o la suscripción mensual de Mercado Pago.
-  let abierto: { columna: 'stripe' | 'preferencia' | 'preapproval'; id: string; enlace?: string }
+  // Dónde se paga y en qué columna queda: el pago del año o la suscripción mensual.
+  let abierto: { columna: 'preferencia' | 'preapproval'; id: string; enlace?: string }
   try {
-    if (conStripe) {
-      const s = await sesionStripe(env, fila)
-      abierto = { columna: 'stripe', id: s.id, enlace: s.url }
-    } else if (plan === 'anual') {
+    if (plan === 'anual') {
       const p = await preferenciaMp(env, fila)
       abierto = { columna: 'preferencia', id: p.id, enlace: p.init_point }
     } else {
@@ -512,7 +495,7 @@ async function suscribir(env: Env, c: Record<string, unknown>): Promise<Response
     }
   } catch (error) {
     await env.DB.prepare('DELETE FROM licencias WHERE id = ?').bind(fila.id).run()
-    throw error instanceof Rechazo ? new Rechazo(502, `${conStripe ? 'Stripe' : 'Mercado Pago'} no pudo abrir el pago. Revisa tu correo e intenta otra vez.`) : error
+    throw error instanceof Rechazo ? new Rechazo(502, 'Mercado Pago no pudo abrir el pago. Revisa tu correo e intenta otra vez.') : error
   }
   await env.DB.prepare(`UPDATE licencias SET ${abierto.columna} = ?, enlace = ?, revisada = ? WHERE id = ?`)
     .bind(abierto.id, abierto.enlace ?? null, new Date().toISOString(), fila.id)
@@ -591,31 +574,23 @@ async function sinOtra(env: Env, email: string, apoyar: boolean) {
   if (!apoyar && results.length) throw new Rechazo(409, 'Ese correo ya tiene una cuenta de Sloth. Su clave te llegó por correo, en «Tu cuenta de Sloth».')
 }
 
-/** Si la clave sigue activa en esta computadora, firmado. Lee la suscripción de Mercado Pago o de Stripe si hace rato que no. */
+/** Si la clave sigue activa en esta computadora, firmado. Lee la suscripción o los pagos de Mercado Pago si hace rato que no. */
 async function licencia(env: Env, c: Record<string, unknown>): Promise<Response> {
   const equipo = equipoDe(c)
   let fila = await porClave(env, c.clave)
   const ahora = Date.now()
   const revisada = fila.revisada ? Date.parse(fila.revisada) : 0
-  // Si Mercado Pago (o Stripe) no contesta, vale lo último que dijo.
-  if ((fila.preapproval || fila.stripe || fila.preferencia) && ahora - revisada > (fila.estado === 'pending' ? REVISAR_PENDIENTE : REVISAR)) fila = await refrescar(env, fila).catch(() => fila)
+  // Si Mercado Pago no contesta, vale lo último que dijo.
+  if ((fila.preapproval || fila.preferencia) && ahora - revisada > (fila.estado === 'pending' ? REVISAR_PENDIENTE : REVISAR)) fila = await refrescar(env, fila).catch(() => fila)
   if (!(await recordarEquipo(env, fila.clave, equipo, ahora)))
     throw new Rechazo(409, `Esta clave ya se usa en ${EQUIPOS} computadoras. Si cambiaste de computadora, escríbenos y la liberamos.`)
   return firmada(env, fila, equipo, ahora)
 }
 
-/** Cancela la suscripción en Mercado Pago o en Stripe. Lo ya pagado sigue valiendo hasta su fecha. */
+/** Cancela la suscripción en Mercado Pago. Lo ya pagado sigue valiendo hasta su fecha. */
 async function cancelar(env: Env, c: Record<string, unknown>): Promise<Response> {
   const equipo = equipoDe(c)
   let fila = await porClave(env, c.clave)
-  if (fila.stripe?.startsWith('sub_') && fila.estado !== 'cancelled') {
-    // Ya cancelada, Stripe contesta 400 o 404: basta con volver a leerla.
-    await stripe(env, 'DELETE', `/v1/subscriptions/${encodeURIComponent(fila.stripe)}`).catch((e) => {
-      if (!(e instanceof Rechazo) || (e.status !== 400 && e.status !== 404)) throw e
-    })
-    fila = await refrescar(env, fila)
-    if (fila.estado !== 'cancelled') throw new Rechazo(502, 'Stripe no pudo cancelar la suscripción. Intenta otra vez en un momento.')
-  }
   if (fila.preapproval && fila.estado !== 'cancelled') {
     // Un 400 es casi siempre que ya estaba cancelada (desde la cuenta del cliente, o por Mercado Pago tras un cobro
     // rechazado): basta con volver a leerla.
@@ -632,7 +607,7 @@ async function cancelar(env: Env, c: Record<string, unknown>): Promise<Response>
     const hasta = fila.pagado_hasta && Date.parse(fila.pagado_hasta) > Date.now() ? ` Sloth sigue abierta hasta el ${fecha(fila.pagado_hasta)}, lo que ya pagaste.` : ''
     await correo(env, fila.email, `Cancelaste tu suscripción a Sloth · folio ${fila.folio}`, [
       'Hola:',
-      `Cancelamos tu suscripción a Sloth. Tu folio de cancelación es ${fila.folio}. ${quien(fila)} ya no te hará más cobros.${hasta}`,
+      `Cancelamos tu suscripción a Sloth. Tu folio de cancelación es ${fila.folio}. Mercado Pago ya no te hará más cobros.${hasta}`,
       'Si no fuiste tú, responde a este correo.'
     ]).catch((e) => console.error('Correo de cancelación', e instanceof Error ? e.message : e))
   }
@@ -640,20 +615,16 @@ async function cancelar(env: Env, c: Record<string, unknown>): Promise<Response>
 }
 
 /**
- * Adónde se va a pagar desde Sloth. Con Stripe, su portal: ahí el cliente cambia su tarjeta y ve sus recibos (cancelar
- * no está ahí: se cancela desde Sloth, que da el folio). Con un año pagado de una vez, el pago del año siguiente. Con la
- * suscripción de Mercado Pago, la tarjeta se cambia en su propia cuenta.
+ * Adónde se va a pagar desde Sloth: con un año pagado de una vez, el pago del año siguiente. La tarjeta de la
+ * suscripción mensual se cambia en la cuenta de Mercado Pago del cliente.
  */
 async function pago(env: Env, c: Record<string, unknown>): Promise<Response> {
   const equipo = equipoDe(c)
   const fila = await porClave(env, c.clave)
-  const renueva = !!fila.preferencia && fila.estado === 'pagado'
-  if (!renueva && !fila.stripe?.startsWith('sub_')) throw new Rechazo(400, 'Esta suscripción se paga con Mercado Pago: cambia tu tarjeta desde tu cuenta de Mercado Pago.')
+  if (!fila.preferencia || fila.estado !== 'pagado') throw new Rechazo(400, 'Esta suscripción se paga con Mercado Pago: cambia tu tarjeta desde tu cuenta de Mercado Pago.')
   if (!(await recordarEquipo(env, fila.clave, equipo, Date.now())))
     throw new Rechazo(409, `Esta clave ya se usa en ${EQUIPOS} computadoras. Si cambiaste de computadora, escríbenos y la liberamos.`)
-  if (renueva) return json({ enlace: await renovar(env, fila) })
-  const s = await suscripcionStripe(env, fila.stripe!)
-  return json({ enlace: (await portalStripe(env, s.customer)).url })
+  return json({ enlace: await renovar(env, fila) })
 }
 
 /**
@@ -689,43 +660,11 @@ async function aviso(env: Env, tipo: string, id: string) {
   if (fila) await guardarEstado(env, fila, leerMp(p))
 }
 
-/**
- * Un aviso de Stripe. Como con Mercado Pago: se comprueba su firma, se contesta enseguida y la suscripción se lee de su
- * API. Sirven `checkout.session.completed` (el primer pago) y `customer.subscription.*` (cada cobro, pausa o cancelación).
- */
-async function webhookStripe(req: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
-  const texto = await req.text()
-  if (!(await firmaDeStripe(req.headers.get('stripe-signature'), texto, env.STRIPE_WEBHOOK_SECRET, Date.now()))) return new Response('Firma inválida', { status: 401 })
-  const e = JSON.parse(texto) as { type?: string; data?: { object?: { id?: string; subscription?: string | null; client_reference_id?: string | null; metadata?: Record<string, string> } } }
-  const o = e.data?.object ?? {}
-  const pago = e.type === 'checkout.session.completed'
-  const suscripcion = pago ? o.subscription : e.type?.startsWith('customer.subscription.') ? o.id : undefined
-  const licencia = (pago ? o.client_reference_id : o.metadata?.licencia) ?? ''
-  if (suscripcion)
-    ctx.waitUntil(
-      (async () => {
-        const fila = await env.DB.prepare('SELECT * FROM licencias WHERE stripe = ? OR id = ?').bind(suscripcion, licencia).first<Fila>()
-        if (fila) await guardarEstado(env, fila, leerStripe(await suscripcionStripe(env, suscripcion)))
-      })().catch((error) => console.error('Aviso de Stripe', e.type, error instanceof Error ? error.message : error))
-    )
-  return new Response('ok')
-}
-
-/** Vuelve a leer la suscripción de Mercado Pago o de Stripe, o los pagos del año pagado de una vez, y la guarda. */
+/** Vuelve a leer la suscripción de Mercado Pago, o los pagos del año pagado de una vez, y la guarda. */
 async function refrescar(env: Env, fila: Fila): Promise<Fila> {
-  if (fila.stripe) return guardarEstado(env, fila, await stripeDe(env, fila.stripe))
   if (fila.preferencia) return guardarEstado(env, fila, leerPagos(await pagosMp(env, fila), fila))
   if (!fila.preapproval) return fila
   return guardarEstado(env, fila, leerMp(await mp<Preapproval>(env, 'GET', `/preapproval/${encodeURIComponent(fila.preapproval)}`)))
-}
-
-/** Lo que dice Stripe de una fila: su suscripción o, mientras no se paga, su sesión de pago. */
-async function stripeDe(env: Env, id: string): Promise<Lectura> {
-  if (id.startsWith('sub_')) return leerStripe(await suscripcionStripe(env, id))
-  const s = await stripe<{ status: string; subscription: SuscripcionStripe | null }>(env, 'GET', `/v1/checkout/sessions/${encodeURIComponent(id)}?expand[]=subscription`)
-  if (s.subscription) return leerStripe(s.subscription)
-  // Una sesión que venció sin pagarse (a las 24 horas) ya no se puede pagar.
-  return { id, estado: s.status === 'expired' ? 'cancelled' : 'pending' }
 }
 
 /** Una suscripción de Mercado Pago, como la guarda el cobro. Cancelada, ya no dice hasta cuándo se pagó: vale la del último cobro que se vio. */
@@ -764,8 +703,7 @@ async function guardarEstado(env: Env, fila: Fila, l: Lectura): Promise<Fila> {
   const ahora = new Date().toISOString()
   const nueva: Fila = {
     ...fila,
-    preapproval: fila.stripe || fila.preferencia ? fila.preapproval : l.id,
-    stripe: fila.stripe ? l.id : null,
+    preapproval: fila.preferencia ? fila.preapproval : l.id,
     estado,
     // Lo pagado de una vez sale entero de sus pagos: uno reembolsado deja de contar.
     pagado_hasta: fila.preferencia ? (l.hasta ?? null) : (l.hasta ?? fila.pagado_hasta),
@@ -777,8 +715,8 @@ async function guardarEstado(env: Env, fila: Fila, l: Lectura): Promise<Fila> {
     const r = await env.DB.prepare('UPDATE licencias SET autorizada = ? WHERE id = ? AND autorizada IS NULL').bind(ahora, fila.id).run()
     if (r.meta.changes) await bienvenida(env, nueva).catch((e) => console.error('Correo con la clave', e instanceof Error ? e.message : e))
   }
-  await env.DB.prepare('UPDATE licencias SET preapproval = ?, stripe = ?, estado = ?, pagado_hasta = ?, autorizada = COALESCE(autorizada, ?), revisada = ? WHERE id = ?')
-    .bind(nueva.preapproval, nueva.stripe, estado, nueva.pagado_hasta, nueva.autorizada, ahora, fila.id)
+  await env.DB.prepare('UPDATE licencias SET preapproval = ?, estado = ?, pagado_hasta = ?, autorizada = COALESCE(autorizada, ?), revisada = ? WHERE id = ?')
+    .bind(nueva.preapproval, estado, nueva.pagado_hasta, nueva.autorizada, ahora, fila.id)
     .run()
   return nueva
 }
@@ -787,16 +725,11 @@ async function guardarEstado(env: Env, fila: Fila, l: Lectura): Promise<Fila> {
 function bienvenida(env: Env, f: Fila) {
   return correo(env, f.email, `Tu clave de Sloth: ${f.clave}`, [
     'Hola:',
-    `${quien(f)} confirmó tu pago: gracias por apoyar a Sloth. Guarda este correo, es donde queda tu clave.`,
+    `Mercado Pago confirmó tu pago: gracias por apoyar a Sloth. Guarda este correo, es donde queda tu clave.`,
     `Tu clave: ${f.clave}`,
     `Pégala en Sloth, en Opciones, y deja de salirte el recordatorio. Si aún no la tienes, descárgala en ${env.ORIGEN}/descargar (Mac: ${env.ORIGEN}/descargar?so=mac; Linux: ${env.ORIGEN}/descargar?so=linux). La clave sirve en dos computadoras a la vez.`,
     'Sloth trabaja con tu propia cuenta de Claude Pro o Max, que pagas aparte a Anthropic. Si tienes dudas, responde a este correo.'
   ])
-}
-
-/** Quién cobra esta suscripción, para los correos y las páginas. */
-export function quien(f: Pick<Fila, 'stripe'>): string {
-  return f.stripe ? 'Stripe' : 'Mercado Pago'
 }
 
 /**
@@ -829,7 +762,6 @@ async function firmada(env: Env, f: Fila, equipo: string, ahora: number): Promis
     emitido: new Date(ahora).toISOString(),
     enlace: f.estado === 'pending' ? (f.enlace ?? undefined) : undefined,
     folio: f.folio ?? undefined,
-    pasarela: f.stripe ? 'stripe' : undefined,
     fundador: fundador || undefined
   })
   const llave = await crypto.subtle.importKey('pkcs8', base64(env.FIRMA), { name: 'Ed25519' }, false, ['sign'])
@@ -951,9 +883,8 @@ export async function avisarCobros(env: Env, ahora = Date.now()) {
         ])
       : correo(env, f.email, `Tu próximo cobro de Sloth: ${fecha(f.pagado_hasta!)}`, [
           'Hola:',
-          `El ${fecha(f.pagado_hasta!)} ${quien(f)} te cobrará ${f.monto.toLocaleString('es-MX')} MXN (IVA incluido)${f.stripe ? ', o lo mismo en tu moneda si pagas desde fuera de México,' : ''} por tu suscripción ${cada} a Sloth.`,
-          'Si no quieres que se renueve, cancélala antes de esa fecha en Sloth: Opciones, Suscripción, «Cancelar suscripción». También puedes responder a este correo o escribirnos por WhatsApp. Lo ya pagado sigue valiendo hasta su fecha.',
-          ...(f.stripe ? ['¿Cambiaste de tarjeta? Ponla en Sloth: Opciones, Suscripción, «Cambiar tarjeta».'] : [])
+          `El ${fecha(f.pagado_hasta!)} Mercado Pago te cobrará ${f.monto.toLocaleString('es-MX')} MXN (IVA incluido) por tu suscripción ${cada} a Sloth.`,
+          'Si no quieres que se renueve, cancélala antes de esa fecha en Sloth: Opciones, Suscripción, «Cancelar suscripción». También puedes responder a este correo o escribirnos por WhatsApp. Lo ya pagado sigue valiendo hasta su fecha.'
         ])
     ).catch((e) => (console.error('Aviso de cobro', e instanceof Error ? e.message : e), false))
     if (enviado) await env.DB.prepare('UPDATE licencias SET avisado_para = ? WHERE id = ?').bind(f.pagado_hasta, f.id).run()
@@ -995,8 +926,7 @@ function fecha(iso: string): string {
 }
 
 /**
- * Adonde vuelve el cliente tras pagar en Mercado Pago o en Stripe (`?s=` es su suscripción, que solo conocen él y quien
- * cobra).
+ * Adonde vuelve el cliente tras pagar en Mercado Pago (`?s=` es su suscripción, que solo conocen él y Mercado Pago).
  * Mientras no se confirme el pago, se recarga sola y vuelve a preguntar; confirmado, enseña la clave y el instalador de
  * cada sistema. Sin `s` viene de la app de antes, que espera abierta y se desbloquea sola.
  */
@@ -1034,11 +964,11 @@ ${correoAviso(escapar(fila.email))}
   if (fila.estado === 'pending')
     return pagina(
       'Esperando tu pago…',
-      `<p>En cuanto ${quien(fila)} lo confirme, aquí aparecen tu clave y el instalador. Suele tardar unos segundos.</p>${correoAviso(escapar(fila.email))}`,
+      `<p>En cuanto Mercado Pago lo confirme, aquí aparecen tu clave y el instalador. Suele tardar unos segundos.</p>${correoAviso(escapar(fila.email))}`,
       5
     )
   return pagina(
-    `${quien(fila)} no confirmó el pago`,
+    'Mercado Pago no confirmó el pago',
     '<p>Vuelve a <a href="https://sloth.vancci.org">sloth.vancci.org</a> e inténtalo otra vez, o escríbenos desde ahí.</p>'
   )
 }

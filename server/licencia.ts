@@ -2,7 +2,7 @@
  * La clave de la app que se vende (`VENTA`): la de una cuenta gratis, con la que se entra a la comunidad, o la de un
  * apoyo, que quita el recordatorio (`web/src/Licencia.tsx`). Sloth abre sin ella. El apoyo se paga en la página de Sloth,
  * que da la clave; la cuenta se crea aquí (`/api/licencia/unirse`). El cobro es `licencias/`, un Worker de Cloudflare con
- * Mercado Pago o Stripe: aquí solo se le pregunta. Su respuesta llega firmada y se guarda en `data/licencia.json`. Sin
+ * Mercado Pago: aquí solo se le pregunta. Su respuesta llega firmada y se guarda en `data/licencia.json`. Sin
  * internet, vale hasta su `hasta` (una semana como mucho), y editar el archivo no la alarga. Se vuelve a preguntar al
  * abrir y cada 6 horas.
  */
@@ -95,7 +95,7 @@ export function licencia(app: string) {
 
   function estado(): Licencia {
     const d = firmado()
-    return { activa: activa(), clave: a.clave, email: d?.email ?? a.email, plan: d?.plan, monto: d?.monto, estado: d?.estado, pagadaHasta: d?.pagadaHasta, folio: d?.folio, pasarela: d?.pasarela, fundador: d?.fundador, error: error || undefined }
+    return { activa: activa(), clave: a.clave, email: d?.email ?? a.email, plan: d?.plan, monto: d?.monto, estado: d?.estado, pagadaHasta: d?.pagadaHasta, folio: d?.folio, fundador: d?.fundador, error: error || undefined }
   }
 
   async function cobro<T>(ruta: string, cuerpo: object): Promise<T> {
@@ -163,7 +163,7 @@ export function licencia(app: string) {
       }
       // Para la ventana de Electron, al buscar la versión nueva: quien apoya la recibe antes (licencias/, `ANTICIPO`).
       if (ruta === '/api/licencia/credencial' && metodo === 'GET') return enviar(res, 200, credencial() ?? {})
-      // Con Stripe: el enlace a su portal, donde se cambia la tarjeta. Con un año pagado de una vez: el pago del siguiente.
+      // Con un año pagado de una vez: el pago del siguiente.
       if (ruta === '/api/licencia/pago' && metodo === 'POST') {
         if (!a.clave) throw new Rechazo(400, 'No hay una suscripción en esta computadora.')
         return enviar(res, 200, await cobro<{ enlace: string }>('/pago', { clave: a.clave, equipo }))
