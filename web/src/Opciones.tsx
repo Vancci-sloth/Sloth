@@ -6,6 +6,7 @@ import { encender, encendido, notificar, sonar, usePermiso } from './avisos'
 import { abrirBienvenida } from './Bienvenida'
 import { Picker } from './Composer'
 import { EspacioDisco } from './Espacio' // espacio en disco
+import { TuEquipo } from './Equipo' // tu equipo
 import { Icono } from './Iconos'
 import { SuscripcionOpciones } from './Licencia' // apoyo
 import { Logo } from './Logos'
@@ -87,6 +88,7 @@ function Ajustes({ onDone, iniciando, onIniciando }: { onDone(): void; iniciando
       <Grupo titulo="Avisos">
         <Avisos />
       </Grupo>
+      <TuEquipo />
       <EspacioDisco />
       <Herramientas req={req} />
     </div>

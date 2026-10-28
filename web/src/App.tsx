@@ -22,6 +22,7 @@ import { BotonNavegador, PanelNavegador, useNavegadorAbierto } from './Navegador
 import { conReferencia, ReferenciaVideo } from './Referencia'
 import { useSoltar } from './Soltar'
 import { elegirModelos, lineaSubagentes, Modelos, type Avanzado } from './Modelos'
+import { AvisoEquipo } from './Equipo' // tu equipo
 import { MisVideos, Rejilla, VideoDe } from './MisVideos'
 import { Modelos3D } from './Modelos3D' // modelos 3D
 import { Comunidad } from './Comunidad' // comunidad
@@ -633,7 +634,12 @@ export function App() {
             <MisVideos cards={cards} sessions={sessions} estilo={view.estilo} onEstilo={(estilo) => go({ kind: 'videos', estilo })} />
           </ConNavegadorRedes>
         )}
-        {newCard && draftId && version && atrasado(version) && <AvisoVersion />}
+        {newCard && draftId && (
+          <div className="avisos-nuevo">
+            {version && atrasado(version) && <AvisoVersion />}
+            <AvisoEquipo /> {/* tu equipo */}
+          </div>
+        )}
         {newCard && draftId && (
           <NewSession
             key={draftId}

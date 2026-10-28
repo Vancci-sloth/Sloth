@@ -16,7 +16,7 @@ import type { CambiosSloth } from './cambios-sloth.ts'
  * cada 3) y por cada 4 GB de memoria. Y uno más no arranca con menos de 2 GB libres, que piden los renders; pero si no
  * trabaja ninguno, arranca igual: si no, un lote se quedaría esperando para siempre en una máquina con poca memoria.
  */
-const CABEN = Math.max(1, Math.min(Math.floor(cpus().length / 3), Math.floor(totalmem() / 4e9)))
+export const CABEN = Math.max(1, Math.min(Math.floor(cpus().length / 3), Math.floor(totalmem() / 4e9)))
 const LIBRE = 2e9
 /**
  * Un video del lote no arranca con menos de esto libre en el disco de su carpeta. Un render deja varios GB de temporales,

@@ -32,6 +32,7 @@ import { peticionDeConfianza } from './origen.ts'
 import { reinicioSolo } from './reinicio.ts'
 import { actualizarYtDlp, instalandoAlgo, instalar, pythonSlothEntero, requisitos } from './requisitos.ts'
 import { espacio } from './espacio.ts' // espacio en disco
+import { equipo } from './equipo.ts' // tu equipo
 import { licencia } from './licencia.ts' // suscripción
 import { Sessions } from './sessions.ts'
 import { eventosEnVivo } from './eventos-en-vivo.ts'
@@ -134,6 +135,8 @@ const comunidadApi = comunidad(APP, {
 avance = avances(sessions, cards, broadcast)
 // Opciones → Espacio en disco: lo que dejan los videos y ya no hace falta. Lo seguro lo borra solo, cada 6 horas.
 const disco = espacio({ app: APP, venta: VENTA, sessions, cards, ocupado, python: () => pythonSlothEntero(APP) }) // espacio en disco
+// Opciones → Tu equipo: con qué transcribe la voz y cuánto tarda cada cosa en esta computadora.
+const maquina = equipo({ app: APP, ocupado }) // tu equipo
 
 // Si el agente (o tú) edita cards.json, las cards se actualizan solas.
 watch(CARDS, () => broadcast({ type: 'cards', cards: cards() }))
@@ -147,7 +150,7 @@ function ocupado(): string | null {
   if (subirLargos?.ocupado()) return subirLargos.ocupado()
   if (idear?.ocupado()) return idear.ocupado() // ideas: una investigación en curso
   if (actualizando) return actualizando
-  return instalandoAlgo() ?? conectando() ?? conectandoCodex()
+  return maquina.ocupado() ?? instalandoAlgo() ?? conectando() ?? conectandoCodex()
 }
 /** Mientras «Actualizar» corre npm install y la comprobación: qué se está actualizando. */
 let actualizando: string | null = null
@@ -259,6 +262,7 @@ async function api(req: IncomingMessage, res: ServerResponse, url: URL): Promise
   }
 
   if (await disco.api(req, res, path)) return true // espacio en disco
+  if (await maquina.api(req, res, path)) return true // tu equipo
 
   if (path === '/api/opciones' && method === 'GET') {
     send(res, 200, opciones())

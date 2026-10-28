@@ -72,8 +72,11 @@ input, textarea, select { font: inherit; color: inherit; }
 @keyframes pulse { 50% { opacity: 0.4; } }
 
 .main { position: relative; min-width: 0; min-height: 0; display: flex; flex-direction: column; }
-.aviso-version { position: absolute; top: 14px; right: 18px; z-index: 2; padding: 6px 12px; border-radius: 999px; background: var(--amber-tinte); border: 1px solid var(--amber); color: var(--amber); font-size: 12.5px; font-weight: 600; }
+/* Arriba a la derecha del hilo nuevo: «Actualizar Claude Code» y «Acelerar Sloth en tu equipo». */
+.avisos-nuevo { position: absolute; top: 14px; right: 18px; z-index: 2; display: flex; gap: 8px; align-items: center; }
+.aviso-version { padding: 6px 12px; border-radius: 999px; background: var(--amber-tinte); border: 1px solid var(--amber); color: var(--amber); font-size: 12.5px; font-weight: 600; }
 .aviso-version:hover { background: var(--amber); color: var(--sobre-ambar); }
+.aviso-version.quieto, .aviso-version.quieto:hover { background: var(--amber-tinte); color: var(--amber); font-weight: 500; }
 
 /* Inicio: arriba las skills, a lo ancho; abajo, centradas, la elegida y el compositor, que no se mueven de su sitio. Si
    sobran skills, hacen scroll ellas solas y el compositor sigue a la vista. */

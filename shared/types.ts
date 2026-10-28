@@ -1272,3 +1272,33 @@ export interface Espacio {
  * alineador de torch (`parakeet`) o sin torch (`parakeet-solo`, en los Mac con Intel).
  */
 export type MotorVoz = 'whisper' | 'parakeet' | 'parakeet-solo'
+
+/** Opciones → Tu equipo (`server/equipo.ts`): qué tiene esta computadora y cuánto tarda cada cosa en ella. */
+export interface Equipo {
+  procesador: string
+  hilos: number
+  /** Bytes. */
+  memoria: number
+  /** La tarjeta de video, si se supo cuál. */
+  tarjeta?: string
+  /** Con qué transcribe hoy la voz; null si aún no está el Python de Sloth. */
+  motor: MotorVoz | null
+  /** Si su Python de Sloth es el de CUDA: Whisper va en la tarjeta (si no, en el procesador, hasta bajar Parakeet). */
+  nvidia: boolean
+  /** Lo medido de la voz: segundos de trabajo por segundo de voz (`veces`) y de cargar el motor (`carga`). */
+  voz?: { motor: MotorVoz; veces: number; carga: number; fecha: string }
+  /** Lo medido del render final, a tamaño completo: cuadros por segundo. */
+  render?: { cuadros: number; fecha: string }
+  /** Con qué dibuja el 3D el Chrome del render; `software`, sin la tarjeta (muy lento). */
+  tresD?: { nombre: string; software: boolean }
+  /** Cuántos videos de un lote trabajan a la vez. */
+  aLaVez: number
+  /**
+   * Si hay algo que la haría más rápida: Parakeet en una sin NVIDIA que aún transcribe con Whisper. Lo ofrece el aviso
+   * del hilo nuevo; `estado`, `paso` y `error`, mientras se baja y si falló.
+   */
+  mejora?: { estado?: 'instalando' | 'esperando'; paso?: string; error?: string }
+  midiendo: boolean
+  /** Por qué no se pudo medir la última vez. */
+  error?: string
+}
