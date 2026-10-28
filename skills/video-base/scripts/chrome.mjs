@@ -82,6 +82,24 @@ function barrerPerfiles() {
 }
 
 /**
+ * Con qué dibuja Chrome, en cada sistema (ADR 0006: lo de Windows lleva su par en Mac y Linux). Con `gpu`, la tarjeta por
+ * ANGLE: compone, rasteriza y hace el WebGL. ANGLE habla con la tarjeta por D3D11 en Windows, por Metal en Mac y por
+ * EGL en Linux (las de Remotion: `angle` y `angle-egl`); sin decírselo, Chrome sin ventana en Linux suele quedarse en
+ * SwiftShader, y allí la tarjeta también hace falta sacarla de la lista negra. Sin tarjeta, en Windows WebGL (Three.js)
+ * va por WARP, el rasterizador por CPU de D3D11, unas 5 veces más rápido que SwiftShader, que queda de respaldo; en Mac y
+ * Linux no hay WARP: SwiftShader. Y componer y rasterizar en la CPU con Skia es mucho más rápido que emularlo: el
+ * rasterizador queda solo para WebGL.
+ */
+export function banderasTarjeta(gpu, sistema = process.platform) {
+  if (sistema === 'win32') {
+    return gpu ? ['--use-angle=d3d11', '--enable-gpu-rasterization'] : ['--use-angle=d3d11-warp', '--enable-unsafe-swiftshader', '--disable-gpu-compositing']
+  }
+  if (!gpu) return ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--disable-gpu-compositing']
+  if (sistema === 'darwin') return ['--use-gl=angle', '--use-angle=metal', '--enable-gpu-rasterization']
+  return ['--use-gl=angle', '--use-angle=gl-egl', '--enable-gpu', '--ignore-gpu-blocklist', '--enable-gpu-rasterization']
+}
+
+/**
  * Abre un Chrome y una pestaña. Devuelve `{ enviar(metodo, params), alEvento(nombre, fn), capturar(formato, calidad), cerrar() }`.
  * `extra`: más banderas de arranque (las que solo necesita quien captura páginas de internet).
  * `gpu`: `true` dibuja con la tarjeta, `false` en la CPU y `'si-hay'` con la tarjeta si Chrome compone con ella; si no
@@ -107,10 +125,7 @@ export async function abrirChrome({ ancho, alto, gpu = false, extra = [] } = {})
     '--disable-background-timer-throttling',
     '--disable-renderer-backgrounding',
     '--disable-backgrounding-occluded-windows',
-    // Con `gpu`, la tarjeta por ANGLE: compone, rasteriza y hace el WebGL. Sin tarjeta, WebGL (Three.js) va por WARP,
-    // el rasterizador por CPU de Windows (D3D11), unas 5 veces más rápido que SwiftShader, que queda de respaldo; y
-    // componer y rasterizar en la CPU con Skia es mucho más rápido que emularlo: el rasterizador queda solo para WebGL.
-    ...(gpu ? ['--use-angle=d3d11', '--enable-gpu-rasterization'] : ['--use-angle=d3d11-warp', '--enable-unsafe-swiftshader', '--disable-gpu-compositing']),
+    ...banderasTarjeta(Boolean(gpu)),
     ...(marcos ? ['--deterministic-mode'] : []),
     ...extra,
     'about:blank'

@@ -35,8 +35,12 @@ sabía cuánto iba a tardar, y la app de Mac, que es de Intel, no podía instala
   Antes de dibujar, `render.cjs` mira con qué dibuja Chrome el 3D (`video-base/scripts/equipo.cjs`): por software
   (SwiftShader) fue un cuadro por segundo contra 9 con la tarjeta, y lo avisa al agente y en Tu equipo.
 - **El renderizador web** (`@remotion/web-renderer`, el de El Diff: Edge con HTML-in-canvas y H.264 por la tarjeta, 5,6
-  veces más rápido allí) no sirve aún para el 3D: el `<ThreeCanvas>` no llega a crearse dentro de su capa oculta. Si
-  Remotion lo arregla, es el siguiente paso para el render en un equipo lento.
+  veces más rápido allí) sí sirve para el 3D. El que fallaba era el `<Audio>` de remotion: truena en el render web, React
+  desmonta el árbol y el `delayRender` del `<ThreeCanvas>` se queda esperando. El prototipo
+  (`video-explicativo/scripts/render_web.mjs`) lo cambia al empaquetar y pega la voz con FFmpeg. Con el video entero de
+  nuevo-4 tardó 38 s contra 120 de `render.cjs` (3,2 veces) y, con solo 4 hilos, 59 contra 213 (3,6), sin cuadros corridos
+  y más parecido a los cuadros sin pérdida que el render de siempre (que pierde en sus capturas JPEG). Aún no lo usa
+  `final.py`.
 
 ## Consecuencias
 
@@ -48,6 +52,8 @@ sabía cuánto iba a tardar, y la app de Mac, que es de Intel, no podía instala
 - En un Mac con Intel, sin torch: Parakeet sin alinear y sin vectores (ADR 0006).
 - Un idioma fuera de los 25 de Parakeet (japonés, hindi) se transcribe mal sin NVIDIA.
 - El render del 3D sigue siendo lo más largo en una computadora vieja: cada cuadro lo dibuja Chrome y le saca una foto.
-  Ahora codifica más ligero, avisa si va por software y dice cuánto falta.
+  Ahora codifica más ligero, avisa si va por software y dice cuánto falta. El renderizador web le quita la foto y el x264,
+  pero no el dibujo: React y three.js rehacen el mundo en cada cuadro (~10 ms en un Edge aquí), y más de 3 Edge se
+  estorban en la tarjeta aunque esta vaya al 20-40 %.
 - Con NVIDIA, Whisper tarda en arrancar (76 s de 93 con 20 s de voz en el equipo del usuario): Parakeet también sería más
   rápido ahí, sin las pistas de nombres. No se cambió.
