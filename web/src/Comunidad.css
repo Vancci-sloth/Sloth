@@ -233,6 +233,17 @@
 .com-enviar:disabled { background: var(--panel-2); color: var(--muted); opacity: 1; }
 .com-enviar .com-ico { width: 14px; height: 14px; stroke-width: 2.6; }
 .com-comentar-error { grid-column: 2; color: var(--bad); font-size: 12.5px; }
+.com-comentar-caja.soltando { border-color: var(--amber); box-shadow: 0 0 0 3px var(--amber-tinte); }
+.com-adjuntar { width: 28px; height: 28px; flex: none; display: grid; place-items: center; border-radius: 50%; color: var(--muted); transition: color 0.15s, background 0.15s; }
+.com-adjuntar:hover:not(:disabled), .com-comentar-caja.soltando .com-adjuntar { background: var(--line); color: var(--text); }
+.com-adjuntar .com-ico { width: 15px; height: 15px; }
+.com-comentar-fotos { grid-column: 2; margin-top: 4px; }
+/* Las imágenes de un comentario, dentro de su globo: una sola, más grande. */
+.com-comentario-fotos { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 2px; }
+.com-comentario-fotos button { display: block; overflow: hidden; border-radius: 8px; border: 1px solid var(--line); background: var(--bg); cursor: zoom-in; transition: border-color 0.15s; }
+.com-comentario-fotos button:hover { border-color: var(--amber); }
+.com-comentario-fotos img { display: block; height: 120px; max-width: 220px; object-fit: cover; }
+.com-comentario-fotos.n1 img { height: auto; max-height: 300px; max-width: 100%; }
 
 /* Tu perfil. */
 .com-caja { width: min(440px, 100%); margin-top: 12vh; padding: 22px 22px 16px; border-radius: 18px; border: 1px solid var(--line); background: linear-gradient(180deg, var(--panel-2), var(--panel) 140px); box-shadow: 0 30px 80px rgba(0, 0, 0, 0.6); animation: com-sube 0.22s cubic-bezier(0.2, 0.8, 0.2, 1); }

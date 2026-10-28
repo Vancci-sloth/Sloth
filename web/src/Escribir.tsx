@@ -31,6 +31,14 @@ interface Subiendo {
 const Icono = ({ de }: { de: NombreIcono }) => <IconoBase de={de} className="esc-ico" />
 let siguiente = 0
 
+/** Sube una imagen a la comunidad: de una publicación o de un comentario. */
+export async function subirImagen(f: File): Promise<AdjuntoComunidad> {
+  const r = await fetch(`/api/comunidad/archivo?tipo=${encodeURIComponent(f.type)}`, { method: 'POST', body: f })
+  const j = (await r.json().catch(() => ({}))) as { llave?: string; url?: string; error?: string }
+  if (!r.ok || !j.llave || !j.url) throw new Error(j.error ?? `No se pudo subir ${f.name || 'la captura'}.`)
+  return { tipo: 'imagen', llave: j.llave, url: j.url }
+}
+
 export function Escribir(props: {
   inicial?: Partial<Escrito>
   /** Al editar: no se vacía al guardar. */
@@ -110,18 +118,7 @@ export function Escribir(props: {
     const fotos = archivos.filter((f) => f.type.startsWith('image/'))
     if (!fotos.length) return setError(archivos.length ? 'Aquí solo se sueltan imágenes; un video, elígelo de «Mis videos».' : '')
     setError('')
-    await Promise.all(
-      fotos.map((f) =>
-        conSubida(
-          undefined,
-          fetch(`/api/comunidad/archivo?tipo=${encodeURIComponent(f.type)}`, { method: 'POST', body: f }).then(async (r) => {
-            const j = (await r.json().catch(() => ({}))) as { llave?: string; url?: string; error?: string }
-            if (!r.ok || !j.llave || !j.url) throw new Error(j.error ?? `No se pudo subir ${f.name || 'la captura'}.`)
-            return { tipo: 'imagen' as const, llave: j.llave, url: j.url }
-          })
-        )
-      )
-    )
+    await Promise.all(fotos.map((f) => conSubida(undefined, subirImagen(f))))
   }
   useEffect(() => {
     if (!props.subir) return

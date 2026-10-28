@@ -2,7 +2,7 @@ import { type CSSProperties, type DragEvent, useEffect, useLayoutEffect, useRef,
 import type { AdjuntoComunidad, Autor, AvisoComunidad, CategoriaComunidad, ComentarioComunidad, FeedComunidad, PublicacionComunidad, RoadmapComunidad } from '../../shared/types'
 import { api, ErrorApi } from './api'
 import { Confirm } from './Confirm'
-import { Escribir, type Escrito } from './Escribir'
+import { Escribir, type Escrito, subirImagen } from './Escribir'
 import { LINK } from './etiquetas'
 import { Unirse } from './Licencia'
 import { Icono as IconoBase, type NombreIcono } from './Iconos'
@@ -18,7 +18,8 @@ import './Comunidad.css'
  * Mejoras es lo que la gente quiere que Sloth haga mejor: el creador dice cómo va cada una, y todos lo ven.
  * «Compartir» de un video de «Mis videos» abre el compositor en Lo que hice con ese video (`compartirVideo`).
  *
- * Los comentarios se responden (un nivel) y se les da me gusta. Lo de los demás se reporta, y lo reportado por 3 deja de
+ * Los comentarios llevan imágenes, como el chat (se pegan, se sueltan o se eligen), se responden (un nivel) y se les da
+ * me gusta. Lo de los demás se reporta, y lo reportado por 3 deja de
  * verse hasta que el creador lo revise. La campana junta tus avisos: te comentaron, te respondieron, te dieron me gusta,
  * cambió tu mejora o hay un anuncio; los que no has leído salen también junto a «Comunidad», en la barra lateral.
  */
@@ -661,10 +662,10 @@ function Abierta(props: {
     }
   }
 
-  /** Un comentario, o la respuesta a uno de primer nivel. */
-  async function comentar(texto: string, responde?: string) {
+  /** Un comentario, o la respuesta a uno de primer nivel, con sus imágenes. */
+  async function comentar(texto: string, adjuntos: AdjuntoComunidad[], responde?: string) {
     if (!p) return
-    const c = await api<ComentarioComunidad>(`/api/comunidad/p/${p.id}/comentar`, { texto, ...(responde ? { responde } : {}) })
+    const c = await api<ComentarioComunidad>(`/api/comunidad/p/${p.id}/comentar`, { texto, adjuntos, ...(responde ? { responde } : {}) })
     setComentarios((l) => [...(l ?? []), c])
     props.onComento()
     const comentaron = [c.autor, ...p.comentaron.filter((a) => a.id !== c.autor.id)].slice(0, 5)
@@ -821,6 +822,7 @@ function Abierta(props: {
                       yo={yo}
                       conNombre={props.conNombre}
                       onResponder={() => setRespondiendo(c.id)}
+                      onAmpliar={setAmpliada}
                       onCambio={(nuevo) => setComentarios((l) => l?.map((y) => (y.id === nuevo.id ? nuevo : y)) ?? l)}
                       onBorrar={async () => {
                         await api(`/api/comunidad/c/${x.id}/borrar`, {})
@@ -844,7 +846,7 @@ function Abierta(props: {
                               placeholder={`Responde a ${c.autor.nombre || 'este comentario'}`}
                               autoFocus
                               conNombre={props.conNombre}
-                              onListo={(texto) => comentar(texto, c.id)}
+                              onListo={(texto, adjuntos) => comentar(texto, adjuntos, c.id)}
                               onCancelar={() => setRespondiendo(null)}
                             />
                           )}
@@ -853,7 +855,7 @@ function Abierta(props: {
                     </div>
                   )
                 })}
-              <Comentar yo={yo} placeholder="Escribe un comentario" conNombre={props.conNombre} onListo={(texto) => comentar(texto)} />
+              <Comentar yo={yo} placeholder="Escribe un comentario" conNombre={props.conNombre} onListo={(texto, adjuntos) => comentar(texto, adjuntos)} />
             </div>
           </>
         )}
@@ -894,14 +896,16 @@ function Abierta(props: {
 }
 
 /**
- * Un comentario o una respuesta: quién y cuándo, el texto en su globo y abajo me gusta y «Responder». Quien lo escribió
- * (o el creador) lo borra; los demás lo reportan. El creador ve cuántos lo reportaron y, si se queda, «Está bien».
+ * Un comentario o una respuesta: quién y cuándo, el texto y sus imágenes en su globo y abajo me gusta y «Responder». Quien
+ * lo escribió (o el creador) lo borra; los demás lo reportan. El creador ve cuántos lo reportaron y, si se queda, «Está
+ * bien».
  */
 function Comentario(props: {
   c: ComentarioComunidad
   yo: Yo
   conNombre(accion: () => void): void
   onResponder(): void
+  onAmpliar(url: string): void
   onCambio(c: ComentarioComunidad): void
   onBorrar(): Promise<void>
   onReportar(): void
@@ -946,7 +950,16 @@ function Comentario(props: {
               )}
             </span>
           </div>
-          <Texto texto={c.texto} className="com-comentario-texto" />
+          {c.texto && <Texto texto={c.texto} className="com-comentario-texto" />}
+          {!!c.adjuntos?.length && (
+            <div className={`com-comentario-fotos n${c.adjuntos.length}`}>
+              {c.adjuntos.map((a) => (
+                <button key={a.llave} title="Ampliar" onClick={() => props.onAmpliar(a.url)}>
+                  <img src={a.url} alt="" loading="lazy" />
+                </button>
+              ))}
+            </div>
+          )}
         </div>
         <div className="com-comentario-pie">
           <button className={`com-gusta chico${c.megusta ? ' on' : ''}`} title={c.megusta ? 'Ya no me gusta' : 'Me gusta'} onClick={() => props.conNombre(() => void megusta())}>
@@ -969,7 +982,7 @@ function Comentario(props: {
       </div>
       {borrando && (
         <Confirm title="¿Borrar este comentario?" action="Borrar" danger onConfirm={props.onBorrar} onClose={() => setBorrando(false)}>
-          <p className="com-confirmar">«{c.texto.slice(0, 140)}{c.texto.length > 140 ? '…' : ''}»</p>
+          <p className="com-confirmar">{c.texto ? `«${c.texto.slice(0, 140)}${c.texto.length > 140 ? '…' : ''}»` : c.adjuntos?.length === 1 ? 'Una imagen' : 'Unas imágenes'}</p>
           {!c.responde && <p className="muted small">Se borran también sus respuestas.</p>}
         </Confirm>
       )}
@@ -977,12 +990,29 @@ function Comentario(props: {
   )
 }
 
-/** Donde se comenta o se responde: crece con el texto; Enter lo manda y Escape cancela una respuesta. */
-function Comentar(props: { yo: Yo; placeholder: string; autoFocus?: boolean; conNombre(accion: () => void): void; onListo(texto: string): Promise<void>; onCancelar?(): void }) {
+/** Las imágenes que lleva un comentario, como en el Worker (`FOTOS_COMENTARIO`). */
+const FOTOS_COMENTARIO = 4
+
+/**
+ * Donde se comenta o se responde: crece con el texto; Enter lo manda y Escape cancela una respuesta. Las imágenes se
+ * pegan, se sueltan encima o se eligen con su botón, como en el chat, y suben en cuanto llegan.
+ */
+function Comentar(props: {
+  yo: Yo
+  placeholder: string
+  autoFocus?: boolean
+  conNombre(accion: () => void): void
+  onListo(texto: string, adjuntos: AdjuntoComunidad[]): Promise<void>
+  onCancelar?(): void
+}) {
   const [texto, setTexto] = useState('')
+  const [fotos, setFotos] = useState<AdjuntoComunidad[]>([])
+  const [subiendo, setSubiendo] = useState(0)
+  const [encima, setEncima] = useState(false)
   const [ocupado, setOcupado] = useState(false)
   const [error, setError] = useState('')
   const ref = useRef<HTMLTextAreaElement>(null)
+  const elegir = useRef<HTMLInputElement>(null)
   useLayoutEffect(() => {
     const el = ref.current
     if (!el) return
@@ -993,14 +1023,33 @@ function Comentar(props: { yo: Yo; placeholder: string; autoFocus?: boolean; con
     if (props.autoFocus) ref.current?.focus()
   }, [])
 
+  async function subir(archivos: File[]) {
+    const imagenes = archivos.filter((f) => f.type.startsWith('image/'))
+    if (!imagenes.length) return setError(archivos.length ? 'En un comentario solo van imágenes.' : '')
+    const caben = FOTOS_COMENTARIO - fotos.length - subiendo
+    setError(imagenes.length > caben ? `Un comentario lleva hasta ${FOTOS_COMENTARIO} imágenes.` : '')
+    const van = imagenes.slice(0, Math.max(0, caben))
+    setSubiendo((n) => n + van.length)
+    await Promise.all(
+      van.map((f) =>
+        subirImagen(f)
+          .then((a) => setFotos((l) => [...l, a]))
+          .catch((e: Error) => setError(e.message))
+          .finally(() => setSubiendo((n) => n - 1))
+      )
+    )
+  }
+
+  const vacio = !texto.trim() && !fotos.length
   const mandar = () =>
     props.conNombre(async () => {
-      if (!texto.trim() || ocupado) return
+      if (vacio || subiendo || ocupado) return
       setOcupado(true)
       setError('')
       try {
-        await props.onListo(texto.trim())
+        await props.onListo(texto.trim(), fotos)
         setTexto('')
+        setFotos([])
         props.onCancelar?.()
       } catch (e) {
         setError(e instanceof Error ? e.message : String(e))
@@ -1012,7 +1061,23 @@ function Comentar(props: { yo: Yo; placeholder: string; autoFocus?: boolean; con
   return (
     <div className="com-comentar">
       <Cara autor={props.yo} />
-      <div className="com-comentar-caja">
+      <div
+        className={`com-comentar-caja${encima ? ' soltando' : ''}`}
+        onDragOver={(e) => {
+          if (!e.dataTransfer.types.includes('Files')) return
+          e.preventDefault()
+          e.stopPropagation()
+          setEncima(true)
+        }}
+        onDragLeave={(e) => !e.currentTarget.contains(e.relatedTarget as Node | null) && setEncima(false)}
+        onDrop={(e) => {
+          setEncima(false)
+          if (!e.dataTransfer.files.length) return
+          e.preventDefault()
+          e.stopPropagation()
+          void subir([...e.dataTransfer.files])
+        }}
+      >
         <textarea
           ref={ref}
           rows={1}
@@ -1024,11 +1089,51 @@ function Comentar(props: { yo: Yo; placeholder: string; autoFocus?: boolean; con
             if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) (e.preventDefault(), mandar())
             if (e.key === 'Escape' && props.onCancelar) (e.stopPropagation(), props.onCancelar())
           }}
+          onPaste={(e) => {
+            const archivos = [...e.clipboardData.files]
+            if (!archivos.some((f) => f.type.startsWith('image/'))) return
+            e.preventDefault()
+            void subir(archivos)
+          }}
         />
-        <button className="com-enviar" disabled={!texto.trim() || ocupado} title="Comentar (Enter)" onClick={mandar}>
+        <button
+          className="com-adjuntar"
+          title={`Agregar imágenes (también puedes pegarlas o soltarlas), hasta ${FOTOS_COMENTARIO}`}
+          disabled={fotos.length + subiendo >= FOTOS_COMENTARIO}
+          onClick={() => elegir.current?.click()}
+        >
+          <Icono de="imagen" />
+        </button>
+        <input
+          ref={elegir}
+          type="file"
+          accept="image/*"
+          multiple
+          hidden
+          onChange={(e) => {
+            void subir([...(e.target.files ?? [])])
+            e.target.value = ''
+          }}
+        />
+        <button className="com-enviar" disabled={vacio || subiendo > 0 || ocupado} title={subiendo ? 'Espera a que termine de subir' : 'Comentar (Enter)'} onClick={mandar}>
           <Icono de="flechaArriba" />
         </button>
       </div>
+      {(fotos.length > 0 || subiendo > 0) && (
+        <div className="esc-fotos com-comentar-fotos">
+          {fotos.map((a) => (
+            <div key={a.llave} className="esc-miniatura">
+              <img src={a.url} alt="" />
+              <button title="Quitar" onClick={() => setFotos((l) => l.filter((x) => x !== a))}>
+                ×
+              </button>
+            </div>
+          ))}
+          {Array.from({ length: subiendo }, (_, i) => (
+            <div key={`subiendo-${i}`} className="esc-miniatura subiendo" title="Subiendo…" />
+          ))}
+        </div>
+      )}
       {error && <div className="com-comentar-error">{error}</div>}
     </div>
   )

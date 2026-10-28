@@ -16,7 +16,8 @@
  *   lo que tuvo actividad más reciente. `antes` es la `actividad` de la última que ya tienes.
  * - `POST /comunidad/publicar` `{categoria, titulo, texto, adjuntos}`.
  * - `GET /comunidad/p/<id>`: una, con sus comentarios. `POST /comunidad/p/<id>` `{categoria?, titulo?, texto?,
- *   adjuntos?, fijada?, estado?}` la cambia; `/borrar`, `/megusta`, `/comentar` `{texto, responde?}`, `/reportar`
+ *   adjuntos?, fijada?, estado?}` la cambia; `/borrar`, `/megusta`, `/comentar` `{texto, responde?, adjuntos?}` (sus
+ *   imágenes, migración 0009), `/reportar`
  *   `{motivo}` y `/revisada` (el creador quita sus reportes).
  * - `POST /comunidad/c/<id>/borrar`, `/megusta`, `/reportar` y `/revisada`: lo mismo para un comentario.
  * - `GET /comunidad/avisos` (`?cuenta`: solo cuántos sin leer) y `POST /comunidad/avisos/leidos`.
@@ -42,6 +43,8 @@ export const METAS = [
 const CREADOR = 'admin'
 const PAGINA = 20
 const MAX_COMENTARIOS = 500
+/** Las imágenes de un comentario, como las de un chat: unas pocas. */
+const FOTOS_COMENTARIO = 4
 /** Lo más que pesa un archivo. Un video son sus primeros segundos: unos pocos MB. */
 const PESO = { imagen: 10 * 1024 * 1024, video: 50 * 1024 * 1024 }
 const TIPOS: Record<string, { tipo: 'imagen' | 'video'; ext: string }> = {
@@ -106,6 +109,7 @@ interface ComentarioGuardado {
   responde: string | null
   likes: number
   reportes: number
+  adjuntos: string
 }
 
 /** Un adjunto como se guarda: sin URLs, que dependen de `ORIGEN`. */
@@ -203,6 +207,9 @@ const INSIGNIA = `(SELECT CASE WHEN MAX(${esFundador('li')}) THEN 'fundador'
 
 const nuevoId = () => letras(12).toLowerCase()
 const urlDe = (env: Env, llave: string) => `${env.ORIGEN}/comunidad/archivo/${llave}`
+/** Los adjuntos guardados (JSON), con sus URLs. */
+const conUrls = (env: Env, adjuntos: string): AdjuntoComunidad[] =>
+  (JSON.parse(adjuntos) as Adjunto[]).map((a) => ({ ...a, url: urlDe(env, a.llave), ...(a.poster ? { posterUrl: urlDe(env, a.poster) } : {}) }))
 const autor = (env: Env, m: Pick<Miembro, 'id' | 'nombre' | 'foto' | 'clave' | 'insignia'>): Autor => ({
   id: m.id,
   nombre: m.nombre,
@@ -292,7 +299,7 @@ async function armar(env: Env, yo: Miembro, filas: Guardada[]): Promise<Publicac
     categoria: f.categoria,
     titulo: f.titulo,
     texto: f.texto,
-    adjuntos: (JSON.parse(f.adjuntos) as Adjunto[]).map((a) => ({ ...a, url: urlDe(env, a.llave), ...(a.poster ? { posterUrl: urlDe(env, a.poster) } : {}) })),
+    adjuntos: conUrls(env, f.adjuntos),
     fijada: !!f.fijada,
     ...(f.estado ? { estado: f.estado } : {}),
     creada: f.creada,
@@ -347,6 +354,7 @@ function comentarioComo(env: Env, yo: Miembro, c: ComentarioGuardado, a: Autor |
     texto: c.texto,
     creada: c.creada,
     ...(c.responde ? { responde: c.responde } : {}),
+    ...(c.adjuntos !== '[]' ? { adjuntos: conUrls(env, c.adjuntos) } : {}),
     likes: c.likes,
     megusta,
     ...(esCreador(yo) && c.reportes ? { reportes: c.reportes } : {})
@@ -385,6 +393,9 @@ export function adjuntosDe(valor: unknown): Adjunto[] {
   const video = lista.findIndex((a) => a.tipo === 'video')
   return lista.filter((a, i) => a.tipo === 'imagen' || i === video).slice(0, 10)
 }
+
+/** Las imágenes de un comentario: archivos de la comunidad, sin video y a lo más `FOTOS_COMENTARIO`. */
+export const fotosDeComentario = (valor: unknown): Adjunto[] => adjuntosDe(valor).filter((a) => a.tipo === 'imagen').slice(0, FOTOS_COMENTARIO)
 
 /** Sin nombre no se publica ni se comenta: así nadie es «alguien». */
 function sinNombre(yo: Miembro) {
@@ -473,6 +484,7 @@ async function cambiar(env: Env, yo: Miembro, f: Guardada, c: Record<string, unk
 async function borrar(env: Env, yo: Miembro, f: Guardada): Promise<{ ok: true }> {
   if (f.autor !== yo.id && !esCreador(yo)) throw new Rechazo(403, 'Solo quien la escribió puede borrarla.')
   const suyos = 'SELECT id FROM comentarios WHERE publicacion = ?'
+  const fotos = await llavesDeComentarios(env, 'SELECT adjuntos FROM comentarios WHERE publicacion = ?', f.id)
   await env.DB.batch([
     env.DB.prepare('DELETE FROM likes WHERE publicacion = ?').bind(f.id),
     env.DB.prepare(`DELETE FROM likes_comentarios WHERE comentario IN (${suyos})`).bind(f.id),
@@ -481,7 +493,7 @@ async function borrar(env: Env, yo: Miembro, f: Guardada): Promise<{ ok: true }>
     env.DB.prepare('DELETE FROM comentarios WHERE publicacion = ?').bind(f.id),
     env.DB.prepare('DELETE FROM publicaciones WHERE id = ?').bind(f.id)
   ])
-  await quitarArchivos(env, llavesDe(f.adjuntos))
+  await quitarArchivos(env, [...llavesDe(f.adjuntos), ...fotos])
   return { ok: true }
 }
 
@@ -511,7 +523,8 @@ async function megustaComentario(env: Env, yo: Miembro, c: ComentarioGuardado): 
 async function comentar(env: Env, yo: Miembro, f: Guardada, c: Record<string, unknown>): Promise<ComentarioComunidad> {
   sinNombre(yo)
   const t = texto(c.texto, 5000)
-  if (!t) throw new Rechazo(400, 'Escribe tu comentario.')
+  const fotos = fotosDeComentario(c.adjuntos)
+  if (!t && !fotos.length) throw new Rechazo(400, 'Escribe tu comentario o agrega una imagen.')
   if (!esCreador(yo) && (await hoyHizo(env, 'comentarios', yo)) >= AL_DIA.comentarios) throw new Rechazo(429, 'Ya comentaste mucho hoy. Mañana sigues.')
   let padre: ComentarioGuardado | null = null
   if (c.responde) {
@@ -522,18 +535,26 @@ async function comentar(env: Env, yo: Miembro, f: Guardada, c: Record<string, un
   const id = nuevoId()
   const responde = padre ? (padre.responde ?? padre.id) : null
   await env.DB.batch([
-    env.DB.prepare('INSERT INTO comentarios (id, publicacion, autor, texto, creada, responde) VALUES (?, ?, ?, ?, ?, ?)').bind(id, f.id, yo.id, t, ahora, responde),
+    env.DB.prepare('INSERT INTO comentarios (id, publicacion, autor, texto, creada, responde, adjuntos) VALUES (?, ?, ?, ?, ?, ?, ?)').bind(id, f.id, yo.id, t, ahora, responde, JSON.stringify(fotos)),
     env.DB.prepare('UPDATE publicaciones SET comentarios = comentarios + 1, actividad = ?, ultimo_comentario = ? WHERE id = ?').bind(ahora, ahora, f.id),
     ...(padre ? aviso(env, padre.autor, yo, 'respondio', f.id, { comentario: id }) : []),
     ...(padre?.autor !== f.autor ? aviso(env, f.autor, yo, 'comento', f.id, { comentario: id }) : [])
   ])
-  return { id, autor: autor(env, yo), texto: t, creada: ahora, ...(responde ? { responde } : {}), likes: 0, megusta: false }
+  const adjuntos = conUrls(env, JSON.stringify(fotos))
+  return { id, autor: autor(env, yo), texto: t, creada: ahora, ...(responde ? { responde } : {}), ...(adjuntos.length ? { adjuntos } : {}), likes: 0, megusta: false }
 }
 
-/** Un comentario y, si es de primer nivel, sus respuestas. */
+/** Las llaves de las imágenes de los comentarios que da `sql` (con `adjuntos`), para borrarlas con ellos. */
+async function llavesDeComentarios(env: Env, sql: string, ...valores: string[]): Promise<string[]> {
+  const { results } = await env.DB.prepare(sql).bind(...valores).all<{ adjuntos: string }>()
+  return results.flatMap((r) => llavesDe(r.adjuntos))
+}
+
+/** Un comentario y, si es de primer nivel, sus respuestas, con sus imágenes. */
 async function borrarComentario(env: Env, yo: Miembro, c: ComentarioGuardado): Promise<{ ok: true }> {
   if (c.autor !== yo.id && !esCreador(yo)) throw new Rechazo(403, 'Solo quien lo escribió puede borrarlo.')
   const ellos = 'SELECT id FROM comentarios WHERE id = ? OR responde = ?'
+  const fotos = await llavesDeComentarios(env, 'SELECT adjuntos FROM comentarios WHERE id = ? OR responde = ?', c.id, c.id)
   await env.DB.batch([
     env.DB.prepare(`DELETE FROM likes_comentarios WHERE comentario IN (${ellos})`).bind(c.id, c.id),
     env.DB.prepare(`DELETE FROM reportes WHERE objeto IN (${ellos})`).bind(c.id, c.id),
@@ -543,6 +564,7 @@ async function borrarComentario(env: Env, yo: Miembro, c: ComentarioGuardado): P
       'UPDATE publicaciones SET comentarios = (SELECT COUNT(*) FROM comentarios WHERE publicacion = ?), ultimo_comentario = (SELECT MAX(creada) FROM comentarios WHERE publicacion = ?) WHERE id = ?'
     ).bind(c.publicacion, c.publicacion, c.publicacion)
   ])
+  await quitarArchivos(env, fotos)
   return { ok: true }
 }
 
@@ -666,5 +688,6 @@ function llavesDe(adjuntos: string): string[] {
 }
 
 async function quitarArchivos(env: Env, llaves: string[]) {
-  if (llaves.length) await env.DESCARGAS.delete(llaves.map((l) => `comunidad/${l}`))
+  // R2 borra hasta mil de una vez, y una publicación con muchos comentarios con imágenes puede pasar de eso.
+  for (let i = 0; i < llaves.length; i += 1000) await env.DESCARGAS.delete(llaves.slice(i, i + 1000).map((l) => `comunidad/${l}`))
 }

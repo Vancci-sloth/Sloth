@@ -1013,6 +1013,8 @@ export interface ComentarioComunidad {
   creada: string
   /** El comentario al que responde, siempre uno de primer nivel. */
   responde?: string
+  /** Sus imágenes, si las lleva. */
+  adjuntos?: AdjuntoComunidad[]
   likes: number
   megusta: boolean
   /** Como en `PublicacionComunidad`. */
