@@ -1,1 +1,1 @@
-Sloth para Mac ya abre en los Mac con Intel (i5, i7); en los de M1 o más nuevos, con Rosetta.
+Sin NVIDIA, la voz se transcribe cinco veces más rápido, el explicativo se renderiza más rápido y Opciones → Tu equipo dice cómo trabaja Sloth en tu computadora.
