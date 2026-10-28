@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { createHmac } from 'node:crypto'
 import test from 'node:test'
 import { DatabaseSync } from 'node:sqlite'
-import { deTodos, esFundador, faltaAvisar, firmaDeMercadoPago, instaladorDe, leerPagos, rangoDe, tarifa, vigencia } from './index.ts'
+import { deTodos, esFundador, faltaAvisar, firmaDeMercadoPago, instaladorDe, leerPagos, rangoDe, sobran, tarifa, vigencia } from './index.ts'
 
 const SECRETO = 'secreto-de-prueba'
 const firmar = (manifiesto: string) => createHmac('sha256', SECRETO).update(manifiesto).digest('hex')
@@ -120,6 +120,14 @@ test('reconoce el instalador de cada sistema, y nada más pasa por la última ve
   assert.equal(instaladorDe('Sloth-0.3.4-mac-arm64.dmg.blockmap'), undefined)
   assert.equal(instaladorDe('latest-mac.yml'), undefined)
   assert.equal(instaladorDe('Sloth-0.3.4-linux-x86_64.AppImage/../x'), undefined)
+})
+
+test('al publicar se borran los instaladores de más, pero no el de la versión que aún se da a quien no apoya', () => {
+  const de = (v: string, dia: number) => ({ key: `Sloth-Setup-${v}.exe`, uploaded: new Date(2026, 9, dia) })
+  const r2 = [de('0.3.31', 28), de('0.3.30', 27), de('0.3.29', 26), de('0.3.28', 25), de('0.3.27', 24)]
+  assert.deepEqual(sobran(r2, []), ['Sloth-Setup-0.3.28.exe', 'Sloth-Setup-0.3.27.exe'])
+  assert.deepEqual(sobran(r2, ['0.3.28']), ['Sloth-Setup-0.3.27.exe'])
+  assert.deepEqual(sobran(r2, ['0.3.2']), ['Sloth-Setup-0.3.28.exe', 'Sloth-Setup-0.3.27.exe'])
 })
 
 test('una versión nueva es de quien apoya hasta su fecha `todos`; las de antes, sin ella, ya son de todos', () => {

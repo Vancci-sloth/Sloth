@@ -34,8 +34,8 @@
  * y una petición a un Worker (100 MB). `ultima.json` dice cuál es la última. Y las actualizaciones de la app instalada
  * (electron-updater): `GET /actualizaciones/latest.yml` dice cuál es la nueva (quien apoya la recibe `ANTICIPO` antes:
  * a los demás se les sigue dando la anterior, que se guarda en `anterior/` al publicar), y de su instalador baja solo los pedazos
- * que cambiaron, con el mapa de bloques de cada versión (`.blockmap`). Se quedan los mapas de todas y los dos últimos
- * instaladores.
+ * que cambiaron, con el mapa de bloques de cada versión (`.blockmap`). Se quedan los mapas de todas, los últimos
+ * instaladores y el de la anterior; si este falta, a todos se les da la última.
  *
  * Lo que pide la Ley Federal de Protección al Consumidor (art. 76 Bis VIII y IX) para un cobro recurrente: suscribirse
  * exige aceptar el cobro automático y los términos (se guarda cuándo y qué versión), cancelar da un folio, y el cron de
@@ -183,6 +183,18 @@ export function instaladorDe(archivo: string): Sistema | undefined {
 }
 /** De cada tipo de archivo (el .exe, el .dmg y el .zip de Mac, el AppImage) se quedan el último y el de antes en R2, por si alguien lo está bajando al publicar. */
 const INSTALADORES = 3
+
+/**
+ * De los instaladores de un tipo en R2, los que sobran: los que pasan de los `INSTALADORES` más nuevos, salvo los de
+ * `guardar` (las versiones de `anterior/`, que aún se dan a quien no apoya, aunque detrás hayan salido varias).
+ */
+export function sobran(objetos: { key: string; uploaded: Date }[], guardar: string[]): string[] {
+  return [...objetos]
+    .sort((a, b) => b.uploaded.getTime() - a.uploaded.getTime())
+    .slice(INSTALADORES)
+    .map((o) => o.key)
+    .filter((key) => !guardar.includes(/\d+\.\d+\.\d+/.exec(key)?.[0] ?? ''))
+}
 /** La versión de los términos que acepta el cliente: la fecha de su «Última actualización» (sloth.vancci.org/terminos). */
 const TERMINOS = /^\d{4}-\d{2}-\d{2}$/
 /** Cuánto antes que los demás recibe lo nuevo quien apoya. */
@@ -302,8 +314,14 @@ async function ultimaPara(req: Request, env: Env, so: Sistema): Promise<Ultima &
   const u = await ultima(env, so)
   const publica = !!env.PUBLICAR && iguales(req.headers.get('authorization') ?? '', `Bearer ${env.PUBLICAR}`)
   if (deTodos(u) || publica || (await apoya(req, env))) return u
-  const anterior = await (await env.DESCARGAS.get(`anterior/${ULTIMAS[so]}`))?.json<Ultima>()
+  const anterior = await anteriorDe(env, so)
   return anterior ? { ...anterior, nueva: u.version } : u
+}
+
+/** La versión de antes de `so`, la que se da a quien no apoya, si su instalador sigue en R2; si no, a todos la última. */
+async function anteriorDe(env: Env, so: Sistema): Promise<Ultima | undefined> {
+  const a = await (await env.DESCARGAS.get(`anterior/${ULTIMAS[so]}`))?.json<Ultima>()
+  return a && (await env.DESCARGAS.head(a.archivo)) ? a : undefined
 }
 
 /** Lo que pide electron-updater: `latest.yml`, que nunca se guarda en caché, y los instaladores y sus mapas por pedazos. */
@@ -316,7 +334,8 @@ async function actualizaciones(req: Request, env: Env, url: URL): Promise<Respon
   if (yml) {
     const so: Sistema = archivo.includes('-mac') ? 'mac' : archivo.includes('-linux') ? 'linux' : 'windows'
     const u = await env.DESCARGAS.get(ULTIMAS[so])
-    if (u && !deTodos(await u.json<Ultima>()) && !(await apoya(req, env)) && (await env.DESCARGAS.head(`anterior/${archivo}`))) llave = `anterior/${archivo}`
+    if (u && !deTodos(await u.json<Ultima>()) && !(await apoya(req, env)) && (await anteriorDe(env, so)) && (await env.DESCARGAS.head(`anterior/${archivo}`)))
+      llave = `anterior/${archivo}`
   }
   const cabeza = await env.DESCARGAS.head(llave)
   if (!cabeza) throw new Rechazo(404, 'No existe')
@@ -385,8 +404,9 @@ async function publicar(req: Request, env: Env, url: URL): Promise<Response> {
     const tipo = BINARIO.exec(archivo)?.groups?.tipo
     if (tipo) {
       const iguales = (await env.DESCARGAS.list({ prefix: 'Sloth-' })).objects.filter((o) => BINARIO.exec(o.key)?.groups?.tipo === tipo)
-      const viejos = iguales.sort((a, b) => b.uploaded.getTime() - a.uploaded.getTime()).slice(INSTALADORES)
-      if (viejos.length) await env.DESCARGAS.delete(viejos.map((o) => o.key))
+      const anteriores = await Promise.all(Object.values(ULTIMAS).map(async (n) => (await (await env.DESCARGAS.get(`anterior/${n}`))?.json<Ultima>())?.version))
+      const viejos = sobran(iguales, anteriores.filter((v) => v !== undefined))
+      if (viejos.length) await env.DESCARGAS.delete(viejos)
     }
     if (!so) return json({ archivo, bytes: obj.size })
     // La misma versión otra vez (se volvió a publicar) conserva cuándo salió; una nueva es de quien apoya `ANTICIPO`.
