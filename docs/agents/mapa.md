@@ -62,13 +62,18 @@ Este es el mapa:
   Lo que se pisa, también al actualizar (`prepararSkills`), se copia antes a `data/skills-tuyas`.
 - `server/requisitos.ts`: lo que las skills necesitan fuera de Sloth. Cada card pide solo los paquetes de su skill
   (`PAQUETES` dice cuáles). Instala automáticamente el Python de Sloth en `%APPDATA%\youtube\piezas\python`,
-  sus paquetes y los modelos; elige CUDA si hay una NVIDIA que lo aguante (`aguantaCuda`) y CPU si no. Una instalación
-  interrumpida se puede reanudar. Si hay varios, Sloth y `sloth.py` usan el mismo (`elegirPython`).
+  sus paquetes y los modelos; elige CUDA y Whisper si hay una NVIDIA que lo aguante (`aguantaCuda`) y, si no, CPU y
+  Parakeet (`MotorVoz`, ADR 0007). Una instalación interrumpida se puede reanudar. Si hay varios, Sloth y `sloth.py`
+  usan el mismo (`elegirPython`).
+- `server/equipo.ts` y `web/src/Equipo.tsx`: Opciones → Tu equipo. Qué eligió Sloth para esta computadora y cuánto
+  tarda aquí la voz y el render, de lo que midió (`equipo.json`, junto a los modelos). Si puede ir más rápido (Parakeet
+  sin NVIDIA), el hilo nuevo lo ofrece arriba, junto a «Actualizar Claude Code».
 - `server/espacio.ts` y `web/src/Espacio.tsx`: Opciones → Espacio en disco. Lo que dejan los videos y no hace falta
   (temporales de Remotion, pedazos de render, `node_modules` repetidos, cachés viejas); lo seguro lo borra solo cada
   6 horas si nada trabaja. Las skills evitan dejarlo con `espacio.py` y `remotion.cjs` de video-base.
 - `python/procesos/`: lo que las skills corren con el Python de Sloth (transcribir la voz o un video ajeno), lanzado por
-  `proceso()` de `sloth.py` o `comun.py`.
+  `proceso()` de `sloth.py` o `comun.py`. Con NVIDIA transcribe Whisper; sin ella, Parakeet y `alineador.py`
+  (`parakeet.py` dice cuál y por qué).
 - `server/cuenta.ts`, `server/version.ts` y `server/opciones.ts`: la cuenta de Claude, la versión de Claude y de Codex
   («Actualizar»: Claude dentro del rango de package.json, Codex en cualquier 0.x) y las credenciales de YouTube e Instagram (en las variables de entorno del usuario).
 - `web/src`: React. `api.ts` habla con el servidor; `eventos.ts` guarda los eventos fuera de `App`, `items.ts` los junta
