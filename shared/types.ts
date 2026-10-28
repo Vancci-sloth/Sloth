@@ -1168,9 +1168,12 @@ export interface Licencia {
   plan?: 'mensual' | 'anual' | 'gratis' | 'cuenta'
   /** Lo que se cobra cada mes o cada año, en pesos. */
   monto?: number
-  /** Como lo dice Mercado Pago (Stripe se traduce a estos): `pending` (sin pagar), `authorized`, `paused` o `cancelled`; o `gratis`. */
+  /**
+   * Como lo dice Mercado Pago (Stripe se traduce a estos): `pending` (sin pagar), `authorized`, `paused` o `cancelled`;
+   * `gratis`; o `pagado`, un año pagado de una vez que no se renueva solo.
+   */
   estado?: string
-  /** Hasta cuándo está pagada (ISO): el próximo cobro o, cancelada, cuando se cierra. */
+  /** Hasta cuándo está pagada (ISO): el próximo cobro o, cancelada o pagada de una vez, cuando se cierra. */
   pagadaHasta?: string
   /** El folio de su cancelación, si la canceló. */
   folio?: string

@@ -163,7 +163,7 @@ export function licencia(app: string) {
       }
       // Para la ventana de Electron, al buscar la versión nueva: quien apoya la recibe antes (licencias/, `ANTICIPO`).
       if (ruta === '/api/licencia/credencial' && metodo === 'GET') return enviar(res, 200, credencial() ?? {})
-      // Con Stripe: el enlace a su portal, donde se cambia la tarjeta.
+      // Con Stripe: el enlace a su portal, donde se cambia la tarjeta. Con un año pagado de una vez: el pago del siguiente.
       if (ruta === '/api/licencia/pago' && metodo === 'POST') {
         if (!a.clave) throw new Rechazo(400, 'No hay una suscripción en esta computadora.')
         return enviar(res, 200, await cobro<{ enlace: string }>('/pago', { clave: a.clave, equipo }))

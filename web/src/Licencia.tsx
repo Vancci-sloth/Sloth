@@ -10,7 +10,7 @@ const fecha = (iso?: string) => (iso ? new Date(iso).toLocaleDateString('es-MX',
 /** La página de Sloth: ahí se apoya, y tiene los términos y el aviso de privacidad. */
 const PAGINA = 'https://sloth.vancci.org'
 /** La versión de los términos que acepta quien crea su cuenta: la de `TERMINOS` en la página. */
-const TERMINOS = '2026-10-26'
+const TERMINOS = '2026-10-28'
 /** Cada cuántos inicios sale el recordatorio a quien no apoya. */
 const CADA = 10
 const INICIOS = 'sloth:inicios'
@@ -202,7 +202,10 @@ function Cabeza({ titulo, children }: { titulo: string; children: ReactNode }) {
   )
 }
 
-/** En Opciones: el apoyo (o la cuenta gratis, o el lugar gratis), el próximo cobro, la clave, cambiar la tarjeta (con Stripe) y cancelar. */
+/**
+ * En Opciones: el apoyo (o la cuenta gratis, o el lugar gratis), el próximo cobro, la clave, cambiar la tarjeta (con
+ * Stripe), renovar (un año pagado de una vez) y cancelar.
+ */
 export function SuscripcionOpciones() {
   const [l, setL] = useState<Licencia>()
   const [error, setError] = useState('')
@@ -215,6 +218,8 @@ export function SuscripcionOpciones() {
   }, [])
 
   if (!l) return <div className="fila"><span className="muted small">{error || 'Mirando…'}</span></div>
+  // Adónde se paga: el portal de Stripe o, con un año pagado de una vez, el pago del siguiente.
+  const pagar = () => api<{ enlace: string }>('/api/licencia/pago', {}).then((r) => window.open(r.enlace, '_blank'), (e) => setError(e.message))
   const cada = l.plan === 'anual' ? 'al año' : 'al mes'
   const pagado = l.plan === 'mensual' || l.plan === 'anual'
   const titulo = `${l.plan === 'gratis' ? 'Gratis de por vida' : pagado ? `Apoyo ${l.plan}` : 'Sin apoyo'}${l.fundador ? ' · Fundador' : ''}`
@@ -229,7 +234,9 @@ export function SuscripcionOpciones() {
           : 'Sloth es gratis: si te sirve, apóyala'
         : l.estado === 'authorized'
           ? `${l.monto ? `${pesos(l.monto)} ${cada}` : 'Activo'}${l.pagadaHasta ? ` · próximo cobro el ${fecha(l.pagadaHasta)}` : ''}`
-          : l.activa
+          : l.estado === 'pagado' && l.activa
+            ? `Pagado hasta el ${fecha(l.pagadaHasta)} · no se renueva solo`
+            : l.activa
             ? `Cancelado: vale hasta el ${fecha(l.pagadaHasta)}${l.folio ? ` · folio ${l.folio}` : ''}`
             : 'Terminó'
   return (
@@ -239,21 +246,26 @@ export function SuscripcionOpciones() {
           <strong>{titulo}</strong>
           <span>{resumen}</span>
         </div>
+        {/* Pagado de una vez: se renueva con la misma clave, también cuando ya se acabó. */}
+        {l.estado === 'pagado' && (
+          <button className={apoya(l) ? 'ghost small' : 'primary small'} onClick={pagar}>
+            Renovar
+          </button>
+        )}
         {!apoya(l) && (
           <>
-            <button className="primary small" onClick={apoyar}>
-              Apoyar
-            </button>
+            {l.estado !== 'pagado' && (
+              <button className="primary small" onClick={apoyar}>
+                Apoyar
+              </button>
+            )}
             <button className="ghost small" onClick={() => setClave(true)}>
               Ya apoyo
             </button>
           </>
         )}
         {l.pasarela === 'stripe' && (l.estado === 'authorized' || l.estado === 'paused') && (
-          <button
-            className="ghost small"
-            onClick={() => api<{ enlace: string }>('/api/licencia/pago', {}).then((r) => window.open(r.enlace, '_blank'), (e) => setError(e.message))}
-          >
+          <button className="ghost small" onClick={pagar}>
             Cambiar tarjeta
           </button>
         )}

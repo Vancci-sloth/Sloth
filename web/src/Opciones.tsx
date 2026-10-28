@@ -67,7 +67,7 @@ function Ajustes({ onDone, iniciando, onIniciando }: { onDone(): void; iniciando
         <p className="grupo-nota">Los verticales salen en TikTok e Instagram; los largos, en YouTube. Sloth tiene que estar abierto mientras sube a TikTok y a YouTube; Instagram publica aunque la computadora esté apagada.</p>
       </section>
       {VENTA && (
-        <Grupo titulo="Apoyo" nota="Sloth es gratis. El apoyo es opcional y se cobra con Mercado Pago o Stripe; cancelado, lo ya pagado sigue valiendo hasta su fecha.">
+        <Grupo titulo="Apoyo" nota="Sloth es gratis. El apoyo es opcional y se cobra con Mercado Pago; cancelado, lo ya pagado sigue valiendo hasta su fecha.">
           <SuscripcionOpciones />
         </Grupo>
       )}

@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { createHmac } from 'node:crypto'
 import test from 'node:test'
 import { DatabaseSync } from 'node:sqlite'
-import { deTodos, esFundador, faltaAvisar, firmaDeMercadoPago, instaladorDe, rangoDe, tarifa, vigencia } from './index.ts'
+import { deTodos, esFundador, faltaAvisar, firmaDeMercadoPago, instaladorDe, leerPagos, rangoDe, tarifa, vigencia } from './index.ts'
 
 const SECRETO = 'secreto-de-prueba'
 const firmar = (manifiesto: string) => createHmac('sha256', SECRETO).update(manifiesto).digest('hex')
@@ -49,6 +49,36 @@ test('avisa del cobro cuando faltan 7 días o menos, una sola vez por cobro', ()
   assert.equal(faltaAvisar({ estado: 'authorized', pagado_hasta: cobro, avisado_para: null }, Date.parse('2026-11-10T15:00:00Z')), false)
   assert.equal(faltaAvisar({ estado: 'cancelled', pagado_hasta: cobro, avisado_para: null }, ahora), false)
   assert.equal(faltaAvisar({ estado: 'authorized', pagado_hasta: '2026-11-01T00:00:00Z', avisado_para: null }, ahora), false)
+})
+
+test('cada pago del año que vale suma un año desde que se aprobó, o desde que acaba lo pagado si se renueva antes', () => {
+  const f = { monto: 2990, preferencia: 'pref-1' }
+  const pago = (status: string, date_approved: string | null, transaction_amount = 2990, currency_id = 'MXN') => ({ status, date_approved, transaction_amount, currency_id })
+  assert.deepEqual(leerPagos([pago('approved', '2026-10-28T10:00:00.000-06:00')], f), { id: 'pref-1', estado: 'pagado', hasta: '2027-10-28T16:00:00.000Z' })
+  // Renovado una semana antes de que se acabe: el año nuevo empieza cuando acaba el primero.
+  assert.equal(leerPagos([pago('approved', '2027-10-21T16:00:00Z'), pago('approved', '2026-10-28T16:00:00Z')], f).hasta, '2028-10-28T16:00:00.000Z')
+  // Renovado cuando ya se había acabado: el año nuevo empieza ese día.
+  assert.equal(leerPagos([pago('approved', '2026-10-28T16:00:00Z'), pago('approved', '2028-01-10T16:00:00Z')], f).hasta, '2029-01-10T16:00:00.000Z')
+  // En reclamo sigue valiendo; reembolsado o con contracargo, ya no.
+  assert.equal(leerPagos([pago('in_mediation', '2026-10-28T16:00:00Z')], f).estado, 'pagado')
+  assert.deepEqual(leerPagos([pago('refunded', '2026-10-28T16:00:00Z')], f), { id: 'pref-1', estado: 'cancelled' })
+  assert.deepEqual(leerPagos([pago('charged_back', '2026-10-28T16:00:00Z'), pago('approved', '2027-10-28T16:00:00Z')], f).hasta, '2028-10-28T16:00:00.000Z')
+  // Una ficha de OXXO sin pagar, o nada todavía: espera el pago.
+  assert.deepEqual(leerPagos([pago('pending', null)], f), { id: 'pref-1', estado: 'pending' })
+  assert.deepEqual(leerPagos([], f), { id: 'pref-1', estado: 'pending' })
+  // Uno de menos o en otra moneda no cuenta.
+  assert.equal(leerPagos([pago('approved', '2026-10-28T16:00:00Z', 299)], f).estado, 'pending')
+  assert.equal(leerPagos([pago('approved', '2026-10-28T16:00:00Z', 2990, 'USD')], f).estado, 'pending')
+})
+
+test('un año pagado de una vez abre hasta su fin y avisa antes de que se acabe, una sola vez', () => {
+  const ahora = Date.parse('2027-10-21T12:00:00Z')
+  const fin = '2027-10-28T16:00:00.000Z'
+  assert.deepEqual(vigencia({ estado: 'pagado', pagado_hasta: fin }, ahora), { activa: true, hasta: ahora + 7 * 24 * 3600_000 })
+  assert.deepEqual(vigencia({ estado: 'pagado', pagado_hasta: fin }, Date.parse('2027-10-29T00:00:00Z')), { activa: false, hasta: Date.parse('2027-10-29T00:00:00Z') })
+  assert.equal(faltaAvisar({ estado: 'pagado', pagado_hasta: fin, avisado_para: null }, Date.parse('2027-10-22T15:00:00Z')), true)
+  assert.equal(faltaAvisar({ estado: 'pagado', pagado_hasta: fin, avisado_para: fin }, Date.parse('2027-10-22T15:00:00Z')), false)
+  assert.equal(faltaAvisar({ estado: 'pagado', pagado_hasta: fin, avisado_para: null }, Date.parse('2027-10-01T15:00:00Z')), false)
 })
 
 test('el precio es el mismo para todos; las 25 primeras personas que apoyan son fundadoras', () => {
