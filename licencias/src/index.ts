@@ -294,14 +294,16 @@ async function apoya(req: Request, env: Env): Promise<boolean> {
 }
 
 /**
- * La versión que le toca a quien pregunta: la última, o la anterior si la última todavía es solo de quien apoya. Con la
- * llave de publicar, siempre la última: de ella sale el número de la siguiente (scripts/version-venta.mjs).
+ * La versión que le toca a quien pregunta: la última, o la anterior si la última todavía es solo de quien apoya; entonces
+ * `nueva` dice cuál es esa, para que sloth.vancci.org la enseñe. Con la llave de publicar, siempre la última: de ella
+ * sale el número de la siguiente (scripts/version-venta.mjs).
  */
-async function ultimaPara(req: Request, env: Env, so: Sistema): Promise<Ultima> {
+async function ultimaPara(req: Request, env: Env, so: Sistema): Promise<Ultima & { nueva?: string }> {
   const u = await ultima(env, so)
   const publica = !!env.PUBLICAR && iguales(req.headers.get('authorization') ?? '', `Bearer ${env.PUBLICAR}`)
   if (deTodos(u) || publica || (await apoya(req, env))) return u
-  return (await env.DESCARGAS.get(`anterior/${ULTIMAS[so]}`))?.json<Ultima>() ?? u
+  const anterior = await (await env.DESCARGAS.get(`anterior/${ULTIMAS[so]}`))?.json<Ultima>()
+  return anterior ? { ...anterior, nueva: u.version } : u
 }
 
 /** Lo que pide electron-updater: `latest.yml`, que nunca se guarda en caché, y los instaladores y sus mapas por pedazos. */

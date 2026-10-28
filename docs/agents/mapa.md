@@ -56,7 +56,8 @@ Este es el mapa:
 - `server/radar/`: buscador propio de noticias tech, cada 5 minutos (`POST /api/radar/buscar`).
 - La comunidad (`web/src/Comunidad.tsx`, `server/comunidad.ts`): un feed como el de Skool que vive en el Worker del cobro
   (`licencias/src/comunidad.ts`); cada quien entra con su cuenta gratis (o la clave de su apoyo) y tú, como creador, con la llave de `publicar.txt`.
-  Publicar una mejora (la ven todos): `POST /api/mejoras {texto}`.
+  Publicar una mejora (la ven todos): `POST /api/mejoras {texto}`. Un anuncio a nombre del creador, en su tono:
+  `docs/agents/anuncios.md`.
 - `server/modelos3d.ts` y `web/src/Modelos3D.tsx`: «Modelos 3D» enseña la biblioteca `skills/modelos-3d` que usan los
   agentes (la de `SKILLS`), que llenan los videos (solo se mira). Empieza vacía; la moneda de la plantilla
   va en `modelos-3d/plantilla`, sin enseñarse.

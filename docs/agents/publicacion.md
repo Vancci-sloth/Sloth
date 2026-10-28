@@ -25,7 +25,9 @@ ramas ni bloquea por sí solo un push a `venta`.
 ## App instalada: este repo, rama venta
 
 1. Actualiza `novedad.txt`: un renglón corto con lo que trae la versión, que se ve al pasar el cursor sobre «Actualizar».
-2. Comprueba el diff completo entre `origin/venta` y `main`: se publicará todo lo que haya entrado a `main`.
+2. Comprueba el diff completo entre `origin/venta` y `main`: se publicará todo lo que haya entrado a `main`. Guarda la
+   lista de sus commits (`git log --no-merges --format="%s%n%b" origin/venta..main`): de ahí sale el anuncio del paso 5,
+   y después del push ya no se puede sacar así.
 3. Tras verificar la cuenta de GitHub indicada en `AGENTS.md`, `git push origin main:venta` inicia
    `.github/workflows/venta.yml`. Genera una versión común, compila los tres instaladores con `npm run compilar` y los
    sube al cobro con `npm run publicar`. No hace falta compilar localmente para publicar.
@@ -35,6 +37,9 @@ ramas ni bloquea por sí solo un push a `venta`.
 4. Comprueba los tres jobs y la versión que ofrece el cobro: `/version`, `/version?so=mac` y `/version?so=linux` en
    `https://api.sloth.vancci.org` (sin apoyo, durante sus 7 días, dicen la anterior). Verifica también los metadatos
    de `/actualizaciones/latest.yml`, `latest-mac.yml` y `latest-linux.yml`, y los enlaces de descarga de cada sistema.
+   Para esperar el flujo, `gh run watch <id> --exit-status` de fondo.
+5. Cuando los tres salieron bien, cuéntalo en Anuncios de la comunidad, sin preguntar: escribe el anuncio como lo
+   escribe Vancci ([anuncios.md](anuncios.md)) y publícalo con `node scripts/anuncio.mjs <archivo>`.
 
 La llave `PUBLICAR` del workflow autoriza la subida. Los secretos de Apple y el comportamiento sin firma están en
 [ADR 0006](../adr/0006-mac-y-linux.md). La comprobación de empaquetado no demuestra que la app abra y funcione en una
