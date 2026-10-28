@@ -8,7 +8,11 @@ import { test } from 'node:test'
 const casa = mkdtempSync(join(tmpdir(), 'sloth-skills-'))
 process.env.HOME = casa
 process.env.USERPROFILE = casa
-const { enlazarSkills, enlazarSkillsCodex } = await import('./skills.ts')
+// Y las skills como las trae Sloth, que `guardarSkillTuya` no toca.
+const originales = mkdtempSync(join(tmpdir(), 'sloth-originales-'))
+mkdirSync(join(originales, 'video-base'))
+process.env.SLOTH_SKILLS_ORIGINALES = originales
+const { enlazarSkills, enlazarSkillsCodex, guardarSkillTuya } = await import('./skills.ts')
 
 test('Codex lee las mismas skills que Claude, y una copia vieja sale de sus carpetas', (t) => {
   t.after(() => rmSync(casa, { recursive: true, force: true }))
@@ -48,4 +52,28 @@ test('Codex lee las mismas skills que Claude, y una copia vieja sale de sus carp
   }
   assert.ok(existsSync(join(codex, 'skills', 'propia')))
   assert.ok(existsSync(join(casa, 'otro-sitio', 'SKILL.md')))
+})
+
+test('borrar un estilo tuyo guarda su skill en una copia y quita sus enlaces, sin tocar las de Sloth', (t) => {
+  const raiz = mkdtempSync(join(tmpdir(), 'sloth-tuya-'))
+  t.after(() => rmSync(raiz, { recursive: true, force: true }))
+  t.after(() => rmSync(originales, { recursive: true, force: true }))
+  const app = join(raiz, 'app')
+  for (const s of ['mio', 'video-base']) {
+    mkdirSync(join(app, 'skills', s), { recursive: true })
+    writeFileSync(join(app, 'skills', s, 'SKILL.md'), `# ${s}`)
+  }
+  const enlaces = join(raiz, 'enlaces')
+  mkdirSync(enlaces)
+  for (const s of ['mio', 'video-base']) symlinkSync(join(app, 'skills', s), join(enlaces, s), 'junction')
+
+  const copia = guardarSkillTuya(app, 'mio', join(app, 'data'), [enlaces])
+  assert.ok(copia && /estilo borrado mio$/.test(copia))
+  assert.equal(readFileSync(join(copia, 'mio', 'SKILL.md'), 'utf8'), '# mio')
+  assert.ok(!existsSync(join(app, 'skills', 'mio')))
+  assert.ok(!readdirSync(enlaces).includes('mio'))
+
+  assert.equal(guardarSkillTuya(app, 'video-base', join(app, 'data'), [enlaces]), undefined)
+  assert.ok(existsSync(join(app, 'skills', 'video-base', 'SKILL.md')))
+  assert.ok(existsSync(join(enlaces, 'video-base', 'SKILL.md')))
 })

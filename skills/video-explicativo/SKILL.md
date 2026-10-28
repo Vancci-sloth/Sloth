@@ -5,7 +5,7 @@ description: Hace un video vertical explicativo (TikTok, Instagram, Shorts) sobr
 
 # Video explicativo
 
-`<skill>` es esta carpeta y `<base>` es `video-base`, junto a ella (`~/.claude/skills/video-base`): masterizar,
+`<skill>` es esta carpeta y `<base>` es `video-base`, la carpeta junto a ella: masterizar,
 comprobar y la hoja de contacto. Lee su [`LEEME.md`](../video-base/LEEME.md) antes de empezar (los errores ya vistos). Los scripts
 van con el `python` del sistema (el que tiene rembg) y se corren desde la raíz del proyecto.
 

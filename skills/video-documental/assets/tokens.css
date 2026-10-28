@@ -1,0 +1,118 @@
+/* ==========================================================================
+   EDITOR V1 — tokens
+   Measured off three documentary-style reels (reference/reference-log.md):
+     REF-1  Palantir Mafia      1916x1078 / 1280x720 @24   78.4s
+     REF-2  Thiel game theory   1440x1080 /  960x720 @25   93.6s
+     REF-3  Airbnb cockroach    1916x1078 @25              70.5s
+   MEASURED = read off the frames. DERIVED = converted to 1920x1080 @30.
+   Import this into every Editor V1 composition; never mix with another style.
+   Fonts are vendored next to this file; copy assets/ into the video, do not
+   reference the skill folder from a composition.
+   ========================================================================== */
+
+@font-face { font-family: "EV1 Sans"; src: url("fonts/Inter-600.woff2") format("woff2"); font-weight: 600; font-display: block; }
+@font-face { font-family: "EV1 Sans"; src: url("fonts/Inter-700.woff2") format("woff2"); font-weight: 700; font-display: block; }
+@font-face { font-family: "EV1 Sans"; src: url("fonts/Inter-900.woff2") format("woff2"); font-weight: 900; font-display: block; }
+@font-face { font-family: "EV1 Serif"; src: url("fonts/PlayfairDisplay-Italic-Var-latin.woff2") format("woff2"); font-style: italic; font-weight: 400 900; font-display: block; }
+@font-face { font-family: "EV1 Serif"; src: url("fonts/PlayfairDisplay-Italic-Var-latinext.woff2") format("woff2"); font-style: italic; font-weight: 400 900; font-display: block; unicode-range: U+0100-024F, U+1E00-1EFF; }
+@font-face { font-family: "EV1 Grotesk"; src: url("fonts/Arimo-700.woff2") format("woff2"); font-weight: 700; font-display: block; }
+@font-face { font-family: "EV1 Didone"; src: url("fonts/BodoniModa-700.woff2") format("woff2"); font-weight: 700; font-display: block; }
+@font-face { font-family: "EV1 Mono"; src: url("fonts/JetBrainsMono-400.woff2") format("woff2"); font-weight: 400; font-display: block; }
+
+:root {
+  /* ---- colour (MEASURED) ---------------------------------------------- */
+  --ev1-white:   #FFFFFF;          /* every caption and keyword */
+  --ev1-black:   #060607;          /* black-ground beats: 6% REF-1, 25% REF-2 of held runtime */
+  --ev1-paper:   #F1F0EC;          /* white-ground beats: 13% / 11% / ~10%, always vignetted grey */
+  --ev1-paper-edge: #B9B8B4;       /* the paper vignette's corner */
+  --ev1-ink:     #121214;          /* small words on the paper ground */
+  --ev1-red:     #F2030A;          /* the shock word: REF-3 #EC020B / #F60104 / #F30105 */
+  --ev1-marker:  #FFE04A;          /* the highlighter on a rebuilt UI (REF-1 $10,000) */
+  --ev1-teal:    #0E5560;          /* shadow tone of the teal split (REF-1 22% of held runtime) */
+  --ev1-amber:   #D9822B;          /* mid tone of the warm grade (REF-1 11%, REF-2 8%) */
+  /* chrome fill on the serif titles (REF-2 "#1 Signaling") */
+  --ev1-chrome: linear-gradient(180deg, #FBFDFF 0%, #DCE6EF 38%, #8EA6BC 52%, #4F6479 62%, #C9D6E2 80%, #F5F8FB 100%);
+
+  /* ---- the frame (vertical: see .ev1-vertical at the end) -------------- */
+  --ev1-w: 1920px;
+  --ev1-h: 1080px;
+
+  /* ---- type (MEASURED at 720, DERIVED to 1080) ------------------------- */
+  --ev1-sans:   "EV1 Sans", system-ui, sans-serif;
+  --ev1-serif:  "EV1 Serif", Georgia, serif;
+  --ev1-didone: "EV1 Didone", "Didot", serif;
+  --ev1-mono:   "EV1 Mono", ui-monospace, monospace;
+  --ev1-grotesk: "EV1 Grotesk", "Helvetica Neue", Arial, sans-serif;   /* REF-1 key words read Helvetica Bold */
+
+  --ev1-cap-size:    62px;    /* REF-1 (16:9) caption ~62px at 1080; REF-2's 4:3 frame read 48 */
+  --ev1-cap-y:       50%;     /* caption centre: 49-52% of H, x 51-53% */
+  --ev1-cap-gap:     0.42em;  /* words sit in pre-laid slots with wide gaps ("that's   the   whole") */
+  --ev1-key-size:    132px;   /* REF-1 key word ~117px single, ~150px stacked */
+  --ev1-title-size:  136px;   /* serif italic chapter title ("#1 Signaling") */
+  --ev1-shock-size:  176px;   /* red Didone caps ("COCKROACHES", "DEAD", "VOICE") */
+  --ev1-mega-size:   560px;   /* the shock word, huge, bold, set BEHIND the speaker's head (matte on top) */
+  --ev1-tag-size:    30px;    /* location tag, bottom-left ("Airbnb office, San Francisco, CA") */
+
+  /* ---- motion (MEASURED in frames at 24/25, DERIVED to 30fps seconds) --- */
+  --ev1-f:            0.0333s;  /* one frame */
+  --ev1-tile-frames:  10;       /* tile-flash reveal: 9 frames @24 -> 11 @30, 1 click per pane */
+  --ev1-pop-step:     0.08s;    /* collage pop-in: one photo every 2 frames @25 */
+  --ev1-invert-frames: 2;       /* negative flash out of a title card (REF-2 f503-504) */
+  --ev1-glitch-frames: 4;       /* datamosh between shots (REF-1 f192-195) */
+  --ev1-focus-frames: 12;       /* rack focus in: 10 frames @24 */
+  --ev1-strobe-step:  0.08s;    /* strobe montage: 2-frame images on one word (REF-2 83.2-84.6s) */
+  --ev1-blur-in:      0.2s;     /* keyword blur-in ("Valley") */
+  --ev1-push:         1.06;     /* slow push on a held still across its beat */
+
+  /* ---- finish ---------------------------------------------------------- */
+  --ev1-grid-line: rgba(255,255,255,0.30);   /* rule-of-thirds overlay (REF-1 lines at 1/3, 2/3) */
+  --ev1-vignette-edge: 0.70;                  /* edge/centre luma: 0.86 REF-1, 0.59 REF-2 */
+  --ev1-cap-shadow: 0 0 2px rgba(0,0,0,.35), 0 2px 10px rgba(0,0,0,.55), 0 0 26px rgba(0,0,0,.35);
+  --ev1-cap-bloom:  0 0 8px rgba(255,255,255,.22);
+}
+
+/* ---- frame ------------------------------------------------------------ */
+.ev1-frame { position: relative; width: 100%; height: 100%; overflow: hidden; background: var(--ev1-black); container-type: size; }
+.ev1-layer { position: absolute; left: 0; top: 0; width: var(--ev1-w); height: var(--ev1-h); overflow: hidden; }
+.ev1-fill  { position: absolute; left: 0; top: 0; width: var(--ev1-w); height: var(--ev1-h); object-fit: cover; display: block; }
+.ev1-black { background: var(--ev1-black); }
+.ev1-paper { background: radial-gradient(ellipse 75% 70% at 50% 50%, var(--ev1-paper) 0%, var(--ev1-paper) 45%, var(--ev1-paper-edge) 100%); }
+
+/* ---- captions: small white words, one at a time, in fixed slots ---------- */
+.ev1-cap { position: absolute; left: 0; width: var(--ev1-w); top: calc(var(--ev1-cap-y) - 0.6 * var(--ev1-cap-size)); display: flex; justify-content: center; gap: var(--ev1-cap-gap); font: 600 var(--ev1-cap-size)/1.2 var(--ev1-sans); color: var(--ev1-white); letter-spacing: -0.01em; text-shadow: var(--ev1-cap-shadow), var(--ev1-cap-bloom); white-space: nowrap; }
+.ev1-cap.on-paper { color: var(--ev1-ink); text-shadow: none; }
+.ev1-cap .w { display: inline-block; opacity: 0; }
+
+/* ---- the three display tiers --------------------------------------------- */
+.ev1-key   { font: 700 var(--ev1-key-size)/0.95 var(--ev1-grotesk); color: var(--ev1-white); letter-spacing: -0.035em; text-shadow: 0 6px 40px rgba(0,0,0,.45); white-space: nowrap; }
+.ev1-title { font: italic 700 var(--ev1-title-size)/1 var(--ev1-serif); letter-spacing: -0.01em; white-space: nowrap; background: var(--ev1-chrome); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.ev1-title-wrap { filter: drop-shadow(0 4px 2px rgba(0,0,0,.55)) drop-shadow(0 0 30px rgba(0,0,0,.35)); }
+.ev1-shock { font: 700 var(--ev1-shock-size)/0.9 var(--ev1-didone); color: var(--ev1-red); text-transform: uppercase; letter-spacing: -0.01em; white-space: nowrap; }
+.ev1-mega  { font: 900 var(--ev1-mega-size)/0.8 var(--ev1-sans); color: var(--ev1-red); text-transform: uppercase; letter-spacing: -0.045em; white-space: nowrap; }
+.ev1-tag   { font: 700 var(--ev1-tag-size)/1 var(--ev1-sans); color: var(--ev1-white); text-shadow: var(--ev1-cap-shadow); }
+
+/* ---- finish overlays ----------------------------------------------------- */
+.ev1-grid { position: absolute; left: 0; top: 0; width: var(--ev1-w); height: var(--ev1-h); pointer-events: none;
+  background:
+    linear-gradient(90deg, transparent calc(33.333% - 1px), var(--ev1-grid-line) calc(33.333% - 1px), var(--ev1-grid-line) calc(33.333% + 1px), transparent calc(33.333% + 1px)),
+    linear-gradient(90deg, transparent calc(66.667% - 1px), var(--ev1-grid-line) calc(66.667% - 1px), var(--ev1-grid-line) calc(66.667% + 1px), transparent calc(66.667% + 1px)),
+    linear-gradient(180deg, transparent calc(33.333% - 1px), var(--ev1-grid-line) calc(33.333% - 1px), var(--ev1-grid-line) calc(33.333% + 1px), transparent calc(33.333% + 1px)),
+    linear-gradient(180deg, transparent calc(66.667% - 1px), var(--ev1-grid-line) calc(66.667% - 1px), var(--ev1-grid-line) calc(66.667% + 1px), transparent calc(66.667% + 1px)); }
+.ev1-vignette { position: absolute; left: 0; top: 0; width: var(--ev1-w); height: var(--ev1-h); pointer-events: none; background: radial-gradient(ellipse 72% 68% at 50% 50%, rgba(0,0,0,0) 55%, rgba(0,0,0,.42) 100%); }
+.ev1-flash { position: absolute; left: 0; top: 0; width: var(--ev1-w); height: var(--ev1-h); background: var(--ev1-white); opacity: 0; pointer-events: none; }
+
+/* ---- rebuilt UI: terminal ------------------------------------------------ */
+.ev1-term { position: absolute; font: 400 34px/1.5 var(--ev1-mono); color: #E8EAED; white-space: pre; }
+.ev1-term .dim { color: #7C8591; } .ev1-term .key { color: #9CC7FF; } .ev1-term .str { color: #B5E3A1; } .ev1-term .err { color: #FF6B6B; }
+.ev1-cursor { display: inline-block; width: 0.6em; height: 1.05em; vertical-align: -0.15em; background: var(--ev1-white); }
+.ev1-mark { position: absolute; background: var(--ev1-marker); mix-blend-mode: multiply; transform-origin: 0 50%; }
+.ev1-mark.on-dark { mix-blend-mode: screen; background: rgba(255, 210, 60, .38); }
+
+/* ---- vertical, 1080x1920 (TikTok, Reels, Shorts) -----------------------------------------------------------------
+   The same style, the same tokens: 1080 is the short side in both formats, so every size stays as measured. Only what
+   runs out of width changes: a caption group wraps onto two lines, centred on its slot, and the caption line sits
+   below the chin (the face fills the top half of a phone frame) and above the app's bottom bar. Src/Edicion.tsx puts
+   .ev1-vertical on the frame when the video is taller than wide. */
+.ev1-vertical { --ev1-w: 1080px; --ev1-h: 1920px; --ev1-cap-y: 63%; }
+.ev1-vertical .ev1-cap { flex-wrap: wrap; align-content: center; height: calc(1.2 * var(--ev1-cap-size)); padding: 0 90px; box-sizing: border-box; row-gap: 0.02em; white-space: normal; }
+.ev1-vertical .ev1-cap .w { white-space: nowrap; }

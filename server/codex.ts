@@ -7,6 +7,7 @@ import { OPCIONES } from './claude.ts'
 import { CodexRpc } from './codex-rpc.ts'
 import { navegadorAgente } from './navegador-agente.ts'
 import { costoCodex } from './precios.ts'
+import { SKILLS } from './skills.ts'
 
 /** Codex conserva los hilos en su almacén; Sloth conserva su id y traduce el protocolo al mismo AgentEvent de Claude. */
 export function startCodex(opts: AgentOptions, connect: Conectar = (notify, exit, config) => new CodexRpc(notify, exit, config), precio = costoCodex): AgentRun {
@@ -207,7 +208,7 @@ export function startCodex(opts: AgentOptions, connect: Conectar = (notify, exit
     const r = await rpc.request<{ thread: { id: string } }>(opts.resume ? 'thread/resume' : 'thread/start', {
       ...(opts.resume ? { threadId: opts.resume } : {}), model: modelo, modelProvider: 'openai', cwd: opts.cwd,
       approvalPolicy: 'never', sandbox: 'danger-full-access',
-      developerInstructions: `${OPCIONES}\nLa interfaz y tus respuestas van en español. Haz las preguntas en mensajes normales, sin herramientas de preguntas interactivas. Las skills de Sloth están en ${join(homedir(), '.claude', 'skills')}. La skill invocada es siempre la de esa carpeta: si ves otra con el mismo nombre (en ${join(homedir(), '.codex', 'skills')} u otra), es una copia vieja y no se usa. Respeta la skill invocada y lee sus referencias cuando hagan falta.`
+      developerInstructions: `${OPCIONES}\nLa interfaz y tus respuestas van en español. Haz las preguntas en mensajes normales, sin herramientas de preguntas interactivas. Las skills de Sloth están en ${SKILLS}. La skill invocada es siempre la de esa carpeta: si ves otra con el mismo nombre (en ${join(homedir(), '.codex', 'skills')} u otra), es una copia vieja y no se usa. Respeta la skill invocada y lee sus referencias cuando hagan falta.`
     })
     threadId = r.thread.id
     opts.onProviderSession(threadId)
@@ -227,7 +228,7 @@ export function startCodex(opts: AgentOptions, connect: Conectar = (notify, exit
    * ese nombre (en ~/.codex/skills), si hay. Así, en octubre de 2026, un El Diff siguió una copia vieja de la skill.
    */
   function input(text: string, images: string[], skill?: SkillRef) {
-    const path = skill?.path ?? (skill && join(homedir(), '.claude', 'skills', skill.name, 'SKILL.md'))
+    const path = skill?.path ?? (skill && join(SKILLS, skill.name, 'SKILL.md'))
     if (path && !existsSync(path)) throw new Error(`No se encontró la skill ${skill!.name}.`)
     return [
       ...images.map((path) => ({ type: 'localImage', path })),

@@ -1,6 +1,5 @@
 // Levanta el servidor y abre Sloth en su ventana (electron/main.ts). Si el servidor sale con 75 (botón «Reiniciar
-// backend», o él solo cuando cambió su código: server/reinicio.ts), lo vuelve a levantar: así la app aplica los cambios
-// que se hizo a sí misma.
+// backend»), lo vuelve a levantar: así la app aplica los cambios de su código.
 import { spawn } from 'node:child_process'
 import { existsSync, readFileSync } from 'node:fs'
 import { homedir } from 'node:os'

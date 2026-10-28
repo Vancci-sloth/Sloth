@@ -98,5 +98,4 @@ test('el resumen suma solo lo nuevo y no cambia de objeto si nada cambió', () =
   const r2 = resumenDe([...mas, { t: 'turn_start', at: 5000 }, { t: 'turn_end', at: 6000, ok: false }])
   assert.equal(r2.sinCosto, 1)
   assert.equal(r2.ms, 3000)
-  assert.equal(r2.revision, r1.revision + 1)
 })

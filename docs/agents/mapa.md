@@ -13,11 +13,15 @@ Este es el mapa:
 - `server/sessions.ts`: cada hilo es `data/sessions/<id>.json` (qué es) y `<id>.jsonl` (lo que pasó). Retoma la sesión
   del proveedor tras reiniciar, reparte los lotes según la máquina y cierra el proceso de un video del lote al acabar.
   `npm run hilo -- <id>` (`scripts/hilo.mjs`) resume un hilo desde esos archivos.
-- `cards.json`: las cards. `skill` es la carpeta en `~/.claude/skills`, enlazada también en `~/.codex/skills` y
-  `~/.agents/skills` (`enlazarSkillsCodex`): Claude y Codex leen los mismos archivos. `cwd`, donde trabaja (`{app}` es este repo; sin
-  él, `trabajo/<id>`, fuera de git). `etapas` es el avance, leído de los archivos del hilo (`server/etapas.ts`) con los
+- `cards.json`: las cards. `skill` es la carpeta en `SKILLS` (`server/skills.ts`): en la app que se vende,
+  `~/.claude/skills`, enlazada también en `~/.codex/skills` y `~/.agents/skills` (`enlazarSkillsCodex`), para que Claude y
+  Codex lean los mismos archivos; en el repo, `skills/` (su Claude usa su propia configuración, `data/claude`, y no toca la
+  de la Sloth instalada). Los scripts de las skills la reciben en `SLOTH_SKILLS`. `cwd`, donde trabaja (`{app}` es la
+  carpeta de Sloth; sin él, `<trabajo>/<id>`, de `carpetaTrabajo` en `server/trabajo.ts`: fuera del repo en desarrollo). `etapas` es el avance, leído de los archivos del hilo (`server/etapas.ts`) con los
   globs `listo`. Los videos terminados son los de la etapa «Video» (los `_*` son a medias); `server/reglas-repo.test.ts`
-  comprueba que ningún glob cuente un borrador.
+  comprueba que ningún glob cuente un borrador. Los estilos que cada quien hace con la card «Nuevo estilo» (skill
+  `crear-estilo`) van en `data/tus-cards.json` y `skills/<id>`, que ninguna actualización toca. Son las únicas que la
+  venta deja borrar (`tuya`); la skill sale a `data/skills-tuyas` (`guardarSkillTuya`).
 - Lo que el estudio ve en vivo: `server/claude.ts` saca los borradores de lo que escribe el agente (Write y los heredocs
   de Bash), el WebSocket los lleva a `web/src/App.tsx` y `Etapas.tsx` los dibuja.
 - El estudio de video (`web/src/Estudio.tsx`): toda card cuyas etapas tengan `fase` se ve igual, con las cinco fases
@@ -29,7 +33,7 @@ Este es el mapa:
   (`lote-MMDD-HHMM-NN`, ver `skills/video-base/LOTE.md`). «Continuar un video» y cambiar la carpeta desde el estudio
   usan una que ya existe.
 - `modelos` (`web/src/Modelos.tsx`): en «Optimizado», el modelo y el esfuerzo medidos para el hilo y sus subagentes
-  (mediciones en `skills/acelerar-skill/bancos`; los de los subagentes van en la línea `Subagentes:`). Una card sin medir
+  (los de los subagentes van en la línea `Subagentes:`). Una card sin medir
   usa lo último que eligió el usuario a mano. En «Avanzado» se elige cada uno.
 - La galería: al elegir un estilo, sus videos terminados ocupan el sitio de las cards (`videosApi` en `etapas.ts`);
   «Mis videos» (`MisVideos.tsx`) los junta todos. Cada card enseña de fondo el más nuevo (`server/previas.ts`).
@@ -52,10 +56,9 @@ Este es el mapa:
 - `server/radar/`: buscador propio de noticias tech, cada 5 minutos (`POST /api/radar/buscar`).
 - La comunidad (`web/src/Comunidad.tsx`, `server/comunidad.ts`): un feed como el de Skool que vive en el Worker del cobro
   (`licencias/src/comunidad.ts`); cada quien entra con su cuenta gratis (o la clave de su apoyo) y tú, como creador, con la llave de `publicar.txt`.
-  En su sección Mejoras, «Hacer con Sloth» abre esta card con `Mejora: <id>`; publicar una (la ven todos):
-  `POST /api/mejoras {texto}`.
+  Publicar una mejora (la ven todos): `POST /api/mejoras {texto}`.
 - `server/modelos3d.ts` y `web/src/Modelos3D.tsx`: «Modelos 3D» enseña la biblioteca `skills/modelos-3d` que usan los
-  agentes (la de `~/.claude/skills`), que llenan los videos (solo se mira). Empieza vacía; la moneda de la plantilla
+  agentes (la de `SKILLS`), que llenan los videos (solo se mira). Empieza vacía; la moneda de la plantilla
   va en `modelos-3d/plantilla`, sin enseñarse.
 - `server/originales.ts` y `web/src/TusCambios.tsx`: en la app que se vende, «Con tus cambios (N)» bajo la card dice qué
   archivos de su skill (y de video-base) ya no son como los trae la versión, y vuelve a la original, entera o uno a uno.
@@ -67,7 +70,7 @@ Este es el mapa:
   usan el mismo (`elegirPython`).
 - `server/equipo.ts` y `web/src/Equipo.tsx`: Opciones → Tu equipo. Qué eligió Sloth para esta computadora y cuánto
   tarda aquí la voz y el render, de lo que midió (`equipo.json`, junto a los modelos). Si puede ir más rápido (Parakeet
-  sin NVIDIA), el hilo nuevo lo ofrece arriba, junto a «Actualizar Claude Code».
+  sin NVIDIA), el hilo nuevo lo ofrece arriba.
 - `server/espacio.ts` y `web/src/Espacio.tsx`: Opciones → Espacio en disco. Lo que dejan los videos y no hace falta
   (temporales de Remotion, pedazos de render, `node_modules` repetidos, cachés viejas); lo seguro lo borra solo cada
   6 horas si nada trabaja. Las skills evitan dejarlo con `espacio.py` y `remotion.cjs` de video-base.
@@ -75,6 +78,6 @@ Este es el mapa:
   `proceso()` de `sloth.py` o `comun.py`. Con NVIDIA transcribe Whisper; sin ella, Parakeet y `alineador.py`
   (`parakeet.py` dice cuál y por qué).
 - `server/cuenta.ts`, `server/version.ts` y `server/opciones.ts`: la cuenta de Claude, la versión de Claude y de Codex
-  («Actualizar»: Claude dentro del rango de package.json, Codex en cualquier 0.x) y las credenciales de YouTube e Instagram (en las variables de entorno del usuario).
+  (la que trae Sloth: se ponen al día al subirlas en package.json y publicar) y las credenciales de YouTube e Instagram (en las variables de entorno del usuario).
 - `web/src`: React. `api.ts` habla con el servidor; `eventos.ts` guarda los eventos fuera de `App`, `items.ts` los junta
   en bloques y `Timeline.tsx` los dibuja; `Composer.tsx` es el campo de texto.

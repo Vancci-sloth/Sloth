@@ -92,7 +92,7 @@ def _copia_igual(lock: bytes) -> Path | None:
     """
     arbol = _arbol(lock)
     candidatos = [*MODULOS.glob("*/node_modules")]
-    for d in (Path.cwd(), Path.cwd().parent, Path("C:/dev")):
+    for d in (Path.cwd(), Path.cwd().parent):
         candidatos += [nm for nm in d.glob("*/node_modules") if not nm.is_junction()]
     for nm in candidatos:
         l = nm.parent / "package-lock.json"

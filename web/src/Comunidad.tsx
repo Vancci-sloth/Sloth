@@ -1,6 +1,5 @@
 import { type CSSProperties, type DragEvent, useEffect, useLayoutEffect, useRef, useState } from 'react'
-import type { AdjuntoComunidad, Autor, AvisoComunidad, CategoriaComunidad, ComentarioComunidad, FeedComunidad, OrigenMejora, PublicacionComunidad, RoadmapComunidad, SessionMeta } from '../../shared/types'
-import { VENTA } from '../../shared/venta'
+import type { AdjuntoComunidad, Autor, AvisoComunidad, CategoriaComunidad, ComentarioComunidad, FeedComunidad, PublicacionComunidad, RoadmapComunidad } from '../../shared/types'
 import { api, ErrorApi } from './api'
 import { Confirm } from './Confirm'
 import { Escribir, type Escrito } from './Escribir'
@@ -16,8 +15,7 @@ import './Comunidad.css'
  * Vive en el Worker del cobro (`licencias/src/comunidad.ts`), por `server/comunidad.ts`, y se vuelve a pedir cada minuto
  * mientras se ve. Quién comentó algo que aún no abres lo recuerda esta computadora (`comunidad:vistas`).
  *
- * Mejoras es lo que la gente quiere que Sloth haga mejor: el creador dice cómo va cada una, y todos lo ven. En su copia,
- * «Hacer con Sloth» abre un borrador de la card Sloth con ella y la línea `Mejora: <id>`, que une sus hilos a ella.
+ * Mejoras es lo que la gente quiere que Sloth haga mejor: el creador dice cómo va cada una, y todos lo ven.
  * «Compartir» de un video de «Mis videos» abre el compositor en Lo que hice con ese video (`compartirVideo`).
  *
  * Los comentarios se responden (un nivel) y se les da me gusta. Lo de los demás se reporta, y lo reportado por 3 deja de
@@ -34,16 +32,6 @@ export const SECCIONES: { id: CategoriaComunidad; nombre: string; icono: NombreI
 ]
 const seccionDe = (id: CategoriaComunidad) => SECCIONES.find((s) => s.id === id) ?? SECCIONES[0]
 
-/** Lo de esta computadora, en la del creador: los hilos de la card Sloth de cada mejora y de qué hilo salió cada una. */
-interface Local {
-  hilos: Record<string, string[]>
-  origenes: Record<string, OrigenMejora>
-}
-/** Cómo va una mejora en esta computadora: su hilo más nuevo y si trabaja. */
-interface EnSloth {
-  hilo?: SessionMeta
-  trabajando: boolean
-}
 type Yo = FeedComunidad['yo']
 
 const COMPARTIR = 'comunidad:compartir'
@@ -86,7 +74,7 @@ function leerVistas(): Record<string, string> {
   }
 }
 
-export function Comunidad({ sessions, onHilo, onHacer }: { sessions: SessionMeta[]; onHilo(id: string): void; onHacer(texto: string, imagenes: string[]): void }) {
+export function Comunidad() {
   const [seccion, setSeccion] = useState<CategoriaComunidad | ''>(() => {
     const guardada = localStorage.getItem('comunidad:seccion')
     return SECCIONES.some((s) => s.id === guardada) ? (guardada as CategoriaComunidad) : ''
@@ -103,7 +91,6 @@ export function Comunidad({ sessions, onHilo, onHacer }: { sessions: SessionMeta
   const [escribiendo, setEscribiendo] = useState<{ seccion: CategoriaComunidad; titulo?: string; video?: { subida: Promise<AdjuntoComunidad>; poster?: string }; clave: number } | null>(null)
   // Tu perfil: al tocarlo o, sin nombre, antes de publicar, comentar o dar me gusta (`luego`).
   const [perfil, setPerfil] = useState<{ luego?: () => void } | null>(null)
-  const [local, setLocal] = useState<Local>({ hilos: {}, origenes: {} })
   const [nueva, setNueva] = useState<string | null>(null)
   const [arrastrando, setArrastrando] = useState(false)
   const [vistas, setVistas] = useState(leerVistas)
@@ -153,9 +140,6 @@ export function Comunidad({ sessions, onHilo, onHacer }: { sessions: SessionMeta
     }
   }
 
-  const cargarLocal = () => {
-    if (!VENTA) void api<Local>('/api/comunidad/local').then(setLocal, () => {})
-  }
   // Al abrir, al cambiar de sección y cada minuto mientras se ve; también cuando algo se publica desde un hilo.
   useEffect(() => {
     void cargar()
@@ -168,9 +152,6 @@ export function Comunidad({ sessions, onHilo, onHacer }: { sessions: SessionMeta
     addEventListener('sloth-comunidad', oir)
     return () => (clearInterval(t), clearInterval(reloj), removeEventListener('sloth-comunidad', oir))
   }, [seccion])
-  // Un hilo nuevo de la card Sloth puede ser el de una mejora.
-  const hilosDeSloth = sessions.filter((s) => s.cardId === 'sloth').length
-  useEffect(cargarLocal, [hilosDeSloth])
 
   // Lo que llega de fuera: un video para compartir o una publicación para abrir.
   useEffect(() => {
@@ -262,12 +243,6 @@ export function Comunidad({ sessions, onHilo, onHacer }: { sessions: SessionMeta
     },
   }
 
-  const hilosPorId = new Map(sessions.map((s) => [s.id, s]))
-  function enSloth(p: PublicacionComunidad): EnSloth | undefined {
-    if (!yo?.creador || VENTA || p.categoria !== 'mejoras') return
-    const suyos = (local.hilos[p.id] ?? []).map((id) => hilosPorId.get(id)).filter((s): s is SessionMeta => !!s)
-    return { hilo: suyos.at(-1), trabajando: suyos.some((s) => s.running || !!s.background?.length || !!s.pendiente) }
-  }
   const caras = [...new Map((lista ?? []).flatMap((p) => [p.autor, ...p.comentaron]).filter((a) => a.nombre).map((a) => [a.id, a])).values()].slice(0, 8)
   const escribe = escribiendo && seccionDe(escribiendo.seccion)
 
@@ -363,7 +338,6 @@ export function Comunidad({ sessions, onHilo, onHacer }: { sessions: SessionMeta
                   yo={yo}
                   nueva={nueva === p.id}
                   visto={vistas[p.id]}
-                  enSloth={enSloth(p)}
                   onAbrir={() => setAbierta(p.id)}
                   onMegusta={() => conNombre(() => void megusta(p))}
                 />
@@ -421,18 +395,10 @@ export function Comunidad({ sessions, onHilo, onHacer }: { sessions: SessionMeta
           id={abierta}
           previa={lista?.find((p) => p.id === abierta)}
           yo={yo}
-          enSloth={(p) => enSloth(p)}
-          origen={local.origenes[abierta]}
           onCambio={actualizar}
           onMegusta={megusta}
           onComento={() => setFeed((f) => f && { ...f, yo: { ...f.yo, comentarios: f.yo.comentarios + 1 } })}
           onBorrada={() => (setLista((l) => l?.filter((x) => x.id !== abierta) ?? l), setAbierta(null))}
-          onHilo={onHilo}
-          onHacer={async (p) => {
-            const r = await api<{ texto: string; imagenes: string[] }>('/api/comunidad/hacer', { id: p.id })
-            actualizar({ ...p, estado: p.estado ?? 'haciendo' })
-            onHacer(r.texto, r.imagenes)
-          }}
           conNombre={conNombre}
           onCerrar={() => (visto(abierta), setAbierta(null))}
         />
@@ -493,8 +459,8 @@ function ElegirSeccion({ valor, creador, onCambio }: { valor: CategoriaComunidad
   )
 }
 
-/** Cómo va una mejora: lo que dijo el creador y, en su copia, lo que pasa en su hilo. */
-function EstadoMejora({ p, enSloth }: { p: PublicacionComunidad; enSloth?: EnSloth }) {
+/** Cómo va una mejora: lo que dijo el creador. */
+function EstadoMejora({ p }: { p: PublicacionComunidad }) {
   if (p.categoria !== 'mejoras') return null
   if (p.estado === 'hecha')
     return (
@@ -502,13 +468,7 @@ function EstadoMejora({ p, enSloth }: { p: PublicacionComunidad; enSloth?: EnSlo
         <Icono de="palomita" /> Hecha
       </span>
     )
-  if (enSloth?.trabajando)
-    return (
-      <span className="com-estado haciendo" title="Su hilo está trabajando ahora">
-        <span className="dot running" /> Sloth la está haciendo
-      </span>
-    )
-  if (p.estado === 'haciendo') return <span className="com-estado haciendo">{enSloth?.hilo ? 'Por revisar' : 'Se está haciendo'}</span>
+  if (p.estado === 'haciendo') return <span className="com-estado haciendo">Se está haciendo</span>
   return <span className="com-estado">Idea</span>
 }
 
@@ -547,7 +507,7 @@ function Bienvenida({ yo, onNombre, onPresentarse, onComentar }: { yo: Yo; onNom
 }
 
 /** Una publicación en el feed: quién, cuándo y dónde; su título y el principio del texto; su portada; y lo que generó. */
-function Tarjeta({ p, yo, nueva, visto, enSloth, onAbrir, onMegusta }: { p: PublicacionComunidad; yo?: Yo; nueva: boolean; visto?: string; enSloth?: EnSloth; onAbrir(): void; onMegusta(): void }) {
+function Tarjeta({ p, yo, nueva, visto, onAbrir, onMegusta }: { p: PublicacionComunidad; yo?: Yo; nueva: boolean; visto?: string; onAbrir(): void; onMegusta(): void }) {
   const portada = p.adjuntos.find((a) => a.tipo === 'video') ?? p.adjuntos[0]
   const imagen = portada && (portada.tipo === 'imagen' ? portada.url : portada.posterUrl)
   // Nuevo: llegó después de la última vez que la abriste, y no lo escribiste tú.
@@ -572,7 +532,7 @@ function Tarjeta({ p, yo, nueva, visto, enSloth, onAbrir, onMegusta }: { p: Publ
             <span>{seccionDe(p.categoria).nombre}</span>
           </span>
         </div>
-        <EstadoMejora p={p} enSloth={enSloth} />
+        <EstadoMejora p={p} />
         {!!p.reportes && <span className="com-reportada">Reportada · {p.reportes}</span>}
         {p.fijada && (
           <span className="com-fijada">
@@ -647,14 +607,10 @@ function Abierta(props: {
   id: string
   previa?: PublicacionComunidad
   yo: Yo
-  enSloth(p: PublicacionComunidad): EnSloth | undefined
-  origen?: OrigenMejora
   onCambio(p: PublicacionComunidad): void
   onMegusta(p: PublicacionComunidad): Promise<PublicacionComunidad>
   onComento(): void
   onBorrada(): void
-  onHilo(id: string): void
-  onHacer(p: PublicacionComunidad): Promise<void>
   conNombre(accion: () => void): void
   onCerrar(): void
 }) {
@@ -666,7 +622,6 @@ function Abierta(props: {
   const [seccion, setSeccion] = useState<CategoriaComunidad>(props.previa?.categoria ?? 'general')
   const [borrando, setBorrando] = useState(false)
   const [ampliada, setAmpliada] = useState<string | null>(null)
-  const [ocupado, setOcupado] = useState(false)
   // El comentario de primer nivel al que respondes, y lo que reportas.
   const [respondiendo, setRespondiendo] = useState<string | null>(null)
   const [reportando, setReportando] = useState<{ que: 'publicación' | 'comentario'; id: string } | null>(null)
@@ -717,7 +672,6 @@ function Abierta(props: {
   }
 
   const suya = !!p && p.autor.id === yo.id
-  const enSloth = p && props.enSloth(p)
   const video = p?.adjuntos.find((a) => a.tipo === 'video')
   const imagenes = p?.adjuntos.filter((a) => a.tipo === 'imagen') ?? []
 
@@ -744,7 +698,7 @@ function Abierta(props: {
                   {p.editada && <span title={fechaLarga(p.editada)}>· editada</span>}
                 </span>
               </div>
-              <EstadoMejora p={p} enSloth={enSloth} />
+              <EstadoMejora p={p} />
               {!!p.reportes && <span className="com-reportada">Reportada · {p.reportes}</span>}
               {!editando && (
                 <div className="com-acciones">
@@ -813,7 +767,7 @@ function Abierta(props: {
               </>
             )}
 
-            {/* Del creador, en Mejoras: cómo va, y en su copia, su hilo de la card Sloth. */}
+            {/* Del creador, en Mejoras: cómo va. */}
             {yo.creador && (p.categoria === 'mejoras' || !!p.reportes) && !editando && (
               <div className="com-creador-barra">
                 {!!p.reportes && (
@@ -825,35 +779,9 @@ function Abierta(props: {
                     <Icono de="palomita" /> Está bien, se queda
                   </button>
                 )}
-                {props.origen && (
-                  <button className="com-boton" title={props.origen.cita} onClick={() => props.onHilo(props.origen!.hilo)}>
-                    <Icono de="hilo" /> Desde «{props.origen.titulo || 'un hilo'}»
-                  </button>
-                )}
-                {enSloth?.hilo && (
-                  <button className={`com-boton${enSloth.trabajando ? ' vivo' : ' fuerte'}`} onClick={() => props.onHilo(enSloth.hilo!.id)}>
-                    {enSloth.trabajando && <span className="dot running" />}
-                    {enSloth.trabajando ? 'Ver cómo va' : 'Revisar el hilo'} <Icono de="flecha" />
-                  </button>
-                )}
-                {p.categoria === 'mejoras' && !VENTA && !enSloth?.hilo && p.estado !== 'hecha' && (
-                  <button
-                    className="com-hacer"
-                    disabled={ocupado}
-                    title="Abre un hilo de Sloth con esta mejora ya escrita, para que lo mandes; todos ven que se está haciendo"
-                    onClick={async () => {
-                      setOcupado(true)
-                      setError('')
-                      try {
-                        await props.onHacer(p)
-                      } catch (e) {
-                        setError(e instanceof Error ? e.message : String(e))
-                        setOcupado(false)
-                      }
-                    }}
-                  >
-                    <img src="/icon.svg" alt="" />
-                    {ocupado ? 'Preparando…' : 'Hacer con Sloth'}
+                {p.categoria === 'mejoras' && !p.estado && (
+                  <button className="com-boton" title="Todos ven que ya se está haciendo" onClick={() => void delCreador({ estado: 'haciendo' })}>
+                    Se está haciendo
                   </button>
                 )}
                 {p.categoria === 'mejoras' &&

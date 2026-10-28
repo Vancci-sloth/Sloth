@@ -64,7 +64,6 @@ function size(bytes: number): string {
 }
 
 
-/** El icono de una card: un emoji, o la ruta de una imagen (`/icon.svg` es el logo de Sloth). */
 /** El icono de una card: una imagen (`/icon.svg`), el nombre de un icono de trazo (`Iconos.tsx`) o un emoji de las de antes. */
 export const Icon = ({ icon }: { icon: string }) =>
   icon.startsWith('/') ? <img className="icon-img" src={icon} alt="" /> : esIcono(icon) ? <Icono de={icon} className="icon-trazo" /> : <>{icon}</>

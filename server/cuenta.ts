@@ -21,8 +21,8 @@ const claude = (app: string) =>
 /** Si sigue abierta la ventana de Claude Code donde se autoriza la cuenta. Solo hay una: mientras esté, no se abre otra. */
 let login = false
 /**
- * Si se está conectando la cuenta o leyendo sus límites: actualizar Claude Code no puede reemplazar su `.exe` mientras
- * corre, y reiniciar el servidor perdería de vista la ventana del inicio de sesión.
+ * Si se está conectando la cuenta o leyendo sus límites: reiniciar el servidor perdería de vista la ventana del inicio
+ * de sesión.
  */
 export const conectando = () =>
   login ? 'Se está conectando la cuenta de Claude. Termina de autorizarla primero.' : leyendo ? 'Se están leyendo los límites del plan de Claude. Es un momento.' : null
@@ -106,7 +106,9 @@ function enTerminal(comando: string[]): Promise<void> {
   const fin = join(carpeta, 'fin')
   const guion = join(carpeta, 'Claude Code.command')
   const q = (s: string) => `'${s.replaceAll("'", `'\\''`)}'`
-  writeFileSync(guion, `#!/bin/sh\ntrap 'touch ${q(fin)}' EXIT HUP INT TERM\n${comando.map(q).join(' ')}\n`, { mode: 0o755 })
+  // La Terminal de Mac no hereda el entorno de Sloth: la configuración de Claude de la copia del repo va en el guion.
+  const config = process.env.CLAUDE_CONFIG_DIR ? `export CLAUDE_CONFIG_DIR=${q(process.env.CLAUDE_CONFIG_DIR)}\n` : ''
+  writeFileSync(guion, `#!/bin/sh\ntrap 'touch ${q(fin)}' EXIT HUP INT TERM\n${config}${comando.map(q).join(' ')}\n`, { mode: 0o755 })
   const enElPath = (p: string) => (process.env.PATH ?? '').split(delimiter).some((d) => d && existsSync(join(d, p)))
   const terminal = process.platform === 'darwin' ? ['open', '-a', 'Terminal'] : TERMINALES.find(([t]) => enElPath(t))
   return new Promise<void>((ok, falla) => {

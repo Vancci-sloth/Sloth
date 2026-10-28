@@ -567,70 +567,28 @@ function EstadoRequisito({ r }: { r: Requisito }) {
   return <span className="estado falta">{r.detalle ?? 'Falta'}</span>
 }
 
-/** Instalado y con otra versión a la que se puede actualizar. */
-export const atrasado = (p: VersionClaude) => !!p.instalada && !!p.ultima && p.instalada !== p.ultima
-
 /**
- * La versión de un agente (`estado`, a la derecha de su fila), con «Actualizar» si hay otra, como en T3 Code, y debajo
- * (`aviso`) el reinicio o el error. Claude reinicia Sloth y la página se recarga sola cuando vuelve; Codex no lo necesita:
- * se vuelve a preguntar su versión.
+ * La versión de un agente (`estado`, a la derecha de su fila), la que trae Sloth: llega al día con cada versión de Sloth.
+ * `aviso`, debajo, si no se pudo leer.
  */
 function useVersion(de: 'claude' | 'codex', mirar = true) {
   const [p, setVersion] = useState<VersionClaude | null>(null)
-  const [ocupado, setOcupado] = useState(false)
-  const [reinicia, setReinicia] = useState(false)
   const [error, setError] = useState('')
-  const pedir = () => api<VersionClaude>(`/api/${de}/version`).then(setVersion, (e) => setError(e.message))
 
   useEffect(() => {
-    if (mirar) void pedir()
+    if (mirar) void api<VersionClaude>(`/api/${de}/version`).then(setVersion, (e) => setError(e.message))
   }, [])
-
-  function actualizar() {
-    setOcupado(true)
-    setError('')
-    api<{ reinicia: boolean }>(`/api/${de}/actualizar`, {})
-      .then((r) => (r.reinicia ? setReinicia(true) : pedir()))
-      .catch((e) => setError(e.message))
-      .finally(() => setOcupado(false))
-  }
 
   let estado: ReactNode
   if (!mirar) estado = null
   else if (!p) estado = <span className="muted small">{error ? '' : 'Buscando versión…'}</span>
   else if (!p.instalada) estado = <span className="estado apagado">No está instalado</span>
-  else if (!atrasado(p))
-    estado = (
-      <span className="estado" title={p.ultima ? 'Es la última versión' : 'No se pudo ver si hay otra versión'}>
-        {p.instalada}
-      </span>
-    )
-  else
-    estado = (
-      <>
-        <span className="estado falta">
-          {p.instalada} → {p.ultima}
-        </span>
-        <button
-          className="primary"
-          title={`${de === 'claude' ? 'Sloth se reinicia solo; los hilos siguen donde iban.' : 'Los hilos siguen donde iban.'} No se puede con un agente trabajando.`}
-          disabled={ocupado || reinicia}
-          onClick={actualizar}
-        >
-          {ocupado ? 'Actualizando…' : 'Actualizar'}
-        </button>
-      </>
-    )
-  const aviso = (
-    <>
-      {reinicia && <p className="small fila-extra">Sloth se está reiniciando con la versión nueva…</p>}
-      {error && <p className="bad small fila-extra">{error}</p>}
-    </>
-  )
+  else estado = <span className="estado">{p.instalada}</span>
+  const aviso = error && <p className="bad small fila-extra">{error}</p>
   return { estado, aviso }
 }
 
-/** Claude Code: con qué cuenta trabaja, qué versión tiene y el botón para ponerlo al día. */
+/** Claude Code: con qué cuenta trabaja y qué versión tiene. */
 function Agentes() {
   const c = useCuenta(true)
   const version = useVersion('claude')

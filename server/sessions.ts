@@ -9,7 +9,6 @@ import type { AgentRun, SkillRef } from './agent.ts'
 import { startClaude } from './claude.ts'
 import { startCodex } from './codex.ts'
 import { guardar } from './disco.ts'
-import type { CambiosSloth } from './cambios-sloth.ts'
 
 /**
  * Cuántos agentes trabajan a la vez mientras un lote espera: uno por cada 3 hilos de CPU (un render ya abre un Chrome por
@@ -95,7 +94,6 @@ export class Sessions {
     private pushMeta: (meta: SessionMeta) => void,
     private pushRemoved: (id: string) => void,
     private pushDraft: (sessionId: string, draft: FileDraft) => void,
-    private cambios?: CambiosSloth,
     private crearAgente: (opts: Parameters<typeof startCodex>[0]) => AgentRun = (opts) => (proveedorDe(opts.model) === 'codex' ? startCodex : startClaude)(opts)
   ) {
     mkdirSync(dir, { recursive: true })
@@ -195,7 +193,6 @@ export class Sessions {
     if (this.compactando.has(id)) throw new Error('Espera a que termine la compactación.')
     const meta = this.metas.get(id)
     if (!meta) throw new Error('No existe esa sesión')
-    if (this.cambios?.esSloth(meta)) this.cambios.comprobarInicio(id)
     // Escribirle a un video que esperaba lo arranca ya, y lo que escribiste le llega en ese primer turno.
     if (meta.pendiente) {
       this.empezar(meta)
@@ -210,22 +207,10 @@ export class Sessions {
    * que retomar, y lo que se le vuelva a mandar (tras una caída, o un video del lote que empieza) la tiene que pedir.
    */
   private turno(meta: SessionMeta, text: string, skill?: SkillRef, images: string[] = []) {
-    if (this.cambios?.esSloth(meta)) this.cambios.iniciar(meta.id, Date.now())
     if (skill) meta.skill = skill.name
     const pide = skill ?? (!meta.providerSessionId && meta.skill ? { name: meta.skill } : undefined)
     this.emit(meta.id, { t: 'turn_start', at: Date.now() })
-    this.runFor(meta).send(meta.reversion ? `${meta.reversion}\n\n${text}` : text, pide, images)
-    if (meta.reversion) { delete meta.reversion; this.save(meta) }
-  }
-
-  /** La reversión queda en el chat y el siguiente turno lee de nuevo los archivos restaurados. */
-  avisarReversion(id: string) {
-    const meta = this.metas.get(id)
-    if (!meta) return
-    this.cerrarQuieto(id)
-    meta.reversion = 'Sloth: el usuario revirtió los archivos de un turno desde el diff. Revisa el código actual antes de continuar; las ediciones de ese turno ya no están aplicadas.'
-    this.save(meta)
-    this.emit(id, { t: 'info', text: 'Se revirtieron los cambios del turno. El agente revisará el código restaurado en tu siguiente mensaje.' })
+    this.runFor(meta).send(text, pide, images)
   }
 
   /**
@@ -491,12 +476,6 @@ export class Sessions {
       hilo: meta.id,
       onEvent: (event) => this.emit(meta.id, event),
       onDraft: (draft) => this.pushDraft(meta.id, draft),
-      // Antes de que corra: lo que cambie desde aquí puede ser de esta herramienta, aunque su evento aún no llegue.
-      onToolStart: (tool) => {
-        if (!this.cambios?.esSloth(meta) || this.compactando.has(meta.id)) return
-        try { this.cambios.herramienta(meta.id, tool, false) }
-        catch (error) { this.emit(meta.id, { t: 'info', text: `No se pudieron guardar los cambios de Sloth: ${error instanceof Error ? error.message : String(error)}` }) }
-      },
       // Un proceso muerto no recibe nada: se olvida, y el siguiente mensaje abre otro que retoma la sesión. Si se cayó,
       // lo que no leyó o lo que cortó sigue como tras una caída del servidor.
       onExit: (caida) => {
@@ -516,17 +495,6 @@ export class Sessions {
     // Un hilo borrado con su agente vivo: al cerrarse, el agente aún avisa de que se cerró, y ya no hay a quién.
     const meta = this.metas.get(id)
     if (!meta) return
-    if (this.cambios?.esSloth(meta) && !this.compactando.has(id)) {
-      try {
-        if (event.t === 'turn_start') this.cambios.iniciar(id, event.at)
-        if (event.t === 'tool') this.cambios.herramienta(id, event.id, false)
-        if (event.t === 'tool_update' && event.done) this.cambios.herramienta(id, event.id, true)
-        if (event.t === 'background') this.cambios.trabajoDeFondo(id, event.tasks.length > 0)
-        if ((event.t === 'turn_end' && !meta.background?.length) || (event.t === 'background' && !event.tasks.length && !meta.running)) this.cambios.terminar(id)
-      } catch (error) {
-        this.emit(id, { t: 'info', text: `No se pudieron guardar los cambios de Sloth: ${error instanceof Error ? error.message : String(error)}` })
-      }
-    }
     const habia = meta.background?.length ?? 0
     if (event.t === 'background') {
       if (event.tasks.join('\n') === (meta.background ?? []).join('\n')) return

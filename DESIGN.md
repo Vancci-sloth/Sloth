@@ -83,7 +83,7 @@ y pasos cumplidos: `--ok`. Borrar: `--bad`.
 - Lo fijado lleva borde ámbar y «Fijada» arriba a la derecha. En Mejoras, una píldora dice cómo va: Idea, Se está
   haciendo (ámbar) o Hecha (verde).
 - Abierta, sobre un velo: entera, con su video (vertical a 9:16), sus imágenes que se amplían, la barra del creador
-  (fijar, «Hacer con Sloth», marcar hecha) y los comentarios en globos, con donde se comenta al final.
+  (fijar, «Se está haciendo», marcar hecha) y los comentarios en globos, con donde se comenta al final.
 - El compositor (`Escribir.tsx`): título, texto que crece, capturas pegadas o soltadas, un video de «Mis videos» y la
   sección en el pie; con un resplandor ámbar detrás. «Ayúdame a decirlo» (el símbolo de Claude, lo único fuera de la
   paleta) en Ayuda y Mejoras, y en «Pedir una mejora» de cada hilo.

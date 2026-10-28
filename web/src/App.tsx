@@ -1,21 +1,20 @@
 import { memo, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { CANAL_CARD, IDEAS_CARD } from '../../shared/ideas' // ideas
-import type { AvanceCorto, Card, CarpetaDeVideo, Model, Previa, Reinicio, Serie, ServerPush, SessionMeta, VersionClaude, VideoHecho } from '../../shared/types'
+import type { AvanceCorto, Card, CarpetaDeVideo, Model, Previa, Serie, ServerPush, SessionMeta, VideoHecho } from '../../shared/types'
 import { NOMBRE_AGENTE, proveedorDe } from '../../shared/providers'
 import { VENTA } from '../../shared/venta'
 import { Ideas, textoAHtml } from './Ideas' // ideas
-import { atrasado, CuentaClaude, Opciones, Requisitos } from './Opciones'
+import { CuentaClaude, Opciones, Requisitos } from './Opciones'
 import { api } from './api'
 import { eventos, useFallo, useResumen } from './eventos'
 import { useDesplazando } from './desplazando'
 import { useAvisos } from './avisos'
 import { TituloDeFila, useBarraPlegada, vistaDeLote, vistaDeVideo, type Plegado, type Vista } from './Barra'
 import { Composer, Icon, Picker, type Choice, type Draft } from './Composer'
-import { designChipHtml, DESIGN, LINK, pedirMejora, threadIcons, threadRef } from './etiquetas'
+import { LINK, pedirMejora, threadIcons, threadRef } from './etiquetas'
 import { Confirm } from './Confirm'
 import { TusCambios } from './TusCambios'
 import { ActualizarSloth } from './Actualizar' // versiones nuevas
-import { CambiosSloth } from './CambiosSloth'
 import { TarjetasEnlaces } from './Enlaces' // tarjeta de los enlaces
 import { esDeEstudio, Estudio } from './Estudio' // panel de etapas
 import { BotonNavegador, PanelNavegador, useNavegadorAbierto } from './Navegador' // navegador de cada hilo
@@ -30,7 +29,6 @@ import { PedirMejora } from './PedirMejora' // comunidad
 import { Icono } from './Iconos'
 import { Bienvenida } from './Bienvenida'
 import { MarcaAgente } from './Logos'
-import { imageUrl } from './Images'
 import { YoutubeLote } from './YoutubeProgramar'
 import { CalendarioYoutube } from './YoutubeCalendario'
 import { opcionesDeCarpetas } from './Etapas' // panel de etapas
@@ -119,8 +117,6 @@ export function App() {
   const abierto = useRef<string | null>(null) // panel de etapas: el hilo abierto, para el WebSocket
   const socket = useRef<WebSocket | null>(null)
   const [connected, setConnected] = useState(false)
-  // Cambios del servidor que esperan a que se reinicie solo, o que no compilan.
-  const [reinicio, setReinicio] = useState<Reinicio>({ pendiente: false })
   const [falloEstado, setFalloEstado] = useState('')
   const [app, setApp] = useState('')
   const [menu, setMenu] = useState<{ session: SessionMeta; x: number; y: number } | null>(null)
@@ -135,12 +131,6 @@ export function App() {
   const [anchor, setAnchor] = useState('')
   // La altura donde empezó la selección: el globo de acciones aparece ahí.
   const [pickY, setPickY] = useState(0)
-  const [version, setVersion] = useState<VersionClaude | null>(null)
-  const enOpciones = view.kind === 'opciones'
-  // Al volver de Opciones se pregunta otra vez: si ahí se actualizó, el aviso se va.
-  useEffect(() => {
-    if (!enOpciones) api<VersionClaude>('/api/claude/version').then(setVersion, () => {})
-  }, [enOpciones])
   const [drafts, setDrafts] = useState<Record<string, Saved>>(() => {
     try {
       return JSON.parse(localStorage.getItem('drafts') ?? '{}')
@@ -176,7 +166,6 @@ export function App() {
           // Los modelos pueden llegar después, por el WebSocket: una lista vacía no tapa la que ya llegó.
           if (state.models.length) setModels(state.models)
           setApp(state.app)
-          setReinicio(state.reinicio ?? { pendiente: false })
           setSessions(state.sessions)
           setAvances(state.avances ?? {}) // avance
           eventos.conexion(true)
@@ -198,7 +187,6 @@ export function App() {
         const push = JSON.parse(msg.data) as ServerPush
         if (push.type === 'cards') setCards(push.cards)
         if (push.type === 'models') setModels(push.models)
-        if (push.type === 'reinicio') setReinicio(push.reinicio)
         // La sección Ideas escucha sus avisos (cada paso de la investigación, lo que escribe Claude) donde esté.
         if (push.type === 'ideas') dispatchEvent(new CustomEvent('sloth-ideas', { detail: push })) // ideas
         if (push.type === 'comunidad') dispatchEvent(new CustomEvent('sloth-comunidad')) // comunidad
@@ -588,7 +576,7 @@ export function App() {
             onRename={() => (plegar(false), setRenombrando(menu.session.id))}
           />
         )}
-        <Pie running={sessions.some((s) => s.running || !!s.background?.length)} connected={connected} enOpciones={view.kind === 'opciones'} fallo={falloEstado} reinicio={reinicio} plegada={plegada} />
+        <Pie running={sessions.some((s) => s.running || !!s.background?.length)} connected={connected} enOpciones={view.kind === 'opciones'} fallo={falloEstado} plegada={plegada} />
       </aside>
 
       <main className="main">
@@ -614,19 +602,7 @@ export function App() {
           />
         )}
         {view.kind === 'modelos3d' && <Modelos3D />} {/* modelos 3D */}
-        {/* comunidad: en Mejoras, «Hacer con Sloth» abre un borrador de la card Sloth con la mejora y sus capturas, para revisarlo y mandarlo. */}
-        {view.kind === 'comunidad' && (
-          <Comunidad
-            sessions={sessions}
-            onHilo={(id) => go({ kind: 'session', id })}
-            onHacer={(texto, imagenes) => {
-              const id = newId()
-              const images = imagenes.map((path) => ({ path, src: imageUrl(path), chip: false }))
-              setDrafts((all) => ({ ...all, [id]: { text: texto, html: textoAHtml(texto), images, cardId: 'sloth', at: Date.now() } }))
-              go({ kind: 'draft', id })
-            }}
-          />
-        )}
+        {view.kind === 'comunidad' && <Comunidad />}
         {/* comunidad: «Pedir una mejora», que abre el símbolo del agente de cualquier hilo y la publica en Mejoras. */}
         <PedirMejora sessions={sessions} />
         {view.kind === 'videos' && (
@@ -636,7 +612,6 @@ export function App() {
         )}
         {newCard && draftId && (
           <div className="avisos-nuevo">
-            {version && atrasado(version) && <AvisoVersion />}
             <AvisoEquipo /> {/* tu equipo */}
           </div>
         )}
@@ -661,12 +636,6 @@ export function App() {
               // En un borrador la card es suya; en el hilo nuevo va en el hash.
               setDrafts((all) => (all[draftId] ? { ...all, [draftId]: { ...all[draftId], cardId: c.id } } : all))
               if (view.kind === 'new') go({ kind: 'new', cardId: c.id })
-            }}
-            onCreate={() => {
-              // Un borrador nuevo para la card Sloth, ya empezado con la etiqueta «Nuevo diseño»: solo falta decir qué hace la skill.
-              const id = newId()
-              setDrafts((all) => ({ ...all, [id]: { text: `${DESIGN} `, html: `${designChipHtml()} `, images: [], cardId: 'sloth', at: Date.now() } }))
-              go({ kind: 'draft', id })
             }}
             onCreated={(id) => {
               setDrafts(({ [draftId]: _, ...rest }) => rest)
@@ -767,7 +736,6 @@ function NewSession(props: {
   draft?: Draft
   onDraft(draft: Draft): void
   onPick(c: Card): void
-  onCreate(): void
   onCreated(id: string): void
 }) {
   const { card, models } = props
@@ -962,12 +930,6 @@ function NewSession(props: {
           <section className="estante">
             <header>
               <h2>Skills</h2>
-              {/* Lo escribe la card Sloth, que la app que se vende no lleva. */}
-              {!VENTA && (
-                <button className="crear" onClick={props.onCreate} title="Abre un hilo con Sloth para escribirla">
-                  ＋ Crear skill
-                </button>
-              )}
             </header>
             {fallo && <p className="bad small">{fallo}</p>}
             {/* Cada skill es un cartel: su último video si lo tiene y, si no, su icono y qué hace. Abajo, cuánto se usa. */}
@@ -996,8 +958,17 @@ function NewSession(props: {
           onClose={() => setBorrando(null)}
           onConfirm={() => api(`/api/cards/${borrando.id}/delete`, {})}
         >
-          Se quita de las cards.{borrando.skill ? <> La skill <code>/{borrando.skill}</code> sigue instalada</> : ' Su carpeta de trabajo sigue ahí'} y los hilos que
-          hiciste con ella se quedan.
+          {borrando.tuya ? (
+            <>
+              Se quitan tu estilo y su skill{borrando.skill && <> <code>/{borrando.skill}</code></>}, que se guarda en una copia por si te arrepientes. Los hilos y los
+              videos que hiciste con él se quedan.
+            </>
+          ) : (
+            <>
+              Se quita de las cards.{borrando.skill ? <> La skill <code>/{borrando.skill}</code> sigue instalada</> : ' Su carpeta de trabajo sigue ahí'} y los hilos
+              que hiciste con ella se quedan.
+            </>
+          )}
         </Confirm>
       )}
     </div>
@@ -1034,22 +1005,21 @@ const Carteles = memo(function Carteles({ cards, activa, previas, sessions, acci
               <span className="card-desc">{c.description}</span>
             </span>
           )}
-          {/* En la app que se vende, las cards son las que trae: ni se duplican ni se borran. */}
-          {!VENTA && (
+          {/* En la app que se vende, las cards de Sloth ni se duplican ni se borran; las de tus estilos se borran. */}
+          {(!VENTA || c.tuya) && (
             <span className="card-actions">
-              <span
-                role="button"
-                title={`Duplicar: sale una card nueva con la misma skill${c.skill ? ` /${c.skill}` : ''}, que puedes cambiar a tu gusto en cards.json`}
-                onClick={(e) => (e.stopPropagation(), acciones.duplicar(c))}
-              >
-                ⧉
-              </span>
-              {/* La card Sloth no se borra: es la que arregla la app. */}
-              {c.id !== 'sloth' && (
-                <span role="button" className="danger" title="Eliminar" onClick={(e) => (e.stopPropagation(), acciones.borrar(c))}>
-                  ✕
+              {!VENTA && (
+                <span
+                  role="button"
+                  title={`Duplicar: sale una card nueva con la misma skill${c.skill ? ` /${c.skill}` : ''}, que puedes cambiar a tu gusto en cards.json`}
+                  onClick={(e) => (e.stopPropagation(), acciones.duplicar(c))}
+                >
+                  ⧉
                 </span>
               )}
+              <span role="button" className="danger" title="Eliminar" onClick={(e) => (e.stopPropagation(), acciones.borrar(c))}>
+                ✕
+              </span>
             </span>
           )}
           <span className="card-pie">
@@ -1213,7 +1183,6 @@ const SessionView = memo(function SessionView({ id, session, card, models }: { i
       />
       {/* Oculto y no quitado: guarda lo que escribías, y una cita del subagente le llega. */}
       <div className="session-composer" hidden={!!subagente}>
-        {session.cardId === 'sloth' && <CambiosSloth key={`cambios:${session.id}`} sessionId={session.id} ocupado={session.running || !!session.background?.length} revision={totals.revision} />}
         {session.pendiente && (
           <div className="queue">
             <div className="queued">
@@ -1473,15 +1442,6 @@ function LoteFila({ videos, card, abierto, onToggle, fila, vista }: { videos: Se
   )
 }
 
-/** Arriba a la derecha del hilo nuevo, si Claude Code tiene versión nueva. Lleva a Opciones, que lo actualiza. */
-function AvisoVersion() {
-  return (
-    <button className="aviso-version" title="Ir a Opciones para actualizar" onClick={() => go({ kind: 'opciones' })}>
-      ↑ Actualizar Claude Code
-    </button>
-  )
-}
-
 /** `Hoy`, `Ayer`, `Esta semana` o `Antes`: la sección de la barra lateral donde cae un hilo. */
 function cuando(t: number) {
   const hoy = new Date().setHours(0, 0, 0, 0)
@@ -1494,10 +1454,9 @@ const sinTildes = (t: string) => t.normalize('NFD').replace(/\p{Diacritic}/gu, '
 
 /**
  * Abajo de la barra lateral: Opciones y Reiniciar backend, que aplica los cambios del servidor. Mientras el servidor
- * vuelve, el botón dice que se está reconectando. Si el servidor cambió, se reinicia solo en cuanto nada trabaja: debajo
- * se dice que espera, o por qué no compila (entonces no se reinicia solo, pero el botón sigue sirviendo).
+ * vuelve, el botón dice que se está reconectando.
  */
-function Pie({ running, connected, enOpciones, fallo, reinicio, plegada }: { running: boolean; connected: boolean; enOpciones: boolean; fallo: string; reinicio: Reinicio; plegada: boolean }) {
+function Pie({ running, connected, enOpciones, fallo, plegada }: { running: boolean; connected: boolean; enOpciones: boolean; fallo: string; plegada: boolean }) {
   const [error, setError] = useState('')
   return (
     <div className="pie">
@@ -1530,12 +1489,6 @@ function Pie({ running, connected, enOpciones, fallo, reinicio, plegada }: { run
           {connected ? 'Reiniciar backend' : 'Reconectando…'}
         </button>
       )}
-      {connected && reinicio.error && (
-        <span className="bad small" title={reinicio.error}>
-          Los cambios del servidor no compilan y no se reinicia solo: {reinicio.error.split('\n')[0]}
-        </span>
-      )}
-      {connected && reinicio.pendiente && !reinicio.error && <span className="muted small pie-nota">Hay cambios del servidor: se reinicia solo cuando nada trabaje.</span>}
       {(error || fallo) && (
         <span className="bad small" title={plegada ? error || fallo : undefined}>
           {error || fallo}

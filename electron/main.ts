@@ -22,7 +22,7 @@ import { app, BrowserWindow, dialog, ipcMain, Menu, nativeTheme, net, screen, se
 import { autoUpdater, CancellationToken } from 'electron-updater'
 import { guardar } from '../server/disco.ts'
 import { anclada, anclar } from './barra.ts'
-import { archivos, huella, huellas, nombreCopia, respaldar } from '../server/originales.ts'
+import { archivos, huella, huellas, nombreCopia, quitarViejos, respaldar } from '../server/originales.ts'
 import { MODELOS_VIEJOS } from './modelos-viejos.ts'
 import { iniciarNavegador, ventanaDelNavegador } from './navegador.ts'
 import type { ActualizacionSloth } from '../shared/types.ts'
@@ -293,13 +293,16 @@ async function prepararApp() {
  * antes: lo que cada skill guarda de los tuyos (las huellas, el banco de temas, la biblioteca 3D) se queda. Los modelos
  * 3D del dueño de Sloth que traían las versiones de antes (la moneda incluida) se van, menos los que cambiaste
  * (`MODELOS_VIEJOS`). Lo que cambiaste en las skills se pisa, pero antes se copia a `data/skills-tuyas`
- * (`respaldarCambios`).
+ * (`respaldarCambios`). Lo que la versión de antes traía y esta ya no se va, si no lo cambiaste (`quitarViejos`).
  */
 async function prepararSkills() {
   const marca = join(APP, 'data', 'skills.txt')
   if (existsSync(marca) && readFileSync(marca, 'utf8') === app.getVersion()) return
-  respaldarCambios()
+  const antes = originalesDeAntes()
+  respaldarCambios(antes)
   await cp(join(process.resourcesPath, 'skills'), join(APP, 'skills'), { recursive: true })
+  // Lo que la versión de antes traía y esta ya no, si sigue como llegó: si no, se quedaría para siempre.
+  quitarViejos(antes, join(process.resourcesPath, 'skills'), join(APP, 'skills'))
   guardar(join(APP, 'data', 'skills-originales.json'), JSON.stringify(huellas(join(process.resourcesPath, 'skills'))))
   // Las skills de las versiones de antes llevaban una bitácora que ya no se usa.
   for (const s of readdirSync(join(APP, 'skills'))) rmSync(join(APP, 'skills', s, 'BITACORA.md'), { force: true })
@@ -315,20 +318,23 @@ async function prepararSkills() {
   writeFileSync(marca, app.getVersion())
 }
 
+/** Las huellas de las skills como las trajo la versión de antes (`data/skills-originales.json`); vacía si es de antes de la lista. */
+function originalesDeAntes(): Record<string, string> {
+  try {
+    return JSON.parse(readFileSync(join(APP, 'data', 'skills-originales.json'), 'utf8'))
+  } catch {
+    return {}
+  }
+}
+
 /**
  * Antes de poner las skills de esta versión, lo que cambiaste en las de antes y que esta pisaría se copia a
- * `data/skills-tuyas/<fecha> antes de la <versión>`. Es tuyo lo que no es como lo trajo su versión
- * (`data/skills-originales.json`); viniendo de una sin esa lista, todo lo que esta pisaría con otra cosa, que puede ser
- * tuyo. Si la copia falla, no se pisa nada (`prepararSkills` lo vuelve a intentar al abrir otra vez).
+ * `data/skills-tuyas/<fecha> antes de la <versión>`. Es tuyo lo que no es como lo trajo su versión (`antes`); viniendo
+ * de una sin esa lista, todo lo que esta pisaría con otra cosa, que puede ser tuyo. Si la copia falla, no se pisa nada
+ * (`prepararSkills` lo vuelve a intentar al abrir otra vez).
  */
-function respaldarCambios() {
+function respaldarCambios(antes: Record<string, string>) {
   const nuevas = join(process.resourcesPath, 'skills')
-  let antes: Record<string, string> = {}
-  try {
-    antes = JSON.parse(readFileSync(join(APP, 'data', 'skills-originales.json'), 'utf8'))
-  } catch {
-    // Una versión de antes de la lista.
-  }
   const cambios = archivos(nuevas).flatMap((r) => {
     const f = join(APP, 'skills', r)
     if (!existsSync(f)) return []

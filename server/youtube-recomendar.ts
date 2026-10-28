@@ -8,6 +8,7 @@ import type { Card, VideoHecho } from '../shared/types.ts'
 import type { CuentaYoutube, EstadoRecomendacionYoutube, RecomendacionYoutube, ReferenciaYoutube } from '../shared/youtube.ts'
 import { guardar, huella } from './disco.ts'
 import { carpetaYoutube } from './youtube-catalogo.ts'
+import { carpetaTrabajo } from './trabajo.ts'
 import { buscarReferenciasYoutube, type ApiPublicaYoutube } from './youtube-referencias.ts'
 import { jsonYoutube, redactarYoutube } from './youtube-redactor.ts'
 import { subtitulosYoutube } from './ideas/transcribir.ts'
@@ -65,8 +66,8 @@ export function recomendacionesYoutube(app: string, api: ApiPublicaYoutube, reda
     if (contexto.trim().length < 150) throw new Error('Falta el guion o una descripción suficiente del contenido. Continúa el hilo del video y pide guardar su guion antes de recomendar títulos.')
     if (canal) {
       try {
-        const perfiles = readdirSync(join(app, 'trabajo', 'ideas'), { withFileTypes: true }).filter((d) => d.isDirectory()).flatMap((d) => {
-          try { return [JSON.parse(readFileSync(join(app, 'trabajo', 'ideas', d.name, 'canal.json'), 'utf8'))] } catch { return [] }
+        const perfiles = readdirSync(join(carpetaTrabajo(app), 'ideas'), { withFileTypes: true }).filter((d) => d.isDirectory()).flatMap((d) => {
+          try { return [JSON.parse(readFileSync(join(carpetaTrabajo(app), 'ideas', d.name, 'canal.json'), 'utf8'))] } catch { return [] }
         }).filter((p) => p.formato !== 'vertical' && typeof p.nombre === 'string' && p.nombre.toLowerCase() === canal.nombre.toLowerCase())
         if (perfiles.length === 1) contexto += '\n\nPerfil del canal conectado (público, objetivo y referencias configuradas):\n' + JSON.stringify(perfiles[0]).slice(0, 8000)
       } catch { /* El perfil es opcional; el guion sigue siendo la fuente del contenido. */ }

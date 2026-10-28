@@ -162,14 +162,8 @@
 .com-boton { display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 12px; border-radius: 999px; color: var(--muted); font-size: 12.5px; font-weight: 600; transition: color 0.15s, background 0.15s; }
 .com-boton .com-ico { width: 13px; height: 13px; }
 .com-boton:hover:not(:disabled) { background: var(--panel-2); color: var(--text); }
-.com-boton.vivo, .com-boton.fuerte { background: var(--amber-tinte); color: var(--amber); }
-.com-boton.vivo:hover, .com-boton.fuerte:hover { background: var(--amber); color: var(--sobre-ambar); }
-.com-boton .dot { width: 6px; height: 6px; box-shadow: none; }
 .com-boton.ok { color: var(--ok); }
 .com-boton.ok:hover { background: rgba(143, 193, 119, 0.13); color: var(--ok); }
-.com-hacer { display: inline-flex; align-items: center; gap: 7px; height: 30px; padding: 0 14px 0 8px; border-radius: 999px; background: var(--amber); color: var(--sobre-ambar); font-size: 12.5px; font-weight: 700; transition: background 0.15s, transform 0.15s, box-shadow 0.15s; }
-.com-hacer img { width: 20px; height: 20px; }
-.com-hacer:hover:not(:disabled) { background: var(--amber-2); transform: translateY(-1px); box-shadow: 0 6px 18px var(--amber-tinte); }
 
 /* Una publicación abierta, sobre un velo. */
 .com-velo { position: fixed; inset: 0; z-index: 70; display: grid; place-items: start center; padding: 40px 24px; overflow-y: auto; background: rgba(15, 14, 12, 0.72); backdrop-filter: blur(3px); animation: com-velo 0.15s ease-out; }

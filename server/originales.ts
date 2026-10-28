@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto'
-import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, statSync } from 'node:fs'
+import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmdirSync, rmSync, statSync } from 'node:fs'
 import { dirname, join, relative } from 'node:path'
 import type { CambioSkill } from '../shared/types.ts'
 
@@ -59,6 +59,34 @@ export function respaldar(cambios: CambioSkill[], carpeta: (skill: string) => st
     mkdirSync(dirname(a), { recursive: true })
     copyFileSync(join(carpeta(c.skill), c.archivo), a)
   }
+}
+
+/**
+ * Al estrenar una versión: lo que traía la de antes (`antes`, sus huellas por `<skill>/<archivo>`) y la nueva (`nuevas`) ya
+ * no trae se va de `actual`, si sigue como llegó, y con él las carpetas que quedan vacías. Lo que el usuario cambió se
+ * queda: ya es suyo. Uno que no se puede borrar (en uso) se queda, sin parar lo demás. Devuelve lo que quitó.
+ */
+export function quitarViejos(antes: Record<string, string>, nuevas: string, actual: string): string[] {
+  const siguen = new Set(archivos(nuevas))
+  return Object.entries(antes).flatMap(([r, h]) => {
+    const f = join(actual, r)
+    try {
+      if (siguen.has(r) || !statSync(f, { throwIfNoEntry: false })?.isFile() || huella(f) !== h) return []
+      rmSync(f)
+    } catch {
+      return []
+    }
+    // La carpeta que quedó vacía también se va, hasta la de la skill.
+    for (let d = dirname(f); relative(actual, d).includes('/') || relative(actual, d).includes('\\'); d = dirname(d)) {
+      try {
+        if (readdirSync(d).length) break
+        rmdirSync(d)
+      } catch {
+        break
+      }
+    }
+    return [r]
+  })
 }
 
 /** Vuelve a poner en `actual` esos archivos de la `original`. Lo demás de la carpeta se queda. */

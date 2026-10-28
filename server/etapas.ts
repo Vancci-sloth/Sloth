@@ -41,7 +41,8 @@ type Avisar = (msg: ServerPush) => void
 /** Una ruta, para compararla con otra: con `/` y en minúsculas. */
 const normal = (ruta: string) => ruta.replaceAll('\\', '/').toLowerCase().replace(/\/$/, '')
 
-const mismaCwd = (a: string, b: string) => normal(a) === normal(b)
+/** Si dos carpetas son la misma, escritas con `/` o con `\`, o en mayúsculas o minúsculas. */
+export const mismaCwd = (a: string, b: string) => normal(a) === normal(b)
 
 type Dir = { name: string; t: number }
 
@@ -127,24 +128,15 @@ function files(folder: string, pattern: string): Archivo[] {
 /** El último archivo que coincide con el glob, si hay alguno. */
 const one = (folder: string, pattern?: string) => (pattern ? files(folder, pattern).at(-1) : undefined)
 
-const esCarpeta = (ruta: string) => {
-  try {
-    return statSync(ruta).isDirectory()
-  } catch {
-    return false
-  }
-}
-
-/** Dónde deja sus videos un estilo: cada carpeta dentro de `cwd` y las de fuera que nombra `videos` en la card. */
+/** Dónde deja sus videos un estilo: cada carpeta dentro de `cwd`. */
 export function carpetasDe(card: Card): string[] {
-  let dentro: string[] = []
   try {
-    dentro = readdirSync(card.cwd, { withFileTypes: true })
+    return readdirSync(card.cwd, { withFileTypes: true })
       .filter((d) => d.isDirectory() && !d.name.startsWith('.') && d.name !== 'node_modules')
-      .map((d) => join(card.cwd, d.name))
-  } catch {}
-  const fuera = (card.videos ?? []).flatMap((p) => globSync(p)).filter(esCarpeta)
-  return [...new Set([...dentro, ...fuera].map((f) => resolve(f)))]
+      .map((d) => resolve(card.cwd, d.name))
+  } catch {
+    return []
+  }
 }
 
 /**
@@ -547,7 +539,7 @@ export async function etapasApi(
     return servir(req, res, file, 'no-cache')
   }
 
-  // Sin etapas (la card Sloth), el hilo no tiene una carpeta suya.
+  // Sin etapas («Nuevo estilo»), el hilo no tiene una carpeta suya.
   const folder = card?.etapas?.length ? folderOf(meta) : meta.cwd
   /** Relee el avance de todos los hilos que miran esta carpeta: más de uno puede seguir el mismo video. */
   const avisarCarpeta = (f: string) => {

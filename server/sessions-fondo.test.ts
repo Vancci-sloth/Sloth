@@ -13,7 +13,7 @@ function preparar(t: test.TestContext) {
   const dir = mkdtempSync(join(tmpdir(), 'sloth-fondo-'))
   const eventos: AgentEvent[] = []
   let emitir!: AgentOptions['onEvent']
-  const sessions = new Sessions(dir, (_, __, events) => eventos.push(...events), () => {}, () => {}, () => {}, undefined, (opts) => {
+  const sessions = new Sessions(dir, (_, __, events) => eventos.push(...events), () => {}, () => {}, () => {}, (opts) => {
     emitir = opts.onEvent
     return { send() {}, steer() {}, compact() {}, async interrupt() {}, close() {} }
   })

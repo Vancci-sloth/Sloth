@@ -3,7 +3,7 @@ import { NOMBRE_AGENTE } from '../../shared/providers'
 import type { AgentEvent } from '../../shared/types'
 import { useEventos } from './eventos'
 import { Icon } from './Composer'
-import { DESIGN, DESIGN_ICON, LINK, LINK_ICON, linkParts, pedirMejora, QUOTE, QUOTE_EVENT, QUOTE_ICON, quoteText, THREAD, THREAD_ICON, threadIconOf } from './etiquetas'
+import { LINK, LINK_ICON, linkParts, pedirMejora, QUOTE, QUOTE_EVENT, QUOTE_ICON, quoteText, THREAD, THREAD_ICON, threadIconOf } from './etiquetas'
 import { MarcaAgente } from './Logos'
 import { imageUrl, Thumbs } from './Images'
 import { buildTimeline, compact, delHilo, duration, errorLlano, REINTENTAR, toolSummary, type Item, type Subagente } from './items'
@@ -386,22 +386,6 @@ function Working({ since }: { since: number }) {
 /** Un archivo adjunto viaja como su ruta entre comillas; en la burbuja se ve otra vez como etiqueta. */
 const FILE = /"([^"]*[\\/]data[\\/]attachments[\\/](?:\d+-)?([^"\\/]+))"/
 
-/** El encargo de crear una skill: en la burbuja se ve otra vez como la etiqueta «Nuevo diseño». */
-function WithDesign({ text }: { text: string }) {
-  if (!text.startsWith(DESIGN)) return <WithQuotes text={text} />
-  return (
-    <>
-      <span className="chip design-chip" title={DESIGN}>
-        <svg className="chip-icon" viewBox="0 0 24 24">
-          <path d={DESIGN_ICON} />
-        </svg>
-        <span className="chip-name">Nuevo diseño</span>
-      </span>
-      <WithQuotes text={text.slice(DESIGN.length)} />
-    </>
-  )
-}
-
 /** Cada cita del chat: en la burbuja se ve otra vez como la etiqueta del compositor, con el texto entero al pasar el ratón. */
 function WithQuotes({ text }: { text: string }) {
   // `split` con un grupo deja: texto, cita, texto, cita…
@@ -492,7 +476,7 @@ const Row = memo(function Row({ item, sessionId, anidado, proveedor, onAbrir, on
         <div className="user-msg">
           <div className="bubble">
             <Thumbs images={item.images.map((path) => ({ path, src: imageUrl(path) }))} />
-            <WithDesign text={item.text} />
+            <WithQuotes text={item.text} />
           </div>
         </div>
       )

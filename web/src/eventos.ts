@@ -53,7 +53,7 @@ function cargar(id: string) {
   const vigente = () => cargando.get(id) === llegados && (cargando.delete(id), true)
   api<{ events: (AgentEvent | null)[] }>(`/api/sessions/${id}/historial`)
     .catch((e) => {
-      // Mientras el servidor anterior espera su reinicio automático, conserva la compatibilidad.
+      // Un servidor de antes, aún sin reiniciar, no conoce esta función: se pide como antes.
       if (e instanceof Error && e.message.includes('aún no conoce esta función')) return api(`/api/sessions/${id}`).then((s) => ({ ...s, events: historialLigero(s.events) }))
       throw e
     })
@@ -207,13 +207,11 @@ export type Resumen = {
   /** Los turnos sin costo (se cortaron antes de saberlo, fueron el primero tras retomar el hilo o Codex sin precio). */
   sinCosto: number
   context?: { used: number; max: number }
-  /** Sube con lo que puede cambiar los archivos de un hilo quieto: un turno que acaba, un aviso, el segundo plano. */
-  revision: number
 }
 
 /** Por el primer evento de cada hilo: lo sumado hasta ahora. Solo se suma lo nuevo, y si nada cambia va el mismo objeto. */
 const sumas = new WeakMap<AgentEvent, { n: number; ultimo: AgentEvent; turnStart: number; r: Resumen }>()
-const VACIO: Resumen = { cost: 0, read: 0, out: 0, ms: 0, sinCosto: 0, revision: 0 }
+const VACIO: Resumen = { cost: 0, read: 0, out: 0, ms: 0, sinCosto: 0 }
 
 export function resumenDe(events?: AgentEvent[]): Resumen {
   if (!events?.length) return VACIO
@@ -227,7 +225,6 @@ export function resumenDe(events?: AgentEvent[]): Resumen {
   for (let i = s.n; i < events.length; i++) {
     const e = events[i]
     if (e.t === 'context') r.context = e
-    if (e.t === 'turn_end' || e.t === 'info' || e.t === 'background' || e.t === 'user') r.revision++
     if (e.t === 'turn_start') s.turnStart = e.at
     if (e.t !== 'turn_end') continue
     r.cost += e.costUsd ?? 0

@@ -1,7 +1,0 @@
-{
-  "command": "node .autoloop/checks/capturas/banco.mjs",
-  "score": "^segundos: ([\\d.]+)",
-  "better": "lower",
-  "margen": 0.10,
-  "timeoutMin": 30
-}

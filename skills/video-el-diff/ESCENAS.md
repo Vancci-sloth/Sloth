@@ -223,8 +223,8 @@ sigue en el beat siguiente cuando este lleva `sigue`.
   de la derecha: pon `tam` 90 (en vertical se ajusta solo). `titular(img=...)` es para una persona recortada: un logo
   ahí se sale de la pantalla.
 - `{"tipo": "meme", "img": "img/distraido.jpg", "etiquetas": [{"texto", "x", "y", "rot", "rojo", "tarde"}]}`: memes de
-  `public/img` con etiquetas en fracciones de la imagen. Hay distraido, drake, harold, pikachu, thisisfine, stonks,
-  notstonks, mathlady, sudor, spiderman, patrick, wojak, gigachad y charlie.
+  `public/img` con etiquetas en fracciones de la imagen. Valen los que el usuario puso ahí (Sloth no trae ninguno); si
+  no está el que pide la frase, se busca como el resto del material.
 - `{"tipo": "logo", "fecha": "6 OCT, 2026"}` y `{"tipo": "logo", "final": True}` para la entrada y la despedida, y
   `{"tipo": "logo", "invitacion": True}` para la invitación. El logo, su lema y los rótulos salen de `src/marca.json`.
 - Primer beat de cada sección: `seccion=True` dentro de `v`.
@@ -234,7 +234,7 @@ sigue en el beat siguiente cuando este lleva `sigue`.
   fabricado del ejemplo absurdo: la app inventada, la terminal que cobra) lleva un componente nuevo en `src/escenas/`.
   Regístralo en `ESCENAS` de `src/Video.tsx`, y en `VERTICALES` si lee `useFormato()` ([Cómo se compone](#cómo-se-compone)).
   Los de episodios viejos (la junta de Zoom, el cartel de película) están en `src/escenas` de esos episodios, si
-  existen en esta computadora (los primeros, en `C:\dev\el-diff-2`).
+  existen en esta computadora.
 
 Emojis 3D en `public/emoji` (Fluent de Microsoft): la mano del 👉 y los de `emo()`. Para agregar uno:
 `https://raw.githubusercontent.com/microsoft/fluentui-emoji/main/assets/<Nombre>/3D/<nombre>_3d.png`.

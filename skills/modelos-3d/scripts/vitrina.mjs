@@ -10,7 +10,7 @@ import { homedir } from "node:os";
 import { join, resolve } from "node:path";
 
 // Empaqueta en una carpeta de %TEMP% que se borra al terminar (video-base): la de `bundle()` se quedaba con una copia de public/.
-const { empaquetar } = createRequire(import.meta.url)(join(homedir(), ".claude", "skills", "video-base", "scripts", "remotion.cjs"));
+const { empaquetar } = createRequire(import.meta.url)(join(process.env.SLOTH_SKILLS || join(homedir(), ".claude", "skills"), "video-base", "scripts", "remotion.cjs"));
 
 const [destino, ...pares] = process.argv.slice(2);
 const { serveUrl, soltar } = await empaquetar(process.cwd(), { entryPoint: resolve("src/modelos/_vitrina.tsx") });

@@ -37,7 +37,7 @@ function useEquipo() {
 }
 
 /**
- * Arriba del hilo nuevo, junto a «Actualizar Claude Code»: si esta computadora puede ir más rápido (Parakeet, en una sin
+ * Arriba del hilo nuevo: si esta computadora puede ir más rápido (Parakeet, en una sin
  * NVIDIA que aún transcribe con Whisper), lo dice y lo baja con un clic. Mientras baja, en qué va.
  */
 export function AvisoEquipo() {

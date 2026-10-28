@@ -3,6 +3,7 @@ import { join } from 'node:path'
 import type { Investigacion } from '../shared/types.ts'
 import type { ReferenciaYoutube } from '../shared/youtube.ts'
 import { LARGO, MADURO, MIN_MUESTRA } from '../shared/ideas.ts'
+import { carpetaTrabajo } from './trabajo.ts'
 
 /** Reutiliza Ideas y actualiza comparables con YouTube. Las vistas relativas siempre usan una muestra del propio canal. */
 export type ApiPublicaYoutube = (recurso: string, params: Record<string, string>) => Promise<unknown>
@@ -15,10 +16,10 @@ export function referenciasGuardadas(app: string, tema: string): ReferenciaYoutu
   const terminos = palabras(tema)
   const todas = new Map<string, ReferenciaYoutube & { puntos: number }>()
   try {
-    for (const dir of readdirSync(join(app, 'trabajo', 'ideas'), { withFileTypes: true })) {
+    for (const dir of readdirSync(join(carpetaTrabajo(app), 'ideas'), { withFileTypes: true })) {
       if (!dir.isDirectory() || dir.name.startsWith('.')) continue
       let inv: Investigacion
-      try { inv = JSON.parse(readFileSync(join(app, 'trabajo', 'ideas', dir.name, 'investigacion.json'), 'utf8')) } catch { continue }
+      try { inv = JSON.parse(readFileSync(join(carpetaTrabajo(app), 'ideas', dir.name, 'investigacion.json'), 'utf8')) } catch { continue }
       for (const v of inv.videos ?? []) {
         if (v.red || !/^[\w-]{11}$/.test(v.id) || (v.segundos ?? 0) < LARGO) continue
         const contenido = palabras(`${v.titulo} ${v.gancho ?? ''}`)
@@ -28,7 +29,7 @@ export function referenciasGuardadas(app: string, tema: string): ReferenciaYoutu
         const x = canal && canal.videos >= MIN_MUESTRA && canal.mediana > 0 ? v.vistas / canal.mediana : undefined
         const antes = todas.get(v.id)
         let transcripcion: string | undefined
-        try { transcripcion = (JSON.parse(readFileSync(join(app, 'trabajo', 'ideas', dir.name, 'transcripciones', `${v.id}.json`), 'utf8')) as { texto?: string }).texto?.slice(0, 6000) } catch {}
+        try { transcripcion = (JSON.parse(readFileSync(join(carpetaTrabajo(app), 'ideas', dir.name, 'transcripciones', `${v.id}.json`), 'utf8')) as { texto?: string }).texto?.slice(0, 6000) } catch {}
         if (!antes || (v.leido ?? v.visto) > antes.leido) todas.set(v.id, { id: v.id, titulo: v.titulo, canal: v.canal, canalId: v.canalId, vistas: v.vistas, fecha: v.fecha, x, muestra: canal?.videos, transcripcion,
           origen: 'Ideas', leido: v.leido ?? v.visto, url: `https://www.youtube.com/watch?v=${v.id}`, puntos })
       }

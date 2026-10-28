@@ -1,7 +1,6 @@
 # Sloth 2.0
 
 Una app local donde cada skill es una card: describes el trabajo y el agente lo hace a la vista.
-La card **Sloth** mejora este mismo repo.
 
 ## Dónde buscar
 
@@ -15,12 +14,10 @@ o fue un hilo (turnos, costo, errores, lo que sigue de fondo, disco libre): `npm
 Al comprobar una compilación o publicar la app, el cobro, la nube o la página de venta, lee `docs/agents/publicacion.md`.
 Ahí están los repos, los comandos y cómo verificar cada despliegue.
 
-## Al editar la app desde la card Sloth
+## Al editar la app
 
-- Lo de `web/` se ve al instante (recarga de Vite).
-- Lo de `server/` o `shared/` se aplica solo (`server/reinicio.ts`): unos 20 s después del último cambio, cuando no trabaja
-  nada (agentes, redes, Ideas), y si pasa el typecheck. **Tú mismo corres dentro de ese servidor**: no lo mates ni lo
-  reinicies desde un comando, o se corta tu turno. Mientras trabajas no se reinicia.
+- Lo de `web/` se ve al instante en la copia que corre (recarga de Vite).
+- Lo de `server/` o `shared/` se aplica con «Reiniciar backend», que no deja si algo trabaja (agentes, redes, Ideas).
 - El servidor escucha en `$PORT`: la app instalada usa 4848, y la copia donde trabajas puede usar otro.
 - Comprueba con `npm run typecheck` y `npm test` antes de dar algo por hecho, y con `npm run comprobar-skills` si tocaste
   `skills/`. Un solo test: `node --import tsx --test <archivo>`.
@@ -50,16 +47,17 @@ Ahí están los repos, los comandos y cómo verificar cada despliegue.
 - La paleta es la de Sloth (variables en `web/src/styles.css`); no inventes colores. La excepción son los logos de otras
   marcas (`web/src/Logos.tsx`). El logo es `web/public/icon.svg`. Los iconos son de trazo (`web/src/Iconos.tsx`), nunca emojis.
 - La interfaz y los comentarios van en español.
-- Las skills viven en `skills/`. `~/.claude/skills` es un enlace (junction) a `C:\dev\vancci-sloth\skills`: de ahí las
-  cargan Claude y la app. Mejorar una skill es editar su carpeta y hacer commit en este repo.
+- Las skills viven en `skills/`. Sloth dev las lee de ahí (su Claude usa `data/claude`); `~/.claude/skills` es de la
+  Sloth instalada, como en la compu de cualquier cliente. En los scripts, las demás skills se buscan en `SLOTH_SKILLS`.
+  Mejorar una skill es editar su carpeta y hacer commit en este repo.
 - Todo estilo de video que crees nace con su card: al terminarlo, añádelo a `cards.json` en el mismo turno, sin
   preguntar, con título, icono y descripción en español, y sus `etapas` con su `fase`. Si ya tenía card, actualízala.
-  Las herramientas que no son un estilo (`autoloop`, `acelerar-skill`, `animacion-de-entrada`) no llevan card.
+  Lo de cada quien (poses, huellas, modelos 3D, material de otros) no entra al repo: va en `.gitignore`.
 - Los estilos de video comparten `skills/video-base`: el lote, los errores ya vistos, la portada que todo vertical lleva
   de primer cuadro (`PORTADA.md`) y los scripts (ver su `LEEME.md`). Lo que
   se repetiría en dos estilos va a la base. `video-el-diff` es la excepción: lo afina el usuario a mano y no se toca
   desde la base.
-- Este archivo entra en cada hilo de la card Sloth, y un test lo para en 1.000 palabras. Lo que entra, saca otra cosa.
+- Este archivo entra en cada hilo que programa Sloth, y un test lo para en 1.000 palabras. Lo que entra, saca otra cosa.
 
 ## Agent skills
 

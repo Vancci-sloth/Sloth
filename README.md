@@ -85,16 +85,9 @@ npm ci
 npm start
 ```
 
-`npm start` levanta el servidor en `http://localhost:4848` y abre la ventana de Sloth. Los agentes cargan las skills
-desde `~/.claude/skills`; enlaza una vez esa carpeta a `skills/` de este repo:
-
-```bash
-# Windows (cmd)
-mklink /J "%USERPROFILE%\.claude\skills" "<carpeta del repo>\skills"
-
-# Mac y Linux
-ln -s "<carpeta del repo>/skills" ~/.claude/skills
-```
+`npm start` levanta el servidor en `http://localhost:4848` y abre la ventana de Sloth. Sus agentes leen las skills de
+`skills/` de este repo, con su propia configuración de Claude en `data/claude` (la cuenta se conecta una vez desde
+Sloth): tu `~/.claude` no cambia, y una Sloth instalada en la misma computadora sigue con las suyas.
 
 Antes de dar algo por hecho: `npm run typecheck`, `npm test` y, si tocaste `skills/`, `npm run comprobar-skills`.
 
@@ -114,7 +107,7 @@ electron/   la ventana de escritorio
 server/     el servidor local que corre los agentes
 web/        la interfaz
 shared/     los tipos que comparten servidor e interfaz
-skills/     los estilos de video (video-el-diff, video-explicativo) y sus herramientas
+skills/     los estilos de video (El Diff, explicativo, reel de comedia, documental) y sus herramientas
 licencias/  el cobro del apoyo, la comunidad y las descargas (Cloudflare Worker)
 nube/       la nube que publica en Instagram (Cloudflare Worker)
 python/     los procesos de Python de Sloth
@@ -151,6 +144,11 @@ para siempre, con insignia en la comunidad, su nombre en los créditos de la pá
 Los PRs son bienvenidos. Lee [`CONTRIBUTING.md`](CONTRIBUTING.md) antes de empezar: la interfaz va en español, la
 paleta es la de Sloth y cada cambio se comprueba en Windows, Mac y Linux. Para reportar un problema de seguridad, no
 abras un issue: sigue [`SECURITY.md`](SECURITY.md).
+
+## Créditos
+
+El estilo **Documental** parte de EDITOR V1, de [NextPhase AI](https://www.skool.com/nextphase-5790/about), que
+venía para HyperFrames; en Sloth se dibuja con Remotion.
 
 ## Licencia
 

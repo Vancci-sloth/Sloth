@@ -7,6 +7,7 @@ import { dirname, isAbsolute, join, relative, resolve } from 'node:path'
 import type { Card, Espacio, GrupoEspacio, IdEspacio } from '../shared/types.ts'
 import { carpetasDe, folderOf, terminados } from './etapas.ts'
 import type { Sessions } from './sessions.ts'
+import { TRABAJO_DEV } from './trabajo.ts'
 
 /**
  * Opciones → Espacio en disco: lo que Sloth y sus estilos de video dejan y ya no hace falta, y borrarlo. Lo seguro (los
@@ -31,7 +32,6 @@ const GRUPOS: Record<IdEspacio, Omit<GrupoEspacio, 'id' | 'bytes' | 'cuantos'>> 
   modulos: { nombre: 'Dependencias repetidas', detalle: 'Cada video traía su propia copia de lo mismo (cerca de 1 GB). Queda una sola, que comparten todos.', seguro: true },
   caches: { nombre: 'Cachés viejas del empaquetado', detalle: 'Remotion guarda una nueva cada vez que cambia algo y nunca borra las viejas. Quedan las dos más nuevas.', seguro: true },
   perfiles: { nombre: 'Perfiles viejos del navegador', detalle: 'Copias de respaldo de perfiles del navegador que ya se cambiaron.', seguro: true },
-  instaladores: { nombre: 'Instaladores viejos de Sloth', detalle: 'Los de versiones anteriores, en dist. Solo en tu copia de desarrollo.', seguro: true },
   fuentes: { nombre: 'Videos bajados de internet', detalle: 'Los originales de videos que terminaste hace más de una semana. El video final no los usa; si lo rehaces, se vuelven a bajar.', seguro: false },
   python: { nombre: 'Otra copia del Python de Sloth', detalle: 'Una instalación vieja de la IA local (torch, Whisper) que Sloth ya no usa.', seguro: false },
   adjuntos: { nombre: 'Adjuntos de hilos borrados', detalle: 'Imágenes y audios que pegaste en hilos que ya no existen, de hace más de una semana.', seguro: false }
@@ -47,7 +47,6 @@ interface Candidato {
 
 export interface OpcionesEspacio {
   app: string
-  venta: boolean
   sessions: Sessions
   cards: () => Card[]
   /** Por qué ahora no conviene tocar nada (un agente trabajando, una subida); `null` si nada trabaja. */
@@ -132,18 +131,6 @@ export function espacio(o: OpcionesEspacio) {
     const datos = join(o.app, 'data')
     for (const d of listar(datos)) for (const p of listar(join(datos, d))) if (p.startsWith('perfil-viejo')) await poner('perfiles', join(datos, d, p))
 
-    if (!o.venta) {
-      const instalador = join(o.app, 'dist', 'instalador')
-      const version = leerVersion(o.app)
-      // Los de antes, en dist/ (Sloth-Setup-0.2.2.exe, Sloth-0.2.2.zip…) y en dist/instalador, con sus .blockmap.
-      for (const dir of [join(o.app, 'dist'), instalador]) {
-        for (const f of listar(dir)) {
-          const v = /^Sloth\b.*?(\d+\.\d+\.\d+)/.exec(f)?.[1]
-          if (v && version && v !== version && !esCarpeta(join(dir, f))) await poner('instaladores', join(dir, f))
-        }
-      }
-    }
-
     if (!auto) {
       // Otro Python de Sloth: solo si el que se usa está entero.
       const elegido = await o.python()
@@ -157,12 +144,10 @@ export function espacio(o: OpcionesEspacio) {
   }
 
   function resumen(lista: Candidato[], liberado?: number): Espacio {
-    const grupos = (Object.keys(GRUPOS) as IdEspacio[])
-      .filter((id) => !o.venta || id !== 'instaladores')
-      .map((id) => {
-        const suyos = lista.filter((c) => c.grupo === id)
-        return { id, ...GRUPOS[id], bytes: suyos.reduce((n, c) => n + c.bytes, 0), cuantos: suyos.length }
-      })
+    const grupos = (Object.keys(GRUPOS) as IdEspacio[]).map((id) => {
+      const suyos = lista.filter((c) => c.grupo === id)
+      return { id, ...GRUPOS[id], bytes: suyos.reduce((n, c) => n + c.bytes, 0), cuantos: suyos.length }
+    })
     const { libre, total } = disco(o.app)
     return { libre, total, grupos, ...(liberado !== undefined ? { liberado } : {}) }
   }
@@ -339,12 +324,14 @@ export function casaDe(skill: string, plantilla: string): string | undefined {
 
 /**
  * Adónde enlazan los node_modules de los videos de las otras copias de Sloth que puede haber en la computadora (la
- * instalada y la de desarrollo, y los proyectos viejos de C:\dev), que no salen en las cards de esta.
+ * instalada y la del repo, que trabaja en `TRABAJO_DEV`), que no salen en las cards de esta.
  */
 function enlacesDeOtrasCopias(): string[] {
-  const raices = [join(LOCAL, 'Programs', 'sloth', 'app', 'trabajo'), 'C:\\dev\\vancci-sloth\\trabajo']
-  const nms = [...raices.flatMap((r) => listar(r).flatMap((card) => listar(join(r, card)).map((v) => join(r, card, v, 'node_modules')))), ...listar('C:\\dev').map((p) => join('C:\\dev', p, 'node_modules'))]
-  return nms.map(enlace).filter((e): e is string => !!e).map(clave)
+  return [join(LOCAL, 'Programs', 'sloth', 'app', 'trabajo'), TRABAJO_DEV]
+    .flatMap((raiz) => listar(raiz).flatMap((card) => listar(join(raiz, card)).map((v) => join(raiz, card, v, 'node_modules'))))
+    .map(enlace)
+    .filter((e): e is string => !!e)
+    .map(clave)
 }
 
 function casasCompartidas(): string[] {
@@ -442,14 +429,6 @@ async function tamano(ruta: string, saltar: string[] = []): Promise<number> {
     n += (await Promise.all(tanda.map((e) => tamano(join(ruta, e))))).reduce((a, b) => a + b, 0)
   }
   return n
-}
-
-function leerVersion(app: string): string | undefined {
-  try {
-    return JSON.parse(readFileSync(join(app, 'package.json'), 'utf8')).version
-  } catch {
-    return
-  }
 }
 
 function disco(ruta: string): { libre: number; total: number } {

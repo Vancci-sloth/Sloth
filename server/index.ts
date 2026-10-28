@@ -5,20 +5,18 @@ import { createServer as servidorTcp } from 'node:net'
 import { basename, dirname, extname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { WebSocketServer, type WebSocket } from 'ws'
-import type { Card, Model, Reinicio, ServerPush } from '../shared/types.ts'
+import type { Card, Model, ServerPush } from '../shared/types.ts'
 import { VENTA } from '../shared/venta.ts'
 import { IMAGE_TYPES } from './agent.ts'
 import { avances } from './avances.ts'
 import { claudeModels, tituloCorto } from './claude.ts'
-import { CambiosSloth } from './cambios-sloth.ts'
-import { listaDeArchivos, mensajeCommit } from './git-mensaje.ts'
 import { codexModels } from './codex.ts'
 import { proveedorDe } from '../shared/providers.ts'
 import { paraMandar } from '../shared/historial.ts'
-import { cerrarCuentaCodex, conectandoCodex, conectarCodex, cuentaCodex, limitesCodex } from './cuenta-codex.ts'
+import { conectandoCodex, conectarCodex, cuentaCodex, limitesCodex } from './cuenta-codex.ts'
 import { conectando, conectarClaude, cuentaClaude, limitesClaude } from './cuenta.ts'
 import { enlacesApi } from './enlaces.ts' // tarjeta de los enlaces
-import { carpetaValida, carpetasApi, etapasApi, videosApi, videosDe } from './etapas.ts' // panel de etapas
+import { carpetaValida, carpetasApi, etapasApi, mismaCwd, videosApi, videosDe } from './etapas.ts' // panel de etapas
 import { ideas } from './ideas/index.ts' // ideas
 import { modelos3d } from './modelos3d.ts' // modelos 3D
 import { miniaturas } from './miniaturas.ts' // panel de etapas
@@ -29,33 +27,43 @@ import { comunidad, llaveDelCreador } from './comunidad.ts' // comunidad
 import { redes } from './redes/index.ts' // redes
 import { youtube } from './youtube.ts'
 import { peticionDeConfianza } from './origen.ts'
-import { reinicioSolo } from './reinicio.ts'
 import { actualizarYtDlp, instalandoAlgo, instalar, pythonSlothEntero, requisitos } from './requisitos.ts'
 import { espacio } from './espacio.ts' // espacio en disco
 import { equipo } from './equipo.ts' // tu equipo
 import { licencia } from './licencia.ts' // suscripción
 import { Sessions } from './sessions.ts'
 import { eventosEnVivo } from './eventos-en-vivo.ts'
-import { cambiosDeCard, carpetaSkill, duplicateCard, enlazarSkills, enlazarSkillsCodex, readCards, removeCard, seriesDe, skillRef, volverAOriginal } from './skills.ts'
+import { cambiosDeCard, carpetaSkill, configClaudeDev, duplicateCard, enlazarSkills, enlazarSkillsCodex, guardarSkillTuya, readCards, removeCard, seriesDe, SKILLS, skillRef, volverAOriginal } from './skills.ts'
 import { estaticos } from './estaticos.ts'
-import { actualizar, type Agente, version } from './version.ts'
+import { type Agente, version } from './version.ts'
 import { cargarPreciosCodex } from './precios.ts'
 
 const APP = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const PORT = Number(process.env.PORT ?? 4848)
 const CARDS = join(APP, 'cards.json')
-/** Las cards que solo viven en esta copia (el repo lo ignora y no van en la app que se vende), si las hay. */
-const CARDS_PRIVADAS = join(APP, 'cards.privado.json')
+/**
+ * Los estilos que hizo cada quien con la card «Nuevo estilo» (skill `crear-estilo`): sus cards van aquí, en `data/`,
+ * que ninguna versión nueva toca, y sus skills en `<app>/skills/<id>`, que tampoco.
+ */
+const CARDS_TUYAS = join(APP, 'data', 'tus-cards.json')
 const ATTACHMENTS = join(APP, 'data', 'attachments')
 const ATTACHMENT_TYPES: Record<string, string> = { ...IMAGE_TYPES, '.wav': 'audio/wav', '.mp3': 'audio/mpeg', '.mp4': 'video/mp4', '.webm': 'video/webm' }
 /** Código de salida que le pide a `scripts/start.mjs` que vuelva a levantar el servidor. */
 const RESTART = 75
-// Los scripts de las skills buscan aquí los procesos del Python de Sloth (`sloth.py`); sin esto, en `C:/dev/vancci-sloth`.
+// Los scripts de las skills buscan aquí los procesos del Python de Sloth (`sloth.py`); sin esto, los de la app de la skill.
 process.env.SLOTH_PROCESOS ??= join(APP, 'python', 'procesos')
-// La app que se vende trae sus skills: las enlaza en ~/.claude/skills, donde las busca Claude.
-if (VENTA) enlazarSkills(APP)
-// Y Codex las lee de esas mismas carpetas, no de copias suyas.
-enlazarSkillsCodex(APP)
+// Y aquí las skills (`video-base`, la suya): sin esto, en ~/.claude/skills, que en la app que se vende es lo mismo.
+process.env.SLOTH_SKILLS ??= SKILLS
+if (VENTA) {
+  // La app que se vende trae sus skills: las enlaza en ~/.claude/skills, donde las busca Claude, y Codex las lee de esas
+  // mismas carpetas, no de copias suyas.
+  enlazarSkills(APP)
+  enlazarSkillsCodex(APP)
+} else {
+  // Desde el repo, Claude usa su propia configuración con las skills del repo (`SKILLS`), y ~/.claude queda para la
+  // Sloth instalada en esta computadora. A Codex se le pasa siempre la ruta de la skill.
+  process.env.CLAUDE_CONFIG_DIR ??= configClaudeDev(APP)
+}
 // Y su clave: la cuenta gratis de la comunidad o el apoyo, que quita el recordatorio. Sloth abre sin ella.
 const suscripcion = VENTA ? licencia(APP) : undefined // suscripción
 
@@ -72,7 +80,6 @@ function broadcast(msg: ServerPush) {
   avance?.oir(msg)
 }
 
-const cambiosSloth = new CambiosSloth(APP)
 const eventos = eventosEnVivo((sessionId, from, events) => broadcast({ type: 'events', sessionId, from, events }))
 const sessions = new Sessions(
   join(APP, 'data', 'sessions'),
@@ -80,25 +87,35 @@ const sessions = new Sessions(
   (session) => broadcast({ type: 'session', session }),
   (sessionId) => broadcast({ type: 'removed', sessionId }),
   // Lo que va escribiendo un `Write` solo lo pintan el estudio y el panel de etapas: a los demás hilos no se les manda.
-  (sessionId, draft) => conEtapas(sessionId) && broadcast({ type: 'draft', sessionId, draft }),
-  cambiosSloth
+  (sessionId, draft) => conEtapas(sessionId) && broadcast({ type: 'draft', sessionId, draft })
 )
 
 /** Si el hilo es de un estilo de video: solo su estudio enseña lo que va escribiendo. */
 const conEtapas = (id: string) => !!cards().find((c) => c.id === sessions.meta(id)?.cardId)?.etapas?.length
 
 /**
- * Las cards de cards.json, más las de cards.privado.json si existe. Se releen solo si alguno cambió. Si quedó a medio escribir o con un error, siguen las
- * últimas buenas: una coma de más no puede dejarte sin «Detener» ni «Reiniciar backend», que pasan por aquí.
+ * Las cards de cards.json, más las tuyas (`CARDS_TUYAS`) si hay; una tuya sin `id` o con el de una de Sloth no cuenta.
+ * Se releen solo si alguno cambió. Si quedó a medio escribir o con un error, siguen las últimas buenas: una coma de más no
+ * puede dejarte sin «Detener» ni «Reiniciar backend», que pasan por aquí. Un error en las tuyas no se lleva las de Sloth.
  */
 let leidas: { mtime: number; cards: Card[] } | undefined
-let mala = 0 // la fecha del cards.json que falló, para avisar una sola vez
+let mala = 0 // la fecha del archivo que falló, para avisar una sola vez
 function cards(): Card[] {
   let mtime = 0
   try {
-    const privadas = existsSync(CARDS_PRIVADAS)
-    mtime = statSync(CARDS).mtimeMs + (privadas ? statSync(CARDS_PRIVADAS).mtimeMs : 0)
-    if (leidas?.mtime !== mtime && mala !== mtime) leidas = { mtime, cards: [...readCards(CARDS, APP), ...(privadas ? readCards(CARDS_PRIVADAS, APP) : [])] }
+    const tuyas = existsSync(CARDS_TUYAS)
+    mtime = statSync(CARDS).mtimeMs + (tuyas ? statSync(CARDS_TUYAS).mtimeMs : 0)
+    if (leidas?.mtime !== mtime && mala !== mtime) {
+      const deSloth = readCards(CARDS, APP)
+      const ids = new Set(deSloth.map((c) => c.id))
+      let suyas: Card[] = []
+      try {
+        if (tuyas) suyas = readCards(CARDS_TUYAS, APP).filter((c) => !ids.has(c.id)).map((c) => ({ ...c, tuya: true }))
+      } catch (error) {
+        console.error(`${CARDS_TUYAS} tiene un error; van solo las cards de Sloth. ${error instanceof Error ? error.message : error}`)
+      }
+      leidas = { mtime, cards: [...deSloth, ...suyas] }
+    }
   } catch (error) {
     if (mala !== mtime) console.error(`cards.json tiene un error; siguen las cards de antes. ${error instanceof Error ? error.message : error}`)
     mala = mtime
@@ -125,7 +142,6 @@ const noticias = radar(APP) // radar
 // también desde su copia instalada (publica en Anuncios); un cliente no la tiene.
 const comunidadApi = comunidad(APP, {
   credencial: () => llaveDelCreador() ?? suscripcion?.credencial(),
-  creador: !VENTA,
   sessions,
   video: (ruta) => cards().flatMap((c) => (c.etapas?.length ? videosDe(c, sessions) : [])).find((v) => v.ruta === ruta),
   cuadro,
@@ -134,36 +150,33 @@ const comunidadApi = comunidad(APP, {
 // En qué fase va cada video y cuántas etapas lleva, para la barra lateral.
 avance = avances(sessions, cards, broadcast)
 // Opciones → Espacio en disco: lo que dejan los videos y ya no hace falta. Lo seguro lo borra solo, cada 6 horas.
-const disco = espacio({ app: APP, venta: VENTA, sessions, cards, ocupado, python: () => pythonSlothEntero(APP) }) // espacio en disco
+const disco = espacio({ app: APP, sessions, cards, ocupado, python: () => pythonSlothEntero(APP) }) // espacio en disco
 // Opciones → Tu equipo: con qué transcribe la voz y cuánto tarda cada cosa en esta computadora.
 const maquina = equipo({ app: APP, ocupado }) // tu equipo
 
 // Si el agente (o tú) edita cards.json, las cards se actualizan solas.
 watch(CARDS, () => broadcast({ type: 'cards', cards: cards() }))
-if (existsSync(CARDS_PRIVADAS)) watch(CARDS_PRIVADAS, () => broadcast({ type: 'cards', cards: cards() }))
+// Y si «Nuevo estilo» hizo uno: su skill se enlaza donde la buscan Claude y Codex antes del primer hilo con su card.
+watch(dirname(CARDS_TUYAS), (_, archivo) => {
+  if (archivo !== basename(CARDS_TUYAS)) return
+  if (VENTA) enlazarSkills(APP), enlazarSkillsCodex(APP)
+  broadcast({ type: 'cards', cards: cards() })
+})
 
 /** Por qué ahora no se puede reiniciar el servidor: lo cortaría a medias. `null` si nada trabaja. */
 function ocupado(): string | null {
   if (sessions.anyRunning()) return 'Hay un agente trabajando. Espera a que termine.'
-  if (cambiosSloth.ocupado()) return 'Sloth está haciendo commit o push. Espera a que termine.'
   if (publicar?.ocupado()) return publicar.ocupado() // redes: una subida o un texto a medias
   if (subirLargos?.ocupado()) return subirLargos.ocupado()
   if (idear?.ocupado()) return idear.ocupado() // ideas: una investigación en curso
-  if (actualizando) return actualizando
   return maquina.ocupado() ?? instalandoAlgo() ?? conectando() ?? conectandoCodex()
 }
-/** Mientras «Actualizar» corre npm install y la comprobación: qué se está actualizando. */
-let actualizando: string | null = null
 
 /** Vuelve a levantar el servidor (lo hace scripts/start.mjs), con lo que haya cambiado. Los agentes se retoman al volver. */
 function reiniciar() {
   sessions.closeAll()
   process.exit(RESTART)
 }
-
-// Si cambia el servidor (lo edita el agente de la card Sloth), se reinicia solo en cuanto nada trabaja. Compilada, su
-// código no cambia.
-const auto = VENTA ? { estado: (): Reinicio => ({ pendiente: false }) } : reinicioSolo(APP, ocupado, (reinicio) => broadcast({ type: 'reinicio', reinicio }), reiniciar)
 
 /**
  * Los modelos se preguntan a Claude Code y a Codex. La interfaz no los espera para enseñar cards y hilos: le
@@ -194,7 +207,7 @@ function carpetasDeLote(card: Card, n: number): string[] {
   const dos = (x: number) => String(x).padStart(2, '0')
   const d = new Date()
   const base = `${card.lote?.prefijo ?? ''}lote-${dos(d.getMonth() + 1)}${dos(d.getDate())}-${dos(d.getHours())}${dos(d.getMinutes())}`
-  const usadas = [...readdirSync(card.cwd), ...sessions.list().flatMap((s) => (s.cwd === card.cwd && s.lote ? [s.lote.carpeta] : []))]
+  const usadas = [...readdirSync(card.cwd), ...sessions.list().flatMap((s) => (mismaCwd(s.cwd, card.cwd) && s.lote ? [s.lote.carpeta] : []))]
   let nombre = base
   for (let k = 2; usadas.some((u) => u.startsWith(`${nombre}-`)); k++) nombre = `${base}-${k}`
   return Array.from({ length: n }, (_, i) => `${nombre}-${String(i + 1).padStart(Math.max(2, String(n).length), '0')}`)
@@ -223,7 +236,7 @@ function carpetaDeVideo(card: Card, title: string): string {
   const d = new Date()
   const base = `${card.lote?.prefijo ?? ''}${palabras.slice(0, 4).join('-') || `video-${dos(d.getMonth() + 1)}${dos(d.getDate())}-${dos(d.getHours())}${dos(d.getMinutes())}`}`
   const usadas = new Set(
-    [...readdirSync(card.cwd), ...sessions.list().flatMap((s) => (s.cwd === card.cwd ? [s.carpeta ?? '', s.lote?.carpeta ?? ''] : []))].map((u) => u.toLowerCase())
+    [...readdirSync(card.cwd), ...sessions.list().flatMap((s) => (mismaCwd(s.cwd, card.cwd) ? [s.carpeta ?? '', s.lote?.carpeta ?? ''] : []))].map((u) => u.toLowerCase())
   )
   let nombre = base
   for (let k = 2; usadas.has(nombre); k++) nombre = `${base}-${k}`
@@ -257,7 +270,7 @@ async function api(req: IncomingMessage, res: ServerResponse, url: URL): Promise
 
   if (path === '/api/state' && method === 'GET') {
     if (!modelos.some((m) => proveedorDe(m.id) === 'claude') || !modelos.some((m) => proveedorDe(m.id) === 'codex')) pedirModelos()
-    send(res, 200, { cards: cards(), sessions: sessions.list(), models: modelos, app: APP, reinicio: auto.estado(), avances: avance?.todos() ?? {} })
+    send(res, 200, { cards: cards(), sessions: sessions.list(), models: modelos, app: APP, avances: avance?.todos() ?? {} })
     return true
   }
 
@@ -324,31 +337,8 @@ async function api(req: IncomingMessage, res: ServerResponse, url: URL): Promise
     return true
   }
 
-  const ver = /^\/api\/(claude|codex)\/(version|actualizar)$/.exec(path)
-  if (ver?.[2] === 'version' && method === 'GET') return send(res, 200, await version(APP, ver[1] as Agente)), true
-  if (ver?.[2] === 'actualizar' && method === 'POST') {
-    // Se cierran los procesos del agente para reemplazarlo. Claude corre dentro de este servidor: luego se reinicia para
-    // cargarlo. Codex se abre otra vez en cada uso: basta con volver a pedir sus modelos.
-    const agente = ver[1] as Agente
-    if (ocupado()) return send(res, 409, { error: ocupado() }), true
-    sessions.closeAll()
-    if (agente === 'codex') cerrarCuentaCodex()
-    actualizando = `Se está actualizando ${agente === 'claude' ? 'Claude Code' : 'Codex'}. Espera a que termine.`
-    try {
-      await actualizar(APP, agente)
-    } catch (error) {
-      return send(res, 500, { error: error instanceof Error ? error.message : String(error) }), true
-    } finally {
-      actualizando = null
-    }
-    send(res, 200, { reinicia: agente === 'claude' })
-    if (agente === 'claude') setTimeout(reiniciar, 100)
-    else {
-      pedirModelos()
-      void cargarPreciosCodex(APP)
-    }
-    return true
-  }
+  const ver = /^\/api\/(claude|codex)\/version$/.exec(path)
+  if (ver && method === 'GET') return send(res, 200, version(APP, ver[1] as Agente)), true
 
   // Las series de la skill de una card, para elegir una al crear un video. Se leen cada vez: viven en la skill.
   const ser = /^\/api\/cards\/([\w-]+)\/series$/.exec(path)
@@ -372,14 +362,25 @@ async function api(req: IncomingMessage, res: ServerResponse, url: URL): Promise
     }
   }
 
+  // Duplicar y borrar, en el repo. En la app que se vende, solo se borran los estilos tuyos: con su card se va su skill,
+  // a una copia (`guardarSkillTuya`), si no la usa otra card.
   const c = /^\/api\/cards\/([\w-]+)\/(duplicate|delete)$/.exec(path)
   if (c && method === 'POST') {
     const [, id, action] = c
-    if (action === 'duplicate') send(res, 200, { id: duplicateCard(CARDS, id) })
-    else {
-      removeCard(CARDS, id)
-      send(res, 200, { ok: true })
+    const todas = cards()
+    const card = todas.find((t) => t.id === id)
+    if (!card) return send(res, 404, { error: 'No existe esa card' }), true
+    if (VENTA && !card.tuya) return send(res, 403, { error: 'Las cards de Sloth no se duplican ni se borran.' }), true
+    const archivo = card.tuya ? CARDS_TUYAS : CARDS
+    if (action === 'duplicate') return send(res, 200, { id: duplicateCard(archivo, id) }), true
+    if (card.tuya) {
+      if (sessions.list().some((s) => s.cardId === id && (s.running || s.background?.length))) {
+        return send(res, 409, { error: 'Un hilo de este estilo está trabajando. Espera a que termine.' }), true
+      }
+      if (card.skill && !todas.some((t) => t.id !== id && t.skill === card.skill)) guardarSkillTuya(APP, card.skill, join(APP, 'data'))
     }
+    removeCard(archivo, id)
+    send(res, 200, { ok: true })
     return true
   }
 
@@ -387,8 +388,6 @@ async function api(req: IncomingMessage, res: ServerResponse, url: URL): Promise
     const input = await body<{ cardId: string; model: string; effort?: string; text: string; images?: string[]; carpeta?: string }>(req)
     const card = cards().find((c) => c.id === input.cardId)
     if (!card) return send(res, 404, { error: 'No existe esa card' }), true
-    // Mientras Sloth hace commit o push, un hilo suyo no puede empezar: se dice antes de crearlo, o quedaba un hilo vacío.
-    if (cambiosSloth.esSloth({ cardId: card.id, cwd: card.cwd })) cambiosSloth.comprobarInicio('')
     mkdirSync(card.cwd, { recursive: true })
     // «Continuar un video»: el hilo nace con su carpeta, que ya existe. Se lo dice el mensaje, en palabras: así vale para
     // cualquier skill sin tocarlas (El Diff la afina el usuario a mano), y pesa más que su paso de crear una carpeta nueva.
@@ -458,43 +457,6 @@ async function api(req: IncomingMessage, res: ServerResponse, url: URL): Promise
   const m = /^\/api\/sessions\/([\w-]+)(?:\/(\w+))?$/.exec(path)
   if (m) {
     const [, id, action] = m
-    if (['cambios', 'diff', 'revertir', 'git'].includes(action)) {
-      const meta = sessions.meta(id)
-      if (!meta) return send(res, 404, { error: 'No existe ese hilo.' }), true
-      if (!cambiosSloth.esSloth(meta)) return send(res, 403, { error: 'Los cambios y la reversión solo están disponibles en Sloth.' }), true
-      if (action === 'cambios' && method === 'GET') return send(res, 200, cambiosSloth.listar(id)), true
-      if (action === 'diff' && method === 'GET') return send(res, 200, await cambiosSloth.verAsync(id)), true
-      if (action === 'git' && method === 'POST') {
-        if (sessions.list().some((s) => resolve(s.cwd) === APP && (s.running || s.background?.length))) return send(res, 409, { error: 'Hay un agente cambiando la app. Espera a que termine o detenlo.' }), true
-        const input = await body<{ operacion?: string; mensaje?: string; revision?: string }>(req)
-        if (!['commit', 'commit-push', 'push', 'auto'].includes(input.operacion ?? '') || typeof input.revision !== 'string' || (input.mensaje !== undefined && typeof input.mensaje !== 'string')) return send(res, 400, { error: 'Acción de Git inválida.' }), true
-        try {
-          const result = await cambiosSloth.guardarGit(input.operacion as 'commit' | 'commit-push' | 'push' | 'auto', input.mensaje ?? '', input.revision, async () => {
-            const archivos = cambiosSloth.ver(id).globales
-            const mensaje = await mensajeCommit(meta, archivos)
-            return `${mensaje}\n\nArchivos incluidos:\n${listaDeArchivos(archivos)}`
-          })
-          send(res, 200, result)
-        } catch (error) {
-          send(res, 409, { error: error instanceof Error ? error.message : String(error) })
-        }
-        return true
-      }
-      if (action === 'revertir' && method === 'POST') {
-        const { cambioId } = await body<{ cambioId?: string }>(req)
-        if (!cambioId) return send(res, 400, { error: 'Elige el cambio que quieres revertir.' }), true
-        if (sessions.list().some((s) => resolve(s.cwd) === APP && (s.running || s.background?.length))) return send(res, 409, { error: 'Hay un agente cambiando la app. Espera a que termine o detenlo.' }), true
-        try {
-          const cambios = cambiosSloth.revertir(id, cambioId)
-          sessions.avisarReversion(id)
-          send(res, 200, cambios)
-        } catch (error) {
-          send(res, 409, { error: error instanceof Error ? error.message : String(error) })
-        }
-        return true
-      }
-      return send(res, 405, { error: 'Método no permitido.' }), true
-    }
     if (action === 'historial' && method === 'GET') {
       const found = await sessions.historial(id)
       // Lo que no cambia nada va como hueco (`paraMandar`): la pantalla lo rellena.
@@ -676,8 +638,6 @@ v6.on('error', () => {})
 v6.listen(PORT, '::1')
 server.listen(PORT, '127.0.0.1', () => {
   console.log(`Sloth en http://localhost:${PORT}`)
-  // La primera copia de Sloth lee todo el repo; luego solo lo que cambió. Mejor ahora que al mandar el primer mensaje.
-  if (!VENTA) setTimeout(() => cambiosSloth.calentar(), 3000)
   // yt-dlp al día, una vez al día: se mira cada hora por si a esa hora trabajaba algo.
   const ytDlp = () => void actualizarYtDlp(APP, () => !ocupado())
   setTimeout(ytDlp, 30_000)

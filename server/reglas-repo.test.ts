@@ -7,7 +7,7 @@ import type { Card } from '../shared/types.ts'
 /** Reglas del repo que se cumplen solas: escritas solo en AGENTS.md, los hilos las pasaban por alto. */
 const REPO = join(import.meta.dirname, '..')
 
-test('AGENTS.md no pasa de 1.000 palabras: entra en cada hilo de la card Sloth', () => {
+test('AGENTS.md no pasa de 1.000 palabras: entra en cada hilo que programa Sloth', () => {
   const palabras = readFileSync(join(REPO, 'AGENTS.md'), 'utf8').split(/\s+/).filter(Boolean).length
   assert.ok(palabras <= 1000, `AGENTS.md tiene ${palabras} palabras. Lo que entra, saca otra cosa (a docs/ con un puntero).`)
 })

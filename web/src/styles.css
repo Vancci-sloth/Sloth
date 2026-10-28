@@ -72,7 +72,7 @@ input, textarea, select { font: inherit; color: inherit; }
 @keyframes pulse { 50% { opacity: 0.4; } }
 
 .main { position: relative; min-width: 0; min-height: 0; display: flex; flex-direction: column; }
-/* Arriba a la derecha del hilo nuevo: «Actualizar Claude Code» y «Acelerar Sloth en tu equipo». */
+/* Arriba a la derecha del hilo nuevo: «Acelerar Sloth en tu equipo». */
 .avisos-nuevo { position: absolute; top: 14px; right: 18px; z-index: 2; display: flex; gap: 8px; align-items: center; }
 .aviso-version { padding: 6px 12px; border-radius: 999px; background: var(--amber-tinte); border: 1px solid var(--amber); color: var(--amber); font-size: 12.5px; font-weight: 600; }
 .aviso-version:hover { background: var(--amber); color: var(--sobre-ambar); }
@@ -104,10 +104,6 @@ input, textarea, select { font: inherit; color: inherit; }
 .estante { min-height: 0; display: flex; flex-direction: column; gap: 12px; }
 .estante header { display: flex; align-items: center; gap: 2px; }
 .estante h2 { flex: 1; margin: 0; font-size: 11px; font-weight: 650; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
-.estante header button { padding: 3px 10px; border-radius: 999px; font-size: 12.5px; color: var(--muted); transition: background 0.15s, color 0.15s; }
-.estante header button:hover { background: var(--panel-2); color: var(--text); }
-.estante header button.crear { color: var(--amber); }
-.estante header button.crear:hover { background: var(--amber-tinte); }
 .cards { min-height: 0; overflow-y: auto; display: grid; grid-template-columns: repeat(auto-fill, minmax(168px, 1fr)); grid-auto-rows: max-content; gap: 14px; margin: 0 -6px; padding: 4px 6px 6px; }
 .card { position: relative; aspect-ratio: 3 / 4; overflow: hidden; isolation: isolate; border-radius: 14px; border: 1px solid var(--line); background: var(--panel-2); text-align: left; transition: border-color 0.15s, transform 0.15s; }
 .card:hover { border-color: #4a4236; transform: translateY(-2px); }
@@ -234,9 +230,6 @@ input, textarea, select { font: inherit; color: inherit; }
 .quote-chip .chip-name { font-weight: 400; font-style: italic; }
 .link-chip small { margin-left: 1px; }
 a.link-chip:hover { border-color: var(--amber); }
-/* «Nuevo diseño»: un destello relleno, en vez del trazo del enlace. */
-.design-chip { border-color: var(--amber); color: var(--amber-2); }
-.design-chip .chip-icon { fill: var(--amber); stroke: none; background: var(--amber-tinte); }
 .composer-bar { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
 /* Un grupo de botones donde solo uno está elegido (`Segmento`): el formato, la duración, el modo del modelo… */
 .segmento { display: flex; border: 1px solid var(--line); border-radius: 999px; padding: 2px; font-size: 12px; }

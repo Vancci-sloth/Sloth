@@ -1,4 +1,4 @@
-/** Las etiquetas del compositor y de la burbuja: hilos, enlaces, citas y «Nuevo diseño». Viven aparte para que Composer.tsx solo exporte componentes. */
+/** Las etiquetas del compositor y de la burbuja: hilos, enlaces y citas. Viven aparte para que Composer.tsx solo exporte componentes. */
 
 /** La referencia a otro hilo que copia el menú de la barra lateral. Al agente le llega tal cual; a la vista, como etiqueta. */
 export function threadRef(title: string, id: string, app: string): string {
@@ -14,12 +14,6 @@ export const LINK = /https?:\/\/[^\s<>"'«»]*[^\s<>"'«».,;:!?)\]]/
 
 /** El eslabón de cadena que distingue la etiqueta de un enlace. */
 export const LINK_ICON = 'M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7'
-
-/** El encargo de «＋ Crear skill», sobre las cards del inicio. Al agente le llega tal cual; a la vista, como la etiqueta «Nuevo diseño». */
-export const DESIGN = 'Crea una skill nueva en ~/.claude/skills que'
-
-/** El destello que distingue la etiqueta «Nuevo diseño». */
-export const DESIGN_ICON = 'M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z'
 
 /**
  * Una cita del chat, como en T3 Code: se elige texto de la conversación y entra al campo como etiqueta. Al agente le
@@ -43,10 +37,6 @@ export const QUOTE_ICON =
 /** El aviso con el que la conversación le pasa una cita al compositor. */
 export const QUOTE_EVENT = 'sloth:cita'
 
-/** La etiqueta «Nuevo diseño» en HTML, para empezar con ella un borrador. Guarda el encargo entero, que es lo que se manda. */
-export function designChipHtml(): string {
-  return `<span class="chip design-chip" contenteditable="false" data-ref="${DESIGN}" title="${DESIGN}"><svg class="chip-icon" viewBox="0 0 24 24"><path d="${DESIGN_ICON}"/></svg><span class="chip-name">Nuevo diseño</span></span>`
-}
 
 /** Lo que enseña la etiqueta de un enlace: el sitio, y el resto en gris. */
 export function linkParts(url: string): [string, string] {

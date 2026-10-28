@@ -582,8 +582,8 @@ export function redes(app: string, sessions: Sessions, cards: () => Card[], avis
   const mismaRuta = (a: string, b: string) => resolve(a).toLowerCase() === resolve(b).toLowerCase()
   const trabajaEn = (card: Card) => sessions.list().some((s) => (s.cardId === card.id || mismaRuta(s.cwd, card.cwd)) && (s.running || !!s.background?.length))
   /**
-   * Un hilo de un estilo de video trabaja (o dejó algo en marcha) en la carpeta de ese archivo. Los de la card Sloth no
-   * cuentan: trabajan en el repo, que tiene dentro `trabajo/`, y bloquearían todos los videos.
+   * Un hilo de un estilo de video trabaja (o dejó algo en marcha) en la carpeta de ese archivo. Los de una card sin
+   * etapas («Nuevo estilo») no cuentan: no hacen videos, y su carpeta no es la de ninguno.
    */
   function enUso(ruta: string) {
     const estilos = new Set(cards().filter((c) => c.etapas?.length).map((c) => c.id))

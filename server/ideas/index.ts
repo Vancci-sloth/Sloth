@@ -5,6 +5,7 @@ import { CANAL_CARD, esVertical, IDEAS_CARD, redDeReferencia, sinInvestigar, ski
 import type { Canal, CanalCompleto, EnVivo, IdeaElegida, Ideas, Investigacion, Rendimiento, ServerPush, SessionMeta, Temas, TrabajoYT, Transcripcion, VueltaAnterior } from '../../shared/types.ts'
 import { guardar } from '../disco.ts'
 import { llaveYoutube, tokenMeta } from '../opciones.ts'
+import { carpetaTrabajo } from '../trabajo.ts'
 import type { Sessions } from '../sessions.ts'
 import { skillRef } from '../skills.ts'
 import { investigar } from './investigar.ts'
@@ -85,7 +86,7 @@ const slug = (s: string) =>
 const lista = (xs: unknown) => [...new Set((Array.isArray(xs) ? xs : []).map((x) => String(x).trim()).filter(Boolean))]
 
 export function ideas(app: string, sessions: Sessions, avisar: (push: ServerPush) => void, youtube?: CuentaYoutube) {
-  const raiz = join(app, 'trabajo', 'ideas')
+  const raiz = join(carpetaTrabajo(app), 'ideas')
   mkdirSync(raiz, { recursive: true })
   const trabajos = new Map<string, TrabajoYT>()
   const paradas = new Map<string, AbortController>()

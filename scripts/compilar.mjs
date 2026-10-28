@@ -6,8 +6,8 @@
 // de bloques (.blockmap) y latest.yml (latest-mac.yml, latest-linux.yml), y `npm run publicar` lo sube. Con
 // `--sin-instalador` la deja lista para abrir, sin instalar, en dist/instalador. Lleva su propio Node, la interfaz y el
 // servidor ya armados, y solo las skills de sus
-// cards. No lleva lo que solo sirve aquí: tus datos (`data/`, `trabajo/`, y tus huellas y tus modelos 3D en las skills),
-// la card Sloth, que edita esta app, Ideas y el Reel de comedia. Lo que se esconde en el código depende de `VENTA` (`shared/venta.ts`).
+// cards. No lleva lo que solo sirve aquí: tus datos (`data/`, `trabajo/`, y tus huellas, tus poses y tus modelos 3D en
+// las skills) ni Ideas. Lo que se esconde en el código depende de `VENTA` (`shared/venta.ts`).
 import { execFileSync, execSync } from 'node:child_process'
 import { cpSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { basename, dirname, join } from 'node:path'
@@ -40,16 +40,14 @@ const SIN_INSTALADOR = process.argv.includes('--sin-instalador')
 /** Lo que trae esta versión, en un renglón (`novedad.txt`): va en latest.yml y la app lo enseña sobre «Actualizar». */
 const NOVEDAD = readFileSync(join(REPO, 'novedad.txt'), 'utf8').split(/\r?\n/)[0].trim()
 
-/** Las cards que no van: Sloth edita esta app y el Reel de comedia es solo tuyo. Ideas no es una card: la quita `VENTA`. */
-const SIN_CARDS = ['sloth', 'reel-collage']
 /** Además de las de cada card: la base común de los estilos y la biblioteca de modelos 3D. */
 const SKILLS_BASE = ['video-base', 'modelos-3d']
 /** Los paquetes que el servidor carga o lanza. Lo demás ya va dentro de server/index.mjs o de la interfaz. */
 const PAQUETES = ['@anthropic-ai/claude-agent-sdk', '@openai/codex', '@playwright/mcp', 'playwright-core', 'ws', 'zod']
 /** Lo que no se copia de las skills ni de los procesos de Python. */
 const BASURA = new Set(['__pycache__', 'node_modules', '.git', '.cache'])
-/** Lo tuyo dentro de las skills, que se llena solo con los videos de cada cliente: tus huellas y tu banco de temas. */
-const TUYO = ['video-explicativo/huellas/registro.jsonl', 'video-explicativo/huellas/hojas', 'video-explicativo/series/banco'].map((r) => join(REPO, 'skills', r))
+/** Lo tuyo dentro de las skills, que se llena solo con los videos de cada cliente: tus huellas, tu banco de temas y tus poses. */
+const TUYO = ['video-explicativo/huellas/registro.jsonl', 'video-explicativo/huellas/hojas', 'video-explicativo/series/banco', 'reel-collage/personaje'].map((r) => join(REPO, 'skills', r))
 /**
  * Tus modelos 3D también son tuyos: cada cliente empieza con la biblioteca vacía y hace los suyos. La moneda que trae de
  * protagonista la plantilla del explicativo va aparte (`modelos-3d/plantilla`), sin enseñarse. Los que llevaban las
@@ -124,11 +122,8 @@ execSync('npm install --omit=dev --no-audit --no-fund --prefer-offline', { cwd: 
 // Las skills van aparte, en resources: la app las pone en app\skills al estrenar cada versión sin pisar lo que llevan de
 // tus videos (`prepararSkills` en electron/main.ts).
 paso('Copiando las cards, sus skills y los procesos de Python')
-// `videos` son carpetas de esta computadora.
 const cards = JSON.parse(readFileSync(join(REPO, 'cards.json'), 'utf8'))
-  .filter((c) => !SIN_CARDS.includes(c.id))
-  .map(({ videos, ...c }) => c)
-writeFileSync(join(APP, 'cards.json'), `${JSON.stringify(cards, null, 2)}\n`)
+cpSync(join(REPO, 'cards.json'), join(APP, 'cards.json'))
 const skills = [...new Set([...SKILLS_BASE, ...cards.flatMap((c) => (c.skill ? [c.skill] : []))])]
 for (const s of skills) cpSync(join(REPO, 'skills', s), join(SALIDA, 'skills', s), { recursive: true, filter: limpio })
 cpSync(join(REPO, 'python', 'procesos'), join(APP, 'python', 'procesos'), { recursive: true, filter: limpio })

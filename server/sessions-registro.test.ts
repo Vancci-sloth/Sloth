@@ -10,7 +10,7 @@ test('el registro abierto escribe cada evento en el disco al momento, y el hilo 
   mkdirSync(base, { recursive: true })
   const dir = mkdtempSync(join(base, 'prueba-sesiones-registro-'))
   let emitir!: AgentOptions['onEvent']
-  const crear = () => new Sessions(dir, () => {}, () => {}, () => {}, () => {}, undefined, (opts) => {
+  const crear = () => new Sessions(dir, () => {}, () => {}, () => {}, () => {}, (opts) => {
     emitir = opts.onEvent
     return { send() {}, steer() {}, async interrupt() {}, close() {} }
   })

@@ -25,9 +25,9 @@ from pathlib import Path
 from comun import MODELOS, proceso, sloth, turno_youtube, wav16k
 
 YOUTUBE = re.compile(r"(?:youtube\.com/(?:watch\?(?:.*&)?v=|shorts/|live/|embed/)|youtu\.be/)([\w-]{11})")
-# Donde dejan sus fuentes los episodios: los vecinos de este (la carpeta de trabajo de la card, se corre en la raíz del
-# episodio), los de las cards de tu copia de Sloth y los de C:\dev. Las rutas que no existen no encuentran nada.
-EPISODIOS = [f"{glob.escape(str(Path.cwd().parent))}/*/fuentes", "C:/dev/vancci-sloth/trabajo/*/*/fuentes", "C:/dev/*/fuentes"]
+# Donde dejan sus fuentes los episodios: los vecinos de este (la carpeta de trabajo de la card; se corre en la raíz del
+# episodio).
+EPISODIOS = [f"{glob.escape(str(Path.cwd().parent))}/*/fuentes"]
 # Lo que no sirve para sacar clips ni cuadros.
 MINIMO = 720
 # El único reintento, el mismo de metraje.py: en octubre de 2026, web_embedded daba 1080p cuando la descarga normal pedía

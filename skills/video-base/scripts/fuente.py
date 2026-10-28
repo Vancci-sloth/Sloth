@@ -25,9 +25,8 @@ from pathlib import Path
 from sloth import MODELOS, PROCESOS, proceso, sloth, turno_youtube, wav16k
 
 YOUTUBE = re.compile(r"(?:youtube\.com/(?:watch\?(?:.*&)?v=|shorts/|live/|embed/)|youtu\.be/)([\w-]{11})")
-# Donde dejan sus fuentes los vídeos: los de las cards de Sloth (`<app>/trabajo/<card>/<vídeo>`, la app de PROCESOS) y
-# los proyectos viejos de C:\dev, si los hay.
-PROYECTOS = [(PROCESOS.parents[1] / "trabajo").as_posix() + "/*/*/fuentes", "C:/dev/*/fuentes"]
+# Donde dejan sus fuentes los vídeos: los de las cards de Sloth (`<app>/trabajo/<card>/<vídeo>`, la app de PROCESOS).
+PROYECTOS = [(PROCESOS.parents[1] / "trabajo").as_posix() + "/*/*/fuentes"]
 # Lo que no sirve para sacar clips ni cuadros: el formato 18 (640x360) que da el cliente mweb.
 MINIMO = 720
 # Los clientes de YouTube con que se reintenta, en orden. Probar más acabó en 429 el 8 de octubre de 2026.

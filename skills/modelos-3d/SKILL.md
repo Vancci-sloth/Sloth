@@ -99,5 +99,5 @@ vuelve a guardar. Al mejorar uno, solo se pasa lo que cambió; `--hace` y `--eti
 
 La biblioteca es de cada quien y empieza vacía: la moneda y el ícono 3D que trae la plantilla del explicativo están
 en `plantilla/`, que `usar` encuentra y `buscar` no enseña (si mejoras uno y lo guardas, pasa a la biblioteca). Lo
-guardado queda en el repo de Sloth (`skills/modelos-3d`) sin commit: al entregar el video, dile al usuario qué
-modelos sumaste o mejoraste.
+guardado queda en la biblioteca de esta computadora (`modelos/` de esta skill), que se ve en «Modelos 3D» de Sloth: al
+entregar el video, dile al usuario qué modelos sumaste o mejoraste.

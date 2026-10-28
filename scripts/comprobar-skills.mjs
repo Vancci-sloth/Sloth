@@ -38,11 +38,23 @@ else if (pys.length) {
   console.log(`· ${pys.length} scripts de Python`)
 }
 
-/** Los node_modules más nuevos con Remotion de un video de ese estilo: la caché compartida o un proyecto de trabajo/. */
+/**
+ * Los node_modules con Remotion de un video de ese estilo: primero los de un video de verdad (de la Sloth instalada o de
+ * la del repo), de donde se toma lo que el script de crear un video le pone a la plantilla; si no hay, los compartidos
+ * (`<estilo>/modulos/*` de El Diff y `sloth-modulos/<estilo>-*` de los demás, ver espacio.py de video-base). De cada
+ * grupo, el más nuevo.
+ */
 function modulosDe(skill) {
   const casa = process.env.LOCALAPPDATA ?? join(process.env.HOME ?? '', '.cache')
-  const candidatos = [...globSync(`${skill}/modulos/*/node_modules`, { cwd: casa }).map((r) => join(casa, r)), ...globSync(`trabajo/${skill}/*/node_modules`, { cwd: REPO }).map((r) => join(REPO, r))]
-  return candidatos.filter((nm) => existsSync(join(nm, 'remotion', 'package.json'))).sort((a, b) => statSync(b).mtimeMs - statSync(a).mtimeMs)[0]
+  const buscar = (...globs) =>
+    globs
+      .flatMap((g) => globSync(g, { cwd: casa }).map((r) => join(casa, r)))
+      .filter((nm) => existsSync(join(nm, 'remotion', 'package.json')))
+      .sort((a, b) => statSync(b).mtimeMs - statSync(a).mtimeMs)[0]
+  return (
+    buscar(`Programs/sloth/app/trabajo/${skill}/*/node_modules`, `sloth-dev/trabajo/${skill}/*/node_modules`) ??
+    buscar(`${skill}/modulos/*/node_modules`, `sloth-modulos/${skill}-*/node_modules`)
+  )
 }
 
 // Las plantillas.

@@ -38,9 +38,9 @@ if (os.freemem() >= LIBRE) {
   memoria.shouldUseParallelEncoding = (a) => ({ ...original(a), hasEnoughMemory: true });
 }
 // Empaqueta en una carpeta de %TEMP% que se borra al terminar: la de `bundle()` lleva una copia de `public/` y se quedaba.
-const { empaquetar } = require(path.join(os.homedir(), ".claude", "skills", "video-base", "scripts", "remotion.cjs"));
+const { empaquetar } = require(path.join(process.env.SLOTH_SKILLS || path.join(os.homedir(), ".claude", "skills"), "video-base", "scripts", "remotion.cjs"));
 // Cuánto falta y, del final, cuánto tardó: en una computadora lenta el render es lo más largo y, sin decirlo, parece colgado.
-const equipo = require(path.join(os.homedir(), ".claude", "skills", "video-base", "scripts", "equipo.cjs"));
+const equipo = require(path.join(process.env.SLOTH_SKILLS || path.join(os.homedir(), ".claude", "skills"), "video-base", "scripts", "equipo.cjs"));
 const { openBrowser, renderMedia, selectComposition } = desde("@remotion/renderer");
 
 const espera = (ms) => new Promise((r) => setTimeout(r, ms));

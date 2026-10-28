@@ -112,7 +112,7 @@ público a fondo antes de buscar nada.
    esa persona y no como las diría un experto. Pruébalas antes de proponerlas:
 
    ```
-   python ~/.claude/skills/ideas-youtube/scripts/probar.py "frase 1" "frase 2" …
+   python <carpeta de esta skill>/scripts/probar.py "frase 1" "frase 2" …
    ```
 
    Enséñale los números en una tabla corta (frase, videos largos, mediana) y explica cuál pide más su público. Deja que

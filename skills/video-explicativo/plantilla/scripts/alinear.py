@@ -25,6 +25,7 @@ un emoji). Si lo que se ve no es lo que se dice (una cifra),
 import difflib
 import json
 import re
+import os
 import subprocess
 import sys
 import unicodedata
@@ -33,7 +34,7 @@ from pathlib import Path
 
 import numpy as np
 
-BASE = Path.home() / ".claude" / "skills" / "video-base" / "scripts"
+BASE = Path(os.environ.get("SLOTH_SKILLS") or Path.home() / ".claude" / "skills") / "video-base" / "scripts"
 sys.path.insert(0, str(BASE))
 from sloth import MODELOS, proceso, wav16k  # noqa: E402
 

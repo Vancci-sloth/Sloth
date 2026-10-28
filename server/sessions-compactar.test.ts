@@ -15,7 +15,7 @@ function preparar(t: test.TestContext, model = 'codex:gpt-prueba') {
   const enviados: string[] = []
   let compactaciones = 0
   let emitir!: AgentOptions['onEvent']
-  const sessions = new Sessions(dir, (_, __, events) => eventos.push(...events), () => {}, () => {}, () => {}, undefined, (opts) => {
+  const sessions = new Sessions(dir, (_, __, events) => eventos.push(...events), () => {}, () => {}, () => {}, (opts) => {
     emitir = opts.onEvent
     return {
       send(text) { enviados.push(text) }, steer(text) { enviados.push(text) },

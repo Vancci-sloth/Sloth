@@ -12,13 +12,14 @@ Vuelve una imagen un recorte de collage: borde blanco grueso y cortado a mano (u
 La sombra no va aquí: la pone el video (CSS), así cambia con el tema.
 """
 
+import os
 import sys
 from pathlib import Path
 
 import numpy as np
 from PIL import Image, ImageFilter
 
-sys.path.insert(0, str(Path.home() / ".claude" / "skills" / "video-base" / "scripts"))
+sys.path.insert(0, str(Path(os.environ.get("SLOTH_SKILLS") or Path.home() / ".claude" / "skills") / "video-base" / "scripts"))
 from recorte import alfa  # noqa: E402
 
 BLANCO = (255, 255, 255)

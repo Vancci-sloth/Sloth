@@ -1,14 +1,13 @@
 import { execFile } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, readFileSync, rmSync } from 'node:fs'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { tmpdir } from 'node:os'
-import { basename, dirname, extname, join, resolve, sep } from 'node:path'
+import { extname, join, resolve, sep } from 'node:path'
 import { promisify } from 'node:util'
 import { query } from '@anthropic-ai/claude-agent-sdk'
 import { NOMBRE_AGENTE, proveedorDe } from '../shared/providers.ts'
 import type { AdjuntoComunidad, AyudaMejora, OrigenMejora, PublicacionComunidad, ServerPush, VideoHecho } from '../shared/types.ts'
-import { guardar } from './disco.ts'
 import { COBRO } from './licencia.ts'
 import type { Sessions } from './sessions.ts'
 import { redactarCodexYoutube } from './youtube-redactor.ts'
@@ -25,12 +24,8 @@ import { redactarCodexYoutube } from './youtube-redactor.ts'
  *   de portada; quien quiera enseñarlo entero pega su enlace en el texto.
  * - `POST /api/comunidad/redactar` `{texto, origen?}`: «Ayúdame a decirlo». Claude lee lo que escribiste (y lo que pasaba
  *   en el hilo de donde sale) y propone el texto (`AyudaMejora`).
- * - `POST /api/mejoras` `{texto, imagenes?, adjuntos?, origen?}`: publica una mejora. Lo usan «Pedir una mejora» de cada
- *   hilo y el agente; `imagenes` son rutas de `data/attachments`. El hilo de donde salió no se publica: se queda en
- *   `data/comunidad.json`, para el pedido de «Hacer con Sloth».
- * - Solo en la del creador: `GET /api/comunidad/local`, los hilos de la card Sloth de cada mejora (su primer mensaje lleva
- *   `Mejora: <id>`) y de dónde salió cada una; y `POST /api/comunidad/hacer` `{id}`, el borrador para la card Sloth (el
- *   pedido y sus imágenes, ya en `data/attachments`), que además la marca «haciéndose» para todos.
+ * - `POST /api/mejoras` `{texto, imagenes?, adjuntos?}`: publica una mejora. Lo usan «Pedir una mejora» de cada hilo y
+ *   el agente; `imagenes` son rutas de `data/attachments`. El hilo de donde salió no se publica.
  */
 
 export type Credencial = { clave: string; equipo: string } | { llave: string }
@@ -53,8 +48,6 @@ class Rechazo extends Error {
 
 interface Opciones {
   credencial(): Credencial | undefined
-  /** La del creador: «Hacer con Sloth» y los hilos de cada mejora. */
-  creador: boolean
   sessions: Sessions
   /** El video terminado con esa ruta, si lo es (los de «Mis videos»). */
   video(ruta: string): VideoHecho | undefined
@@ -64,14 +57,7 @@ interface Opciones {
 }
 
 export function comunidad(app: string, o: Opciones) {
-  const archivo = join(app, 'data', 'comunidad.json')
   const adjuntos = resolve(app, 'data', 'attachments')
-  let origenes: Record<string, OrigenMejora> = {}
-  try {
-    if (existsSync(archivo)) origenes = (JSON.parse(readFileSync(archivo, 'utf8')) as { origenes?: typeof origenes }).origenes ?? {}
-  } catch (e) {
-    console.error('data/comunidad.json está dañado:', e instanceof Error ? e.message : e)
-  }
 
   /** Una petición al Worker, con quién eres. */
   async function nube(ruta: string, init: { metodo?: string; cuerpo?: string | Buffer; tipo?: string } = {}): Promise<Response> {
@@ -137,11 +123,6 @@ export function comunidad(app: string, o: Opciones) {
     return Promise.all(validas.map(async (p) => ({ tipo: 'imagen' as const, ...(await subir(readFileSync(p), IMAGENES[extname(p).toLowerCase()])) })))
   }
 
-  function escribir() {
-    mkdirSync(dirname(archivo), { recursive: true })
-    guardar(archivo, JSON.stringify({ origenes }, null, 1))
-  }
-
   /** El hilo de donde se pidió, si existe; lo demás de `origen` se recorta. */
   function origenValido(v: unknown): OrigenMejora | undefined {
     if (!v || typeof v !== 'object') return
@@ -152,62 +133,6 @@ export function comunidad(app: string, o: Opciones) {
       titulo: String(titulo ?? o.sessions.meta(hilo)?.title ?? '').slice(0, 200),
       ...(typeof cita === 'string' && cita.trim() ? { cita: cita.trim().slice(0, 4000) } : {})
     }
-  }
-
-  /** La línea con que un hilo dice de qué mejora sale. «Hacer con Sloth» la escribe en el borrador. */
-  const MARCA = /^Mejora: ([\w-]+)\s*$/m
-  /** La mejora de cada hilo, o `null`. Su primer mensaje no cambia: se lee una vez. */
-  const deHilo = new Map<string, string | null>()
-  function mejoraDe(id: string): string | null {
-    if (!deHilo.has(id)) {
-      const primero = o.sessions.primerUsuario(id)
-      if (!primero) return null // Aún sin mandar: se mira otra vez la próxima.
-      deHilo.set(id, MARCA.exec(primero.text)?.[1] ?? null)
-    }
-    return deHilo.get(id)!
-  }
-
-  /** Los hilos de la card Sloth de cada mejora, del más viejo al más nuevo. */
-  function hilos(): Record<string, string[]> {
-    const r: Record<string, string[]> = {}
-    for (const s of [...o.sessions.list()].sort((a, b) => a.createdAt - b.createdAt)) {
-      if (s.cardId !== 'sloth') continue
-      const m = mejoraDe(s.id)
-      if (m) (r[m] ??= []).push(s.id)
-    }
-    return r
-  }
-
-  /** El borrador de «Hacer con Sloth»: la mejora, el hilo de donde salió (el agente lee su historial) y la línea que la une. */
-  async function hacer(id: string): Promise<{ texto: string; imagenes: string[] }> {
-    const { publicacion: p } = await nubeJson<{ publicacion: PublicacionComunidad }>(`/comunidad/p/${encodeURIComponent(id)}`)
-    const origen = origenes[p.id]
-    mkdirSync(adjuntos, { recursive: true })
-    const imagenes = await Promise.all(
-      p.adjuntos
-        .filter((a) => a.tipo === 'imagen')
-        .map(async (a) => {
-          const r = await fetch(a.url, { signal: AbortSignal.timeout(60_000) })
-          if (!r.ok) throw new Rechazo(502, 'No se pudo bajar una de sus imágenes.')
-          const ruta = join(adjuntos, `${Date.now()}-${basename(a.llave)}`)
-          writeFileSync(ruta, Buffer.from(await r.arrayBuffer()))
-          return ruta
-        })
-    )
-    const quien = p.autor.creador ? '' : `La pidió ${p.autor.nombre || 'alguien'} en la comunidad.`
-    const texto = [
-      p.titulo,
-      p.texto || (imagenes.length ? 'Mira la captura: esto es lo que quiero mejorar en Sloth.' : ''),
-      quien,
-      // Como `threadRef` de web/src/etiquetas.ts: el borrador lo enseña como el hilo, y el agente lee su historial.
-      origen && `Pasó en Hilo de Sloth «${origen.titulo}» (id ${origen.hilo}), su historial está en ${join(app, 'data', 'sessions', `${origen.hilo}.jsonl`)}`,
-      origen?.cita && origen.cita.split('\n').map((l) => `> ${l}`).join('\n'),
-      `Mejora: ${p.id}`
-    ]
-      .filter(Boolean)
-      .join('\n\n')
-    if (!p.estado) await nubeJson(`/comunidad/p/${encodeURIComponent(p.id)}`, { cuerpo: JSON.stringify({ estado: 'haciendo' }) })
-    return { texto, imagenes }
   }
 
   /**
@@ -307,30 +232,16 @@ export function comunidad(app: string, o: Opciones) {
         }
       }
       if (ruta === '/api/mejoras' && metodo === 'POST') {
-        const c = await cuerpo<{ titulo?: string; texto?: string; imagenes?: unknown; adjuntos?: unknown; origen?: unknown }>(req)
-        const desde = origenValido(c.origen)
+        const c = await cuerpo<{ titulo?: string; texto?: string; imagenes?: unknown; adjuntos?: unknown }>(req)
         const p = await nubeJson<PublicacionComunidad>('/comunidad/publicar', {
           cuerpo: JSON.stringify({ categoria: 'mejoras', titulo: c.titulo ?? '', texto: c.texto ?? '', adjuntos: [...(Array.isArray(c.adjuntos) ? c.adjuntos : []), ...(await subirImagenes(c.imagenes))] })
         })
-        if (desde) (origenes[p.id] = desde), escribir()
         o.avisar({ type: 'comunidad' })
         return enviar(res, 200, p)
-      }
-      if (ruta === '/api/comunidad/local' && metodo === 'GET') {
-        if (!o.creador) return enviar(res, 200, { hilos: {}, origenes: {} })
-        return enviar(res, 200, { hilos: hilos(), origenes })
-      }
-      if (ruta === '/api/comunidad/hacer' && metodo === 'POST') {
-        if (!o.creador) throw new Rechazo(403, 'Eso solo lo hace el creador de Sloth.')
-        return enviar(res, 200, await hacer(String((await cuerpo<{ id?: string }>(req)).id ?? '')))
       }
       // Lo demás va al Worker tal cual.
       const r = await nube(`${ruta.replace(/^\/api/, '')}${url.search}`, metodo === 'GET' ? {} : { metodo, cuerpo: (await bytes(req)).toString('utf8') || '{}' })
       const texto = await r.text()
-      if (ruta.endsWith('/borrar') && r.ok) {
-        const id = /^\/api\/comunidad\/p\/([\w-]+)\/borrar$/.exec(ruta)?.[1]
-        if (id && origenes[id]) delete origenes[id], escribir()
-      }
       res.writeHead(r.status, { 'content-type': 'application/json' })
       res.end(texto || '{}')
       return true

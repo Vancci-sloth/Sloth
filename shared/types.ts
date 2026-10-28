@@ -5,9 +5,9 @@ export interface Card {
   id: string
   title: string
   description: string
-  /** Nombre de la carpeta de la skill en ~/.claude/skills. */
+  /** Nombre de la carpeta de la skill en `SKILLS` (`server/skills.ts`). */
   skill?: string
-  /** Carpeta donde trabaja el agente. `{app}` es la carpeta de Sloth. Si falta, es `{app}/trabajo/<id>`. */
+  /** Carpeta donde trabaja el agente. `{app}` es la carpeta de Sloth. Si falta, es `<trabajo>/<id>` (`carpetaTrabajo`). */
   cwd: string
   icon?: string
   /** El estilo también hace videos horizontales, para YouTube: Ideas lo ofrece para un video largo (El Diff). */
@@ -18,10 +18,10 @@ export interface Card {
   etapas?: Etapa[]
   /** Si arma el video por escenas: la fase Video del estudio es entonces un editor de escenas, y estos son sus archivos. */
   editor?: EditorConf
-  /** Carpetas de fuera de `cwd` (globs absolutos) donde también hay videos de este estilo, para verlos al elegirlo. */
-  videos?: string[]
-  /** Los modelos del modo «Optimizado»: lo que medimos como mejor en cada tarea (ver `skills/acelerar-skill/bancos`). */
+  /** Los modelos del modo «Optimizado»: lo que medimos como mejor en cada tarea. */
   modelos?: ModelosConf
+  /** Un estilo que hiciste con «Nuevo estilo» (`data/tus-cards.json`): lo pone el servidor. Se borra también en la venta. */
+  tuya?: boolean
 }
 
 /** Un modelo con su esfuerzo. `medido` dice dónde se midió; sin él, es el de por defecto. */
@@ -253,40 +253,6 @@ export interface Tokens {
   cacheRead: number
 }
 
-/** El diff compacto y recuperable de un turno de la card Sloth. */
-export interface ArchivoCambiado {
-  ruta: string
-  tipo: 'nuevo' | 'modificado' | 'eliminado'
-  sumadas: number
-  quitadas: number
-  diff: string
-  binario: boolean
-  truncado: boolean
-}
-
-export interface CambioSloth {
-  id: string
-  inicio: number
-  revertido: boolean
-  archivos: ArchivoCambiado[]
-  enCurso?: boolean
-}
-
-/** Ronda del agente y trabajo pendiente del repo; las acciones de Git usan siempre los globales. */
-export interface VistaCambiosSloth {
-  ronda?: CambioSloth
-  historial: CambioSloth[]
-  globales: ArchivoCambiado[]
-  git: { rama: string; remoto?: string; destino?: string; revision: string; ocupado: boolean; conflictos: boolean }
-}
-
-export interface ResultadoGitSloth {
-  commit?: string
-  push: boolean
-  errorPush?: string
-  mensaje?: string
-}
-
 export interface SessionMeta {
   id: string
   cardId: string
@@ -316,8 +282,6 @@ export interface SessionMeta {
   retomas?: number
   /** Si su último turno acabó bien: `false` si falló o se cortó. Falta si aún no acabó ninguno. Lo mira el archivado automático. */
   acaboBien?: boolean
-  /** Tras revertir desde el diff de Sloth, el próximo mensaje avisa al agente de que cambió el código. */
-  reversion?: string
   /**
    * La skill que invoca el primer mensaje. Mientras el agente no haya respondido (sin `providerSessionId`), cada turno la
    * vuelve a pedir: un hilo que se cayó antes de la primera respuesta no la olvida al retomarse.
@@ -493,13 +457,9 @@ export interface TandaRedes {
   redes: RedId[]
 }
 
-/**
- * `GET /api/claude/version`: la versión de Claude Code que usa Sloth y la más nueva a la que se puede actualizar sin salir
- * del rango del SDK en package.json. `null` si no se pudo saber.
- */
+/** `GET /api/claude/version` (y `/api/codex/version`): la versión que trae Sloth. `null` si no está instalado. */
 export interface VersionClaude {
   instalada: string | null
-  ultima: string | null
 }
 
 /**
@@ -975,15 +935,6 @@ export interface CuentaInvestigacion {
   instagram?: string | null
 }
 
-/**
- * Cambios del servidor (los `.ts` de server/ y shared/) que aún no se aplicaron: Sloth se reinicia solo en cuanto nada
- * trabaja (`server/reinicio.ts`). Con `error`, no pasaron la comprobación de tipos y no se reinicia hasta que algo cambie.
- */
-export interface Reinicio {
-  pendiente: boolean
-  error?: string
-}
-
 /** De dónde sale una mejora pedida desde un hilo (el símbolo de su agente): el hilo y lo que pasó (lo que elegiste, o el error). */
 export interface OrigenMejora {
   hilo: string
@@ -1122,8 +1073,6 @@ export type ServerPush =
   | { type: 'ideas'; canalId: string; trabajo?: TrabajoYT }
   /** Redes: cambió algo de lo programado (va cada vez que se guarda), con lo que pide atención; con `acabo`, al terminar lo que mandaste. */
   | { type: 'redes'; aviso: AvisoRedes; acabo?: TandaRedes }
-  /** Cambió el servidor y espera a reiniciarse solo, o no compila. */
-  | { type: 'reinicio'; reinicio: Reinicio }
   /** Comunidad: se publicó algo desde esta computadora fuera de la sección (desde un hilo, o el agente). */
   | { type: 'comunidad' }
 
@@ -1246,7 +1195,7 @@ export interface PuenteNavegador {
 }
 
 /** Lo que se puede borrar sin perder nada tuyo, en Opciones → Espacio en disco (`server/espacio.ts`). */
-export type IdEspacio = 'temporales' | 'renders' | 'modulos' | 'caches' | 'perfiles' | 'instaladores' | 'fuentes' | 'python' | 'adjuntos'
+export type IdEspacio = 'temporales' | 'renders' | 'modulos' | 'caches' | 'perfiles' | 'fuentes' | 'python' | 'adjuntos'
 
 export interface GrupoEspacio {
   id: IdEspacio

@@ -18,8 +18,8 @@ import { CABEN } from './sessions.ts'
  * Sin nada medido, la voz se mide sola la primera vez que se abre, si nada trabaja (`medir.py`, unos 30 s con 30 s de
  * ruido); «Medir otra vez» la repite.
  *
- * Si hay una mejora (Parakeet en una sin NVIDIA que se instaló antes de que existiera), el hilo nuevo la ofrece arriba,
- * como «Actualizar Claude Code», y se baja con un clic (`instalarMejora`).
+ * Si hay una mejora (Parakeet en una sin NVIDIA que se instaló antes de que existiera), el hilo nuevo la ofrece arriba
+ * y se baja con un clic (`instalarMejora`).
  */
 
 const EQUIPO = join(dirname(MODELOS), 'equipo.json')

@@ -2,7 +2,7 @@
 // decir cuánto falta. Lo medido va en `equipo.json`, junto a los modelos (%APPDATA%/youtube), el mismo archivo donde la
 // voz apunta lo suyo (python/procesos/medidas.py de Sloth):
 //
-//   const equipo = require(path.join(os.homedir(), ".claude", "skills", "video-base", "scripts", "equipo.cjs"));
+//   const equipo = require(path.join(process.env.SLOTH_SKILLS || path.join(os.homedir(), ".claude", "skills"), "video-base", "scripts", "equipo.cjs"));
 //   await equipo.tarjeta3D(navegador, desde)  // con qué dibuja el 3D el Chrome de Remotion; avisa si es por software
 //   equipo.estimado(cuadros)             // «unos 12 min» para tantos cuadros a tamaño completo, si ya se midió
 //   equipo.anotarRender(cuadros, segundos)   // solo el render final, a tamaño completo

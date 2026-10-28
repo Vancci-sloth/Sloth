@@ -4,8 +4,8 @@ Lo que comparten los estilos de vídeo: el lote, los errores ya vistos y los scr
 `SKILL.md` ni card): la leen y la usan las skills de cada estilo, que se quedan solo con lo suyo.
 
 - **La usan:** `reel-collage` y `video-explicativo` (sus scripts, `LOTE.md` y este archivo; `video-explicativo`, también
-  las huellas), `video-documental` (`sloth.py`, `chrome.mjs`, la hoja, masterizar y comprobar), `animacion-de-entrada` (la hoja) y los
-  procesos de Python de Sloth (`sloth.py`).
+  las huellas), `video-documental` (`sloth.py`, `chrome.mjs`, la hoja, masterizar y comprobar), los estilos que hace
+  cada quien con `crear-estilo` y los procesos de Python de Sloth (`sloth.py`).
 - **`video-el-diff`** es un estilo propio que el usuario afina a mano: ni lo toques desde aquí ni le muevas nada. Solo
   toma prestados `chrome.mjs`, `recorte.py` y la portada (`PORTADA.md`, `portada.mjs`), así que un cambio en ellos
   también le llega.
@@ -16,7 +16,7 @@ Lo que comparten los estilos de vídeo: el lote, los errores ya vistos y los scr
 | [PORTADA.md](PORTADA.md) | La portada que todo vídeo vertical lleva de primer fotograma, en el estilo de su vídeo |
 | `scripts/` | Las herramientas (abajo) |
 
-`<base>` es esta carpeta: `~/.claude/skills/video-base`.
+`<base>` es esta carpeta, `video-base`, junto a las skills de cada estilo.
 
 ## Errores ya vistos
 
@@ -91,5 +91,4 @@ Todos dicen cómo se usan si los corres sin argumentos. Node sin dependencias y 
 
 ## Cambiar la base
 
-Un cambio aquí cambia todos los estilos que la usan. Pruébalo antes en una carpeta aparte en `C:\dev`, y apúntalo en el
-commit (la carpeta `~/.claude/skills` está en git).
+Un cambio aquí cambia todos los estilos que la usan. Pruébalo antes en un video de prueba de cada estilo que la usa.

@@ -13,7 +13,7 @@ test('abrir el historial mientras llega un turno conserva los índices y los eve
   const dir = mkdtempSync(join(base, 'prueba-sesiones-historial-'))
   let emitir!: AgentOptions['onEvent']
   const enviados: AgentEvent[] = []
-  const crear = () => new Sessions(dir, (_, __, events) => enviados.push(...events), () => {}, () => {}, () => {}, undefined, (opts) => {
+  const crear = () => new Sessions(dir, (_, __, events) => enviados.push(...events), () => {}, () => {}, () => {}, (opts) => {
     emitir = opts.onEvent
     return { send() {}, steer() {}, async interrupt() {}, close() {} }
   })

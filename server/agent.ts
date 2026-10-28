@@ -14,7 +14,7 @@ export interface AgentRun {
   close(): void
 }
 
-/** La skill que invoca el mensaje (`/<name>`), por el nombre de su carpeta en ~/.claude/skills. */
+/** La skill que invoca el mensaje (`/<name>`), por el nombre de su carpeta en `SKILLS` (`skills.ts`). */
 export interface SkillRef {
   name: string
   path?: string
@@ -34,8 +34,6 @@ export interface AgentOptions {
   onProviderSession(id: string): void
   /** Lo que lleva escrito un `Write` antes de terminar. Opcional: no todo proveedor lo da. */
   onDraft?(draft: FileDraft): void
-  /** Una herramienta empieza a escribirse: aún no corre. Opcional, como `onDraft`. */
-  onToolStart?(id: string): void
   /**
    * El proceso del agente ya no está: lo que se le mande se perdería, el siguiente mensaje abre otro. Con `caida`, se cayó
    * (no lo cerró Sloth), y `turno` dice si cortó un turno a la mitad.

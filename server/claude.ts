@@ -353,7 +353,6 @@ export function reader(opts: AgentOptions, state: { idle: boolean; max: number; 
           state.measure()
         }
       }
-      if (e.type === 'content_block_start' && e.content_block.type === 'tool_use') opts.onToolStart?.(e.content_block.id)
       if (e.type === 'content_block_start' && e.content_block.type === 'tool_use' && (e.content_block.name === 'Write' || e.content_block.name === 'Bash')) {
         writing.set(`${messageId}:${e.index}`, { id: e.content_block.id, bash: e.content_block.name === 'Bash', json: '', sent: 0 })
       }

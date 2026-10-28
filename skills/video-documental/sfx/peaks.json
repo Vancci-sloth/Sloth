@@ -1,0 +1,127 @@
+{
+ "ev1kit/click_1": {
+  "len_ms": 70.0,
+  "peak_ms": 3.8,
+  "rms20_peak_dbfs": -19.5
+ },
+ "ev1kit/click_2": {
+  "len_ms": 70.0,
+  "peak_ms": 3.9,
+  "rms20_peak_dbfs": -20.4
+ },
+ "ev1kit/click_3": {
+  "len_ms": 70.0,
+  "peak_ms": 4.1,
+  "rms20_peak_dbfs": -19.6
+ },
+ "ev1kit/click_4": {
+  "len_ms": 70.0,
+  "peak_ms": 3.9,
+  "rms20_peak_dbfs": -18.8
+ },
+ "ev1kit/clicktrain_1": {
+  "len_ms": 440.0,
+  "peak_ms": 358.3,
+  "rms20_peak_dbfs": -20.5
+ },
+ "ev1kit/clicktrain_2": {
+  "len_ms": 390.0,
+  "peak_ms": 229.9,
+  "rms20_peak_dbfs": -20.8
+ },
+ "ev1kit/clicktrain_3": {
+  "len_ms": 850.0,
+  "peak_ms": 363.1,
+  "rms20_peak_dbfs": -19.9
+ },
+ "ev1kit/clicktrain_4": {
+  "len_ms": 1120.0,
+  "peak_ms": 773.8,
+  "rms20_peak_dbfs": -20.6
+ },
+ "ev1kit/swish_1": {
+  "len_ms": 340.0,
+  "peak_ms": 269.9,
+  "rms20_peak_dbfs": -11.6
+ },
+ "ev1kit/glitch_1": {
+  "len_ms": 270.0,
+  "peak_ms": 226.1,
+  "rms20_peak_dbfs": -5.9
+ },
+ "ev1kit/impact_1": {
+  "len_ms": 900.0,
+  "peak_ms": 118.0,
+  "rms20_peak_dbfs": -5.7
+ },
+ "ev1kit/impact_2": {
+  "len_ms": 460.0,
+  "peak_ms": 56.1,
+  "rms20_peak_dbfs": -8.4
+ },
+ "ev1kit/subboom_1": {
+  "len_ms": 1220.0,
+  "peak_ms": 42.7,
+  "rms20_peak_dbfs": -6.0
+ },
+ "ev1kit/subtone_1": {
+  "len_ms": 800.0,
+  "peak_ms": 749.9,
+  "rms20_peak_dbfs": -3.4
+ },
+ "ev1kit/subtone_2": {
+  "len_ms": 1044.0,
+  "peak_ms": 1016.8,
+  "rms20_peak_dbfs": -4.4
+ },
+ "ev1kit/riser_1": {
+  "len_ms": 980.0,
+  "peak_ms": 866.5,
+  "rms20_peak_dbfs": -9.1
+ },
+ "ev1kit/riser_2": {
+  "len_ms": 1202.0,
+  "peak_ms": 549.8,
+  "rms20_peak_dbfs": -4.0
+ },
+ "ev1kit/riser_3": {
+  "len_ms": 1060.0,
+  "peak_ms": 960.3,
+  "rms20_peak_dbfs": -4.7
+ },
+ "ev1kit/sweepdown_1": {
+  "len_ms": 750.0,
+  "peak_ms": 643.4,
+  "rms20_peak_dbfs": -6.6
+ },
+ "ev1kit/explosion_1": {
+  "len_ms": 1150.0,
+  "peak_ms": 960.4,
+  "rms20_peak_dbfs": -8.7
+ },
+ "ev1kit/outro_1": {
+  "len_ms": 1580.0,
+  "peak_ms": 147.8,
+  "rms20_peak_dbfs": -4.2
+ },
+ "ev1kit/outro_2": {
+  "len_ms": 1350.0,
+  "peak_ms": 1228.6,
+  "rms20_peak_dbfs": -8.9
+ },
+ "ev1/tick": {
+  "len_ms": 18.0,
+  "peak_ms": 0.4,
+  "rms20_peak_dbfs": -18.68
+ },
+ "ev1/hit": {
+  "len_ms": 700.0,
+  "peak_ms": 2.9,
+  "rms20_peak_dbfs": -7.8
+ },
+ "ev1/glitch": {
+  "len_ms": 164.1,
+  "peak_ms": 8.2,
+  "rms20_peak_dbfs": -11.33
+ }
+}

@@ -3,7 +3,7 @@
 // 5 de 1.15 GB. Esta la borra al acabar, aunque el proceso termine con un error o con Ctrl+C, y antes barre las que
 // dejaron otros procesos que se cortaron (las `remotion-*` de más de 6 horas, como `limpiar_temporales` de espacio.py).
 //
-//   const { empaquetar } = require(join(homedir(), ".claude", "skills", "video-base", "scripts", "remotion.cjs"))
+//   const { empaquetar } = require(join(process.env.SLOTH_SKILLS || join(homedir(), ".claude", "skills"), "video-base", "scripts", "remotion.cjs"))
 //   const { serveUrl, soltar } = await empaquetar(raiz, { entryPoint, publicDir })   // soltar() al terminar de renderizar
 //
 // Usa el @remotion/bundler del proyecto (`raiz`), el mismo que usa su renderer.
