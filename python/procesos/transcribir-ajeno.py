@@ -10,21 +10,34 @@ Recibe un WAV de 16 kHz, mono y 16 bits (`wav16k()` de quien lo lanza lo saca de
 
 Contesta con `{"idioma": "en", "segmentos": [{"start", "end", "text"}, ...]}`, con los tiempos en segundos desde el
 principio del archivo.
+
+Sin NVIDIA va con Parakeet (`parakeet.py`), que entiende 25 idiomas de Europa y no dice cuál oyó: el idioma sale de las
+palabras más comunes del texto (`parakeet.language`).
 """
 
 from pathlib import Path
 
+import parakeet
 from interfaz import progress, run
 from transcribir import free, load_foreign_whisper, read_voice, said
 
 
+def with_parakeet(model, voice) -> dict:
+    """Lo dicho, como `said()`: en frases, con su idioma."""
+    segments = parakeet.segments(parakeet.chunks(model, voice, progress))
+    return {"idioma": parakeet.language(" ".join(s["text"] for s in segments)), "segmentos": segments}
+
+
 def transcribe(files: list[str], options: dict) -> dict:
+    folder = Path(options["modelos"])
+    voice = read_voice(files[0])
+    if parakeet.engine(folder).startswith("parakeet"):
+        return with_parakeet(parakeet.load(folder), voice)
+
     import torch
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    voice = read_voice(files[0])
-
-    whisper = load_foreign_whisper(Path(options["modelos"]), device)
+    whisper = load_foreign_whisper(folder, device)
     transcript = whisper.transcribe(voice, progress_callback=lambda percent: progress(percent / 100))
     del whisper
     free(device)

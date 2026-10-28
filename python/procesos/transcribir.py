@@ -1,5 +1,7 @@
 """
-Transcribe una voz en español con WhisperX large-v3-turbo y da el tiempo de cada palabra con un alineador.
+Transcribe una voz en español y da el tiempo de cada palabra con un alineador. Con una NVIDIA, con WhisperX
+large-v3-turbo; sin ella, con Parakeet (`parakeet.py`, que dice cuál elige y por qué), unas cinco veces más rápido en el
+procesador, y el mismo alineador encima si hay torch (si no, los tiempos de Parakeet).
 
 Recibe un WAV de 16 kHz, mono y 16 bits (`wav16k()` de quien lo lanza lo saca de la voz con FFmpeg). Opciones:
 `modelos` (la carpeta de los modelos, `%APPDATA%/youtube/modelos`, con los modelos ya puestos: aquí no se baja nada),
@@ -19,12 +21,15 @@ entre sus vecinas.
 
 import gc
 import os
+import time
 import wave
 from pathlib import Path
 
 import numpy as np
 
+import medidas
 import modelos_transcripcion as models
+import parakeet
 from interfaz import progress, run
 
 SAMPLE_RATE = 16000
@@ -146,22 +151,103 @@ def load_aligner(folder: Path, name: str, device: str):
     return whisperx.load_align_model(LANGUAGE, device, model_name=str(aligner.folder(folder)), model_cache_only=True)
 
 
+def terms_of(options: dict) -> list[str]:
+    return [str(term).strip() for term in options.get("terminos") or [] if str(term).strip()]
+
+
 def device_and_terms(options: dict) -> tuple[str, list[str]]:
     import torch
 
-    terms = [str(term).strip() for term in options.get("terminos") or [] if str(term).strip()]
-    return ("cuda" if torch.cuda.is_available() else "cpu"), terms
+    return ("cuda" if torch.cuda.is_available() else "cpu"), terms_of(options)
 
 
 def transcribe(files: list[str], options: dict) -> dict:
+    folder = Path(options["modelos"])
+    engine = parakeet.engine(folder)
+    voices = [read_voice(f) for f in files]
+    started = time.perf_counter()
+    if engine.startswith("parakeet"):
+        words, load = with_parakeet(voices, options, engine)
+    else:
+        words, load = with_whisper(voices, options)
+    medidas.note_voice(folder, engine, time.perf_counter() - started - load, sum(len(v) for v in voices) / SAMPLE_RATE, load)
+    progress(1)
+    return {"words": words[0], "trozos": words} if len(voices) > 1 else {"words": words[0]}
+
+
+def with_parakeet(voices: list[np.ndarray], options: dict, engine: str) -> tuple[list[list[dict]], float]:
+    """
+    Las palabras de cada voz con Parakeet, afinadas con el alineador si hay torch (`engine` es `parakeet`): el de
+    `alineador.py`, que no importa WhisperX, o WhisperX con uno de Hugging Face. Cada trozo de Parakeet se alinea aparte:
+    si el alineador no sitúa todas sus palabras, se quedan las de Parakeet.
+    """
+    folder = Path(options["modelos"])
+    n = len(voices)
+    align = engine == "parakeet" and bool(options.get("alineador"))
+    # Lo que se lleva Parakeet del total cuando se alinea (17 s contra 12 s en una voz de 147 s).
+    share = 0.6 if align else 1.0
+    terms = terms_of(options)
+    started = time.perf_counter()
+    model = parakeet.load(folder)
+    load = time.perf_counter() - started
+    done = [
+        parakeet.chunks(model, voice, lambda f, k=k: progress(share * (k + f) / n), bool(options.get("cifras_en_letra")), terms)
+        for k, voice in enumerate(voices)
+    ]
+    del model
+    if not align:
+        return [rounded([w for c in chunks for w in c["words"]]) for chunks in done], load
+
+    # Parakeet fuera antes de cargar el alineador: juntos, una voz de 11 min llegaba a 2,5 GB.
+    free("cpu")
+    started = time.perf_counter()
+    align_chunk = chunk_aligner(folder, options["alineador"])
+    load += time.perf_counter() - started
+    words = []
+    for k, (voice, chunks) in enumerate(zip(voices, done)):
+        found = []
+        for i, chunk in enumerate(chunks):
+            found += align_chunk(voice, chunk) if chunk["words"] else []
+            progress(share + (1 - share) * (k + (i + 1) / len(chunks)) / n)
+        words.append(rounded(found))
+    del align_chunk
+    free("cpu")
+    return words, load
+
+
+def chunk_aligner(folder: Path, name: str):
+    """Lo que alinea un trozo de Parakeet en el procesador: `(voz, trozo) -> palabras`."""
+    if isinstance(models.aligner(name), models.TorchaudioModel):
+        from alineador import Aligner
+
+        return Aligner(folder, name).chunk
+
+    import whisperx
+
+    align_model, metadata = load_aligner(folder, name, "cpu")
+
+    def align(voice: np.ndarray, chunk: dict) -> list[dict]:
+        segment = {"text": " ".join(w["text"] for w in chunk["words"]), "start": chunk["start"], "end": chunk["end"]}
+        aligned = timed_words(whisperx.align([segment], align_model, metadata, voice, "cpu")["segments"])
+        return aligned if len(aligned) == len(chunk["words"]) else chunk["words"]
+
+    return align
+
+
+def rounded(words: list[dict]) -> list[dict]:
+    return [{"text": w["text"], "start": round(float(w["start"]), 3), "end": round(float(max(w["start"], w["end"])), 3)} for w in words]
+
+
+def with_whisper(voices: list[np.ndarray], options: dict) -> tuple[list[list[dict]], float]:
     import whisperx
 
     folder = Path(options["modelos"])
     device, terms = device_and_terms(options)
-    voices = [read_voice(f) for f in files]
     n = len(voices)
 
+    started = time.perf_counter()
     whisper = load_whisper(folder, device, terms, bool(options.get("cifras_en_letra")))
+    load = time.perf_counter() - started
     transcripts = []
     for k, voice in enumerate(voices):
         transcripts.append(whisper.transcribe(
@@ -184,8 +270,7 @@ def transcribe(files: list[str], options: dict) -> dict:
         words.append(timed_words(aligned["segments"]))
     del align_model
     free(device)
-    progress(1)
-    return {"words": words[0], "trozos": words} if n > 1 else {"words": words[0]}
+    return words, load
 
 
 if __name__ == "__main__":

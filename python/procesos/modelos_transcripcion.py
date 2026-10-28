@@ -1,5 +1,5 @@
 """
-Los modelos de la transcripción, fijados: el Whisper y los dos alineadores para el español. Viven en
+Los modelos de la transcripción, fijados: el Whisper, el Parakeet y los dos alineadores para el español. Viven en
 `%APPDATA%/youtube/modelos` (`MODELOS` de `sloth.py` y `comun.py`), cada uno en una carpeta que lleva su versión: si se
 cambia la versión fijada, hay que ponerlo de nuevo. Los procesos no bajan nada: los baja `instalarPythonSloth` de
 `server/requisitos.ts` con `download` («Descargar todo» de Sloth), y `installed()` le dice si faltan.
@@ -96,6 +96,20 @@ WHISPER = HuggingFaceModel(
     },
 )
 
+# El transcriptor de las computadoras sin NVIDIA (`parakeet.py`): Parakeet TDT 0.6B v3 de NVIDIA (CC-BY-4.0, se puede
+# vender), en ONNX y en int8, sin torch.
+PARAKEET = HuggingFaceModel(
+    name="parakeet-tdt-0.6b-v3",
+    repo="istupakov/parakeet-tdt-0.6b-v3-onnx",
+    revision="8f23f0c03c8761650bdb5b40aaf3e40d2c15f1ce",
+    files={
+        "config.json": 97,
+        "decoder_joint-model.int8.onnx": 18202004,
+        "encoder-model.int8.onnx": 652183999,
+        "vocab.txt": 93939,
+    },
+)
+
 ALIGNERS: dict[str, Model] = {
     # Sin usar: el de licencia comercial, para cuando un Canal gane dinero.
     "xlsr-53-es": HuggingFaceModel(
@@ -126,9 +140,36 @@ def aligner(name: str) -> Model:
     return ALIGNERS[name]
 
 
-def needed(aligner_name: str | None) -> list[Model]:
-    """Los modelos para transcribir con ese alineador; sin alineador, solo Whisper."""
-    return [WHISPER] if aligner_name is None else [WHISPER, aligner(aligner_name)]
+def needed(aligner_name: str | None, engine: str = "whisper") -> list[Model]:
+    """
+    Los modelos para transcribir con ese motor (`whisper`, `parakeet` o `parakeet-solo`, el de las máquinas sin torch,
+    que no alinea) y ese alineador; sin alineador, solo el del motor.
+    """
+    first = PARAKEET if engine.startswith("parakeet") else WHISPER
+    return [first] if aligner_name is None or engine == "parakeet-solo" else [first, aligner(aligner_name)]
+
+
+def check(models: Path, engine: str) -> dict:
+    """
+    Lo que le falta al Python de Sloth con ese motor (`falta`: sin eso no transcribe) y lo que lo haría más rápido
+    (`mejora`). Sin NVIDIA basta con uno de los dos transcriptores: uno que ya transcribe con Whisper (instalado antes de
+    Parakeet) puede bajar Parakeet, que es la mejora; uno nuevo baja solo Parakeet. Lo pregunta server/requisitos.ts.
+    """
+    from importlib.util import find_spec
+
+    def modules(*names: str) -> list[str]:
+        return [n for n in names if not find_spec(n)]
+
+    def files(*needed: Model) -> list[str]:
+        return [m.name for m in needed if not m.installed(models)]
+
+    if engine == "parakeet-solo":
+        return {"falta": modules("onnx_asr", "yt_dlp") + files(PARAKEET), "mejora": []}
+    missing = modules("torch", "whisperx", "yt_dlp", "transformers") + files(aligner("voxpopuli-es"))
+    if engine == "whisper":
+        return {"falta": missing + files(WHISPER), "mejora": []}
+    parakeet = modules("onnx_asr") + files(PARAKEET)
+    return {"falta": missing, "mejora": parakeet} if not files(WHISPER) else {"falta": missing + parakeet, "mejora": []}
 
 
 def downloaded_bytes(models: Path, model: Model) -> int:

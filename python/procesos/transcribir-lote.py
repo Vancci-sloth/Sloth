@@ -24,6 +24,7 @@ if sys.platform == "win32":
 else:
     import fcntl
 
+import parakeet
 from interfaz import progress, run
 from transcribir import free, load_foreign_whisper, read_voice, said
 
@@ -60,6 +61,9 @@ def gpu_turn():
 
 
 def transcribe(files: list[str], options: dict) -> dict:
+    if parakeet.engine(Path(options["modelos"])).startswith("parakeet"):
+        return with_parakeet(files, options)
+
     import torch
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -79,6 +83,21 @@ def transcribe(files: list[str], options: dict) -> dict:
             progress((i + 1) / len(files))
         del whisper
         free(device)
+    return answer
+
+
+def with_parakeet(files: list[str], options: dict) -> dict:
+    """Sin NVIDIA: Parakeet, cargado una vez para todos (`transcribir-ajeno.py` dice cómo sale el idioma)."""
+    answer = {}
+    with gpu_turn():
+        model = parakeet.load(Path(options["modelos"]))
+        for i, file in enumerate(files):
+            try:
+                segments = parakeet.segments(parakeet.chunks(model, read_voice(file), lambda f, i=i: progress((i + f) / len(files)), terms=options.get("terminos")))
+                answer[file] = {"idioma": parakeet.language(" ".join(s["text"] for s in segments)), "segmentos": segments}
+            except Exception as error:
+                answer[file] = {"error": f"{type(error).__name__}: {error}"}
+            progress((i + 1) / len(files))
     return answer
 
 
