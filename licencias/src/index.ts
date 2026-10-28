@@ -216,7 +216,9 @@ export default {
 
 async function atender(req: Request, env: Env, ctx: ExecutionContext, url: URL): Promise<Response> {
   try {
-    if (req.method === 'GET' && url.pathname === '/precio') return json(await precios(env))
+    // `pais`: de dónde visita, según Cloudflare. Fuera de México la página ofrece primero Stripe, que acepta tarjetas de
+    // cualquier país; Mercado Pago casi solo las mexicanas.
+    if (req.method === 'GET' && url.pathname === '/precio') return json({ ...(await precios(env)), pais: req.cf?.country ?? null })
     // Los Fundadores que pidieron salir en los créditos de la página.
     if (req.method === 'GET' && url.pathname === '/creditos') return json({ fundadores: await creditos(env) })
     if (req.method === 'GET' && url.pathname === '/version') return json(await ultimaPara(req, env, sistema(url.searchParams.get('so'))))
