@@ -6,7 +6,7 @@ desde esta carpeta, y le pasa por la entrada un JSON con los archivos que tiene 
 `{"files": ["C:/...", ...], "options": {...}}`. El proceso contesta por la salida con un único JSON y sale con 0. Si
 falla, sale con 1 y la última línea de su salida de errores dice por qué. Todo lo demás que escriba (avisos de las
 bibliotecas) va a la salida de errores, así la salida solo lleva la respuesta. Cuánto lleva lo avisa con `progress`,
-en líneas propias de la salida de errores (`@progreso 0.4200`); hoy nadie las lee.
+en líneas propias de la salida de errores (`@progreso 0.4200`): `proceso()` de sloth.py las lee para decir cuánto falta.
 """
 
 import json

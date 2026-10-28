@@ -96,14 +96,76 @@ def turno_youtube():
     return turno("youtube", "Esperando a YouTube: hay otra descarga en curso.")
 
 
+def _segundos(archivos: list[str]) -> float:
+    """Lo que duran los WAV, o 0 si alguno no se puede leer."""
+    import wave
+
+    try:
+        total = 0.0
+        for a in archivos:
+            with wave.open(a, "rb") as w:
+                total += w.getnframes() / w.getframerate()
+        return total
+    except (OSError, wave.Error, EOFError):
+        return 0.0
+
+
+def _tiempo(s: float) -> str:
+    return f"unos {max(1, round(s / 5) * 5)} s" if s < 90 else f"unos {round(s / 60)} min"
+
+
+def _correr(nombre: str, entrada: str, voz: float) -> tuple[int, str, str]:
+    """
+    Corre el proceso y, si transcribe `voz` segundos de voz, dice antes cuánto tardará en este equipo (lo que midieron
+    las anteriores en `equipo.json`, ver `python/procesos/medidas.py`) y cada 10 % cuánto lleva y cuánto falta: en una
+    computadora lenta, sin eso, parecía colgado.
+    """
+    import threading
+
+    if voz:
+        medida = {}
+        try:
+            medida = json.loads((MODELOS.parent / "equipo.json").read_text(encoding="utf-8")).get("voz") or {}
+        except (OSError, ValueError):
+            pass
+        minutos = f"{int(voz // 60)}:{int(voz % 60):02d}"
+        estimado = f"; en este equipo, {_tiempo(medida['carga'] + medida['veces'] * voz)}" if medida.get("veces") else ""
+        print(f"Transcribo {minutos} de voz{estimado}.", flush=True)
+    p = subprocess.Popen([str(python_sloth()), *BANDERAS, nombre], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                         stderr=subprocess.PIPE, text=True, encoding="utf8", cwd=PROCESOS)
+    errores: list[str] = []
+    inicio = time.time()
+
+    def leer() -> None:
+        dicho = 0
+        for linea in p.stderr:
+            if not linea.startswith("@progreso"):
+                errores.append(linea)
+                continue
+            parte = float(linea.split()[1])
+            if voz and parte >= (dicho + 1) / 10 and parte < 1:
+                dicho = int(parte * 10)
+                falta = (time.time() - inicio) * (1 - parte) / parte
+                print(f"Transcribiendo: {dicho * 10} % (faltan {_tiempo(falta)}).", flush=True)
+
+    hilo = threading.Thread(target=leer, daemon=True)
+    hilo.start()
+    # Sin communicate(): la salida de errores ya la lee `leer`. El proceso lee toda la entrada antes de contestar.
+    p.stdin.write(entrada)
+    p.stdin.close()
+    salida = p.stdout.read()
+    p.wait()
+    hilo.join()
+    return p.returncode, salida, "".join(errores)
+
+
 def proceso(nombre: str, archivos: list[str], opciones: dict) -> dict:
     """Corre un proceso de Sloth (python/procesos/<nombre>.py): JSON por stdin, JSON en la última línea de stdout."""
     entrada = json.dumps({"files": archivos, "options": opciones})
     with turno_gpu():
-        r = sloth(nombre, input=entrada, capture_output=True, text=True, encoding="utf8", cwd=PROCESOS)
-    if r.returncode != 0:
-        raise SystemExit(f"{nombre} falló:\n{r.stderr[-3000:]}")
-    salida = r.stdout
+        codigo, salida, errores = _correr(nombre, entrada, _segundos(archivos) if nombre.startswith("transcribir") else 0)
+    if codigo != 0:
+        raise SystemExit(f"{nombre} falló:\n{errores[-3000:]}")
     for marca in ('{"words"', '{"idioma"', '{"n"'):
         i = salida.rfind(marca)
         if i >= 0:
@@ -153,6 +215,9 @@ def calentar_vectores() -> None:
 def vectorizar(archivo: str, opciones: dict) -> dict:
     """Como `proceso("vectores.py", [archivo], opciones)`, con el modelo ya cargado si se puede: el primer pedido lo
     arranca y lo espera (hasta 90 s); si no responde, el proceso de siempre."""
+    # El Python de Sloth sin torch (Mac con Intel) no tiene vectores: que quien llama compare por palabras sin esperar.
+    if "-onnx-" in str(python_sloth()):
+        raise SystemExit("este equipo no tiene el modelo de vectores (su Python de Sloth no lleva torch)")
     pedido = {"files": [archivo], "options": opciones}
     r = _pedir_vectores(pedido)
     if r is None:

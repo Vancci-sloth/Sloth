@@ -175,6 +175,9 @@ La plantilla trae el motor y un ejemplo; lo de cada video es poco. Cómo se arma
 
 ## Pasos
 
+Los tiempos de los pasos son de una computadora con NVIDIA. En otra tardan más, sobre todo la voz y el render: sus
+scripts dicen al empezar cuánto tardarán aquí y luego cuánto falta. Lánzalos en segundo plano y dile al usuario esa cifra.
+
 1. **Proyecto y marca.** `python <skill>/scripts/nuevo.py <nombre>`, **en segundo plano** (tarda un minuto y medio:
    deja el proyecto empaquetado, con la marca aplicada, y el modelo de vectores de `huellas.py` cargado), y a la vez
    `marca.py ver`. Si a la marca le falta algo, pregúntalo ya ("La marca") y, con la respuesta guardada, `marca.py

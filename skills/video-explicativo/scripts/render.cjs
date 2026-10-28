@@ -2,6 +2,9 @@
 //
 //   node <skill>/scripts/render.cjs <salida.mp4> [--scale=0.5] [--crf=16] [--x264-preset=slow] [--pixel-format=yuv420p]
 //                                   [--color-space=bt709] [--frames=0-1391 | --mitad=1|2]
+//
+// Antes de dibujar mira con qué dibuja el 3D Chrome y avisa si es por software (`tarjeta3D` de video-base/scripts/
+// equipo.cjs); un solo Chrome hace eso y el render. Dice cuánto tardará, si ya se midió aquí, y cada 10 % cuánto falta.
 //   node <skill>/scripts/render.cjs --empaqueta     (solo empaqueta: deja lista la caché de webpack, ~40 s la primera vez)
 //
 // Remotion solo codifica en paralelo si, tras reservar 1 GB por millón de píxeles (2 GB en 1080×1920), quedan 2 GB
@@ -36,7 +39,9 @@ if (os.freemem() >= LIBRE) {
 }
 // Empaqueta en una carpeta de %TEMP% que se borra al terminar: la de `bundle()` lleva una copia de `public/` y se quedaba.
 const { empaquetar } = require(path.join(os.homedir(), ".claude", "skills", "video-base", "scripts", "remotion.cjs"));
-const { renderMedia, selectComposition } = desde("@remotion/renderer");
+// Cuánto falta y, del final, cuánto tardó: en una computadora lenta el render es lo más largo y, sin decirlo, parece colgado.
+const equipo = require(path.join(os.homedir(), ".claude", "skills", "video-base", "scripts", "equipo.cjs"));
+const { openBrowser, renderMedia, selectComposition } = desde("@remotion/renderer");
 
 const espera = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -72,8 +77,11 @@ const reemplaza = async (nuevo, destino) => {
 (async () => {
   const { serveUrl, soltar } = await empaquetar(raiz);
   if (empaqueta) return soltar();
-  // Lo mismo que remotion.config.ts: el 3D con la tarjeta de video (ANGLE).
-  const base = { serveUrl, chromiumOptions: { gl: "angle" }, logLevel: "error" };
+  // Lo mismo que remotion.config.ts: el 3D con la tarjeta de video (ANGLE). Un solo Chrome para todo.
+  const chromiumOptions = { gl: "angle" };
+  const navegador = await openBrowser("chrome", { chromiumOptions, logLevel: "error" });
+  const base = { serveUrl, chromiumOptions, logLevel: "error", puppeteerInstance: navegador };
+  await equipo.tarjeta3D(navegador, desde);
   const composition = await selectComposition({ ...base, id: "Video" });
   const n = composition.durationInFrames;
   const mitad = Math.floor(n / 2);
@@ -81,6 +89,10 @@ const reemplaza = async (nuevo, destino) => {
   let aviso = 0;
   const destino = path.resolve(raiz, salida);
   const temporal = path.join(path.dirname(destino), `_render-${process.pid}.mp4`);
+  const cuadros = frames ? frames[1] - frames[0] + 1 : n;
+  const cuanto = !op.scale || Number(op.scale) === 1 ? equipo.estimado(cuadros) : "";
+  console.log(`Render: ${cuadros} cuadros${cuanto ? `; en este equipo, ${cuanto}` : ""}.`);
+  const inicio = Date.now();
   await renderMedia({
     ...base,
     composition,
@@ -95,10 +107,12 @@ const reemplaza = async (nuevo, destino) => {
     onProgress: ({ progress }) => {
       if (progress * 10 >= aviso + 1) {
         aviso = Math.floor(progress * 10);
-        console.log(`${aviso * 10} %`);
+        console.log(aviso < 10 ? `${aviso * 10} % (faltan ${equipo.falta(progress, inicio)})` : "100 %");
       }
     },
   });
+  if (!frames && (!op.scale || Number(op.scale) === 1)) equipo.anotarRender(n, (Date.now() - inicio) / 1000);
+  await navegador.close({ silent: true });
   soltar();
   await reemplaza(temporal, destino);
 })().catch((e) => {
