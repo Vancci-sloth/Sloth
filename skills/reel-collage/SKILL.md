@@ -1,6 +1,6 @@
 ---
 name: reel-collage
-description: Hace un reel vertical de comedia sobre cualquier tema o sobre un guion que traiga el usuario. Un experto muy serio enseña a resolver una situación con pasos físicos absurdos que se ven literales, con las poses recortadas del usuario sobre fotos reales. Úsala cuando pidan un reel de comedia, otro reel como el anterior o un sketch con sus fotos.
+description: Hace un reel de comedia, vertical (TikTok, Reels, Shorts) u horizontal (YouTube), sobre cualquier tema o sobre un guion que traiga el usuario. Un experto muy serio enseña a resolver una situación con pasos físicos absurdos que se ven literales, con las poses recortadas del usuario sobre fotos reales. Úsala cuando pidan un reel de comedia, otro reel como el anterior o un sketch con sus fotos.
 ---
 
 # Reel de comedia
@@ -53,6 +53,23 @@ La evidencia (once reels de referencia, transcritos y mirados cuadro a cuadro) e
   la línea `Lote:`), `<tema>` es ese `<nombre>`, exacto: el panel lo busca así. Las rutas que le des al usuario van en un
   bloque de código.
 
+## Formato
+
+El mensaje trae `Formato: vertical` o `Formato: horizontal` (lo elige el usuario en Sloth); sin esa línea, vertical. El
+reel se hace en ese y solo en ese, compuesto así desde el principio: `nuevo.py <tema> --formato <formato>` lo deja en
+`FORMATO` de `src/datos.ts`, de donde sacan su tamaño la composición y los scripts. Lo común a todos los estilos (nada
+recortado ni con barras; el otro formato es otro video en Sloth), en [`FORMATO.md`](../video-base/FORMATO.md).
+
+- **`Formato: vertical`** (1080×1920, TikTok, Reels y Shorts): todo apilado, como lo hace él: el comentario arriba, él
+  abajo a la derecha y escenarios en fotos verticales. Lleva la portada de primer fotograma (paso 8).
+- **`Formato: horizontal`** (1920×1080, YouTube): el mismo reel, a lo ancho. En el gancho, el clip a pantalla completa,
+  el comentario arriba a la izquierda y él en el tercio derecho; en el sketch, escenarios en fotos horizontales, él en un
+  tercio y la criatura en el otro, los recortes a tres cuartos de su alto del vertical (`ESCALA`) y lo que vuela sale
+  por los lados. Sin portada dentro del video: `portada.png` es la miniatura de YouTube de
+  [`PORTADA.md`](../video-base/PORTADA.md) («En horizontal»), no se corre `portada.mjs` y `final.py` no la pega.
+
+Cada plano en los dos, en «El formato» de [`ESCENAS.md`](ESCENAS.md).
+
 ## De dónde sale el guion
 
 - **Un tema o un enlace**: lo escribes tú, en la voz de [`GUION.md`](GUION.md).
@@ -65,16 +82,18 @@ Si el mensaje trae `Lote: video 3 de 20. Carpeta: reel-<nombre>` (lo pone Sloth)
 la vez otros agentes, cada uno en su hilo:
 
 - el tema es el video de la línea `Enlace:`;
-- el proyecto es `python <skill>/scripts/nuevo.py <nombre>`, sin el `reel-` (lo pone `nuevo.py`): la carpeta tiene que
-  quedar con el nombre exacto de `Carpeta:`, que es donde la busca el panel de Sloth;
+- el proyecto es `python <skill>/scripts/nuevo.py <nombre> --formato <formato>`, sin el `reel-` (lo pone `nuevo.py`) y
+  con el formato del mensaje: la carpeta tiene que quedar con el nombre exacto de `Carpeta:`, que es donde la busca el
+  panel de Sloth;
 - vale [`LOTE.md`](../video-base/LOTE.md) de `video-base`: no preguntes ni escribas fuera de tu carpeta. Las poses que
   falten se piden al entregar, como siempre, y el fondo lo buscas tú con licencia libre (paso 5). Sin biblioteca de
   poses no hay reel: si está vacía, para y pide las fotos, lo único que se pregunta en un lote.
 
 ## Pasos
 
-1. **Proyecto.** `python <skill>/scripts/nuevo.py <tema>`. Copia las poses de la biblioteca a `public/personaje/` y
-   las suma a `src/poses.ts` (las que no trae la plantilla, con alto 650: ajústalo en el proyecto). Pídele al usuario,
+1. **Proyecto.** `python <skill>/scripts/nuevo.py <tema> --formato <formato>` (el de la línea `Formato:`; sin ella,
+   `vertical`). Copia las poses de la biblioteca a `public/personaje/` y las suma a `src/poses.ts` (las que no trae la
+   plantilla, con alto 650: ajústalo en el proyecto). Pídele al usuario,
    en el mismo mensaje en que le cuentas el plan, su **imagen de fondo**: la foto del lugar donde pasa el sketch (si no
    tiene, la buscas tú en el paso 5). Listo cuando la carpeta tiene `node_modules` y `public/personaje/`. Ese
    `node_modules` es un enlace al que comparten todos los reels: no corras `npm install` en el reel, cambiaría el de
@@ -90,14 +109,14 @@ la vez otros agentes, cada uno en su hilo:
    mueve, escenario) y los pasos escalan hasta el remate.
 4. **Voz.** `python <skill>/scripts/voz.py --oir`. Listo cuando dura entre 20 y 32 s (o lo que pidió el usuario) y la
    transcripción trae cada nombre propio bien y ninguna palabra pegada entre dos frases.
-5. **Material.** Un escenario por lugar (foto real vertical; el primero, la imagen de fondo del usuario si la mandó),
-   cada criatura y cada pieza de utilería. Cada original va a
+5. **Material.** Un escenario por lugar (foto real del formato: vertical u horizontal; el primero, la imagen de fondo
+   del usuario si la mandó), cada criatura y cada pieza de utilería. Cada original va a
    `fuentes/material/` y lo que entra al video, a `public/img/`: los recortes con
    `python <base>/scripts/recorte.py fuentes/material/<foto> public/img/<nombre>.png` (limpios, sin borde), los
    logos en SVG con `scripts/svg_png.py`, las capturas con `scripts/captura.py`.
    Lo que hay que buscar con licencia libre encárgaselo a un subagente con `model: "sonnet"`: qué foto (la criatura de
-   cuerpo entero y de lado, el escenario vertical con piso), licencias que valen (CC0, dominio público, Unsplash, Pexels;
-   no CC-BY-SA), dónde buscar (Wikimedia Commons, Pexels, Met Museum Open Access), y que devuelva texto, no imágenes.
+   cuerpo entero y de lado, el escenario con piso y en el formato del reel), licencias que valen (CC0, dominio público,
+   Unsplash, Pexels; no CC-BY-SA), dónde buscar (Wikimedia Commons, Pexels, Met Museum Open Access), y que devuelva texto, no imágenes.
    Una persona que recibe los golpes es de dominio público o CC0, o no se le reconoce la cara: la licencia de Pexels no
    deja mostrar a alguien identificable de forma negativa. Los logos y productos del tema son material original.
    Listo cuando cada fila de la tabla de acciones tiene sus archivos y los miraste.
@@ -111,9 +130,10 @@ la vez otros agentes, cada uno en su hilo:
    pasa `comprobar.mjs`; si algo sale con ✘, arréglalo antes de entregar. Después, una hoja más con `revisar.py
    --sin-render` sobre el final (copia el MP4 a `out/borrador.mp4`) para confirmar que es la versión nueva. Luego su
    portada como primer cuadro ([`PORTADA.md`](../video-base/PORTADA.md) de la base): collage de fotos reales y él,
-   recortado de su pose más seria (pásala de referencia con otro `-i`), frente a la situación del gancho. Entrega la
-   ruta, el guion, qué es material real y qué recorte de stock, y lo que no revisaste: el audio no lo oyes, solo lo
-   transcribes. No le propongas al usuario cambios a la skill al entregar.
+   recortado de su pose más seria (pásala de referencia con otro `-i`), frente a la situación del gancho. En
+   horizontal, eso mismo es la miniatura de YouTube («En horizontal» de `PORTADA.md`), que no entra en el video.
+   Entrega la ruta, el guion, qué es material real y qué recorte de stock, y lo que no revisaste: el audio no lo oyes,
+   solo lo transcribes. No le propongas al usuario cambios a la skill al entregar.
 
 ## El personaje
 

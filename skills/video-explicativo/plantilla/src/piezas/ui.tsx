@@ -2,7 +2,7 @@
 // la flecha. Todas toman los colores del tema del capítulo (TemaContexto, lo pone Video.tsx).
 import React, { createContext, useContext, useLayoutEffect, useRef, useState } from "react";
 import { AbsoluteFill, Easing, interpolate, spring, useCurrentFrame, useVideoConfig } from "remotion";
-import { COLORES, LETRA, MONO, ROJO, Tema } from "../tema";
+import { ALTO, ANCHO, COLORES, LETRA, MONO, ROJO, Tema } from "../tema";
 
 export const TemaContexto = createContext<Tema>("oscuro");
 export const useColores = () => COLORES[useContext(TemaContexto)];
@@ -253,7 +253,7 @@ export const Flecha: React.FC<{ en: number; de: string; a: string; curva?: numbe
     const svg = ref.current;
     if (!svg) return;
     const base = svg.getBoundingClientRect();
-    const k = base.width / 1080;
+    const k = base.width / ANCHO;
     const medir = (id: string): Caja | null => {
       const el = document.querySelector(`[data-ancla="${id}"]`);
       if (!el) return null;
@@ -297,7 +297,7 @@ export const Flecha: React.FC<{ en: number; de: string; a: string; curva?: numbe
     );
   }
   return (
-    <svg ref={ref} style={{ position: "absolute", left: 0, top: 0, width: 1080, height: 1920, overflow: "visible", pointerEvents: "none" }}>
+    <svg ref={ref} style={{ position: "absolute", left: 0, top: 0, width: ANCHO, height: ALTO, overflow: "visible", pointerEvents: "none" }}>
       {dibujo}
     </svg>
   );

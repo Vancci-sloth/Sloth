@@ -1,8 +1,20 @@
 import voz from "../public/voz.json";
 
+// El formato del reel, el de la línea `Formato:` del mensaje: lo pone `nuevo.py --formato` y lo leen la composición y
+// los scripts (comun.py). Un reel se compone en uno solo desde el principio; cómo va cada plano en cada uno, en
+// «El formato» de ESCENAS.md.
+export type Formato = "vertical" | "horizontal";
+export const FORMATO = "vertical" as Formato;
+export const HORIZONTAL = FORMATO === "horizontal";
+/** El valor de cada formato: `segun(780, 1240)` es 780 en vertical y 1240 en horizontal. */
+export const segun = <T,>(vertical: T, horizontal: T): T => (HORIZONTAL ? horizontal : vertical);
+
 export const FPS = 30;
-export const W = 1080;
-export const H = 1920;
+export const W = segun(1080, 1920);
+export const H = segun(1920, 1080);
+/** El alto de los recortes respecto al vertical: en horizontal, plano abierto a lo ancho y lugar para volar. Las poses
+ * ya lo traen (`pose()`); a las criaturas y la utilería dales su alto del vertical por esto. */
+export const ESCALA = segun(1, 0.75);
 
 type Palabra = { w: string; a: number; b: number };
 type Frase = { i: number; texto: string; inicio: number; fin: number; palabras: Palabra[] };

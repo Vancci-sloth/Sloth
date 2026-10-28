@@ -1,8 +1,10 @@
-"""Mide cuánto se mueve y qué tan lleno está el centro de la pantalla de varios videos verticales (final.py lo corre).
+"""Mide cuánto se mueve y qué tan lleno está el centro de la pantalla de varios videos (final.py lo corre).
 
     python -X utf8 medir.py [--borrador] <video> [<video>...]
 
-El centro es la franja de 22 % a 70 % del alto (donde va el diagrama, sin el texto de arriba ni el personaje de abajo).
+El centro es donde va lo que se explica, sin el texto ni el personaje: en vertical, la franja de 22 % a 70 % del alto
+(entre el texto de arriba y el personaje de abajo); en horizontal, de 5 % a 72 % del alto y de 5 % a 66 % del ancho
+(arriba del texto y a la izquierda del personaje). El formato lo dice el video.
 - quieto: % del tiempo en que el centro no cambia de un cuadro al siguiente.
 - movimiento: cambio medio del centro por cuadro (0–255).
 - novedades/min: picos de cambio (algo nuevo que entra o se reacomoda) por minuto.
@@ -20,22 +22,33 @@ import sys
 
 import numpy as np
 
-W, H = 180, 320
+def es_horizontal(video: str) -> bool:
+    cmd = ["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height", "-of", "csv=p=0", video]
+    ancho, alto = map(int, subprocess.run(cmd, capture_output=True, text=True, check=True).stdout.strip().split(",")[:2])
+    return ancho > alto
 
 
-def cuadros(video: str):
-    cmd = ["ffmpeg", "-nostdin", "-v", "error", "-i", video, "-vf", f"fps=30,scale={W}:{H},format=gray", "-f", "rawvideo", "-"]
+def cuadros(video: str, w: int, h: int):
+    cmd = ["ffmpeg", "-nostdin", "-v", "error", "-i", video, "-vf", f"fps=30,scale={w}:{h},format=gray", "-f", "rawvideo", "-"]
     datos = subprocess.run(cmd, capture_output=True, check=True).stdout
-    return np.frombuffer(datos, dtype=np.uint8).reshape(-1, H, W).astype(np.int16)
+    return np.frombuffer(datos, dtype=np.uint8).reshape(-1, h, w).astype(np.int16)
+
+
+def centro(video: str):
+    """Los cuadros del centro de la pantalla, en gris y en chico (180×320 o 320×180 el cuadro entero)."""
+    if es_horizontal(video):
+        w, h = 320, 180
+        return cuadros(video, w, h)[:, int(h * 0.05):int(h * 0.72), int(w * 0.05):int(w * 0.66)]
+    w, h = 180, 320
+    return cuadros(video, w, h)[:, int(h * 0.22):int(h * 0.70)]
 
 
 def main() -> None:
-    a, b = int(H * 0.22), int(H * 0.70)
     print(f"{'video':42} {'quieto':>7} {'movim.':>7} {'nov/min':>8} {'lleno':>6} {'parado':>7}")
     videos = [v for v in sys.argv[1:] if v != "--borrador"]
     tope = 30 if "--borrador" in sys.argv[1:] else 25
     for v in videos:
-        c = cuadros(v)[:, a:b]
+        c = centro(v)
         dif = np.abs(np.diff(c, axis=0)).mean(axis=(1, 2))
         quieto = (dif < 0.25).mean() * 100
         # Picos: un cuadro que cambia mucho más que su entorno.

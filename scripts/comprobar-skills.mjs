@@ -1,11 +1,12 @@
 // Comprueba las skills, que `npm run typecheck` y `npm test` no miran: la sintaxis de cada .mjs (`node --check`) y de
-// cada .py (`ast.parse`, sin dejar __pycache__), y los tipos de cada plantilla de Remotion. La plantilla se copia a una
+// cada .py (`ast.parse`, sin dejar __pycache__), que cada estilo de video haga los dos formatos y los tipos de cada
+// plantilla de Remotion. La plantilla se copia a una
 // carpeta temporal con un enlace a los node_modules de un video de ese estilo; el enlace se quita con `rmdirSync`, que en
 // un enlace solo quita el enlace y en una carpeta llena falla: nunca borra los node_modules de nadie. Sin video de ese
 // estilo no hay node_modules y la plantilla se salta (lo dice). Sale con 1 si algo falla.
 //   npm run comprobar-skills [-- <skill>...]
 import { execFileSync, spawnSync } from 'node:child_process'
-import { cpSync, existsSync, globSync, lstatSync, mkdtempSync, readdirSync, rmdirSync, rmSync, statSync, symlinkSync, unlinkSync } from 'node:fs'
+import { cpSync, existsSync, globSync, lstatSync, mkdtempSync, readdirSync, readFileSync, rmdirSync, rmSync, statSync, symlinkSync, unlinkSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join, relative } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -37,6 +38,15 @@ else if (pys.length) {
   for (const l of salida.split('\n').filter(Boolean)) fallo(relative(REPO, l.split(':').slice(0, -2).join(':')), l)
   console.log(`· ${pys.length} scripts de Python`)
 }
+
+// Todo estilo de video hace vertical y horizontal (skills/video-base/FORMATO.md): la skill de cada card con etapas dice
+// qué hace con `Formato: horizontal`.
+const cards = JSON.parse(readFileSync(join(REPO, 'cards.json'), 'utf8')).filter((c) => c.etapas && c.skill && skills.includes(c.skill))
+for (const c of cards) {
+  if (!readFileSync(join(SKILLS, c.skill, 'SKILL.md'), 'utf8').includes('Formato: horizontal'))
+    fallo(`skills/${c.skill}/SKILL.md`, 'No dice qué hace con «Formato: horizontal»: todo estilo de video hace los dos formatos (video-base/FORMATO.md).')
+}
+console.log(`· ${cards.length} estilos de video, con los dos formatos`)
 
 /**
  * Los node_modules con Remotion de un video de ese estilo: primero los de un video de verdad (de la Sloth instalada o de

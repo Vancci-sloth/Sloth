@@ -40,7 +40,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 import numpy as np
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageFont, ImageOps
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from sloth import MODELOS, ffmpeg, turno, vectorizar  # noqa: E402
@@ -279,9 +279,11 @@ def semejanza(a, b) -> float:
 
 
 def hoja_de(cuadros: list[Image.Image]) -> Image.Image:
+    # Un cuadro horizontal se recorta al centro en 9:16 en vez de aplastarlo: así se compara con los verticales. Un
+    # vertical ya es 9:16 y sale igual que antes.
     hoja = Image.new("RGB", (CELDA[0] * CUADROS, CELDA[1]))
     for i, c in enumerate(cuadros[:CUADROS]):
-        hoja.paste(c.convert("RGB").resize(CELDA, Image.LANCZOS), (i * CELDA[0], 0))
+        hoja.paste(ImageOps.fit(c.convert("RGB"), CELDA, Image.LANCZOS), (i * CELDA[0], 0))
     return hoja
 
 

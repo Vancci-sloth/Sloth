@@ -2,10 +2,9 @@
   {
     "id": "video-el-diff",
     "title": "El Diff",
-    "description": "Tu noticiero en vertical para TikTok, con tu nombre, tu sello y tu despedida: le das un enlace o un tema, te escribe el guion, grabas tu voz y arma el episodio, o un short.",
+    "description": "Tu noticiero para TikTok o YouTube, con tu nombre, tu sello y tu despedida: le das un enlace o un tema, te escribe el guion, grabas tu voz y arma el episodio, o un short.",
     "skill": "video-el-diff",
     "icon": "noticiero",
-    "horizontal": true,
     "etapas": [
       {
         "nombre": "Fuentes",
@@ -104,7 +103,7 @@
   {
     "id": "video-explicativo",
     "title": "Video explicativo",
-    "description": "Un vertical que explica cualquier tema en el tiempo que necesite: un solo mundo 3D que la cámara recorre sin cortes, el texto palabra por palabra y tu personaje abajo (el perro salchicha, uno tuyo o ninguno). Tú grabas la voz y el cierre lleva a donde quieras.",
+    "description": "Un video que explica cualquier tema en el tiempo que necesite: un solo mundo 3D que la cámara recorre sin cortes, el texto palabra por palabra y tu personaje (el perro salchicha, uno tuyo o ninguno). Tú grabas la voz y el cierre lleva a donde quieras.",
     "skill": "video-explicativo",
     "icon": "pizarra",
     "etapas": [
@@ -150,7 +149,7 @@
   {
     "id": "reel-collage",
     "title": "Reel de comedia",
-    "description": "Un sketch vertical de comedia sobre cualquier tema o tu propio guion: un experto muy serio enseña a resolver una situación con pasos físicos absurdos, con tus poses recortadas sobre fotos reales y la voz que elijas.",
+    "description": "Un sketch de comedia sobre cualquier tema o tu propio guion: un experto muy serio enseña a resolver una situación con pasos físicos absurdos, con tus poses recortadas sobre fotos reales y la voz que elijas.",
     "skill": "reel-collage",
     "icon": "risa",
     "lote": {
@@ -202,7 +201,6 @@
     "description": "Tu grabación hablando a cámara, convertida en un documental para YouTube, TikTok o Reels: cada frase con material real encontrado en internet, recoloreado y animado a golpe de corte, tú recortado delante de un mundo que cambia y un clic en cada imagen.",
     "skill": "video-documental",
     "icon": "claqueta",
-    "horizontal": true,
     "etapas": [
       {
         "nombre": "Tu grabación",

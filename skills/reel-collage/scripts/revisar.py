@@ -5,14 +5,15 @@ Render rápido a media escala y hoja de cuadros para revisar.
 
 Deja out/borrador.mp4 y revision/hoja.png: un cuadro al 85 % de cada frase (cuando ya entró todo lo de esa frase) más
 los segundos que se pidan, que sirven para revisar movimiento (la entrada de un personaje, un impacto, una pausa). La
-hoja la hace `hoja.mjs` de video-base, la misma de todos los estilos.
+hoja la hace `hoja.mjs` de video-base, la misma de todos los estilos: en vertical, 6 columnas de 360 px de ancho; en
+horizontal, 4 de 480x270, el tamaño al que se tiene que leer todo (FORMATO.md de video-base).
 """
 
 import json
 import subprocess
 import sys
 
-from comun import CONCURRENCIA, PROYECTO, base
+from comun import CONCURRENCIA, PROYECTO, base, formato
 from espacio import limpiar_temporales  # de video-base, que comun.py pone en sys.path
 
 
@@ -29,9 +30,10 @@ def main() -> None:
         tiempos += [(float(s), "") for s in extra[0].split(",")]
     tiempos.sort()
     (PROYECTO / "revision").mkdir(exist_ok=True)
+    celdas = ["--columnas", "4", "--ancho", "480"] if formato() == "horizontal" else ["--columnas", "6"]
     base("hoja.mjs", str(borrador), str(PROYECTO / "revision" / "hoja.png"),
          "--t", ",".join(f"{t:.3f}" for t, _ in tiempos),
-         "--rotulos", "|".join(e.replace("|", "/") for _, e in tiempos), "--columnas", "6")
+         "--rotulos", "|".join(e.replace("|", "/") for _, e in tiempos), *celdas)
 
 
 main()

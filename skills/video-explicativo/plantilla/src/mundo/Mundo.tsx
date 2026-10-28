@@ -13,7 +13,7 @@ import * as THREE from "three";
 import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 import { temaEn } from "../capitulos";
 import { ALTO, ANCHO, PALETA, REJILLA } from "../tema";
-import { camaraDe, CENTRO_Y, FOV, Plano, vistaEn } from "./camara";
+import { camaraDe, centrar, FOV, Plano, vistaEn } from "./camara";
 
 const Rodaje: React.FC<{ planos: Plano[] }> = ({ planos }) => {
   const f = useCurrentFrame();
@@ -34,7 +34,7 @@ const Rodaje: React.FC<{ planos: Plano[] }> = ({ planos }) => {
     cam.quaternion.copy(c.quaternion);
     cam.fov = c.fov;
     cam.aspect = ANCHO / ALTO;
-    cam.setViewOffset(ANCHO, ALTO, 0, ALTO / 2 - CENTRO_Y, ANCHO, ALTO);
+    centrar(cam);
     cam.updateMatrixWorld();
     scene.environment = entorno;
     scene.environmentIntensity = 0.75 + 0.25 * t.claridad;

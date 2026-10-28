@@ -31,6 +31,7 @@ Este es el mapa:
 - La carpeta del video: un hilo de video nace con su carpeta nombrada por Sloth, y el mensaje lleva la línea
   `Carpeta: <nombre>`, que leen las skills. Con `lote`, varios enlaces pueden ser un video cada uno
   (`lote-MMDD-HHMM-NN`, ver `skills/video-base/LOTE.md`). Cambiar la carpeta desde el estudio usa una que ya existe.
+  Todo estilo de video hace vertical y horizontal: el compositor manda la línea `Formato:` (`skills/video-base/FORMATO.md`).
 - `modelos` (`web/src/Modelos.tsx`): en «Optimizado», el modelo y el esfuerzo medidos para el hilo y sus subagentes
   (los de los subagentes van en la línea `Subagentes:`). Una card sin medir
   usa lo último que eligió el usuario a mano. En «Avanzado» se elige cada uno.

@@ -8,16 +8,25 @@
 import { createContext, useContext } from "react";
 import { Easing } from "remotion";
 import * as THREE from "three";
-import { ALTO, ANCHO } from "../tema";
+import { ALTO, ANCHO, ZONA } from "../tema";
 
 export type V3 = [number, number, number];
 export type Plano = { en: number; pos: V3; mira: V3; fov?: number; dura?: number; arco?: V3; deriva?: number };
 
+/** El campo de visión vertical, en grados: el mismo en los dos formatos (en horizontal, a lo ancho cabe el triple). */
 export const FOV = 32;
 /** Cuántos grados rodea la mira un plano sostenido si no dice otra cosa (0, quieta; negativo, al otro lado). */
 export const DERIVA = 6;
-/** Dónde cae la mira en la pantalla: el centro de la zona entre el texto de arriba y el perro. */
-export const CENTRO_Y = 880;
+/**
+ * Dónde cae la mira en la pantalla: el centro de la zona entre el texto de arriba y el perro (vertical), o arriba a la
+ * izquierda del texto y del personaje (horizontal). Ver `ZONA` en tema.ts.
+ */
+export const [CENTRO_X, CENTRO_Y] = ZONA.mira;
+/** Píxeles que mide un metro a un metro de la cámara (a `d` metros, K / d): 3348 en vertical, 1883 en horizontal. */
+export const K = Math.round(ALTO / 2 / Math.tan((FOV * Math.PI) / 360));
+
+/** Corre el cuadro para que la mira caiga en (CENTRO_X, CENTRO_Y) y no en el centro de la pantalla. */
+export const centrar = (cam: THREE.PerspectiveCamera) => cam.setViewOffset(ANCHO, ALTO, ANCHO / 2 - CENTRO_X, ALTO / 2 - CENTRO_Y, ANCHO, ALTO);
 
 const curva = Easing.inOut(Easing.cubic);
 export const v3 = (p: V3) => new THREE.Vector3(p[0], p[1], p[2]);
@@ -55,7 +64,7 @@ export const camaraDe = (planos: Plano[], f: number) => {
   // Respira: unos centímetros de vaivén, como cámara en mano.
   cam.position.copy(v.pos).add(new THREE.Vector3(Math.sin(f / 53) * 0.035, Math.sin(f / 41) * 0.03, Math.sin(f / 67) * 0.03));
   cam.lookAt(v.mira.clone().add(new THREE.Vector3(Math.sin(f / 61) * 0.02, Math.sin(f / 47) * 0.02, 0)));
-  cam.setViewOffset(ANCHO, ALTO, 0, ALTO / 2 - CENTRO_Y, ANCHO, ALTO);
+  centrar(cam);
   cam.updateMatrixWorld();
   return cam;
 };

@@ -1,10 +1,11 @@
 // El encuadre de cada toma, sin adivinar: la cámara más cercana que deja todo lo que la toma tiene que enseñar (objetos
-// 3D con su radio y tarjetas 2D con su tamaño en px) dentro de la zona útil, entre el texto de arriba (o el índice) y el
-// perro. guion.ts escribe sus TOMAS y saca de ellas sus PLANOS con `planosDe`: la cámara no se copia a mano, y al
-// cambiar una toma su plano cambia solo. `npm run encuadre -- --revisa` los mide.
+// 3D con su radio y tarjetas 2D con su tamaño en px) dentro de la zona útil: en vertical, entre el texto de arriba (o
+// el índice) y el perro; en horizontal, arriba a la izquierda del texto y del personaje (`ZONA.escena` en tema.ts).
+// guion.ts escribe sus TOMAS y saca de ellas sus PLANOS con `planosDe`: la cámara no se copia a mano, y al cambiar una
+// toma su plano cambia solo. `npm run encuadre -- --revisa` los mide.
 import * as THREE from "three";
-import { ALTO, ANCHO } from "../tema";
-import { CENTRO_Y, FOV, Plano, proyectar, V3 } from "./camara";
+import { ANCHO, ALTO, ZONA } from "../tema";
+import { centrar, FOV, Plano, proyectar, V3 } from "./camara";
 
 /** Algo que la toma tiene que enseñar: un objeto 3D (`r`, su radio) o una tarjeta 2D clavada en el mundo (`caja`, su
  * tamaño en px como en EnMundo, qué punto de la caja va en `p` y cuánto se corre). */
@@ -19,7 +20,7 @@ export type Cosa = { n: string; p: V3; r?: number; caja?: { w: number; h: number
 export type Toma = { n: string; en: number; dura?: number; az: number; el: number; arriba?: number; cosas: Cosa[]; lejos?: number; deriva?: number; arco?: V3; fov?: number };
 
 /** Si hay un índice fijo arriba (1 · 2 · 3), lo de arriba empieza debajo de él: `arriba: INDICE`. */
-export const INDICE = 575;
+export const INDICE = ZONA.indice;
 
 const k = (d: number, fov = FOV) => ALTO / 2 / Math.tan((fov * Math.PI) / 360) / d;
 
@@ -27,7 +28,7 @@ export const camaraFija = (pos: THREE.Vector3, mira: THREE.Vector3, fov = FOV) =
   const cam = new THREE.PerspectiveCamera(fov, ANCHO / ALTO, 0.05, 400);
   cam.position.copy(pos);
   cam.lookAt(mira);
-  cam.setViewOffset(ANCHO, ALTO, 0, ALTO / 2 - CENTRO_Y, ANCHO, ALTO);
+  centrar(cam);
   cam.updateMatrixWorld();
   return cam;
 };
@@ -48,7 +49,8 @@ export const cajaDe = (cam: THREE.PerspectiveCamera, c: Cosa) => {
 const todo = (cam: THREE.PerspectiveCamera, cosas: Cosa[]) =>
   cosas.map((c) => cajaDe(cam, c)).reduce((a, b) => [Math.min(a[0], b[0]), Math.min(a[1], b[1]), Math.max(a[2], b[2]), Math.max(a[3], b[3])]);
 
-export const zona = (t: Toma) => ({ x0: 90, x1: 990, y0: t.arriba ?? 500, y1: 1320 });
+/** La zona útil de una toma (en vertical, x de 90 a 990 e y de 500 a 1320). */
+export const zona = (t: Toma) => ({ x0: ZONA.escena.izquierda, x1: ZONA.escena.derecha, y0: t.arriba ?? ZONA.escena.arriba + 30, y1: ZONA.escena.abajo - 70 });
 
 const r2 = (v: THREE.Vector3) => v.toArray().map((x) => Math.round(x * 100) / 100) as V3;
 

@@ -1,6 +1,7 @@
 # Cómo se arman las escenas
 
-El video es una composición de Remotion de 1080x1920 a 30 fps (`src/Reel.tsx`), con los tiempos de `public/voz.json`.
+El video es una composición de Remotion de `W`x`H` a 30 fps (`src/Reel.tsx`): 1080x1920 en vertical y 1920x1080 en
+horizontal («El formato», abajo). Los tiempos son los de `public/voz.json`.
 En `src/datos.ts`, `ini(i)` y `fin(i)` dan el fotograma de inicio y fin de la frase `i`; `palabra(i, "patea")`, el de
 una palabra dentro de ella (por prefijo y sin acentos, la palabra como la dijo el TTS: "patéalo" se encuentra con
 "patea"). El `Reel.tsx` de la plantilla trae un sketch de ejemplo con cada movimiento de abajo: cópialo y cámbialo.
@@ -8,6 +9,25 @@ una palabra dentro de ella (por prefijo y sin acentos, la palabra como la dijo e
 Cómo lo resuelve la referencia, plano por plano: [`ejemplos/referencia.md`](ejemplos/referencia.md) (el cocodrilo:
 el gancho, y la superficie y el fondo del lago como un solo lugar; el tigre sobre el elefante: lanzar, volar, aterrizar
 en otro escenario).
+
+## El formato
+
+`FORMATO` en `src/datos.ts` (lo pone `nuevo.py --formato`) da el tamaño. Las coordenadas de tu reel son las de su
+formato; el ejemplo de la plantilla trae las dos con `segun(vertical, horizontal)`. Lo de abajo, sin decirlo, es el
+vertical; el horizontal no es el vertical estirado, es otro acomodo:
+
+| Plano | Vertical | Horizontal |
+|---|---|---|
+| El comentario | Arriba, a todo el ancho (`y 300`) | Arriba a la izquierda (`x 96`, `y 80`, 1000 de ancho), con la letra 1.25 veces la del vertical: así se lee a 480x270 |
+| Él en el gancho (`hablando`) | Abajo a la derecha, 1000 de alto | En el tercio derecho, pegado abajo y a 150 px del borde, 750 de alto |
+| Una página sin video | En el celular (`captura.py <url> <png> 390`), `BAJA` de `[170, -1010]` y el comentario en `y 240` | En la computadora (`captura.py <url> <png> 1280`, sale de 1920 de ancho), `BAJA` de `[300, -900]`: empieza debajo del comentario |
+| Escenarios | Fotos verticales, piso hacia 1560-1600 | Fotos horizontales de al menos 1920 de ancho, piso hacia 940-990. `encuadre` elige qué parte de la foto se queda, sin estirarla (`"50% 100%"` guarda el piso) |
+| Recortes | Él, de pie, de 250 a 700 px | Todo a `ESCALA` (0.75): `pose()` ya lo hace; a las criaturas y la utilería, su alto del vertical por `ESCALA`. Él, de pie, de 190 a 520 |
+| Dónde va cada uno | Él y la criatura juntos, la acción a lo alto | Él en un tercio y la criatura en el otro: la acción va a lo ancho |
+| Lo que vuela | Sale por un borde (x < -300 o > 1380) | Vuelos planos (`altura` de 60 a 160) que salen por los lados (x < -300 o > 2220): arriba hay poco lugar |
+| Lo que se ve | Arriba, abajo y a la derecha lo tapa TikTok | Un margen del 5 % por lado (96 px a los lados, 54 arriba y abajo) |
+
+El clip del gancho va a pantalla completa en los dos (un clip horizontal de YouTube ya llena el horizontal).
 
 ## El gancho
 
@@ -26,7 +46,7 @@ en otro escenario).
 
 ## El sketch
 
-- **Escenarios**: de 3 a 6 fotos reales verticales, una por lugar que nombra la voz (`ESCENARIOS` y `TOMAS`), con la
+- **Escenarios**: de 3 a 6 fotos reales del formato, una por lugar que nombra la voz (`ESCENARIOS` y `TOMAS`), con la
   cámara fija y corte seco de uno al otro. El primero vuelve a montar la situación del clip con recortes (el kayak en el
   lago, él sobre el elefante). Se piensan como un solo espacio: la superficie y el fondo del mar, un tramo de escalera y
   el de abajo, el parque y el coliseo. Él llega con el corte: ya está ahí.

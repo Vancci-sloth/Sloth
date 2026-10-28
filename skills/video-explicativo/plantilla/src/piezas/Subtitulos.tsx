@@ -1,14 +1,16 @@
-// El texto de arriba, palabra por palabra al ritmo de la voz: el relleno en gris, lo que carga
-// sentido en negrita, y una palabra por frase con la caja de selección de Figma (borde azul y dos tiradores). Cada
-// palabra entra con desenfoque en ~5 cuadros y el renglón se recentra poco a poco mientras entra. La frase nueva borra
-// la anterior; el primer renglón no se mueve y el segundo cae debajo.
+// El texto, palabra por palabra al ritmo de la voz (arriba en vertical; en horizontal, en el tercio de abajo, junto al
+// personaje: `ZONA.texto`): el relleno en gris, lo que carga sentido en negrita, y una palabra por frase con la caja
+// de selección de Figma (borde azul y dos tiradores). Cada palabra entra con desenfoque en ~5 cuadros y el renglón se
+// recentra poco a poco mientras entra. La frase nueva borra la anterior; el primer renglón no se mueve y el segundo cae
+// debajo.
 import { measureText } from "@remotion/layout-utils";
 import React from "react";
 import { Easing, Img, interpolate, staticFile, useCurrentFrame } from "remotion";
 import { cuadro, FRASES, PALABRAS } from "../tiempo";
-import { ANCHO, AZUL, LETRA, ZONA } from "../tema";
+import { AZUL, LETRA, ZONA } from "../tema";
 import { esIcono, Glifo } from "./iconos";
 
+// La misma letra en los dos formatos: un horizontal se ve más chico, y encogida no se lee a 480×270.
 const TAM = 74;
 const RENGLON = 86;
 const ENTRA = 5; // cuadros
@@ -71,7 +73,7 @@ export const Subtitulos: React.FC<{ texto: string; tenue: string }> = ({ texto, 
         // Ancho de lo que ya se ve: la palabra que entra suma su ancho poco a poco, y el renglón se recentra solo.
         let visible = 0;
         renglon.forEach((fi, k) => (visible += avance(fi) * (fi.ancho + (k ? ESPACIO : 0))));
-        let x = (ANCHO - visible) / 2;
+        let x = ZONA.texto.x - visible / 2;
         const y = ZONA.texto.centro - TAM / 2 + r * RENGLON;
         return renglon.map((fi, k) => {
           const a = avance(fi);

@@ -10,8 +10,6 @@ export interface Card {
   /** Carpeta donde trabaja el agente. `{app}` es la carpeta de Sloth. Si falta, es `<trabajo>/<id>` (`carpetaTrabajo`). */
   cwd: string
   icon?: string
-  /** El estilo también hace videos horizontales, para YouTube: Ideas lo ofrece para un video largo (El Diff). */
-  horizontal?: boolean
   /** Con varios enlaces, un video por enlace, cada uno en su hilo. */
   lote?: LoteConf
   /** Los pasos de su trabajo. Si dicen su `fase`, el hilo se ve en el estudio de video (`Estudio.tsx`). */

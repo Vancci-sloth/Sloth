@@ -787,12 +787,12 @@ function NewSession(props: {
   useEffect(() => setSerie(''), [card.id])
   const laSerie = series.find((s) => s.id === serie)
   const lote = !!card.lote && enlaces.length > 1 && !!porEnlace[card.id]
-  // En los estilos que también hacen horizontales (El Diff), el formato del video: la skill hace solo ese. La card
+  // Todo estilo de video hace los dos formatos (skills/video-base/FORMATO.md): la skill hace solo el elegido. La card
   // recuerda el último; una idea de YouTube ya lo trae escrito en el mensaje (`Formato: horizontal`), y ese manda.
   const [formatos, setFormatos] = useStored<Record<string, 'vertical' | 'horizontal'>>('formato', {})
   const formatoEscrito = /^Formato: (vertical|horizontal)\s*$/m.exec(props.draft?.text ?? '')?.[1] as 'vertical' | 'horizontal' | undefined
   const formato = formatoEscrito ?? formatos[card.id] ?? 'vertical'
-  const conFormato = !!card.horizontal
+  const conFormato = !!card.etapas
   // Un archivo o un enlace soltado en cualquier parte del inicio va al mensaje.
   const soltar = useSoltar()
 

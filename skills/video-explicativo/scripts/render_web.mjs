@@ -23,7 +23,7 @@
  * cuadro 0 en todos los explicativos) se pega después.
  */
 import { spawn } from "node:child_process";
-import { mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { cpus, tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
@@ -45,6 +45,12 @@ const TRAMO = Number(op.tramo ?? 300);
 const BITRATE = Number(op.bitrate ?? 20) * 1e6;
 const ESCALA = Number(op.scale ?? 1);
 const PORTADA = op.portada ? resolve(RAIZ, op.portada) : null;
+// En horizontal la portada es la miniatura de YouTube y no entra en el video (PORTADA.md de video-base).
+const FORMATO = join(RAIZ, "src", "datos", "formato.json");
+if (PORTADA && existsSync(FORMATO) && readFileSync(FORMATO, "utf8").includes('"horizontal"')) {
+  console.error("Este video es horizontal: su portada.png es la miniatura de YouTube y no va en el video. Quita --portada.");
+  process.exit(1);
+}
 const t0 = Date.now();
 const marca = (que) => console.log(`${((Date.now() - t0) / 1000).toFixed(1)} s  ${que}`);
 

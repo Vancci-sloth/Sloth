@@ -1,11 +1,20 @@
-// Medidas y colores del estilo: texto arriba, diagrama al centro y el personaje abajo; lo único de collage es el
-// personaje, una foto recortada como sticker. Los colores de fondo son de cada video (`PALETA`).
+// Medidas y colores del estilo: en vertical, texto arriba, diagrama al centro y el personaje abajo; en horizontal, el
+// personaje a la derecha y el texto abajo (`ZONA`). Lo único de collage es el personaje, una foto recortada como
+// sticker. Los colores de fondo son de cada video (`PALETA`).
 import { loadFont as figtree } from "@remotion/google-fonts/Figtree";
 import { loadFont as mono } from "@remotion/google-fonts/JetBrainsMono";
 import { loadFont as marcador } from "@remotion/google-fonts/PermanentMarker";
+import formato from "./datos/formato.json";
+import { CON_PERSONAJE } from "./marca";
 
-export const ANCHO = 1080;
-export const ALTO = 1920;
+/**
+ * El formato del video, el que eligió el usuario en Sloth (la línea `Formato:`; `nuevo.py --formato` lo deja en
+ * datos/formato.json): vertical, 1080×1920 (TikTok, Reels, Shorts), u horizontal, 1920×1080 (YouTube). Se compone en
+ * ese desde el principio: nada se recorta ni se rellena al otro (FORMATO.md de video-base).
+ */
+export const HORIZONTAL = formato.formato === "horizontal";
+export const ANCHO = HORIZONTAL ? 1920 : 1080;
+export const ALTO = HORIZONTAL ? 1080 : 1920;
 export const FPS = 30;
 
 const letra = figtree("normal", { weights: ["400", "500", "600", "700", "800"], subsets: ["latin", "latin-ext"] });
@@ -90,9 +99,34 @@ export const SIGNIFICA = {
 };
 export const DECORATIVOS = ["#a855f7", "#ec4899", "#14b8a6", "#6366f1", "#d946ef", "#8b5cf6"];
 
-// Zonas del cuadro. TikTok tapa ~140 px a la derecha (botones) y ~360 abajo (usuario y texto): lo importante va al centro.
-export const ZONA = {
-  texto: { centro: 330, ancho: 940 },
-  escena: { arriba: 470, abajo: 1390 },
-  personaje: { alto: 600 },
-};
+/**
+ * Dónde va cada cosa en el cuadro. Lo fijo en la pantalla (un índice, el cierre) se coloca con esto, no con números de
+ * un formato.
+ * - Vertical: el texto arriba, el mundo al centro y el personaje abajo. TikTok tapa ~140 px a la derecha (botones) y
+ *   ~360 abajo (usuario y texto): lo importante va al centro.
+ * - Horizontal: el personaje en el tercio de la derecha, el texto en el tercio de abajo, a su izquierda, y lo que se
+ *   explica arriba a la izquierda; el mundo ocupa todo el ancho. Un margen del 5 % por lado. La letra no se encoge
+ *   (un horizontal se ve más chico): la misma que en vertical. Sin personaje, el texto y la escena van centrados a lo
+ *   ancho.
+ *
+ * `texto`: el centro (x) y la altura del primer renglón, y su ancho máximo. `escena`: donde va lo 2D fijo y lo que
+ * enseña cada toma (encuadra.ts deja 30 px arriba y 70 abajo); `mira`, dónde cae en la pantalla lo que mira la cámara;
+ * `indice`, dónde empieza lo de la toma si hay un índice fijo arriba (1 · 2 · 3). `personaje`: su lado, su centro (x)
+ * y cuánto sube cuando enseña algo (en vertical, sobre el texto de TikTok).
+ */
+const ESCENA_H = { arriba: 40, abajo: 790, izquierda: 96, derecha: CON_PERSONAJE ? 1290 : 1824 };
+export const ZONA = HORIZONTAL
+  ? {
+      texto: { x: CON_PERSONAJE ? 693 : 960, centro: 862, ancho: CON_PERSONAJE ? 1180 : 1600 },
+      escena: ESCENA_H,
+      mira: [(ESCENA_H.izquierda + ESCENA_H.derecha) / 2, 395] as [number, number],
+      indice: 150,
+      personaje: { alto: 600, x: 1580, sube: 40 },
+    }
+  : {
+      texto: { x: 540, centro: 330, ancho: 940 },
+      escena: { arriba: 470, abajo: 1390, izquierda: 90, derecha: 990 },
+      mira: [540, 880] as [number, number],
+      indice: 575,
+      personaje: { alto: 600, x: 540, sube: 140 },
+    };

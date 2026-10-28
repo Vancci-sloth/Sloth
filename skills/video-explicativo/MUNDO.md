@@ -1,7 +1,8 @@
 # El mundo 3D, pieza por pieza
 
 Todo el video es un solo mundo 3D (three.js en Remotion) que una cámara recorre sin cortes, con lo 2D clavado en él,
-el texto arriba y el personaje abajo. Lo que cambia en cada video son cuatro archivos: `src/mundo/guion.ts`,
+el texto y el personaje (arriba y abajo en vertical; en horizontal, abajo y a la derecha: "Formato" de `SKILL.md`).
+Lo que cambia en cada video son cuatro archivos: `src/mundo/guion.ts`,
 `src/mundo/Escena3D.tsx`, `src/escenas/*.tsx` y `src/capitulos.ts`. El de Berachain, completo, está en
 [`ejemplos/berachain/`](ejemplos/berachain/): míralo para ver cómo se usa cada pieza,
 no como molde. El mapa, los capítulos, la pieza propia y el personaje de cada video salen de su enfoque
@@ -14,7 +15,11 @@ Antes de armar nada, relee "Las reglas de la imagen" de `SKILL.md`: cada decisi�
 
 Metros, con el piso en y = 0 y la cámara mirando hacia −z. **En vertical cabe muy poco a lo ancho** (a 10 m de la
 cámara se ven ~2.8 m de lado a lado), así que el mundo se acomoda en profundidad y la cámara vuelve a sitios ya vistos.
-Eso es lo único fijo: **el lugar sale del tema**.
+**En horizontal cabe el triple** (a 10 m, ~6 m junto al personaje y ~9 sin él): lo que se compara va lado a lado, y el
+lugar tiene que llenar también los lados del cuadro (sus paredes, su horizonte), porque de lado se ve lo que en
+vertical quedaba fuera (una cochera hecha para vertical, vista en horizontal, dejaba ver por encima de su pared el
+bosque del otro capítulo). Eso es lo único
+fijo: **el lugar sale del tema**.
 
 - En Berachain fue una casa del protagonista adelante y un camino hacia el fondo (la cadena de bloques, el modelo
   `cadena`), con lo que se explica primero cerca y lo que salió mal más allá.
@@ -69,8 +74,9 @@ verdad se movió, antes del render final.
 **Las cámaras no se adivinan ni se copian: salen de las tomas.** En `TOMAS` de `guion.ts` va, por toma (`Toma` de
 `encuadra.ts`), desde qué cuadro (`en`, `dura`), qué tiene que verse (objetos 3D con su radio, tarjetas 2D con su tamaño
 en px) y desde dónde (azimut y elevación), más `lejos`, `deriva` o `arco` si hacen falta; `PLANOS = planosDe(TOMAS)` le
-pone a cada una el `pos` y la `mira` que lo dejan todo entre el texto de arriba (o el índice, `arriba: INDICE`) y el
-perro, lo más cerca posible. Al cambiar una toma su plano cambia solo: antes cada video copiaba a mano los números que
+pone a cada una el `pos` y la `mira` que lo dejan todo en la zona útil (`ZONA.escena` de `src/tema.ts`: entre el texto
+de arriba, o el índice con `arriba: INDICE`, y el perro; en horizontal, arriba a la izquierda del texto y del perro),
+lo más cerca posible. Al cambiar una toma su plano cambia solo: antes cada video copiaba a mano los números que
 imprimía `encuadre.ts` y se inventaba un script para hacerlo (nuevo-7, nuevo-8). Sin esto las tomas salían con la
 cadena tapando todo o con lo importante cortado. Para revisarlas:
 
@@ -146,7 +152,9 @@ Los colores con significado se pasan desde el video, nunca van dentro del modelo
 Un componente por capítulo (`CAPITULOS` en `index.tsx`). Lo que acompaña a un objeto va en `EnMundo` (`p`, un punto del
 mundo; `origen`, qué punto de la caja va en él; `desplaza`, unos px para dejarlo al lado sin taparlo), así se mueve con
 la cámara; y dentro, `Entra` con su `en` y su `sale`. Solo lo que es de la pantalla (el índice 1 · 2 · 3, el cierre)
-va fijo con `Aparece`.
+va fijo con `Aparece`, colocado con `ZONA` y `ANCHO` de `src/tema.ts` (`left: ZONA.escena.izquierda`, `top:
+ZONA.escena.arriba`), no con los números del vertical: así cae en su sitio en el formato del video. Una tarjeta más
+alta que la zona del horizontal (de 70 a 720 px), como un post con su foto debajo, se arma a lo ancho: la foto al lado.
 
 | Pieza | Para |
 |---|---|
@@ -171,8 +179,10 @@ El gancho va sin él; entra cuando termina (en Berachain, en «pero primero») y
 se asusta.
 Las poses y para qué sirve cada una: [`personaje/POSES.md`](personaje/POSES.md). Las que sostienen algo llevan
 `objeto: { nodo: … }` (el cartel con `Cartel`, el celular con `PantallaCanal`) y `sube: SUBE`. Habla solo: abre la
-boca con el nivel de la voz (si su pose tiene boca abierta). Con `personaje: ninguno` en la marca, la plantilla no lo
-dibuja: el mundo baja hasta el borde y lo que el personaje enseñaba en su celular o su cartel va en el mundo.
+boca con el nivel de la voz (si su pose tiene boca abierta). Va abajo al centro en vertical y de pie en el tercio de la
+derecha en horizontal (`ZONA.personaje`; `x` en un tramo lo mueve). Con `personaje: ninguno` en la marca, la plantilla
+no lo dibuja: el mundo baja hasta el borde (en horizontal, texto y escena se centran a lo ancho) y lo que el personaje
+enseñaba en su celular o su cartel va en el mundo.
 
 ## 8. Revisar y terminar
 

@@ -24,15 +24,30 @@ Final (~2 min):
 2. Pasa comprobar.mjs de video-base: tamaño, fps, sonoridad, pico, negros, arranque. Si algo sale con ✘, falla.
 3. Mide el centro de la pantalla (medir.py): cuánto tiempo está quieto, cuánto se mueve y qué tan lleno está.
 4. Guarda su huella con su hoja (huellas.py de video-base): los siguientes videos se comparan con él.
-5. Le pone la portada como primer cuadro si ya existe portada.png (PORTADA.md de video-base): un render nuevo no la pierde.
+5. En vertical, le pone la portada como primer cuadro si ya existe portada.png (PORTADA.md de video-base): un render
+   nuevo no la pierde. En horizontal no: su portada.png es la miniatura de YouTube y no entra en el video.
+
+El formato (vertical u horizontal) es el de src/datos/formato.json, que dejó nuevo.py: con él se comprueba el tamaño y,
+en horizontal, las hojas van con celdas de 480×270, donde se tiene que leer todo (FORMATO.md de video-base).
 """
 
+import json
 import subprocess
 import sys
 from pathlib import Path
 
 SKILL = Path(__file__).resolve().parent.parent
 BASE = SKILL.parent / "video-base" / "scripts"
+
+
+def horizontal(raiz: Path) -> bool:
+    archivo = raiz / "src" / "datos" / "formato.json"
+    return archivo.exists() and json.loads(archivo.read_text(encoding="utf-8")).get("formato") == "horizontal"
+
+
+def hoja(raiz: Path, video: Path, salida: Path, *opciones: str) -> None:
+    ancho = ("--ancho", "480") if horizontal(raiz) else ()
+    correr("node", str(BASE / "hoja.mjs"), str(video), str(salida), *opciones, *ancho)
 
 
 def correr(*cmd: str, **kw) -> None:
@@ -58,7 +73,7 @@ def borrador(raiz: Path, mitad: str | None) -> None:
     opciones = ("--scale=0.5", "--crf=12", "--x264-preset=veryfast", "--pixel-format=yuv420p")
     if mitad in (None, "1"):
         render(raiz, out / "borrador-a.mp4", *opciones, "--mitad=1")
-        correr("node", str(BASE / "hoja.mjs"), str(out / "borrador-a.mp4"), str(raiz / "revision" / "borrador-1.png"), "--cada", "2")
+        hoja(raiz, out / "borrador-a.mp4", raiz / "revision" / "borrador-1.png", "--cada", "2")
         if mitad == "1":
             print("\nLanza ya `final.py --borrador 2` en segundo plano y, mientras, mira revision/borrador-1.png entera; "
                   "anota los arreglos y hazlos cuando termine el 2.")
@@ -69,7 +84,7 @@ def borrador(raiz: Path, mitad: str | None) -> None:
     correr("ffmpeg", "-nostdin", "-y", "-v", "error", "-f", "concat", "-safe", "0", "-i", str(lista), "-c", "copy", str(video))
     correr(sys.executable, "-X", "utf8", str(SKILL / "scripts" / "medir.py"), "--borrador", str(video))
     desde = f"{duracion(out / 'borrador-a.mp4'):.2f}"
-    correr("node", str(BASE / "hoja.mjs"), str(video), str(raiz / "revision" / "borrador-2.png"), "--cada", "2", "--desde", desde)
+    hoja(raiz, video, raiz / "revision" / "borrador-2.png", "--cada", "2", "--desde", desde)
     correr(sys.executable, "-B", "-X", "utf8", str(BASE / "huellas.py"), "parecidos", str(SKILL), str(video))
     print()
     print("Mira las dos hojas enteras: cada momento cuando ya terminó de entrar, nada tapado ni cortado, nada que asome.")
@@ -78,14 +93,19 @@ def borrador(raiz: Path, mitad: str | None) -> None:
 def final(raiz: Path) -> None:
     video = raiz / "out" / f"{raiz.name}.mp4"
     render(raiz, video, "--crf=14", "--x264-preset=veryfast", "--pixel-format=yuv420p", "--color-space=bt709")
-    r = subprocess.run(["node", str(BASE / "comprobar.mjs"), str(video)], capture_output=True, text=True, encoding="utf8")
+    tamano = "1920x1080" if horizontal(raiz) else "1080x1920"
+    r = subprocess.run(["node", str(BASE / "comprobar.mjs"), str(video), "--tamano", tamano], capture_output=True, text=True, encoding="utf8")
     print(r.stdout[-1500:])
     if r.returncode != 0 or "✘" in r.stdout:
         sys.exit("comprobar.mjs encontró problemas: arréglalos antes de entregar.")
     correr(sys.executable, "-X", "utf8", str(SKILL / "scripts" / "medir.py"), str(video))
     correr(sys.executable, "-B", "-X", "utf8", str(BASE / "huellas.py"), "cerrar", str(SKILL), str(video))
     portada = raiz / "portada.png"
-    if portada.exists():
+    if horizontal(raiz):
+        if not portada.exists():
+            print("Falta la miniatura de YouTube: hazla según «En horizontal» de PORTADA.md de video-base (portada.png, "
+                  "1280×720). No va en el video: no corras portada.mjs.")
+    elif portada.exists():
         correr("node", str(BASE / "portada.mjs"), str(video), str(portada))
     else:
         print("Falta la portada: hazla según PORTADA.md de video-base y ponla con portada.mjs.")

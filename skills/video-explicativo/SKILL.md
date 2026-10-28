@@ -1,6 +1,6 @@
 ---
 name: video-explicativo
-description: Hace un video vertical explicativo (TikTok, Instagram, Shorts) sobre cualquier tema y para cualquier propósito. Un solo mundo 3D que la cámara recorre sin cortes, el texto palabra por palabra arriba y abajo el personaje del canal (el perro salchicha u otro), recortado como sticker, que habla y reacciona. Dura lo que pide lo que hay que contar, sin relleno. El usuario graba la voz y el cierre invita a donde él quiera (su Telegram, Instagram, WhatsApp…). Úsala cuando pidan explicar algo en un video vertical (un proyecto, una noticia, cómo funciona algo, una historia) o un video con el perro.
+description: Hace un video explicativo, vertical (TikTok, Instagram, Shorts) u horizontal (YouTube), sobre cualquier tema y para cualquier propósito. Un solo mundo 3D que la cámara recorre sin cortes, el texto palabra por palabra y el personaje del canal (el perro salchicha u otro), recortado como sticker, que habla y reacciona. Dura lo que pide lo que hay que contar, sin relleno. El usuario graba la voz y el cierre invita a donde él quiera (su Telegram, Instagram, WhatsApp, YouTube…). Úsala cuando pidan explicar algo en un video (un proyecto, una noticia, cómo funciona algo, una historia) o un video con el perro.
 ---
 
 # Video explicativo
@@ -32,9 +32,9 @@ algo.
 
 ## Cada video es único
 
-Lo fijo del estilo es poco: un mundo 3D en una sola toma, el texto palabra por palabra arriba, el personaje abajo y
-"Las reglas de la imagen". Todo lo demás sale del tema y cambia de un video a otro: la forma del guion, cómo suena, el
-lugar y cómo se recorre, sus colores, el protagonista y dónde está en el cuadro, el primer cuadro, cómo cambia de
+Lo fijo del estilo es poco: un mundo 3D en una sola toma, el texto palabra por palabra, el personaje (dónde va cada
+uno, en "Formato") y "Las reglas de la imagen". Todo lo demás sale del tema y cambia de un video a otro: la forma del
+guion, cómo suena, el lugar y cómo se recorre, sus colores, el protagonista y dónde está en el cuadro, el primer cuadro, cómo cambia de
 capítulo, la pieza que solo tiene ese video y qué hace el personaje. Una historia de Reddit tiene que sentirse historia de
 Reddit; una noticia, noticia. El de Berachain es un ejemplo de cómo se resolvió un tema, no el molde. Cómo se decide,
 en "El enfoque" de [`GUION.md`](GUION.md).
@@ -44,6 +44,26 @@ en "El enfoque" de [`GUION.md`](GUION.md).
 - **Que no se parezca a otro lo comprueba un script**: `<base>/scripts/huellas.py` compara la huella de este video (lo
   que cuenta y cómo se ve) con la de todos los que ya se hicieron, y solo dice lo que choca. Va dos veces: en el
   enfoque (paso 3) y con el mundo armado (paso 8).
+
+## Formato
+
+Lo elige el usuario en Sloth y llega en el mensaje. Lo común a todos los estilos (un video, un formato; nada recortado
+ni con barras; revisar a 480×270; la portada) está en [`FORMATO.md`](../video-base/FORMATO.md); aquí, cómo se acomoda
+este.
+
+- **`Formato: vertical`, o sin esa línea:** 1080×1920, como siempre: el texto arriba, el mundo al centro y el
+  personaje abajo. `nuevo.py <nombre>`.
+- **`Formato: horizontal`:** 1920×1080, para YouTube: `nuevo.py <nombre> --formato horizontal`, y el proyecto nace así
+  (`src/datos/formato.json`). La plantilla ya lo compone: el personaje en el tercio de la derecha, del mismo tamaño
+  que en vertical; el texto en el tercio de abajo, a su izquierda, con la misma letra (no se encoge); y lo que se
+  explica arriba a la izquierda, con el mundo detrás a todo el ancho. Sin personaje, texto y escena van centrados.
+  `final.py` comprueba el 1920×1080 y saca las hojas a 480×270.
+- **Al armar uno horizontal:** el mundo se ve el triple de ancho, así que se reparte a los lados y el lugar llena los
+  lados del cuadro ("El mapa" de [`MUNDO.md`](MUNDO.md)); la zona de cada toma es más baja (de 70 a 720 px), y lo
+  que no cabe lo dice `npm run encuadre -- --revisa`; lo fijo en la pantalla se coloca con `ZONA` de `src/tema.ts`,
+  nunca con los números del vertical (540, 1080, 470). Su portada no va dentro: `portada.png` es la miniatura de
+  YouTube (paso 9).
+- Si en el hilo piden el otro formato, no hagas una copia: que cree otro video en Sloth con ese formato.
 
 ## Series
 
@@ -120,7 +140,7 @@ contra esta lista antes de enseñarla.
 
 **Palabras**
 
-1. **Pocas palabras en el centro**: un número o una o dos palabras. Lo que se dice ya va arriba; el centro enseña.
+1. **Pocas palabras en el centro**: un número o una o dos palabras. Lo que se dice ya va en el texto; el centro enseña.
 2. **Imágenes en vez de nombres**: el logo real (de un fondo, un exchange, una empresa), un ícono o un objeto 3D. Un
    nombre escrito en una píldora es lo que hay que cambiar.
 3. **Nada de emojis**, tampoco en los subtítulos: íconos SVG de Phosphor (`Glifo`, `Icono`, `Icono3D`) o imágenes.
@@ -167,10 +187,11 @@ La plantilla trae el motor y un ejemplo; lo de cada video es poco. Cómo se arma
 | `src/escenas/*.tsx` | Lo 2D de cada capítulo, clavado en el mundo (pruebas, números, botones) y las poses del personaje | Sí |
 | `src/tema.ts` | Los colores del video (`PALETA`: sus dos fondos y su luz), si el piso lleva cuadrícula (`REJILLA`) y qué significa cada color (`SIGNIFICA`) | Sí |
 | `src/capitulos.ts` | Con qué fondo empieza y dónde cambia | Sí |
-| `subtitulos.txt`, `terminos.txt` | El texto de arriba, frase por frase, y los nombres que el transcriptor tiene que reconocer | Sí |
+| `subtitulos.txt`, `terminos.txt` | El texto, frase por frase, y los nombres que el transcriptor tiene que reconocer | Sí |
+| `src/datos/formato.json`, `ZONA` en `src/tema.ts` | El formato (lo pone `nuevo.py`) y dónde va cada cosa en él: el texto, la escena, la mira de la cámara y el personaje | No |
 | `src/mundo/camara.ts`, `Mundo.tsx`, `EnMundo.tsx` | El motor 3D: la cámara, la luz, el piso, lo 2D clavado en el mundo | No |
 | `src/modelos/` | Los modelos 3D, copiados de la biblioteca ([`modelos-3d`](../modelos-3d/SKILL.md)) con `comun.tsx` (`EnEscena`, `conGris`) | Los nuevos, y se guardan en la biblioteca |
-| `src/piezas/`, `src/escenas/comun.tsx` | Texto de arriba, perro, tarjetas, íconos, flechas, subrayado, el precio pegado, el post de Reddit, el cierre al canal | No |
+| `src/piezas/`, `src/escenas/comun.tsx` | El texto, el perro, tarjetas, íconos, flechas, subrayado, el precio pegado, el post de Reddit, el cierre al canal | No |
 | `public/perro/`, `src/datos/marca.json` | Las poses del personaje, con boca cerrada y abierta ([`personaje/POSES.md`](personaje/POSES.md); la carpeta se llama `perro` sea cual sea), y la red, el nombre y la foto del cierre: los pone `marca.py aplicar` | No |
 
 ## Pasos
@@ -178,7 +199,8 @@ La plantilla trae el motor y un ejemplo; lo de cada video es poco. Cómo se arma
 Los tiempos de los pasos son de una computadora con NVIDIA. En otra tardan más, sobre todo la voz y el render: sus
 scripts dicen al empezar cuánto tardarán aquí y luego cuánto falta. Lánzalos en segundo plano y dile al usuario esa cifra.
 
-1. **Proyecto y marca.** `python <skill>/scripts/nuevo.py <nombre>`, **en segundo plano** (tarda un minuto y medio:
+1. **Proyecto y marca.** `python <skill>/scripts/nuevo.py <nombre>` (con `--formato horizontal` si el mensaje trae
+   `Formato: horizontal`: ver "Formato"), **en segundo plano** (tarda un minuto y medio:
    deja el proyecto empaquetado, con la marca aplicada, y el modelo de vectores de `huellas.py` cargado), y a la vez
    `marca.py ver`. Si a la marca le falta algo, pregúntalo ya ("La marca") y, con la respuesta guardada, `marca.py
    aplicar <proyecto>` cuando `nuevo.py` haya terminado. Mientras, lee la serie y empieza a buscar. Todo lo que no dependa de otra cosa va junto, en el mismo mensaje o en el mismo
@@ -247,7 +269,7 @@ scripts dicen al empezar cuánto tardarán aquí y luego cuánto falta. Lánzalo
    mírala en su lugar. Listo cuando compila, cada cosa entra en la palabra que la nombra y lo nuevo está guardado.
 7. **Encuadre.** Las tomas van en `TOMAS` de `src/mundo/guion.ts` (qué tiene que verse en cada una y desde dónde) y
    `encuadra.ts` saca de ellas los planos, con la cámara más cercana que deja los objetos y las tarjetas entre el texto
-   de arriba y el personaje: no copies cámaras a mano. `npm run encuadre -- --revisa` (vuelve a empaquetar cada vez) dice
+   y el personaje (en horizontal, arriba a la izquierda de los dos): no copies cámaras a mano. `npm run encuadre -- --revisa` (vuelve a empaquetar cada vez) dice
    qué se sale y mide el ritmo de la cámara. Listo cuando la línea `ritmo` va toda en ✓ y no queda un ✗ grande; el video entero se mira en
    el borrador, no en fotos.
 8. **Revisión, con un borrador.** El borrador es la primera vez que se ve el video entero, sin fotos antes (cuestan lo
@@ -275,10 +297,13 @@ scripts dicen al empezar cuánto tardarán aquí y luego cuánto falta. Lánzalo
    antes del final: en nuevo-11 se renderizó, llegó la versión buena y hubo que renderizar otra vez (7 min).
    `python -B <skill>/scripts/final.py` (~2 min): renderiza una sola vez, directo a H.264 bt709, pasa
    `comprobar.mjs`, mide el ritmo y guarda la huella con su hoja. Si algo sale con ✘, arréglalo antes de entregar.
-   Deja `out/<carpeta>.mp4`. Antes de entregar, su portada como primer cuadro ([`PORTADA.md`](../video-base/PORTADA.md)
-   de la base, que dice también qué hacer sin ChatGPT): el mundo 3D del video y abajo el personaje (si la marca tiene),
-   recortado como sticker con borde blanco, con la cara que dice el título (pásale su pose de referencia con otro
-   `-i`), y el título en la letra sans redonda del texto de arriba, blanco con la palabra clave resaltada. Entrega la ruta, los modelos que sumaste a la biblioteca y lo que no
+   Deja `out/<carpeta>.mp4`. Antes de entregar, su portada ([`PORTADA.md`](../video-base/PORTADA.md) de la base, que
+   dice también qué hacer sin ChatGPT): el mundo 3D del video y el personaje (si la marca tiene), recortado como
+   sticker con borde blanco, con la cara que dice el título (pásale su pose de referencia con otro `-i`), y el título
+   en la letra sans redonda del texto, blanco con la palabra clave resaltada. En vertical va de primer cuadro, con el
+   personaje abajo. En horizontal es la miniatura de YouTube ("En horizontal" de `PORTADA.md`), con el título a un
+   lado y el personaje al otro: se queda en `portada.png`, no se corre `portada.mjs` y `final.py` no la pega.
+   Entrega la ruta, los modelos que sumaste a la biblioteca y lo que no
    revisaste: el audio no lo oyes, solo lo transcribes. No le propongas al usuario cambios a la skill al entregar.
 
 ## Imágenes con Codex

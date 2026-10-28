@@ -5,7 +5,7 @@
 // se hace su pieza.
 import React from "react";
 import { interpolate, interpolateColors, useCurrentFrame } from "remotion";
-import { proyectar, useCamara, V3 } from "../mundo/camara";
+import { K, proyectar, useCamara, V3 } from "../mundo/camara";
 import { EnMundo } from "../mundo/EnMundo";
 import { monedaEn, precioEn } from "../mundo/guion";
 import { Pildora, useNegado } from "../piezas/diagrama";
@@ -13,7 +13,7 @@ import { Glifo } from "../piezas/iconos";
 import { MARCA } from "../marca";
 import { colorDeRed, TarjetaCierre } from "../piezas/tarjetas";
 import { Ancla, Aparece, Pulso, sujeta, suave, useColores } from "../piezas/ui";
-import { LETRA, MONO, ROJO } from "../tema";
+import { HORIZONTAL, LETRA, MONO, ROJO, ZONA } from "../tema";
 
 const dinero = (v: number) => `$${v.toFixed(2)}`;
 
@@ -136,19 +136,23 @@ export const PantallaCanal: React.FC<{ nombre?: string; avatar?: string }> = ({ 
 /**
  * El cierre: la tarjeta de la cuenta o el canal de `MARCA` (su red, su nombre y su foto) entra en `pero` («pero si
  * quieres enterarte…»), el botón se pulsa en `unete` y en `enlace` sale dónde está («en mi perfil», o la página). Va
- * fija en la pantalla, arriba del personaje (que enseña el canal en su celular). Sin red de cierre no dibuja nada.
+ * fija en la pantalla, arriba del personaje en vertical y a su izquierda en horizontal (él enseña el canal en su
+ * celular). Sin red de cierre no dibuja nada.
  */
 export const Canal: React.FC<{ nombre?: string; avatar?: string; pero: number; unete: number; enlace: number }> = ({ nombre = MARCA.nombre, avatar = MARCA.avatar, pero, unete, enlace }) => {
   const red = MARCA.red;
   if (red === "ninguna") return null;
   const { color, fondo } = colorDeRed(red);
+  // El centro de la escena y la altura de la tarjeta: en vertical, 540 y 470; el botón queda 418 px más abajo.
+  const x = (ZONA.escena.izquierda + ZONA.escena.derecha) / 2;
+  const arriba = HORIZONTAL ? ZONA.escena.arriba + 30 : ZONA.escena.arriba;
   return (
     <>
-      <Aparece en={pero} desde={{ escala: 1.1 }} style={{ left: 540 - 420, top: 470 }}>
+      <Aparece en={pero} desde={{ escala: 1.1 }} style={{ left: x - 420, top: arriba }}>
         <TarjetaCierre red={red} clic={unete + 4} avatar={avatar} nombre={nombre} ancho={840} />
       </Aparece>
-      <Pulso x={540} y={888} desde={pero + 8} hasta={unete + 4} color={color} radio={300} cada={24} />
-      <Aparece en={enlace} style={{ left: 60, width: 960, top: 1150, display: "flex", justifyContent: "center" }}>
+      <Pulso x={x} y={arriba + 418} desde={pero + 8} hasta={unete + 4} color={color} radio={300} cada={24} />
+      <Aparece en={enlace} style={{ left: x - 480, width: 960, top: arriba + (HORIZONTAL ? 590 : 680), display: "flex", justifyContent: "center" }}>
         <Pildora color={color} fondo={fondo} style={{ fontSize: 46, padding: "16px 32px" }}>
           <Glifo nombre="Link" tam={46} peso="bold" />
           {red === "web" ? nombre : "en mi perfil"}
@@ -164,7 +168,7 @@ export const Canal: React.FC<{ nombre?: string; avatar?: string; pero: number; u
  */
 export const Hueco: React.FC<{ id: string; p: V3; radio: number }> = ({ id, p, radio }) => {
   const cam = useCamara();
-  const lado = (2 * radio * 3348) / Math.max(0.5, proyectar(cam, p).prof);
+  const lado = (2 * radio * K) / Math.max(0.5, proyectar(cam, p).prof);
   return (
     <EnMundo p={p}>
       <Ancla id={id}>

@@ -2,7 +2,8 @@
 
 Todo vídeo vertical, de cualquier estilo, empieza con su portada: un solo fotograma (un trigésimo de segundo) que
 TikTok, Reels y Shorts enseñan de portada y en la cuadrícula del perfil. Se hace al final, cuando el vídeo ya está
-renderizado, y no se pregunta: va siempre. El vídeo horizontal no lleva.
+renderizado, y no se pregunta: va siempre. El vídeo horizontal no la lleva dentro: la suya es la miniatura de YouTube
+([abajo](#en-horizontal-la-miniatura-de-youtube)).
 
 ## Cómo se ve
 
@@ -56,3 +57,23 @@ Mírala (paso 4) y sigue en el paso 5. **Con ella:**
    de x264 que el vídeo, y lo pega delante sin recodificar el resto (un segundo, sin segunda compresión); si el vídeo no
    lo deja, lo recodifica entero, como antes, y lo dice. El Diff no usa `portada.mjs`: su `final.py` la renderiza como
    un tramo más.
+
+## En horizontal: la miniatura de YouTube
+
+YouTube no enseña el primer fotograma: enseña la miniatura que se sube aparte. Así que en un vídeo horizontal
+`portada.png` es esa miniatura, de 1280×720, y **no entra en el vídeo**: no se corre `portada.mjs` y el `final.py` del
+estilo no la pega. Sloth la ofrece al programar el vídeo en YouTube. Se hace como la de arriba, con estos cambios:
+
+- **Cómo se ve.** Del estilo del vídeo y legible en chico, igual que la vertical: en las listas de YouTube mide unos
+  170 px de ancho. El título a un lado (de 2 a 5 palabras, no más de 45 % del ancho) y el protagonista al otro. Nada
+  en el 5 % de cada borde ni en la esquina de abajo a la derecha, donde YouTube pone la duración.
+- **Sin cuenta de ChatGPT:** `portada_sin_ia.mjs` con `--horizontal`.
+- **Con ella:** los cuadros de referencia, a `scale=960:-2`. En el pedido, la segunda línea cambia por esta (lo demás,
+  igual):
+
+  ```
+  portada.png: a horizontal 3:2 (1536x1024) thumbnail for a YouTube video. It must look like it belongs to the same video as the attached frames: same art style, colors, typography, characters and world. <LO QUE PIDE EL ESTILO> <QUÉ SE VE>. Big bold title text in Spanish, exactly: "<EL TÍTULO>" (keep every accent), huge, high contrast with a thick outline or shadow, readable at thumbnail size. The title on one side, in two or three lines, no wider than 45% of the image; the main subject on the other side, complete (never cut by a straight edge). Keep the title and the main subject between 15% and 85% of the height (the top and bottom get cropped to 16:9) and away from the bottom-right corner (YouTube covers it with the video length). The edges are background only. No other text, no logos, no watermarks, no borders, no UI.
+  ```
+
+  Y se recorta a 16:9: `ffmpeg -nostdin -v error -i <la generada>.png -vf "scale=1280:-2,crop=1280:720" portada.png`.
+- **Mírala** entera y en chico (`-vf scale=240:-2`), como en el paso 4.

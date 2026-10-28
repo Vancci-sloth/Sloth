@@ -5,7 +5,9 @@
  "frases": [
   {"texto": "Alguien preguntó qué haces en esta situación."},
   {"texto": "Déjenme enseñarles."},
+  {"texto": "Primero, deja que se acerque."},
   {"texto": "En cuanto lo tengas cerca, patéalo contra la pared más cercana."},
+  {"texto": "Luego cárgalo sobre tu cabeza."},
   {"texto": "Banda, así se resuelve esta situación."}
  ]
 }

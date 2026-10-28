@@ -1,5 +1,5 @@
-// El video entero: el mundo 3D (uno solo, que la cámara recorre de principio a fin), lo 2D del capítulo clavado en ese
-// mundo, el texto de arriba, el personaje y la voz. Los capítulos (oscuro o claro) repintan el mismo mundo; el cambio
+// El video entero, en su formato (vertical u horizontal: `ZONA` en tema.ts): el mundo 3D (uno solo, que la cámara
+// recorre de principio a fin), lo 2D del capítulo clavado en ese mundo, el texto, el personaje y la voz. Los capítulos (oscuro o claro) repintan el mismo mundo; el cambio
 // desenfoca todo el cuadro y pasa por gris en ~6 cuadros (capitulos.ts). Al moverse rápido la cámara, el mundo se
 // desenfoca un poco (el barrido).
 import React, { useEffect, useState } from "react";
@@ -14,7 +14,7 @@ import { Mundo } from "./mundo/Mundo";
 import { Personaje } from "./piezas/Personaje";
 import { Subtitulos } from "./piezas/Subtitulos";
 import { TemaContexto } from "./piezas/ui";
-import { FUENTES } from "./tema";
+import { FUENTES, HORIZONTAL } from "./tema";
 
 export const Video: React.FC = () => {
   const [espera] = useState(() => delayRender("Cargando las fuentes"));
@@ -45,10 +45,13 @@ const Cuadro: React.FC = () => {
             <Mundo planos={PLANOS}>
               <Escena3D />
             </Mundo>
-            {/* El mundo se funde con el fondo arriba (el texto) y abajo (el personaje). */}
+            {/* El mundo se funde con el fondo donde va el texto y el personaje: arriba y abajo en vertical; en
+                horizontal, en el tercio de abajo (el personaje, a la derecha, va encima del mundo). */}
             <AbsoluteFill
               style={{
-                background: `linear-gradient(${fondo} 0%, ${fondo} 11%, transparent 25%, transparent ${conPerro ? 74 : 88}%, ${fondo} ${conPerro ? 96 : 100}%)`,
+                background: HORIZONTAL
+                  ? `linear-gradient(transparent 0%, transparent 66%, ${fondo} 80%, ${fondo} 100%)`
+                  : `linear-gradient(${fondo} 0%, ${fondo} 11%, transparent 25%, transparent ${conPerro ? 74 : 88}%, ${fondo} ${conPerro ? 96 : 100}%)`,
               }}
             />
             <TemaContexto.Provider value={t.tema}>

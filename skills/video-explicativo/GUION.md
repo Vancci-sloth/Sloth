@@ -154,7 +154,8 @@ lo pide.
 
 ## Los subtítulos
 
-`subtitulos.txt` es el texto de arriba, una frase por renglón, tal como se ve (máximo dos renglones en pantalla). Lo
+`subtitulos.txt` es el texto (arriba en vertical, abajo en horizontal), una frase por renglón, tal como se ve (máximo
+dos renglones en pantalla; las mismas frases en los dos formatos). Lo
 mecánico lo hace `python -B -X utf8 <skill>/scripts/subtitulos.py`: parte `guion.md` en renglones de unas 30 letras y
 junta las cifras como se ven y como se dicen (`$10=diez_dólares`, `96%=noventa_y_seis_por_ciento`, `11:58=once_cincuenta_y_ocho`,
 `2015=dos_mil_quince`). Luego se marca a mano, y se juntan las fechas o cifras que no juntó y se rehace un corte feo:

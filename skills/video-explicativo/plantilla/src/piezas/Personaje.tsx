@@ -1,4 +1,5 @@
-// El personaje, abajo: una foto recortada como sticker (lo único de collage del video). Habla como un muñeco:
+// El personaje, abajo (en vertical, al centro; en horizontal, en el tercio de la derecha: `ZONA.personaje`): una foto
+// recortada como sticker (lo único de collage del video). Habla como un muñeco:
 // abre la boca en cada sílaba (la foto `abierta` de su pose, que solo cambia la boca; scripts/bocas.py) y
 // rebota con la voz. Cambia de pose con un golpe en la palabra que la pide y, en las poses que sostienen algo (la
 // moneda, el cartel, el celular), enseña encima lo que se está explicando (`objeto`, en el ancla de la pose). Cuando
@@ -7,7 +8,7 @@ import React from "react";
 import { Easing, Img, interpolate, spring, staticFile, useCurrentFrame, useVideoConfig } from "remotion";
 import datos from "../datos/personaje.json";
 import { BOCA } from "../tiempo";
-import { ALTO, ANCHO, ZONA } from "../tema";
+import { ALTO, ZONA } from "../tema";
 import { chueco } from "./ui";
 
 type Bocas = { cerrada: string; abierta?: string };
@@ -54,7 +55,7 @@ export const Personaje: React.FC<{ tramos: Tramo[]; entra: number; sale?: number
   const escala = interpolate(golpe, [0, 1], [1.12, 1]) * (1 + nivel * 0.035);
   const rebote = -nivel * 16;
 
-  const xDe = (t: Tramo) => t.x ?? ANCHO / 2;
+  const xDe = (t: Tramo) => t.x ?? ZONA.personaje.x;
   const x = previo ? interpolate(paso, [0, 1], [xDe(previo), xDe(tramo)]) : xDe(tramo);
   const ancla = ANCLAS[tramo.pose];
   const foto = bocas.abierta && abierta(f) ? bocas.abierta : bocas.cerrada;

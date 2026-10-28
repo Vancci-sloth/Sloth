@@ -4,7 +4,7 @@
 import React from "react";
 import { TEMAS } from "../capitulos";
 import type { Tramo } from "../piezas/Personaje";
-import { MARCADOR } from "../tema";
+import { MARCADOR, ZONA } from "../tema";
 import { PrecioPegado } from "./comun";
 
 /** Lo 2D de cada capítulo, en el orden de TEMAS (capitulos.ts): un componente por capítulo. */
@@ -16,8 +16,8 @@ export const Cartel: React.FC<{ texto: string }> = ({ texto }) => (
   <div style={{ fontFamily: MARCADOR, fontSize: 112, color: "#141414", transform: "rotate(-4deg)", lineHeight: 1 }}>{texto}</div>
 );
 
-/** Cuánto sube el personaje cuando enseña algo a la altura del pecho, para que no lo tape el texto de TikTok. */
-export const SUBE = 140;
+/** Cuánto sube el personaje cuando enseña algo a la altura del pecho, para que no lo tape el texto de TikTok (vertical). */
+export const SUBE = ZONA.personaje.sube;
 
 /** El personaje entra en «pero primero» (el gancho va sin él) y cambia de pose en la palabra que la pide. */
 export const PERSONAJE: { tramos: Tramo[]; entra: number } = {

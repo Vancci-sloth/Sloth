@@ -1,5 +1,6 @@
 import React from "react";
 import { Easing, Img, interpolate, random, spring, staticFile, useCurrentFrame, useVideoConfig } from "remotion";
+import { segun } from "./datos";
 
 /** Dónde está un recorte en un fotograma: x es su centro, y su piso (los pies); giro en grados. */
 export type Punto = { x: number; y: number; giro?: number; escala?: number };
@@ -35,7 +36,8 @@ const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
 
 /** Un lanzamiento: de `de` a `a` entre los fotogramas `desde` y `hasta`, en arco de `altura` px por encima del punto
  * más alto, dando `vueltas` (negativas, al otro lado). Antes de `desde` está en `de`; después, en `a`. Para que salga
- * del cuadro, pon `a` fuera (x < -300 o > 1380) y que el siguiente escenario lo reciba con otro `arco`. */
+ * del cuadro, pon `a` fuera (x < -300 o > W + 300: 1380 en vertical, 2220 en horizontal) y que el siguiente escenario
+ * lo reciba con otro `arco`. */
 export const arco = (f: number, desde: number, hasta: number, de: Punto, a: Punto, altura = 300, vueltas = 0): Punto => {
   const t = interpolate(f, [desde, hasta], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
   const cima = Math.min(de.y, a.y) - altura;
@@ -158,31 +160,37 @@ export const usePop = (desde: number, rigidez = 220) => {
 const SISTEMA = "'Segoe UI', Roboto, Arial, sans-serif";
 
 /** El comentario de Instagram en modo oscuro, arriba del clip del gancho, como en los reels de referencia: avatar,
- * usuario con palomita, hace cuánto, el texto como lo escribe la gente, "Responder" y el corazón con sus likes. */
-export const Comentario: React.FC<{ usuario: string; texto: string; hace?: string; likes?: string; y?: number }> = ({ usuario, texto, hace = "5 d", likes, y = 300 }) => (
-  <div style={{
-    position: "absolute", left: 40, right: 40, top: y, background: "rgba(18,18,18,0.94)", borderRadius: 18,
-    padding: "22px 26px", display: "flex", gap: 20, fontFamily: SISTEMA, color: "#f5f5f5",
-  }}>
+ * usuario con palomita, hace cuánto, el texto como lo escribe la gente, "Responder" y el corazón con sus likes. En
+ * vertical va a todo el ancho; en horizontal, arriba a la izquierda (él está en el tercio derecho) y con la letra un
+ * poco mayor, para que se lea a 480x270. */
+export const Comentario: React.FC<{ usuario: string; texto: string; hace?: string; likes?: string; y?: number }> = ({ usuario, texto, hace = "5 d", likes, y = segun(300, 80) }) => {
+  const k = segun(1, 1.25); // la letra y lo demás de la tarjeta
+  return (
     <div style={{
-      width: 64, height: 64, borderRadius: "50%", flexShrink: 0,
-      background: "radial-gradient(circle at 35% 30%, #c9a27e, #6b4a33)", border: "2px solid #333",
-    }} />
-    <div style={{ flex: 1, minWidth: 0 }}>
-      <div style={{ fontSize: 27, lineHeight: 1.2 }}>
-        <b>{usuario}</b>
-        <span style={{
-          display: "inline-block", width: 24, height: 24, borderRadius: "50%", background: "#3897f0", color: "white",
-          fontSize: 17, textAlign: "center", lineHeight: "24px", margin: "0 8px", verticalAlign: "1px",
-        }}>✓</span>
-        <span style={{ color: "#a8a8a8" }}>{hace}</span>
+      position: "absolute", left: segun(40, 96), right: segun(40, undefined), width: segun(undefined, 1000), top: y,
+      background: "rgba(18,18,18,0.94)", borderRadius: 18 * k,
+      padding: `${22 * k}px ${26 * k}px`, display: "flex", gap: 20 * k, fontFamily: SISTEMA, color: "#f5f5f5",
+    }}>
+      <div style={{
+        width: 64 * k, height: 64 * k, borderRadius: "50%", flexShrink: 0,
+        background: "radial-gradient(circle at 35% 30%, #c9a27e, #6b4a33)", border: "2px solid #333",
+      }} />
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 27 * k, lineHeight: 1.2 }}>
+          <b>{usuario}</b>
+          <span style={{
+            display: "inline-block", width: 24 * k, height: 24 * k, borderRadius: "50%", background: "#3897f0", color: "white",
+            fontSize: 17 * k, textAlign: "center", lineHeight: `${24 * k}px`, margin: `0 ${8 * k}px`, verticalAlign: "1px",
+          }}>✓</span>
+          <span style={{ color: "#a8a8a8" }}>{hace}</span>
+        </div>
+        <div style={{ fontSize: 31 * k, lineHeight: 1.25, marginTop: 4 * k }}>{texto}</div>
+        <div style={{ fontSize: 24 * k, color: "#a8a8a8", marginTop: 10 * k, fontWeight: 600 }}>Responder</div>
       </div>
-      <div style={{ fontSize: 31, lineHeight: 1.25, marginTop: 4 }}>{texto}</div>
-      <div style={{ fontSize: 24, color: "#a8a8a8", marginTop: 10, fontWeight: 600 }}>Responder</div>
+      <div style={{ textAlign: "center", color: "#a8a8a8", fontSize: 22 * k, flexShrink: 0, paddingTop: 6 * k }}>
+        <div style={{ fontSize: 34 * k, lineHeight: 1 }}>♡</div>
+        {likes && <div style={{ marginTop: 4 * k }}>{likes}</div>}
+      </div>
     </div>
-    <div style={{ textAlign: "center", color: "#a8a8a8", fontSize: 22, flexShrink: 0, paddingTop: 6 }}>
-      <div style={{ fontSize: 34, lineHeight: 1 }}>♡</div>
-      {likes && <div style={{ marginTop: 4 }}>{likes}</div>}
-    </div>
-  </div>
-);
+  );
+};

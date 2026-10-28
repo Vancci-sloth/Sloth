@@ -19,7 +19,8 @@ export const T = {
 
 /**
  * Los lugares del mundo, en metros. El piso es y = 0 y la cámara mira hacia −z. En vertical cabe muy poco a lo ancho
- * (a 10 m se ven ~2.8 m de lado a lado): lo que tiene que verse junto va en fila hacia el fondo, no a los lados.
+ * (a 10 m se ven ~2.8 m de lado a lado): lo que tiene que verse junto va en fila hacia el fondo, no a los lados. En
+ * horizontal cabe el triple (a 10 m, ~6 m junto al personaje): lo que se compara va lado a lado.
  */
 export const L = {
   casa: [0, 1.08, 3.6] as V3, // la casa de la moneda: parada en el piso; el gancho y el cierre pasan aquí

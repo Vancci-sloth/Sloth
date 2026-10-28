@@ -1,7 +1,11 @@
 """
-Render final a 1080x1920, audio masterizado para redes (-14 LUFS, true peak <= -1 dBTP) y comprobación.
+Render final en el tamaño de su formato (1080x1920 o 1920x1080, `FORMATO` de src/datos.ts), audio masterizado para
+redes (-14 LUFS, true peak <= -1 dBTP) y comprobación.
 
     python -B final.py <nombre>          deja out/reel-<nombre>.mp4 (el panel de etapas de Sloth busca out/reel-*.mp4)
+
+En vertical, si ya está `portada.png`, la vuelve a poner de primer fotograma. En horizontal no: ahí `portada.png` es la
+miniatura de YouTube y no entra en el video (PORTADA.md de video-base).
 
 A veces Remotion falla al mezclar el audio ("remotion-audio-mixing ... No such file or directory", una carpeta temporal
 que no llegó a crear): se reintenta. El MP4 crudo se borra antes de renderizar, para que un fallo nunca deje pasar uno
@@ -13,7 +17,7 @@ El master y la comprobación son los de video-base (`masterizar.mjs`, `comprobar
 import subprocess
 import sys
 
-from comun import CONCURRENCIA, PROYECTO, base, ffmpeg
+from comun import CONCURRENCIA, PROYECTO, base, ffmpeg, formato, tamano
 from espacio import comprobar_disco  # de video-base, que comun.py pone en sys.path
 
 
@@ -41,10 +45,14 @@ def main() -> None:
            "-ar", "48000", "-ac", "2", "-shortest", "-movflags", "+faststart", str(final))
     crudo.unlink()
     audio.unlink()
-    base("comprobar.mjs", str(final), "--tamano", "1080x1920")
-    # La portada como primer cuadro (PORTADA.md de video-base): si ya se hizo, un render nuevo no la pierde.
+    base("comprobar.mjs", str(final), "--tamano", tamano())
     portada = PROYECTO / "portada.png"
-    if portada.exists():
+    if formato() == "horizontal":
+        # La miniatura de YouTube, aparte: nunca se pega en el video.
+        if not portada.exists():
+            print("Falta la miniatura: hazla según «En horizontal» de PORTADA.md de video-base (sin portada.mjs).")
+    # La portada como primer cuadro (PORTADA.md de video-base): si ya se hizo, un render nuevo no la pierde.
+    elif portada.exists():
         base("portada.mjs", str(final), str(portada))
     else:
         print("Falta la portada: hazla según PORTADA.md de video-base y ponla con portada.mjs.")

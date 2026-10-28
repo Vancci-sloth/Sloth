@@ -14,15 +14,16 @@ Sloth la enseña en el inicio en cuanto ese archivo cambia, y enlaza la skill do
 
 ## Pasos
 
-1. **Entender el video.** Lo que hace falta saber, y nada más: de qué van los videos, si son verticales (TikTok, Reels,
-   Shorts) u horizontales (YouTube), cuánto duran, de dónde sale la voz (la graba el usuario o una voz de `edge-tts`),
-   si sale una persona o un personaje y cómo se ve. Si mandó ejemplos, bájalos fuera de las skills, a
+1. **Entender el video.** Lo que hace falta saber, y nada más: de qué van los videos, cuánto duran, de dónde sale la voz
+   (la graba el usuario o una voz de `edge-tts`), si sale una persona o un personaje y cómo se ve. El formato no se
+   pregunta: todo estilo hace los dos, vertical (TikTok, Reels, Shorts) y horizontal (YouTube), y el usuario elige uno
+   en Sloth cada vez. Si sus ejemplos son de uno solo, el otro lo acomodas tú ([FORMATO.md](../video-base/FORMATO.md)). Si mandó ejemplos, bájalos fuera de las skills, a
    `<skills>/../trabajo/<id>/referencias`, con `python <skills>/video-base/scripts/fuente.py <url> <carpeta>`, y míralos
    en una hoja (`node <skills>/video-base/scripts/hoja.mjs <video> <png> --cada 0.5`). Lo que no esté claro, pregúntalo en
    un solo mensaje. Listo cuando puedes describir el estilo en tres líneas y el usuario está de acuerdo.
 2. **Partir del más parecido.** Copia a `<skills>/<id>/` el estilo de Sloth que más se le parece, sin lo que juntó quien
    lo usa (`huellas/`, `series/banco/` y, del reel, `personaje/`):
-   - `video-explicativo`: vertical que explica algo, un mundo 3D que la cámara recorre, la voz del usuario.
+   - `video-explicativo`: explica algo, un mundo 3D que la cámara recorre, la voz del usuario.
    - `reel-collage`: sketch de comedia con recortes de la persona sobre fotos reales y voz de `edge-tts`.
    - `video-documental`: una toma hablando a cámara, cubierta de material real que cambia cada segundo.
    - `video-el-diff`: noticiero seco con material original de una noticia.
@@ -34,6 +35,9 @@ Sloth la enseña en el inicio en cuanto ese archivo cambia, y enlaza la skill do
    carpeta de la línea `Carpeta: <nombre>` del mensaje, con ese nombre exacto (la pone Sloth y su estudio la busca ahí).
    Cambia la plantilla de Remotion, los scripts y los textos de apoyo (guion, escenas) a lo que pide el estilo; quita lo
    que no use. Lo que ya resuelve `video-base` (bajar, transcribir, masterizar, comprobar, la portada) se usa desde ahí.
+   **Siempre los dos formatos:** Sloth manda `Formato: vertical` o `Formato: horizontal` en el mensaje, la plantilla
+   compone el que llegue (1080×1920 o 1920×1080) y `SKILL.md` lleva su sección «Formato», que dice qué hace con cada
+   línea y cómo se acomoda en cada uno ([FORMATO.md](../video-base/FORMATO.md)).
 4. **La card.** Añádela a `<skills>/../data/tus-cards.json` (un arreglo; créalo si no está y no toques las demás), al
    final, cuando la skill ya existe:
 
@@ -58,14 +62,16 @@ Sloth la enseña en el inicio en cuanto ese archivo cambia, y enlaza la skill do
      le toca hacer al usuario; `copiar`, que el texto se lee en voz alta; `muestra`, qué se enseña si no es lo de `listo`.
    - `icon`: uno de trazo, nunca un emoji: `noticiero`, `pizarra`, `claqueta`, `risa`, `video`, `imagen`, `megafono`,
      `personas`, `foco`, `globo`, `escena`, `sonido`, `calendario`, `lapiz`.
-   - `horizontal: true` si también hace videos horizontales; `lote: { "prefijo": "<algo>-" }` si sirve hacer varios a
-     la vez, uno por enlace.
+   - `lote: { "prefijo": "<algo>-" }` si sirve hacer varios a la vez, uno por enlace.
+   - El selector de formato (Vertical u Horizontal) sale solo en toda card con `etapas`: no lleva nada para eso.
 
    Listo cuando el archivo es JSON válido y la card sale en el inicio de Sloth.
-5. **Probar.** Haz un video de prueba corto (de 10 a 15 s) siguiendo la skill nueva, en
-   `<skills>/../trabajo/<id>/prueba`: si pide la voz del usuario, usa una de `edge-tts` solo para probar. Arregla lo que
-   falle en la skill, no en el video. Listo cuando sale el MP4 y lo miraste en una hoja.
-6. **Entregar.** Dile al usuario en pocas líneas qué hace su estilo, qué le va a pedir cada vez y dónde está la prueba.
+5. **Probar.** Haz dos videos de prueba cortos (de 10 a 15 s) siguiendo la skill nueva, uno vertical y uno horizontal,
+   en `<skills>/../trabajo/<id>/prueba-vertical` y `prueba-horizontal`: si pide la voz del usuario, usa una de
+   `edge-tts` solo para probar. Arregla lo que falle en la skill, no en el video. Listo cuando salen los dos MP4, los
+   miraste en una hoja y el horizontal se ve pensado para YouTube, no un vertical estirado.
+6. **Entregar.** Dile al usuario en pocas líneas qué hace su estilo, qué le va a pedir cada vez y dónde están las dos
+   pruebas.
 
 ## Cambiar un estilo tuyo
 

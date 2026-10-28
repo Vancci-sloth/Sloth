@@ -12,8 +12,9 @@ Lo que comparten los estilos de vídeo: el lote, los errores ya vistos y los scr
 
 | Archivo | Qué es |
 |---|---|
+| [FORMATO.md](FORMATO.md) | Vertical u horizontal: todo estilo hace los dos, y qué cambia de uno a otro (`Formato:` del mensaje) |
 | [LOTE.md](LOTE.md) | Lo que cambia cuando el vídeo es uno de un lote; solo se lee si el mensaje trae `Lote:` |
-| [PORTADA.md](PORTADA.md) | La portada que todo vídeo vertical lleva de primer fotograma, en el estilo de su vídeo |
+| [PORTADA.md](PORTADA.md) | La portada que todo vídeo vertical lleva de primer fotograma, en el estilo de su vídeo, y la miniatura de YouTube del horizontal |
 | `scripts/` | Las herramientas (abajo) |
 
 `<base>` es esta carpeta, `video-base`, junto a las skills de cada estilo.
@@ -66,8 +67,10 @@ Su skill dice lo suyo y usa de aquí lo que ya existe: si te ves copiando un pá
 aquí. Nace con su card en `cards.json` de Sloth, con sus `etapas`, cada una con su `fase` (`idea`, `guion`, `sonido`,
 `video` o `entrega`: Idea · Guion · Sonido y voz · Video · Entrega, ver `FASES` en `shared/types.ts` de Sloth). `listo`
 es el glob que la da por hecha y, si no dice otra cosa en `muestra`, lo que el panel enseña de ella. El video terminado
-es el de la etapa «Video». Si es vertical, lleva su portada ([PORTADA.md](PORTADA.md)): su skill dice cómo se ve la
-suya, su `final.py` la vuelve a poner si ya existe, y su card tiene la etapa «Portada» (fase `entrega`).
+es el de la etapa «Video». Hace los dos formatos, vertical y horizontal ([FORMATO.md](FORMATO.md)): su plantilla
+compone los dos y su skill dice, en su sección «Formato», cómo se acomoda en cada uno. Lleva su portada
+([PORTADA.md](PORTADA.md)): su skill dice cómo se ve la suya, su `final.py` la vuelve a poner si ya existe (solo en
+vertical) y su card tiene la etapa «Portada» (fase `entrega`).
 
 ## Los scripts
 
@@ -80,7 +83,7 @@ Todos dicen cómo se usan si los corres sin argumentos. Node sin dependencias y 
 | `hoja.mjs video.mp4 hoja.png [--n 16 \| --cada 0.25 \| --t …] [--zonas] [--recomprimir 3M]` | Hoja de contacto con tiempos; zonas seguras; prueba de recompresión |
 | `hoja.mjs carpeta hoja.png` | Hoja de una carpeta de imágenes |
 | `portada.mjs video.mp4 portada.png` | Pone la portada como primer fotograma, en un segundo y sin recodificar el vídeo (si no puede, recodifica); otra vez, la cambia |
-| `portada_sin_ia.mjs video.mp4 portada.png --titulo "…"` | La portada sin cuenta de ChatGPT: un cuadro del vídeo y el título encima, en la zona que se ve |
+| `portada_sin_ia.mjs video.mp4 portada.png --titulo "…" [--horizontal]` | La portada sin cuenta de ChatGPT: un cuadro del vídeo y el título encima, en la zona que se ve; con `--horizontal`, la miniatura de YouTube (1280x720) |
 | `chrome.mjs` (librería) | Busca Chrome o Edge (o el de `CHROME`) y lo abre sin ventana: `abrirChrome({ ancho, alto })` |
 | `sloth.py`, `fuente.py` | El Python de Sloth (el transcriptor, yt-dlp) y bajar y transcribir un vídeo. `proceso()` dice antes cuánto tardará la voz en este equipo y luego cuánto falta, cada 10 %. WhisperX va de uno en uno en toda la máquina (`turno_gpu`), y las descargas de YouTube también (`turno_youtube`): los vídeos de un lote esperan ahí su turno. `vectorizar` usa el modelo de vectores ya cargado (`vectores_vivo.py`, que se va tras 10 min sin uso): un texto nuevo tarda menos de un segundo en vez de ~18. Un video de YouTube que otro vídeo ya bajó se enlaza de su carpeta en vez de bajarlo |
 | `huellas.py buscar\|revisar\|parecidos\|cerrar <skill>` | Que ningún vídeo de un estilo salga igual a otro ya hecho: la huella de cada uno (lo que cuenta y cómo se ve, y su hoja de ocho cuadros) en `<skill>/huellas/`, comparada contra todas por el script, que solo dice lo que choca. Python del sistema con numpy y Pillow; los textos, con los vectores de Sloth |

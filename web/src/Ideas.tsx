@@ -1984,11 +1984,8 @@ function Anteriores({ d, corriendo, onCambio }: { d: CanalCompleto; corriendo: b
   )
 }
 
-/**
- * Las cards con que se puede hacer una idea: en YouTube, las que hacen videos que pueden ser horizontales; en vertical,
- * todas las de video.
- */
-const estilos = (cards: Card[], vertical: boolean) => cards.filter((c) => c.etapas && (vertical || c.horizontal))
+/** Las cards con que se puede hacer una idea: todas las de video, que hacen los dos formatos (`Formato:` del brief). */
+const estilos = (cards: Card[]) => cards.filter((c) => c.etapas)
 
 /**
  * Lo que recibe la card al hacer una idea. Sin enlaces: con dos o más, El Diff ofrecería un video por enlace. Por eso la
@@ -2045,7 +2042,7 @@ function IdeaVista(props: {
   const cardDe = (id?: string) => props.cards.find((c) => c.id === id)
   const vertical = esVertical(d.canal)
   // El estilo que Claude sugiere va primero.
-  const conQue = estilos(props.cards, vertical).sort((a, b) => Number(b.id === idea.estilo) - Number(a.id === idea.estilo))
+  const conQue = estilos(props.cards).sort((a, b) => Number(b.id === idea.estilo) - Number(a.id === idea.estilo))
 
   const elegir = (estado: IdeaElegida['estado'] | null, cardId?: string) => api(`/api/ideas/${d.canal.id}/elegir`, { ideaId: idea.id, estado, cardId })
   async function hacerCon(card: Card) {
