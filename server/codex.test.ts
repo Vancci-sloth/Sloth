@@ -251,6 +251,28 @@ test('un subagente mantiene ocupado el hilo hasta terminar, y Detener limpia el 
   assert.deepEqual(h.events.filter((e) => e.t === 'background').at(-1)!.tasks, [])
 })
 
+test('el informe que un subagente le entrega al que lo lanzó no deja a nadie en segundo plano', async () => {
+  const h = preparar()
+  const actividad = (enHilo: string, id: string, agentThreadId: string, agentPath: string, kind: string) => {
+    const item = { id, type: 'subAgentActivity', kind, model: null, reasoningEffort: null, agentThreadId, agentPath }
+    h.notify('item/started', { threadId: enHilo, item })
+    h.notify('item/completed', { threadId: enHilo, item })
+  }
+  h.run.send('Prueba')
+  await setImmediate()
+  actividad('hilo', 'a', 'hijo', '/root/material', 'started')
+  actividad('hijo', 'b', 'nieto', '/root/material/fotos', 'started')
+  // Cada uno le entrega a quien lo lanzó: el aviso va en su hilo y nombra hacia arriba (el principal es «root»).
+  actividad('nieto', 'c', 'hijo', '/root/material', 'interacted')
+  h.notify('turn/completed', { threadId: 'nieto', turn: { id: 'n1', status: 'completed' } })
+  actividad('hijo', 'd', 'hilo', '/root', 'interacted')
+  h.notify('turn/completed', { threadId: 'hijo', turn: { id: 'h1', status: 'completed' } })
+  h.notify('turn/completed', { threadId: 'hilo', turn: { id: 'turno-1', status: 'completed' } })
+  assert.deepEqual(h.events.filter((e) => e.t === 'background').map((e) => e.tasks), [['material'], ['material', 'fotos'], ['material'], []])
+  assert.deepEqual(h.events.flatMap((e) => (e.t === 'tool' && e.name === 'Agent' ? [(e.input as { description: string }).description] : [])), ['material', 'fotos'])
+  h.run.close()
+})
+
 test('con el protocolo de ahora, cada subagente es una fila con su trabajo, su estado y su gasto', async () => {
   const pedidas: string[] = []
   const h = preparar(undefined, (modelo, uso) => (pedidas.push(modelo), uso.input + uso.cacheRead + uso.output))

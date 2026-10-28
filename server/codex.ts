@@ -55,11 +55,25 @@ export function startCodex(opts: AgentOptions, connect: Conectar = (notify, exit
     if (!fila || ocupada(fila)) return
     emit({ t: 'subagent', id: fila, status: estado === 'completed' ? 'completed' : estado === 'interrupted' || estado === 'shutdown' ? 'stopped' : 'failed', at: Date.now() })
   }
-  /** Un subagente nuevo, con el protocolo de ahora: su fila es como la de `Agent` en Claude, con su nombre en Codex. */
-  const actividad = (a: NonNullable<Notificacion['item']>, parent?: string) => {
+  // El hilo que lanzó a cada subagente (el del agente principal o el de otro subagente).
+  const padreDe = new Map<string, string>()
+  /** Si `otro` es el hilo `desde` o uno de los que lo lanzaron, hasta el agente principal. */
+  const deArriba = (otro: string, desde: string) => {
+    for (let h: string | undefined = desde; h; h = padreDe.get(h)) if (h === otro) return true
+    return otro === threadId
+  }
+  /**
+   * Un subagente nuevo, con el protocolo de ahora: su fila es como la de `Agent` en Claude, con su nombre en Codex. Llega
+   * en el hilo de quien le habla (`emisor`). Cuando un subagente le entrega su informe al que lo lanzó, el aviso va en
+   * su hilo y nombra a ese padre: no es un subagente nuevo. Contarlo así dejaba «root», el agente principal, en segundo
+   * plano para siempre, y el hilo parecía trabajar cuando ya había terminado.
+   */
+  const actividad = (a: NonNullable<Notificacion['item']>, parent?: string, emisor = threadId) => {
     const hijo = a.agentThreadId!
+    if (deArriba(hijo, emisor)) return
     const titulo = a.agentPath?.split('/').filter(Boolean).pop() || 'Subagente de Codex'
     if (!lanzador.has(hijo)) {
+      padreDe.set(hijo, emisor)
       const fila = `subagente:${hijo}`
       lanzador.set(hijo, fila)
       if (a.model) modeloDe.set(hijo, a.model)
@@ -116,7 +130,7 @@ export function startCodex(opts: AgentOptions, connect: Conectar = (notify, exit
     const id = idDe(item.id)
     const done = method === 'item/completed'
     // Llega al empezar y al acabar el aviso, y lo de su hilo puede llegar entre los dos.
-    if (item.type === 'subAgentActivity') actividad(item, parent)
+    if (item.type === 'subAgentActivity') actividad(item, parent, hijo)
     else if (done && item.type === 'agentMessage') completo(item.id, item.text ?? '')
     else if (done && item.type === 'reasoning') completo(`${item.id}:pensamiento`, (item.summary ?? []).join('\n'), true)
     else if (item.type === 'contextCompaction' && done) emit({ t: 'info', text: 'Codex compactó el contexto para continuar.' })
@@ -135,8 +149,11 @@ export function startCodex(opts: AgentOptions, connect: Conectar = (notify, exit
     // El protocolo de antes: después de su herramienta, que es la fila del subagente.
     if (item.type === 'collabAgentToolCall' && done) {
       for (const [otro, state] of Object.entries(item.agentsStates ?? {})) {
+        // Lo que un subagente le dice al que lo lanzó tampoco es un subagente (ver `actividad`).
+        if (deArriba(otro, hijo ?? threadId)) continue
         if (state.status === 'running' || state.status === 'pendingInit') {
           if (!lanzador.has(otro)) {
+            padreDe.set(otro, hijo ?? threadId)
             lanzador.set(otro, id)
             usoDe.set(otro, CERO)
           }
@@ -178,6 +195,7 @@ export function startCodex(opts: AgentOptions, connect: Conectar = (notify, exit
     opts.onExit?.(error && !cerrado ? { error: error.message, turno } : undefined)
     subagentes.clear()
     lanzador.clear()
+    padreDe.clear()
     segundoPlano()
   }, {
     mcp_servers: Object.fromEntries(Object.entries(navegadorAgente(opts.lote, opts.hilo)).map(([name, server]) => [name, { command: server.command, args: server.args ?? [], ...(server.env ? { env: server.env } : {}) }]))

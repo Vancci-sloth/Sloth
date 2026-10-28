@@ -18,6 +18,8 @@ import type { CambiosSloth } from './cambios-sloth.ts'
  */
 export const CABEN = Math.max(1, Math.min(Math.floor(cpus().length / 3), Math.floor(totalmem() / 4e9)))
 const LIBRE = 2e9
+/** Cuánto espera el hilo, con el segundo plano recién vacío, antes de decir que ya no queda nada (`avisarFondo`). */
+const CALMA = 4000
 /**
  * Un video del lote no arranca con menos de esto libre en el disco de su carpeta. Un render deja varios GB de temporales,
  * y con el disco lleno se cae todo: los renders, los agentes y este servidor, que ya no puede guardar los hilos.
@@ -426,6 +428,30 @@ export class Sessions {
   private despertadores = new Set<string>()
 
   /**
+   * Cuando lo de segundo plano (subagentes, comandos, un Monitor) termina con el turno ya acabado, el hilo lo dice: el
+   * agente suele cerrar su turno con «todo listo» mientras algo sigue, y sin esto había que preguntarle si ya acabó. Espera
+   * `CALMA`: al terminar una tarea, Claude Code abre él solo un turno para leerla, y eso no es quedarse quieto. Solo con el
+   * proceso del agente vivo: si se cerró o se reinició Sloth, lo de fondo se cortó, no terminó.
+   */
+  private avisarFondo(id: string, meta: SessionMeta, event: AgentEvent, habia: number) {
+    if (event.t === 'turn_start' || (event.t === 'background' && event.tasks.length)) {
+      clearTimeout(this.fondoVacio.get(id))
+      this.fondoVacio.delete(id)
+    }
+    if (event.t !== 'background' || event.tasks.length || !habia || meta.running || !this.runs.has(id)) return
+    clearTimeout(this.fondoVacio.get(id))
+    const reloj = setTimeout(() => {
+      this.fondoVacio.delete(id)
+      if (!meta.running && !meta.background?.length && this.metas.has(id)) {
+        this.emit(id, { t: 'info', text: 'Terminó lo que seguía en segundo plano: ya no queda nada trabajando en este hilo.' })
+      }
+    }, CALMA)
+    reloj.unref()
+    this.fondoVacio.set(id, reloj)
+  }
+  private fondoVacio = new Map<string, ReturnType<typeof setTimeout>>()
+
+  /**
    * Cuenta el rato quieto de un video del lote. Cualquier cosa que haga anula el reloj, y se vuelve a armar cuando acaba
    * bien un turno o se le vacía el segundo plano: Claude Code puede abrir un turno él solo cuando termina una tarea.
    */
@@ -501,6 +527,7 @@ export class Sessions {
         this.emit(id, { t: 'info', text: `No se pudieron guardar los cambios de Sloth: ${error instanceof Error ? error.message : String(error)}` })
       }
     }
+    const habia = meta.background?.length ?? 0
     if (event.t === 'background') {
       if (event.tasks.join('\n') === (meta.background ?? []).join('\n')) return
       meta.background = event.tasks
@@ -530,6 +557,7 @@ export class Sessions {
     if (event.t === 'turn_end' && !event.ok && !event.caida && meta.lote) this.pausar(meta.lote.id, `«${meta.title}»: ${event.error ?? 'se detuvo'}`)
     // Nadie mira un video del lote mientras trabaja: si su turno acaba bien, su proceso se cierra en cuanto queda quieto.
     if (meta.lote) this.ocioso(id, meta, event)
+    this.avisarFondo(id, meta, event, habia)
     // Un agente que deja de trabajar libera sitio.
     if (event.t === 'turn_end' || event.t === 'background') setTimeout(() => this.repartir())
   }
