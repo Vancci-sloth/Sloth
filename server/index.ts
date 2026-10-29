@@ -12,7 +12,7 @@ import { IMAGE_TYPES } from './agent.ts'
 import { avances } from './avances.ts'
 import { claudeModels, tituloCorto } from './claude.ts'
 import { codexModels } from './codex.ts'
-import { asegurarAgente, bajandoAgente, estadoAgentes, rutaAgente } from './agentes.ts'
+import { alBajarAgente, asegurarAgente, bajandoAgente, estadoAgentes, rutaAgente } from './agentes.ts'
 import { opencodeModels } from './opencode.ts'
 import { type Proveedor, proveedorDe } from '../shared/providers.ts'
 import { paraMandar } from '../shared/historial.ts'
@@ -211,6 +211,9 @@ function pedirModelos() {
   })
 }
 pedirModelos()
+// Al bajarse un agente, desde donde sea (Opciones, el primer mensaje de un hilo, conectar su cuenta), llegan sus modelos:
+// si no, quien actualizaba desde una versión que traía Claude Code veía el menú de modelos vacío hasta reabrir Sloth.
+alBajarAgente(pedirModelos)
 // Codex no da dólares: sus precios de la API se bajan con cada versión de Codex (server/precios.ts).
 void cargarPreciosCodex(APP)
 
@@ -385,7 +388,7 @@ async function api(req: IncomingMessage, res: ServerResponse, url: URL): Promise
   if (path === '/api/agentes' && method === 'GET') return send(res, 200, estadoAgentes()), true
   const baja = /^\/api\/(claude|codex|opencode)\/descargar$/.exec(path)
   if (baja && method === 'POST') {
-    void asegurarAgente(baja[1] as Proveedor).then(pedirModelos, () => {})
+    void asegurarAgente(baja[1] as Proveedor).catch(() => {})
     return send(res, 200, estadoAgentes()), true
   }
 

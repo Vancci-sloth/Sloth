@@ -97,6 +97,9 @@ caminoDeAgentes()
 
 const instalando = new Map<Proveedor, Promise<string>>()
 const errores = new Map<Proveedor, string>()
+/** Lo que se hace cada vez que un agente termina de bajarse, lo haya pedido quien sea: pedir su catálogo de modelos. */
+const alBajarse: (() => void)[] = []
+export const alBajarAgente = (fn: () => void) => void alBajarse.push(fn)
 
 export function estadoAgente(p: Proveedor): EstadoAgente {
   return { nombre: AGENTES[p].nombre, instalado: !!rutaAgente(p), instalando: instalando.has(p), error: errores.get(p), pesa: AGENTES[p].pesa }
@@ -136,7 +139,10 @@ export function asegurarAgente(p: Proveedor): Promise<string> {
   })()
   instalando.set(p, descarga)
   descarga.then(
-    () => instalando.delete(p),
+    () => {
+      instalando.delete(p)
+      for (const fn of alBajarse) fn()
+    },
     (e) => {
       instalando.delete(p)
       errores.set(p, `No se pudo descargar ${AGENTES[p].nombre}: ${e instanceof Error ? e.message : e}`)
