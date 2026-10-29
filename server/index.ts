@@ -20,7 +20,7 @@ import { conectandoCodex, conectarCodex, cuentaCodex, limitesCodex } from './cue
 import { conectando, conectarClaude, cuentaClaude, limitesClaude } from './cuenta.ts'
 import { cancelarOpenCode, conectandoOpenCode, conectarOpenCode, cuentaOpenCode, limitesOpenCode, quitarCuentaOpenCode, usarCuentaOpenCode } from './cuenta-opencode.ts'
 import { enlacesApi } from './enlaces.ts' // tarjeta de los enlaces
-import { etapasApi, mismaCwd, videosApi, videosDe } from './etapas.ts' // panel de etapas
+import { etapasApi, mismaCwd, queFalta, videosApi, videosDe } from './etapas.ts' // panel de etapas
 import { ideas } from './ideas/index.ts' // ideas
 import { modelos3d } from './modelos3d.ts' // modelos 3D
 import { miniaturas } from './miniaturas.ts' // panel de etapas
@@ -94,7 +94,13 @@ const sessions = new Sessions(
   (session) => broadcast({ type: 'session', session }),
   (sessionId) => broadcast({ type: 'removed', sessionId }),
   // Lo que va escribiendo un `Write` solo lo pintan el estudio y el panel de etapas: a los demás hilos no se les manda.
-  (sessionId, draft) => conEtapas(sessionId) && broadcast({ type: 'draft', sessionId, draft })
+  (sessionId, draft) => conEtapas(sessionId) && broadcast({ type: 'draft', sessionId, draft }),
+  undefined,
+  // Si el agente cierra su turno con el video a medias, Sloth le pide que siga (`sinAcabar`).
+  (meta) => {
+    const card = cards().find((c) => c.id === meta.cardId)
+    return card ? queFalta(meta, card) : []
+  }
 )
 
 /** Si el hilo es de un estilo de video: solo su estudio enseña lo que va escribiendo. */

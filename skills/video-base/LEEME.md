@@ -62,6 +62,14 @@ en el script.
 - Espera a `document.fonts.ready` antes del primer fotograma, o el primero sale con la fuente de reserva.
 - El agente de Chrome headless (`HeadlessChrome`) está bloqueado en x.com; Edge headless no baja de ~500 px de ancho.
 
+### El turno
+
+- No cierres el turno con el vídeo a medias. Si una comprobación falla (`medir.py`, `comprobar.mjs`), arregla lo que dice
+  y vuelve a renderizar hasta que pase: un vídeo de Codex cerró su turno con un borrador que no pasaba la de movimiento
+  y el usuario se quedó esperando. Sloth lee de las etapas de la card lo que falta y te pide que sigas, pero cada vuelta
+  cuesta. Cierra solo con el vídeo y la portada hechos, o con una pregunta cuando necesites algo que solo puede darte el
+  usuario (su voz, una foto, elegir).
+
 ### Revisar
 
 - Hojas de contacto, no cuadros sueltos: un revisor que abrió 90 imágenes sueltas gastó la mitad de su costo en eso.
