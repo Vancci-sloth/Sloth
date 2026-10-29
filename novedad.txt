@@ -1,1 +1,1 @@
-OpenCode, gratis con tu cuenta, como tercer agente. Claude y ChatGPT también con llave de API, y series en todos los estilos de video.
+Al descargar Claude, Codex u OpenCode ya no sale «spawn EBUSY»: Sloth espera a que el antivirus termine de revisarlo.

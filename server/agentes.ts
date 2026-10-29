@@ -1,4 +1,4 @@
-import { execFile } from 'node:child_process'
+import { execFile, type ExecFileException } from 'node:child_process'
 import { existsSync, mkdirSync, readFileSync, rmSync } from 'node:fs'
 import { delimiter, dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -76,8 +76,13 @@ const AGENTES: Record<Proveedor, Agente> = {
 /** Donde queda lo que se bajó de cada agente. */
 const carpeta = (p: Proveedor) => join(PIEZAS, p)
 
-/** El ejecutable del agente, si está: el de la app (repo) o el que se bajó. `null` si falta. */
-export function rutaAgente(p: Proveedor): string | null {
+/**
+ * El ejecutable del agente, si está: el de la app (repo) o el que se bajó. `null` si falta o aún se está bajando: el
+ * archivo ya existe antes de que pueda arrancar, y quien lo arranque entonces sale con `spawn EBUSY`.
+ */
+export const rutaAgente = (p: Proveedor): string | null => (instalando.has(p) ? null : buscar(p))
+
+function buscar(p: Proveedor): string | null {
   for (const modulos of [join(APP, 'node_modules'), join(carpeta(p), 'node_modules')]) {
     const exe = AGENTES[p].exe(modulos)
     if (exe && existsSync(exe)) return exe
@@ -127,11 +132,13 @@ export function asegurarAgente(p: Proveedor): Promise<string> {
     const dir = carpeta(p)
     mkdirSync(dir, { recursive: true })
     await npm(dir, AGENTES[p].paquete())
-    let exe = rutaAgente(p)
-    if (p === 'opencode' && exe && !(await arranca(exe))) {
+    let exe = buscar(p)
+    // Que arranque una vez antes de darlo por bajado: así nadie lo abre mientras el antivirus lo revisa.
+    if (exe && !(await arranca(exe)) && p === 'opencode') {
       rmSync(join(dir, 'node_modules', OPENCODE), { recursive: true, force: true })
       await npm(dir, AGENTES[p].paquete().replace(OPENCODE, `${OPENCODE}-baseline`))
-      exe = rutaAgente(p)
+      exe = buscar(p)
+      if (exe) await arranca(exe)
     }
     if (!exe) throw new Error(`${AGENTES[p].nombre} no trae un programa para esta computadora (${plataforma}).`)
     if (p === 'codex') caminoDeAgentes()
@@ -206,8 +213,19 @@ function npm(dir: string, paquete: string) {
   return correr(`npm install --prefix "${dir}" --no-save --no-audit --no-fund --ignore-scripts --loglevel=error ${paquete}`, dir)
 }
 
-/** Si el programa corre en esta computadora. */
-const arranca = (exe: string) => new Promise<boolean>((ok) => execFile(exe, ['--version'], { timeout: 30000, windowsHide: true }, (error) => ok(!error)))
+/**
+ * Si el programa corre en esta computadora. Recién bajado, el antivirus de Windows lo tiene abierto unos segundos y
+ * arrancarlo sale con EBUSY: se espera hasta medio minuto.
+ */
+async function arranca(exe: string): Promise<boolean> {
+  for (let i = 0; i < 30; i++) {
+    const error = await new Promise<ExecFileException | null>((ok) => execFile(exe, ['--version'], { timeout: 30000, windowsHide: true }, ok))
+    if (!error) return true
+    if (error.code !== 'EBUSY') return false
+    await new Promise((r) => setTimeout(r, 1000))
+  }
+  return false
+}
 
 /** Para `query()` del SDK de Claude: su programa, que el SDK solo busca a su lado y puede estar bajado aparte. */
 export function programaClaude(): { pathToClaudeCodeExecutable?: string } {
