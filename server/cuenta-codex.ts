@@ -82,7 +82,7 @@ export async function conectarCodex(): Promise<CuentaClaude> {
 /** Lee las cuotas del plan sin abrir un turno ni gastar tokens. Las lecturas simultáneas comparten un minuto de caché. */
 export function limitesCodex(): Promise<LimitesClaude> {
   // Con la llave no hay plan: se paga por uso.
-  if (llaveEnUso('codex')) return Promise.resolve({ ventanas: [] })
+  if (llaveEnUso('codex')) return Promise.resolve({ ventanas: [], llave: true })
   if (!limites || Date.now() - limites.leido > 60_000) {
     limites = { leido: Date.now(), valor: (async () => {
       leyendoLimites++

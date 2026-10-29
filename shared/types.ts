@@ -555,6 +555,8 @@ export interface LlaveAgente {
 export interface LimitesClaude {
   /** `uso`, de 0 a 100; `reinicia`, la fecha ISO en que vuelve a cero. */
   ventanas: { nombre: string; uso: number; reinicia?: string }[]
+  /** Se paga con la llave de API (`server/acceso.ts`): no hay plan ni límites que enseñar. */
+  llave?: boolean
 }
 
 /**

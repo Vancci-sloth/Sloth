@@ -307,7 +307,7 @@ export function startOpenCode(opts: AgentOptions, conectar: () => Promise<Servid
         return
       }
       case 'session.retry.scheduled':
-        if (propio) emit({ t: 'info', text: `${limite(d.error) ? 'El modelo gratis está saturado' : 'OpenCode no pudo hablar con el modelo'}; vuelve a intentarlo ${new Date(d.at).toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}.` })
+        if (propio) emit({ t: 'info', text: `${sinUsoGratis(d.error) ? 'Se acabó tu uso gratis de OpenCode' : limite(d.error) ? 'El modelo gratis está saturado' : 'OpenCode no pudo hablar con el modelo'}; vuelve a intentarlo ${new Date(d.at).toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}.` })
         return
       case 'session.compaction.ended':
       case 'session.compaction.failed':
@@ -336,7 +336,7 @@ export function startOpenCode(opts: AgentOptions, conectar: () => Promise<Servid
         if (propio) terminar(true)
         return
       case 'session.execution.failed':
-        if (propio) terminar(false, limite(d.error) ? 'El modelo gratis llegó a su límite por ahora. Espera unos minutos o elige otro modelo gratis.' : (d.error?.message ?? errorTurno))
+        if (propio) terminar(false, errorDe(d.error, errorTurno))
         return
       case 'session.execution.interrupted':
         if (propio) terminar(false, detenido || d.reason === 'user' ? 'lo detuviste' : `OpenCode cortó el turno (${d.reason}).`)
@@ -446,6 +446,17 @@ export function startOpenCode(opts: AgentOptions, conectar: () => Promise<Servid
 /** Un 429: el modelo gratis no da más por ahora. */
 const limite = (error?: { status?: number; type?: string; message?: string }) => error?.status === 429 || /rate.?limit|too many requests|quota/i.test(error?.message ?? '')
 
+/**
+ * «Free usage limit reached»: no es un modelo saturado, se acabó el uso gratis de esta computadora en todos los modelos.
+ * OpenCode no publica de cuánto es ni cuándo vuelve (suele ser en horas, a veces al día siguiente).
+ */
+const sinUsoGratis = (error?: { message?: string }) => /free usage/i.test(error?.message ?? '')
+const SIN_USO_GRATIS = 'Se acabó tu uso gratis de OpenCode por ahora (OpenCode no dice cuándo vuelve).'
+
+/** El error de un turno o de una respuesta suelta, en palabras de Sloth. */
+const errorDe = (error: { status?: number; message?: string } | undefined, otro: string | undefined) =>
+  sinUsoGratis(error) ? SIN_USO_GRATIS : limite(error) ? 'El modelo gratis llegó a su límite por ahora. Espera unos minutos o elige otro modelo gratis.' : (error?.message ?? otro)
+
 const CERO: Tokens = { input: 0, output: 0, cacheRead: 0 }
 const suma = (a: Tokens, b: Tokens): Tokens => ({ input: a.input + b.input, output: a.output + b.output, cacheRead: a.cacheRead + b.cacheRead })
 
@@ -487,7 +498,7 @@ export async function redactarOpenCode(model: string | undefined, cwd: string, p
         if (e.type === 'session.execution.succeeded') (clearTimeout(reloj), ok([...textos.values()].join('\n').trim()))
         if (e.type === 'session.execution.failed' || e.type === 'session.execution.interrupted' || e.type === ('sloth.caida' as string)) {
           clearTimeout(reloj)
-          mal(new Error(limite(d.error) ? 'El modelo gratis llegó a su límite por ahora. Espera unos minutos.' : (d.error?.message ?? 'OpenCode no pudo responder. Intenta otra vez.')))
+          mal(new Error(errorDe(d.error, 'OpenCode no pudo responder. Intenta otra vez.')))
         }
       })
     })

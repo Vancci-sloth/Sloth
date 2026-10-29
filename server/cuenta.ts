@@ -153,7 +153,7 @@ let leyendo = 0
  */
 export function limitesClaude(): Promise<LimitesClaude> {
   // Con la llave no hay plan: se paga por uso.
-  if (llaveEnUso('claude')) return Promise.resolve({ ventanas: [] })
+  if (llaveEnUso('claude')) return Promise.resolve({ ventanas: [], llave: true })
   if (!limites || Date.now() - limites.leido > 60_000) limites = { leido: Date.now(), valor: leerLimites() }
   return limites.valor
 }

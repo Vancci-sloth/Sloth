@@ -345,6 +345,10 @@ export function errorLlano(error = '', caida = false, agente: Proveedor = 'claud
     return { titulo: 'Se cortó a mitad del trabajo', ayuda: 'Lo que ya hizo sigue en su carpeta. Pulsa «Reintentar» y sigue desde ahí.', reintentar: true }
   }
   if (/^lo detuviste/i.test(error)) return { titulo: 'Lo detuviste', ayuda: 'Dile qué cambiar, o pulsa «Reintentar» para que siga.', reintentar: true, tuyo: true }
+  // El uso gratis se acaba en todos los modelos a la vez: cambiar a otro gratis no sirve.
+  if (agente === 'opencode' && /uso gratis|free usage/i.test(error)) {
+    return { titulo: 'Se acabó tu uso gratis de OpenCode', ayuda: 'Vuelve solo, en unas horas o al día siguiente: OpenCode no dice cuándo. Mientras, elige Claude o ChatGPT abajo y pulsa «Reintentar».', reintentar: true }
+  }
   if (agente === 'opencode' && /modelo gratis|rate.?limit|too many requests|\b429\b/i.test(error)) {
     return { titulo: 'El modelo gratis está saturado', ayuda: 'Espera unos minutos y pulsa «Reintentar», o elige otro modelo gratis.', reintentar: true }
   }

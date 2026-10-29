@@ -179,3 +179,12 @@ test('un 429 del modelo gratis se dice como saturado, no como un error raro', as
   h.oir({ type: 'session.execution.failed', data: { sessionID: SESION, error: { type: 'api', status: 429, message: 'Too Many Requests' } } })
   assert.match((h.events.at(-1) as any).error, /modelo gratis llegó a su límite/)
 })
+
+test('si se acabó el uso gratis, lo dice así y no como un modelo saturado', async () => {
+  const h = preparar()
+  h.run.send('Hola', undefined, [])
+  await setImmediate()
+  await setImmediate()
+  h.oir({ type: 'session.execution.failed', data: { sessionID: SESION, error: { type: 'api', status: 429, message: 'Free usage limit reached. Free models work in OpenCode (https://opencode.ai); subscribe to OpenCode Go to keep going: https://opencode.ai/go' } } })
+  assert.match((h.events.at(-1) as any).error, /Se acabó tu uso gratis de OpenCode/)
+})

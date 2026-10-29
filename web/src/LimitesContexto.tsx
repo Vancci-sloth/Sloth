@@ -28,12 +28,13 @@ function Proveedor({ id, nombre, ahora, opcional }: { id: string; nombre: string
     const reloj = setInterval(leer, 60_000)
     return () => { vigente = false; clearInterval(reloj) }
   }, [id])
-  if (opcional && (error || !limites?.ventanas.length)) return null
+  if (opcional && (error || (!limites?.ventanas.length && !limites?.llave))) return null
   return (
     <span className={`context-provider context-provider-${id}`}>
       <strong className="context-provider-name">{nombre}</strong>
       {error ? <span className="context-limit-note">No se pudieron consultar los límites.</span>
         : !limites ? <span className="context-limit-note">Consultando límites…</span>
+        : limites.llave ? <span className="context-limit-note">Pagas con tu llave de API: se cobra por uso y no hay límites del plan. Para verlos, cambia a «Tu suscripción» en Opciones → Agentes.</span>
         : !limites.ventanas.length ? <span className="context-limit-note">El proveedor no informa límites del plan.</span>
         : limites.ventanas.map((v) => {
           const queda = Math.max(0, Math.min(100, 100 - v.uso))
@@ -51,12 +52,27 @@ function Proveedor({ id, nombre, ahora, opcional }: { id: string; nombre: string
   )
 }
 
-/** Se monta solo al abrir el hover del contexto: consulta las dos cuentas, sin bloquear una si falla la otra. */
-export function LimitesContexto() {
+/**
+ * Se monta solo al abrir el hover del contexto: consulta las dos cuentas, sin bloquear una si falla la otra. En un hilo
+ * de OpenCode va primero lo suyo: no tiene plan, y su uso gratis tiene un tope que OpenCode no enseña.
+ */
+export function LimitesContexto({ opencode }: { opencode?: boolean }) {
   const [ahora, setAhora] = useState(Date.now)
   useEffect(() => {
     const reloj = setInterval(() => setAhora(Date.now()), 60_000)
     return () => clearInterval(reloj)
   }, [])
-  return <span className="context-limits"><span className="picker-label">Límites del plan</span><Proveedor id="codex" nombre="Codex" ahora={ahora} opcional /><Proveedor id="claude" nombre="Claude" ahora={ahora} /></span>
+  return (
+    <span className="context-limits">
+      <span className="picker-label">Límites del plan</span>
+      {opencode && (
+        <span className="context-provider context-provider-opencode">
+          <strong className="context-provider-name">OpenCode · gratis</strong>
+          <span className="context-limit-note">Sin plan: el uso gratis tiene un tope que OpenCode no publica ni deja ver. Al acabarse, vuelve solo en unas horas o al día siguiente.</span>
+        </span>
+      )}
+      <Proveedor id="codex" nombre="Codex" ahora={ahora} opcional />
+      <Proveedor id="claude" nombre="Claude" ahora={ahora} />
+    </span>
+  )
 }

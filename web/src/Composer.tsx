@@ -244,7 +244,7 @@ function withLinks(text: string): Node[] {
  * o se corta. Aunque vaya casi vacío, el arco nunca baja de un trazo que se vea. Al pasar el ratón abre una tarjeta
  * con el detalle, con la cara del menú de modelos en vez del `title` del sistema.
  */
-function ContextRing({ used, max }: { used: number; max: number }) {
+function ContextRing({ used, max, opencode }: { used: number; max: number; opencode?: boolean }) {
   const [hover, setHover] = useState(false)
   const [foco, setFoco] = useState(false)
   const abierto = hover || foco
@@ -280,7 +280,7 @@ function ContextRing({ used, max }: { used: number; max: number }) {
           <span>quedan {compact(Math.max(0, max - used))}</span>
         </span>
         {full && <span className="context-warn">Casi lleno: el agente compactará la conversación pronto.</span>}
-        {leyendo && <LimitesContexto />}
+        {leyendo && <LimitesContexto opencode={opencode} />}
       </span>
     </span>
   )
@@ -716,7 +716,7 @@ export function Composer(props: {
         )}
         {props.extra}
         <span className="spacer" />
-        {props.context && <ContextRing {...props.context} />}
+        {props.context && <ContextRing {...props.context} opencode={!!choice && proveedorDe(choice.model) === 'opencode'} />}
         {uploading > 0 && <span className="muted small">Subiendo…</span>}
         {error && <span className="bad small">{error}</span>}
         {(!trabajando || !empty) && (
