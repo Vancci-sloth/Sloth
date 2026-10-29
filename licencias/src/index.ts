@@ -1,23 +1,25 @@
 /**
- * El cobro de Sloth: el apoyo mensual o anual con Mercado Pago, las cuentas gratis y la clave que revisa la app
+ * El cobro de Sloth: el apoyo mensual o anual con PayPal, las cuentas gratis y la clave que revisa la app
  * (`server/licencia.ts`). Sloth es gratis: el apoyo es opcional y quita el recordatorio de la app. La página
- * (sloth.vancci.org) suscribe desde el navegador (`POST /suscribir`, que da el enlace de pago de Mercado Pago) y,
+ * (sloth.vancci.org) suscribe desde el navegador (`POST /suscribir`, que da el enlace de pago de PayPal) y,
  * pagada, `/gracias` enseña la clave y el instalador; la clave llega también por correo. La
  * app crea una cuenta gratis con su `equipo` (`plan: 'gratis'`, que da una de plan `cuenta`) para entrar a la comunidad.
  * Al abrir y cada pocas horas, Sloth pregunta cómo va su clave (`POST /licencia`). La respuesta va firmada con `FIRMA`
  * (Ed25519): Sloth la guarda y, sin internet, vale hasta su `hasta` sin que se pueda alargar a mano.
  *
- * Mercado Pago manda: cada aviso (`POST /webhook`) y cada revisión vuelven a leer la suscripción de su API, así que un
- * aviso perdido o repetido solo cambia cuándo se entera Sloth. En D1, `licencias` (una por suscripción o lugar gratis) y
- * `equipos` (las computadoras de cada clave, `EQUIPOS` como mucho). El mensual es una suscripción sin plan, con pago
- * pendiente: Mercado Pago cobra solo cada mes con lo que eligió el cliente en su página, que es tarjeta o su cuenta.
+ * PayPal manda: cada aviso (`POST /webhook/paypal`) y cada revisión vuelven a leer la suscripción o la orden de su API,
+ * así que un aviso perdido o repetido solo cambia cuándo se entera Sloth. En D1, `licencias` (una por suscripción o
+ * lugar gratis) y `equipos` (las computadoras de cada clave, `EQUIPOS` como mucho). El mensual es una suscripción
+ * (`paypal`) a un plan de su monto, que se crea la primera vez (`paypal_ids`).
  *
- * El anual con Mercado Pago es un pago único de Checkout Pro (`preferencia`), porque ahí salen todos sus medios:
- * tarjeta, meses sin intereses, OXXO, SPEI, saldo… (las suscripciones solo aceptan tarjeta). No se renueva solo
- * (estado `pagado`): cada pago aprobado de la fila suma un año, y el cron avisa antes de que se acabe con un enlace para
- * pagar el siguiente (`/renovar`), con la misma clave. Lo pagado se lee de sus pagos (`/v1/payments/search`, por
- * `external_reference`), así que un aviso repetido no suma dos veces. Las suscripciones anuales de antes siguen igual.
- * Por eso el webhook de la aplicación «Sloth» en Mercado Pago lleva los temas de suscripciones y también «Pagos».
+ * El anual es una orden de PayPal (`orden`) que se cobra una vez: no se renueva sola (estado `pagado`). Cada cobro de la
+ * fila suma un año, y el cron avisa antes de que se acabe con un enlace para pagar el siguiente (`/renovar`), con la
+ * misma clave. Lo cobrado de cada orden se guarda en `paypal_pagos`, así que un aviso repetido no suma dos veces. La
+ * orden aprobada hay que cobrarla (`capture`): lo hace quien se entere primero, `/gracias` o el aviso.
+ *
+ * Hasta el 29 de octubre de 2026 se cobró con Mercado Pago. Lo de entonces sigue sin cambios: sus suscripciones
+ * (`preapproval`) cobran, se leen y se cancelan en Mercado Pago, con su aviso (`POST /webhook`), y un año pagado ahí de
+ * una vez (`preferencia`) cuenta sus pagos, aunque el siguiente se pague con PayPal.
  * Del 24 al 28 de octubre de 2026 también se pudo pagar con Stripe; nadie llegó a pagar y se quitó. De entonces queda
  * la columna `stripe`, vacía.
  *
@@ -53,7 +55,13 @@ export interface Env {
   DESCARGAS: R2Bucket
   /** La llave de `npm run publicar`. */
   PUBLICAR?: string
-  /** `prueba` cobra con la vendedora de prueba (`MP_ACCESS_TOKEN`); `produccion`, de verdad (`MP_ACCESS_TOKEN_PRODUCCION`). */
+  /** `prueba` cobra en el sandbox de PayPal; `produccion`, de verdad. Las llaves son las de la app de PayPal de ese modo. */
+  PAYPAL_MODO: 'prueba' | 'produccion'
+  PAYPAL_CLIENT_ID?: string
+  PAYPAL_SECRET?: string
+  /** El id del webhook de esa app: con él, PayPal confirma que un aviso es suyo. */
+  PAYPAL_WEBHOOK_ID?: string
+  /** Las suscripciones de Mercado Pago de antes: `prueba`, la vendedora de prueba (`MP_ACCESS_TOKEN`); `produccion`, la real. */
   MP_MODO: 'prueba' | 'produccion'
   MP_ACCESS_TOKEN: string
   MP_ACCESS_TOKEN_PRODUCCION?: string
@@ -103,18 +111,26 @@ export interface Fila {
   folio: string | null
   cancelada: string | null
   avisado_para: string | null
-  /** El `MP_MODO` con que se creó. */
+  /** El `PAYPAL_MODO` (antes, el `MP_MODO`) con que se creó. */
   modo: string
-  /** Con un año pagado de una vez: el último pago de Checkout Pro que se abrió para ella. */
+  /** Un año pagado de una vez con Mercado Pago: el último pago de Checkout Pro que se abrió para ella. */
   preferencia: string | null
+  /** La suscripción mensual de PayPal. */
+  paypal: string | null
+  /** Un año pagado de una vez con PayPal: la última orden que se abrió para ella. */
+  orden: string | null
 }
 
 /** Lo que el cobro guarda de una suscripción o de los pagos del año. `hasta`: su próximo cobro o su fin, si se sabe. */
 export interface Lectura {
-  id: string
   estado: Estado
   hasta?: string
 }
+
+/** Un año pagado de una vez, con Mercado Pago o con PayPal: no se renueva solo. */
+const deUnaVez = (f: Pick<Fila, 'preferencia' | 'orden'>) => !!(f.preferencia || f.orden)
+/** Quién cobra la suscripción de la fila, o quién cobró el primer año: para los correos y la página de gracias. */
+const pasarela = (f: Pick<Fila, 'preapproval' | 'preferencia'>) => (f.preapproval || f.preferencia ? 'Mercado Pago' : 'PayPal')
 
 /** Cuántos se han unido: los lugares gratis tomados y las suscripciones pagadas alguna vez (de ellas, las de fundador). */
 export interface Cuenta {
@@ -133,10 +149,33 @@ interface Preapproval {
   external_reference?: string
 }
 
-/** Un pago de Checkout Pro: `init_point` es adonde va el cliente. */
-interface Preferencia {
+/** Una suscripción de PayPal, con lo que se lee de ella. `approve` (en `links`) es adonde va el cliente. */
+interface SuscripcionPaypal {
   id: string
-  init_point: string
+  status: string
+  custom_id?: string
+  billing_info?: { next_billing_time?: string }
+  links?: { rel: string; href: string }[]
+}
+
+/** Una orden de PayPal: `payer-action` (en `links`) es adonde va el cliente; `custom_id`, su fila. */
+interface OrdenPaypal {
+  id: string
+  status: string
+  links?: { rel: string; href: string }[]
+  purchase_units?: { custom_id?: string; payments?: { captures?: { status: string; amount: { value: string; currency_code: string }; create_time?: string }[] } }[]
+}
+
+/** Un aviso de PayPal: solo dice qué cambió. */
+interface AvisoPaypal {
+  event_type?: string
+  resource?: {
+    id?: string
+    custom_id?: string
+    billing_agreement_id?: string
+    purchase_units?: { custom_id?: string }[]
+    supplementary_data?: { related_ids?: { order_id?: string } }
+  }
 }
 
 /** Un pago de Mercado Pago, con lo que se lee de él. */
@@ -150,12 +189,23 @@ export interface PagoMp {
 }
 
 const MP = 'https://api.mercadopago.com'
+const PAYPAL = { produccion: 'https://api-m.paypal.com', prueba: 'https://api-m.sandbox.paypal.com' }
 /** Los pagos que valen: aprobados, o en reclamo mientras no se resuelva en contra (entonces pasan a `charged_back`). */
 const VALEN = new Set(['approved', 'in_mediation'])
+/** El estado de un cobro de PayPal, con el nombre de Mercado Pago que entiende `leerPagos`. */
+const COBRO_PAYPAL: Record<string, string> = {
+  COMPLETED: 'approved',
+  PARTIALLY_REFUNDED: 'approved',
+  PENDING: 'pending',
+  REFUNDED: 'refunded',
+  REVERSED: 'charged_back',
+  DECLINED: 'rejected',
+  FAILED: 'rejected'
+}
 const DIA = 24 * 3600_000
 /** Sin internet, Sloth sigue abierta hasta una semana desde la última respuesta. */
 const SIN_CONEXION = 7 * DIA
-/** Cada cuánto se vuelve a leer de Mercado Pago una suscripción al revisarla; pendiente, casi siempre (esperan el pago). */
+/** Cada cuánto se vuelve a leer de PayPal (o de Mercado Pago) una suscripción al revisarla; pendiente, casi siempre (esperan el pago). */
 const REVISAR = 6 * 3600_000
 const REVISAR_PENDIENTE = 10_000
 /** Las computadoras que pueden usar una clave a la vez: las que preguntaron en los últimos `VISTO`. */
@@ -270,6 +320,7 @@ async function atender(req: Request, env: Env, ctx: ExecutionContext, url: URL):
     if (url.pathname.startsWith('/publicar/')) return await publicar(req, env, url)
     if (req.method === 'GET' && url.pathname === '/gracias') return await gracias(env, url)
     if (req.method === 'GET' && url.pathname === '/renovar') return await renovacion(env, url)
+    if (req.method === 'POST' && url.pathname === '/webhook/paypal') return await webhookPaypal(req, env, ctx)
     if (req.method === 'POST' && url.pathname === '/webhook') return await webhook(req, env, ctx, url)
     if (req.method === 'POST' && url.pathname === '/suscribir') return await suscribir(env, await cuerpo(req))
     if (req.method === 'POST' && url.pathname === '/licencia') return await licencia(env, await cuerpo(req))
@@ -491,8 +542,7 @@ export function tarifa(c: Cuenta, env: Tarifas, ahora = Date.now()) {
 }
 
 /**
- * Crea la suscripción mensual en Mercado Pago, o el pago del año (Checkout Pro), pendiente de pago, y da el enlace
- * donde el cliente paga. Desde la página, sin `equipo`, nada más: la clave se ve en `/gracias` cuando se confirma el pago, nunca antes, porque cualquiera puede
+ * Crea la suscripción mensual en PayPal, o la orden del año, pendiente de pago, y da el enlace donde el cliente paga. Desde la página, sin `equipo`, nada más: la clave se ve en `/gracias` cuando se confirma el pago, nunca antes, porque cualquiera puede
  * escribir el correo de otro. Desde la app de antes, con su `equipo`, también la clave, que espera el pago. Con `plan`
  * `gratis`, una cuenta gratis (solo desde la app): la clave, ya activa.
  */
@@ -512,7 +562,7 @@ async function suscribir(env: Env, c: Record<string, unknown>): Promise<Response
   const p = await precios(env)
   // Un doble clic, o volver a abrir el pago: la misma suscripción pendiente de la última hora.
   const previa = await env.DB.prepare(
-    "SELECT * FROM licencias WHERE email = ? AND plan = ? AND estado = 'pending' AND enlace IS NOT NULL AND creada > ? ORDER BY creada DESC LIMIT 1"
+    "SELECT * FROM licencias WHERE email = ? AND plan = ? AND estado = 'pending' AND enlace IS NOT NULL AND (paypal IS NOT NULL OR orden IS NOT NULL) AND creada > ? ORDER BY creada DESC LIMIT 1"
   )
     .bind(email, plan, new Date(Date.now() - 3600_000).toISOString())
     .first<Fila>()
@@ -540,33 +590,21 @@ async function suscribir(env: Env, c: Record<string, unknown>): Promise<Response
     folio: null,
     cancelada: null,
     avisado_para: null,
-    modo: env.MP_MODO,
-    preferencia: null
+    modo: env.PAYPAL_MODO,
+    preferencia: null,
+    paypal: null,
+    orden: null
   }
   await env.DB.prepare('INSERT INTO licencias (id, clave, email, plan, monto, fundador, estado, creada, acepto, terminos, modo) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
     .bind(fila.id, fila.clave, email, plan, fila.monto, fila.fundador, fila.estado, fila.creada, acepto, terminos, fila.modo)
     .run()
-  // Dónde se paga y en qué columna queda: el pago del año o la suscripción mensual.
-  let abierto: { columna: 'preferencia' | 'preapproval'; id: string; enlace?: string }
+  // Dónde se paga y en qué columna queda: la orden del año o la suscripción mensual.
+  let abierto: { columna: 'orden' | 'paypal'; id: string; enlace: string }
   try {
-    if (plan === 'anual') {
-      const p = await preferenciaMp(env, fila)
-      abierto = { columna: 'preferencia', id: p.id, enlace: p.init_point }
-    } else {
-      const p = await mp<Preapproval>(env, 'POST', '/preapproval', {
-        // Sin acentos ni «·»: con ellos, Mercado Pago contesta «Parameters passed are invalid».
-        reason: 'Sloth - plan mensual',
-        external_reference: fila.id,
-        payer_email: email,
-        auto_recurring: { frequency: 1, frequency_type: 'months', transaction_amount: fila.monto, currency_id: 'MXN' },
-        back_url: `${env.ORIGEN}/gracias?s=${fila.id}`,
-        status: 'pending'
-      })
-      abierto = { columna: 'preapproval', id: p.id, enlace: p.init_point }
-    }
+    abierto = plan === 'anual' ? { columna: 'orden', ...(await ordenPaypal(env, fila)) } : { columna: 'paypal', ...(await suscripcionPaypal(env, fila)) }
   } catch (error) {
     await env.DB.prepare('DELETE FROM licencias WHERE id = ?').bind(fila.id).run()
-    throw error instanceof Rechazo ? new Rechazo(502, 'Mercado Pago no pudo abrir el pago. Revisa tu correo e intenta otra vez.') : error
+    throw error instanceof Rechazo ? new Rechazo(502, 'PayPal no pudo abrir el pago. Revisa tu correo e intenta otra vez.') : error
   }
   await env.DB.prepare(`UPDATE licencias SET ${abierto.columna} = ?, enlace = ?, revisada = ? WHERE id = ?`)
     .bind(abierto.id, abierto.enlace ?? null, new Date().toISOString(), fila.id)
@@ -576,29 +614,87 @@ async function suscribir(env: Env, c: Record<string, unknown>): Promise<Response
   return json({ clave: fila.clave, enlace: abierto.enlace })
 }
 
-/**
- * El pago de un año de una vez en Checkout Pro: ahí salen todos los medios de Mercado Pago. Lleva la fila en
- * `external_reference`, con lo que se encuentran sus pagos; al pagar (o al sacar la ficha de OXXO), vuelve a `/gracias`.
- */
-function preferenciaMp(env: Env, f: Fila): Promise<Preferencia> {
+/** La página de PayPal en español, sin dirección de envío, y de vuelta a `/gracias` al pagar o al salir. */
+function experiencia(env: Env, f: Fila, accion: 'PAY_NOW' | 'SUBSCRIBE_NOW') {
   const vuelta = `${env.ORIGEN}/gracias?s=${f.id}`
-  return mp<Preferencia>(env, 'POST', '/checkout/preferences', {
-    items: [{ id: 'sloth-anual', title: 'Sloth - plan anual', quantity: 1, unit_price: f.monto, currency_id: 'MXN' }],
-    payer: { email: f.email },
-    external_reference: f.id,
-    back_urls: { success: vuelta, pending: vuelta, failure: vuelta },
-    auto_return: 'approved',
-    // Hasta 12 meses; sin intereses, los que se ofrezcan en «Comisiones y MSI» del panel de Mercado Pago.
-    payment_methods: { installments: 12 },
-    statement_descriptor: 'SLOTH'
-  })
+  return { brand_name: 'Sloth', locale: 'es-MX', shipping_preference: 'NO_SHIPPING', user_action: accion, return_url: vuelta, cancel_url: vuelta }
 }
 
-/** Abre el pago del año siguiente de un año pagado de una vez: la misma fila y la misma clave. Da adónde ir a pagar. */
+/** El enlace `rel` de lo que dio PayPal. */
+function enlacePaypal(links: { rel: string; href: string }[] | undefined, rel: string): string {
+  const href = links?.find((l) => l.rel === rel)?.href
+  if (!href) throw new Rechazo(502, `PayPal no dio el enlace ${rel}`)
+  return href
+}
+
+/** La suscripción mensual en PayPal, al plan de su monto. Lleva la fila en `custom_id`. */
+async function suscripcionPaypal(env: Env, f: Fila): Promise<{ id: string; enlace: string }> {
+  const s = await paypal<SuscripcionPaypal>(env, 'POST', '/v1/billing/subscriptions', {
+    plan_id: await planPaypal(env, f.monto),
+    custom_id: f.id,
+    subscriber: { email_address: f.email },
+    application_context: experiencia(env, f, 'SUBSCRIBE_NOW')
+  })
+  return { id: s.id, enlace: enlacePaypal(s.links, 'approve') }
+}
+
+/** Un año pagado de una vez: una orden de PayPal con la fila en `custom_id`, que se cobra cuando el cliente la aprueba. */
+async function ordenPaypal(env: Env, f: Fila): Promise<{ id: string; enlace: string }> {
+  const o = await paypal<OrdenPaypal>(env, 'POST', '/v2/checkout/orders', {
+    intent: 'CAPTURE',
+    purchase_units: [{ custom_id: f.id, description: 'Sloth - plan anual', soft_descriptor: 'SLOTH', amount: { currency_code: 'MXN', value: f.monto.toFixed(2) } }],
+    payment_source: { paypal: { experience_context: experiencia(env, f, 'PAY_NOW') } }
+  })
+  return { id: o.id, enlace: enlacePaypal(o.links, 'payer-action') }
+}
+
+/** El plan mensual de PayPal de `monto`, que se crea la primera vez (y el producto «Sloth», también una vez). */
+async function planPaypal(env: Env, monto: number): Promise<string> {
+  const llave = `${env.PAYPAL_MODO}:mensual:${monto}`
+  const plan = await idPaypal(env, llave)
+  if (plan) return plan
+  const deProducto = `${env.PAYPAL_MODO}:producto`
+  const producto =
+    (await idPaypal(env, deProducto)) ??
+    (await guardarIdPaypal(env, deProducto, (await paypal<{ id: string }>(env, 'POST', '/v1/catalogs/products', { name: 'Sloth', type: 'SERVICE', category: 'SOFTWARE' })).id))
+  const nuevo = await paypal<{ id: string }>(env, 'POST', '/v1/billing/plans', {
+    product_id: producto,
+    name: 'Sloth - plan mensual',
+    status: 'ACTIVE',
+    billing_cycles: [
+      {
+        frequency: { interval_unit: 'MONTH', interval_count: 1 },
+        tenure_type: 'REGULAR',
+        sequence: 1,
+        total_cycles: 0,
+        pricing_scheme: { fixed_price: { value: monto.toFixed(2), currency_code: 'MXN' } }
+      }
+    ],
+    // Un cobro que falla se reintenta; tras tres, PayPal la suspende (`paused`) y vale hasta lo pagado.
+    payment_preferences: { auto_bill_outstanding: true, payment_failure_threshold: 3 }
+  })
+  return guardarIdPaypal(env, llave, nuevo.id)
+}
+
+async function idPaypal(env: Env, llave: string): Promise<string | undefined> {
+  return (await env.DB.prepare('SELECT id FROM paypal_ids WHERE llave = ?').bind(llave).first<{ id: string }>())?.id
+}
+
+/** Guarda el id, o se queda con el que otra petición guardó antes. */
+async function guardarIdPaypal(env: Env, llave: string, id: string): Promise<string> {
+  await env.DB.prepare('INSERT OR IGNORE INTO paypal_ids (llave, id) VALUES (?, ?)').bind(llave, id).run()
+  return (await idPaypal(env, llave)) ?? id
+}
+
+/**
+ * Abre el pago del año siguiente de un año pagado de una vez, con PayPal aunque el primero fuera con Mercado Pago: la
+ * misma fila y la misma clave. Antes guarda lo cobrado de la orden que deja de ser la última. Da adónde ir a pagar.
+ */
 async function renovar(env: Env, f: Fila): Promise<string> {
-  const p = await preferenciaMp(env, f)
-  await env.DB.prepare('UPDATE licencias SET preferencia = ?, enlace = ? WHERE id = ?').bind(p.id, p.init_point, f.id).run()
-  return p.init_point
+  if (f.orden) await cobrarOrden(env, f, f.orden)
+  const o = await ordenPaypal(env, f)
+  await env.DB.prepare('UPDATE licencias SET orden = ?, enlace = ? WHERE id = ?').bind(o.id, o.enlace, f.id).run()
+  return o.enlace
 }
 
 /**
@@ -616,7 +712,7 @@ async function unirse(env: Env, email: string, equipo: string, acepto: string, t
     `INSERT INTO licencias (id, clave, email, plan, monto, fundador, estado, autorizada, creada, acepto, terminos, modo)
      VALUES (?, ?, ?, 'cuenta', 0, 0, 'gratis', ?, ?, ?, ?, ?)`
   )
-    .bind(crypto.randomUUID(), clave, email, acepto, acepto, acepto, terminos, env.MP_MODO)
+    .bind(crypto.randomUUID(), clave, email, acepto, acepto, acepto, terminos, env.PAYPAL_MODO)
     .run()
   await recordarEquipo(env, clave, equipo, Date.now())
   await correo(env, email, 'Tu cuenta de Sloth', [
@@ -645,31 +741,34 @@ async function sinOtra(env: Env, email: string, apoyar: boolean) {
   if (!apoyar && results.length) throw new Rechazo(409, 'Ese correo ya tiene una cuenta de Sloth. Su clave te llegó por correo, en «Tu cuenta de Sloth».')
 }
 
-/** Si la clave sigue activa en esta computadora, firmado. Lee la suscripción o los pagos de Mercado Pago si hace rato que no. */
+/** Si la clave sigue activa en esta computadora, firmado. Lee la suscripción o los pagos de PayPal (o de Mercado Pago) si hace rato que no. */
 async function licencia(env: Env, c: Record<string, unknown>): Promise<Response> {
   const equipo = equipoDe(c)
   let fila = await porClave(env, c.clave)
   const ahora = Date.now()
   const revisada = fila.revisada ? Date.parse(fila.revisada) : 0
-  // Si Mercado Pago no contesta, vale lo último que dijo.
-  if ((fila.preapproval || fila.preferencia) && ahora - revisada > (fila.estado === 'pending' ? REVISAR_PENDIENTE : REVISAR)) fila = await refrescar(env, fila).catch(() => fila)
+  // Si PayPal o Mercado Pago no contestan, vale lo último que dijeron.
+  if ((fila.paypal || fila.preapproval || deUnaVez(fila)) && ahora - revisada > (fila.estado === 'pending' ? REVISAR_PENDIENTE : REVISAR))
+    fila = await refrescar(env, fila).catch(() => fila)
   if (!(await recordarEquipo(env, fila.clave, equipo, ahora)))
     throw new Rechazo(409, `Esta clave ya se usa en ${EQUIPOS} computadoras. Si cambiaste de computadora, escríbenos y la liberamos.`)
   return firmada(env, fila, equipo, ahora)
 }
 
-/** Cancela la suscripción en Mercado Pago. Lo ya pagado sigue valiendo hasta su fecha. */
+/** Cancela la suscripción en PayPal (o en Mercado Pago, las de antes). Lo ya pagado sigue valiendo hasta su fecha. */
 async function cancelar(env: Env, c: Record<string, unknown>): Promise<Response> {
   const equipo = equipoDe(c)
   let fila = await porClave(env, c.clave)
-  if (fila.preapproval && fila.estado !== 'cancelled') {
-    // Un 400 es casi siempre que ya estaba cancelada (desde la cuenta del cliente, o por Mercado Pago tras un cobro
-    // rechazado): basta con volver a leerla.
-    await mp(env, 'PUT', `/preapproval/${encodeURIComponent(fila.preapproval)}`, { status: 'cancelled' }).catch((e) => {
-      if (!(e instanceof Rechazo) || e.status !== 400) throw e
-    })
+  if ((fila.paypal || fila.preapproval) && fila.estado !== 'cancelled') {
+    // Un 422 de PayPal o un 400 de Mercado Pago es casi siempre que ya estaba cancelada (desde la cuenta del cliente, o
+    // tras cobros rechazados): basta con volver a leerla.
+    const yaEstaba = (e: unknown) => {
+      if (!(e instanceof Rechazo) || e.status !== (fila.paypal ? 422 : 400)) throw e
+    }
+    if (fila.paypal) await paypal(env, 'POST', `/v1/billing/subscriptions/${encodeURIComponent(fila.paypal)}/cancel`, { reason: 'Cancelada desde Sloth' }).catch(yaEstaba)
+    else await mp(env, 'PUT', `/preapproval/${encodeURIComponent(fila.preapproval!)}`, { status: 'cancelled' }).catch(yaEstaba)
     fila = await refrescar(env, fila)
-    if (fila.estado !== 'cancelled') throw new Rechazo(502, 'Mercado Pago no pudo cancelar la suscripción. Intenta otra vez en un momento.')
+    if (fila.estado !== 'cancelled') throw new Rechazo(502, `${pasarela(fila)} no pudo cancelar la suscripción. Intenta otra vez en un momento.`)
   }
   // El comprobante de la cancelación (Profeco pide dar un folio), una sola vez.
   if (fila.estado === 'cancelled' && !fila.folio) {
@@ -678,7 +777,7 @@ async function cancelar(env: Env, c: Record<string, unknown>): Promise<Response>
     const hasta = fila.pagado_hasta && Date.parse(fila.pagado_hasta) > Date.now() ? ` Sloth sigue abierta hasta el ${fecha(fila.pagado_hasta)}, lo que ya pagaste.` : ''
     await correo(env, fila.email, `Cancelaste tu suscripción a Sloth · folio ${fila.folio}`, [
       'Hola:',
-      `Cancelamos tu suscripción a Sloth. Tu folio de cancelación es ${fila.folio}. Mercado Pago ya no te hará más cobros.${hasta}`,
+      `Cancelamos tu suscripción a Sloth. Tu folio de cancelación es ${fila.folio}. ${pasarela(fila)} ya no te hará más cobros.${hasta}`,
       'Si no fuiste tú, responde a este correo.'
     ]).catch((e) => console.error('Correo de cancelación', e instanceof Error ? e.message : e))
   }
@@ -687,12 +786,12 @@ async function cancelar(env: Env, c: Record<string, unknown>): Promise<Response>
 
 /**
  * Adónde se va a pagar desde Sloth: con un año pagado de una vez, el pago del año siguiente. La tarjeta de la
- * suscripción mensual se cambia en la cuenta de Mercado Pago del cliente.
+ * suscripción mensual se cambia en la cuenta de PayPal (o de Mercado Pago) del cliente.
  */
 async function pago(env: Env, c: Record<string, unknown>): Promise<Response> {
   const equipo = equipoDe(c)
   const fila = await porClave(env, c.clave)
-  if (!fila.preferencia || fila.estado !== 'pagado') throw new Rechazo(400, 'Esta suscripción se paga con Mercado Pago: cambia tu tarjeta desde tu cuenta de Mercado Pago.')
+  if (!deUnaVez(fila) || fila.estado !== 'pagado') throw new Rechazo(400, `Esta suscripción se paga con ${pasarela(fila)}: cambia tu tarjeta desde tu cuenta de ${pasarela(fila)}.`)
   if (!(await recordarEquipo(env, fila.clave, equipo, Date.now())))
     throw new Rechazo(409, `Esta clave ya se usa en ${EQUIPOS} computadoras. Si cambiaste de computadora, escríbenos y la liberamos.`)
   return json({ enlace: await renovar(env, fila) })
@@ -718,29 +817,121 @@ async function aviso(env: Env, tipo: string, id: string) {
     const p = await mp<PagoMp>(env, 'GET', `/v1/payments/${encodeURIComponent(id)}`)
     const fila = p.external_reference ? await env.DB.prepare('SELECT * FROM licencias WHERE id = ?').bind(p.external_reference).first<Fila>() : null
     // Los cobros de las suscripciones también avisan aquí: esos los cuenta su suscripción.
-    if (fila?.preferencia) await guardarEstado(env, fila, leerPagos(await pagosMp(env, fila, p), fila))
+    if (fila?.preferencia) await refrescar(env, fila, { mp: p })
     return
   }
   let preapproval: string | undefined
   if (tipo === 'subscription_preapproval') preapproval = id
   if (tipo === 'subscription_authorized_payment') preapproval = (await mp<{ preapproval_id?: string }>(env, 'GET', `/authorized_payments/${encodeURIComponent(id)}`)).preapproval_id
   if (!preapproval) return
-  const p = await mp<Preapproval>(env, 'GET', `/preapproval/${encodeURIComponent(preapproval)}`)
-  // El aviso de una recién creada puede llegar antes de guardar su id: se busca también por la referencia.
-  const fila = await env.DB.prepare('SELECT * FROM licencias WHERE preapproval = ? OR id = ?').bind(p.id, p.external_reference ?? '').first<Fila>()
-  if (fila) await guardarEstado(env, fila, leerMp(p))
+  const fila = await env.DB.prepare('SELECT * FROM licencias WHERE preapproval = ?').bind(preapproval).first<Fila>()
+  if (fila) await refrescar(env, fila)
 }
 
-/** Vuelve a leer la suscripción de Mercado Pago, o los pagos del año pagado de una vez, y la guarda. */
-async function refrescar(env: Env, fila: Fila): Promise<Fila> {
-  if (fila.preferencia) return guardarEstado(env, fila, leerPagos(await pagosMp(env, fila), fila))
-  if (!fila.preapproval) return fila
-  return guardarEstado(env, fila, leerMp(await mp<Preapproval>(env, 'GET', `/preapproval/${encodeURIComponent(fila.preapproval)}`)))
+/**
+ * Un aviso de PayPal. Se comprueba con PayPal que es suyo, se contesta enseguida y luego se lee de su API lo que cambió:
+ * la suscripción (sus cambios, y sus cobros con `billing_agreement_id`) o la orden del año (aprobada, que falta cobrar,
+ * o su cobro, que trae la orden; uno sin ella, como un reembolso, vuelve a leer todas las de su fila).
+ */
+async function webhookPaypal(req: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+  const texto = await req.text()
+  if (!(await firmaDePaypal(req.headers, texto, env).catch(() => false))) return new Response('Firma inválida', { status: 401 })
+  const a = JSON.parse(texto) as AvisoPaypal
+  ctx.waitUntil(avisoPaypal(env, a).catch((e) => console.error('Aviso de PayPal', a.event_type, e instanceof Error ? e.message : e)))
+  return new Response('ok')
+}
+
+async function avisoPaypal(env: Env, a: AvisoPaypal) {
+  const tipo = a.event_type ?? ''
+  const r = a.resource ?? {}
+  const suscripcion = tipo.startsWith('BILLING.SUBSCRIPTION.') ? r.id : r.billing_agreement_id
+  if (suscripcion) {
+    const fila = await env.DB.prepare('SELECT * FROM licencias WHERE paypal = ?').bind(suscripcion).first<Fila>()
+    if (fila) await refrescar(env, fila)
+    return
+  }
+  const referencia = r.custom_id ?? r.purchase_units?.[0]?.custom_id
+  const fila = referencia ? await env.DB.prepare('SELECT * FROM licencias WHERE id = ?').bind(referencia).first<Fila>() : null
+  if (!fila || !deUnaVez(fila)) return
+  const orden = tipo.startsWith('CHECKOUT.ORDER.') ? r.id : r.supplementary_data?.related_ids?.order_id
+  const ordenes = orden ? [orden] : (await env.DB.prepare('SELECT orden FROM paypal_pagos WHERE licencia = ?').bind(fila.id).all<{ orden: string }>()).results.map((p) => p.orden)
+  await refrescar(env, fila, { ordenes })
+}
+
+/**
+ * La firma de un aviso de PayPal la comprueba PayPal mismo, con el id del webhook. El aviso va tal cual llegó: vuelto a
+ * escribir, cambiaría y no pasaría.
+ */
+async function firmaDePaypal(h: Headers, texto: string, env: Env): Promise<boolean> {
+  if (!env.PAYPAL_WEBHOOK_ID) return false
+  const datos = {
+    auth_algo: h.get('paypal-auth-algo'),
+    cert_url: h.get('paypal-cert-url'),
+    transmission_id: h.get('paypal-transmission-id'),
+    transmission_sig: h.get('paypal-transmission-sig'),
+    transmission_time: h.get('paypal-transmission-time'),
+    webhook_id: env.PAYPAL_WEBHOOK_ID
+  }
+  if (Object.values(datos).some((v) => !v)) return false
+  const cuerpo = `${JSON.stringify(datos).slice(0, -1)},"webhook_event":${texto}}`
+  return (await paypal<{ verification_status?: string }>(env, 'POST', '/v1/notifications/verify-webhook-signature', cuerpo)).verification_status === 'SUCCESS'
+}
+
+/**
+ * Vuelve a leer la suscripción (de PayPal o de Mercado Pago) o los pagos del año pagado de una vez, y la guarda. `otros`:
+ * lo que trajo un aviso, por si la búsqueda aún no lo ve (el pago de Mercado Pago) o no es la última orden (las de PayPal).
+ */
+async function refrescar(env: Env, fila: Fila, otros: { mp?: PagoMp; ordenes?: string[] } = {}): Promise<Fila> {
+  if (deUnaVez(fila)) return guardarEstado(env, fila, leerPagos(await pagosDelAño(env, fila, otros), fila))
+  if (fila.paypal) return guardarEstado(env, fila, leerPaypal(await paypal<SuscripcionPaypal>(env, 'GET', `/v1/billing/subscriptions/${encodeURIComponent(fila.paypal)}`)))
+  if (fila.preapproval) return guardarEstado(env, fila, leerMp(await mp<Preapproval>(env, 'GET', `/preapproval/${encodeURIComponent(fila.preapproval)}`)))
+  return fila
 }
 
 /** Una suscripción de Mercado Pago, como la guarda el cobro. Cancelada, ya no dice hasta cuándo se pagó: vale la del último cobro que se vio. */
 function leerMp(p: Preapproval): Lectura {
-  return { id: p.id, estado: p.status as Estado, hasta: p.status === 'authorized' ? p.next_payment_date : undefined }
+  return { estado: p.status as Estado, hasta: p.status === 'authorized' ? p.next_payment_date : undefined }
+}
+
+/** Una suscripción de PayPal, con los estados de Mercado Pago, que son los que entiende Sloth. Como allá, cancelada vale la fecha del último cobro que se vio. */
+export function leerPaypal(s: Pick<SuscripcionPaypal, 'status' | 'billing_info'>): Lectura {
+  const estado: Estado =
+    s.status === 'ACTIVE' ? 'authorized' : s.status === 'SUSPENDED' ? 'paused' : s.status === 'CANCELLED' || s.status === 'EXPIRED' ? 'cancelled' : 'pending'
+  return { estado, hasta: estado === 'authorized' ? s.billing_info?.next_billing_time : undefined }
+}
+
+/** Los pagos de un año pagado de una vez: los de Mercado Pago, si empezó ahí, y lo cobrado de sus órdenes de PayPal. */
+async function pagosDelAño(env: Env, f: Fila, otros: { mp?: PagoMp; ordenes?: string[] }): Promise<Pick<PagoMp, 'status' | 'transaction_amount' | 'currency_id' | 'date_approved'>[]> {
+  const deMp = f.preferencia ? await pagosMp(env, f, otros.mp) : []
+  for (const orden of new Set([f.orden, ...(otros.ordenes ?? [])])) if (orden) await cobrarOrden(env, f, orden)
+  const { results } = await env.DB.prepare('SELECT estado AS status, monto AS transaction_amount, moneda AS currency_id, aprobado AS date_approved FROM paypal_pagos WHERE licencia = ?')
+    .bind(f.id)
+    .all<Pick<PagoMp, 'status' | 'transaction_amount' | 'currency_id' | 'date_approved'>>()
+  return [...deMp, ...results]
+}
+
+/**
+ * Lee una orden de PayPal de la fila, la cobra si el cliente ya la aprobó (sin eso, PayPal no cobra nada) y guarda
+ * cómo va su cobro. Una orden de otra fila no se toca.
+ */
+async function cobrarOrden(env: Env, f: Fila, id: string) {
+  const ruta = `/v2/checkout/orders/${encodeURIComponent(id)}`
+  let o = await paypal<OrdenPaypal>(env, 'GET', ruta)
+  if (o.purchase_units?.[0]?.custom_id !== f.id) return
+  // Si `/gracias` y el aviso la cobran a la vez, la segunda recibe un 422: ya está cobrada, basta con leerla.
+  if (o.status === 'APPROVED')
+    o = await paypal<OrdenPaypal>(env, 'POST', `${ruta}/capture`, {}, { 'paypal-request-id': `cobro-${id}` }).catch((e) => {
+      if (!(e instanceof Rechazo) || e.status !== 422) throw e
+      return paypal<OrdenPaypal>(env, 'GET', ruta)
+    })
+  const c = o.purchase_units?.[0]?.payments?.captures?.[0]
+  if (!c) return
+  const estado = COBRO_PAYPAL[c.status] ?? c.status.toLowerCase()
+  await env.DB.prepare(
+    'INSERT INTO paypal_pagos (orden, licencia, estado, monto, moneda, aprobado) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT (orden) DO UPDATE SET estado = excluded.estado, aprobado = excluded.aprobado'
+  )
+    .bind(id, f.id, estado, Number(c.amount.value), c.amount.currency_code, VALEN.has(estado) ? (c.create_time ?? new Date().toISOString()) : null)
+    .run()
 }
 
 /** Los pagos de un año pagado de una vez: los de su fila. La búsqueda tarda en ver uno recién hecho: el del aviso va aparte. */
@@ -752,10 +943,9 @@ async function pagosMp(env: Env, f: Fila, avisado?: PagoMp): Promise<PagoMp[]> {
 /**
  * Un año pagado de una vez, como lo guarda el cobro: cada pago que vale, en pesos y de su monto, suma un año desde que
  * se aprobó, o desde que acaba lo ya pagado si se renovó antes. Sin ninguno que valga: reembolsado o con contracargo,
- * se acabó; si no, espera el pago (también una ficha de OXXO sin pagar).
+ * se acabó; si no, espera el pago.
  */
-export function leerPagos(pagos: Pick<PagoMp, 'status' | 'transaction_amount' | 'currency_id' | 'date_approved'>[], f: Pick<Fila, 'monto' | 'preferencia'>): Lectura {
-  const id = f.preferencia ?? ''
+export function leerPagos(pagos: Pick<PagoMp, 'status' | 'transaction_amount' | 'currency_id' | 'date_approved'>[], f: Pick<Fila, 'monto'>): Lectura {
   const aprobados = pagos
     .filter((p) => VALEN.has(p.status) && p.currency_id === 'MXN' && p.transaction_amount >= f.monto && p.date_approved)
     .map((p) => Date.parse(p.date_approved!))
@@ -765,8 +955,8 @@ export function leerPagos(pagos: Pick<PagoMp, 'status' | 'transaction_amount' | 
     const d = new Date(Math.max(fin, aprobado))
     fin = d.setUTCFullYear(d.getUTCFullYear() + 1)
   }
-  if (fin) return { id, estado: 'pagado', hasta: new Date(fin).toISOString() }
-  return { id, estado: pagos.some((p) => p.status === 'refunded' || p.status === 'charged_back') ? 'cancelled' : 'pending' }
+  if (fin) return { estado: 'pagado', hasta: new Date(fin).toISOString() }
+  return { estado: pagos.some((p) => p.status === 'refunded' || p.status === 'charged_back') ? 'cancelled' : 'pending' }
 }
 
 async function guardarEstado(env: Env, fila: Fila, l: Lectura): Promise<Fila> {
@@ -774,10 +964,9 @@ async function guardarEstado(env: Env, fila: Fila, l: Lectura): Promise<Fila> {
   const ahora = new Date().toISOString()
   const nueva: Fila = {
     ...fila,
-    preapproval: fila.preferencia ? fila.preapproval : l.id,
     estado,
     // Lo pagado de una vez sale entero de sus pagos: uno reembolsado deja de contar.
-    pagado_hasta: fila.preferencia ? (l.hasta ?? null) : (l.hasta ?? fila.pagado_hasta),
+    pagado_hasta: deUnaVez(fila) ? (l.hasta ?? null) : (l.hasta ?? fila.pagado_hasta),
     autorizada: fila.autorizada ?? (estado === 'authorized' || estado === 'pagado' ? ahora : null),
     revisada: ahora
   }
@@ -786,8 +975,8 @@ async function guardarEstado(env: Env, fila: Fila, l: Lectura): Promise<Fila> {
     const r = await env.DB.prepare('UPDATE licencias SET autorizada = ? WHERE id = ? AND autorizada IS NULL').bind(ahora, fila.id).run()
     if (r.meta.changes) await bienvenida(env, nueva).catch((e) => console.error('Correo con la clave', e instanceof Error ? e.message : e))
   }
-  await env.DB.prepare('UPDATE licencias SET preapproval = ?, estado = ?, pagado_hasta = ?, autorizada = COALESCE(autorizada, ?), revisada = ? WHERE id = ?')
-    .bind(nueva.preapproval, estado, nueva.pagado_hasta, nueva.autorizada, ahora, fila.id)
+  await env.DB.prepare('UPDATE licencias SET estado = ?, pagado_hasta = ?, autorizada = COALESCE(autorizada, ?), revisada = ? WHERE id = ?')
+    .bind(estado, nueva.pagado_hasta, nueva.autorizada, ahora, fila.id)
     .run()
   return nueva
 }
@@ -796,7 +985,7 @@ async function guardarEstado(env: Env, fila: Fila, l: Lectura): Promise<Fila> {
 function bienvenida(env: Env, f: Fila) {
   return correo(env, f.email, `Tu clave de Sloth: ${f.clave}`, [
     'Hola:',
-    `Mercado Pago confirmó tu pago: gracias por apoyar a Sloth. Guarda este correo, es donde queda tu clave.`,
+    `${pasarela(f)} confirmó tu pago: gracias por apoyar a Sloth. Guarda este correo, es donde queda tu clave.`,
     `Tu clave: ${f.clave}`,
     `Pégala en Sloth, en Opciones, y deja de salirte el recordatorio. Si aún no la tienes, descárgala en ${env.ORIGEN}/descargar (Mac: ${env.ORIGEN}/descargar?so=mac; Linux: ${env.ORIGEN}/descargar?so=linux). La clave sirve en dos computadoras a la vez.`,
     'Sloth trabaja con tu propia cuenta de Claude Pro o Max, que pagas aparte a Anthropic. Si tienes dudas, responde a este correo.'
@@ -804,8 +993,8 @@ function bienvenida(env: Env, f: Fila) {
 }
 
 /**
- * Si abre Sloth y hasta cuándo, sin volver a preguntar. Autorizada, abre mientras Mercado Pago la mantenga así (él
- * reintenta los cobros que fallan y la cancela si no puede); cancelada, en pausa o pagada de una vez, hasta el fin de
+ * Si abre Sloth y hasta cuándo, sin volver a preguntar. Autorizada, abre mientras PayPal o Mercado Pago la mantengan así
+ * (reintentan los cobros que fallan y la cancela si no puede); cancelada, en pausa o pagada de una vez, hasta el fin de
  * lo pagado. Un lugar gratis abre siempre.
  */
 export function vigencia(f: Pick<Fila, 'estado' | 'pagado_hasta'>, ahora: number): { activa: boolean; hasta: number } {
@@ -917,6 +1106,40 @@ async function mp<T>(env: Env, metodo: string, ruta: string, cuerpo?: unknown): 
   return datos as T
 }
 
+/** El acceso a PayPal, que dura horas: se reusa mientras viva este Worker. */
+let accesoPaypal: { token: string; vence: number; modo: string } | undefined
+
+async function tokenPaypal(env: Env): Promise<string> {
+  if (accesoPaypal?.modo === env.PAYPAL_MODO && Date.now() < accesoPaypal.vence) return accesoPaypal.token
+  if (!env.PAYPAL_CLIENT_ID || !env.PAYPAL_SECRET) throw new Error(`Faltan las llaves de PayPal del modo ${env.PAYPAL_MODO}.`)
+  const r = await fetch(`${PAYPAL[env.PAYPAL_MODO]}/v1/oauth2/token`, {
+    method: 'POST',
+    headers: { authorization: `Basic ${btoa(`${env.PAYPAL_CLIENT_ID}:${env.PAYPAL_SECRET}`)}`, 'content-type': 'application/x-www-form-urlencoded' },
+    body: 'grant_type=client_credentials'
+  })
+  const j = (await r.json().catch(() => ({}))) as { access_token?: string; expires_in?: number }
+  if (!r.ok || !j.access_token) throw new Error(`PayPal no dio acceso: ${r.status}`)
+  accesoPaypal = { token: j.access_token, vence: Date.now() + ((j.expires_in ?? 600) - 60) * 1000, modo: env.PAYPAL_MODO }
+  return j.access_token
+}
+
+/** Una llamada a PayPal. `cuerpo` en texto va tal cual (el aviso que se comprueba); si no, en JSON. */
+async function paypal<T>(env: Env, metodo: string, ruta: string, cuerpo?: unknown, extra: Record<string, string> = {}): Promise<T> {
+  const r = await fetch(`${PAYPAL[env.PAYPAL_MODO]}${ruta}`, {
+    method: metodo,
+    headers: { authorization: `Bearer ${await tokenPaypal(env)}`, 'content-type': 'application/json', ...extra },
+    body: cuerpo === undefined ? undefined : typeof cuerpo === 'string' ? cuerpo : JSON.stringify(cuerpo)
+  })
+  // Cancelar contesta 204, sin cuerpo.
+  const datos = (await r.json().catch(() => ({}))) as { name?: string; message?: string; details?: { issue?: string }[] }
+  if (!r.ok) {
+    // Solo el estado y el error: nada del cliente.
+    console.error('PayPal', metodo, ruta.replace(/\/[\w-]{12,}(?=\/|$)/g, '/…'), r.status, datos.name ?? '', datos.details?.[0]?.issue ?? '')
+    throw new Rechazo(r.status, datos.message ?? `PayPal respondió ${r.status}`)
+  }
+  return datos as T
+}
+
 export async function cuerpo(req: Request): Promise<Record<string, unknown>> {
   const c = await req.json().catch(() => null)
   if (!c || typeof c !== 'object') throw new Rechazo(400, 'Petición inválida.')
@@ -949,12 +1172,12 @@ export async function avisarCobros(env: Env, ahora = Date.now()) {
       ? correo(env, f.email, `Tu año de Sloth se acaba el ${fecha(f.pagado_hasta!)}`, [
           'Hola:',
           `Tu año de apoyo a Sloth se acaba el ${fecha(f.pagado_hasta!)}. No se renueva solo: no te vamos a cobrar nada.`,
-          `Si quieres seguir apoyando, paga el año siguiente (${f.monto.toLocaleString('es-MX')} MXN, IVA incluido) con tarjeta, meses sin intereses, OXXO o transferencia: ${env.ORIGEN}/renovar?s=${f.id}. Tu clave es la misma y el año nuevo empieza cuando se acabe este.`,
+          `Si quieres seguir apoyando, paga el año siguiente (${f.monto.toLocaleString('es-MX')} MXN, IVA incluido) con PayPal: ${env.ORIGEN}/renovar?s=${f.id}. Tu clave es la misma y el año nuevo empieza cuando se acabe este.`,
           'También lo renuevas desde Sloth: Opciones, Apoyo, «Renovar». Si tienes dudas, responde a este correo.'
         ])
       : correo(env, f.email, `Tu próximo cobro de Sloth: ${fecha(f.pagado_hasta!)}`, [
           'Hola:',
-          `El ${fecha(f.pagado_hasta!)} Mercado Pago te cobrará ${f.monto.toLocaleString('es-MX')} MXN (IVA incluido) por tu suscripción ${cada} a Sloth.`,
+          `El ${fecha(f.pagado_hasta!)} ${pasarela(f)} te cobrará ${f.monto.toLocaleString('es-MX')} MXN (IVA incluido) por tu suscripción ${cada} a Sloth.`,
           'Si no quieres que se renueve, cancélala antes de esa fecha en Sloth: Opciones, Suscripción, «Cancelar suscripción». También puedes responder a este correo o escribirnos por WhatsApp. Lo ya pagado sigue valiendo hasta su fecha.'
         ])
     ).catch((e) => (console.error('Aviso de cobro', e instanceof Error ? e.message : e), false))
@@ -997,7 +1220,7 @@ function fecha(iso: string): string {
 }
 
 /**
- * Adonde vuelve el cliente tras pagar en Mercado Pago (`?s=` es su suscripción, que solo conocen él y Mercado Pago).
+ * Adonde vuelve el cliente tras pagar en PayPal, o al salir sin pagar (`?s=` es su suscripción, que solo conocen él y PayPal).
  * Mientras no se confirme el pago, se recarga sola y vuelve a preguntar; confirmado, enseña la clave y el instalador de
  * cada sistema. Sin `s` viene de la app de antes, que espera abierta y se desbloquea sola.
  */
@@ -1025,21 +1248,15 @@ ${correoAviso(escapar(fila.email))}
 <li>Ábrela y pega tu clave en Opciones: deja de salirte el recordatorio. Sirve en dos computadoras a la vez.</li>
 <li>Conecta tu cuenta de Claude, elige un estilo y escribe el tema.</li></ol>`
     )
-  // Pagado de una vez puede tardar: una ficha de OXXO o una transferencia se acreditan cuando se pagan.
-  if (fila.estado === 'pending' && fila.preferencia)
-    return pagina(
-      'Esperando tu pago…',
-      `<p>Si pagaste con tarjeta, aquí aparecen tu clave y el instalador en unos segundos. Si elegiste OXXO o transferencia, paga tu ficha: en cuanto Mercado Pago lo acredite, te llega tu clave por correo (en OXXO puede tardar unas horas).</p>${correoAviso(escapar(fila.email))}${fila.enlace ? `<p class="otros"><a href="${escapar(fila.enlace)}">Volver al pago</a></p>` : ''}`,
-      15
-    )
+  // Quien sale de PayPal sin pagar también vuelve aquí: puede volver al pago.
   if (fila.estado === 'pending')
     return pagina(
       'Esperando tu pago…',
-      `<p>En cuanto Mercado Pago lo confirme, aquí aparecen tu clave y el instalador. Suele tardar unos segundos.</p>${correoAviso(escapar(fila.email))}`,
+      `<p>En cuanto ${pasarela(fila)} lo confirme, aquí aparecen tu clave y el instalador. Suele tardar unos segundos.</p>${correoAviso(escapar(fila.email))}${fila.enlace ? `<p class="otros">¿Saliste sin pagar? <a href="${escapar(fila.enlace)}">Volver al pago</a></p>` : ''}`,
       5
     )
   return pagina(
-    'Mercado Pago no confirmó el pago',
+    `${pasarela(fila)} no confirmó el pago`,
     '<p>Vuelve a <a href="https://sloth.vancci.org">sloth.vancci.org</a> e inténtalo otra vez, o escríbenos desde ahí.</p>'
   )
 }

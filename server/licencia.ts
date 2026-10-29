@@ -2,7 +2,7 @@
  * La clave de la app que se vende (`VENTA`): la de una cuenta gratis, con la que se entra a la comunidad, o la de un
  * apoyo, que quita el recordatorio (`web/src/Licencia.tsx`). Sloth abre sin ella. El apoyo se paga en la página de Sloth,
  * que da la clave; la cuenta se crea aquí (`/api/licencia/unirse`). El cobro es `licencias/`, un Worker de Cloudflare con
- * Mercado Pago: aquí solo se le pregunta. Su respuesta llega firmada y se guarda en `data/licencia.json`. Sin
+ * PayPal: aquí solo se le pregunta. Su respuesta llega firmada y se guarda en `data/licencia.json`. Sin
  * internet, vale hasta su `hasta` (una semana como mucho), y editar el archivo no la alarga. Se vuelve a preguntar al
  * abrir y cada 6 horas.
  */

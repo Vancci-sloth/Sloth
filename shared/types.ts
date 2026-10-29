@@ -1160,8 +1160,8 @@ export interface Licencia {
   /** Lo que se cobra cada mes o cada año, en pesos. */
   monto?: number
   /**
-   * Como lo dice Mercado Pago: `pending` (sin pagar), `authorized`, `paused` o `cancelled`; `gratis`; o `pagado`, un
-   * año pagado de una vez que no se renueva solo.
+   * Con los nombres de Mercado Pago, también los de PayPal: `pending` (sin pagar), `authorized`, `paused` o `cancelled`;
+   * `gratis`; o `pagado`, un año pagado de una vez que no se renueva solo.
    */
   estado?: string
   /** Hasta cuándo está pagada (ISO): el próximo cobro o, cancelada o pagada de una vez, cuando se cierra. */

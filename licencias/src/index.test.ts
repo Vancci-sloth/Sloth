@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { createHmac } from 'node:crypto'
 import test from 'node:test'
 import { DatabaseSync } from 'node:sqlite'
-import { deTodos, esFundador, faltaAvisar, firmaDeMercadoPago, instaladorDe, leerPagos, liberada, rangoDe, sobran, tarifa, vigencia } from './index.ts'
+import { deTodos, esFundador, faltaAvisar, firmaDeMercadoPago, instaladorDe, leerPagos, leerPaypal, liberada, rangoDe, sobran, tarifa, vigencia } from './index.ts'
 
 const SECRETO = 'secreto-de-prueba'
 const firmar = (manifiesto: string) => createHmac('sha256', SECRETO).update(manifiesto).digest('hex')
@@ -52,23 +52,33 @@ test('avisa del cobro cuando faltan 7 días o menos, una sola vez por cobro', ()
 })
 
 test('cada pago del año que vale suma un año desde que se aprobó, o desde que acaba lo pagado si se renueva antes', () => {
-  const f = { monto: 2990, preferencia: 'pref-1' }
+  const f = { monto: 2990 }
   const pago = (status: string, date_approved: string | null, transaction_amount = 2990, currency_id = 'MXN') => ({ status, date_approved, transaction_amount, currency_id })
-  assert.deepEqual(leerPagos([pago('approved', '2026-10-28T10:00:00.000-06:00')], f), { id: 'pref-1', estado: 'pagado', hasta: '2027-10-28T16:00:00.000Z' })
+  assert.deepEqual(leerPagos([pago('approved', '2026-10-28T10:00:00.000-06:00')], f), { estado: 'pagado', hasta: '2027-10-28T16:00:00.000Z' })
   // Renovado una semana antes de que se acabe: el año nuevo empieza cuando acaba el primero.
   assert.equal(leerPagos([pago('approved', '2027-10-21T16:00:00Z'), pago('approved', '2026-10-28T16:00:00Z')], f).hasta, '2028-10-28T16:00:00.000Z')
   // Renovado cuando ya se había acabado: el año nuevo empieza ese día.
   assert.equal(leerPagos([pago('approved', '2026-10-28T16:00:00Z'), pago('approved', '2028-01-10T16:00:00Z')], f).hasta, '2029-01-10T16:00:00.000Z')
   // En reclamo sigue valiendo; reembolsado o con contracargo, ya no.
   assert.equal(leerPagos([pago('in_mediation', '2026-10-28T16:00:00Z')], f).estado, 'pagado')
-  assert.deepEqual(leerPagos([pago('refunded', '2026-10-28T16:00:00Z')], f), { id: 'pref-1', estado: 'cancelled' })
+  assert.deepEqual(leerPagos([pago('refunded', '2026-10-28T16:00:00Z')], f), { estado: 'cancelled' })
   assert.deepEqual(leerPagos([pago('charged_back', '2026-10-28T16:00:00Z'), pago('approved', '2027-10-28T16:00:00Z')], f).hasta, '2028-10-28T16:00:00.000Z')
-  // Una ficha de OXXO sin pagar, o nada todavía: espera el pago.
-  assert.deepEqual(leerPagos([pago('pending', null)], f), { id: 'pref-1', estado: 'pending' })
-  assert.deepEqual(leerPagos([], f), { id: 'pref-1', estado: 'pending' })
+  // Un cobro pendiente, o nada todavía: espera el pago.
+  assert.deepEqual(leerPagos([pago('pending', null)], f), { estado: 'pending' })
+  assert.deepEqual(leerPagos([], f), { estado: 'pending' })
   // Uno de menos o en otra moneda no cuenta.
   assert.equal(leerPagos([pago('approved', '2026-10-28T16:00:00Z', 299)], f).estado, 'pending')
   assert.equal(leerPagos([pago('approved', '2026-10-28T16:00:00Z', 2990, 'USD')], f).estado, 'pending')
+})
+
+test('una suscripción de PayPal se lee con los estados de Mercado Pago; solo activa dice su próximo cobro', () => {
+  const cobro = { next_billing_time: '2026-11-29T10:00:00Z' }
+  assert.deepEqual(leerPaypal({ status: 'ACTIVE', billing_info: cobro }), { estado: 'authorized', hasta: '2026-11-29T10:00:00Z' })
+  assert.deepEqual(leerPaypal({ status: 'APPROVAL_PENDING' }), { estado: 'pending', hasta: undefined })
+  assert.deepEqual(leerPaypal({ status: 'APPROVED' }), { estado: 'pending', hasta: undefined })
+  assert.deepEqual(leerPaypal({ status: 'SUSPENDED', billing_info: cobro }), { estado: 'paused', hasta: undefined })
+  assert.equal(leerPaypal({ status: 'CANCELLED', billing_info: cobro }).estado, 'cancelled')
+  assert.equal(leerPaypal({ status: 'EXPIRED' }).estado, 'cancelled')
 })
 
 test('un año pagado de una vez abre hasta su fin y avisa antes de que se acabe, una sola vez', () => {

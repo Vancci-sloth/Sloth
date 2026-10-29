@@ -1,7 +1,9 @@
 // El cobro de Sloth (ver src/index.ts), en la cuenta de Cloudflare de Sloth, como la nube. Se
 // despliega con `npm run licencias -- deploy` desde la raíz. Los secretos van con `npm run licencias -- secret put X`:
-// MP_ACCESS_TOKEN (producción de «Sloth pruebas», la app de la vendedora de prueba), MP_ACCESS_TOKEN_PRODUCCION (producción
-// de la aplicación «Sloth» real), MP_WEBHOOK_SECRET (la clave secreta de los webhooks de la real),
+// PAYPAL_CLIENT_ID y PAYPAL_SECRET (las de la app de PayPal del modo `PAYPAL_MODO`, en developer.paypal.com), PAYPAL_WEBHOOK_ID
+// (el id del webhook de esa app, a ORIGEN/webhook/paypal, con todos los eventos; `npm run paypal` pone los tres), y de las suscripciones de Mercado Pago
+// de antes: MP_ACCESS_TOKEN (producción de «Sloth pruebas», la app de la vendedora de prueba), MP_ACCESS_TOKEN_PRODUCCION
+// (producción de la aplicación «Sloth» real), MP_WEBHOOK_SECRET (la clave secreta de los webhooks de la real),
 // FIRMA (la llave privada Ed25519 en PKCS8 y base64; la pública va en server/licencia.ts) y PUBLICAR (la llave de
 // `npm run publicar`, que también está en %APPDATA%\sloth\licencias\publicar.txt). La base de datos se crea con
 // `npm run licencias -- d1 migrations apply sloth-licencias --remote`. El instalador vive en el bucket DESCARGAS.
@@ -18,9 +20,12 @@
   "d1_databases": [{ "binding": "DB", "database_name": "sloth-licencias", "database_id": "0de2b337-32cc-474e-bcb4-14cac3181a5e" }],
   "r2_buckets": [{ "binding": "DESCARGAS", "bucket_name": "sloth-descargas" }],
   "vars": {
-    // Con cuál de los dos tokens cobra. Al pasar a `produccion`, borra las suscripciones de prueba (no existen en la
-    // cuenta real) sin tocar los lugares gratis, que son de personas de verdad:
-    // DELETE FROM licencias WHERE plan != 'gratis' AND modo = 'prueba'; DELETE FROM equipos WHERE clave NOT IN (SELECT clave FROM licencias);
+    // `prueba` cobra en el sandbox de PayPal; `produccion`, de verdad. Al cambiarlo, cambian también sus tres secretos. Al
+    // pasar a `produccion`, borra las suscripciones de prueba (no existen en la cuenta real) sin tocar los lugares gratis
+    // ni las cuentas, que son de personas de verdad:
+    // DELETE FROM licencias WHERE plan IN ('mensual', 'anual') AND modo = 'prueba'; DELETE FROM equipos WHERE clave NOT IN (SELECT clave FROM licencias);
+    "PAYPAL_MODO": "produccion",
+    // Con cuál de los dos tokens se leen y cancelan las suscripciones de Mercado Pago de antes.
     "MP_MODO": "produccion",
     "ORIGEN": "https://api.sloth.vancci.org",
     // GRATIS: los lugares gratis de por vida que se dieron cuando Sloth se vendía (ya no se dan). El apoyo cuesta lo mismo

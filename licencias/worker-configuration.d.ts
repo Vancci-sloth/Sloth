@@ -4,6 +4,7 @@
 interface __BaseEnv_Env {
 	DESCARGAS: R2Bucket;
 	DB: D1Database;
+	PAYPAL_MODO: "produccion";
 	MP_MODO: "produccion";
 	ORIGEN: "https://api.sloth.vancci.org";
 	GRATIS: 25;
@@ -24,7 +25,7 @@ type StringifyValues<EnvType extends Record<string, unknown>> = {
 	[Binding in keyof EnvType]: EnvType[Binding] extends string ? EnvType[Binding] : string;
 };
 declare namespace NodeJS {
-	interface ProcessEnv extends StringifyValues<Pick<Cloudflare.Env, "MP_MODO" | "ORIGEN" | "GRATIS" | "FUNDADORES" | "PRECIO_MENSUAL" | "PRECIO_ANUAL" | "CORREO_DE" | "CORREO_RESPUESTA">> {}
+	interface ProcessEnv extends StringifyValues<Pick<Cloudflare.Env, "PAYPAL_MODO" | "MP_MODO" | "ORIGEN" | "GRATIS" | "FUNDADORES" | "PRECIO_MENSUAL" | "PRECIO_ANUAL" | "CORREO_DE" | "CORREO_RESPUESTA">> {}
 }
 declare module "*.txt" {
 	const value: string;
