@@ -54,4 +54,4 @@ AppImage para Linux x64. El cobro los da en `/descargar`, `/descargar?so=mac` y 
 - El Diff lee con OCR las capturas sin texto: en Windows usa el del sistema; en Mac y Linux, RapidOCR
   (`skills/video-el-diff/plantilla/ubicar.py`). Sloth instala RapidOCR con los paquetes de El Diff fuera de Windows
   (`PAQUETES` en server/requisitos.ts). Las capturas de `pagina.mjs` que ya traen texto evitan el OCR.
-- Anclar a la barra de tareas sigue siendo solo de Windows; en Mac está el Dock, y en Linux, el icono junto al reloj.
+- Anclar a la barra de tareas sigue siendo solo de Windows; en Mac está el Dock, y en Linux, el lanzador de cada escritorio.

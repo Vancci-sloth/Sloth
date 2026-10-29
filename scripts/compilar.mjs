@@ -270,7 +270,7 @@ const hechos = await empaquetar({
     extraResources: [
       ...(WINDOWS ? [] : fuera),
       { from: join(SALIDA, 'skills'), to: 'skills' },
-      ...(WINDOWS ? [{ from: join(VENTANA, 'ayudante.exe'), to: 'ayudante.exe' }, { from: ICONO, to: 'icon.ico' }] : [{ from: ICONO_PNG, to: 'icon.png' }])
+      ...(WINDOWS ? [{ from: join(VENTANA, 'ayudante.exe'), to: 'ayudante.exe' }] : [{ from: ICONO_PNG, to: 'icon.png' }])
     ],
     win: { icon: ICONO },
     nsis: {

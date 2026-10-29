@@ -1,7 +1,7 @@
 /**
  * La app de escritorio de Sloth, con Electron. En la que se vende (`npm run compilar`) es Sloth.exe: levanta el servidor
- * con su propio Node (`node\node.exe app\scripts\start.mjs`), lo enseña en su ventana y deja su icono junto al reloj para
- * volver a abrirla o cerrar Sloth. También pone las versiones nuevas: electron-updater pregunta al cobro de Sloth y baja
+ * con su propio Node (`node\node.exe app\scripts\start.mjs`) y lo enseña en su ventana; al cerrarla se cierra todo, sin
+ * quedarse de fondo. También pone las versiones nuevas: electron-updater pregunta al cobro de Sloth y baja
  * solo lo que cambió. En el repo, `npm start` levanta el servidor y abre esta misma ventana con `SLOTH_VENTANA`, su
  * dirección: entonces solo se pone la ventana.
  *
@@ -18,7 +18,7 @@ import { cpSync, createWriteStream, existsSync, linkSync, mkdirSync, readdirSync
 import { cp } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
-import { app, BrowserWindow, dialog, ipcMain, Menu, nativeTheme, net, screen, session, shell, Tray, type WebContents } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, Menu, nativeTheme, net, screen, session, shell, type WebContents } from 'electron'
 import { autoUpdater, CancellationToken } from 'electron-updater'
 import { guardar } from '../server/disco.ts'
 import { anclada, anclar } from './barra.ts'
@@ -48,6 +48,8 @@ const A_MANO = MAC && !__MAC_FIRMADA__
 const REGISTRO = join(APP, 'data', 'sloth.log')
 /** Dónde se dejó la ventana. */
 const LUGAR = join(APP, 'data', 'ventana.json')
+/** Existe si marcaste «No volver a mostrar» en el aviso al cerrar. */
+const SIN_AVISO = join(APP, 'data', 'sin-aviso-al-cerrar.json')
 /** --bg de web/src/styles.css: el fondo mientras carga y el de la barra de título. */
 const FONDO = '#0f0e0c'
 /** Cada cuánto se pregunta si hay versión nueva. */
@@ -64,12 +66,9 @@ const INTENTOS = 5
 
 let ventana: BrowserWindow | undefined
 let servidor: ChildProcess | undefined
-let icono: Tray | undefined
 let registro: WriteStream | undefined
 /** El servidor ya dijo «Sloth en …»: la ventana puede cargar la interfaz. */
 let listo = !!SOLO_VENTANA
-/** Sloth ya corría, abierta de otra forma: esta es solo su ventana, y sale al cerrarla. */
-let ajena = !!SOLO_VENTANA
 let cerrando = false
 let actualizacion: ActualizacionSloth = { actual: app.getVersion(), ...(A_MANO && { aMano: true }) }
 /** La descarga en curso: cancelarla la da por muerta. */
@@ -92,8 +91,8 @@ else {
   mudarPerfil()
   app.on('second-instance', () => abrir())
   app.on('activate', () => abrir())
-  // Cerrar la ventana no cierra Sloth: sigue en su icono, trabajando.
-  app.on('window-all-closed', () => ajena && app.quit())
+  // Cerrar la ventana cierra Sloth entera, también en Mac: el servidor y lo que lanzó se detienen (`before-quit`).
+  app.on('window-all-closed', () => app.quit())
   app.on('before-quit', () => {
     cerrando = true
     detener()
@@ -126,8 +125,6 @@ async function iniciar() {
   mkdirSync(join(APP, 'data'), { recursive: true })
   registro = createWriteStream(REGISTRO)
   process.on('uncaughtException', (e) => anotar(e.stack ?? e.message))
-  // En Mac está el Dock: no hace falta el icono junto al reloj.
-  if (!MAC) ponerIcono()
   try {
     if (!WINDOWS) await prepararApp()
     await prepararSkills()
@@ -167,11 +164,48 @@ function abrir() {
     if (caidas.length <= 3) v.reload()
     else if (caidas.length === 4) dialog.showErrorBox('Sloth', 'La ventana se cerró varias veces seguidas. Recárgala con Ctrl+R: los agentes y tus archivos siguen trabajando.')
   })
-  v.on('close', () => guardarLugar(v))
+  v.on('close', (e) => {
+    // Solo si el servidor es de esta ventana: si no (el repo, o Sloth ya abierta de otra forma), cerrarla no detiene nada.
+    if (servidor && !cerrando && !existsSync(SIN_AVISO)) {
+      e.preventDefault()
+      void avisarAlCerrar(v)
+    } else guardarLugar(v)
+  })
   v.on('closed', () => (ventana = undefined))
   if (maximizada) v.maximize()
   v.show()
   if (listo) void v.loadURL(URL_SLOTH)
+}
+
+let avisando = false
+
+/** Qué pasa al cerrar la ventana, hasta que marques «No volver a mostrar». */
+async function avisarAlCerrar(v: BrowserWindow) {
+  if (avisando) return
+  avisando = true
+  const { response, checkboxChecked } = await dialog.showMessageBox(v, {
+    type: 'question',
+    title: 'Sloth',
+    message: '¿Cerrar Sloth?',
+    detail: 'Se cierra por completo, sin quedarse de fondo: se detiene todo lo que esté haciendo, también los videos a medias.',
+    buttons: ['Cerrar Sloth', 'Cancelar'],
+    defaultId: 0,
+    cancelId: 1,
+    // Botones normales: si no, Windows los pinta como enlaces grandes con flecha.
+    noLink: true,
+    checkboxLabel: 'No volver a mostrar'
+  })
+  avisando = false
+  if (response !== 0) return
+  if (checkboxChecked) {
+    try {
+      guardar(SIN_AVISO, '{}')
+    } catch {
+      // Se vuelve a avisar la próxima vez.
+    }
+  }
+  cerrando = true
+  v.close()
 }
 
 /** Al frente, como estaba antes de minimizarla. */
@@ -254,20 +288,6 @@ function permisos() {
 function menu() {
   const mac = process.platform === 'darwin'
   return Menu.buildFromTemplate([...(mac ? [{ role: 'appMenu' as const }] : []), { role: 'editMenu' }, { role: 'viewMenu' }, ...(mac ? [{ role: 'windowMenu' as const }] : [])])
-}
-
-function ponerIcono() {
-  icono = new Tray(join(process.resourcesPath, WINDOWS ? 'icon.ico' : 'icon.png'))
-  icono.setToolTip('Sloth')
-  icono.setContextMenu(
-    Menu.buildFromTemplate([
-      { label: 'Abrir Sloth', click: () => abrir() },
-      { label: 'Ver el registro', click: () => void shell.openPath(REGISTRO) },
-      { type: 'separator' },
-      { label: 'Cerrar Sloth', click: () => void cerrar() }
-    ])
-  )
-  icono.on('click', () => abrir())
 }
 
 /**
@@ -399,8 +419,6 @@ function termino(codigo: number | null) {
   servidor = undefined
   if (cerrando) return
   if (codigo === 0) {
-    ajena = true
-    icono?.destroy()
     marcarListo()
     if (!ventana) app.quit()
     return
@@ -422,19 +440,6 @@ function detener() {
       // Ya había salido.
     }
   }
-}
-
-async function cerrar() {
-  const { response } = await dialog.showMessageBox({
-    type: 'question',
-    title: 'Sloth',
-    message: '¿Cerrar Sloth?',
-    detail: 'Se detiene todo lo que Sloth esté haciendo, también los videos a medias.',
-    buttons: ['Cerrar Sloth', 'Cancelar'],
-    defaultId: 0,
-    cancelId: 1
-  })
-  if (response === 0) salir()
 }
 
 function salir() {
