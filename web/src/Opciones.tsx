@@ -12,6 +12,7 @@ import { SuscripcionOpciones } from './Licencia' // apoyo
 import { Logo } from './Logos'
 import { BotonNavegador } from './Navegador'
 import { RadarOpciones } from './RadarOpciones' // radar
+import { Segmento } from './Segmento'
 import { ConNavegadorRedes, RedesOpciones } from './Redes' // redes
 import { YoutubeOpciones } from './Youtube'
 import { VENTA } from '../../shared/venta'
@@ -310,6 +311,101 @@ function Autorizando({ c }: { c: UsoCuenta }) {
 }
 
 /**
+ * Dónde se sacan las llaves de API de cada agente, dónde se ve lo que gastan y qué pasa con los hilos al cambiar: los de
+ * Codex siguen con lo que empezaron (`SessionMeta.conLlave`).
+ */
+const API = {
+  claude: {
+    marca: 'Anthropic',
+    llaves: 'https://console.anthropic.com/settings/keys',
+    uso: 'https://console.anthropic.com/usage',
+    hilos: 'Los hilos que trabajan ahora siguen como empezaron; los demás cambian con su siguiente mensaje.'
+  },
+  codex: {
+    marca: 'OpenAI',
+    llaves: 'https://platform.openai.com/api-keys',
+    uso: 'https://platform.openai.com/usage',
+    hilos: 'Cada hilo de Codex sigue con lo que empezó, cuenta o llave; los nuevos usan lo que elijas.'
+  }
+}
+
+/**
+ * Pagar con una llave de API en vez de con la suscripción (`server/acceso.ts`): en Opciones, `selector`, a la vista
+ * bajo cada agente; en los avisos, `boton`; y el campo donde se pega la llave. La llave se queda guardada al volver a la
+ * suscripción, para cambiar sin pegarla otra vez.
+ */
+function useLlave(c: UsoCuenta, proveedor: 'claude' | 'codex') {
+  const [pegando, setPegando] = useState(false)
+  const [llave, setLlave] = useState('')
+  const l = c.cuenta?.llave
+  const a = API[proveedor]
+  const cambiar = (api: boolean, nueva?: string | null) =>
+    c.pedir(`/api/${proveedor}/acceso`, { api, llave: nueva }).then((cuenta) => cuenta && (setPegando(false), setLlave('')))
+  // Con la llave, el menú de la cuenta lleva a lo que se gasta; lo demás está en `selector`.
+  const menu = l?.activa ? [{ label: 'Llave de API', options: [{ value: 'uso-api', label: 'Ver lo que gastas ↗' }] }] : []
+  /** Lo que toca hacer con lo elegido en el menú; `false` si no es de la llave. */
+  const elegir = (que: string) => que === 'uso-api' && (window.open(a.uso, '_blank', 'noreferrer'), true)
+  /** Elegir la llave sin ninguna guardada abre el campo; volver a la suscripción lo cierra. */
+  const elegirPago = (pago: 'cuenta' | 'api') => {
+    if (pago === 'cuenta') {
+      setPegando(false)
+      if (l?.activa) void cambiar(false)
+    } else if (!l) setPegando(true)
+    else if (!l.activa) void cambiar(true)
+  }
+  const selector = (
+    <div className="fila-extra pago">
+      <span className="muted small">Paga con</span>
+      <Segmento
+        label="Cómo paga"
+        valor={pegando || l?.activa ? 'api' : 'cuenta'}
+        opciones={[
+          { id: 'cuenta', texto: 'Tu suscripción', disabled: c.ocupado },
+          { id: 'api', texto: l ? `Llave de API …${l.final}` : 'Llave de API', disabled: c.ocupado },
+        ]}
+        onCambio={elegirPago}
+      />
+      {l && !pegando && (
+        <>
+          <button className="ghost small" disabled={c.ocupado} onClick={() => setPegando(true)}>
+            Cambiar de llave
+          </button>
+          <button className="ghost small" disabled={c.ocupado} onClick={() => void cambiar(false, null)}>
+            Quitar
+          </button>
+        </>
+      )}
+    </div>
+  )
+  const boton = !pegando && (
+    <button className="ghost" disabled={c.ocupado} onClick={() => (l ? void cambiar(true) : setPegando(true))}>
+      Usar llave de API
+    </button>
+  )
+  const formulario = pegando && (
+    <form className="fila-extra" onSubmit={(e) => (e.preventDefault(), llave.trim() && void cambiar(true, llave))}>
+      <div className="opcion-fila">
+        <input type="password" autoFocus placeholder={`Pega tu llave de ${a.marca}`} value={llave} onChange={(e) => setLlave(e.target.value)} autoComplete="off" />
+        <button className="primary" disabled={c.ocupado || !llave.trim()}>
+          {c.ocupado ? 'Probando…' : 'Guardar'}
+        </button>
+        <button type="button" className="ghost" onClick={() => (setPegando(false), setLlave(''))}>
+          Cancelar
+        </button>
+      </div>
+      <p className="muted small">
+        Se cobra por uso en tu cuenta de{' '}
+        <a href={a.llaves} target="_blank" rel="noreferrer">
+          {a.marca}
+        </a>
+        , no en tu plan. Se guarda solo en Sloth, en esta computadora. {a.hilos}
+      </p>
+    </form>
+  )
+  return { activa: !!l?.activa, menu, elegir, selector, boton, formulario }
+}
+
+/**
  * Lo que ve quien abre la app sin cuenta de Claude: encima del compositor, y solo entonces. `onFalta` dice si falta
  * (`undefined` mientras no se sabe), para no dejar mandar un video que no va a poder empezar.
  */
@@ -347,6 +443,7 @@ export const CuentaChatGPT = ({ onFalta }: { onFalta?(falta?: boolean): void }) 
 
 function AvisoClaude({ onFalta }: { onFalta?(falta?: boolean): void }) {
   const c = useCuenta()
+  const llave = useLlave(c, 'claude')
   const falta = c.cuenta ? !c.cuenta.conectada : undefined
   useEffect(() => onFalta?.(falta), [falta])
   if (!c.cuenta || !falta) return null
@@ -357,16 +454,20 @@ function AvisoClaude({ onFalta }: { onFalta?(falta?: boolean): void }) {
           <Logo de="claude" />
           <div className="fila-nombre">
             <strong>Conecta tu cuenta de Claude</strong>
-            {!c.cuenta.conectando && <span>Sloth trabaja con tu cuenta de Claude (Pro o Max). Se autoriza una sola vez en el navegador.</span>}
+            {!c.cuenta.conectando && <span>Sloth trabaja con tu cuenta de Claude (Pro o Max), o con una llave de API. La cuenta se autoriza una sola vez en el navegador.</span>}
           </div>
           {c.cuenta.conectando ? (
             <span className="estado moviendo">Esperando al navegador…</span>
           ) : (
-            <button className="primary" disabled={c.ocupado} onClick={c.conectar}>
-              {c.ocupado ? 'Abriendo el navegador…' : 'Conectar con Claude'}
-            </button>
+            <>
+              {llave.boton}
+              <button className="primary" disabled={c.ocupado} onClick={c.conectar}>
+                {c.ocupado ? 'Abriendo el navegador…' : 'Conectar con Claude'}
+              </button>
+            </>
           )}
         </div>
+        {llave.formulario}
         <Autorizando c={c} />
         {c.error && <p className="bad small fila-extra">{c.error}</p>}
       </div>
@@ -380,6 +481,7 @@ function AvisoClaude({ onFalta }: { onFalta?(falta?: boolean): void }) {
  */
 function CuentaCodex({ aviso = false, onFalta }: { aviso?: boolean; onFalta?(falta?: boolean): void }) {
   const c = useCuenta(true, 'codex')
+  const llave = useLlave(c, 'codex')
   const version = useVersion('codex', !aviso)
   const falta = c.cuenta ? !c.cuenta.conectada : undefined
   useEffect(() => onFalta?.(falta), [falta])
@@ -408,31 +510,42 @@ function CuentaCodex({ aviso = false, onFalta }: { aviso?: boolean; onFalta?(fal
               value=""
               disabled={c.ocupado}
               groups={[
-                {
-                  label: 'Cuenta',
-                  options: [
-                    { value: 'uso', label: 'Ver tu uso ↗' },
-                    { value: 'cambiar', label: 'Cambiar de cuenta' },
-                  ],
-                },
+                ...(llave.activa
+                  ? []
+                  : [
+                      {
+                        label: 'Cuenta',
+                        options: [
+                          { value: 'uso', label: 'Ver tu uso ↗' },
+                          { value: 'cambiar', label: 'Cambiar de cuenta' },
+                        ],
+                      },
+                    ]),
+                ...llave.menu,
               ]}
-              onChange={(que) => (que === 'uso' ? window.open('https://chatgpt.com/codex/settings/usage', '_blank', 'noreferrer') : conectar())}
+              onChange={(que) => llave.elegir(que) || (que === 'uso' ? window.open('https://chatgpt.com/codex/settings/usage', '_blank', 'noreferrer') : conectar())}
             />
           ) : (
-            <span>Sloth trabaja con tu cuenta de ChatGPT (Plus o Pro), y con ella hace las imágenes de los videos: portadas y personajes. Se autoriza en el navegador.</span>
+            <span>Sloth trabaja con tu cuenta de ChatGPT (Plus o Pro), o con una llave de API, y con ella hace las imágenes de los videos: portadas y personajes. La cuenta se autoriza en el navegador.</span>
           )}
         </div>
         {version.estado}
         {cuenta?.conectando ? (
           <span className="estado moviendo">Esperando al navegador…</span>
         ) : (
-          !cuenta?.conectada && (
-            <button className="primary" disabled={c.ocupado || !cuenta} onClick={conectar}>
-              {c.ocupado ? 'Conectando…' : 'Conectar con ChatGPT'}
-            </button>
+          cuenta &&
+          !cuenta.conectada && (
+            <>
+              {aviso && llave.boton}
+              <button className="primary" disabled={c.ocupado} onClick={conectar}>
+                {c.ocupado ? 'Conectando…' : 'Conectar con ChatGPT'}
+              </button>
+            </>
           )
         )}
       </div>
+      {!aviso && cuenta && llave.selector}
+      {llave.formulario}
       {url && <p className="fila-extra small"><a href={url} target="_blank" rel="noreferrer">Abrir inicio de sesión de ChatGPT ↗</a>. Vuelve aquí después de autorizar.</p>}
       {!aviso && cuenta?.conectada && <Limites proveedor="codex" />}
       {c.error && <p className="bad small fila-extra">{c.error}</p>}
@@ -623,6 +736,7 @@ function useVersion(de: 'claude' | 'codex', mirar = true) {
 /** Claude Code: con qué cuenta trabaja y qué versión tiene. */
 function Agentes() {
   const c = useCuenta(true)
+  const llave = useLlave(c, 'claude')
   const version = useVersion('claude')
   const cuenta = c.cuenta
   return (
@@ -641,20 +755,25 @@ function Agentes() {
                 value=""
                 disabled={c.ocupado}
                 groups={[
-                  {
-                    label: 'Cuenta',
-                    options: [
-                      { value: 'uso', label: 'Ver tu uso ↗' },
-                      { value: 'cambiar', label: 'Cambiar de cuenta' },
-                    ],
-                  },
+                  ...(llave.activa
+                    ? []
+                    : [
+                        {
+                          label: 'Cuenta',
+                          options: [
+                            { value: 'uso', label: 'Ver tu uso ↗' },
+                            { value: 'cambiar', label: 'Cambiar de cuenta' },
+                          ],
+                        },
+                      ]),
+                  ...llave.menu,
                 ]}
-                onChange={(que) => (que === 'uso' ? window.open('https://claude.ai/settings/usage', '_blank', 'noreferrer') : c.conectar())}
+                onChange={(que) => llave.elegir(que) || (que === 'uso' ? window.open('https://claude.ai/settings/usage', '_blank', 'noreferrer') : c.conectar())}
               />
             ) : cuenta.conectando ? (
               <span className="falta">Esperando al navegador…</span>
             ) : (
-              <span className="falta">Sin cuenta: Sloth trabaja con tu cuenta de Claude (Pro o Max)</span>
+              <span className="falta">Sin cuenta: Sloth trabaja con tu cuenta de Claude (Pro o Max) o con una llave de API</span>
             )}
           </div>
           {version.estado}
@@ -664,6 +783,8 @@ function Agentes() {
             </button>
           )}
         </div>
+        {cuenta && llave.selector}
+        {llave.formulario}
         <Autorizando c={c} />
         {/* Con una llave de API no hay plan ni límites: se paga por uso. */}
         {cuenta?.conectada && cuenta.plan && <Limites proveedor="claude" />}

@@ -1,4 +1,5 @@
 import type { CuentaClaude, LimitesClaude } from '../shared/types.ts'
+import { conLlave, llaveDe, llaveEnUso } from './acceso.ts'
 import { CodexRpc } from './codex-rpc.ts'
 import { ventanasCodex, type LimitesCodexRpc } from './limites-codex.ts'
 
@@ -48,13 +49,14 @@ function descansar() {
 }
 
 export function cuentaCodex(): Promise<CuentaClaude> {
+  if (llaveEnUso('codex')) return Promise.resolve(conLlave('codex'))
   // Los avisos y Opciones pueden leer a la vez; comparten una lectura y un proceso.
   lectura ??= (async () => {
     const c = cliente()
     try {
       await c.ready
       const r = await c.request<{ account: { type: string; email?: string; planType?: string } | null }>('account/read', { refreshToken: false })
-      return { conectada: r.account?.type === 'chatgpt', quien: r.account?.email, plan: r.account?.planType, conectando: login && { url: login.url }, error: fallo }
+      return { conectada: r.account?.type === 'chatgpt', quien: r.account?.email, plan: r.account?.planType, conectando: login && { url: login.url }, error: fallo, llave: llaveDe('codex') }
     } catch (error) {
       return { conectada: false, error: error instanceof Error ? error.message : String(error) }
     } finally { lectura = undefined; descansar() }
@@ -75,6 +77,8 @@ export async function conectarCodex(): Promise<CuentaClaude> {
 
 /** Lee las cuotas del plan sin abrir un turno ni gastar tokens. Las lecturas simultáneas comparten un minuto de caché. */
 export function limitesCodex(): Promise<LimitesClaude> {
+  // Con la llave no hay plan: se paga por uso.
+  if (llaveEnUso('codex')) return Promise.resolve({ ventanas: [] })
   if (!limites || Date.now() - limites.leido > 60_000) {
     limites = { leido: Date.now(), valor: (async () => {
       leyendoLimites++

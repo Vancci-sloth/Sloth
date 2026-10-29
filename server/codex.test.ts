@@ -6,7 +6,7 @@ import { startCodex } from './codex.ts'
 import { buildTimeline } from '../web/src/items.ts'
 
 /** Prueba el protocolo y las carreras entre turnos, sin gastar el plan ni tocar las credenciales del usuario. */
-function preparar(resume?: string, precio: Parameters<typeof startCodex>[2] = () => undefined) {
+function preparar(resume?: string, precio: Parameters<typeof startCodex>[2] = () => undefined, cuenta = 'chatgpt') {
   const events: AgentEvent[] = []
   const pedidos: { method: string; params: Record<string, unknown> }[] = []
   const sesiones: string[] = []
@@ -14,12 +14,14 @@ function preparar(resume?: string, precio: Parameters<typeof startCodex>[2] = ()
   let exit!: (error?: Error) => void
   let turno = 0
   let fallo: string | undefined
+  const llaves: unknown[] = []
   const run = startCodex({
-    cwd: process.cwd(), model: 'codex:gpt-prueba', effort: 'high', resume,
+    cwd: process.cwd(), model: 'codex:gpt-prueba', effort: 'high', resume, conLlave: false,
     onEvent: (e) => events.push(e), onProviderSession: (id) => sesiones.push(id)
-  }, (n, e) => {
+  }, (n, e, _config, llave) => {
     notify = n
     exit = e
+    llaves.push(llave)
     return {
       ready: Promise.resolve(),
       async request<T>(method: string, params: unknown = {}): Promise<T> {
@@ -27,7 +29,7 @@ function preparar(resume?: string, precio: Parameters<typeof startCodex>[2] = ()
         pedidos.push({ method, params: p })
         if (fallo === method) throw new Error('Falló la petición')
         let result: unknown = {}
-        if (method === 'account/read') result = { account: { type: 'chatgpt' } }
+        if (method === 'account/read') result = { account: cuenta ? { type: cuenta } : null }
         if (method === 'thread/start' || method === 'thread/resume') result = { thread: { id: 'hilo' } }
         if (method === 'turn/start') {
           const turn = { id: `turno-${++turno}`, status: 'inProgress' }
@@ -40,7 +42,7 @@ function preparar(resume?: string, precio: Parameters<typeof startCodex>[2] = ()
       close() { exit() }
     }
   }, precio)
-  return { run, events, pedidos, sesiones, notify: (method: string, params: unknown) => notify(method, params), caer: () => exit(new Error('Se cayó Codex')), fallar: (method: string) => { fallo = method } }
+  return { run, events, pedidos, sesiones, llaves, notify: (method: string, params: unknown) => notify(method, params), caer: () => exit(new Error('Se cayó Codex')), fallar: (method: string) => { fallo = method } }
 }
 
 test('retoma el id de Codex y envía modelo, esfuerzo e imágenes al proveedor correcto', async () => {
@@ -55,6 +57,19 @@ test('retoma el id de Codex y envía modelo, esfuerzo e imágenes al proveedor c
   const turn = h.pedidos.find((p) => p.method === 'turn/start')!
   assert.equal(turn.params.effort, 'high')
   assert.deepEqual((turn.params.input as unknown[])[0], { type: 'localImage', path: 'C:/imagen.png' })
+  h.run.close()
+})
+
+test('un hilo que empezó con la cuenta de ChatGPT no se retoma con la llave de API', async () => {
+  // Codex le reenvía su razonamiento cifrado por el servidor de ChatGPT, que la API no puede leer.
+  const h = preparar('guardado', undefined, '')
+  h.run.send('Sigue')
+  await setImmediate()
+  await setImmediate()
+  assert.deepEqual(h.llaves, [null])
+  assert.ok(!h.pedidos.some((p) => p.method === 'thread/resume'))
+  const fin = h.events.find((e) => e.t === 'turn_end')
+  assert.match(JSON.stringify(fin), /empezó con tu cuenta de ChatGPT/)
   h.run.close()
 })
 

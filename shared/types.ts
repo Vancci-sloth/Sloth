@@ -264,6 +264,11 @@ export interface SessionMeta {
   updatedAt: number
   /** El id del hilo en su proveedor, para retomarlo tras reiniciar. */
   providerSessionId?: string
+  /**
+   * Codex: el hilo empezó con la llave de API, no con la cuenta de ChatGPT, y sigue con ella (`server/acceso.ts`). Codex le
+   * reenvía al modelo su razonamiento, cifrado para lo que lo hizo.
+   */
+  conLlave?: boolean
   running: boolean
   /** Fuera de la lista de la barra lateral, sin borrarse. */
   archived?: boolean
@@ -522,6 +527,13 @@ export interface CuentaClaude {
   plan?: string
   conectando?: { url?: string }
   error?: string
+  /** La llave de API guardada, si la hay (`server/acceso.ts`); `activa`, si se paga con ella en vez de con la cuenta. */
+  llave?: LlaveAgente
+}
+
+export interface LlaveAgente {
+  final: string
+  activa: boolean
 }
 
 /**

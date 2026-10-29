@@ -2,6 +2,7 @@ import { existsSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import type { Model, Tokens } from '../shared/types.ts'
+import { codexConLlave, llaveEnUso, type CodexLlave } from './acceso.ts'
 import type { AgentOptions, AgentRun, SkillRef } from './agent.ts'
 import { OPCIONES } from './claude.ts'
 import { CodexRpc } from './codex-rpc.ts'
@@ -10,7 +11,10 @@ import { costoCodex } from './precios.ts'
 import { SKILLS } from './skills.ts'
 
 /** Codex conserva los hilos en su almacén; Sloth conserva su id y traduce el protocolo al mismo AgentEvent de Claude. */
-export function startCodex(opts: AgentOptions, connect: Conectar = (notify, exit, config) => new CodexRpc(notify, exit, config), precio = costoCodex): AgentRun {
+export function startCodex(opts: AgentOptions, connect: Conectar = (notify, exit, config, llave) => new CodexRpc(notify, exit, config, llave), precio = costoCodex): AgentRun {
+  // Con la llave de API o con la cuenta de ChatGPT: un hilo retomado sigue con lo que empezó (`SessionMeta.conLlave`).
+  const conLlave = opts.conLlave ?? !!llaveEnUso('codex')
+  const llave = conLlave ? codexConLlave(true) ?? null : null
   let threadId = ''
   let turnId = ''
   let busy = false
@@ -200,13 +204,18 @@ export function startCodex(opts: AgentOptions, connect: Conectar = (notify, exit
     segundoPlano()
   }, {
     mcp_servers: Object.fromEntries(Object.entries(navegadorAgente(opts.lote, opts.hilo)).map(([name, server]) => [name, { command: server.command, args: server.args ?? [], ...(server.env ? { env: server.env } : {}) }]))
-  })
+  }, llave)
   const ready = (async () => {
     await rpc.ready
-    const account = await rpc.request<{ account: { type: string } | null }>('account/read', { refreshToken: false })
-    if (account.account?.type !== 'chatgpt') throw new Error('Conecta tu cuenta de ChatGPT en Opciones → Agentes → Codex.')
+    if (conLlave && !llave) throw new Error('Este hilo empezó con tu llave de API de OpenAI, y ya no está en Opciones → Agentes → Codex. Vuelve a ponerla para seguirlo, o abre un hilo nuevo.')
+    // Con la llave de API no hace falta la cuenta: va por otro proveedor.
+    const account = llave ? undefined : await rpc.request<{ account: { type: string } | null }>('account/read', { refreshToken: false })
+    if (account && account.account?.type !== 'chatgpt')
+      throw new Error(opts.resume
+        ? 'Este hilo empezó con tu cuenta de ChatGPT y sigue con ella: conéctala en Opciones → Agentes → Codex para seguirlo, o abre un hilo nuevo con la llave de API.'
+        : 'Conecta tu cuenta de ChatGPT en Opciones → Agentes → Codex, o usa una llave de API.')
     const r = await rpc.request<{ thread: { id: string } }>(opts.resume ? 'thread/resume' : 'thread/start', {
-      ...(opts.resume ? { threadId: opts.resume } : {}), model: modelo, modelProvider: 'openai', cwd: opts.cwd,
+      ...(opts.resume ? { threadId: opts.resume } : {}), model: modelo, modelProvider: llave?.proveedor ?? 'openai', cwd: opts.cwd,
       approvalPolicy: 'never', sandbox: 'danger-full-access',
       developerInstructions: `${OPCIONES}\nLa interfaz y tus respuestas van en español. Haz las preguntas en mensajes normales, sin herramientas de preguntas interactivas. Las skills de Sloth están en ${SKILLS}. La skill invocada es siempre la de esa carpeta: si ves otra con el mismo nombre (en ${join(homedir(), '.codex', 'skills')} u otra), es una copia vieja y no se usa. Respeta la skill invocada y lee sus referencias cuando hagan falta.`
     })
@@ -303,7 +312,7 @@ const CERO: Tokens = { input: 0, output: 0, cacheRead: 0 }
 const tokensDe = (u: Uso): Tokens => ({ input: u.inputTokens - u.cachedInputTokens, output: u.outputTokens, cacheRead: u.cachedInputTokens })
 const resta = (a: Tokens, b: Tokens): Tokens => ({ input: a.input - b.input, output: a.output - b.output, cacheRead: a.cacheRead - b.cacheRead })
 const suma = (a: Tokens, b: Tokens): Tokens => ({ input: a.input + b.input, output: a.output + b.output, cacheRead: a.cacheRead + b.cacheRead })
-type Conectar = (notify: (method: string, params: unknown) => void, exit: (error?: Error) => void, config: Record<string, unknown>) => Pick<CodexRpc, 'ready' | 'request' | 'close'>
+type Conectar = (notify: (method: string, params: unknown) => void, exit: (error?: Error) => void, config: Record<string, unknown>, llave: CodexLlave | null) => Pick<CodexRpc, 'ready' | 'request' | 'close'>
 
 /** El catálogo viene de Codex, con sus esfuerzos: no se fija una lista de GPT en Sloth. */
 export async function codexModels(): Promise<Model[]> {

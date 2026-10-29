@@ -1,5 +1,7 @@
+export type Proveedor = 'claude' | 'codex'
+
 /** Los ids de Codex llevan prefijo para no mezclar catálogos ni sesiones de proveedores. */
-export const proveedorDe = (model: string): 'claude' | 'codex' => model.startsWith('codex:') ? 'codex' : 'claude'
+export const proveedorDe = (model: string): Proveedor => model.startsWith('codex:') ? 'codex' : 'claude'
 
 /**
  * Cómo se le dice a cada proveedor donde se habla de quien te ayuda, de tu plan o de tu cuenta: Codex corre con la cuenta

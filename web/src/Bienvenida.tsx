@@ -69,8 +69,8 @@ export function Bienvenida() {
 
         {/* Con una de las dos basta. Con ChatGPT, además, hace las imágenes de los videos. */}
         <Paso n={1} titulo="Conecta tu cuenta de Claude o ChatGPT" hecho={claude || chatgpt}>
-          Sloth trabaja con tu plan de Claude (Pro o Max) o de ChatGPT (Plus o Pro) y no te cobra aparte. Con ChatGPT, además,
-          hace las imágenes de los videos: portadas y personajes.
+          Sloth trabaja con tu plan de Claude (Pro o Max) o de ChatGPT (Plus o Pro) y no te cobra aparte. Si prefieres pagar
+          por uso, también con una llave de API. Con ChatGPT, además, hace las imágenes de los videos: portadas y personajes.
           <CuentaClaude onFalta={(falta) => setClaude(falta === undefined ? undefined : !falta)} />
           <CuentaChatGPT onFalta={(falta) => setChatgpt(falta === undefined ? undefined : !falta)} />
         </Paso>
@@ -105,7 +105,7 @@ export function Bienvenida() {
         <Paso n={anclada === null ? 4 : 5} titulo="Lo que gasta">
           Cada video usa una parte de los límites de tu plan, que ves en Opciones. Las cifras en dólares que salen en cada
           video dicen cuánto costaría pagado aparte, no lo que se te cobra. Un video gasta bastante: con el plan Pro el límite
-          se acaba pronto, y con Max alcanza para varios.
+          se acaba pronto, y con Max alcanza para varios. Con una llave de API no hay límites: esas cifras son lo que pagas.
         </Paso>
 
         <div className="modal-actions">

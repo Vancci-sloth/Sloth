@@ -7,11 +7,12 @@ import { fileURLToPath } from 'node:url'
 import { WebSocketServer, type WebSocket } from 'ws'
 import type { Card, Model, ServerPush } from '../shared/types.ts'
 import { VENTA } from '../shared/venta.ts'
+import { cambiarAcceso } from './acceso.ts'
 import { IMAGE_TYPES } from './agent.ts'
 import { avances } from './avances.ts'
 import { claudeModels, tituloCorto } from './claude.ts'
 import { codexModels } from './codex.ts'
-import { proveedorDe } from '../shared/providers.ts'
+import { type Proveedor, proveedorDe } from '../shared/providers.ts'
 import { paraMandar } from '../shared/historial.ts'
 import { conectandoCodex, conectarCodex, cuentaCodex, limitesCodex } from './cuenta-codex.ts'
 import { conectando, conectarClaude, cuentaClaude, limitesClaude } from './cuenta.ts'
@@ -312,6 +313,20 @@ async function api(req: IncomingMessage, res: ServerResponse, url: URL): Promise
 
   if (path === '/api/claude/conectar' && method === 'POST') {
     send(res, 200, await conectarClaude(APP))
+    return true
+  }
+
+  // Pagar con la cuenta o con una llave de API (`server/acceso.ts`). Devuelve la cuenta como queda.
+  const acceso = /^\/api\/(claude|codex)\/acceso$/.exec(path)
+  if (acceso && method === 'POST') {
+    const { api, llave } = await body<{ api: boolean; llave?: string | null }>(req)
+    const p = acceso[1] as Proveedor
+    try {
+      await cambiarAcceso(p, !!api, llave)
+      send(res, 200, await (p === 'codex' ? cuentaCodex() : cuentaClaude(APP, true)))
+    } catch (error) {
+      send(res, 400, { error: error instanceof Error ? error.message : String(error) })
+    }
     return true
   }
 

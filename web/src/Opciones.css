@@ -32,6 +32,8 @@
 .fila-extra { display: flex; flex-direction: column; gap: 8px; margin: 0; padding: 0 16px 14px; }
 .item:has(> .fila > .logo) > .fila-extra { padding-left: 60px; }
 .fila-extra p { margin: 0; }
+/* Con qué paga cada agente: la suscripción o la llave de API. */
+.fila-extra.pago { flex-direction: row; flex-wrap: wrap; align-items: center; }
 .requisito-error { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 120px; overflow-y: auto; }
 
 /* El logo de cada cosa (`Logos.tsx`), en su cuadrito. Los chicos van apilados en la fila de las herramientas plegadas. */

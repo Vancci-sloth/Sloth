@@ -6,6 +6,7 @@ import { dirname, join } from 'node:path'
 import { Readable } from 'node:stream'
 import { pipeline } from 'node:stream/promises'
 import type { MotorVoz as Motor, Requisito } from '../shared/types.ts'
+import { llaveEnUso } from './acceso.ts'
 import { correr } from './version.ts'
 
 /**
@@ -491,10 +492,11 @@ const PIEZAS: Pieza[] = [
     id: 'chatgpt',
     nombre: 'ChatGPT (Codex)',
     para: 'Opcional. Hace las portadas y las imágenes de los videos; sin él, salen sin imágenes generadas.',
-    aMano: 'Conecta tu cuenta de ChatGPT en Opciones → Agentes → Codex.',
+    aMano: 'Conecta tu cuenta de ChatGPT en Opciones → Agentes → Codex, o usa una llave de API.',
     opcional: true,
-    // `codex` lo pone en el PATH scripts/start.mjs (o `npm start`). Sale con 0 si hay sesión.
-    mirar: (app) => correr('codex login status', app).then(() => 'conectado', () => null)
+    // `codex` lo pone en el PATH scripts/start.mjs (o `npm start`). Sale con 0 si hay sesión. Con la llave de API
+    // (`server/acceso.ts`), `codex exec` la lee de CODEX_API_KEY.
+    mirar: (app) => (llaveEnUso('codex') ? Promise.resolve('con llave de API') : correr('codex login status', app).then(() => 'conectado', () => null))
   }
 ]
 

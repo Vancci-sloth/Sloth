@@ -14,5 +14,7 @@ dist
 !/skills/video-el-diff/plantilla/public/img/LEEME.md
 /skills/modelos-3d/modelos/
 /skills/ideas-*/METODO.md
+# Las skills de la cuenta de claude.ai (docx, pdf…): Claude Code las baja a data/claude/skills, que es esta carpeta.
+/skills/synced/
 # Un repo aparte que comparta esta carpeta, para respaldar lo de arriba.
 /.privado.git/

@@ -2,6 +2,7 @@ import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process'
 import { createRequire } from 'node:module'
 import { dirname, join } from 'node:path'
 import { createInterface } from 'node:readline'
+import { codexConLlave, type CodexLlave } from './acceso.ts'
 
 /** El app-server oficial, por JSON-RPC sobre stdio. No lee ni copia las credenciales de Codex. */
 export class CodexRpc {
@@ -14,7 +15,9 @@ export class CodexRpc {
   constructor(
     private onNotification: (method: string, params: unknown) => void = () => {},
     private onExit: (error?: Error) => void = () => {},
-    config: Record<string, unknown> = {}
+    config: Record<string, unknown> = {},
+    /** Con qué trabaja: la llave de API, o `null` para la cuenta de ChatGPT. Sin él, lo elegido en Opciones. */
+    llave: CodexLlave | null = codexConLlave() ?? null
   ) {
     const destinos: Record<string, string> = {
       'win32-x64': 'x86_64-pc-windows-msvc', 'win32-arm64': 'aarch64-pc-windows-msvc',
@@ -26,10 +29,12 @@ export class CodexRpc {
     if (!destino) throw new Error(`Codex no admite esta plataforma: ${plataforma}.`)
     const raiz = dirname(createRequire(import.meta.url).resolve(`@openai/codex-${plataforma}/package.json`))
     const exe = join(raiz, 'vendor', destino, 'bin', process.platform === 'win32' ? 'codex.exe' : 'codex')
-    // La elección del usuario es su plan de ChatGPT, aunque tenga llaves de API en el entorno o un proveedor personalizado.
+    // La elección del usuario es su plan de ChatGPT, aunque tenga llaves de API en el entorno o un proveedor personalizado,
+    // o la llave que eligió en Opciones (`server/acceso.ts`).
     const env = { ...process.env }
     for (const key of ['OPENAI_API_KEY', 'CODEX_API_KEY', 'CODEX_ACCESS_TOKEN', 'OPENAI_IDENTITY_TOKEN_FILE', 'OPENAI_FEDERATION_RULE_ID']) delete env[key]
-    const ajustes = { ...config, model_provider: 'openai', forced_login_method: 'chatgpt' }
+    Object.assign(env, llave?.env)
+    const ajustes = { ...config, ...(llave?.config ?? { model_provider: 'openai', forced_login_method: 'chatgpt' }) }
     const args = ['app-server', '--listen', 'stdio://', ...Object.entries(ajustes).flatMap(([key, value]) => ['-c', `${key}=${toml(value)}`])]
     this.proc = spawn(exe, args, { env, windowsHide: true, stdio: 'pipe' })
     // stderr no es el protocolo; se drena sin guardar datos de autenticación ni volcarlos a la interfaz.

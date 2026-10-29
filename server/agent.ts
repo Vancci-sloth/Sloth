@@ -30,6 +30,8 @@ export interface AgentOptions {
   lote?: boolean
   /** El hilo: su agente usa la página del hilo en el navegador integrado. */
   hilo?: string
+  /** Codex: si trabaja con la llave de API o con la cuenta de ChatGPT. Sin él, lo que esté elegido en Opciones. */
+  conLlave?: boolean
   onEvent(event: AgentEvent): void
   onProviderSession(id: string): void
   /** Lo que lleva escrito un `Write` antes de terminar. Opcional: no todo proveedor lo da. */

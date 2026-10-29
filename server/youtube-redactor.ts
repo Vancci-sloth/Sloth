@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs'
 import { extname } from 'node:path'
 import { query, type SDKUserMessage } from '@anthropic-ai/claude-agent-sdk'
 import { proveedorDe } from '../shared/providers.ts'
+import { codexConLlave } from './acceso.ts'
 import { CodexRpc } from './codex-rpc.ts'
 
 /** Una redacción con imágenes reales, sin herramientas ni sesión persistente, usando el proveedor elegido en el hilo. */
@@ -54,9 +55,11 @@ export async function redactarCodexYoutube(model: string, cwd: string, prompt: s
   const reloj = setTimeout(() => { fallar(new Error('La recomendación tardó demasiado. Puedes reintentar.')); rpc.close() }, 180_000)
   try {
     await rpc.ready
-    const cuenta = await rpc.request<{ account: { type: string } | null }>('account/read', { refreshToken: false })
-    if (cuenta.account?.type !== 'chatgpt') throw new Error('Conecta Codex en Opciones → Agentes para generar recomendaciones.')
-    const r = await rpc.request<{ thread: { id: string } }>('thread/start', { model: model.replace(/^codex:/, ''), modelProvider: 'openai', cwd, approvalPolicy: 'never', sandbox: 'read-only', ephemeral: true, developerInstructions: instruccion })
+    // Con la llave de API no hace falta la cuenta (`server/acceso.ts`).
+    const llave = codexConLlave()
+    const cuenta = llave ? undefined : await rpc.request<{ account: { type: string } | null }>('account/read', { refreshToken: false })
+    if (cuenta && cuenta.account?.type !== 'chatgpt') throw new Error('Conecta Codex en Opciones → Agentes para generar recomendaciones.')
+    const r = await rpc.request<{ thread: { id: string } }>('thread/start', { model: model.replace(/^codex:/, ''), modelProvider: llave?.proveedor ?? 'openai', cwd, approvalPolicy: 'never', sandbox: 'read-only', ephemeral: true, developerInstructions: instruccion })
     threadId = r.thread.id
     await rpc.request('turn/start', { threadId, input: [{ type: 'text', text: prompt, text_elements: [] }, ...imagenes.map((path) => ({ type: 'localImage', path }))], ...(esquema ? { outputSchema: esquema } : {}), ...(effort ? { effort } : {}) })
     return await listo

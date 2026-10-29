@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os'
 import { delimiter, join } from 'node:path'
 import { query, type Query, type SDKUserMessage } from '@anthropic-ai/claude-agent-sdk'
 import type { CuentaClaude, LimitesClaude } from '../shared/types.ts'
+import { conLlave, llaveDe, llaveEnUso } from './acceso.ts'
 import { Inbox } from './agent.ts'
 
 /**
@@ -48,6 +49,7 @@ function estado(app: string): Promise<{ loggedIn?: boolean; email?: string; subs
 }
 
 export async function cuentaClaude(app: string, fresco = false): Promise<CuentaClaude> {
+  if (llaveEnUso('claude')) return conLlave('claude')
   if (conectada && !fresco && !login) return conectada
   const s = await estado(app)
   const cuenta = {
@@ -55,7 +57,8 @@ export async function cuentaClaude(app: string, fresco = false): Promise<CuentaC
     quien: s.email ?? (s.apiKeySource ? `llave de API (${s.apiKeySource})` : undefined),
     plan: s.subscriptionType,
     conectando: login ? {} : undefined,
-    error: fallo || undefined
+    error: fallo || undefined,
+    llave: llaveDe('claude')
   }
   conectada = cuenta.conectada && !login && !fallo ? cuenta : null
   return cuenta
@@ -144,6 +147,8 @@ let leyendo = 0
  * experimental en el SDK: si cambia o deja de estar, falla y Opciones lo dice en una línea.
  */
 export function limitesClaude(): Promise<LimitesClaude> {
+  // Con la llave no hay plan: se paga por uso.
+  if (llaveEnUso('claude')) return Promise.resolve({ ventanas: [] })
   if (!limites || Date.now() - limites.leido > 60_000) limites = { leido: Date.now(), valor: leerLimites() }
   return limites.valor
 }

@@ -5,6 +5,7 @@ import { historialLigero } from '../shared/historial.ts'
 import { leerHistorial, primerUsuario } from './historial.ts'
 import type { AgentEvent, FileDraft, SessionMeta } from '../shared/types.ts'
 import { proveedorDe } from '../shared/providers.ts'
+import { llaveEnUso } from './acceso.ts'
 import type { AgentRun, SkillRef } from './agent.ts'
 import { startClaude } from './claude.ts'
 import { startCodex } from './codex.ts'
@@ -467,6 +468,8 @@ export class Sessions {
   private runFor(meta: SessionMeta): AgentRun {
     const live = this.runs.get(meta.id)
     if (live) return live
+    // Un hilo de Codex sigue con la llave o con la cuenta con que empezó; los de antes de las llaves, con la cuenta.
+    const conLlave = proveedorDe(meta.model) === 'codex' ? (meta.providerSessionId ? !!meta.conLlave : !!llaveEnUso('codex')) : undefined
     const run = this.crearAgente({
       cwd: meta.cwd,
       model: meta.model,
@@ -474,6 +477,7 @@ export class Sessions {
       resume: meta.providerSessionId,
       lote: !!meta.lote,
       hilo: meta.id,
+      conLlave,
       onEvent: (event) => this.emit(meta.id, event),
       onDraft: (draft) => this.pushDraft(meta.id, draft),
       // Un proceso muerto no recibe nada: se olvida, y el siguiente mensaje abre otro que retoma la sesión. Si se cayó,
@@ -484,6 +488,7 @@ export class Sessions {
       },
       onProviderSession: (providerId) => {
         meta.providerSessionId = providerId
+        meta.conLlave = conLlave || undefined
         this.save(meta)
       }
     })
