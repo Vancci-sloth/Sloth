@@ -55,6 +55,11 @@ const FONDO = '#0f0e0c'
 /** Cada cuánto se pregunta si hay versión nueva. */
 const CADA = 6 * 3600_000
 /**
+ * Entre pregunta y pregunta, cada cuánto se mira solo cuál es la última (`/ultima` del cobro, en caché): si cambió, salió
+ * una o se liberó para todos en un live, y se pregunta ya.
+ */
+const VISTAZO = 5 * 60_000
+/**
  * Si la descarga pasa este tiempo sin avanzar, está muerta: al irse el internet, la de Electron no siempre falla, se
  * queda esperando para siempre. Se corta y empieza otra.
  */
@@ -502,7 +507,8 @@ function anotar(texto: unknown) {
 
 /**
  * Las versiones nuevas, del cobro de Sloth (`/actualizaciones`, lo que sube `npm run publicar`). Al abrir y cada 6 horas
- * pregunta; «Actualizar» (web/src/Actualizar.tsx) la baja: solo los pedazos del instalador que cambiaron desde esta
+ * pregunta, y antes si el vistazo de cada 5 minutos ve que cambió la última (la que el creador libera en un live llega
+ * así); «Actualizar» (web/src/Actualizar.tsx) la baja: solo los pedazos del instalador que cambiaron desde esta
  * versión. Luego cierra Sloth, el instalador la pone y la vuelve a abrir.
  */
 function actualizaciones() {
@@ -553,4 +559,17 @@ function actualizaciones() {
   }
   primera = revisar()
   setInterval(revisar, CADA)
+  // La primera vez solo se anota cómo está: la pregunta de al abrir ya la ve.
+  const so = MAC ? 'mac' : WINDOWS ? 'windows' : 'linux'
+  let vista: string | undefined
+  const vistazo = async () => {
+    const ahora = await fetch(`${COBRO}/ultima?so=${so}`)
+      .then((r) => (r.ok ? r.text() : undefined))
+      .catch(() => undefined)
+    if (!ahora) return
+    if (vista !== undefined && ahora !== vista && !bajada) void revisar()
+    vista = ahora
+  }
+  void vistazo()
+  setInterval(vistazo, VISTAZO)
 }

@@ -6,6 +6,7 @@ import { Escribir, type Escrito, subirImagen } from './Escribir'
 import { LINK } from './etiquetas'
 import { Unirse } from './Licencia'
 import { Icono as IconoBase, type NombreIcono } from './Iconos'
+import { Liberar } from './Liberar'
 import './Comunidad.css'
 
 /**
@@ -15,7 +16,8 @@ import './Comunidad.css'
  * Vive en el Worker del cobro (`licencias/src/comunidad.ts`), por `server/comunidad.ts`, y se vuelve a pedir cada minuto
  * mientras se ve. Quién comentó algo que aún no abres lo recuerda esta computadora (`comunidad:vistas`).
  *
- * Mejoras es lo que la gente quiere que Sloth haga mejor: el creador dice cómo va cada una, y todos lo ven.
+ * Mejoras es lo que la gente quiere que Sloth haga mejor: el creador dice cómo va cada una, y todos lo ven. Arriba, solo
+ * él ve la versión que aún es de quien apoya y la libera para todos en un live (`Liberar.tsx`).
  * «Compartir» de un video de «Mis videos» abre el compositor en Lo que hice con ese video (`compartirVideo`).
  *
  * Los comentarios llevan imágenes, como el chat (se pegan, se sueltan o se eligen), se responden (un nivel) y se les da
@@ -258,6 +260,8 @@ export function Comunidad() {
             </div>
             {feed && <Avisos sinLeer={feed.avisos} onAbrir={setAbierta} onLeidos={() => setFeed((f) => f && { ...f, avisos: 0 })} />}
           </header>
+
+          {yo?.creador && <Liberar onAnunciar={(v) => abrirCompositor('anuncios', `Sloth ${v} ya es para todos`)} />}
 
           {escribiendo && escribe ? (
             <div className="com-nueva">

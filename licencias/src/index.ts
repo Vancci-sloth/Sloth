@@ -33,7 +33,8 @@
  * (`DESCARGAS`) y lo sube `npm run publicar` por partes, con `PUBLICAR`: pesa más de lo que aceptan wrangler (300 MiB)
  * y una petición a un Worker (100 MB). `ultima.json` dice cuál es la última. Y las actualizaciones de la app instalada
  * (electron-updater): `GET /actualizaciones/latest.yml` dice cuál es la nueva (quien apoya la recibe `ANTICIPO` antes:
- * a los demás se les sigue dando la anterior, que se guarda en `anterior/` al publicar), y de su instalador baja solo los pedazos
+ * a los demás se les sigue dando la anterior, que se guarda en `anterior/` al publicar; el creador la da a todos antes,
+ * en un live, con `liberar`, y la app lo ve en su vistazo a `GET /ultima`), y de su instalador baja solo los pedazos
  * que cambiaron, con el mapa de bloques de cada versión (`.blockmap`). Se quedan los mapas de todas, los últimos
  * instaladores y el de la anterior; si este falta, a todos se les da la última.
  *
@@ -44,6 +45,7 @@
  *
  * Y la comunidad (`/comunidad/*`, en `comunidad.ts`), de quien tiene una licencia activa.
  */
+import type { VersionLiberable } from '../../shared/types.ts'
 import { comunidad, creditos } from './comunidad.ts'
 
 export interface Env {
@@ -256,6 +258,7 @@ async function atender(req: Request, env: Env, ctx: ExecutionContext, url: URL):
     // Los Fundadores que pidieron salir en los créditos de la página.
     if (req.method === 'GET' && url.pathname === '/creditos') return json({ fundadores: await creditos(env) })
     if (req.method === 'GET' && url.pathname === '/version') return json(await ultimaPara(req, env, sistema(url.searchParams.get('so'))))
+    if (req.method === 'GET' && url.pathname === '/ultima') return await ultimaLigera(req, env, ctx, sistema(url.searchParams.get('so')))
     if ((req.method === 'GET' || req.method === 'HEAD') && url.pathname === '/descargar') {
       const so = sistema(url.searchParams.get('so'))
       const u = await ultimaPara(req, env, so)
@@ -290,6 +293,46 @@ async function ultima(env: Env, so: Sistema = 'windows'): Promise<Ultima> {
 /** El instalador de la última versión de `so`, con `Range` para que el navegador pueda retomar una descarga cortada. */
 /** Si `u` ya es de todos (`todos` pasó o no lo tiene). */
 export const deTodos = (u: Pick<Ultima, 'todos'>, ahora = Date.now()) => !u.todos || ahora >= Date.parse(u.todos)
+
+/** `u`, de todos desde `ahora` si aún era solo de quien apoya; si ya lo era, igual. */
+export const liberada = <U extends Pick<Ultima, 'todos'>>(u: U, ahora: string): U => (deTodos(u, Date.parse(ahora)) ? u : { ...u, todos: ahora })
+
+/**
+ * Para el creador (`/comunidad/liberar`): la última versión de cada sistema y, si aún es solo de quien apoya, desde
+ * cuándo será de todos. Con `liberar`, lo es ya: cuando el chat de un live cumple su meta. No hay que compilar nada; las
+ * apps abiertas lo ven en su siguiente vistazo a `/ultima`.
+ */
+export async function liberar(env: Env, liberar: boolean): Promise<VersionLiberable[]> {
+  const ahora = new Date().toISOString()
+  const sistemas = await Promise.all(
+    (Object.keys(ULTIMAS) as Sistema[]).map(async (so) => {
+      const u = await (await env.DESCARGAS.get(ULTIMAS[so]))?.json<Ultima>()
+      if (!u) return
+      const nueva = liberar ? liberada(u, ahora) : u
+      if (nueva !== u) await env.DESCARGAS.put(ULTIMAS[so], JSON.stringify(nueva), { httpMetadata: { contentType: 'application/json' } })
+      return { so, version: nueva.version, ...(deTodos(nueva) ? {} : { todos: nueva.todos }) }
+    })
+  )
+  return sistemas.filter((s) => s !== undefined)
+}
+
+/** Cuánto guarda la caché `/ultima`: la piden todas las apps abiertas cada pocos minutos. */
+const ULTIMA_EN_CACHE = 30
+
+/**
+ * El vistazo de la app instalada (electron/main.ts): la última versión de `so` y desde cuándo es de todos. Si cambia
+ * (salió una, o se liberó en un live), la app pregunta por ella de inmediato. Es igual para todos: va en caché.
+ */
+async function ultimaLigera(req: Request, env: Env, ctx: ExecutionContext, so: Sistema): Promise<Response> {
+  const cache = typeof caches === 'undefined' ? undefined : caches.default
+  const llave = new Request(new URL(`/ultima?so=${so}`, req.url))
+  const guardada = await cache?.match(llave)
+  if (guardada) return guardada
+  const u = await (await env.DESCARGAS.get(ULTIMAS[so]))?.json<Ultima>()
+  const r = json(u ? { version: u.version, ...(u.todos ? { todos: u.todos } : {}) } : {}, 200, { 'cache-control': `public, max-age=${ULTIMA_EN_CACHE}` })
+  if (cache) ctx.waitUntil(cache.put(llave, r.clone()))
+  return r
+}
 
 /**
  * Si quien pregunta apoya hoy: la app manda su clave y su computadora (`x-sloth-clave`, `x-sloth-equipo`), y la clave
@@ -394,13 +437,16 @@ async function publicar(req: Request, env: Env, url: URL): Promise<Response> {
   if (req.method === 'POST' && url.pathname === '/publicar/fin') {
     const { partes, version, paraTodos } = (await cuerpo(req)) as { partes: R2UploadedPart[]; version: string; paraTodos?: boolean }
     // Una versión nueva: la que había pasa a `anterior/` (su ultima.json y su latest.yml, que aún no se reemplaza: va al
-    // final), salvo que aún fuera solo de quien apoya; entonces la anterior sigue siendo la de antes.
+    // final), salvo que aún fuera solo de quien apoya; entonces la anterior sigue siendo la de antes. Si esa ya no tiene
+    // instalador, a quien no apoya se le estaba dando la que había: pasa a ser la anterior, o la nueva le llegaría ya.
     const so = instaladorDe(archivo)
     const previa = so ? await (await env.DESCARGAS.get(ULTIMAS[so]))?.json<Ultima>() : undefined
-    if (so && previa && previa.version !== String(version) && deTodos(previa)) {
+    if (so && previa && previa.version !== String(version) && (deTodos(previa) || !(await anteriorDe(env, so)))) {
       const yml = { windows: 'latest.yml', mac: 'latest-mac.yml', linux: 'latest-linux.yml' }[so]
       const actual = await env.DESCARGAS.get(yml)
-      await env.DESCARGAS.put(`anterior/${ULTIMAS[so]}`, JSON.stringify(previa), { httpMetadata: { contentType: 'application/json' } })
+      // Sin `todos`: la anterior ya es de todos, aunque su fecha no hubiera llegado.
+      const { todos: _, ...anterior } = previa
+      await env.DESCARGAS.put(`anterior/${ULTIMAS[so]}`, JSON.stringify(anterior), { httpMetadata: { contentType: 'application/json' } })
       if (actual) await env.DESCARGAS.put(`anterior/${yml}`, await actual.arrayBuffer(), { httpMetadata: { contentType: 'text/yaml; charset=utf-8' } })
     }
     const obj = await subida.complete(partes)

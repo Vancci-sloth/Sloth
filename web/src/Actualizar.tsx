@@ -2,9 +2,12 @@ import { useEffect, useState } from 'react'
 import type { ActualizacionSloth } from '../../shared/types'
 import { Confirm } from './Confirm'
 
-/** Mientras baja, cada cuánto se pregunta cómo va; si no, cada cuánto se mira si hay versión nueva. */
+/**
+ * Mientras baja, cada cuánto se pregunta cómo va; si no, cada cuánto se mira si la ventana ya sabe de una versión nueva
+ * (pregunta solo a electron/main.ts, que la busca en el cobro: una liberada en un live se ve en minutos).
+ */
 const BAJANDO = 1000
-const CADA = 30 * 60_000
+const CADA = 60_000
 
 /**
  * Abajo de la barra lateral de la app que se vende: si hay una versión nueva de Sloth, el botón que la pone. Lo sabe la

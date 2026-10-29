@@ -38,7 +38,9 @@ ramas ni bloquea por sí solo un push a `venta`.
    sube al cobro con `npm run publicar`. No hace falta compilar localmente para publicar.
    Quien apoya recibe cada versión 7 días antes (`ANTICIPO` en `licencias/`): los demás siguen con la anterior en la app,
    en `/version` y en `/descargar`. Un arreglo urgente sale para todos de inmediato con `[para todos]` en el mensaje del
-   último commit que llega a `venta`, o con la opción `para_todos` al correr el workflow a mano.
+   último commit que llega a `venta`, o con la opción `para_todos` al correr el workflow a mano. Ya publicada, el
+   creador la da a todos antes de sus 7 días (cuando el chat de un live cumple su meta) con «Liberar para todos», arriba
+   de la Comunidad en su Sloth: no compila nada, y las apps abiertas la ven en unos 5 minutos (`/ultima`).
 4. Comprueba los tres jobs y la versión que ofrece el cobro: `/version`, `/version?so=mac` y `/version?so=linux` en
    `https://api.sloth.vancci.org` (sin apoyo, durante sus 7 días, dicen la anterior). Pedido sin llave, `/version` es
    lo que se le da a quien no apoya: si trae `nueva`, sigue con la anterior; si no, ya tiene esa. Qué arreglo le llegó

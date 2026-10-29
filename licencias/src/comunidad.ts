@@ -25,9 +25,11 @@
  * - `POST /comunidad/perfil` `{nombre?, foto?, creditos?}`: `creditos`, solo un Fundador (sale en `GET /creditos`).
  * - `PUT /comunidad/archivo`, con el archivo de cuerpo y su `content-type`: una imagen o un video (sus primeros
  *   segundos, que recorta `server/comunidad.ts`; el entero se enlaza en el texto). Da su llave.
+ * - `GET /comunidad/liberar`, solo el creador: la última versión de cada sistema y si aún es solo de quien apoya.
+ *   `POST` la da a todos ya (`liberar` en `index.ts`), cuando el chat de un live cumple su meta.
  */
 import type { AdjuntoComunidad, Autor, AvisoComunidad, CategoriaComunidad, ComentarioComunidad, FeedComunidad, PublicacionComunidad, RoadmapComunidad } from '../../shared/types.ts'
-import { CLAVE, EQUIPO, esFundador, type Env, type Fila, Rechazo, cuerpo, iguales, json, letras, servir, vigencia } from './index.ts'
+import { CLAVE, EQUIPO, esFundador, type Env, type Fila, Rechazo, cuerpo, iguales, json, letras, liberar, servir, vigencia } from './index.ts'
 
 export const CATEGORIAS: CategoriaComunidad[] = ['general', 'hice', 'ayuda', 'mejoras', 'anuncios']
 
@@ -139,6 +141,10 @@ export async function comunidad(req: Request, env: Env, url: URL): Promise<Respo
     return json({ ok: true })
   }
   if (ruta === '/comunidad/archivo' && req.method === 'PUT') return json(await subir(req, env))
+  if (ruta === '/comunidad/liberar' && (req.method === 'GET' || req.method === 'POST')) {
+    if (!esCreador(yo)) throw new Rechazo(403, 'Eso solo lo hace el creador de Sloth.')
+    return json(await liberar(env, req.method === 'POST'))
+  }
 
   const p = /^\/comunidad\/p\/([a-z0-9]+)(?:\/(borrar|megusta|comentar|reportar|revisada))?$/.exec(ruta)
   if (p && req.method === 'GET' && !p[2]) return json(await abrir(env, yo, p[1]))

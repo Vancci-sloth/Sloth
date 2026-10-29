@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { createHmac } from 'node:crypto'
 import test from 'node:test'
 import { DatabaseSync } from 'node:sqlite'
-import { deTodos, esFundador, faltaAvisar, firmaDeMercadoPago, instaladorDe, leerPagos, rangoDe, sobran, tarifa, vigencia } from './index.ts'
+import { deTodos, esFundador, faltaAvisar, firmaDeMercadoPago, instaladorDe, leerPagos, liberada, rangoDe, sobran, tarifa, vigencia } from './index.ts'
 
 const SECRETO = 'secreto-de-prueba'
 const firmar = (manifiesto: string) => createHmac('sha256', SECRETO).update(manifiesto).digest('hex')
@@ -135,4 +135,15 @@ test('una versión nueva es de quien apoya hasta su fecha `todos`; las de antes,
   assert.equal(deTodos({}, ahora), true)
   assert.equal(deTodos({ todos: '2026-11-05T12:00:00Z' }, ahora), false)
   assert.equal(deTodos({ todos: '2026-11-01T12:00:00Z' }, ahora), true)
+})
+
+test('liberar en un live da a todos ya la versión que aún era de quien apoya; la que ya era de todos no cambia', () => {
+  const ahora = new Date().toISOString()
+  const pendiente = { version: '0.3.20', todos: new Date(Date.now() + 5 * 864e5).toISOString() }
+  assert.deepEqual(liberada(pendiente, ahora), { version: '0.3.20', todos: ahora })
+  assert.equal(deTodos(liberada(pendiente, ahora)), true)
+  const yaDeTodos = { version: '0.3.19', todos: '2026-10-01T12:00:00Z' }
+  assert.equal(liberada(yaDeTodos, ahora), yaDeTodos)
+  const deAntes = { version: '0.3.2' }
+  assert.equal(liberada(deAntes, ahora), deAntes)
 })

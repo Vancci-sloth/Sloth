@@ -1091,6 +1091,13 @@ export interface FeedComunidad {
   mas: boolean
 }
 
+/** `/api/comunidad/liberar`, solo del creador: la última versión de un sistema y, mientras es solo de quien apoya, desde cuándo será de todos. */
+export interface VersionLiberable {
+  so: 'windows' | 'mac' | 'linux'
+  version: string
+  todos?: string
+}
+
 /** Lo que el servidor empuja por el WebSocket. */
 export type ServerPush =
   | { type: 'events'; sessionId: string; from: number; events: AgentEvent[] }
