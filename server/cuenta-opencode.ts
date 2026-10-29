@@ -58,6 +58,13 @@ export async function conectarOpenCode(): Promise<Cuenta> {
   const { client } = await conexion()
   if (!intento) {
     fallo = undefined
+    // OpenCode carga sus integraciones al arrancar, un momento después de contestar: antes, `connect` da 500 («OAuth
+    // method not found»). Se espera a que la de su cuenta tenga el método.
+    for (const fin = Date.now() + 15_000; ; await new Promise((r) => setTimeout(r, 250))) {
+      const i = await client.integration.get({ integrationID: CONSOLA }).catch(() => null)
+      if (i?.data.methods.some((m) => 'id' in m && m.id === 'device')) break
+      if (Date.now() > fin) throw new Error('OpenCode no ofrece conectar la cuenta ahora. Intenta otra vez en un momento.')
+    }
     const r = await client.integration.oauth.connect({ integrationID: CONSOLA, methodID: 'device', answer: { server: SERVIDOR } })
     intento = { id: r.data.attemptID, url: r.data.url, codigo: /code:\s*(\S+)/i.exec(r.data.instructions)?.[1] }
   }
