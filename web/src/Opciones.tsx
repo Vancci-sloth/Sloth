@@ -480,8 +480,8 @@ function Bajando({ a }: { a?: EstadoAgente }) {
  */
 export function CuentaOpenCode({ aviso = false, onFalta }: { aviso?: boolean; onFalta?(falta?: boolean): void }) {
   const { agentes, error, bajar } = useAgentes()
-  const version = useVersion('opencode', !aviso)
   const a = agentes?.opencode
+  const version = useVersion('opencode', !aviso, a?.instalado)
   const falta = a ? !a.instalado : undefined
   useEffect(() => onFalta?.(falta), [falta])
   if (aviso && !falta) return null
@@ -570,7 +570,7 @@ function CuentaCodex({ aviso = false, onFalta }: { aviso?: boolean; onFalta?(fal
   const c = useCuenta(true, 'codex')
   const { agentes } = useAgentes(c.ocupado)
   const llave = useLlave(c, 'codex')
-  const version = useVersion('codex', !aviso)
+  const version = useVersion('codex', !aviso, agentes?.codex.instalado)
   const falta = c.cuenta ? !c.cuenta.conectada : undefined
   useEffect(() => onFalta?.(falta), [falta])
   if (aviso && !falta) return null
@@ -804,13 +804,14 @@ function EstadoRequisito({ r }: { r: Requisito }) {
  * La versión de un agente (`estado`, a la derecha de su fila), la que trae Sloth: llega al día con cada versión de Sloth.
  * `aviso`, debajo, si no se pudo leer.
  */
-function useVersion(de: Proveedor, mirar = true) {
+function useVersion(de: Proveedor, mirar = true, instalado?: boolean) {
   const [p, setVersion] = useState<VersionClaude | null>(null)
   const [error, setError] = useState('')
 
+  // Se vuelve a preguntar al terminar de bajarse el agente: si no, seguiría diciendo «No está instalado».
   useEffect(() => {
     if (mirar) void api<VersionClaude>(`/api/${de}/version`).then(setVersion, (e) => setError(e.message))
-  }, [])
+  }, [instalado])
 
   let estado: ReactNode
   if (!mirar) estado = null
@@ -826,7 +827,7 @@ function Agentes() {
   const c = useCuenta(true)
   const { agentes } = useAgentes(!!c.cuenta?.conectando)
   const llave = useLlave(c, 'claude')
-  const version = useVersion('claude')
+  const version = useVersion('claude', true, agentes?.claude.instalado)
   const cuenta = c.cuenta
   return (
     <>
