@@ -504,7 +504,7 @@ export function CuentaOpenCode({ aviso = false, onFalta }: { aviso?: boolean; on
   }
   const elegir = (que: string) => {
     const [accion, id] = que.split(':')
-    if (accion === 'saldo') window.open('https://opencode.ai/auth', '_blank', 'noreferrer')
+    if (accion === 'saldo') window.open(cuenta?.uso ?? 'https://opencode.ai/auth', '_blank', 'noreferrer')
     else if (accion === 'otra') conectar()
     else void c.pedir(`/api/opencode/${accion}`, { id })
   }

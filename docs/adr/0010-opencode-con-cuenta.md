@@ -33,8 +33,12 @@ catálogo solo trae los modelos gratis; con ella, también los de pago de Zen, q
 
 ## Consecuencias
 
-- Empezar con OpenCode lleva un paso más: crear la cuenta en su página. A cambio, el uso gratis es de cada quien, no de
-  toda la red.
+- Empezar con OpenCode lleva un paso más: crear la cuenta en su página.
+- **La cuenta no repone el uso gratis.** Se probó con dos cuentas recién creadas en una computadora que ya había gastado
+  el suyo: las dos chocaron con el mismo «Free usage limit reached» en el primer paso, sin gastar nada. OpenCode cuenta
+  lo gratis por computadora o red, no por cuenta. Lo que da la cuenta son los modelos de pago con su saldo (30 de 38 en
+  el catálogo, verificado) y Go.
+- La etiqueta de cada cuenta en OpenCode es el nombre de su organización («Personal» en todas): Sloth enseña el correo.
 - Cuando se acaba el uso gratis, el hilo lo dice así y ofrece los modelos de pago, Claude o ChatGPT; no lo confunde con
   un modelo saturado.
 - Los datos de la cuenta (el token que renueva OpenCode) viven en la base de `data/opencode`, en esta computadora.

@@ -39,12 +39,20 @@ export async function cuentaOpenCode(): Promise<Cuenta> {
     }
     const cuentas = (await client.credential.list()).filter((c) => c.integrationID === CONSOLA)
     const activa = cuentas.find((c) => c.active)
+    // La etiqueta es el nombre de la organización («Personal» en todas): se distinguen por el correo.
+    const quien = (c: (typeof cuentas)[number]) => {
+      const correo = c.value.metadata?.email
+      return typeof correo === 'string' ? correo : c.label
+    }
+    // Dónde se ven el saldo y el uso de la cuenta activa, en su organización de opencode.ai.
+    const uso = activa && (await client.experimental.usage.limits().then((r) => r.data?.workspace.usageURL, () => undefined))
     return {
       conectada: !!activa,
-      quien: activa?.label,
+      quien: activa && quien(activa),
       conectando: intento && { url: intento.url, codigo: intento.codigo },
       error: fallo,
-      cuentas: cuentas.map((c) => ({ id: c.id, quien: c.label, activa: c.active })),
+      cuentas: cuentas.map((c) => ({ id: c.id, quien: quien(c), activa: c.active })),
+      uso,
       cambio
     }
   } catch (error) {

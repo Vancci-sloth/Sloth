@@ -546,6 +546,8 @@ export interface CuentaClaude {
   llave?: LlaveAgente
   /** OpenCode recuerda cada cuenta que se conectó, y trabaja con la activa: así se cambia de una a otra. */
   cuentas?: { id: string; quien: string; activa: boolean }[]
+  /** Dónde se ven el saldo y el uso de la cuenta, en su página (OpenCode). */
+  uso?: string
 }
 
 export interface LlaveAgente {
