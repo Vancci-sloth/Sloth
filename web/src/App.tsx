@@ -34,6 +34,8 @@ import { CalendarioYoutube } from './YoutubeCalendario'
 import { avisarTanda, AvisoRedes, ConNavegadorRedes, usePublicar } from './Redes' // redes
 import { NombreDelHilo, Renombrar } from './Renombrar'
 import { Segmento } from './Segmento'
+import { SelectorVoz, useVoz } from './Voz' // voz de AI Studio
+import { lineaVoz } from '../../shared/voz'
 import { Timeline } from './Timeline'
 import { compact, duration } from './items'
 import './Barra.css'
@@ -793,6 +795,11 @@ function NewSession(props: {
   const formatoEscrito = /^Formato: (vertical|horizontal)\s*$/m.exec(props.draft?.text ?? '')?.[1] as 'vertical' | 'horizontal' | undefined
   const formato = formatoEscrito ?? formatos[card.id] ?? 'vertical'
   const conFormato = !!card.etapas
+  // La voz: mandarla tú o que el agente la genere en AI Studio (`Voz.tsx`). La card recuerda la última; sin la cuenta
+  // de Google conectada, la mandas tú.
+  const voz = useVoz()
+  const [voces, setVoces] = useStored<Record<string, string>>('voz', {})
+  const vozElegida = voz.estado?.cuenta ? (voces[card.id] ?? '') : ''
   // Un archivo o un enlace soltado en cualquier parte del inicio va al mensaje.
   const soltar = useSoltar()
 
@@ -843,6 +850,7 @@ function NewSession(props: {
                 onCambio={(f) => setFormatos({ ...formatos, [card.id]: f })}
               />
             )}
+            {conFormato && <SelectorVoz card={card} voz={voz} valor={vozElegida} onCambio={(v) => setVoces({ ...voces, [card.id]: v })} />}
             {card.lote && enlaces.length > 1 && (
               <Segmento
                 label="Lote"
@@ -871,6 +879,7 @@ function NewSession(props: {
           const pide = [
             laSerie && `Serie: ${laSerie.nombre} (${laSerie.archivo}; cómo se usa, en video-base/SERIES.md)${text ? '' : '. Elige tú el tema.'}`,
             conFormato && !formatoEscrito && `Formato: ${formato}`,
+            conFormato && lineaVoz(card, vozElegida),
             // El modelo de cada subagente: lo medido, o lo que elegiste en «Avanzado». La skill lo lee aquí.
             lineaSubagentes(tareas)
           ]

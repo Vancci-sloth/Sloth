@@ -152,6 +152,9 @@
     "description": "Un sketch de comedia sobre cualquier tema o tu propio guion: un experto muy serio enseña a resolver una situación con pasos físicos absurdos, con tus poses recortadas sobre fotos reales y la voz que elijas.",
     "skill": "reel-collage",
     "icon": "risa",
+    "voz": {
+      "propia": "Voz de edge-tts"
+    },
     "lote": {
       "prefijo": "reel-"
     },
@@ -201,6 +204,7 @@
     "description": "Tu grabación hablando a cámara, convertida en un documental para YouTube, TikTok o Reels: cada frase con material real encontrado en internet, recoloreado y animado a golpe de corte, tú recortado delante de un mundo que cambia y un clic en cada imagen.",
     "skill": "video-documental",
     "icon": "claqueta",
+    "voz": false,
     "etapas": [
       {
         "nombre": "Tu grabación",

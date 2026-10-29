@@ -80,7 +80,8 @@ mundo y la imagen siguen siendo de cada video (ver "Cada video es único").
 - **Las imágenes nuevas se hacen con Codex** (`codex exec` con su herramienta `image_gen`), nunca con Gemini: poses del
   personaje, bocas abiertas, las caras o texturas del protagonista. Solo con ChatGPT conectado; cómo, en "Imágenes con
   Codex".
-- **La voz la graba el usuario.** Tú escribes el guion y se lo das para leer; no hay voz sintética.
+- **La voz la graba el usuario**, o la generas tú en AI Studio si el mensaje trae `Voz:` con una voz
+  ([`<base>/VOZ.md`](../video-base/VOZ.md)). Ninguna otra voz sintética.
 - **El cierre es el de la marca.** La última frase del guion, en todos los videos y de cualquier tema, es `cierre.frase`
   de la marca, tal cual; en la imagen, la tarjeta `Canal`, que ya lee su red, su nombre y su foto. Con red `ninguna`,
   el video termina en su propio remate, sin invitar a nada.
@@ -203,7 +204,8 @@ scripts dicen al empezar cuánto tardarán aquí y luego cuánto falta. Lánzalo
 3. **Enfoque y guion.** Primero el enfoque y su huella, juntos en `fuentes/huella.json` ("El enfoque" de
    [`GUION.md`](GUION.md)), y `python -B -X utf8 <base>/scripts/huellas.py revisar <skill>`: si algo choca, cambia
    el enfoque y vuelve a revisar. Después el guion en `guion.md` (lo que el usuario lee en voz alta). **En cuanto esté,
-   dáselo para grabar**. Antes, tú mismo (son segundos) corre `python -B -X utf8 <skill>/scripts/subtitulos.py` (parte
+   dáselo para grabar** (con `Voz:` de AI Studio, en vez de dárselo pide la voz con `generar_voz`, `archivo` el
+   guion). Antes, tú mismo (son segundos) corre `python -B -X utf8 <skill>/scripts/subtitulos.py` (parte
    `guion.md` en renglones y pone las cifras como se ven y como se dicen) y escribe los nombres del tema en
    `terminos.txt`, uno por renglón: con eso ya se puede alinear la voz en cuanto llegue. Y lanza en segundo plano:
    - un subagente con tu mismo modelo para marcar los subtítulos, con este encargo: «en `<proyecto>`, marca
@@ -221,7 +223,7 @@ scripts dicen al empezar cuánto tardarán aquí y luego cuánto falta. Lánzalo
 4. **Su voz.** Llega en cualquier formato (el m4a del celular, mp3, ogg, opus, un video): pásala a
    `fuentes/voz/original.wav` con `ffmpeg -nostdin -v error -y -i <audio> -vn -c:a pcm_s16le -ar 48000
    fuentes/voz/original.wav` (si trae silencio largo al principio o al final, recórtalo en el mismo comando). Si
-   Sloth ya la dejó ahí, sigue. Luego, **en segundo plano** mientras sigues con lo de arriba,
+   Sloth ya la dejó ahí, sigue. La de AI Studio llega en `fuentes/voz/ai-studio.wav`: pásala igual. Luego, **en segundo plano** mientras sigues con lo de arriba,
    `python -I -B -X utf8 scripts/alinear.py fuentes/voz/original.wav` (la nivela, la transcribe, rehace solo lo que
    Whisper se saltó o cambió, y empareja los subtítulos; ~75 s) y
    `python -I -B -X utf8 scripts/acelerar.py fuentes/voz/original.wav fuentes/voz/voz-lenta.json` (la acerca a 224

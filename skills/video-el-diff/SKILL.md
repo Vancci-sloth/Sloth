@@ -26,7 +26,8 @@ video. El de [`plantilla/src/marca.json`](plantilla/src/marca.json) trae todos l
   último beat, a donde manda (su newsletter, su canal, otro video); vacía, el episodio acaba en la despedida.
 - `aprendido`: lo que funcionó en su canal, con sus números (ver «El ángulo»).
 - `voz_studio`: la voz de AI Studio con la que generas tú la narración (su nombre allí, p. ej. `Fola`; ver el paso 5);
-  vacía, el usuario manda su voz.
+  vacía, el usuario manda su voz. Si el mensaje trae la línea `Voz:`, manda ella
+  ([`VOZ.md`](../video-base/VOZ.md) de video-base).
 
 **Antes del paso 1**, si no hay `marca.json` en la carpeta donde trabajas, pregúntale al usuario en un solo mensaje el
 nombre de su noticiero, su sello, de qué son sus noticias, cómo se despide y a dónde invita al final (newsletter, su
@@ -206,12 +207,11 @@ la carpeta de las skills.
    el chat si trabajas dentro de Sloth (en su carpeta `trabajo`): lo lee en la etapa Guion del panel, y su botón
    «Copiar» lo copia sin el título ni los encabezados. Fuera de Sloth, pégalo completo **sin los encabezados `##`**. Lo graba (o lo genera) leyendo todo lo que ve: en el episodio 5 la voz leyó
    los 14 títulos. No hace falta escribir la pronunciación.
-   **Con `voz_studio` en la marca, la voz la generas tú**: no se la pidas. Al copiar `guion.md`, corre de fondo
-   `node <skill>/scripts/voz_studio.mjs` (en la raíz del episodio). Pega el guion en «Generate speech» de AI Studio,
-   en la cuenta de Google del usuario y con esa voz, y deja `fuentes/voz/studio.wav`: un guion de 6 minutos tarda unos
-   2 minutos. Ese es el WAV de la fase 2. Si sale con error (3: falta la sesión, y entonces corre `--entrar` y pide al
-   usuario que entre; 4: la cuota del día; 2: la página cambió), díselo y pídele la voz como siempre. Si corriges
-   `guion.md` después, vuelve a correrlo: con el mismo texto no pide nada.
+   **Con `Voz:` de AI Studio en el mensaje, o `voz_studio` en la marca y sin `Voz:`, la voz la generas tú**: no se
+   la pidas. Al copiar `guion.md`, pídela con `generar_voz` (`archivo` el `guion.md`, que se narra sin títulos ni
+   encabezados, y `salida` `fuentes/voz/ai-studio.wav`), como dice [`VOZ.md`](../video-base/VOZ.md): un guion de 6
+   minutos tarda unos 2 minutos. Ese es el WAV de la fase 2. Si falla (sin cuenta conectada, la cuota del día), díselo
+   y pídele la voz como siempre. Si corriges `guion.md` después, vuelve a pedirla: con el mismo texto sale al momento.
 6. **Las escenas, sin esperar la voz.** En cuanto copias `guion.md`, haz las escenas (pasos 2 y 3 de la
    [Fase 2](#fase-2-el-video)), aunque las capturas no hayan terminado: la voz llega en unos 2 a 4 minutos. Lo que
    cambie después en el guion, o lo que pida el usuario, lo corrige otra vez el agente de ese bloque.
@@ -225,7 +225,7 @@ La fase 2 la coordinas tú, en tu sesión: lo pesado va en subagentes con el con
 escenas y los revisores) y lo demás son scripts. Así salió el-diff-10 (25 de octubre) en 26 minutos de punta a punta,
 con lo que no depende de otra cosa a la vez:
 
-- **En cuanto copias `guion.md`** (paso 6 de la fase 1), en un mismo mensaje: la voz (`voz_studio.mjs`, o la que mande
+- **En cuanto copias `guion.md`** (paso 6 de la fase 1), en un mismo mensaje: la voz (`generar_voz`, o la que mande
   el usuario), `material.py` y `repartir.py` (pasos 2 y 3), los agentes de cada bloque, de fondo, y la portada (paso 6).
   Las capturas y los clips que aún no llegan salen como `FALTA` o en blanco: cuando lleguen, otra vez `material.py`.
 - **Cuando llega el WAV:** `voz.py` (paso 1), de fondo, mientras escriben las escenas.

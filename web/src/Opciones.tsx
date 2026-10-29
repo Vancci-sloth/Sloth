@@ -15,6 +15,7 @@ import { RadarOpciones } from './RadarOpciones' // radar
 import { Segmento } from './Segmento'
 import { ConNavegadorRedes, RedesOpciones } from './Redes' // redes
 import { YoutubeOpciones } from './Youtube'
+import { VozOpciones } from './Voz' // voz de AI Studio
 import { VENTA } from '../../shared/venta'
 import './Opciones.css'
 
@@ -76,6 +77,9 @@ function Ajustes({ onDone, iniciando, onIniciando }: { onDone(): void; iniciando
         <Agentes />
         <CuentaCodex />
         <CuentaOpenCode />
+      </Grupo>
+      <Grupo titulo="Voz" nota="Al pedir un video eliges en «Voz» si la mandas tú o si el agente la genera aquí. La sesión de Google vive en un perfil aparte del navegador de Sloth: ningún agente la usa.">
+        <VozOpciones />
       </Grupo>
       {/* Solo sirven a Ideas: sin la de YouTube, las recomendaciones van con el canal conectado. */}
       {!VENTA && (

@@ -20,6 +20,12 @@ export interface Card {
   modelos?: ModelosConf
   /** Un estilo que hiciste con «Nuevo estilo» (`data/tus-cards.json`): lo pone el servidor. Se borra también en la venta. */
   tuya?: boolean
+  /**
+   * La voz del video. Sin esto, un estilo (con `etapas`) deja elegir en el compositor entre mandarla tú o que el agente la
+   * genere en AI Studio (`shared/voz.ts`). `false`: no hay qué elegir, la voz es tu grabación a cámara. `propia`: cómo la
+   * hace el estilo si no eliges AI Studio, cuando no es mandándola tú.
+   */
+  voz?: false | { propia: string }
 }
 
 /** Un modelo con su esfuerzo. `medido` dice dónde se midió; sin él, es el de por defecto. */
@@ -1208,6 +1214,45 @@ export interface PuenteSloth {
  * hilo. Tiene su propio perfil: la sesión de las redes no la tienen los agentes.
  */
 export const NAVEGADOR_REDES = 'redes'
+
+/**
+ * La página del navegador integrado donde Sloth genera las voces en Google AI Studio (`server/voz/`), con la sesión de
+ * Google del usuario en su propio perfil: tampoco la tienen los agentes.
+ */
+export const NAVEGADOR_VOZ = 'voz'
+
+/** Una voz de AI Studio: su nombre allí (`Fola`), cómo suena y el grupo en que la pone la página (`Podcast`). */
+export interface VozStudio {
+  nombre: string
+  descripcion: string
+  grupo: string
+}
+
+/**
+ * `GET /api/voz`: la cuenta de Google con que Sloth genera las voces (`null`: sin conectar), si está esperando a que
+ * entres en Edge, las voces que ofrece la página y cuántas esperan su turno. `error`: lo último que falló al conectar.
+ */
+export interface EstadoVoz {
+  cuenta: string | null
+  conectando: boolean
+  voces: VozStudio[]
+  enFila: number
+  error?: string
+}
+
+/**
+ * Una voz pedida (`POST /api/voz/generar`). `archivo`: el WAV ya en su sitio; `segundos`, lo que dura. `error`: por qué
+ * no salió, dicho para el agente.
+ */
+export interface TrabajoVoz {
+  id: string
+  estado: 'en-fila' | 'generando' | 'lista' | 'error'
+  voz: string
+  palabras: number
+  archivo?: string
+  segundos?: number
+  error?: string
+}
 
 /**
  * La página de un hilo en el navegador integrado (electron/navegador.ts). `url` vacía: aún no abrió nada. `agente`: el

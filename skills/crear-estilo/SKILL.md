@@ -15,7 +15,7 @@ Sloth la enseña en el inicio en cuanto ese archivo cambia, y enlaza la skill do
 ## Pasos
 
 1. **Entender el video.** Lo que hace falta saber, y nada más: de qué van los videos, cuánto duran, de dónde sale la voz
-   (la graba el usuario o una voz de `edge-tts`), si sale una persona o un personaje y cómo se ve. El formato no se
+   (la graba el usuario, una voz de AI Studio o una de `edge-tts`), si sale una persona o un personaje y cómo se ve. El formato no se
    pregunta: todo estilo hace los dos, vertical (TikTok, Reels, Shorts) y horizontal (YouTube), y el usuario elige uno
    en Sloth cada vez. Si sus ejemplos son de uno solo, el otro lo acomodas tú ([FORMATO.md](../video-base/FORMATO.md)). Si mandó ejemplos, bájalos fuera de las skills, a
    `<skills>/../trabajo/<id>/referencias`, con `python <skills>/video-base/scripts/fuente.py <url> <carpeta>`, y míralos
@@ -38,6 +38,9 @@ Sloth la enseña en el inicio en cuanto ese archivo cambia, y enlaza la skill do
    **Siempre los dos formatos:** Sloth manda `Formato: vertical` o `Formato: horizontal` en el mensaje, la plantilla
    compone el que llegue (1080×1920 o 1920×1080) y `SKILL.md` lleva su sección «Formato», que dice qué hace con cada
    línea y cómo se acomoda en cada uno ([FORMATO.md](../video-base/FORMATO.md)).
+   **La voz, como elija el usuario:** si el estilo lleva voz narrada, el mensaje puede traer la línea `Voz:` (mandarla
+   él o generarla tú en AI Studio). `SKILL.md` dice en qué paso está el guion y remite a
+   [VOZ.md](../video-base/VOZ.md) para lo demás.
 4. **La card.** Añádela a `<skills>/../data/tus-cards.json` (un arreglo; créalo si no está y no toques las demás), al
    final, cuando la skill ya existe:
 
@@ -63,7 +66,9 @@ Sloth la enseña en el inicio en cuanto ese archivo cambia, y enlaza la skill do
    - `icon`: uno de trazo, nunca un emoji: `noticiero`, `pizarra`, `claqueta`, `risa`, `video`, `imagen`, `megafono`,
      `personas`, `foco`, `globo`, `escena`, `sonido`, `calendario`, `lapiz`.
    - `lote: { "prefijo": "<algo>-" }` si sirve hacer varios a la vez, uno por enlace.
-   - El selector de formato (Vertical u Horizontal) sale solo en toda card con `etapas`: no lleva nada para eso.
+   - El selector de formato (Vertical u Horizontal) sale solo en toda card con `etapas`: no lleva nada para eso. El de
+     la voz (mandarla tú o una de AI Studio), también; si la voz es la grabación a cámara del usuario, `"voz": false`,
+     y si el estilo hace la suya (edge-tts), `"voz": { "propia": "Voz de edge-tts" }`.
 
    Listo cuando el archivo es JSON válido y la card sale en el inicio de Sloth.
 5. **Probar.** Haz dos videos de prueba cortos (de 10 a 15 s) siguiendo la skill nueva, uno vertical y uno horizontal,

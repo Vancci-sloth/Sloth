@@ -5,6 +5,7 @@ import type { AgentEvent, Model, Tokens } from '../shared/types.ts'
 import { IMAGE_TYPES, Inbox, stringify, type AgentOptions, type AgentRun, type SkillRef } from './agent.ts'
 import { herramientasIdeas } from './ideas/mcp.ts' // ideas
 import { navegadorAgente } from './navegador-agente.ts'
+import { mcpVoz } from './voz/index.ts'
 import { programaClaude, rutaAgente } from './agentes.ts'
 
 /** Los modelos que conoce Claude Code, con lo que admite cada uno. Se pregunta una vez por arranque; si falla, en la siguiente. */
@@ -78,9 +79,9 @@ export function startClaude(opts: AgentOptions): AgentRun {
       allowDangerouslySkipPermissions: true,
       settingSources: ['user', 'project', 'local'],
       systemPrompt: { type: 'preset', preset: 'claude_code', append: OPCIONES },
-      // El navegador del agente y, en un canal de Ideas, sus herramientas (`parecidos`; en uno vertical, también las de TikTok e
-      // Instagram): se suman a los MCP del usuario.
-      mcpServers: { ...navegadorAgente(opts.lote, opts.hilo), ...herramientasIdeas(opts.cwd) },
+      // El navegador del agente, la voz de AI Studio y, en un canal de Ideas, sus herramientas (`parecidos`; en uno vertical,
+      // también las de TikTok e Instagram): se suman a los MCP del usuario.
+      mcpServers: { ...navegadorAgente(opts.lote, opts.hilo), ...mcpVoz(), ...herramientasIdeas(opts.cwd) },
       includePartialMessages: true
     }
   })

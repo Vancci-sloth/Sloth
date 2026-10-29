@@ -15,6 +15,7 @@ Lo que comparten los estilos de vídeo: el lote, los errores ya vistos y los scr
 | [FORMATO.md](FORMATO.md) | Vertical u horizontal: todo estilo hace los dos, y qué cambia de uno a otro (`Formato:` del mensaje) |
 | [LOTE.md](LOTE.md) | Lo que cambia cuando el vídeo es uno de un lote; solo se lee si el mensaje trae `Lote:` |
 | [PORTADA.md](PORTADA.md) | La portada que todo vídeo vertical lleva de primer fotograma, en el estilo de su vídeo, y la miniatura de YouTube del horizontal |
+| [VOZ.md](VOZ.md) | La voz que el usuario elige al pedir el vídeo (`Voz:` del mensaje): mandarla él o generarla tú en AI Studio con el MCP `voz` |
 | [SERIES.md](SERIES.md) | Las series (`series/`), formatos fijos del canal para todo estilo: Sloth las ofrece al crear un vídeo; solo se lee si el mensaje trae `Serie:` |
 | `scripts/` | Las herramientas (abajo) |
 

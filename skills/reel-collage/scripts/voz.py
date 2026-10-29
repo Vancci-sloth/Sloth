@@ -1,5 +1,6 @@
 """
-La narración con edge-tts, frase por frase y pegada como los jump cuts del reel de referencia.
+La narración con edge-tts (o con una voz de AI Studio), frase por frase y pegada como los jump cuts del reel de
+referencia.
 
     python voz.py [--oir]
 
@@ -8,6 +9,9 @@ Lee `guion.json` de la raíz del proyecto:
     {"voz": "es-MX-JorgeNeural", "rate": "+25%", "antes": 1.5,
      "frases": [{"texto": "lo que dice el guion", "dicho": "como lo pronuncia el TTS", "pausa": 0.6}, ...]}
 
+Con `"studio": "Fola"`, cada frase la genera Sloth en Google AI Studio con esa voz (VOZ.md de video-base) en vez de
+edge-tts: AI Studio no da el tiempo de cada palabra, así que se reparte por letras dentro de su frase. Cada frase se
+pide aparte y queda en fuentes/voz/fNN.wav: al cambiar el guion, solo se vuelven a pedir las que cambiaron.
 `antes` son los segundos en que el clip del gancho suena solo, antes de la primera palabra. `dicho` es opcional (si
 falta, se lee `texto`); `pausa` también: segundos de silencio después de la frase. Deja public/voz.wav (48 kHz, nivelado a -12 LUFS) y public/voz.json (inicio y fin de cada
 frase y de cada palabra, en segundos). Con --oir la transcribe con WhisperX y la imprime, para comprobar que se
@@ -16,8 +20,11 @@ entiende.
 
 import asyncio
 import json
+import os
+import re
 import subprocess
 import sys
+import urllib.request
 from pathlib import Path
 
 import edge_tts
@@ -40,6 +47,36 @@ async def sintetizar(texto: str, voz: str, rate: str, destino: Path) -> list[dic
             palabras.append({"w": c["text"], "a": c["offset"] / 1e7, "b": (c["offset"] + c["duration"]) / 1e7})
     destino.write_bytes(audio)
     return palabras
+
+
+def pedir(ruta: str, datos: dict | None = None) -> dict:
+    url = os.environ.get("SLOTH_URL", "http://127.0.0.1:4848") + ruta
+    pedido = urllib.request.Request(url, data=json.dumps(datos).encode() if datos else None, headers={"content-type": "application/json"})
+    try:
+        with urllib.request.urlopen(pedido, timeout=120) as r:
+            return json.load(r)
+    except urllib.error.HTTPError as e:
+        sys.exit(f"AI Studio: {json.load(e).get('error', e)}")
+
+
+def studio(texto: str, voz: str, destino: Path) -> None:
+    """La frase con una voz de AI Studio, que genera Sloth en la cuenta de Google del usuario."""
+    t = pedir("/api/voz/generar", {"texto": texto, "voz": voz, "salida": str(destino.resolve())})
+    while t["estado"] in ("en-fila", "generando"):
+        t = pedir(f"/api/voz/trabajos/{t['id']}?esperar=40")
+    if t["estado"] == "error":
+        sys.exit(f"AI Studio: {t['error']}")
+
+
+def repartir(texto: str, a: float, b: float) -> list[dict]:
+    """Los tiempos de cada palabra entre `a` y `b`, por cuántas letras tiene."""
+    palabras = texto.split()
+    pesos = [max(1, len(re.sub(r"\W", "", w))) for w in palabras]
+    total, hecho, salida = sum(pesos), 0, []
+    for w, p in zip(palabras, pesos):
+        salida.append({"w": w, "a": a + (b - a) * hecho / total, "b": a + (b - a) * (hecho + p) / total})
+        hecho += p
+    return salida
 
 
 def leer(archivo: Path) -> np.ndarray:
@@ -102,16 +139,24 @@ def oir(wav: Path) -> None:
 
 def main() -> None:
     g = json.loads((PROYECTO / "guion.json").read_text(encoding="utf8"))
-    voz, rate = g.get("voz", "es-MX-JorgeNeural"), g.get("rate", "+25%")
+    voz, rate, voz_studio = g.get("voz", "es-MX-JorgeNeural"), g.get("rate", "+25%"), g.get("studio")
     tmp = PROYECTO / "fuentes" / "voz"
     tmp.mkdir(parents=True, exist_ok=True)
     antes = float(g.get("antes", 0.0))
     pistas, salida, t = [np.zeros(int(SR * antes), dtype=np.float32)], [], antes
     for i, f in enumerate(g["frases"]):
-        mp3 = tmp / f"f{i:02d}.mp3"
-        palabras = asyncio.run(sintetizar(f.get("dicho", f["texto"]), voz, rate, mp3))
-        x = leer(mp3)
-        a, b = recorte(x)
+        dicho = f.get("dicho", f["texto"])
+        if voz_studio:
+            archivo = tmp / f"f{i:02d}.wav"
+            studio(dicho, voz_studio, archivo)
+            x = leer(archivo)
+            a, b = recorte(x)
+            palabras = repartir(dicho, a / SR, b / SR)
+        else:
+            mp3 = tmp / f"f{i:02d}.mp3"
+            palabras = asyncio.run(sintetizar(dicho, voz, rate, mp3))
+            x = leer(mp3)
+            a, b = recorte(x)
         x, mapa = comprimir(x[a:b])
         largo = len(x) / SR
         salida.append({
@@ -128,6 +173,8 @@ def main() -> None:
     (PROYECTO / "public").mkdir(exist_ok=True)
     ffmpeg("-i", str(crudo), "-af", "loudnorm=I=-12:TP=-1:LRA=11", "-ar", str(SR), str(PROYECTO / "public" / "voz.wav"))
     dur = len(audio) / SR
+    if voz_studio:
+        voz, rate = f"AI Studio {voz_studio}", ""
     (PROYECTO / "public" / "voz.json").write_text(json.dumps({"voz": voz, "rate": rate, "duracion": round(dur, 3), "frases": salida},
                                                              ensure_ascii=False, indent=1), encoding="utf8")
     palabras = sum(len(f["texto"].split()) for f in salida)
