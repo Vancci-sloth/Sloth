@@ -8,7 +8,7 @@ import { WebSocketServer, type WebSocket } from 'ws'
 import type { Card, Model, ServerPush } from '../shared/types.ts'
 import { VENTA } from '../shared/venta.ts'
 import { cambiarAcceso } from './acceso.ts'
-import { IMAGE_TYPES } from './agent.ts'
+import { IMAGE_TYPES, nombreAdjunto } from './agent.ts'
 import { avances } from './avances.ts'
 import { claudeModels, tituloCorto } from './claude.ts'
 import { codexModels } from './codex.ts'
@@ -563,7 +563,7 @@ async function api(req: IncomingMessage, res: ServerResponse, url: URL): Promise
 
   if (path === '/api/upload' && method === 'POST') {
     mkdirSync(ATTACHMENTS, { recursive: true })
-    const file = join(ATTACHMENTS, `${Date.now()}-${basename(url.searchParams.get('name') ?? 'archivo')}`)
+    const file = join(ATTACHMENTS, `${Date.now()}-${nombreAdjunto(basename(url.searchParams.get('name') ?? 'archivo'))}`)
     await new Promise((ok, fail) => req.pipe(createWriteStream(file)).on('finish', ok).on('error', fail))
     // `wav`: la voz de una etapa que pide un WAV, como la grabó el celular (m4a, mp3…). Si FFmpeg no puede, va tal cual.
     const wav = url.searchParams.has('wav') && extname(file).toLowerCase() !== '.wav' ? await aWav(file) : null

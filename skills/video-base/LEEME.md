@@ -47,6 +47,13 @@ en el script.
   nunca lo copies de otro, y no corras `npm install` dentro de un video, cambiaría el de todos. Si a un estilo le falta un
   paquete, va en el `package.json` y el `package-lock.json` de su plantilla.
 
+### Lo que adjunta el usuario
+
+- Cada imagen del mensaje trae su ruta en una línea `Imagen adjunta: <ruta>` (en `data\attachments` de Sloth). Si va en
+  el video, cópiala a `public/` de la raíz del proyecto (la carpeta con su `package.json`, la de `Carpeta:`) y úsala con
+  `staticFile('<nombre>')`: Remotion no sirve una ruta absoluta ni una de fuera de `public/`, y el primer render salía
+  sin ella. No la busques por el disco ni la pidas otra vez.
+
 ### Chrome y la captura
 
 - Nunca una ruta fija a Chrome con su versión: se rompe con la siguiente actualización. `chrome.mjs` lo busca solo, y

@@ -46,6 +46,29 @@ export interface AgentOptions {
 /** Las imágenes que se pueden adjuntar, por extensión. */
 export const IMAGE_TYPES: Record<string, string> = { '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.gif': 'image/gif', '.webp': 'image/webp' }
 
+/**
+ * El nombre con que se guarda un adjunto: sin acentos, espacios, comillas ni paréntesis («WhatsApp Image 10.46 PM (1).jpeg»
+ * pasa a `WhatsApp-Image-10.46-PM-1.jpeg`). Así el agente lo usa en la shell, en Python o en Remotion sin pelearse con
+ * las comillas.
+ */
+export function nombreAdjunto(nombre: string): string {
+  const limpio = nombre
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/[^\w.-]+/g, '-')
+    .replace(/-{2,}/g, '-')
+    .replace(/-+(?=\.|$)|^[-.]+/g, '')
+  return limpio || 'archivo'
+}
+
+/**
+ * El texto que le llega al agente, con la ruta de cada imagen al final. La imagen va aparte y el modelo la ve, pero sin
+ * su ruta no puede copiarla al proyecto: se ponía a buscarla y a corregir rutas.
+ */
+export function conRutas(text: string, images: string[]): string {
+  return images.length ? `${text}\n\n${images.map((p) => `Imagen adjunta: ${p}`).join('\n')}` : text
+}
+
 /** Una cola que se lee con `for await`: los mensajes del usuario entran aquí y el agente los va tomando. */
 export class Inbox<T> implements AsyncIterable<T> {
   private items: T[] = []

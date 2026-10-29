@@ -6,7 +6,7 @@ import { leerHistorial, primerUsuario } from './historial.ts'
 import type { AgentEvent, FileDraft, SessionMeta } from '../shared/types.ts'
 import { NOMBRE_AGENTE, proveedorDe } from '../shared/providers.ts'
 import { llaveEnUso } from './acceso.ts'
-import type { AgentRun, SkillRef } from './agent.ts'
+import { conRutas, type AgentRun, type SkillRef } from './agent.ts'
 import { conAgente } from './agentes.ts'
 import { startClaude } from './claude.ts'
 import { startCodex } from './codex.ts'
@@ -216,7 +216,7 @@ export class Sessions {
     if (skill) meta.skill = skill.name
     const pide = skill ?? (!meta.providerSessionId && meta.skill ? { name: meta.skill } : undefined)
     this.emit(meta.id, { t: 'turn_start', at: Date.now() })
-    this.runFor(meta).send(text, pide, images)
+    this.runFor(meta).send(conRutas(text, images), pide, images)
   }
 
   /**
@@ -328,7 +328,7 @@ export class Sessions {
     if (!meta) throw new Error('No existe esa sesión')
     if (!meta.running) return this.send(id, text, undefined, images)
     this.emit(id, { t: 'user', text, at: Date.now(), ...(images.length ? { images } : {}) })
-    this.runFor(meta).steer(text, images)
+    this.runFor(meta).steer(conRutas(text, images), images)
   }
 
   async interrupt(id: string) {

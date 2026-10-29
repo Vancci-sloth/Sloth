@@ -1,1 +1,1 @@
-Al descargar Claude, Codex u OpenCode ya no sale «spawn EBUSY»: Sloth espera a que el antivirus termine de revisarlo.
+La imagen que adjuntas entra al video desde el primer render: el agente ya sabe dónde está y su nombre no rompe las comillas.
