@@ -50,6 +50,7 @@ export function gruposModelos(models: Model[]) {
   return [
     { id: 'claude', label: 'Anthropic' },
     { id: 'codex', label: 'OpenAI' },
+    { id: 'opencode', label: 'OpenCode · gratis' },
   ].map((p) => ({
     label: p.label,
     options: models.filter((m) => proveedorDe(m.id) === p.id).map((m) => ({ value: m.id, label: m.label })),

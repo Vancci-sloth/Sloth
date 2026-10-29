@@ -5,6 +5,7 @@ import type { Model, Tokens } from '../shared/types.ts'
 import { codexConLlave, llaveEnUso, type CodexLlave } from './acceso.ts'
 import type { AgentOptions, AgentRun, SkillRef } from './agent.ts'
 import { OPCIONES } from './claude.ts'
+import { rutaAgente } from './agentes.ts'
 import { CodexRpc } from './codex-rpc.ts'
 import { navegadorAgente } from './navegador-agente.ts'
 import { costoCodex } from './precios.ts'
@@ -316,6 +317,8 @@ type Conectar = (notify: (method: string, params: unknown) => void, exit: (error
 
 /** El catálogo viene de Codex, con sus esfuerzos: no se fija una lista de GPT en Sloth. */
 export async function codexModels(): Promise<Model[]> {
+  // Sin el programa de Codex (aún no se bajó) no hay catálogo: pedirlo no lo baja.
+  if (!rutaAgente('codex')) return []
   const rpc = new CodexRpc()
   try {
     await rpc.ready

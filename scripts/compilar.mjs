@@ -42,8 +42,11 @@ const NOVEDAD = readFileSync(join(REPO, 'novedad.txt'), 'utf8').split(/\r?\n/)[0
 
 /** Además de las de cada card: la base común de los estilos y la biblioteca de modelos 3D. */
 const SKILLS_BASE = ['video-base', 'modelos-3d']
-/** Los paquetes que el servidor carga o lanza. Lo demás ya va dentro de server/index.mjs o de la interfaz. */
-const PAQUETES = ['@anthropic-ai/claude-agent-sdk', '@openai/codex', '@playwright/mcp', 'playwright-core', 'ws', 'zod']
+/**
+ * Los paquetes que el servidor carga o lanza. Lo demás ya va dentro de server/index.mjs o de la interfaz. De los agentes
+ * van solo su SDK y su lanzador: su programa (cientos de MB cada uno) se baja al elegirlo (`server/agentes.ts`).
+ */
+const PAQUETES = ['@anthropic-ai/claude-agent-sdk', '@openai/codex', '@opencode/client', '@playwright/mcp', 'playwright-core', 'ws', 'zod']
 /** Lo que no se copia de las skills ni de los procesos de Python. */
 const BASURA = new Set(['__pycache__', 'node_modules', '.git', '.cache'])
 /**
@@ -121,7 +124,8 @@ paso('Instalando los paquetes')
 const instalada = (p) => JSON.parse(readFileSync(join(REPO, 'node_modules', p, 'package.json'), 'utf8')).version
 const dependencias = Object.fromEntries(PAQUETES.map((p) => [p, instalada(p)]))
 writeFileSync(join(APP, 'package.json'), `${JSON.stringify({ name: 'sloth', version: VERSION, private: true, type: 'module', dependencies: dependencias }, null, 2)}\n`)
-execSync('npm install --omit=dev --no-audit --no-fund --prefer-offline', { cwd: APP, stdio: 'inherit' })
+// Sin los opcionales: son los programas de Claude y Codex para cada sistema, que se bajan al elegirlos.
+execSync('npm install --omit=dev --omit=optional --no-audit --no-fund --prefer-offline', { cwd: APP, stdio: 'inherit' })
 
 // Las skills van aparte, en resources: la app las pone en app\skills al estrenar cada versión sin pisar lo que llevan de
 // tus videos (`prepararSkills` en electron/main.ts).

@@ -11,6 +11,8 @@ import type { AdjuntoComunidad, AyudaMejora, OrigenMejora, PublicacionComunidad,
 import { COBRO } from './licencia.ts'
 import type { Sessions } from './sessions.ts'
 import { redactarCodexYoutube } from './youtube-redactor.ts'
+import { programaClaude, rutaAgente } from './agentes.ts'
+import { redactarOpenCode } from './opencode.ts'
 
 /**
  * La comunidad, vista desde esta computadora. Vive en el Worker del cobro (`licencias/src/comunidad.ts`): todo
@@ -160,7 +162,8 @@ export function comunidad(app: string, o: Opciones) {
 
   /**
    * El agente del hilo lee lo que escribiste (y lo que pasaba en él) y propone el texto. Con Claude, Sonnet: entiende el
-   * error y tarda segundos. Con Codex, el modelo del hilo con poco esfuerzo, sin herramientas. Sin hilo, Claude.
+   * error y tarda segundos. Con Codex, el modelo del hilo con poco esfuerzo, sin herramientas; con OpenCode, el del hilo.
+   * Sin hilo, Claude, o OpenCode si es el único que se bajó (la versión gratis).
    */
   async function redactar(texto: string, origen?: OrigenMejora): Promise<AyudaMejora> {
     const partes: string[] = []
@@ -170,9 +173,15 @@ export function comunidad(app: string, o: Opciones) {
     }
     partes.push(`<lo_que_escribio>\n${texto.slice(0, 4000) || '(nada aún: deduce la mejora de lo que pasó)'}\n</lo_que_escribio>`)
     const hilo = origen && o.sessions.meta(origen.hilo)
-    const agente = hilo && proveedorDe(hilo.model) === 'codex' ? 'codex' : 'claude'
+    const agente = hilo ? proveedorDe(hilo.model) : !rutaAgente('claude') && rutaAgente('opencode') ? 'opencode' : 'claude'
     const nombre = NOMBRE_AGENTE[agente]
-    const respuesta = agente === 'codex' ? await redactarConCodex(hilo!.model, hilo!.cwd, partes.join('\n\n'), nombre) : await redactarConClaude(partes.join('\n\n'))
+    const prompt = partes.join('\n\n')
+    const respuesta =
+      agente === 'codex'
+        ? await redactarConCodex(hilo!.model, hilo!.cwd, prompt, nombre)
+        : agente === 'opencode'
+          ? await redactarOpenCode(hilo?.model, hilo?.cwd ?? tmpdir(), `${prompt}\n\nResponde solo con un JSON que cumpla este esquema:\n${JSON.stringify(ESQUEMA_AYUDA)}`, [], AYUDA)
+          : await redactarConClaude(prompt)
     const r = JSON.parse(/\{[\s\S]*\}/.exec(respuesta)?.[0] ?? 'null') as Partial<AyudaMejora> | null
     if (!r?.mejora) throw new Error(`${nombre} respondió algo que no se entiende. Intenta otra vez.`)
     return {
@@ -185,7 +194,7 @@ export function comunidad(app: string, o: Opciones) {
   async function redactarConClaude(prompt: string): Promise<string> {
     const q = query({
       prompt,
-      options: { model: 'sonnet', systemPrompt: AYUDA, tools: [], maxTurns: 1, settingSources: [], persistSession: false, thinking: { type: 'disabled' } }
+      options: { ...programaClaude(), model: 'sonnet', systemPrompt: AYUDA, tools: [], maxTurns: 1, settingSources: [], persistSession: false, thinking: { type: 'disabled' } }
     })
     const plazo = setTimeout(() => q.close(), 90_000)
     try {

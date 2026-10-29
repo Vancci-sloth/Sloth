@@ -1,6 +1,6 @@
 import { type CSSProperties, type MutableRefObject, type ReactNode, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { NOMBRE_AGENTE } from '../../shared/providers'
+import { NOMBRE_AGENTE, type Proveedor } from '../../shared/providers'
 import type { AdjuntoComunidad, AyudaMejora, OrigenMejora, VideoHecho, VideosDeTodos } from '../../shared/types'
 import { api } from './api'
 import { Icono as IconoBase, type NombreIcono } from './Iconos'
@@ -55,7 +55,7 @@ export function Escribir(props: {
   /** Con el símbolo de su agente: «Ayúdame a decirlo». */
   ayuda?: boolean
   /** Quién ayuda: el agente del hilo de donde sale (sin hilo, Claude). */
-  agente?: 'claude' | 'codex'
+  agente?: Proveedor
   /** De qué hilo sale, para que su agente lea lo que pasaba. */
   origen?: OrigenMejora
   /** Deja elegir uno de «Mis videos». */

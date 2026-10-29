@@ -18,6 +18,11 @@ npm test
 npm run compilar -- --sin-instalador
 ```
 
+El instalador no trae el programa de Claude Code, Codex ni OpenCode (ADR 0009): `compilar` deja fuera los opcionales
+de npm, que son justo esos programas, y la app los baja al elegir cada agente. En `dist/` no debe haber ninguna
+carpeta `claude-agent-sdk-<sistema>` ni `codex-<sistema>`. Para probar la descarga, abre la app compilada en una
+cuenta sin `%APPDATA%\sloth\piezas\agentes` y elige cada agente.
+
 Cada sistema se comprueba en el suyo. Antes de publicar, comprueba que los tres resultados de `Comprobar Sloth`
 corresponden al commit de `main` que vas a subir y terminaron bien. Este workflow informa; no configura protección de
 ramas ni bloquea por sí solo un push a `venta`.

@@ -15,6 +15,16 @@ import { Segmento } from './Segmento'
 const POR_DEFECTO: ModeloTarea = { model: 'claude-opus-5-5', effort: 'high' }
 /** Con ChatGPT y sin Claude, la card va en «Avanzado» con GPT-6.1 Terra en medio, mientras no elijas otro. */
 export const CON_CHATGPT: Avanzado = { principal: { model: 'codex:gpt-6.1-terra', effort: 'medium' }, tareas: {} }
+/**
+ * Sin Claude ni ChatGPT, el modelo gratis de OpenCode con que va un hilo nuevo: el que mejor siguió las skills en las
+ * pruebas, si sigue en el catálogo (cambia solo); si no, el primero.
+ */
+const OPENCODE_PRIMERO = 'opencode:opencode/big-pickle'
+export function conOpenCode(models: Model[]): Avanzado | undefined {
+  const gratis = models.filter((m) => proveedorDe(m.id) === 'opencode')
+  const m = gratis.find((x) => x.id === OPENCODE_PRIMERO) ?? gratis[0]
+  return m && { principal: { model: m.id }, tareas: {} }
+}
 const SUBAGENTES = ['opus', 'sonnet', 'haiku']
 const ESFUERZOS = ['low', 'medium', 'high', 'xhigh']
 const NOMBRE: Record<string, string> = { opus: 'Opus', sonnet: 'Sonnet', haiku: 'Haiku' }
@@ -34,8 +44,8 @@ export function elegirModelos(conf: ModelosConf | undefined, models: Model[], av
     valido(models, POR_DEFECTO) ||
     (models[0] && valido(models, { model: models[0].id }))
   const choice = (avanzado?.principal && valido(models, avanzado.principal)) || optimo
-  // Las mediciones actuales piden alias de Claude: Codex elige sus propios subagentes.
-  const tareas: Tarea[] = proveedorDe(choice?.model ?? '') === 'codex' ? [] : (conf?.tareas ?? []).map((t) => ({ ...t, ...(avanzado?.tareas[t.nombre] ?? {}) }))
+  // Las mediciones actuales piden alias de Claude: Codex y OpenCode eligen sus propios subagentes.
+  const tareas: Tarea[] = proveedorDe(choice?.model ?? '') !== 'claude' ? [] : (conf?.tareas ?? []).map((t) => ({ ...t, ...(avanzado?.tareas[t.nombre] ?? {}) }))
   return { choice, tareas }
 }
 
@@ -55,8 +65,8 @@ export function Modelos(props: {
   avanzado?: Avanzado
   choice?: Choice
   tareas: Tarea[]
-  /** Solo hay cuenta de ChatGPT: «Optimizado», medido con Claude, no se puede elegir. */
-  soloChatGPT?: boolean
+  /** Sin cuenta de Claude, con qué va: «Optimizado», medido con Claude, no se puede elegir. */
+  sinClaude?: 'codex' | 'opencode' | false
   onAvanzado(a: Avanzado | undefined): void
 }) {
   const [open, setOpen] = useState(false)
@@ -95,7 +105,7 @@ export function Modelos(props: {
             label="Modo"
             valor={avanzado ? 'avanzado' : 'optimizado'}
             opciones={[
-              { id: 'optimizado', texto: 'Optimizado', disabled: props.soloChatGPT, title: props.soloChatGPT ? 'Va con Claude: conecta tu cuenta en Opciones' : undefined },
+              { id: 'optimizado', texto: 'Optimizado', disabled: !!props.sinClaude, title: props.sinClaude ? 'Va con Claude: conecta tu cuenta en Opciones' : undefined },
               { id: 'avanzado', texto: 'Avanzado' }
             ]}
             onCambio={(modo) => (modo === 'optimizado' ? props.onAvanzado(undefined) : !avanzado && props.onAvanzado({ principal: choice, tareas: {} }))}
@@ -162,8 +172,10 @@ export function Modelos(props: {
             ))}
           </div>
           <p className="modelos-nota muted small">
-            {props.soloChatGPT
+            {props.sinClaude === 'codex'
               ? 'Con tu cuenta de ChatGPT, el hilo va en uno de sus modelos: GPT-6.1 Terra, si no eliges otro. «Optimizado» va con Claude: se puede elegir al conectar tu cuenta de Claude en Opciones.'
+              : props.sinClaude === 'opencode'
+              ? 'Sin cuenta de pago, el hilo va en un modelo gratis de OpenCode: Big Pickle, si no eliges otro. «Optimizado» va con Claude: se puede elegir al conectar tu cuenta de Claude en Opciones.'
               : avanzado
                 ? 'Tus elecciones se quedan para esta card. «Optimizado» vuelve a lo medido o, si la skill no se ha medido, a lo último que elegiste.'
                 : tareas.length || principalMedido

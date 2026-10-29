@@ -1,8 +1,7 @@
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process'
-import { createRequire } from 'node:module'
-import { dirname, join } from 'node:path'
 import { createInterface } from 'node:readline'
 import { codexConLlave, type CodexLlave } from './acceso.ts'
+import { rutaAgente } from './agentes.ts'
 
 /** El app-server oficial, por JSON-RPC sobre stdio. No lee ni copia las credenciales de Codex. */
 export class CodexRpc {
@@ -19,16 +18,9 @@ export class CodexRpc {
     /** Con qué trabaja: la llave de API, o `null` para la cuenta de ChatGPT. Sin él, lo elegido en Opciones. */
     llave: CodexLlave | null = codexConLlave() ?? null
   ) {
-    const destinos: Record<string, string> = {
-      'win32-x64': 'x86_64-pc-windows-msvc', 'win32-arm64': 'aarch64-pc-windows-msvc',
-      'darwin-x64': 'x86_64-apple-darwin', 'darwin-arm64': 'aarch64-apple-darwin',
-      'linux-x64': 'x86_64-unknown-linux-musl', 'linux-arm64': 'aarch64-unknown-linux-musl'
-    }
-    const plataforma = `${process.platform}-${process.arch}`
-    const destino = destinos[plataforma]
-    if (!destino) throw new Error(`Codex no admite esta plataforma: ${plataforma}.`)
-    const raiz = dirname(createRequire(import.meta.url).resolve(`@openai/codex-${plataforma}/package.json`))
-    const exe = join(raiz, 'vendor', destino, 'bin', process.platform === 'win32' ? 'codex.exe' : 'codex')
+    // El programa, de la app o bajado aparte (`server/agentes.ts`). Quien abre un hilo de Codex lo baja antes (`conAgente`).
+    const exe = rutaAgente('codex')
+    if (!exe) throw new Error('Codex aún no está descargado. Elígelo en Opciones → Agentes para descargarlo.')
     // La elección del usuario es su plan de ChatGPT, aunque tenga llaves de API en el entorno o un proveedor personalizado,
     // o la llave que eligió en Opciones (`server/acceso.ts`).
     const env = { ...process.env }

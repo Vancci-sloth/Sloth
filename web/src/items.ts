@@ -1,4 +1,4 @@
-import { NOMBRE_AGENTE } from '../../shared/providers'
+import { NOMBRE_AGENTE, type Proveedor } from '../../shared/providers'
 import type { AgentEvent } from '../../shared/types'
 
 /** Lo que se dibuja: los eventos de la sesión juntados en bloques. */
@@ -336,15 +336,18 @@ export const REINTENTAR = 'Sigue donde te quedaste.'
 /**
  * Un turno que acabó mal, en palabras de todos los días: qué pasó y qué hacer. `reintentar`: pedirle que siga puede
  * bastar. `tuyo`: lo detuviste tú, no es un fallo. El error tal cual se ve al pasar el ratón. `agente`: el del hilo, que
- * nombra el plan y la cuenta (con Codex, los de ChatGPT).
+ * nombra el plan y la cuenta (con Codex, los de ChatGPT). OpenCode no tiene plan ni cuenta: sus modelos gratis se saturan.
  */
-export function errorLlano(error = '', caida = false, agente: 'claude' | 'codex' = 'claude'): { titulo: string; ayuda: string; reintentar: boolean; tuyo?: boolean } {
+export function errorLlano(error = '', caida = false, agente: Proveedor = 'claude'): { titulo: string; ayuda: string; reintentar: boolean; tuyo?: boolean } {
   const nombre = NOMBRE_AGENTE[agente]
   // La caída la marca el servidor. Los hilos de antes de la marca traen la frase con que sessions.ts cierra el turno.
   if (caida || /^el servidor se cerró a mitad del turno/.test(error)) {
     return { titulo: 'Se cortó a mitad del trabajo', ayuda: 'Lo que ya hizo sigue en su carpeta. Pulsa «Reintentar» y sigue desde ahí.', reintentar: true }
   }
   if (/^lo detuviste/i.test(error)) return { titulo: 'Lo detuviste', ayuda: 'Dile qué cambiar, o pulsa «Reintentar» para que siga.', reintentar: true, tuyo: true }
+  if (agente === 'opencode' && /modelo gratis|rate.?limit|too many requests|\b429\b/i.test(error)) {
+    return { titulo: 'El modelo gratis está saturado', ayuda: 'Espera unos minutos y pulsa «Reintentar», o elige otro modelo gratis.', reintentar: true }
+  }
   if (/hit your .*limit|usage limit|rate.?limit|out of usage|spend limit|credit balance|\b429\b/i.test(error)) {
     const cuando = reinicio(error)
     return { titulo: `Llegaste al límite de tu plan de ${nombre}`, ayuda: `${cuando ? `Se reinicia: ${cuando}.` : 'En Opciones ves cuándo se reinicia.'} Entonces pulsa «Reintentar».`, reintentar: true }

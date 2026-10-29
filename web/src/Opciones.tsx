@@ -1,7 +1,7 @@
 import { type ReactNode, useEffect, useRef, useState } from 'react'
-import { type CuentaClaude as Cuenta, type Opciones as Datos, type LimitesClaude, NAVEGADOR_REDES, type Requisito, type VersionClaude } from '../../shared/types'
+import { type CuentaClaude as Cuenta, type Opciones as Datos, type EstadoAgente, type LimitesClaude, NAVEGADOR_REDES, type Requisito, type VersionClaude } from '../../shared/types'
 import { api } from './api'
-import { proveedorDe } from '../../shared/providers'
+import { type Proveedor, proveedorDe } from '../../shared/providers'
 import { encender, encendido, notificar, sonar, usePermiso } from './avisos'
 import { abrirBienvenida } from './Bienvenida'
 import { Picker } from './Composer'
@@ -72,9 +72,10 @@ function Ajustes({ onDone, iniciando, onIniciando }: { onDone(): void; iniciando
           <SuscripcionOpciones />
         </Grupo>
       )}
-      <Grupo titulo="Agentes">
+      <Grupo titulo="Agentes" nota="Cada agente se descarga la primera vez que lo eliges. Claude y ChatGPT necesitan un plan de pago o una llave de API; OpenCode es gratis.">
         <Agentes />
         <CuentaCodex />
+        <CuentaOpenCode />
       </Grupo>
       {/* Solo sirven a Ideas: sin la de YouTube, las recomendaciones van con el canal conectado. */}
       {!VENTA && (
@@ -410,23 +411,25 @@ function useLlave(c: UsoCuenta, proveedor: 'claude' | 'codex') {
  * (`undefined` mientras no se sabe), para no dejar mandar un video que no va a poder empezar.
  */
 export function CuentaClaude({ model, onFalta }: { model?: string; onFalta?(falta?: boolean): void }) {
-  return proveedorDe(model ?? '') === 'codex' ? <CuentaCodex aviso onFalta={onFalta} /> : <AvisoClaude onFalta={onFalta} />
+  const p = proveedorDe(model ?? '')
+  return p === 'codex' ? <CuentaCodex aviso onFalta={onFalta} /> : p === 'opencode' ? <CuentaOpenCode aviso onFalta={onFalta} /> : <AvisoClaude onFalta={onFalta} />
 }
 
 const CUENTA_CONECTADA = 'sloth-cuenta-conectada'
 
 /**
- * Si está conectada la cuenta de ChatGPT y no la de Claude (`undefined` mientras no se sabe). Entonces un hilo nuevo va
- * en ChatGPT: «Optimizado» se midió con Claude y no podría empezar. Se vuelve a mirar al conectar una cuenta aquí.
+ * Con qué va un hilo nuevo si no está la cuenta de Claude (`undefined` mientras no se sabe; `false`, con Claude o sin
+ * ninguno): con ChatGPT si está su cuenta y, si no, con OpenCode si ya se bajó. «Optimizado» se midió con Claude y no
+ * podría empezar. Se vuelve a mirar al conectar una cuenta o al bajar OpenCode.
  */
-export function useSoloChatGPT() {
-  const [solo, setSolo] = useState<boolean>()
+export function useSinClaude() {
+  const [sin, setSin] = useState<'codex' | 'opencode' | false>()
   useEffect(() => {
     let vivo = true
     const leer = () =>
-      Promise.all([api<Cuenta>('/api/claude/cuenta'), api<Cuenta>('/api/codex/cuenta')]).then(
-        ([claude, codex]) => vivo && setSolo(!claude.conectada && codex.conectada),
-        () => vivo && setSolo(false)
+      Promise.all([api<Cuenta>('/api/claude/cuenta'), api<Cuenta>('/api/codex/cuenta'), api<Record<Proveedor, EstadoAgente>>('/api/agentes')]).then(
+        ([claude, codex, agentes]) => vivo && setSin(claude.conectada ? false : codex.conectada ? 'codex' : agentes.opencode.instalado ? 'opencode' : false),
+        () => vivo && setSin(false)
       )
     void leer()
     addEventListener(CUENTA_CONECTADA, leer)
@@ -435,7 +438,88 @@ export function useSoloChatGPT() {
       removeEventListener(CUENTA_CONECTADA, leer)
     }
   }, [])
-  return solo
+  return sin
+}
+
+/**
+ * Si el programa de cada agente ya se bajó (`server/agentes.ts`). Mientras se baja alguno, o con `vigilar` (se está
+ * conectando una cuenta, que lo baja antes), se mira cada dos segundos. Al acabar, avisa como al conectar una cuenta.
+ */
+function useAgentes(vigilar = false) {
+  const [agentes, setAgentes] = useState<Record<Proveedor, EstadoAgente>>()
+  const [error, setError] = useState('')
+  const leer = () => api<Record<Proveedor, EstadoAgente>>('/api/agentes').then(setAgentes, (e) => setError(e.message))
+  useEffect(() => void leer(), [])
+  const bajando = !!agentes && Object.values(agentes).some((a) => a.instalando)
+  useEffect(() => {
+    if (!bajando && !vigilar) return
+    const id = setInterval(() => void leer(), 2000)
+    return () => clearInterval(id)
+  }, [bajando, vigilar])
+  const antes = useRef(bajando)
+  useEffect(() => {
+    if (antes.current && !bajando) dispatchEvent(new Event(CUENTA_CONECTADA))
+    antes.current = bajando
+  }, [bajando])
+  const bajar = (p: Proveedor) => {
+    setError('')
+    return api<Record<Proveedor, EstadoAgente>>(`/api/${p}/descargar`, {}).then(setAgentes, (e) => setError(e.message))
+  }
+  return { agentes, error, bajar }
+}
+
+/** «Descargando Claude Code (290 MB)…», mientras se baja el programa del agente; si no, nada. */
+function Bajando({ a }: { a?: EstadoAgente }) {
+  return a?.instalando ? <span className="estado moviendo">Descargando {a.nombre} ({a.pesa})…</span> : null
+}
+
+/**
+ * OpenCode, la versión gratis: sin cuenta ni pago, con los modelos gratis de OpenCode Zen. Se baja al elegirlo. Lo que
+ * hay que saber va siempre a la vista, no en letra chica: son gratis por un tiempo, y algunos usan lo que les mandas.
+ * `aviso`: encima del compositor y en la bienvenida, solo mientras falte bajarlo.
+ */
+export function CuentaOpenCode({ aviso = false, onFalta }: { aviso?: boolean; onFalta?(falta?: boolean): void }) {
+  const { agentes, error, bajar } = useAgentes()
+  const version = useVersion('opencode', !aviso)
+  const a = agentes?.opencode
+  const falta = a ? !a.instalado : undefined
+  useEffect(() => onFalta?.(falta), [falta])
+  if (aviso && !falta) return null
+  const contenido = (
+    <div className="item">
+      <div className="fila">
+        <Logo de="opencode" />
+        <div className="fila-nombre">
+          <strong>OpenCode · gratis</strong>
+          <span>Sin cuenta ni pago: Sloth trabaja con los modelos gratis de OpenCode. Pueden equivocarse más que Claude o ChatGPT, y no hacen imágenes (portadas ni personajes nuevos).</span>
+        </div>
+        {a?.instalando ? (
+          <Bajando a={a} />
+        ) : a?.instalado ? (
+          version.estado
+        ) : (
+          a && (
+            <button className="primary" onClick={() => void bajar('opencode')}>
+              Usar gratis ({a.pesa})
+            </button>
+          )
+        )}
+      </div>
+      <div className="fila-extra small">
+        <p>
+          <b>Antes de usarlo:</b> los modelos son gratis por tiempo limitado y a veces se saturan. Algunos (como Big Pickle)
+          usan lo que les mandas para mejorar el modelo, y otros lo guardan unos días: no les mandes datos personales ni
+          privados.{' '}
+          <a href="https://opencode.ai/docs/zen" target="_blank" rel="noreferrer">
+            Qué hace cada modelo con tus datos ↗
+          </a>
+        </p>
+      </div>
+      {(error || a?.error) && <p className="bad small fila-extra">{error || a?.error}</p>}
+      {version.aviso}
+    </div>
+  )
+  return aviso ? <section className="panel cuenta-aviso">{contenido}</section> : contenido
 }
 
 /** La cuenta de ChatGPT, solo si falta, como la de Claude: en la bienvenida. */
@@ -443,6 +527,7 @@ export const CuentaChatGPT = ({ onFalta }: { onFalta?(falta?: boolean): void }) 
 
 function AvisoClaude({ onFalta }: { onFalta?(falta?: boolean): void }) {
   const c = useCuenta()
+  const { agentes } = useAgentes(!!c.cuenta?.conectando)
   const llave = useLlave(c, 'claude')
   const falta = c.cuenta ? !c.cuenta.conectada : undefined
   useEffect(() => onFalta?.(falta), [falta])
@@ -454,9 +539,11 @@ function AvisoClaude({ onFalta }: { onFalta?(falta?: boolean): void }) {
           <Logo de="claude" />
           <div className="fila-nombre">
             <strong>Conecta tu cuenta de Claude</strong>
-            {!c.cuenta.conectando && <span>Sloth trabaja con tu cuenta de Claude (Pro o Max), o con una llave de API. La cuenta se autoriza una sola vez en el navegador.</span>}
+            {!c.cuenta.conectando && <span>Sloth trabaja con tu plan de pago de Claude (Pro o Max), o con una llave de API. La cuenta se autoriza una sola vez en el navegador.</span>}
           </div>
-          {c.cuenta.conectando ? (
+          {agentes?.claude.instalando ? (
+            <Bajando a={agentes.claude} />
+          ) : c.cuenta.conectando ? (
             <span className="estado moviendo">Esperando al navegador…</span>
           ) : (
             <>
@@ -481,6 +568,7 @@ function AvisoClaude({ onFalta }: { onFalta?(falta?: boolean): void }) {
  */
 function CuentaCodex({ aviso = false, onFalta }: { aviso?: boolean; onFalta?(falta?: boolean): void }) {
   const c = useCuenta(true, 'codex')
+  const { agentes } = useAgentes(c.ocupado)
   const llave = useLlave(c, 'codex')
   const version = useVersion('codex', !aviso)
   const falta = c.cuenta ? !c.cuenta.conectada : undefined
@@ -526,11 +614,11 @@ function CuentaCodex({ aviso = false, onFalta }: { aviso?: boolean; onFalta?(fal
               onChange={(que) => llave.elegir(que) || (que === 'uso' ? window.open('https://chatgpt.com/codex/settings/usage', '_blank', 'noreferrer') : conectar())}
             />
           ) : (
-            <span>Sloth trabaja con tu cuenta de ChatGPT (Plus o Pro), o con una llave de API, y con ella hace las imágenes de los videos: portadas y personajes. La cuenta se autoriza en el navegador.</span>
+            <span>Sloth trabaja con tu plan de pago de ChatGPT (Plus o Pro), o con una llave de API, y con ella hace las imágenes de los videos: portadas y personajes. La cuenta se autoriza en el navegador.</span>
           )}
         </div>
-        {version.estado}
-        {cuenta?.conectando ? (
+        {agentes?.codex.instalando ? <Bajando a={agentes.codex} /> : version.estado}
+        {agentes?.codex.instalando ? null : cuenta?.conectando ? (
           <span className="estado moviendo">Esperando al navegador…</span>
         ) : (
           cuenta &&
@@ -716,7 +804,7 @@ function EstadoRequisito({ r }: { r: Requisito }) {
  * La versión de un agente (`estado`, a la derecha de su fila), la que trae Sloth: llega al día con cada versión de Sloth.
  * `aviso`, debajo, si no se pudo leer.
  */
-function useVersion(de: 'claude' | 'codex', mirar = true) {
+function useVersion(de: Proveedor, mirar = true) {
   const [p, setVersion] = useState<VersionClaude | null>(null)
   const [error, setError] = useState('')
 
@@ -736,6 +824,7 @@ function useVersion(de: 'claude' | 'codex', mirar = true) {
 /** Claude Code: con qué cuenta trabaja y qué versión tiene. */
 function Agentes() {
   const c = useCuenta(true)
+  const { agentes } = useAgentes(!!c.cuenta?.conectando)
   const llave = useLlave(c, 'claude')
   const version = useVersion('claude')
   const cuenta = c.cuenta
@@ -773,10 +862,10 @@ function Agentes() {
             ) : cuenta.conectando ? (
               <span className="falta">Esperando al navegador…</span>
             ) : (
-              <span className="falta">Sin cuenta: Sloth trabaja con tu cuenta de Claude (Pro o Max) o con una llave de API</span>
+              <span className="falta">Sin cuenta: Sloth trabaja con tu plan de pago de Claude (Pro o Max) o con una llave de API</span>
             )}
           </div>
-          {version.estado}
+          {agentes?.claude.instalando ? <Bajando a={agentes.claude} /> : version.estado}
           {cuenta && !cuenta.conectada && !cuenta.conectando && (
             <button className="primary" disabled={c.ocupado} onClick={c.conectar}>
               {c.ocupado ? 'Abriendo el navegador…' : 'Conectar con Claude'}

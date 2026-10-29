@@ -1,5 +1,5 @@
 import { Fragment, memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import { NOMBRE_AGENTE } from '../../shared/providers'
+import { NOMBRE_AGENTE, proveedorDe } from '../../shared/providers'
 import type { AgentEvent } from '../../shared/types'
 import { useEventos } from './eventos'
 import { Icon } from './Composer'
@@ -294,7 +294,7 @@ export function Timeline({ running, background, sessionId, proveedor = 'claude',
             {sessionId && (
               <button
                 className="cite-btn"
-                title={`Pide una mejora a Sloth sobre esto; ${NOMBRE_AGENTE[proveedor === 'codex' ? 'codex' : 'claude']} te ayuda a decirla`}
+                title={`Pide una mejora a Sloth sobre esto; ${NOMBRE_AGENTE[proveedorDe(proveedor === 'claude' ? '' : `${proveedor}:`)]} te ayuda a decirla`}
                 onClick={() => {
                   getSelection()?.removeAllRanges()
                   setCita(null)
@@ -538,7 +538,7 @@ function Respuestas({ opciones, onElegir }: { opciones: string[]; onElegir?(text
  * Codex, el plan y la cuenta son los de ChatGPT.
  */
 function Fallo({ item, datos, proveedor, sessionId, onResponder }: { item: Extract<Item, { kind: 'turn_end' }>; datos: string; proveedor: string; sessionId?: string; onResponder?(text: string): Promise<unknown> }) {
-  const agente = proveedor === 'codex' ? 'codex' : 'claude'
+  const agente = proveedorDe(proveedor === 'claude' ? '' : `${proveedor}:`)
   const e = errorLlano(item.error, item.caida, agente)
   const [enviando, setEnviando] = useState(false)
   const [fallo, setFallo] = useState('')

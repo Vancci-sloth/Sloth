@@ -1,5 +1,6 @@
 import type { CuentaClaude, LimitesClaude } from '../shared/types.ts'
 import { conLlave, llaveDe, llaveEnUso } from './acceso.ts'
+import { asegurarAgente, rutaAgente } from './agentes.ts'
 import { CodexRpc } from './codex-rpc.ts'
 import { ventanasCodex, type LimitesCodexRpc } from './limites-codex.ts'
 
@@ -50,6 +51,8 @@ function descansar() {
 
 export function cuentaCodex(): Promise<CuentaClaude> {
   if (llaveEnUso('codex')) return Promise.resolve(conLlave('codex'))
+  // Sin el programa de Codex (aún no se bajó, `server/agentes.ts`) no hay sesión: mirarla no lo baja; conectarla, sí.
+  if (!rutaAgente('codex')) return Promise.resolve({ conectada: false, llave: llaveDe('codex') })
   // Los avisos y Opciones pueden leer a la vez; comparten una lectura y un proceso.
   lectura ??= (async () => {
     const c = cliente()
@@ -65,6 +68,7 @@ export function cuentaCodex(): Promise<CuentaClaude> {
 }
 
 export async function conectarCodex(): Promise<CuentaClaude> {
+  await asegurarAgente('codex')
   const c = cliente()
   await c.ready
   if (login) return cuentaCodex()

@@ -16,6 +16,7 @@ import { montarNube, nubeAlDia } from './cloudflare.ts'
 import { hayNube, instagram } from './instagram.ts'
 import { abierto, conGoogle, contextoDeGoogle, deGoogle, deLaApp, desconectar, enGoogle, navegador, pasarDeEdge, pestana, SinSesion, sinAviso, soltar } from './navegador.ts'
 import { tiktok } from './tiktok.ts'
+import { programaClaude } from '../agentes.ts'
 
 /**
  * Publicar en redes: los videos verticales terminados de cada estilo se programan en las redes, uno por hueco del
@@ -408,7 +409,7 @@ export function redes(app: string, sessions: Sessions, cards: () => Card[], avis
     let salida = ''
     escribiendoTextos++
     try {
-      for await (const m of query({ prompt, options: { model: 'sonnet', tools: [], maxTurns: 1, settingSources: [], persistSession: false, cwd: carpeta } }))
+      for await (const m of query({ prompt, options: { ...programaClaude(), model: 'sonnet', tools: [], maxTurns: 1, settingSources: [], persistSession: false, cwd: carpeta } }))
         if (m.type === 'result' && m.subtype === 'success') salida = m.result
     } finally {
       escribiendoTextos--

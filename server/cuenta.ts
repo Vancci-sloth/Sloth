@@ -6,6 +6,7 @@ import { query, type Query, type SDKUserMessage } from '@anthropic-ai/claude-age
 import type { CuentaClaude, LimitesClaude } from '../shared/types.ts'
 import { conLlave, llaveDe, llaveEnUso } from './acceso.ts'
 import { Inbox } from './agent.ts'
+import { asegurarAgente, programaClaude, rutaAgente } from './agentes.ts'
 
 /**
  * La cuenta de Claude con la que trabaja Sloth. Es la del Claude Code que trae el SDK, que la guarda en `~/.claude`: si ya
@@ -15,9 +16,6 @@ import { Inbox } from './agent.ts'
  * sesión se complete en su propio flujo, sin que una app lo maneje por el usuario.
  */
 
-/** El ejecutable que trae el SDK, el mismo que corre los hilos. */
-const claude = (app: string) =>
-  join(app, 'node_modules', '@anthropic-ai', `claude-agent-sdk-${process.platform}-${process.arch}`, process.platform === 'win32' ? 'claude.exe' : 'claude')
 
 /** Si sigue abierta la ventana de Claude Code donde se autoriza la cuenta. Solo hay una: mientras esté, no se abre otra. */
 let login = false
@@ -35,10 +33,15 @@ let fallo = ''
  */
 let conectada: CuentaClaude | null = null
 
-/** `claude auth status` sale con 1 cuando no hay sesión, pero escribe el JSON igual. */
-function estado(app: string): Promise<{ loggedIn?: boolean; email?: string; subscriptionType?: string; apiKeySource?: string }> {
+/**
+ * `claude auth status` sale con 1 cuando no hay sesión, pero escribe el JSON igual. Sin el programa de Claude Code (aún
+ * no se bajó, `server/agentes.ts`), no hay sesión: mirarla no lo baja; conectarla, sí.
+ */
+function estado(_app: string): Promise<{ loggedIn?: boolean; email?: string; subscriptionType?: string; apiKeySource?: string }> {
   return new Promise((ok) => {
-    execFile(claude(app), ['auth', 'status', '--json'], { timeout: 10000 }, (_error, salida) => {
+    const exe = rutaAgente('claude')
+    if (!exe) return ok({})
+    execFile(exe, ['auth', 'status', '--json'], { timeout: 10000 }, (_error, salida) => {
       try {
         ok(JSON.parse(salida))
       } catch {
@@ -74,11 +77,13 @@ export function conectarClaude(app: string): Promise<CuentaClaude> {
     login = true
     fallo = ''
     conectada = null
-    const comando = [claude(app), 'auth', 'login', '--claudeai']
-    const ventana =
-      process.platform === 'win32'
+    // Sin el programa de Claude Code, primero se baja (mientras, Opciones dice que se está conectando).
+    const ventana = asegurarAgente('claude').then((exe) => {
+      const comando = [exe, 'auth', 'login', '--claudeai']
+      return process.platform === 'win32'
         ? new Promise<void>((ok, falla) => spawn('cmd', ['/c', 'start', 'Claude Code', '/wait', ...comando], { stdio: 'ignore' }).on('error', falla).on('exit', () => ok()))
         : enTerminal(comando)
+    })
     // Sigue conectando hasta saberlo: Opciones deja de preguntar en cuanto deja de estarlo, y no vería el fallo.
     void ventana.then(
       () => cerrar(app),
@@ -158,7 +163,7 @@ async function leerLimites(): Promise<LimitesClaude> {
   let q: Query | undefined
   let reloj: ReturnType<typeof setTimeout> | undefined
   try {
-    q = query({ prompt: new Inbox<SDKUserMessage>(), options: { settingSources: [] } })
+    q = query({ prompt: new Inbox<SDKUserMessage>(), options: { ...programaClaude(), settingSources: [] } })
     const tarde = new Promise<never>((_, mal) => (reloj = setTimeout(() => mal(new Error('Claude Code no contestó a tiempo.')), 20_000)))
     const u = await Promise.race([q.usage_EXPERIMENTAL_MAY_CHANGE_DO_NOT_RELY_ON_THIS_API_YET({ skipBehaviors: true }), tarde])
     const r = u.rate_limits

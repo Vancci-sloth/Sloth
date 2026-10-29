@@ -462,9 +462,21 @@ export interface TandaRedes {
   redes: RedId[]
 }
 
-/** `GET /api/claude/version` (y `/api/codex/version`): la versión que trae Sloth. `null` si no está instalado. */
+/** `GET /api/claude/version` (y la de Codex y OpenCode): la versión que trae Sloth. `null` si no está instalado. */
 export interface VersionClaude {
   instalada: string | null
+}
+
+/**
+ * `GET /api/agentes`: si el programa de un agente ya se bajó (`server/agentes.ts`). Se baja la primera vez que alguien
+ * lo elige; `pesa` lo dice antes.
+ */
+export interface EstadoAgente {
+  nombre: string
+  instalado: boolean
+  instalando: boolean
+  error?: string
+  pesa: string
 }
 
 /**

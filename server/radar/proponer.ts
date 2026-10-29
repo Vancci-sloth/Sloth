@@ -1,6 +1,7 @@
 import { query } from '@anthropic-ai/claude-agent-sdk'
 import type { FuenteProbada, FuenteRadar } from '../../shared/types.ts'
 import { googleNoticias, probarVarias } from './probar.ts'
+import { programaClaude } from '../agentes.ts'
 
 /**
  * «Proponer fuentes para un tema»: Claude (Sonnet, sin herramientas ni hilo, como el título corto de `claude.ts`) dice
@@ -33,6 +34,7 @@ async function preguntar(tema: string): Promise<FuenteRadar[]> {
   const q = query({
     prompt: `<tema>\n${tema.slice(0, 200)}\n</tema>`,
     options: {
+      ...programaClaude(),
       model: 'sonnet',
       systemPrompt: SISTEMA,
       tools: [],

@@ -1,0 +1,380 @@
+[
+ {
+  "type": "session.execution.started",
+  "data": {
+   "sessionID": "ses_e799658eaffe3I5aU9jIlylNk8"
+  }
+ },
+ {
+  "type": "session.step.started",
+  "data": {
+   "sessionID": "ses_e799658eaffe3I5aU9jIlylNk8",
+   "agent": "build",
+   "model": {
+    "id": "big-pickle",
+    "providerID": "opencode",
+    "variant": "default"
+   },
+   "assistantMessageID": "msg_18669a745001ngD5F8iGYW3MeO",
+   "started": 1793256433481
+  }
+ },
+ {
+  "type": "session.reasoning.started",
+  "data": {
+   "sessionID": "ses_e799658eaffe3I5aU9jIlylNk8",
+   "assistantMessageID": "msg_18669a745001ngD5F8iGYW3MeO",
+   "ordinal": 0,
+   "native": {
+    "reasoningField": "reasoning_content"
+   }
+  }
+ },
+ {
+  "type": "session.reasoning.delta",
+  "data": {
+   "sessionID": "ses_e799658eaffe3I5aU9jIlylNk8",
+   "assistantMessageID": "msg_18669a745001ngD5F8iGYW3MeO",
+   "ordinal": 0,
+   "delta": "The user wants me to use bash (shell tool)"
+  }
+ },
+ {
+  "type": "session.reasoning.delta",
+  "data": {
+   "sessionID": "ses_e799658eaffe3I5aU9jIlylNk8",
+   "assistantMessageID": "msg_18669a745001ngD5F8iGYW3MeO",
+   "ordinal": 0,
+   "delta": " to create hola.txt, then read it with read tool"
+  }
+ },
+ {
+  "type": "session.reasoning.delta",
+  "data": {
+   "sessionID": "ses_e799658eaffe3I5aU9jIlylNk8",
+   "assistantMessageID": "msg_18669a745001ngD5F8iGYW3MeO",
+   "ordinal": 0,
+   "delta": ", then respond only \"listo\".\n\nNote: no need to load"
+  }
+ },
+ {
+  "type": "session.usage.updated",
+  "data": {
+   "sessionID": "ses_e799658eaffe3I5aU9jIlylNk8",
+   "cost": 0,
+   "tokens": {
+    "input": 121,
+    "output": 8,
+    "reasoning": 80,
+    "cache": {
+     "read": 384,
+     "write": 0
+    }
+   }
+  }
+ },
+ {
+  "type": "session.reasoning.delta",
+  "data": {
+   "sessionID": "ses_e799658eaffe3I5aU9jIlylNk8",
+   "assistantMessageID": "msg_18669a745001ngD5F8iGYW3MeO",
+   "ordinal": 0,
+   "delta": " skill. Let"
+  }
+ },
+ {
+  "type": "session.reasoning.delta",
+  "data": {
+   "sessionID": "ses_e799658eaffe3I5aU9jIlylNk8",
+   "assistantMessageID": "msg_18669a745001ngD5F8iGYW3MeO",
+   "ordinal": 0,
+   "delta": "'s do it."
+  }
+ },
+ {
+  "type": "session.tool.input.started",
+  "data": {
+   "sessionID": "ses_e799658eaffe3I5aU9jIlylNk8",
+   "assistantMessageID": "msg_18669a745001ngD5F8iGYW3MeO",
+   "id": "call_00_uao5f4mxotexmaukzh9wjq81",
+   "name": "shell"
+  }
+ },
+ {
+  "type": "session.reasoning.ended",
+  "data": {
+   "sessionID": "ses_e799658eaffe3I5aU9jIlylNk8",
+   "assistantMessageID": "msg_18669a745001ngD5F8iGYW3MeO",
+   "ordinal": 0,
+   "text": "The user wants me to use bash (shell tool) to create hola.txt, then read it with read tool, then respond only \"listo\".\n\nNote: no need to load skill. Let's do it.",
+   "native": {
+    "reasoningField": "reasoning_content"
+   }
+  }
+ },
+ {
+  "type": "session.tool.input.ended",
+  "data": {
+   "sessionID": "ses_e799658eaffe3I5aU9jIlylNk8",
+   "assistantMessageID": "msg_18669a745001ngD5F8iGYW3MeO",
+   "id": "call_00_uao5f4mxotexmaukzh9wjq81",
+   "text": "{\"command\": \"echo \\\"hola desde opencode\\\" > hola.txt\"}"
+  }
+ },
+ {
+  "type": "session.tool.called",
+  "data": {
+   "sessionID": "ses_e799658eaffe3I5aU9jIlylNk8",
+   "assistantMessageID": "msg_18669a745001ngD5F8iGYW3MeO",
+   "id": "call_00_uao5f4mxotexmaukzh9wjq81",
+   "input": {
+    "command": "echo \"hola desde opencode\" > hola.txt"
+   },
+   "executed": false
+  }
+ },
+ {
+  "type": "session.tool.progress",
+  "data": {
+   "sessionID": "ses_e799658eaffe3I5aU9jIlylNk8",
+   "assistantMessageID": "msg_18669a745001ngD5F8iGYW3MeO",
+   "id": "call_00_uao5f4mxotexmaukzh9wjq81",
+   "metadata": {
+    "shellID": "sh_18669aff70016RQbKDrlJChlpU"
+   }
+  }
+ },
+ {
+  "type": "session.tool.success",
+  "data": {
+   "sessionID": "ses_e799658eaffe3I5aU9jIlylNk8",
+   "assistantMessageID": "msg_18669a745001ngD5F8iGYW3MeO",
+   "id": "call_00_uao5f4mxotexmaukzh9wjq81",
+   "content": [
+    {
+     "type": "text",
+     "text": "(no output)"
+    }
+   ],
+   "metadata": {
+    "status": "completed",
+    "truncated": false,
+    "exit": 0
+   },
+   "executed": false
+  }
+ },
+ {
+  "type": "session.step.ended",
+  "data": {
+   "sessionID": "ses_e799658eaffe3I5aU9jIlylNk8",
+   "assistantMessageID": "msg_18669a745001ngD5F8iGYW3MeO",
+   "finish": "tool-calls",
+   "rawFinish": "tool_calls",
+   "tokens": {
+    "input": 7567,
+    "output": 48,
+    "reasoning": 44,
+    "cache": {
+     "read": 2688,
+     "write": 0
+    }
+   },
+   "cost": 0
+  }
+ },
+ {
+  "type": "session.usage.updated",
+  "data": {
+   "sessionID": "ses_e799658eaffe3I5aU9jIlylNk8",
+   "cost": 0,
+   "tokens": {
+    "input": 7688,
+    "output": 56,
+    "reasoning": 124,
+    "cache": {
+     "read": 3072,
+     "write": 0
+    }
+   }
+  }
+ },
+ {
+  "type": "session.step.started",
+  "data": {
+   "sessionID": "ses_e799658eaffe3I5aU9jIlylNk8",
+   "agent": "build",
+   "model": {
+    "id": "big-pickle",
+    "providerID": "opencode",
+    "variant": "default"
+   },
+   "assistantMessageID": "msg_18669b0430016oG6M08VZaEHXZ",
+   "started": 1793256435786
+  }
+ },
+ {
+  "type": "session.tool.input.started",
+  "data": {
+   "sessionID": "ses_e799658eaffe3I5aU9jIlylNk8",
+   "assistantMessageID": "msg_18669b0430016oG6M08VZaEHXZ",
+   "id": "call_00_fj1wuctnss1sylpg630kv4e0",
+   "name": "read"
+  }
+ },
+ {
+  "type": "session.tool.input.ended",
+  "data": {
+   "sessionID": "ses_e799658eaffe3I5aU9jIlylNk8",
+   "assistantMessageID": "msg_18669b0430016oG6M08VZaEHXZ",
+   "id": "call_00_fj1wuctnss1sylpg630kv4e0",
+   "text": "{\"path\": \"hola.txt\"}"
+  }
+ },
+ {
+  "type": "session.tool.called",
+  "data": {
+   "sessionID": "ses_e799658eaffe3I5aU9jIlylNk8",
+   "assistantMessageID": "msg_18669b0430016oG6M08VZaEHXZ",
+   "id": "call_00_fj1wuctnss1sylpg630kv4e0",
+   "input": {
+    "path": "hola.txt"
+   },
+   "executed": false
+  }
+ },
+ {
+  "type": "session.tool.success",
+  "data": {
+   "sessionID": "ses_e799658eaffe3I5aU9jIlylNk8",
+   "assistantMessageID": "msg_18669b0430016oG6M08VZaEHXZ",
+   "id": "call_00_fj1wuctnss1sylpg630kv4e0",
+   "content": [
+    {
+     "type": "text",
+     "text": "Read file hola.txt, lines 1-1\n1: hola desde opencode"
+    }
+   ],
+   "metadata": {
+    "truncated": false
+   },
+   "executed": false
+  }
+ },
+ {
+  "type": "session.step.ended",
+  "data": {
+   "sessionID": "ses_e799658eaffe3I5aU9jIlylNk8",
+   "assistantMessageID": "msg_18669b0430016oG6M08VZaEHXZ",
+   "finish": "tool-calls",
+   "rawFinish": "tool_calls",
+   "tokens": {
+    "input": 121,
+    "output": 39,
+    "reasoning": 0,
+    "cache": {
+     "read": 10240,
+     "write": 0
+    }
+   },
+   "cost": 0
+  }
+ },
+ {
+  "type": "session.usage.updated",
+  "data": {
+   "sessionID": "ses_e799658eaffe3I5aU9jIlylNk8",
+   "cost": 0,
+   "tokens": {
+    "input": 7809,
+    "output": 95,
+    "reasoning": 124,
+    "cache": {
+     "read": 13312,
+     "write": 0
+    }
+   }
+  }
+ },
+ {
+  "type": "session.step.started",
+  "data": {
+   "sessionID": "ses_e799658eaffe3I5aU9jIlylNk8",
+   "agent": "build",
+   "model": {
+    "id": "big-pickle",
+    "providerID": "opencode",
+    "variant": "default"
+   },
+   "assistantMessageID": "msg_18669b5f5001d3uMxaUMqL5o6B",
+   "started": 1793256437244
+  }
+ },
+ {
+  "type": "session.text.started",
+  "data": {
+   "sessionID": "ses_e799658eaffe3I5aU9jIlylNk8",
+   "assistantMessageID": "msg_18669b5f5001d3uMxaUMqL5o6B",
+   "ordinal": 0
+  }
+ },
+ {
+  "type": "session.text.delta",
+  "data": {
+   "sessionID": "ses_e799658eaffe3I5aU9jIlylNk8",
+   "assistantMessageID": "msg_18669b5f5001d3uMxaUMqL5o6B",
+   "ordinal": 0,
+   "delta": "listo."
+  }
+ },
+ {
+  "type": "session.text.ended",
+  "data": {
+   "sessionID": "ses_e799658eaffe3I5aU9jIlylNk8",
+   "assistantMessageID": "msg_18669b5f5001d3uMxaUMqL5o6B",
+   "ordinal": 0,
+   "text": "listo."
+  }
+ },
+ {
+  "type": "session.step.ended",
+  "data": {
+   "sessionID": "ses_e799658eaffe3I5aU9jIlylNk8",
+   "assistantMessageID": "msg_18669b5f5001d3uMxaUMqL5o6B",
+   "finish": "stop",
+   "rawFinish": "stop",
+   "tokens": {
+    "input": 191,
+    "output": 4,
+    "reasoning": 0,
+    "cache": {
+     "read": 10240,
+     "write": 0
+    }
+   },
+   "cost": 0
+  }
+ },
+ {
+  "type": "session.usage.updated",
+  "data": {
+   "sessionID": "ses_e799658eaffe3I5aU9jIlylNk8",
+   "cost": 0,
+   "tokens": {
+    "input": 8000,
+    "output": 99,
+    "reasoning": 124,
+    "cache": {
+     "read": 23552,
+     "write": 0
+    }
+   }
+  }
+ },
+ {
+  "type": "session.execution.succeeded",
+  "data": {
+   "sessionID": "ses_e799658eaffe3I5aU9jIlylNk8"
+  }
+ }
+]

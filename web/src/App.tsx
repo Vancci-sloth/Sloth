@@ -4,7 +4,7 @@ import type { AvanceCorto, Card, Model, Previa, Serie, ServerPush, SessionMeta, 
 import { NOMBRE_AGENTE, proveedorDe } from '../../shared/providers'
 import { VENTA } from '../../shared/venta'
 import { Ideas, textoAHtml } from './Ideas' // ideas
-import { CuentaClaude, Opciones, Requisitos, useSoloChatGPT } from './Opciones'
+import { CuentaClaude, Opciones, Requisitos, useSinClaude } from './Opciones'
 import { api } from './api'
 import { eventos, useFallo, useResumen } from './eventos'
 import { useDesplazando } from './desplazando'
@@ -20,7 +20,7 @@ import { esDeEstudio, Estudio } from './Estudio' // panel de etapas
 import { BotonNavegador, PanelNavegador, useNavegadorAbierto } from './Navegador' // navegador de cada hilo
 import { conReferencia, ReferenciaVideo } from './Referencia'
 import { useSoltar } from './Soltar'
-import { CON_CHATGPT, elegirModelos, lineaSubagentes, Modelos, type Avanzado } from './Modelos'
+import { CON_CHATGPT, conOpenCode, elegirModelos, lineaSubagentes, Modelos, type Avanzado } from './Modelos'
 import { AvisoEquipo } from './Equipo' // tu equipo
 import { MisVideos, Rejilla, VideoDe } from './MisVideos'
 import { Modelos3D } from './Modelos3D' // modelos 3D
@@ -741,9 +741,9 @@ function NewSession(props: {
   // El modelo: «Optimizado» usa lo medido para esta card (el hilo y cada subagente) o, sin medir, lo último que elegiste
   // a mano; «Avanzado», lo que elegiste para ella.
   const [avanzados, setAvanzados] = useStored<Record<string, Avanzado>>('modelos', {})
-  // Con ChatGPT y sin Claude, lo medido no podría empezar: sin elección tuya, la card va en «Avanzado» con ChatGPT.
-  const soloChatGPT = useSoloChatGPT()
-  const avanzado = avanzados[card.id] ?? (soloChatGPT ? CON_CHATGPT : undefined)
+  // Sin Claude, lo medido no podría empezar: sin elección tuya, la card va en «Avanzado» con ChatGPT o, sin él, con OpenCode.
+  const sinClaude = useSinClaude()
+  const avanzado = avanzados[card.id] ?? (sinClaude === 'codex' ? CON_CHATGPT : sinClaude === 'opencode' ? conOpenCode(models) : undefined)
   const { choice, tareas } = useMemo(() => elegirModelos(card.modelos, models, avanzado, lastChoice(models)), [card.modelos, models, avanzado])
   function cambiarModelos(a: Avanzado | undefined) {
     const { [card.id]: _, ...resto } = avanzados
@@ -818,7 +818,7 @@ function NewSession(props: {
         onDraft={props.onDraft}
         bloqueo={sinCuenta ? 'Primero conecta tu cuenta (arriba)' : undefined}
         placeholder={card.skill ? `Qué quieres de /${card.skill}…` : 'Qué cambio quieres en Sloth…'}
-        modelos={<Modelos conf={card.modelos} models={models} avanzado={avanzado} choice={choice} tareas={tareas} soloChatGPT={soloChatGPT} onAvanzado={cambiarModelos} />}
+        modelos={<Modelos conf={card.modelos} models={models} avanzado={avanzado} choice={choice} tareas={tareas} sinClaude={sinClaude} onAvanzado={cambiarModelos} />}
         extra={
           <>
             {series.length > 0 && (
@@ -928,8 +928,8 @@ function NewSession(props: {
           <p>{card.description}</p>
           <TusCambios card={card} clave={hilos.map((s) => s.id + s.updatedAt).join()} />
         </div>
-        {/* Hasta saber qué cuentas hay no sale: el aviso de Claude no se asoma a quien solo tiene ChatGPT. */}
-        {soloChatGPT !== undefined && <CuentaClaude model={choice?.model} onFalta={setSinCuenta} />}
+        {/* Hasta saber qué cuentas hay no sale: el aviso de Claude no se asoma a quien solo tiene ChatGPT u OpenCode. */}
+        {sinClaude !== undefined && <CuentaClaude model={choice?.model} onFalta={setSinCuenta} />}
         {/* Las herramientas de video solo hacen falta en los estilos de video, y de los paquetes, los de su skill. */}
         {card.etapas && <Requisitos skill={card.skill} />}
         {composer}

@@ -12,6 +12,8 @@ import { IMAGE_TYPES } from './agent.ts'
 import { avances } from './avances.ts'
 import { claudeModels, tituloCorto } from './claude.ts'
 import { codexModels } from './codex.ts'
+import { asegurarAgente, bajandoAgente, estadoAgentes, rutaAgente } from './agentes.ts'
+import { opencodeModels } from './opencode.ts'
 import { type Proveedor, proveedorDe } from '../shared/providers.ts'
 import { paraMandar } from '../shared/historial.ts'
 import { conectandoCodex, conectarCodex, cuentaCodex, limitesCodex } from './cuenta-codex.ts'
@@ -170,7 +172,7 @@ function ocupado(): string | null {
   if (publicar?.ocupado()) return publicar.ocupado() // redes: una subida o un texto a medias
   if (subirLargos?.ocupado()) return subirLargos.ocupado()
   if (idear?.ocupado()) return idear.ocupado() // ideas: una investigación en curso
-  return maquina.ocupado() ?? instalandoAlgo() ?? conectando() ?? conectandoCodex()
+  return maquina.ocupado() ?? instalandoAlgo() ?? bajandoAgente() ?? conectando() ?? conectandoCodex()
 }
 
 /** Vuelve a levantar el servidor (lo hace scripts/start.mjs), con lo que haya cambiado. Los agentes se retoman al volver. */
@@ -180,8 +182,9 @@ function reiniciar() {
 }
 
 /**
- * Los modelos se preguntan a Claude Code y a Codex. La interfaz no los espera para enseñar cards y hilos: le
- * llegan por el WebSocket. Se piden al arrancar y, si fallaron, otra vez cuando alguien abre la app.
+ * Los modelos se preguntan a Claude Code, a Codex y a OpenCode, a los que ya se bajaron (`server/agentes.ts`). La
+ * interfaz no los espera para enseñar cards y hilos: le llegan por el WebSocket. Se piden al arrancar, al bajar un agente
+ * y, si fallaron, otra vez cuando alguien abre la app.
  */
 let modelos: Model[] = []
 let cargandoModelos = false
@@ -189,10 +192,11 @@ function pedirModelos() {
   if (cargandoModelos) return
   cargandoModelos = true
   // Cada proveedor llega por separado: el que tarda no tapa los modelos que ya se pueden elegir.
-  void Promise.allSettled([claudeModels(), codexModels()].map(async (pedido, i) => {
-    const lista = await pedido
+  const pedidos: [Proveedor, () => Promise<Model[]>][] = [['claude', claudeModels], ['codex', codexModels], ['opencode', opencodeModels]]
+  void Promise.allSettled(pedidos.map(async ([p, pedir]) => {
+    const lista = await pedir()
     if (!lista.length) return
-    modelos = [...modelos.filter((m) => proveedorDe(m.id) !== (i ? 'codex' : 'claude')), ...lista]
+    modelos = [...modelos.filter((m) => proveedorDe(m.id) !== p), ...lista]
     broadcast({ type: 'models', models: modelos })
   })).finally(() => { cargandoModelos = false })
 }
@@ -270,7 +274,7 @@ async function api(req: IncomingMessage, res: ServerResponse, url: URL): Promise
   const method = req.method ?? 'GET'
 
   if (path === '/api/state' && method === 'GET') {
-    if (!modelos.some((m) => proveedorDe(m.id) === 'claude') || !modelos.some((m) => proveedorDe(m.id) === 'codex')) pedirModelos()
+    if ((['claude', 'codex', 'opencode'] as const).some((p) => rutaAgente(p) && !modelos.some((m) => proveedorDe(m.id) === p))) pedirModelos()
     send(res, 200, { cards: cards(), sessions: sessions.list(), models: modelos, app: APP, avances: avance?.todos() ?? {} })
     return true
   }
@@ -352,7 +356,15 @@ async function api(req: IncomingMessage, res: ServerResponse, url: URL): Promise
     return true
   }
 
-  const ver = /^\/api\/(claude|codex)\/version$/.exec(path)
+  // El programa de cada agente, que se baja al elegirlo (`server/agentes.ts`). Al acabar, su catálogo de modelos.
+  if (path === '/api/agentes' && method === 'GET') return send(res, 200, estadoAgentes()), true
+  const baja = /^\/api\/(claude|codex|opencode)\/descargar$/.exec(path)
+  if (baja && method === 'POST') {
+    void asegurarAgente(baja[1] as Proveedor).then(pedirModelos, () => {})
+    return send(res, 200, estadoAgentes()), true
+  }
+
+  const ver = /^\/api\/(claude|codex|opencode)\/version$/.exec(path)
   if (ver && method === 'GET') return send(res, 200, version(APP, ver[1] as Agente)), true
 
   // Las series de la skill de una card, para elegir una al crear un video. Se leen cada vez: viven en las skills, y

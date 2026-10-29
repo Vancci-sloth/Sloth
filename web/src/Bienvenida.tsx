@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { Icono } from './Iconos'
-import { CuentaChatGPT, CuentaClaude, Requisitos } from './Opciones'
+import { CuentaChatGPT, CuentaClaude, CuentaOpenCode, Requisitos } from './Opciones'
 import './Bienvenida.css'
 
 const VISTA = 'bienvenida'
@@ -17,6 +17,7 @@ export function Bienvenida() {
   const [abierta, setAbierta] = useState(() => !localStorage.getItem(VISTA))
   const [claude, setClaude] = useState<boolean>()
   const [chatgpt, setChatgpt] = useState<boolean>()
+  const [opencode, setOpencode] = useState<boolean>()
   const [listo, setListo] = useState<boolean>()
   // En la app instalada en Windows: si Sloth está anclada a la barra de tareas. `null`, aquí no se ofrece.
   const [anclada, setAnclada] = useState<boolean | null>(null)
@@ -61,18 +62,21 @@ export function Bienvenida() {
           <div>
             <h2>Te damos la bienvenida a Sloth</h2>
             <p>
-              Sloth hace videos verticales con Claude o ChatGPT. Eliges un estilo, le das un tema o un enlace, y lo ves trabajar paso a
-              paso: investiga, escribe el guion, te pide tu voz y arma el video.
+              Sloth hace videos con Claude, con ChatGPT o, gratis, con OpenCode. Eliges un estilo, le das un tema o un enlace, y lo
+              ves trabajar paso a paso: investiga, escribe el guion, te pide tu voz y arma el video.
             </p>
           </div>
         </header>
 
-        {/* Con una de las dos basta. Con ChatGPT, además, hace las imágenes de los videos. */}
-        <Paso n={1} titulo="Conecta tu cuenta de Claude o ChatGPT" hecho={claude || chatgpt}>
-          Sloth trabaja con tu plan de Claude (Pro o Max) o de ChatGPT (Plus o Pro) y no te cobra aparte. Si prefieres pagar
-          por uso, también con una llave de API. Con ChatGPT, además, hace las imágenes de los videos: portadas y personajes.
+        {/* Con uno basta. Con ChatGPT, además, hace las imágenes de los videos. */}
+        <Paso n={1} titulo="Elige con qué trabaja: Claude, ChatGPT u OpenCode" hecho={claude || chatgpt || opencode}>
+          <b>Claude y ChatGPT necesitan un plan de pago</b>: Claude Pro o Max, o ChatGPT Plus o Pro (o una llave de API, que
+          se paga por uso). Sloth no te cobra aparte, y con ellos salen los mejores videos; con ChatGPT, además, hace las
+          imágenes: portadas y personajes. <b>OpenCode es gratis</b> y no pide cuenta: usa solo sus modelos gratis, que pueden
+          equivocarse más y a veces se saturan. Cada uno se descarga al elegirlo.
           <CuentaClaude onFalta={(falta) => setClaude(falta === undefined ? undefined : !falta)} />
           <CuentaChatGPT onFalta={(falta) => setChatgpt(falta === undefined ? undefined : !falta)} />
+          <CuentaOpenCode aviso onFalta={(falta) => setOpencode(falta === undefined ? undefined : !falta)} />
         </Paso>
         <Paso n={2} titulo="Prepara tu computadora" hecho={listo}>
           Los estilos usan unas herramientas (FFmpeg, Python…). Si falta alguna, aquí sale el botón para descargarla; tarda unos
@@ -106,6 +110,7 @@ export function Bienvenida() {
           Cada video usa una parte de los límites de tu plan, que ves en Opciones. Las cifras en dólares que salen en cada
           video dicen cuánto costaría pagado aparte, no lo que se te cobra. Un video gasta bastante: con el plan Pro el límite
           se acaba pronto, y con Max alcanza para varios. Con una llave de API no hay límites: esas cifras son lo que pagas.
+          Con OpenCode no pagas nada, pero sus modelos gratis a veces se saturan: entonces toca esperar unos minutos.
         </Paso>
 
         <div className="modal-actions">

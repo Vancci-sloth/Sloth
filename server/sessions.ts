@@ -4,11 +4,13 @@ import { join } from 'node:path'
 import { historialLigero } from '../shared/historial.ts'
 import { leerHistorial, primerUsuario } from './historial.ts'
 import type { AgentEvent, FileDraft, SessionMeta } from '../shared/types.ts'
-import { proveedorDe } from '../shared/providers.ts'
+import { NOMBRE_AGENTE, proveedorDe } from '../shared/providers.ts'
 import { llaveEnUso } from './acceso.ts'
 import type { AgentRun, SkillRef } from './agent.ts'
+import { conAgente } from './agentes.ts'
 import { startClaude } from './claude.ts'
 import { startCodex } from './codex.ts'
+import { startOpenCode } from './opencode.ts'
 import { guardar } from './disco.ts'
 
 /**
@@ -95,7 +97,10 @@ export class Sessions {
     private pushMeta: (meta: SessionMeta) => void,
     private pushRemoved: (id: string) => void,
     private pushDraft: (sessionId: string, draft: FileDraft) => void,
-    private crearAgente: (opts: Parameters<typeof startCodex>[0]) => AgentRun = (opts) => (proveedorDe(opts.model) === 'codex' ? startCodex : startClaude)(opts)
+    private crearAgente: (opts: Parameters<typeof startCodex>[0]) => AgentRun = (opts) => {
+      const p = proveedorDe(opts.model)
+      return conAgente(p, opts, { claude: startClaude, codex: startCodex, opencode: startOpenCode }[p])
+    }
   ) {
     mkdirSync(dir, { recursive: true })
     for (const file of readdirSync(dir).filter((f) => f.endsWith('.json'))) {
@@ -344,7 +349,7 @@ export class Sessions {
     const run = this.runFor(meta)
     if (!run.compact) throw new Error('Este agente no admite compactación manual.')
     this.compactando.add(id)
-    this.emit(id, { t: 'info', text: `Compactando el contexto de ${proveedorDe(meta.model) === 'codex' ? 'Codex' : 'Claude'}…` })
+    this.emit(id, { t: 'info', text: `Compactando el contexto de ${{ claude: 'Claude', codex: 'Codex', opencode: 'OpenCode' }[proveedorDe(meta.model)]}…` })
     this.emit(id, { t: 'turn_start', at: Date.now() })
     try { run.compact() }
     catch (error) {
@@ -357,7 +362,7 @@ export class Sessions {
     const meta = this.metas.get(id)
     // Cerrar el agente mataría lo que corre en segundo plano.
     if (!meta || meta.running || meta.background?.length) return
-    if (proveedorDe(meta.model) !== proveedorDe(model)) throw new Error('Para cambiar de Claude a Codex o al revés, abre un hilo nuevo. Cada proveedor conserva su propia conversación.')
+    if (proveedorDe(meta.model) !== proveedorDe(model)) throw new Error(`Para cambiar de ${NOMBRE_AGENTE[proveedorDe(meta.model)]} a ${NOMBRE_AGENTE[proveedorDe(model)]}, abre un hilo nuevo. Cada proveedor conserva su propia conversación.`)
     meta.model = model
     meta.effort = effort
     this.cerrar(id)

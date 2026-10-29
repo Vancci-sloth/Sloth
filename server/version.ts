@@ -1,13 +1,16 @@
 import { spawn } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
+import type { Proveedor } from '../shared/providers.ts'
 import type { VersionClaude } from '../shared/types.ts'
+import { rutaAgente } from './agentes.ts'
 
 /**
- * La versión de cada agente, que Opciones enseña en su fila. Los dos son paquetes de este repo y llegan al día con cada
- * versión de Sloth; aquí no se actualizan.
+ * La versión de cada agente, que Opciones enseña en su fila. Son paquetes de este repo y llegan al día con cada versión
+ * de Sloth; aquí no se actualizan. Su programa se baja aparte, al elegirlos (`server/agentes.ts`): sin él, no está
+ * instalado.
  */
-export type Agente = 'claude' | 'codex'
+export type Agente = Proveedor
 
 type Publicada = { version: string; claudeCodeVersion?: string }
 
@@ -15,6 +18,7 @@ const AGENTES: Record<Agente, { paquete: string; version(p: Publicada): string |
   // La que se reconoce es la de Claude Code, no la del SDK.
   claude: { paquete: '@anthropic-ai/claude-agent-sdk', version: (p) => p.claudeCodeVersion },
   codex: { paquete: '@openai/codex', version: (p) => p.version },
+  opencode: { paquete: '@opencode/client', version: (p) => p.version },
 }
 
 /** Corre un comando y devuelve lo que escribió. Si falla, el error lleva el final de la salida. */
@@ -31,6 +35,7 @@ export function correr(comando: string, cwd: string): Promise<string> {
 
 export function version(app: string, agente: Agente): VersionClaude {
   const a = AGENTES[agente]
+  if (!rutaAgente(agente)) return { instalada: null }
   try {
     return { instalada: a.version(JSON.parse(readFileSync(join(app, 'node_modules', a.paquete, 'package.json'), 'utf8'))) ?? null }
   } catch {
