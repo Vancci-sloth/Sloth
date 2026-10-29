@@ -1,7 +1,7 @@
 # Qué pasó esta semana
 
-Lo más importante de la semana en el nicho del canal (`nicho` en la marca), en unos 30 segundos. Es el género «una
-noticia» de [`GUION.md`](../GUION.md).
+Lo más importante de la semana en el nicho del canal, en unos 30 segundos. Es «una noticia» (en
+video-explicativo, ese género de su `GUION.md`).
 
 ## El tema, si no te dieron uno
 
@@ -24,7 +24,7 @@ noticia» de [`GUION.md`](../GUION.md).
 
 ## Secciones para cuando la semana no trae una clara
 
-Adáptalas al nicho de la marca:
+Adáptalas al nicho del canal:
 
 1. El número de la semana y por qué se movió (un precio, un récord, una cifra oficial).
 2. El tropiezo de la semana: quién, cuánto y cómo.

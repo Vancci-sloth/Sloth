@@ -1,8 +1,8 @@
 # Desmontando estafas
 
-Una estafa del nicho del canal (`nicho` en la marca) que circula hoy, desarmada pieza por pieza para que el que lo ve
-la reconozca y se la mande a quien le pueda caer. Es el género «explicar algo» de [`GUION.md`](../GUION.md), con forma
-de alerta.
+Una estafa del nicho del canal que circula hoy, desarmada pieza por pieza para que el que lo ve
+la reconozca y se la mande a quien le pueda caer. Es «explicar algo» con forma de alerta (en video-explicativo, ese
+género de su `GUION.md`).
 
 ## El tema, si no te dieron uno
 
@@ -26,7 +26,7 @@ de alerta.
 
 ## Temas para empezar
 
-Ejemplos de varios nichos; busca los del nicho de la marca:
+Ejemplos de varios nichos; busca los del nicho del canal:
 
 1. Falso soporte técnico que te escribe por DM o WhatsApp.
 2. Videos deepfake de famosos que prometen duplicar tu dinero.

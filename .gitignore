@@ -8,7 +8,7 @@ dist
 /references/
 /skills/reel-collage/personaje/
 /skills/video-explicativo/huellas/
-/skills/video-explicativo/series/banco/
+/skills/*/series/banco/
 /skills/video-el-diff/plantilla/public/img/*
 !/skills/video-el-diff/plantilla/public/img/grano.png
 !/skills/video-el-diff/plantilla/public/img/LEEME.md

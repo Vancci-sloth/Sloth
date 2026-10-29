@@ -340,11 +340,12 @@ async function api(req: IncomingMessage, res: ServerResponse, url: URL): Promise
   const ver = /^\/api\/(claude|codex)\/version$/.exec(path)
   if (ver && method === 'GET') return send(res, 200, version(APP, ver[1] as Agente)), true
 
-  // Las series de la skill de una card, para elegir una al crear un video. Se leen cada vez: viven en la skill.
+  // Las series de la skill de una card, para elegir una al crear un video. Se leen cada vez: viven en las skills, y
+  // todo estilo de video (la card con `etapas`) tiene las de video-base.
   const ser = /^\/api\/cards\/([\w-]+)\/series$/.exec(path)
   if (ser && method === 'GET') {
-    const skill = cards().find((c) => c.id === ser[1])?.skill
-    return send(res, 200, skill ? seriesDe(skill) : []), true
+    const card = cards().find((c) => c.id === ser[1])
+    return send(res, 200, card?.skill ? seriesDe(card.skill, !!card.etapas) : []), true
   }
 
   // «Con tus cambios»: lo que el usuario (o su agente) cambió en la skill de una card, y volver a la original, entera o un

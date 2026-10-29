@@ -1,12 +1,12 @@
 # Historias de Reddit
 
-Historias reales de gente a la que algo del nicho del canal (`nicho` en la marca) le salió muy mal por un error
-(perdió dinero, tiempo o algo que no vuelve), sacadas de Reddit y contadas con nuestras palabras. Es el género «una
-historia» de [`GUION.md`](../GUION.md).
+Historias reales de gente a la que algo del nicho del canal le salió muy mal por un error (perdió dinero, tiempo o
+algo que no vuelve), sacadas de Reddit y contadas con nuestras palabras. Es «una historia» (en video-explicativo, ese
+género de su `GUION.md`).
 
 ## El tema, si no te dieron uno
 
-- **Primero el banco:** `banco.py ver reddit` (ver "Series" en el SKILL). Si una sirve, tómala y salta a leerla.
+- **Primero el banco:** `banco.py ver <skill> reddit` (ver [`SERIES.md`](../SERIES.md)). Si una sirve, tómala y salta a leerla.
 - **Dónde:** cinco o seis subreddits del nicho (crypto: r/CryptoCurrency, r/Bitcoin, r/ethereum, r/solana,
   r/ledgerwallet; finanzas: r/personalfinance, r/povertyfinance; tecnología: r/techsupport, r/sysadmin; cocina:
   r/Cooking, r/KitchenConfidential).
@@ -66,7 +66,7 @@ historia» de [`GUION.md`](../GUION.md).
   publicó».
 - **Que no se repita:** ni un tema ya hecho, ni el mismo error que alguno de los dos últimos de esta serie
   (`huellas.py buscar --serie`).
-- Las que leíste y no usaste, al banco (`banco.py guardar reddit`). Al darle el guion al usuario, dile por qué
+- Las que leíste y no usaste, al banco (`banco.py guardar <skill> reddit`). Al darle el guion al usuario, dile por qué
   elegiste esa historia y dale otras dos, por si prefiere.
 
 ## Qué tiene que pasar
@@ -77,7 +77,7 @@ historia» de [`GUION.md`](../GUION.md).
   (qué es una seed phrase, una red equivocada) va dentro de la historia, en una frase, cuando hace falta.
 - Lo que dijeron los comentarios más votados, y el EDIT del autor si lo hay: es el giro final.
 - En la imagen, el post rehecho (el sub, la hora, los votos) con **el usuario tapado o cambiado**; los comentarios,
-  igual (`Post` y `Comentario` de la plantilla). Dónde sale el post (una pantalla del lugar, un celular, impreso) es
+  igual (en video-explicativo, `Post` y `Comentario` de su plantilla). Dónde sale el post (una pantalla del lugar, un celular, impreso) es
   de cada video. El texto del post, contado con nuestras palabras, no copiado entero.
 - Termina en lo que habría evitado el error, en una frase y sin sermón.
 

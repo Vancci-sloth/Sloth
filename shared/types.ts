@@ -106,12 +106,14 @@ export interface EditorConf {
 }
 
 /**
- * Una serie de una skill de video (`skills/<skill>/series/<id>.md`): un formato fijo del canal, que elige solo su tema.
- * `GET /api/cards/<id>/series`; el nombre es el título del archivo.
+ * Una serie de video (`skills/video-base/series/<id>.md`, o de la skill): un formato fijo del canal, que elige solo su
+ * tema. `GET /api/cards/<id>/series`; el nombre es el título del archivo.
  */
 export interface Serie {
   id: string
   nombre: string
+  /** Su archivo, desde la carpeta de las skills (`video-base/series/mitos.md`). */
+  archivo: string
 }
 
 /** Un archivo de una skill que ya no es como lo trae Sloth (`server/originales.ts`): cambiado o, con `borrado`, quitado. */

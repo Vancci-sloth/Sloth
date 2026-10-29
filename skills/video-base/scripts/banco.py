@@ -1,13 +1,14 @@
 """
 El banco de historias de una serie: las candidatas que ya se buscaron, leyeron y comprobaron y no se usaron, para que
-el siguiente video no empiece a buscar de cero. Vive en `<skill>/series/banco/<serie>.jsonl` (una por renglón), y
-`<serie>` es el nombre del archivo de la serie (`reddit`, `estafas`…). Noticias no usa banco: caducan.
+el siguiente video no empiece a buscar de cero. Cada estilo tiene el suyo, en `<skill>/series/banco/<serie>.jsonl` (una
+por renglón), y `<serie>` es el nombre del archivo de la serie (`reddit`, `estafas`…), de `<skill>/series/` o de
+`<base>/series/`. Noticias no usa banco: caducan.
 
-    python -B -X utf8 <skill>/scripts/banco.py ver <serie>
+    python -B -X utf8 <base>/scripts/banco.py ver <skill> <serie>
         las libres, de más a menos votos, y si alguna ya se hizo (huellas.py buscar, todas en una llamada)
-    python -B -X utf8 <skill>/scripts/banco.py tomar <serie> <enlace>
+    python -B -X utf8 <base>/scripts/banco.py tomar <skill> <serie> <enlace>
         la marca usada por este proyecto (desde su raíz), para que otro video no la tome a la vez
-    python -B -X utf8 <skill>/scripts/banco.py guardar <serie> '<json>'
+    python -B -X utf8 <base>/scripts/banco.py guardar <skill> <serie> '<json>'
         suma una (o una lista): {"enlace", "titulo", "tema", "votos", "comentarios", "fecha", "momento",
         "comprobado", "notas"}. `tema` en pocas palabras, como el de la huella; `momento`, el instante en que todo se
         tuerce; `comprobado`, qué se verificó y dónde (o qué falta). La que ya está (mismo enlace), no se repite.
@@ -19,16 +20,21 @@ import sys
 from datetime import date
 from pathlib import Path
 
-SKILL = Path(__file__).resolve().parent.parent
-BASE = SKILL.parent / "video-base" / "scripts"
+BASE = Path(__file__).resolve().parent
 sys.path.insert(0, str(BASE))
 from sloth import turno  # noqa: E402
 
 
-def archivo(serie: str) -> Path:
-    if not (SKILL / "series" / f"{serie}.md").exists():
-        sys.exit(f"No hay series/{serie}.md.")
-    return SKILL / "series" / "banco" / f"{serie}.jsonl"
+def serie_md(skill: Path, serie: str) -> Path:
+    for ruta in (skill / "series" / f"{serie}.md", BASE.parent / "series" / f"{serie}.md"):
+        if ruta.exists():
+            return ruta
+    sys.exit(f"No hay series/{serie}.md ni en {skill.name} ni en video-base.")
+
+
+def archivo(skill: Path, serie: str) -> Path:
+    serie_md(skill, serie)
+    return skill / "series" / "banco" / f"{serie}.jsonl"
 
 
 def leer(ruta: Path) -> list[dict]:
@@ -44,12 +50,12 @@ def escribir(ruta: Path, todas: list[dict]) -> None:
     temporal.replace(ruta)
 
 
-def nombre_de(serie: str) -> str:
-    return (SKILL / "series" / f"{serie}.md").read_text(encoding="utf-8").splitlines()[0].lstrip("# ").strip()
+def nombre_de(skill: Path, serie: str) -> str:
+    return serie_md(skill, serie).read_text(encoding="utf-8").splitlines()[0].lstrip("# ").strip()
 
 
-def ver(serie: str) -> None:
-    libres = sorted((h for h in leer(archivo(serie)) if h.get("estado", "libre") == "libre"), key=lambda h: -(h.get("votos") or 0))
+def ver(skill: Path, serie: str) -> None:
+    libres = sorted((h for h in leer(archivo(skill, serie)) if h.get("estado", "libre") == "libre"), key=lambda h: -(h.get("votos") or 0))
     if not libres:
         print("El banco está vacío: busca como dice la serie y guarda aquí las que no uses.")
         return
@@ -58,12 +64,12 @@ def ver(serie: str) -> None:
               f"  {h.get('titulo', '')}\n  tema: {h.get('tema', '')}\n  momento: {h.get('momento', '')}\n"
               f"  comprobado: {h.get('comprobado', '')}" + (f"\n  notas: {h['notas']}" if h.get("notas") else ""))
     print(flush=True)
-    subprocess.run([sys.executable, "-B", "-X", "utf8", str(BASE / "huellas.py"), "buscar", str(SKILL),
-                    *[h.get("tema") or h.get("titulo", "") for h in libres], "--serie", nombre_de(serie)])
+    subprocess.run([sys.executable, "-B", "-X", "utf8", str(BASE / "huellas.py"), "buscar", str(skill),
+                    *[h.get("tema") or h.get("titulo", "") for h in libres], "--serie", nombre_de(skill, serie)])
 
 
-def tomar(serie: str, enlace: str) -> None:
-    ruta = archivo(serie)
+def tomar(skill: Path, serie: str, enlace: str) -> None:
+    ruta = archivo(skill, serie)
     with turno("banco", "Esperando el banco de historias: otro video lo está usando."):
         todas = leer(ruta)
         h = next((x for x in todas if x["enlace"] == enlace), None)
@@ -76,10 +82,10 @@ def tomar(serie: str, enlace: str) -> None:
     print(f"Tomada: {h.get('titulo', enlace)}")
 
 
-def guardar(serie: str, texto: str) -> None:
+def guardar(skill: Path, serie: str, texto: str) -> None:
     nuevas = json.loads(texto)
     nuevas = nuevas if isinstance(nuevas, list) else [nuevas]
-    ruta = archivo(serie)
+    ruta = archivo(skill, serie)
     with turno("banco", "Esperando el banco de historias: otro video lo está usando."):
         todas = leer(ruta)
         hay = {h["enlace"] for h in todas}
@@ -92,9 +98,12 @@ def guardar(serie: str, texto: str) -> None:
 def main() -> None:
     sys.stdout.reconfigure(encoding="utf-8")
     a = sys.argv[1:]
-    if len(a) < 2 or a[0] not in ("ver", "tomar", "guardar") or a[0] != "ver" and len(a) < 3:
+    if len(a) < 3 or a[0] not in ("ver", "tomar", "guardar") or a[0] != "ver" and len(a) < 4:
         sys.exit(__doc__)
-    {"ver": lambda: ver(a[1]), "tomar": lambda: tomar(a[1], a[2]), "guardar": lambda: guardar(a[1], a[2])}[a[0]]()
+    skill = Path(a[1]).resolve()
+    if not skill.is_dir():
+        sys.exit(f"No existe la skill {a[1]}.")
+    {"ver": lambda: ver(skill, a[2]), "tomar": lambda: tomar(skill, a[2], a[3]), "guardar": lambda: guardar(skill, a[2], a[3])}[a[0]]()
 
 
 main()

@@ -1,7 +1,7 @@
 # Mitos vs. realidad
 
-Una cosa que todo mundo repite sobre el nicho del canal (`nicho` en la marca), puesta a prueba con datos. Cada video,
-un mito. Se parece al género «un misterio» de [`GUION.md`](../GUION.md): la duda primero, las pruebas una por una y la
+Una cosa que todo mundo repite sobre el nicho del canal, puesta a prueba con datos. Cada video, un mito. Se parece a
+«un misterio» (en video-explicativo, ese género de su `GUION.md`): la duda primero, las pruebas una por una y la
 respuesta al final.
 
 ## El tema, si no te dieron uno
@@ -22,7 +22,7 @@ respuesta al final.
 
 ## Temas para empezar
 
-Ejemplos de varios nichos; busca los del nicho de la marca:
+Ejemplos de varios nichos; busca los del nicho del canal:
 
 1. Crypto: «Ya es demasiado tarde para entrar.»
 2. Crypto: «Bitcoin solo lo usan criminales.»

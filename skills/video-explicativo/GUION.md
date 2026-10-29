@@ -124,7 +124,7 @@ lo pide.
   primera persona como si le hubiera pasado al usuario; los comentarios más votados son las reacciones, con sus votos;
   el EDIT o la actualización del autor es el giro final. En la imagen, el post rehecho (el sub, la hora, los votos)
   con el usuario tapado o cambiado, y los comentarios igual (`Post` y `Comentario` de `src/piezas/reddit.tsx`). Más
-  en [`series/reddit.md`](series/reddit.md).
+  en [`series/reddit.md`](../video-base/series/reddit.md) de la base.
 - **Una noticia**: lo que pasó, primero y en una frase; quién y cómo se supo; por qué importa al que lo ve; qué
   sigue. Registro de reportero, al día y con la hora del corte.
 - **Una comparación** (X contra Y): las dos en escena todo el video, por rondas, cada una con su marcador; el ganador

@@ -179,14 +179,22 @@ export function volverAOriginal(card: Card, todas: Card[], datos: string, uno?: 
   }
 }
 
-/** Las series de una skill: cada `series/<id>.md` de su carpeta, con el título de su primera línea `# `. */
-export function seriesDe(skill: string): Serie[] {
-  const dir = join(SKILLS, skill, 'series')
-  if (!existsSync(dir)) return []
-  return readdirSync(dir)
-    .filter((f) => f.endsWith('.md'))
-    .map((f) => ({ id: f.slice(0, -3), nombre: /^# (.+)$/m.exec(readFileSync(join(dir, f), 'utf8'))?.[1].trim() ?? f.slice(0, -3) }))
-    .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'))
+/**
+ * Las series de una skill: cada `series/<id>.md` de su carpeta, con el título de su primera línea `# `. Un estilo de
+ * video tiene además las de `video-base/series` (`video-base/SERIES.md`); con el mismo id, la suya manda.
+ */
+export function seriesDe(skill: string, estilo: boolean): Serie[] {
+  const series = new Map<string, Serie>()
+  for (const carpeta of [...(estilo ? ['video-base'] : []), skill]) {
+    const dir = join(SKILLS, carpeta, 'series')
+    if (!existsSync(dir)) continue
+    for (const f of readdirSync(dir).filter((f) => f.endsWith('.md'))) {
+      const id = f.slice(0, -3)
+      const nombre = /^# (.+)$/m.exec(readFileSync(join(dir, f), 'utf8'))?.[1].trim() ?? id
+      series.set(id, { id, nombre, archivo: `${carpeta}/series/${f}` })
+    }
+  }
+  return [...series.values()].sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'))
 }
 
 export function readCards(file: string, appDir: string): Card[] {

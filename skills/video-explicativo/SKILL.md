@@ -67,22 +67,9 @@ este.
 
 ## Series
 
-Las series son formatos fijos que sirven para cualquier nicho, cada una en su archivo de [`series/`](series/): qué es,
-dónde buscar el tema y cómo elegirlo en el nicho de la marca, qué tiene que pasar en el video y temas de ejemplo. Sloth las
-enseña al crear un video y, si el usuario elige una, el mensaje trae la línea
-`Serie: <nombre> (series/<archivo>.md)`.
-
-- Lee ese archivo antes de investigar. Manda sobre lo general de esta skill en el tema y en lo que tiene que pasar; la
-  forma, el mundo y la imagen siguen siendo de cada video (ver "Cada video es único").
-- **Si el usuario no dio un tema**, elígelo tú con "El tema, si no te dieron uno" de la serie, sin preguntar.
-  **Primero el banco** (menos en Noticias, que caducan): `python -B -X utf8 <skill>/scripts/banco.py ver <serie>`
-  enseña las candidatas que otros videos ya buscaron, leyeron y comprobaron, y si alguna ya se hizo. Si una cumple lo
-  que pide la serie y no se hizo, `banco.py tomar <serie> <enlace>`, vuelve a leer su hilo y comprueba lo que diga
-  `comprobado` que falta. Si ninguna sirve, busca, compara y decide; todos los candidatos en una sola llamada (cargar
-  los vectores tarda): `python -B -X utf8 <base>/scripts/huellas.py buscar <skill> "<tema 1>" "<tema 2>" "<tema 3>"
-  --serie "<serie>"`. **Las que leíste y no usaste, al banco** con `banco.py guardar` (su enlace, votos, el momento en
-  que se tuerce y qué comprobaste): son el próximo video. Al darle el guion, dile por qué esa y otras dos opciones.
-- **Si dio un tema**, haz ese, con lo que pide la serie.
+Si el mensaje trae la línea `Serie:`, sigue [`SERIES.md`](../video-base/SERIES.md) de la base: lee el archivo de la
+serie antes de investigar, elige el tema del banco o de lo que pide la serie, y el nicho es el de la marca. La forma, el
+mundo y la imagen siguen siendo de cada video (ver "Cada video es único").
 
 ## Lo que el usuario pidió y no se negocia
 
@@ -287,12 +274,8 @@ scripts dicen al empezar cuánto tardarán aquí y luego cuánto falta. Lánzalo
    sin ✘, el subagente contestó que no se parece, cada celda cumple "Las reglas de la imagen" y nada queda tapado o
    cortado. **Hasta entonces no hay render final**: en el de Celsius se renderizó tres veces por cosas que se veían
    en el borrador.
-   Mientras se renderiza el primer borrador, si es de una serie (menos Noticias) y su banco tiene menos de tres
-   libres, lanza en segundo plano un subagente con tu mismo modelo: «llena el banco de `<serie>`: sigue "El tema, si
-   no te dieron uno" de `<skill>/series/<serie>.md`, busca y lee historias que no estén ya en el banco ni hechas
-   (`<skill>/scripts/banco.py ver <serie>` y `huellas.py buscar`), comprueba lo que se pueda y guarda tres con
-   `banco.py guardar`; no toques ningún proyecto». Esos minutos de render son de espera: así el siguiente video no
-   empieza a buscar de cero.
+   Mientras se renderiza el primer borrador, si es de una serie, llena su banco como dice el final de
+   [`SERIES.md`](../video-base/SERIES.md): esos minutos de render son de espera.
 9. **Final.** Si algún subagente de modelos sigue afinando, pídele que entregue ya (`SendMessage`) y espera su versión
    antes del final: en nuevo-11 se renderizó, llegó la versión buena y hubo que renderizar otra vez (7 min).
    `python -B <skill>/scripts/final.py` (~2 min): renderiza una sola vez, directo a H.264 bt709, pasa

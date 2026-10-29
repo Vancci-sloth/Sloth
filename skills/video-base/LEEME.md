@@ -15,6 +15,7 @@ Lo que comparten los estilos de vídeo: el lote, los errores ya vistos y los scr
 | [FORMATO.md](FORMATO.md) | Vertical u horizontal: todo estilo hace los dos, y qué cambia de uno a otro (`Formato:` del mensaje) |
 | [LOTE.md](LOTE.md) | Lo que cambia cuando el vídeo es uno de un lote; solo se lee si el mensaje trae `Lote:` |
 | [PORTADA.md](PORTADA.md) | La portada que todo vídeo vertical lleva de primer fotograma, en el estilo de su vídeo, y la miniatura de YouTube del horizontal |
+| [SERIES.md](SERIES.md) | Las series (`series/`), formatos fijos del canal para todo estilo: Sloth las ofrece al crear un vídeo; solo se lee si el mensaje trae `Serie:` |
 | `scripts/` | Las herramientas (abajo) |
 
 `<base>` es esta carpeta, `video-base`, junto a las skills de cada estilo.
@@ -87,6 +88,7 @@ Todos dicen cómo se usan si los corres sin argumentos. Node sin dependencias y 
 | `chrome.mjs` (librería) | Busca Chrome o Edge (o el de `CHROME`) y lo abre sin ventana: `abrirChrome({ ancho, alto })` |
 | `sloth.py`, `fuente.py` | El Python de Sloth (el transcriptor, yt-dlp) y bajar y transcribir un vídeo. `proceso()` dice antes cuánto tardará la voz en este equipo y luego cuánto falta, cada 10 %. WhisperX va de uno en uno en toda la máquina (`turno_gpu`), y las descargas de YouTube también (`turno_youtube`): los vídeos de un lote esperan ahí su turno. `vectorizar` usa el modelo de vectores ya cargado (`vectores_vivo.py`, que se va tras 10 min sin uso): un texto nuevo tarda menos de un segundo en vez de ~18. Un video de YouTube que otro vídeo ya bajó se enlaza de su carpeta en vez de bajarlo |
 | `huellas.py buscar\|revisar\|parecidos\|cerrar <skill>` | Que ningún vídeo de un estilo salga igual a otro ya hecho: la huella de cada uno (lo que cuenta y cómo se ve, y su hoja de ocho cuadros) en `<skill>/huellas/`, comparada contra todas por el script, que solo dice lo que choca. Python del sistema con numpy y Pillow; los textos, con los vectores de Sloth |
+| `banco.py ver\|tomar\|guardar <skill> <serie>` | El banco de historias de una serie, en `<skill>/series/banco/`: las candidatas ya leídas y comprobadas que no se usaron ([SERIES.md](SERIES.md)) |
 | `espacio.py` (librería) | El disco: `enlazar_modulos` (un solo `node_modules` por plantilla, en %LOCALAPPDATA%/sloth-modulos, enlazado desde cada video: antes cada uno copiaba ~1 GB), `limpiar_temporales` (las `remotion-*` de %TEMP% que dejan los renders cortados) y `comprobar_disco` (para antes de renderizar sin espacio). Sloth hace lo mismo en Opciones → Espacio en disco |
 | `equipo.cjs` (librería) | El render según este equipo: `tarjeta3D()` (avisa si Chrome dibuja el 3D por software), `estimado(cuadros)` y `falta(parte, desde)` para decir cuánto tardará, y `anotarRender()` del final, que Sloth enseña en Opciones → Tu equipo |
 | `remotion.cjs` (librería) | `empaquetar(raiz)`: el `bundle()` de Remotion en una carpeta de %TEMP% que se borra al terminar (la de Remotion se quedaba, con una copia de `public/`). Todo script que empaquete usa este |

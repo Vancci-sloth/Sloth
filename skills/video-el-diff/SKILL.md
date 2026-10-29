@@ -101,12 +101,16 @@ El `GANCHO` (el rótulo fijo de arriba) y la portada como primer cuadro son del 
 
 ## Series
 
-Las series son los formatos fijos del noticiero, cada una en su archivo de [`series/`](series/) (aún no hay ninguna):
-qué es, dónde buscar el tema y cómo elegirlo, qué tiene que pasar en el video y unos temas para empezar. Sloth las
-enseña al crear un video y, si el usuario elige una, el mensaje trae la línea `Serie: <nombre> (series/<archivo>.md)`.
+Las series son formatos fijos del canal, cada una en su archivo: qué es, dónde buscar el tema y cómo elegirlo, qué
+tiene que pasar en el video y unos temas para empezar. Las de todos los estilos están en
+[`video-base/series/`](../video-base/series/) y su uso, en [`SERIES.md`](../video-base/SERIES.md); las propias del
+noticiero irían en [`series/`](series/) (aún no hay ninguna), y con el mismo nombre la suya manda. Sloth las enseña al
+crear un video y, si el usuario elige una, el mensaje trae la línea `Serie: <nombre> (<archivo>; …)`, con la ruta desde
+la carpeta de las skills.
 
 - Lee ese archivo antes de buscar el tema. Manda sobre lo general de esta skill en el tema y en lo que tiene que pasar;
-  el tono, el material y la imagen siguen siendo los de esta skill.
+  el tono, el material y la imagen siguen siendo los de esta skill. Lo que la serie dice de otro estilo (un género del
+  guion del explicativo, una pieza de su plantilla), tradúcelo a lo de El Diff.
 - **Si el usuario no dio un tema**, elígelo tú con "El tema, si no te dieron uno" de la serie, sin preguntar, y al
   darle el guion dile por qué ese y otras dos opciones.
 - **Si dio un tema**, haz ese, con lo que pide la serie.

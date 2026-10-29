@@ -781,7 +781,7 @@ function NewSession(props: {
   // ser las fuentes de un solo video. La card recuerda la última elección, para quien hace lotes siempre.
   const enlaces = enlacesDe(props.draft?.text ?? '')
   const [porEnlace, setPorEnlace] = useStored<Record<string, boolean>>('porEnlace', {})
-  // Una serie de la skill (`skills/<skill>/series/`): sin escribir nada, el agente elige el tema y hace el video.
+  // Una serie (`skills/video-base/series/` o de la skill): sin escribir nada, el agente elige el tema y hace el video.
   const series = useSeries(card)
   const [serie, setSerie] = useState('')
   useEffect(() => setSerie(''), [card.id])
@@ -869,7 +869,7 @@ function NewSession(props: {
           if (porEnlace) text = enlaces.reduce((t, e) => t.replaceAll(e, ''), text).replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim()
           // La skill lo lee en el mensaje, debajo de lo que escribió el usuario.
           const pide = [
-            laSerie && `Serie: ${laSerie.nombre} (series/${laSerie.id}.md)${text ? '' : '. Elige tú el tema.'}`,
+            laSerie && `Serie: ${laSerie.nombre} (${laSerie.archivo}; cómo se usa, en video-base/SERIES.md)${text ? '' : '. Elige tú el tema.'}`,
             conFormato && !formatoEscrito && `Formato: ${formato}`,
             // El modelo de cada subagente: lo medido, o lo que elegiste en «Avanzado». La skill lo lee aquí.
             lineaSubagentes(tareas)

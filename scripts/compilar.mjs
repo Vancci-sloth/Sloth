@@ -46,15 +46,19 @@ const SKILLS_BASE = ['video-base', 'modelos-3d']
 const PAQUETES = ['@anthropic-ai/claude-agent-sdk', '@openai/codex', '@playwright/mcp', 'playwright-core', 'ws', 'zod']
 /** Lo que no se copia de las skills ni de los procesos de Python. */
 const BASURA = new Set(['__pycache__', 'node_modules', '.git', '.cache'])
-/** Lo tuyo dentro de las skills, que se llena solo con los videos de cada cliente: tus huellas, tu banco de temas y tus poses. */
-const TUYO = ['video-explicativo/huellas/registro.jsonl', 'video-explicativo/huellas/hojas', 'video-explicativo/series/banco', 'reel-collage/personaje'].map((r) => join(REPO, 'skills', r))
+/**
+ * Lo tuyo dentro de las skills, que se llena solo con los videos de cada cliente: tus huellas, tus poses y el banco de
+ * temas de las series, que cada estilo guarda en su `series/banco`.
+ */
+const TUYO = ['video-explicativo/huellas/registro.jsonl', 'video-explicativo/huellas/hojas', 'reel-collage/personaje'].map((r) => join(REPO, 'skills', r))
+const esBanco = (ruta) => basename(ruta) === 'banco' && basename(dirname(ruta)) === 'series'
 /**
  * Tus modelos 3D también son tuyos: cada cliente empieza con la biblioteca vacía y hace los suyos. La moneda que trae de
  * protagonista la plantilla del explicativo va aparte (`modelos-3d/plantilla`), sin enseñarse. Los que llevaban las
  * versiones de antes los quita la app al actualizarse (electron/modelos-viejos.ts).
  */
 const MODELOS = join(REPO, 'skills', 'modelos-3d', 'modelos')
-const limpio = (ruta) => !BASURA.has(basename(ruta)) && !TUYO.includes(ruta) && dirname(ruta) !== MODELOS
+const limpio = (ruta) => !BASURA.has(basename(ruta)) && !TUYO.includes(ruta) && !esBanco(ruta) && dirname(ruta) !== MODELOS
 
 const paso = (texto) => console.log(`\n· ${texto}`)
 // Compilada desde un hilo de Sloth, heredaría el `development` de su Vite, y React saldría en modo desarrollo.

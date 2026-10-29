@@ -1,7 +1,7 @@
 # Historia y drama
 
-Los grandes escándalos, misterios y caídas del nicho del canal (`nicho` en la marca), contados como una historia con
-giros. Es el género «una historia» o «una caída» de [`GUION.md`](../GUION.md), según el caso.
+Los grandes escándalos, misterios y caídas del nicho del canal, contados como una historia con
+giros. Es «una historia» o «una caída», según el caso (en video-explicativo, esos géneros de su `GUION.md`).
 
 ## El tema, si no te dieron uno
 
@@ -22,7 +22,7 @@ giros. Es el género «una historia» o «una caída» de [`GUION.md`](../GUION.
 
 ## Temas para empezar
 
-Ejemplos de varios nichos; busca los del nicho de la marca:
+Ejemplos de varios nichos; busca los del nicho del canal:
 
 1. Crypto: la pizza más cara de la historia, 10,000 BTC por dos pizzas en 2010.
 2. Crypto: FTX y Sam Bankman-Fried, de genio de portada a la cárcel.
