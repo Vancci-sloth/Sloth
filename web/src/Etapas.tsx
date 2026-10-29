@@ -334,15 +334,13 @@ function Muestra({ sessionId, archivos, writing, copiar }: { sessionId: string; 
 }
 
 /**
- * Un texto de la etapa. Si se lee en voz alta (`copiar`), se parte donde empieza la lectura, en el primer `##`: arriba
- * quedan el título y las notas, y «Copiar» acompaña a la lectura mientras bajas por ella.
+ * Un texto de la etapa. Si se lee en voz alta (`copiar`), «Copiar» nace arriba a la derecha, acompaña la lectura
+ * mientras bajas y copia el texto entero. No se parte en el primer `##`: en El Diff, antes va la intro, que también se lee.
  */
 function Texto({ url, copiar }: { url: string; copiar?: boolean }) {
   const [text, setText] = useState('')
   const [copied, setCopied] = useState(false)
-  const start = copiar ? Math.max(0, text.search(/^## /m)) : 0
-  const head = useMemo(() => markdown(text.slice(0, start)), [text, start])
-  const body = useMemo(() => markdown(text.slice(start)), [text, start])
+  const body = useMemo(() => markdown(text), [text])
   useEffect(() => {
     let alive = true
     fetch(url)
@@ -353,33 +351,33 @@ function Texto({ url, copiar }: { url: string; copiar?: boolean }) {
     }
   }, [url])
   function copy() {
-    navigator.clipboard.writeText(paraLeer(text.slice(start))).then(() => {
+    navigator.clipboard.writeText(paraLeer(text)).then(() => {
       setCopied(true)
       setTimeout(() => setCopied(false), 1600)
     })
   }
   if (!copiar || !text) return <div className="md etapa-texto" dangerouslySetInnerHTML={{ __html: body }} />
   return (
-    <div>
-      {start > 0 && <div className="md etapa-texto etapa-notas" dangerouslySetInnerHTML={{ __html: head }} />}
-      <div className="etapa-lectura">
-        <button className={`etapa-copiar ${copied ? 'copiado' : ''}`} type="button" title="Copia lo que se lee, sin los encabezados" onClick={copy}>
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-            {copied ? <path d="M20 6 9 17l-5-5" /> : <><rect x="9" y="9" width="12" height="12" rx="2" /><path d="M5 15V5a2 2 0 0 1 2-2h10" /></>}
-          </svg>
-          {copied ? 'Copiado' : 'Copiar'}
-        </button>
-        <div className="md etapa-texto" dangerouslySetInnerHTML={{ __html: body }} />
-      </div>
+    <div className="etapa-lectura">
+      <button className={`etapa-copiar ${copied ? 'copiado' : ''}`} type="button" title="Copia el guion entero, sin los encabezados ni el corte de datos" onClick={copy}>
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+          {copied ? <path d="M20 6 9 17l-5-5" /> : <><rect x="9" y="9" width="12" height="12" rx="2" /><path d="M5 15V5a2 2 0 0 1 2-2h10" /></>}
+        </svg>
+        {copied ? 'Copiado' : 'Copiar'}
+      </button>
+      <div className="md etapa-texto" dangerouslySetInnerHTML={{ __html: body }} />
     </div>
   )
 }
 
-/** Lo que se lee en voz alta, sin los encabezados. */
+/**
+ * Lo que se lee en voz alta, sin los encabezados ni la línea del corte de datos del video explicativo (la misma que
+ * se salta su `subtitulos.py`).
+ */
 function paraLeer(text: string): string {
   return text
     .split(/\r?\n/)
-    .filter((line) => !/^#{1,6} /.test(line))
+    .filter((line) => !/^#{1,6} /.test(line) && !/^(Corte de datos|Datos al)/.test(line.trim()))
     .join('\n')
     .replace(/\n{3,}/g, '\n\n')
     .trim()

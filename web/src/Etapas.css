@@ -21,10 +21,9 @@
 .entrega-botones .primary { padding: 5px 14px; }
 
 .etapa-texto { font-size: 13.5px; }
-/* Un texto para leer en voz alta: arriba, apagadas, el título y las notas; después, la lectura con su «Copiar». */
-.etapa-notas p { color: var(--muted); }
-.etapa-lectura { display: flow-root; margin-top: 1em; }
-/* Nace a la altura del primer encabezado y se queda arriba a la derecha mientras bajas por la lectura. */
+/* Un texto para leer en voz alta, con su «Copiar». */
+.etapa-lectura { display: flow-root; }
+/* Nace arriba a la derecha, junto al título, y se queda ahí mientras bajas por la lectura. */
 .etapa-copiar { position: sticky; top: 8px; float: right; z-index: 1; display: inline-flex; align-items: center; gap: 6px; margin: -3px 0 -12px 12px; padding: 4px 12px 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; color: var(--amber-2); background: linear-gradient(var(--amber-tinte), var(--amber-tinte)), var(--panel); border: 1px solid color-mix(in srgb, var(--amber) 40%, transparent); box-shadow: 0 0 0 5px var(--panel), 0 6px 16px 4px var(--panel); transition: background 0.15s, color 0.15s, border-color 0.15s; }
 .etapa-copiar:hover { color: var(--sobre-ambar); background: var(--amber); border-color: var(--amber); }
 .etapa-copiar.copiado { color: var(--ok); background: linear-gradient(color-mix(in srgb, var(--ok) 13%, transparent), color-mix(in srgb, var(--ok) 13%, transparent)), var(--panel); border-color: color-mix(in srgb, var(--ok) 40%, transparent); }
