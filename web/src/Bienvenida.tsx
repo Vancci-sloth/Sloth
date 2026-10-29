@@ -72,8 +72,9 @@ export function Bienvenida() {
         <Paso n={1} titulo="Elige con qué trabaja: Claude, ChatGPT u OpenCode" hecho={claude || chatgpt || opencode}>
           <b>Claude y ChatGPT necesitan un plan de pago</b>: Claude Pro o Max, o ChatGPT Plus o Pro (o una llave de API, que
           se paga por uso). Sloth no te cobra aparte, y con ellos salen los mejores videos; con ChatGPT, además, hace las
-          imágenes: portadas y personajes. <b>OpenCode es gratis</b> y no pide cuenta: usa solo sus modelos gratis, que pueden
-          equivocarse más y a veces se saturan. Cada uno se descarga al elegirlo.
+          imágenes: portadas y personajes. <b>OpenCode es gratis</b> con tu cuenta de OpenCode, que se crea gratis: sus modelos
+          gratis pueden equivocarse más y a veces se saturan, y si le pones saldo a tu cuenta, también usas los de pago. Cada
+          uno se descarga al elegirlo.
           <CuentaClaude onFalta={(falta) => setClaude(falta === undefined ? undefined : !falta)} />
           <CuentaChatGPT onFalta={(falta) => setChatgpt(falta === undefined ? undefined : !falta)} />
           <CuentaOpenCode aviso onFalta={(falta) => setOpencode(falta === undefined ? undefined : !falta)} />
@@ -110,7 +111,8 @@ export function Bienvenida() {
           Cada video usa una parte de los límites de tu plan, que ves en Opciones. Las cifras en dólares que salen en cada
           video dicen cuánto costaría pagado aparte, no lo que se te cobra. Un video gasta bastante: con el plan Pro el límite
           se acaba pronto, y con Max alcanza para varios. Con una llave de API no hay límites: esas cifras son lo que pagas.
-          Con OpenCode no pagas nada, pero sus modelos gratis a veces se saturan: entonces toca esperar unos minutos.
+          Con los modelos gratis de OpenCode no pagas nada, pero tu uso gratis tiene un tope: al acabarse, vuelve solo en
+          unas horas. Sus modelos de pago se cobran del saldo de tu cuenta de OpenCode.
         </Paso>
 
         <div className="modal-actions">

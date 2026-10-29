@@ -21,7 +21,7 @@ export const CON_CHATGPT: Avanzado = { principal: { model: 'codex:gpt-6.1-terra'
  */
 const OPENCODE_PRIMERO = 'opencode:opencode/big-pickle'
 export function conOpenCode(models: Model[]): Avanzado | undefined {
-  const gratis = models.filter((m) => proveedorDe(m.id) === 'opencode')
+  const gratis = models.filter((m) => proveedorDe(m.id) === 'opencode' && !m.precio)
   const m = gratis.find((x) => x.id === OPENCODE_PRIMERO) ?? gratis[0]
   return m && { principal: { model: m.id }, tareas: {} }
 }
@@ -175,7 +175,7 @@ export function Modelos(props: {
             {props.sinClaude === 'codex'
               ? 'Con tu cuenta de ChatGPT, el hilo va en uno de sus modelos: GPT-6.1 Terra, si no eliges otro. «Optimizado» va con Claude: se puede elegir al conectar tu cuenta de Claude en Opciones.'
               : props.sinClaude === 'opencode'
-              ? 'Sin cuenta de pago, el hilo va en un modelo gratis de OpenCode: Big Pickle, si no eliges otro. «Optimizado» va con Claude: se puede elegir al conectar tu cuenta de Claude en Opciones.'
+              ? 'Con tu cuenta de OpenCode, el hilo va en uno de sus modelos gratis: Big Pickle, si no eliges otro. «Optimizado» va con Claude: se puede elegir al conectar tu cuenta de Claude en Opciones.'
               : avanzado
                 ? 'Tus elecciones se quedan para esta card. «Optimizado» vuelve a lo medido o, si la skill no se ha medido, a lo último que elegiste.'
                 : tareas.length || principalMedido

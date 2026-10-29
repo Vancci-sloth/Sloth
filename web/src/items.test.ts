@@ -210,4 +210,5 @@ test('errorLlano: el límite y la cuenta son los del agente del hilo, y con Chat
   assert.equal(errorLlano('API Error: 529 overloaded').titulo, 'Claude no respondió')
   assert.equal(errorLlano('Se acabó tu uso gratis de OpenCode por ahora.', false, 'opencode').titulo, 'Se acabó tu uso gratis de OpenCode')
   assert.equal(errorLlano('El modelo gratis llegó a su límite por ahora.', false, 'opencode').titulo, 'El modelo gratis está saturado')
+  assert.equal(errorLlano('Conecta tu cuenta de OpenCode en Opciones: es gratis.', false, 'opencode').titulo, 'Falta tu cuenta de OpenCode')
 })

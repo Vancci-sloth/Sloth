@@ -218,6 +218,8 @@ export interface Model {
   label: string
   efforts: string[]
   defaultEffort?: string
+  /** Los de OpenCode que no son gratis: se cobran del saldo de la cuenta. Lo que cuesta, en dólares por millón de tokens. */
+  precio?: string
 }
 
 /** Lo que pasa en una sesión, venga del proveedor que venga. La interfaz dibuja esta lista. */
@@ -537,10 +539,13 @@ export interface CuentaClaude {
   quien?: string
   /** `pro`, `max`… */
   plan?: string
-  conectando?: { url?: string }
+  /** `codigo`: el que OpenCode pide confirmar en su página al autorizar. */
+  conectando?: { url?: string; codigo?: string }
   error?: string
   /** La llave de API guardada, si la hay (`server/acceso.ts`); `activa`, si se paga con ella en vez de con la cuenta. */
   llave?: LlaveAgente
+  /** OpenCode recuerda cada cuenta que se conectó, y trabaja con la activa: así se cambia de una a otra. */
+  cuentas?: { id: string; quien: string; activa: boolean }[]
 }
 
 export interface LlaveAgente {

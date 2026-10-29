@@ -14,8 +14,8 @@ function reinicio(fecha: string, ahora: number): string {
   return `${minutos} min`
 }
 
-/** `opcional` (Codex): si no hay cuenta conectada o no da límites, no sale. */
-function Proveedor({ id, nombre, ahora, opcional }: { id: string; nombre: string; ahora: number; opcional?: boolean }) {
+/** `opcional` (Codex): si no hay cuenta conectada o no da límites, no sale. `sinPlan`: lo que se dice si no da límites. */
+function Proveedor({ id, nombre, ahora, opcional, sinPlan = 'El proveedor no informa límites del plan.' }: { id: string; nombre: string; ahora: number; opcional?: boolean; sinPlan?: string }) {
   const [limites, setLimites] = useState<LimitesClaude>()
   const [error, setError] = useState(false)
   useEffect(() => {
@@ -35,7 +35,7 @@ function Proveedor({ id, nombre, ahora, opcional }: { id: string; nombre: string
       {error ? <span className="context-limit-note">No se pudieron consultar los límites.</span>
         : !limites ? <span className="context-limit-note">Consultando límites…</span>
         : limites.llave ? <span className="context-limit-note">Pagas con tu llave de API: se cobra por uso y no hay límites del plan. Para verlos, cambia a «Tu suscripción» en Opciones → Agentes.</span>
-        : !limites.ventanas.length ? <span className="context-limit-note">El proveedor no informa límites del plan.</span>
+        : !limites.ventanas.length ? <span className="context-limit-note">{sinPlan}</span>
         : limites.ventanas.map((v) => {
           const queda = Math.max(0, Math.min(100, 100 - v.uso))
           return (
@@ -53,8 +53,9 @@ function Proveedor({ id, nombre, ahora, opcional }: { id: string; nombre: string
 }
 
 /**
- * Se monta solo al abrir el hover del contexto: consulta las dos cuentas, sin bloquear una si falla la otra. En un hilo
- * de OpenCode va primero lo suyo: no tiene plan, y su uso gratis tiene un tope que OpenCode no enseña.
+ * Se monta solo al abrir el hover del contexto: consulta las cuentas, sin bloquear una si falla otra. En un hilo de
+ * OpenCode va primero lo suyo: los límites de Go si la cuenta lo tiene; si no, que su uso gratis tiene un tope que
+ * OpenCode no enseña.
  */
 export function LimitesContexto({ opencode }: { opencode?: boolean }) {
   const [ahora, setAhora] = useState(Date.now)
@@ -66,10 +67,7 @@ export function LimitesContexto({ opencode }: { opencode?: boolean }) {
     <span className="context-limits">
       <span className="picker-label">Límites del plan</span>
       {opencode && (
-        <span className="context-provider context-provider-opencode">
-          <strong className="context-provider-name">OpenCode · gratis</strong>
-          <span className="context-limit-note">Sin plan: el uso gratis tiene un tope que OpenCode no publica ni deja ver. Al acabarse, vuelve solo en unas horas o al día siguiente.</span>
-        </span>
+        <Proveedor id="opencode" nombre="OpenCode" ahora={ahora} sinPlan="Sin OpenCode Go: el uso gratis tiene un tope que OpenCode no publica ni deja ver. Al acabarse, vuelve solo en unas horas o al día siguiente. Los modelos de pago se cobran de tu saldo." />
       )}
       <Proveedor id="codex" nombre="Codex" ahora={ahora} opcional />
       <Proveedor id="claude" nombre="Claude" ahora={ahora} />

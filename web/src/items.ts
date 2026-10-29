@@ -336,7 +336,7 @@ export const REINTENTAR = 'Sigue donde te quedaste.'
 /**
  * Un turno que acabó mal, en palabras de todos los días: qué pasó y qué hacer. `reintentar`: pedirle que siga puede
  * bastar. `tuyo`: lo detuviste tú, no es un fallo. El error tal cual se ve al pasar el ratón. `agente`: el del hilo, que
- * nombra el plan y la cuenta (con Codex, los de ChatGPT). OpenCode no tiene plan ni cuenta: sus modelos gratis se saturan.
+ * nombra el plan y la cuenta (con Codex, los de ChatGPT). Con OpenCode, sus modelos gratis se saturan o se acaba el uso gratis.
  */
 export function errorLlano(error = '', caida = false, agente: Proveedor = 'claude'): { titulo: string; ayuda: string; reintentar: boolean; tuyo?: boolean } {
   const nombre = NOMBRE_AGENTE[agente]
@@ -345,9 +345,12 @@ export function errorLlano(error = '', caida = false, agente: Proveedor = 'claud
     return { titulo: 'Se cortó a mitad del trabajo', ayuda: 'Lo que ya hizo sigue en su carpeta. Pulsa «Reintentar» y sigue desde ahí.', reintentar: true }
   }
   if (/^lo detuviste/i.test(error)) return { titulo: 'Lo detuviste', ayuda: 'Dile qué cambiar, o pulsa «Reintentar» para que siga.', reintentar: true, tuyo: true }
-  // El uso gratis se acaba en todos los modelos a la vez: cambiar a otro gratis no sirve.
+  if (agente === 'opencode' && /^Conecta tu cuenta de OpenCode/.test(error)) {
+    return { titulo: 'Falta tu cuenta de OpenCode', ayuda: 'Conéctala en Opciones: es gratis. Luego pulsa «Reintentar».', reintentar: true }
+  }
+  // El uso gratis se acaba en todos los modelos gratis a la vez: cambiar a otro gratis no sirve.
   if (agente === 'opencode' && /uso gratis|free usage/i.test(error)) {
-    return { titulo: 'Se acabó tu uso gratis de OpenCode', ayuda: 'Vuelve solo, en unas horas o al día siguiente: OpenCode no dice cuándo. Mientras, elige Claude o ChatGPT abajo y pulsa «Reintentar».', reintentar: true }
+    return { titulo: 'Se acabó tu uso gratis de OpenCode', ayuda: 'Vuelve solo, en unas horas o al día siguiente: OpenCode no dice cuándo. Mientras, elige abajo un modelo de pago de OpenCode, Claude o ChatGPT, y pulsa «Reintentar».', reintentar: true }
   }
   if (agente === 'opencode' && /modelo gratis|rate.?limit|too many requests|\b429\b/i.test(error)) {
     return { titulo: 'El modelo gratis está saturado', ayuda: 'Espera unos minutos y pulsa «Reintentar», o elige otro modelo gratis.', reintentar: true }

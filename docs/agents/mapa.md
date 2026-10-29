@@ -10,10 +10,11 @@ Este es el mapa:
   proveedor sería otro adaptador que cumpla `AgentRun` (`server/agent.ts`).
 - `server/codex.ts`: adaptador de Codex; usa `server/codex-rpc.ts` y traduce sus mensajes al mismo `AgentEvent`. Su
   costo es a precio de la API, con la tabla que `server/precios.ts` baja de LiteLLM con cada versión de Codex.
-- `server/opencode.ts`: adaptador de OpenCode 2, la versión gratis (solo sus modelos gratis de Zen, sin cuenta), hecho
+- `server/opencode.ts`: adaptador de OpenCode 2, la versión gratis (con la cuenta de OpenCode de cada quien, que se crea
+  gratis y se conecta en `server/cuenta-opencode.ts`; primero sus modelos gratis de Zen y luego los de pago), hecho
   como el de T3 Code: un solo `opencode serve` para todos los hilos, con sus datos en `data/opencode`; cada hilo es una
   sesión en su carpeta, con las instrucciones de Sloth y su navegador (un MCP que solo él puede usar). Se prueba con un
-  turno grabado (`opencode.grabacion.json`). ADR 0009.
+  turno grabado (`opencode.grabacion.json`). ADR 0009 y 0010.
 - `server/agentes.ts`: el programa de Claude Code, Codex y OpenCode no viene en el instalador: se baja al elegir el agente
   (bienvenida, Opciones o el primer mensaje de un hilo suyo, `conAgente`) a `%APPDATA%\sloth\piezas\agentes`. En el repo
   ya está en node_modules. Un proveedor nuevo es una entrada más en `AGENTES`.

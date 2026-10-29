@@ -13,7 +13,7 @@ import { startOpenCode } from './opencode.ts'
 const GRABACION: { type: string; data: Record<string, any> }[] = JSON.parse(readFileSync(new URL('./opencode.grabacion.json', import.meta.url), 'utf8'))
 const SESION = GRABACION[0].data.sessionID
 
-function preparar(resume?: string) {
+function preparar(resume?: string, conCuenta = true) {
   const events: AgentEvent[] = []
   const pedidos: { metodo: string; input: any }[] = []
   const sesiones: string[] = []
@@ -36,7 +36,8 @@ function preparar(resume?: string) {
     },
     mcp: { add: pedir('mcp.add'), remove: pedir('mcp.remove') },
     skill: { list: pedir('skill.list', () => ({ data: [{ id: 'video-explicativo' }] })) },
-    permission: { reply: pedir('permission.reply') }
+    permission: { reply: pedir('permission.reply') },
+    credential: { list: pedir('credential.list', () => (conCuenta ? [{ id: 'cred-1', integrationID: 'opencode', label: 'yo@correo.com', active: true }] : [])) }
   }
   const servidor = { client, proc: {}, oyentes, raiz: new Map() } as any
   const run = startOpenCode(
@@ -187,4 +188,14 @@ test('si se acabó el uso gratis, lo dice así y no como un modelo saturado', as
   await setImmediate()
   h.oir({ type: 'session.execution.failed', data: { sessionID: SESION, error: { type: 'api', status: 429, message: 'Free usage limit reached. Free models work in OpenCode (https://opencode.ai); subscribe to OpenCode Go to keep going: https://opencode.ai/go' } } })
   assert.match((h.events.at(-1) as any).error, /Se acabó tu uso gratis de OpenCode/)
+})
+
+test('sin cuenta de OpenCode no se manda nada: el turno acaba pidiendo conectarla', async () => {
+  const h = preparar(undefined, false)
+  h.run.send('Hola', undefined, [])
+  for (let i = 0; i < 5; i++) await setImmediate()
+  assert.equal(h.pedidos.some((p) => p.metodo === 'session.prompt'), false)
+  const fin = h.events.at(-1) as Extract<AgentEvent, { t: 'turn_end' }>
+  assert.equal(fin.t, 'turn_end')
+  assert.match(fin.error ?? '', /^Conecta tu cuenta de OpenCode/)
 })

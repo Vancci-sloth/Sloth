@@ -12,7 +12,8 @@ import { navegadorAgente } from './navegador-agente.ts'
 import { SKILLS } from './skills.ts'
 
 /**
- * OpenCode 2 (`opencode serve`), la versión gratis de Sloth: sus modelos gratis (OpenCode Zen) no piden cuenta. Como lo
+ * OpenCode 2 (`opencode serve`), la versión gratis de Sloth: trabaja con la cuenta de OpenCode de cada quien, que se crea
+ * gratis (`server/cuenta-opencode.ts`); sus modelos gratis no cobran nada y los de pago, del saldo de la cuenta. Como lo
  * hace T3 Code (`packages/provider-opencode/src/server/v2`): un solo servidor para todos los hilos, cada hilo una sesión
  * en su carpeta (`location`), y lo de cada hilo va en su sesión: las instrucciones de Sloth
  * (`session.instructions.entry.put`) y su navegador, un MCP con su nombre (`mcp.add`) que las reglas de la sesión dejan
@@ -24,8 +25,13 @@ import { SKILLS } from './skills.ts'
 
 const APP = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const DATOS = join(APP, 'data', 'opencode')
-/** Solo los gratis de Zen: los de otros proveedores salen si el entorno trae su llave (la de Google, por ejemplo). */
-const ZEN = 'opencode'
+/**
+ * Los modelos de Zen y, si la cuenta tiene Go, los de Go: los de otros proveedores salen si el entorno trae su llave (la
+ * de Google, por ejemplo), y no se cobrarían en la cuenta de OpenCode.
+ */
+const ZEN = ['opencode', 'opencode-go']
+/** La integración de la cuenta de OpenCode (su consola): la que se conecta en el navegador. */
+export const CONSOLA = 'opencode'
 
 /** Lo que Sloth le dice al agente, como a Codex (`developerInstructions`). */
 const INSTRUCCIONES = `${OPCIONES}
@@ -389,6 +395,7 @@ export function startOpenCode(opts: AgentOptions, conectar: () => Promise<Servid
     await ready
     if (cerrado) return
     const c = servidorDe!.client
+    if (!steer && !(await conCuenta(c))) throw new Error(SIN_CUENTA)
     const path = skill?.path ?? (skill && join(SKILLS, skill.name, 'SKILL.md'))
     if (path && !existsSync(path)) throw new Error(`No se encontró la skill ${skill!.name}.`)
     const conocidas = skill ? await c.skill.list({ location: { directory: opts.cwd } }).then((l) => l.data.map((x) => x.id), () => [] as string[]) : []
@@ -461,21 +468,36 @@ const CERO: Tokens = { input: 0, output: 0, cacheRead: 0 }
 const suma = (a: Tokens, b: Tokens): Tokens => ({ input: a.input + b.input, output: a.output + b.output, cacheRead: a.cacheRead + b.cacheRead })
 
 /**
- * Los modelos gratis de OpenCode Zen, con sus esfuerzos (`variants`): el catálogo lo da OpenCode y cambia solo (son
- * gratis «por tiempo limitado»). Vacío si OpenCode no se ha bajado: el catálogo no lo baja.
+ * Los modelos de OpenCode Zen, con sus esfuerzos (`variants`): primero los gratis y luego los de pago, con su precio. El
+ * catálogo lo da OpenCode y cambia solo (los gratis lo son «por tiempo limitado»). Vacío si OpenCode no se ha bajado (el
+ * catálogo no lo baja) o si no hay cuenta conectada.
  */
 export async function opencodeModels(): Promise<Model[]> {
   if (!rutaAgente('opencode')) return []
   try {
     const { client } = await conexion()
+    if (!(await conCuenta(client))) return []
     const lista = await client.model.list({ location: { directory: APP } })
-    return lista.data
-      .filter((m) => m.providerID === ZEN && m.enabled && m.status !== 'deprecated' && m.capabilities.tools !== false && m.cost.every((c) => c.input === 0 && c.output === 0))
-      .map((m) => ({ id: `opencode:${m.providerID}/${m.id}`, label: `OpenCode · ${m.name}`, efforts: m.variants.map((v) => v.id) }))
+    const usables = lista.data.filter((m) => ZEN.includes(m.providerID) && m.enabled && m.status !== 'deprecated' && m.capabilities.tools !== false)
+    const gratis = (m: (typeof usables)[number]) => m.cost.every((c) => c.input === 0 && c.output === 0)
+    const modelo = (m: (typeof usables)[number]): Model => ({
+      id: `opencode:${m.providerID}/${m.id}`,
+      label: `${m.providerID === ZEN[0] ? 'OpenCode' : 'OpenCode Go'} · ${m.name}`,
+      efforts: m.variants.map((v) => v.id),
+      ...(gratis(m) ? {} : { precio: `$${m.cost[0].input} / $${m.cost[0].output}` })
+    })
+    // Los gratis primero, en el orden del catálogo; los de pago, por nombre.
+    return [...usables.filter(gratis).map(modelo), ...usables.filter((m) => !gratis(m)).map(modelo).sort((a, b) => a.label.localeCompare(b.label))]
   } catch {
     return []
   }
 }
+
+/** Si hay una cuenta de OpenCode activa: sin ella, Sloth no trabaja con OpenCode (`server/cuenta-opencode.ts`). */
+export const conCuenta = (client: OpenCodeClient) =>
+  client.credential.list().then((l) => l.some((c) => c.integrationID === CONSOLA && c.active), () => false)
+
+export const SIN_CUENTA = 'Conecta tu cuenta de OpenCode en Opciones: es gratis.'
 
 /**
  * Una respuesta de un solo turno, sin herramientas ni sesión que quede: lo que en Claude es un `query` con `tools: []`
@@ -484,6 +506,7 @@ export async function opencodeModels(): Promise<Model[]> {
 export async function redactarOpenCode(model: string | undefined, cwd: string, prompt: string, imagenes: string[], instruccion: string): Promise<string> {
   const s = await conexion()
   const c = s.client
+  if (!(await conCuenta(c))) throw new Error(SIN_CUENTA)
   const elegido = model ?? (await opencodeModels())[0]?.id
   if (!elegido) throw new Error('OpenCode no tiene modelos gratis ahora. Intenta más tarde.')
   const { providerID, id } = modeloDe(elegido)

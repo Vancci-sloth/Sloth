@@ -72,7 +72,7 @@ function Ajustes({ onDone, iniciando, onIniciando }: { onDone(): void; iniciando
           <SuscripcionOpciones />
         </Grupo>
       )}
-      <Grupo titulo="Agentes" nota="Cada agente se descarga la primera vez que lo eliges. Claude y ChatGPT necesitan un plan de pago o una llave de API; OpenCode es gratis.">
+      <Grupo titulo="Agentes" nota="Cada agente se descarga la primera vez que lo eliges. Claude y ChatGPT necesitan un plan de pago o una llave de API; OpenCode, solo tu cuenta, que es gratis.">
         <Agentes />
         <CuentaCodex />
         <CuentaOpenCode />
@@ -419,16 +419,16 @@ const CUENTA_CONECTADA = 'sloth-cuenta-conectada'
 
 /**
  * Con qué va un hilo nuevo si no está la cuenta de Claude (`undefined` mientras no se sabe; `false`, con Claude o sin
- * ninguno): con ChatGPT si está su cuenta y, si no, con OpenCode si ya se bajó. «Optimizado» se midió con Claude y no
- * podría empezar. Se vuelve a mirar al conectar una cuenta o al bajar OpenCode.
+ * ninguno): con ChatGPT si está su cuenta y, si no, con OpenCode si está la suya. «Optimizado» se midió con Claude y no
+ * podría empezar. Se vuelve a mirar al conectar una cuenta.
  */
 export function useSinClaude() {
   const [sin, setSin] = useState<'codex' | 'opencode' | false>()
   useEffect(() => {
     let vivo = true
     const leer = () =>
-      Promise.all([api<Cuenta>('/api/claude/cuenta'), api<Cuenta>('/api/codex/cuenta'), api<Record<Proveedor, EstadoAgente>>('/api/agentes')]).then(
-        ([claude, codex, agentes]) => vivo && setSin(claude.conectada ? false : codex.conectada ? 'codex' : agentes.opencode.instalado ? 'opencode' : false),
+      Promise.all([api<Cuenta>('/api/claude/cuenta'), api<Cuenta>('/api/codex/cuenta'), api<Cuenta>('/api/opencode/cuenta')]).then(
+        ([claude, codex, opencode]) => vivo && setSin(claude.conectada ? false : codex.conectada ? 'codex' : opencode.conectada ? 'opencode' : false),
         () => vivo && setSin(false)
       )
     void leer()
@@ -474,40 +474,106 @@ function Bajando({ a }: { a?: EstadoAgente }) {
 }
 
 /**
- * OpenCode, la versión gratis: sin cuenta ni pago, con los modelos gratis de OpenCode Zen. Se baja al elegirlo. Lo que
- * hay que saber va siempre a la vista, no en letra chica: son gratis por un tiempo, y algunos usan lo que les mandas.
- * `aviso`: encima del compositor y en la bienvenida, solo mientras falte bajarlo.
+ * OpenCode, la versión gratis: con la cuenta de OpenCode de cada quien, que se crea gratis (`server/cuenta-opencode.ts`).
+ * Sus modelos gratis no cobran nada; los de pago, del saldo que se le ponga en opencode.ai. Como las de Claude y ChatGPT,
+ * se conecta en el navegador, y su menú cambia de cuenta. Lo que hay que saber de los gratis va siempre a la vista, no en
+ * letra chica: son gratis por un tiempo, y algunos usan lo que les mandas. `aviso`: encima del compositor y en la
+ * bienvenida, solo mientras falte la cuenta.
  */
 export function CuentaOpenCode({ aviso = false, onFalta }: { aviso?: boolean; onFalta?(falta?: boolean): void }) {
-  const { agentes, error, bajar } = useAgentes()
+  const c = useCuenta(true, 'opencode')
+  const { agentes, error } = useAgentes(c.ocupado)
   const a = agentes?.opencode
   const version = useVersion('opencode', !aviso, a?.instalado)
-  const falta = a ? !a.instalado : undefined
+  const cuenta = c.cuenta
+  const falta = cuenta ? !cuenta.conectada : undefined
   useEffect(() => onFalta?.(falta), [falta])
   if (aviso && !falta) return null
+  const espera = cuenta?.conectando
+  const conectar = () => {
+    // Como con ChatGPT, la pestaña se abre en el clic para que no la bloqueen; si antes hay que bajar OpenCode, tarda
+    // minutos, y la página se abre al llegar el código.
+    const ventana = a?.instalado ? window.open('about:blank', '_blank') : null
+    if (ventana) ventana.opener = null
+    void c.conectar().then((cuenta) => {
+      const url = cuenta?.conectando?.url
+      if (ventana && url) ventana.location.href = url
+      else if (url) window.open(url, '_blank', 'noreferrer')
+      else ventana?.close()
+    })
+  }
+  const elegir = (que: string) => {
+    const [accion, id] = que.split(':')
+    if (accion === 'saldo') window.open('https://opencode.ai/auth', '_blank', 'noreferrer')
+    else if (accion === 'otra') conectar()
+    else void c.pedir(`/api/opencode/${accion}`, { id })
+  }
+  const activa = cuenta?.cuentas?.find((x) => x.activa)
+  const otras = cuenta?.cuentas?.filter((x) => !x.activa) ?? []
   const contenido = (
     <div className="item">
       <div className="fila">
         <Logo de="opencode" />
         <div className="fila-nombre">
-          <strong>OpenCode · gratis</strong>
-          <span>Sin cuenta ni pago: Sloth trabaja con los modelos gratis de OpenCode. Pueden equivocarse más que Claude o ChatGPT, y no hacen imágenes (portadas ni personajes nuevos).</span>
+          <strong>OpenCode · gratis con tu cuenta</strong>
+          {cuenta?.conectada ? (
+            <Picker
+              className="sub"
+              label={cuenta.quien || 'Cuenta conectada'}
+              value=""
+              disabled={c.ocupado}
+              groups={[
+                {
+                  label: 'Cuenta',
+                  options: [
+                    { value: 'saldo', label: 'Ver tu saldo y tu uso ↗' },
+                    { value: 'otra', label: 'Conectar otra cuenta' },
+                    ...(activa ? [{ value: `quitar:${activa.id}`, label: 'Quitar esta cuenta' }] : []),
+                  ],
+                },
+                ...(otras.length ? [{ label: 'Cambiar a', options: otras.map((x) => ({ value: `usar:${x.id}`, label: x.quien })) }] : []),
+              ]}
+              onChange={elegir}
+            />
+          ) : (
+            <span>
+              Sloth trabaja con tu cuenta de OpenCode, que se crea gratis en su página. Sus modelos gratis no te cobran nada; si
+              le pones saldo, también puedes usar los de pago. Pueden equivocarse más que Claude o ChatGPT, y no hacen imágenes
+              (portadas ni personajes nuevos).
+            </span>
+          )}
         </div>
-        {a?.instalando ? (
-          <Bajando a={a} />
-        ) : a?.instalado ? (
-          version.estado
+        {a?.instalando ? <Bajando a={a} /> : a?.instalado && !aviso ? version.estado : null}
+        {a?.instalando ? null : espera ? (
+          <>
+            <span className="estado moviendo">Esperando al navegador…</span>
+            <button className="ghost small" disabled={c.ocupado} onClick={() => void c.pedir('/api/opencode/cancelar', {})}>
+              Cancelar
+            </button>
+          </>
         ) : (
-          a && (
-            <button className="primary" onClick={() => void bajar('opencode')}>
-              Usar gratis ({a.pesa})
+          cuenta &&
+          !cuenta.conectada && (
+            <button className="primary" disabled={c.ocupado} onClick={conectar}>
+              {c.ocupado ? 'Conectando…' : 'Conectar con OpenCode'}
             </button>
           )
         )}
       </div>
+      {espera?.url && (
+        <p className="fila-extra small">
+          En la página de OpenCode, entra o crea tu cuenta gratis y confirma el código <b>{espera.codigo}</b>. Al terminar, esto
+          se actualiza solo.{' '}
+          <a href={espera.url} target="_blank" rel="noreferrer">
+            Abrir la página de OpenCode ↗
+          </a>
+        </p>
+      )}
+      {!aviso && cuenta?.conectada && <Limites proveedor="opencode" />}
       <div className="fila-extra small">
         <p>
-          <b>Antes de usarlo:</b> los modelos son gratis por tiempo limitado y a veces se saturan. Algunos (como Big Pickle)
+          <b>Antes de usarlo:</b> los modelos gratis lo son por tiempo limitado, a veces se saturan y tu uso gratis tiene un
+          tope que OpenCode no publica: al acabarse, vuelve solo en unas horas. Algunos (como Big Pickle)
           usan lo que les mandas para mejorar el modelo, y otros lo guardan unos días: no les mandes datos personales ni
           privados.{' '}
           <a href="https://opencode.ai/docs/zen" target="_blank" rel="noreferrer">
@@ -515,7 +581,7 @@ export function CuentaOpenCode({ aviso = false, onFalta }: { aviso?: boolean; on
           </a>
         </p>
       </div>
-      {(error || a?.error) && <p className="bad small fila-extra">{error || a?.error}</p>}
+      {(c.error || error || a?.error) && <p className="bad small fila-extra">{c.error || error || a?.error}</p>}
       {version.aviso}
     </div>
   )
@@ -890,7 +956,7 @@ function Agentes() {
  * ámbar si se acerca y roja casi al tope, con cuándo vuelve a cero. Preguntarlo abre Claude Code (o Codex): solo aquí, y
  * el servidor lo guarda un minuto.
  */
-function Limites({ proveedor }: { proveedor: 'claude' | 'codex' }) {
+function Limites({ proveedor }: { proveedor: Proveedor }) {
   const [limites, setLimites] = useState<LimitesClaude | null>(null)
   const [fallo, setFallo] = useState(false)
   useEffect(() => void api<LimitesClaude>(`/api/${proveedor}/limites`).then(setLimites, () => setFallo(true)), [])

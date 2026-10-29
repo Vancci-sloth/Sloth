@@ -51,9 +51,13 @@ export function gruposModelos(models: Model[]) {
     { id: 'claude', label: 'Anthropic' },
     { id: 'codex', label: 'OpenAI' },
     { id: 'opencode', label: 'OpenCode · gratis' },
+    // Los de pago de OpenCode, debajo de los gratis: se cobran del saldo de la cuenta.
+    { id: 'opencode', label: 'OpenCode · de pago (de tu saldo, por millón de tokens)', pago: true },
   ].map((p) => ({
     label: p.label,
-    options: models.filter((m) => proveedorDe(m.id) === p.id).map((m) => ({ value: m.id, label: m.label })),
+    options: models
+      .filter((m) => proveedorDe(m.id) === p.id && !!m.precio === !!p.pago)
+      .map((m) => ({ value: m.id, label: m.precio ? `${m.label} · ${m.precio}` : m.label })),
   })).filter((g) => g.options.length > 0)
 }
 

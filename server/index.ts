@@ -18,6 +18,7 @@ import { type Proveedor, proveedorDe } from '../shared/providers.ts'
 import { paraMandar } from '../shared/historial.ts'
 import { conectandoCodex, conectarCodex, cuentaCodex, limitesCodex } from './cuenta-codex.ts'
 import { conectando, conectarClaude, cuentaClaude, limitesClaude } from './cuenta.ts'
+import { cancelarOpenCode, conectandoOpenCode, conectarOpenCode, cuentaOpenCode, limitesOpenCode, quitarCuentaOpenCode, usarCuentaOpenCode } from './cuenta-opencode.ts'
 import { enlacesApi } from './enlaces.ts' // tarjeta de los enlaces
 import { etapasApi, mismaCwd, videosApi, videosDe } from './etapas.ts' // panel de etapas
 import { ideas } from './ideas/index.ts' // ideas
@@ -172,7 +173,7 @@ function ocupado(): string | null {
   if (publicar?.ocupado()) return publicar.ocupado() // redes: una subida o un texto a medias
   if (subirLargos?.ocupado()) return subirLargos.ocupado()
   if (idear?.ocupado()) return idear.ocupado() // ideas: una investigación en curso
-  return maquina.ocupado() ?? instalandoAlgo() ?? bajandoAgente() ?? conectando() ?? conectandoCodex()
+  return maquina.ocupado() ?? instalandoAlgo() ?? bajandoAgente() ?? conectando() ?? conectandoCodex() ?? conectandoOpenCode()
 }
 
 /** Vuelve a levantar el servidor (lo hace scripts/start.mjs), con lo que haya cambiado. Los agentes se retoman al volver. */
@@ -188,17 +189,26 @@ function reiniciar() {
  */
 let modelos: Model[] = []
 let cargandoModelos = false
+/** Se pidieron mientras llegaban: al cambiar la cuenta de OpenCode, lo que llegaba ya no vale. */
+let otraVez = false
 function pedirModelos() {
-  if (cargandoModelos) return
+  if (cargandoModelos) return void (otraVez = true)
   cargandoModelos = true
   // Cada proveedor llega por separado: el que tarda no tapa los modelos que ya se pueden elegir.
   const pedidos: [Proveedor, () => Promise<Model[]>][] = [['claude', claudeModels], ['codex', codexModels], ['opencode', opencodeModels]]
   void Promise.allSettled(pedidos.map(async ([p, pedir]) => {
     const lista = await pedir()
-    if (!lista.length) return
+    // Sin cuenta de OpenCode no hay sus modelos: quitarla los quita.
+    if (!lista.length && (p !== 'opencode' || !modelos.some((m) => proveedorDe(m.id) === p))) return
     modelos = [...modelos.filter((m) => proveedorDe(m.id) !== p), ...lista]
     broadcast({ type: 'models', models: modelos })
-  })).finally(() => { cargandoModelos = false })
+  })).finally(() => {
+    cargandoModelos = false
+    if (otraVez) {
+      otraVez = false
+      pedirModelos()
+    }
+  })
 }
 pedirModelos()
 // Codex no da dólares: sus precios de la API se bajan con cada versión de Codex (server/precios.ts).
@@ -297,6 +307,21 @@ async function api(req: IncomingMessage, res: ServerResponse, url: URL): Promise
     return true
   }
 
+  // La cuenta de OpenCode (`server/cuenta-opencode.ts`): mirarla, conectar otra, dejar de esperar al navegador, usar otra
+  // de las conectadas o quitarla. Sus modelos dependen de la cuenta: cada cambio los vuelve a pedir.
+  const oc = /^\/api\/opencode\/(cuenta|conectar|cancelar|usar|quitar)$/.exec(path)
+  if (oc && method === (oc[1] === 'cuenta' ? 'GET' : 'POST')) {
+    try {
+      const id = oc[1] === 'usar' || oc[1] === 'quitar' ? (await body<{ id: string }>(req)).id : ''
+      const { cambio, ...cuenta } = await { cuenta: cuentaOpenCode, conectar: conectarOpenCode, cancelar: cancelarOpenCode, usar: () => usarCuentaOpenCode(id), quitar: () => quitarCuentaOpenCode(id) }[oc[1] as 'cuenta']()
+      send(res, 200, cuenta)
+      if (cambio || id) pedirModelos()
+    } catch (error) {
+      send(res, 400, { error: error instanceof Error ? error.message : String(error) })
+    }
+    return true
+  }
+
   // `meta` es un token, no una llave, pero llega igual: `{ llave }`.
   const o = /^\/api\/opciones\/(youtube|meta)$/.exec(path)
   if (o && method === 'POST') {
@@ -335,9 +360,9 @@ async function api(req: IncomingMessage, res: ServerResponse, url: URL): Promise
   }
 
   // Opciones y hover del contexto: cuotas reales de cada plan, como mucho una consulta por minuto.
-  if ((path === '/api/claude/limites' || path === '/api/codex/limites') && method === 'GET') {
+  if ((path === '/api/claude/limites' || path === '/api/codex/limites' || path === '/api/opencode/limites') && method === 'GET') {
     try {
-      send(res, 200, await (path === '/api/codex/limites' ? limitesCodex() : limitesClaude()))
+      send(res, 200, await (path === '/api/codex/limites' ? limitesCodex() : path === '/api/opencode/limites' ? limitesOpenCode() : limitesClaude()))
     } catch (error) {
       send(res, 500, { error: error instanceof Error ? error.message : String(error) })
     }

@@ -2,6 +2,8 @@
 
 Fecha: 2026-10-29
 
+Lo de usar OpenCode sin cuenta lo reemplaza el ADR 0010: el uso gratis sin cuenta se acababa enseguida.
+
 ## Contexto
 
 Sloth solo trabajaba con Claude o con ChatGPT, y los dos piden un plan de pago (o una llave de API). Quien quería
