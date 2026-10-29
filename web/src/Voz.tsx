@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { Card, EstadoVoz } from '../../shared/types'
+import { lineaVoz } from '../../shared/voz'
 import { api } from './api'
 import { Picker } from './Composer'
 import { Logo } from './Logos'
@@ -42,10 +43,6 @@ export function SelectorVoz({ card, voz, valor, onCambio }: { card: Card; voz: U
   if (card.voz === false) return null
   const e = voz.estado
   const propia = card.voz?.propia ?? 'La mando yo'
-  const grupos = new Map<string, { value: string; label: string }[]>()
-  for (const v of e?.voces ?? []) grupos.set(`AI Studio · ${v.grupo}`, [...(grupos.get(`AI Studio · ${v.grupo}`) ?? []), { value: v.nombre, label: `${v.nombre} · ${v.descripcion}` }])
-  // Una que ya no sale entre las de la página (se eligió antes) sigue a la vista.
-  if (valor && e?.cuenta && !e.voces.some((v) => v.nombre === valor)) grupos.set('AI Studio', [{ value: valor, label: valor }])
   const label = e?.conectando ? 'Voz: entra con Google en Edge…' : valor && e?.cuenta ? `Voz: ${valor} · AI Studio` : `Voz: ${propia.toLowerCase()}`
   return (
     <Picker
@@ -53,14 +50,70 @@ export function SelectorVoz({ card, voz, valor, onCambio }: { card: Card; voz: U
       value={e?.cuenta ? valor : ''}
       menuWidth={340}
       disabled={!e || e.conectando}
-      groups={[
-        { label: 'Voz', options: [{ value: '', label: propia }] },
-        ...(e?.cuenta
-          ? [...grupos].map(([label, options]) => ({ label, options }))
-          : [{ label: 'AI Studio · Gemini 3.8 Flash TTS, gratis', options: [{ value: CONECTAR, label: 'Conectar tu cuenta de Google…' }] }])
-      ]}
+      groups={[{ label: 'Voz', options: [{ value: '', label: propia }] }, ...gruposDeVoces(e, valor)]}
       onChange={(v) => (v === CONECTAR ? voz.conectar() : onCambio(v))}
     />
+  )
+}
+
+/**
+ * Las voces de AI Studio para un menú, por grupos como los pone la página. Sin cuenta, la opción de conectarla. Una
+ * elegida antes que ya no sale entre las de la página (`valor`) sigue a la vista.
+ */
+function gruposDeVoces(e: EstadoVoz | undefined, valor = '') {
+  if (!e?.cuenta) return [{ label: 'AI Studio · Gemini 3.8 Flash TTS, gratis', options: [{ value: CONECTAR, label: 'Conectar tu cuenta de Google…' }] }]
+  const grupos = new Map<string, { value: string; label: string }[]>()
+  for (const v of e.voces) grupos.set(`AI Studio · ${v.grupo}`, [...(grupos.get(`AI Studio · ${v.grupo}`) ?? []), { value: v.nombre, label: `${v.nombre} · ${v.descripcion}` }])
+  if (valor && !e.voces.some((v) => v.nombre === valor)) grupos.set('AI Studio', [{ value: valor, label: valor }])
+  return [...grupos].map(([label, options]) => ({ label, options }))
+}
+
+/** La última voz que se eligió para generar desde un hilo ya empezado. */
+const ULTIMA = 'voz-hilo'
+
+/**
+ * En la etapa que espera tu voz (`Etapas.tsx`): en vez de grabarla, que el agente la genere con una voz de AI Studio.
+ * Sin cuenta, ofrece conectarla ahí mismo. `onGenerar` recibe el mensaje para el agente, con la línea `Voz:`.
+ */
+export function GenerarVoz({ onGenerar }: { onGenerar(texto: string): Promise<void> }) {
+  const voz = useVoz()
+  const e = voz.estado
+  const [elegida, setElegida] = useState(() => localStorage.getItem(ULTIMA) ?? '')
+  const [mandando, setMandando] = useState(false)
+  // La guardada solo vale si la página la ofrece; si no, la primera.
+  const valor = e?.voces.some((v) => v.nombre === elegida) ? elegida : (e?.voces[0]?.nombre ?? '')
+  if (!e) return null
+  if (!e.cuenta)
+    return (
+      <div className="generar-voz">
+        <span>O que la genere el agente con una voz de AI Studio, gratis con tu cuenta de Google.</span>
+        <button className="ghost small" disabled={e.conectando} onClick={voz.conectar}>
+          {e.conectando ? 'Entra con Google en la ventana de Edge…' : 'Conectar con Google'}
+        </button>
+        {voz.error && !e.conectando && <span className="bad small">{voz.error}</span>}
+      </div>
+    )
+  return (
+    <div className="generar-voz">
+      <span>O que la genere el agente con una voz de AI Studio:</span>
+      <Picker
+        label={`Voz: ${valor}`}
+        value={valor}
+        menuWidth={340}
+        groups={gruposDeVoces(e, valor)}
+        onChange={(v) => (localStorage.setItem(ULTIMA, v), setElegida(v))}
+      />
+      <button
+        className="primary small"
+        disabled={!valor || mandando}
+        onClick={() => {
+          setMandando(true)
+          void onGenerar(`No la voy a grabar: genérala tú.\n\n${lineaVoz({}, valor)}`).finally(() => setMandando(false))
+        }}
+      >
+        {mandando ? 'Pidiéndola…' : 'Generar la voz'}
+      </button>
+    </div>
   )
 }
 
