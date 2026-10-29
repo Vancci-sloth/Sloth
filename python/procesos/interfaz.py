@@ -7,6 +7,8 @@ desde esta carpeta, y le pasa por la entrada un JSON con los archivos que tiene 
 falla, sale con 1 y la última línea de su salida de errores dice por qué. Todo lo demás que escriba (avisos de las
 bibliotecas) va a la salida de errores, así la salida solo lleva la respuesta. Cuánto lleva lo avisa con `progress`,
 en líneas propias de la salida de errores (`@progreso 0.4200`): `proceso()` de sloth.py las lee para decir cuánto falta.
+La voz viva (`video-base/scripts/voz_viva.py`) corre los mismos procesos sin lanzarlos y manda esas líneas por su
+conexión (`sink`).
 """
 
 import json
@@ -17,11 +19,17 @@ from typing import Any
 
 
 PROGRESS = "@progreso"
+# Adónde va cada línea de avance; sin nada, a la salida de errores.
+sink: Callable[[str], None] | None = None
 
 
 def progress(fraction: float) -> None:
     """Avisa de cuánto lleva el proceso, de 0 a 1, en la salida de errores."""
-    print(f"{PROGRESS} {min(1.0, max(0.0, fraction)):.4f}", file=sys.__stderr__, flush=True)
+    line = f"{PROGRESS} {min(1.0, max(0.0, fraction)):.4f}"
+    if sink:
+        sink(line)
+    else:
+        print(line, file=sys.__stderr__, flush=True)
 
 
 def run(process: Callable[[list[str], dict[str, Any]], Any]) -> None:

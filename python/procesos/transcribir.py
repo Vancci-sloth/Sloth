@@ -95,14 +95,37 @@ def timed_words(segments: list[dict]) -> list[dict]:
     return words
 
 
-def load_whisper(folder: Path, device: str, terms: list[str], numerals_in_words: bool = False):
+# Whisper, su detector de voz y los alineadores ya cargados, cuando los procesos los corre la voz viva
+# (`video-base/scripts/voz_viva.py`), que atiende todas las voces con un solo Python. Importar torch y WhisperX y cargarlos
+# tardaba de 36 s a 10 min según lo ocupada que estuviera la máquina (los 4 GB de torch/lib vuelven a leerse cada vez);
+# transcribir y alinear 6 min de voz ya cargado, 20 s. Un proceso suelto lo deja en None: carga, usa y suelta.
+kept: dict | None = None
+
+
+def whisper_model(folder: Path, device: str, **options):
+    """`whisperx.load_model` con Whisper y su detector de voz guardados en `kept`, si los hay."""
     import whisperx
 
-    return whisperx.load_model(
+    model, vad = (kept or {}).get(("whisper", device), (None, None))
+    pipeline = whisperx.load_model(
         str(models.WHISPER.folder(folder)),
         device,
         compute_type="float16" if device == "cuda" else "int8",
         threads=threads(device),
+        model=model,
+        vad_model=vad,
+        local_files_only=True,
+        **options,
+    )
+    if kept is not None:
+        kept[("whisper", device)] = (pipeline.model, pipeline.vad_model)
+    return pipeline
+
+
+def load_whisper(folder: Path, device: str, terms: list[str], numerals_in_words: bool = False):
+    return whisper_model(
+        folder,
+        device,
         language=LANGUAGE,
         asr_options={
             "hotwords": ", ".join(terms) if terms else None,
@@ -110,7 +133,6 @@ def load_whisper(folder: Path, device: str, terms: list[str], numerals_in_words:
             # Sin dígitos ni "%", "$" o "£": Whisper los dice con letra ("por ciento"), que el alineador sí sitúa.
             "suppress_numerals": numerals_in_words,
         },
-        local_files_only=True,
     )
 
 
@@ -120,16 +142,7 @@ def load_foreign_whisper(folder: Path, device: str, terms: list[str] | None = No
     primeros 30 s de cada archivo, y sin texto inicial. `terms` son pistas de cómo se escriben los nombres del nicho
     (sin ellas, Whisper oía «Cloud» donde decían «Claude»); sin `terms`, como siempre.
     """
-    import whisperx
-
-    return whisperx.load_model(
-        str(models.WHISPER.folder(folder)),
-        device,
-        compute_type="float16" if device == "cuda" else "int8",
-        threads=threads(device),
-        asr_options={"hotwords": ", ".join(terms)} if terms else None,
-        local_files_only=True,
-    )
+    return whisper_model(folder, device, asr_options={"hotwords": ", ".join(terms)} if terms else None)
 
 
 def said(transcript: dict) -> dict:
@@ -145,10 +158,16 @@ def said(transcript: dict) -> dict:
 def load_aligner(folder: Path, name: str, device: str):
     import whisperx
 
+    if kept is not None and ("aligner", name, device) in kept:
+        return kept[("aligner", name, device)]
     aligner = models.aligner(name)
     if isinstance(aligner, models.TorchaudioModel):
-        return whisperx.load_align_model(LANGUAGE, device, model_name=aligner.bundle, model_dir=str(aligner.folder(folder)))
-    return whisperx.load_align_model(LANGUAGE, device, model_name=str(aligner.folder(folder)), model_cache_only=True)
+        loaded = whisperx.load_align_model(LANGUAGE, device, model_name=aligner.bundle, model_dir=str(aligner.folder(folder)))
+    else:
+        loaded = whisperx.load_align_model(LANGUAGE, device, model_name=str(aligner.folder(folder)), model_cache_only=True)
+    if kept is not None:
+        kept[("aligner", name, device)] = loaded
+    return loaded
 
 
 def terms_of(options: dict) -> list[str]:
@@ -170,7 +189,9 @@ def transcribe(files: list[str], options: dict) -> dict:
         words, load = with_parakeet(voices, options, engine)
     else:
         words, load = with_whisper(voices, options)
-    medidas.note_voice(folder, engine, time.perf_counter() - started - load, sum(len(v) for v in voices) / SAMPLE_RATE, load)
+    # Con Whisper ya cargado (la voz viva) no hubo carga: la que se apunta es la de un proceso suelto.
+    medidas.note_voice(folder, engine, time.perf_counter() - started - load, sum(len(v) for v in voices) / SAMPLE_RATE,
+                       None if kept is not None else load)
     progress(1)
     return {"words": words[0], "trozos": words} if len(voices) > 1 else {"words": words[0]}
 

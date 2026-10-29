@@ -10,6 +10,7 @@ entorno se dañó y vuelve a bajar 4 GB. Ya pasó dos veces.
 
 import json
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -114,39 +115,54 @@ def _tiempo(s: float) -> str:
     return f"unos {max(1, round(s / 5) * 5)} s" if s < 90 else f"unos {round(s / 60)} min"
 
 
+def _anunciar(voz: float, cargado: bool) -> None:
+    """
+    Dice cuánto tardará en este equipo transcribir `voz` segundos de voz, de lo que midieron las anteriores en
+    `equipo.json` (ver `python/procesos/medidas.py`); con Whisper ya cargado (`cargado`), sin la carga.
+    """
+    medida = {}
+    try:
+        medida = json.loads((MODELOS.parent / "equipo.json").read_text(encoding="utf-8")).get("voz") or {}
+    except (OSError, ValueError):
+        pass
+    minutos = f"{int(voz // 60)}:{int(voz % 60):02d}"
+    carga = 0 if cargado else medida.get("carga", 0)
+    estimado = f"; en este equipo, {_tiempo(carga + medida['veces'] * voz)}" if medida.get("veces") else ""
+    print(f"Transcribo {minutos} de voz{estimado}.", flush=True)
+
+
+def _avance(voz: float):
+    """Lo que dice cada 10 % cuánto lleva y cuánto falta: en una computadora lenta, sin eso, parecía colgado."""
+    inicio = time.time()
+    dicho = 0
+
+    def avisar(parte: float) -> None:
+        nonlocal dicho
+        if voz and parte >= (dicho + 1) / 10 and parte < 1:
+            dicho = int(parte * 10)
+            falta = (time.time() - inicio) * (1 - parte) / parte
+            print(f"Transcribiendo: {dicho * 10} % (faltan {_tiempo(falta)}).", flush=True)
+
+    return avisar
+
+
 def _correr(nombre: str, entrada: str, voz: float) -> tuple[int, str, str]:
-    """
-    Corre el proceso y, si transcribe `voz` segundos de voz, dice antes cuánto tardará en este equipo (lo que midieron
-    las anteriores en `equipo.json`, ver `python/procesos/medidas.py`) y cada 10 % cuánto lleva y cuánto falta: en una
-    computadora lenta, sin eso, parecía colgado.
-    """
+    """Corre el proceso y, si transcribe `voz` segundos de voz, dice antes cuánto tardará y luego cuánto falta."""
     import threading
 
     if voz:
-        medida = {}
-        try:
-            medida = json.loads((MODELOS.parent / "equipo.json").read_text(encoding="utf-8")).get("voz") or {}
-        except (OSError, ValueError):
-            pass
-        minutos = f"{int(voz // 60)}:{int(voz % 60):02d}"
-        estimado = f"; en este equipo, {_tiempo(medida['carga'] + medida['veces'] * voz)}" if medida.get("veces") else ""
-        print(f"Transcribo {minutos} de voz{estimado}.", flush=True)
+        _anunciar(voz, cargado=False)
     p = subprocess.Popen([str(python_sloth()), *BANDERAS, nombre], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                          stderr=subprocess.PIPE, text=True, encoding="utf8", cwd=PROCESOS)
     errores: list[str] = []
-    inicio = time.time()
+    avisar = _avance(voz)
 
     def leer() -> None:
-        dicho = 0
         for linea in p.stderr:
-            if not linea.startswith("@progreso"):
+            if linea.startswith("@progreso"):
+                avisar(float(linea.split()[1]))
+            else:
                 errores.append(linea)
-                continue
-            parte = float(linea.split()[1])
-            if voz and parte >= (dicho + 1) / 10 and parte < 1:
-                dicho = int(parte * 10)
-                falta = (time.time() - inicio) * (1 - parte) / parte
-                print(f"Transcribiendo: {dicho * 10} % (faltan {_tiempo(falta)}).", flush=True)
 
     hilo = threading.Thread(target=leer, daemon=True)
     hilo.start()
@@ -159,11 +175,127 @@ def _correr(nombre: str, entrada: str, voz: float) -> tuple[int, str, str]:
     return p.returncode, salida, "".join(errores)
 
 
+def _aparte(script: Path, registro: Path | None = None) -> subprocess.Popen | None:
+    """
+    Arranca `script` con el Python de Sloth, suelto de quien lo lanza (sigue vivo cuando este script acaba), con su
+    salida en `registro` si se da. None si no se pudo.
+    """
+    salida = open(registro, "w", encoding="utf-8") if registro else subprocess.DEVNULL
+    aparte = dict(close_fds=True, stdin=subprocess.DEVNULL, stdout=salida, stderr=salida)
+    try:
+        if sys.platform != "win32":
+            return subprocess.Popen([str(python_sloth()), *BANDERAS, str(script)], start_new_session=True, **aparte)
+        base = subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.CREATE_NO_WINDOW
+        for flags in (base | subprocess.CREATE_BREAKAWAY_FROM_JOB, base):
+            try:
+                return subprocess.Popen([str(python_sloth()), *BANDERAS, str(script)], creationflags=flags, **aparte)
+            except OSError:
+                continue
+        return None
+    finally:
+        if registro:
+            salida.close()
+
+
+VOZ_VIVA = Path(__file__).resolve().parent / "voz_viva.py"
+PUERTO_VOZ = Path(tempfile.gettempdir()) / "sloth-voz.json"
+REGISTRO_VOZ = Path(tempfile.gettempdir()) / "sloth-voz.log"
+# Los procesos que atiende voz_viva.py.
+VOZ_PROCESOS = ("transcribir.py", "transcribir-ajeno.py")
+# Lo más que se espera a que cargue: con la máquina muy ocupada, una carga tardó 10 min.
+VOZ_ARRANQUE = 15 * 60
+
+
+def _whisper_en_gpu() -> bool:
+    """
+    Si aquí transcribe Whisper en una NVIDIA: el Python de Sloth es el de CUDA (`-cu128-`, como `motorDe` de
+    server/requisitos.ts). Sin ella, Parakeet carga en 4 s y no hace falta tenerlo cargado.
+    """
+    if os.environ.get("SLOTH_MOTOR"):
+        return False
+    try:
+        carpeta = python_sloth().relative_to(APPDATA / "youtube" / "piezas" / "python").parts[0]
+    except (SystemExit, ValueError):
+        return False
+    return re.search(r"-cu\d+", carpeta) is not None
+
+
+def _pedir_voz(pedido: dict, avisar=None) -> dict | None:
+    """
+    El pedido a Whisper ya cargado (voz_viva.py), pasando a `avisar` cada avance: su respuesta (`{"ok"}` o `{"error"}`),
+    o None si no está o se cortó.
+    """
+    import socket
+
+    try:
+        puerto = json.loads(PUERTO_VOZ.read_text(encoding="utf-8"))["puerto"]
+        with socket.create_connection(("127.0.0.1", puerto), timeout=10) as c, c.makefile("rwb") as f:
+            c.settimeout(None)
+            f.write((json.dumps(pedido) + "\n").encode("utf-8"))
+            f.flush()
+            for linea in f:
+                texto = linea.decode("utf-8")
+                if not texto.startswith("@progreso"):
+                    return json.loads(texto)
+                if avisar:
+                    avisar(float(texto.split()[1]))
+    except (OSError, ValueError, KeyError):
+        pass
+    return None
+
+
+def _soltar_voz() -> None:
+    """Cierra la voz viva, si está: suelta su Whisper de la tarjeta."""
+    _pedir_voz({"salir": True})
+
+
+def _arrancar_voz() -> bool:
+    """Arranca voz_viva.py y lo espera hasta que tiene Whisper cargado. False si no llegó."""
+    print("Cargo Whisper una vez; las siguientes voces ya no lo esperan.", flush=True)
+    PUERTO_VOZ.unlink(missing_ok=True)
+    p = _aparte(VOZ_VIVA, REGISTRO_VOZ)
+    limite = time.time() + VOZ_ARRANQUE
+    while p and p.poll() is None and time.time() < limite:
+        if PUERTO_VOZ.exists() and _pedir_voz({"ping": True}) is not None:
+            return True
+        time.sleep(1)
+    if p and p.poll() is None:
+        p.kill()
+    return False
+
+
+def _con_voz_viva(nombre: str, archivos: list[str], opciones: dict, voz: float) -> dict | None:
+    """
+    El proceso con Whisper ya cargado (voz_viva.py), que arranca si no está. None si no se pudo: entonces va el proceso
+    de siempre, que también dice por qué falló, y la voz viva se cierra antes para no ocupar la tarjeta con dos Whisper.
+    """
+    if _pedir_voz({"ping": True}) is None and not _arrancar_voz():
+        print("Whisper no quedó cargado: transcribo con el proceso de siempre.", flush=True)
+        return None
+    if voz:
+        _anunciar(voz, cargado=True)
+    r = _pedir_voz({"proceso": nombre, "files": archivos, "options": opciones}, _avance(voz))
+    if r is None or "error" in r:
+        print(f"Whisper ya cargado falló ({(r or {}).get('error', 'se cortó')}): lo repito con el proceso de siempre.",
+              flush=True)
+        _soltar_voz()
+        return None
+    return r["ok"]
+
+
 def proceso(nombre: str, archivos: list[str], opciones: dict) -> dict:
-    """Corre un proceso de Sloth (python/procesos/<nombre>.py): JSON por stdin, JSON en la última línea de stdout."""
+    """
+    Corre un proceso de Sloth (python/procesos/<nombre>.py): JSON por stdin, JSON en la última línea de stdout. Con una
+    NVIDIA, las transcripciones van a Whisper ya cargado (voz_viva.py): cargarlo en cada una tardaba de 36 s a 10 min.
+    """
     entrada = json.dumps({"files": archivos, "options": opciones})
+    voz = _segundos(archivos) if nombre.startswith("transcribir") else 0
     with turno_gpu():
-        codigo, salida, errores = _correr(nombre, entrada, _segundos(archivos) if nombre.startswith("transcribir") else 0)
+        if nombre in VOZ_PROCESOS and _whisper_en_gpu():
+            r = _con_voz_viva(nombre, archivos, opciones, voz)
+            if r is not None:
+                return r
+        codigo, salida, errores = _correr(nombre, entrada, voz)
     if codigo != 0:
         raise SystemExit(f"{nombre} falló:\n{errores[-3000:]}")
     for marca in ('{"words"', '{"idioma"', '{"n"'):
@@ -199,17 +331,7 @@ def calentar_vectores() -> None:
         if _pedir_vectores({"files": [], "options": {"modo": "ping"}}) is not None:
             return
         PUERTO_VECTORES.unlink(missing_ok=True)
-        aparte = dict(close_fds=True, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        if sys.platform != "win32":
-            subprocess.Popen([str(python_sloth()), *BANDERAS, str(VECTORES_VIVO)], start_new_session=True, **aparte)
-            return
-        base = subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.CREATE_NO_WINDOW
-        for flags in (base | subprocess.CREATE_BREAKAWAY_FROM_JOB, base):
-            try:
-                subprocess.Popen([str(python_sloth()), *BANDERAS, str(VECTORES_VIVO)], creationflags=flags, **aparte)
-                return
-            except OSError:
-                continue
+        _aparte(VECTORES_VIVO)
 
 
 def vectorizar(archivo: str, opciones: dict) -> dict:

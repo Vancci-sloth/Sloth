@@ -9,10 +9,13 @@ archivo por ruta; sin voz (música, solo texto en pantalla), `segmentos` va vac�
 `{"error"}` y no para a los demás.
 
 Espera su turno en la GPU con el candado de `turno_gpu()` (`video-base/scripts/sloth.py`): Whisper ocupa unos 3 GB de los
-6, y si un vídeo se está transcribiendo a la vez no caben los dos. Mientras espera, lo dice en la salida de errores.
+6, y si un vídeo se está transcribiendo a la vez no caben los dos. Mientras espera, lo dice en la salida de errores. Por
+lo mismo, con el turno cierra la voz viva (`video-base/scripts/voz_viva.py`), que tiene otro Whisper cargado.
 """
 
+import json
 import os
+import socket
 import sys
 import tempfile
 import time
@@ -60,6 +63,19 @@ def gpu_turn():
                 fcntl.flock(lock.fileno(), fcntl.LOCK_UN)
 
 
+def close_live_voice() -> None:
+    """Cierra la voz viva, si está (`_soltar_voz()` de sloth.py), y espera a que suelte la tarjeta."""
+    try:
+        port = json.loads((Path(tempfile.gettempdir()) / "sloth-voz.json").read_text(encoding="utf8"))["puerto"]
+        with socket.create_connection(("127.0.0.1", port), timeout=10) as c, c.makefile("rwb") as f:
+            c.settimeout(60)
+            f.write(b'{"salir": true}\n')
+            f.flush()
+            f.readline()
+    except (OSError, ValueError, KeyError):
+        pass
+
+
 def transcribe(files: list[str], options: dict) -> dict:
     if parakeet.engine(Path(options["modelos"])).startswith("parakeet"):
         return with_parakeet(files, options)
@@ -69,7 +85,8 @@ def transcribe(files: list[str], options: dict) -> dict:
     device = "cuda" if torch.cuda.is_available() else "cpu"
     answer = {}
     with gpu_turn():
-        whisper = load_foreign_whisper(Path(options["modelos"]), device, options.get("terminos"))
+        close_live_voice()
+        whisper =load_foreign_whisper(Path(options["modelos"]), device, options.get("terminos"))
         for i, file in enumerate(files):
             try:
                 transcript = whisper.transcribe(

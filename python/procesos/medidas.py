@@ -26,19 +26,22 @@ def read(models: Path) -> dict:
         return {}
 
 
-def note_voice(models: Path, engine: str, seconds: float, voice: float, load: float, fresh: bool = False) -> None:
+def note_voice(models: Path, engine: str, seconds: float, voice: float, load: float | None, fresh: bool = False) -> None:
     """
-    Apunta una transcripción: `seconds` de trabajo para `voice` segundos de voz, y `load` de cargar el motor. `fresh`
-    (lo que mide `medir.py`) reemplaza lo de antes en vez de promediarse.
+    Apunta una transcripción: `seconds` de trabajo para `voice` segundos de voz, y `load` de cargar el motor (None si ya
+    estaba cargado: queda la carga de antes). `fresh` (lo que mide `medir.py`) reemplaza lo de antes en vez de promediarse.
     """
     if voice < 5:
         return
     data = read(models)
     times = seconds / voice
     before = data.get("voz") or {}
+    if load is None:
+        load = before.get("carga", 0.0) if before.get("motor") == engine else 0.0
+    elif before.get("motor") == engine and not fresh:
+        load = (before.get("carga", load) + load) / 2
     if before.get("motor") == engine and not fresh:
         times = (before["veces"] + times) / 2
-        load = (before.get("carga", load) + load) / 2
     data["voz"] = {"motor": engine, "veces": round(times, 3), "carga": round(load, 1), "fecha": time.strftime("%Y-%m-%d")}
     target = path(models)
     temp = target.with_name(f"{target.name}.{os.getpid()}.tmp")
