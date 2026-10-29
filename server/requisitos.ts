@@ -510,9 +510,11 @@ function paquetes(modulos: string[]): Pieza {
       const faltan = await modulosQueFaltan(app, modulos)
       return faltan ? `Faltan ${faltan.map((m) => PAQUETES[m].pip).join(', ')}` : 'Antes hace falta Python'
     },
+    // numba y llvmlite (de rembg, por pymatting) solo de rueda: desde la 0.63 y la 0.46 no salen para Mac con Intel, y
+    // pip compilaba llvmlite, que pide LLVM, y fallaba. Así se queda con la última que trae rueda.
     instalar: async (app) => {
       const faltan = (await modulosQueFaltan(app, modulos)) ?? modulos
-      return correr(`python -m pip install --disable-pip-version-check ${faltan.map((m) => `"${PAQUETES[m].pip}"`).join(' ')}`, app)
+      return correr(`python -m pip install --disable-pip-version-check --only-binary=numba,llvmlite ${faltan.map((m) => `"${PAQUETES[m].pip}"`).join(' ')}`, app)
     }
   }
 }

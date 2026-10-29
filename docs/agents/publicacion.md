@@ -35,7 +35,9 @@ ramas ni bloquea por sí solo un push a `venta`.
    en `/version` y en `/descargar`. Un arreglo urgente sale para todos de inmediato con `[para todos]` en el mensaje del
    último commit que llega a `venta`, o con la opción `para_todos` al correr el workflow a mano.
 4. Comprueba los tres jobs y la versión que ofrece el cobro: `/version`, `/version?so=mac` y `/version?so=linux` en
-   `https://api.sloth.vancci.org` (sin apoyo, durante sus 7 días, dicen la anterior). Verifica también los metadatos
+   `https://api.sloth.vancci.org` (sin apoyo, durante sus 7 días, dicen la anterior). Pedido sin llave, `/version` es
+   lo que se le da a quien no apoya: si trae `nueva`, sigue con la anterior; si no, ya tiene esa. Qué arreglo le llegó
+   a un cliente se mira ahí y en `git log origin/venta`, no en las fechas de los commits. Verifica también los metadatos
    de `/actualizaciones/latest.yml`, `latest-mac.yml` y `latest-linux.yml`, y los enlaces de descarga de cada sistema.
    Para esperar el flujo, `gh run watch <id> --exit-status` de fondo.
 5. Cuando los tres salieron bien, cuéntalo en Anuncios de la comunidad, sin preguntar: escribe el anuncio como lo

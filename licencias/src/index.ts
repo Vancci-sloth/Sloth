@@ -315,7 +315,10 @@ async function ultimaPara(req: Request, env: Env, so: Sistema): Promise<Ultima &
   const publica = !!env.PUBLICAR && iguales(req.headers.get('authorization') ?? '', `Bearer ${env.PUBLICAR}`)
   if (deTodos(u) || publica || (await apoya(req, env))) return u
   const anterior = await anteriorDe(env, so)
-  return anterior ? { ...anterior, nueva: u.version } : u
+  if (anterior) return { ...anterior, nueva: u.version }
+  // Sin el instalador de la anterior, la última ya se le da a todos: sin `todos`, que diría que aún no.
+  const { todos: _, ...deTodas } = u
+  return deTodas
 }
 
 /** La versión de antes de `so`, la que se da a quien no apoya, si su instalador sigue en R2; si no, a todos la última. */
