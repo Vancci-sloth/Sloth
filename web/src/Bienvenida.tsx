@@ -111,8 +111,9 @@ export function Bienvenida() {
           Cada video usa una parte de los límites de tu plan, que ves en Opciones. Las cifras en dólares que salen en cada
           video dicen cuánto costaría pagado aparte, no lo que se te cobra. Un video gasta bastante: con el plan Pro el límite
           se acaba pronto, y con Max alcanza para varios. Con una llave de API no hay límites: esas cifras son lo que pagas.
-          Con los modelos gratis de OpenCode no pagas nada, pero tu uso gratis tiene un tope: al acabarse, vuelve solo en
-          unas horas. Sus modelos de pago se cobran del saldo de tu cuenta de OpenCode.
+          Con los modelos gratis de OpenCode no pagas nada, pero tu uso gratis tiene un tope, y es de tu computadora: al
+          acabarse, vuelve solo en unas horas, y cambiar de cuenta no lo repone. Sus modelos de pago se cobran del saldo de tu
+          cuenta de OpenCode.
         </Paso>
 
         <div className="modal-actions">

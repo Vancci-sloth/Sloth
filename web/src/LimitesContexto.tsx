@@ -67,7 +67,7 @@ export function LimitesContexto({ opencode }: { opencode?: boolean }) {
     <span className="context-limits">
       <span className="picker-label">Límites del plan</span>
       {opencode && (
-        <Proveedor id="opencode" nombre="OpenCode" ahora={ahora} sinPlan="Sin OpenCode Go: el uso gratis tiene un tope que OpenCode no publica ni deja ver. Al acabarse, vuelve solo en unas horas o al día siguiente. Los modelos de pago se cobran de tu saldo." />
+        <Proveedor id="opencode" nombre="OpenCode" ahora={ahora} sinPlan="Sin OpenCode Go: el uso gratis tiene un tope que OpenCode no publica ni deja ver, y es de tu computadora: cambiar de cuenta no lo repone. Al acabarse, vuelve solo en unas horas o al día siguiente. Los modelos de pago se cobran de tu saldo." />
       )}
       <Proveedor id="codex" nombre="Codex" ahora={ahora} opcional />
       <Proveedor id="claude" nombre="Claude" ahora={ahora} />

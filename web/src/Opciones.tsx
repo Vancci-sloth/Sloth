@@ -573,7 +573,8 @@ export function CuentaOpenCode({ aviso = false, onFalta }: { aviso?: boolean; on
       <div className="fila-extra small">
         <p>
           <b>Antes de usarlo:</b> los modelos gratis lo son por tiempo limitado, a veces se saturan y tu uso gratis tiene un
-          tope que OpenCode no publica: al acabarse, vuelve solo en unas horas. Algunos (como Big Pickle)
+          tope que OpenCode no publica. Ese tope es de tu computadora, no de tu cuenta: cambiar de cuenta no lo repone; al
+          acabarse, vuelve solo en unas horas. Algunos (como Big Pickle)
           usan lo que les mandas para mejorar el modelo, y otros lo guardan unos días: no les mandes datos personales ni
           privados.{' '}
           <a href="https://opencode.ai/docs/zen" target="_blank" rel="noreferrer">

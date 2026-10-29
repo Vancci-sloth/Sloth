@@ -350,7 +350,7 @@ export function errorLlano(error = '', caida = false, agente: Proveedor = 'claud
   }
   // El uso gratis se acaba en todos los modelos gratis a la vez: cambiar a otro gratis no sirve.
   if (agente === 'opencode' && /uso gratis|free usage/i.test(error)) {
-    return { titulo: 'Se acabó tu uso gratis de OpenCode', ayuda: 'Vuelve solo, en unas horas o al día siguiente: OpenCode no dice cuándo. Mientras, elige abajo un modelo de pago de OpenCode, Claude o ChatGPT, y pulsa «Reintentar».', reintentar: true }
+    return { titulo: 'Se acabó tu uso gratis de OpenCode', ayuda: 'Vuelve solo, en unas horas o al día siguiente: OpenCode no dice cuándo. Es de tu computadora: cambiar de cuenta no lo repone. Mientras, elige abajo un modelo de pago de OpenCode, Claude o ChatGPT, y pulsa «Reintentar».', reintentar: true }
   }
   if (agente === 'opencode' && /modelo gratis|rate.?limit|too many requests|\b429\b/i.test(error)) {
     return { titulo: 'El modelo gratis está saturado', ayuda: 'Espera unos minutos y pulsa «Reintentar», o elige otro modelo gratis.', reintentar: true }
