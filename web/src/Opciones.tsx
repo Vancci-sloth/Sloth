@@ -527,7 +527,7 @@ export function CuentaOpenCode({ aviso = false, onFalta }: { aviso?: boolean; on
       <div className="fila">
         <Logo de="opencode" />
         <div className="fila-nombre">
-          <strong>OpenCode · gratis con tu cuenta</strong>
+          <strong>OpenCode · rango gratis con tu cuenta</strong>
           {cuenta?.conectada ? (
             <Picker
               className="sub"

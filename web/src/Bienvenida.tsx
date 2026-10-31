@@ -1,10 +1,35 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { Icono } from './Iconos'
+import { Logo } from './Logos'
 import { CuentaChatGPT, CuentaClaude, CuentaOpenCode, Requisitos } from './Opciones'
 import './Bienvenida.css'
 
 const VISTA = 'bienvenida'
 const EVENTO = 'sloth-bienvenida'
+
+/** Todos los agentes, según haya que pagar para usarlos. Los del rango gratis no son gratis: su uso gratis tiene límites. */
+const OPCIONES = [
+  {
+    titulo: 'De paga',
+    agentes: [
+      ['claude', 'Claude'],
+      ['codex', 'ChatGPT'],
+      ['deepseek', 'DeepSeek'],
+      ['cursor', 'Cursor'],
+      ['muse', 'Muse Code'],
+      ['pi', 'Pi']
+    ]
+  },
+  {
+    titulo: 'Rango gratis',
+    nota: 'No son gratis del todo: su uso gratis tiene límites, y esos límites varían.',
+    agentes: [
+      ['opencode', 'OpenCode'],
+      ['antigravity', 'Antigravity'],
+      ['grok', 'Grok']
+    ]
+  }
+]
 
 /** Opciones la vuelve a abrir. */
 export const abrirBienvenida = () => dispatchEvent(new Event(EVENTO))
@@ -62,20 +87,32 @@ export function Bienvenida() {
           <div>
             <h2>Te damos la bienvenida a Sloth</h2>
             <p>
-              Sloth hace videos con Claude, con ChatGPT o, gratis, con OpenCode. Eliges un estilo, le das un tema o un enlace, y lo
-              ves trabajar paso a paso: investiga, escribe el guion, te pide tu voz y arma el video.
+              Sloth hace videos con Claude, con ChatGPT, con OpenCode y otros agentes. Eliges un estilo, le das un tema o un enlace, y
+              lo ves trabajar paso a paso: investiga, escribe el guion, te pide tu voz y arma el video.
             </p>
           </div>
         </header>
 
         {/* Con uno basta. Con ChatGPT, además, hace las imágenes de los videos. */}
-        <Paso n={1} titulo="Elige con qué trabaja: Claude, ChatGPT u OpenCode" hecho={claude || chatgpt || opencode}>
-          <b>Claude y ChatGPT necesitan un plan de pago</b>: Claude Pro o Max, o ChatGPT Plus o Pro (o una llave de API, que
-          se paga por uso). Sloth no te cobra aparte, y con ellos salen los mejores videos; con ChatGPT, además, hace las
-          imágenes: portadas y personajes. <b>OpenCode es gratis</b> con tu cuenta de OpenCode, que se crea gratis: sus modelos
-          gratis pueden equivocarse más y a veces se saturan, y si le pones saldo a tu cuenta, también usas los de pago. Cada
-          uno se descarga al elegirlo. También trabaja con DeepSeek, Grok, Antigravity, Cursor, Muse Code y Pi: se conectan en
-          Opciones → Agentes.
+        <Paso n={1} titulo="Elige con qué trabaja" hecho={claude || chatgpt || opencode}>
+          Con uno basta, y Sloth no te cobra aparte. Todos se conectan en Opciones → Agentes; Pi usa el plan o la llave que le
+          conectes.
+          {OPCIONES.map(({ titulo, nota, agentes }) => (
+            <div className="opcion" key={titulo}>
+              <b>{titulo}</b>
+              <div>
+                <ul>
+                  {agentes.map(([id, nombre]) => (
+                    <li key={id}>
+                      <Logo de={id} nombre={nombre} chico />
+                      {nombre}
+                    </li>
+                  ))}
+                </ul>
+                {nota && <p>{nota}</p>}
+              </div>
+            </div>
+          ))}
           <CuentaClaude onFalta={(falta) => setClaude(falta === undefined ? undefined : !falta)} />
           <CuentaChatGPT onFalta={(falta) => setChatgpt(falta === undefined ? undefined : !falta)} />
           <CuentaOpenCode aviso onFalta={(falta) => setOpencode(falta === undefined ? undefined : !falta)} />

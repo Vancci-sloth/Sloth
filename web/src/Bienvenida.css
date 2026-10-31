@@ -15,6 +15,11 @@
 .bienvenida .paso-texto { color: var(--muted); font-size: 13.5px; line-height: 1.55; }
 .bienvenida .paso-texto b { color: var(--text); }
 .bienvenida .paso-texto .panel { margin-top: 10px; }
+.bienvenida .opcion { display: flex; gap: 12px; align-items: flex-start; margin-top: 10px; }
+.bienvenida .opcion b { flex: none; width: 88px; line-height: 26px; }
+.bienvenida .opcion ul { display: flex; flex-wrap: wrap; gap: 8px 14px; margin: 0; padding: 0; list-style: none; }
+.bienvenida .opcion li { display: flex; align-items: center; gap: 6px; color: var(--text); }
+.bienvenida .opcion p { margin: 6px 0 0; font-size: 12.5px; line-height: 1.45; }
 .bienvenida .anclar { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; margin-top: 10px; }
 .bienvenida .anclar p { margin: 0; }
 .bienvenida .modal-actions { justify-content: space-between; border-top: 1px solid var(--line); padding-top: 16px; margin-top: 4px; }
