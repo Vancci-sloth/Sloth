@@ -5,6 +5,7 @@ import type { AgentEvent, Model, Tokens } from '../shared/types.ts'
 import { IMAGE_TYPES, Inbox, stringify, type AgentOptions, type AgentRun, type SkillRef } from './agent.ts'
 import { herramientasIdeas } from './ideas/mcp.ts' // ideas
 import { navegadorAgente } from './navegador-agente.ts'
+import { mcpVoz } from './voz/index.ts'
 import { programaClaude, rutaAgente } from './agentes.ts'
 import { sitiosDeAgente } from './tope-agentes.ts'
 
@@ -87,9 +88,9 @@ export function startClaude(opts: AgentOptions): AgentRun {
       allowDangerouslySkipPermissions: true,
       settingSources: ['user', 'project', 'local'],
       systemPrompt: { type: 'preset', preset: 'claude_code', append: OPCIONES },
-      // El navegador del agente y, en un canal de Ideas, sus herramientas (`parecidos`; en uno vertical, también las de TikTok e
-      // Instagram): se suman a los MCP del usuario.
-      mcpServers: { ...navegadorAgente(opts.lote, opts.hilo), ...herramientasIdeas(opts.cwd) },
+      // El navegador del agente, la voz de AI Studio y, en un canal de Ideas, sus herramientas (`parecidos`; en uno vertical,
+      // también las de TikTok e Instagram): se suman a los MCP del usuario.
+      mcpServers: { ...navegadorAgente(opts.lote, opts.hilo), ...mcpVoz(), ...herramientasIdeas(opts.cwd) },
       includePartialMessages: true,
       // Un subagente espera su sitio en la máquina antes de arrancar (`TOPE_AGENTES`). El que lanza otro subagente ya tiene
       // el suyo: si esperara, ninguno soltaría nada.

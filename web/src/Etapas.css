@@ -18,6 +18,9 @@
 .entrega-lista { display: flex; flex-direction: column; gap: 8px; }
 .entrega-nombre { color: var(--text); overflow-wrap: anywhere; }
 .entrega-botones { display: flex; justify-content: flex-end; align-items: center; gap: 14px; }
+/* En vez de grabar la voz, que el agente la genere en AI Studio (`GenerarVoz`). */
+.generar-voz { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding-top: 10px; border-top: 1px solid color-mix(in srgb, var(--amber) 25%, transparent); color: var(--text); }
+.generar-voz > span:first-child { flex: 1 1 220px; }
 .entrega-botones .primary { padding: 5px 14px; }
 
 .etapa-texto { font-size: 13.5px; }

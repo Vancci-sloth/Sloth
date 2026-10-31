@@ -427,6 +427,19 @@ export function avanceCorto(meta: SessionMeta, card: Card): { avance: AvanceCort
   return { avance, fresco: frescoHasta < Infinity ? frescoHasta : undefined }
 }
 
+/**
+ * Lo que le falta al video de un hilo para estar terminado, los nombres de sus etapas, con lo mismo que lee el estudio.
+ * Nada si ya está o si lo que sigue lo tiene que dar el usuario (una etapa con `espera`, como su voz). Para que Sloth le
+ * pida al agente que siga si cerró su turno a medias (`Sessions`).
+ */
+export function queFalta(meta: SessionMeta, card: Card): string[] {
+  const folder = folderOf(meta)
+  const etapas = (card.etapas ?? []).map((e) => ({ ...e, hecha: listos(folder, e.listo).length > 0 }))
+  const { current, saltada } = enCurso(etapas)
+  if (current < 0 || etapas[current].espera) return []
+  return etapas.filter((e, i) => i >= current && !e.hecha && !saltada(i)).map((e) => e.nombre)
+}
+
 /** Los `cwd` que se vigilan, con los globs de su card. */
 const vigiladas = new Map<string, { globs: string[] }>()
 

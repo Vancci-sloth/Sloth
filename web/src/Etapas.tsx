@@ -6,6 +6,7 @@ import { api } from './api'
 import { Picker } from './Composer'
 import { imageUrl } from './Images'
 import { buildTimeline } from './items'
+import { GenerarVoz } from './Voz' // voz de AI Studio
 import './Etapas.css'
 
 /**
@@ -192,7 +193,8 @@ function Recibido({ path, working }: { path: string; working: boolean }) {
 
 /**
  * Lo que una etapa espera del usuario, con un sitio donde dárselo: soltar el archivo o elegirlo. Se ve antes de mandarse
- * y solo sale con «Confirmar», como un mensaje del chat con su ruta: el agente ya sabe qué hacer con él.
+ * y solo sale con «Confirmar», como un mensaje del chat con su ruta: el agente ya sabe qué hacer con él. Si espera tu
+ * voz, también se puede pedir que el agente la genere en AI Studio (`GenerarVoz`).
  */
 function Entrega({ sessionId, etapa }: { sessionId: string; etapa: Avance['etapas'][number] }) {
   const [file, setFile] = useState<File | null>(null)
@@ -200,6 +202,7 @@ function Entrega({ sessionId, etapa }: { sessionId: string; etapa: Avance['etapa
   const [over, setOver] = useState(false)
   const [busy, setBusy] = useState(false)
   const [sent, setSent] = useState(false)
+  const [generada, setGenerada] = useState(false)
   const [error, setError] = useState('')
   const picker = useRef<HTMLInputElement>(null)
   // La extensión que pide la etapa (`.wav`), si su glob la dice sin ambigüedad. Un WAV es la voz: vale cualquier audio,
@@ -236,6 +239,7 @@ function Entrega({ sessionId, etapa }: { sessionId: string; etapa: Avance['etapa
   }
 
   if (sent) return <div className="etapa-espera">Enviado. El agente sigue con {file?.name}.</div>
+  if (generada) return <div className="etapa-espera">Pedido. El agente genera la voz en AI Studio y sigue con ella.</div>
   return (
     <div className="etapa-espera">
       {etapa.espera}
@@ -262,6 +266,18 @@ function Entrega({ sessionId, etapa }: { sessionId: string; etapa: Avance['etapa
         >
           Suelta aquí el archivo o haz clic para elegirlo
         </button>
+      )}
+      {voz && !file && (
+        <GenerarVoz
+          onGenerar={async (text) => {
+            try {
+              await api(`/api/sessions/${sessionId}/send`, { text, steer: true })
+              setGenerada(true)
+            } catch (e) {
+              setError(e instanceof Error ? e.message : String(e))
+            }
+          }}
+        />
       )}
       <input
         ref={picker}

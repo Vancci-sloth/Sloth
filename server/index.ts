@@ -20,7 +20,7 @@ import { conectandoCodex, conectarCodex, cuentaCodex, limitesCodex } from './cue
 import { conectando, conectarClaude, cuentaClaude, limitesClaude } from './cuenta.ts'
 import { cancelarOpenCode, conectandoOpenCode, conectarOpenCode, cuentaOpenCode, limitesOpenCode, quitarCuentaOpenCode, usarCuentaOpenCode } from './cuenta-opencode.ts'
 import { enlacesApi } from './enlaces.ts' // tarjeta de los enlaces
-import { etapasApi, mismaCwd, videosApi, videosDe } from './etapas.ts' // panel de etapas
+import { etapasApi, mismaCwd, queFalta, videosApi, videosDe } from './etapas.ts' // panel de etapas
 import { ideas } from './ideas/index.ts' // ideas
 import { modelos3d } from './modelos3d.ts' // modelos 3D
 import { miniaturas } from './miniaturas.ts' // panel de etapas
@@ -29,6 +29,7 @@ import { previas } from './previas.ts' // previas de las cards
 import { radar } from './radar/index.ts' // radar
 import { comunidad, llaveDelCreador } from './comunidad.ts' // comunidad
 import { redes } from './redes/index.ts' // redes
+import { voz } from './voz/index.ts' // voz de AI Studio
 import { youtube } from './youtube.ts'
 import { peticionDeConfianza } from './origen.ts'
 import { actualizarYtDlp, instalandoAlgo, instalar, pythonSlothEntero, requisitos } from './requisitos.ts'
@@ -60,6 +61,8 @@ const RESTART = 75
 process.env.SLOTH_PROCESOS ??= join(APP, 'python', 'procesos')
 // Y aquí las skills (`video-base`, la suya): sin esto, en ~/.claude/skills, que en la app que se vende es lo mismo.
 process.env.SLOTH_SKILLS ??= SKILLS
+// Y aquí, este servidor: el MCP de la voz (`server/voz/mcp.mjs`) y los scripts que piden algo a Sloth.
+process.env.SLOTH_URL = `http://127.0.0.1:${PORT}`
 if (VENTA) {
   // La app que se vende trae sus skills: las enlaza en ~/.claude/skills, donde las busca Claude, y Codex las lee de esas
   // mismas carpetas, no de copias suyas.
@@ -93,7 +96,13 @@ const sessions = new Sessions(
   (session) => broadcast({ type: 'session', session }),
   (sessionId) => broadcast({ type: 'removed', sessionId }),
   // Lo que va escribiendo un `Write` solo lo pintan el estudio y el panel de etapas: a los demás hilos no se les manda.
-  (sessionId, draft) => conEtapas(sessionId) && broadcast({ type: 'draft', sessionId, draft })
+  (sessionId, draft) => conEtapas(sessionId) && broadcast({ type: 'draft', sessionId, draft }),
+  undefined,
+  // Si el agente cierra su turno con el video a medias, Sloth le pide que siga (`sinAcabar`).
+  (meta) => {
+    const card = cards().find((c) => c.id === meta.cardId)
+    return card ? queFalta(meta, card) : []
+  }
 )
 
 /** Si el hilo es de un estilo de video: solo su estudio enseña lo que va escribiendo. */
@@ -162,6 +171,8 @@ avance = avances(sessions, cards, broadcast)
 const disco = espacio({ app: APP, sessions, cards, ocupado, python: () => pythonSlothEntero(APP) }) // espacio en disco
 // Opciones → Tu equipo: con qué transcribe la voz y cuánto tarda cada cosa en esta computadora.
 const maquina = equipo({ app: APP, ocupado }) // tu equipo
+// La voz de los videos, que los agentes piden a Sloth y Sloth genera en AI Studio con la cuenta de Google del usuario.
+const narrar = voz(APP) // voz de AI Studio
 
 // Si el agente (o tú) edita cards.json, las cards se actualizan solas.
 watch(CARDS, () => broadcast({ type: 'cards', cards: cards() }))
@@ -178,6 +189,7 @@ function ocupado(): string | null {
   if (publicar?.ocupado()) return publicar.ocupado() // redes: una subida o un texto a medias
   if (subirLargos?.ocupado()) return subirLargos.ocupado()
   if (idear?.ocupado()) return idear.ocupado() // ideas: una investigación en curso
+  if (narrar.ocupado()) return narrar.ocupado() // voz de AI Studio: una a medias
   return maquina.ocupado() ?? instalandoAlgo() ?? bajandoAgente() ?? conectando() ?? conectandoCodex() ?? conectandoOpenCode()
 }
 
@@ -306,6 +318,7 @@ async function api(req: IncomingMessage, res: ServerResponse, url: URL): Promise
 
   if (await disco.api(req, res, path)) return true // espacio en disco
   if (await maquina.api(req, res, path)) return true // tu equipo
+  if (await narrar.api(req, res, path)) return true // voz de AI Studio
 
   if (path === '/api/opciones' && method === 'GET') {
     send(res, 200, opciones())

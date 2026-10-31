@@ -23,6 +23,13 @@ const LIBRE = 2e9
 /** Cuánto espera el hilo, con el segundo plano recién vacío, antes de decir que ya no queda nada (`avisarFondo`). */
 const CALMA = 4000
 /**
+ * Cuántas veces seguidas, sin que escribas, Sloth le pide a un agente que siga: uno de Codex u OpenCode que acabó su turno
+ * con algo en segundo plano (`avisarFondo`) o cualquiera que lo cerró con el video a medias (`sinAcabar`).
+ */
+const DESPERTARES = 3
+/** Las herramientas con que el agente le pregunta algo al usuario: el turno que acaba con una espera su respuesta. */
+const PREGUNTAS = /AskUserQuestion|request_user_input/i
+/**
  * Un video del lote no arranca con menos de esto libre en el disco de su carpeta. Un render deja varios GB de temporales,
  * y con el disco lleno se cae todo: los renders, los agentes y este servidor, que ya no puede guardar los hilos.
  */
@@ -69,6 +76,13 @@ function alDia(meta: SessionMeta & { provider?: string; queue?: unknown; pendien
 
 type Mensaje = Extract<AgentEvent, { t: 'user' }>
 
+/** El último mensaje del agente en estos eventos (no el de un subagente), entero. */
+function ultimoTexto(events: AgentEvent[]): string {
+  const ultimo = events.findLast((e) => e.t === 'text' && !e.parent)
+  if (ultimo?.t !== 'text') return ''
+  return events.map((e) => (e.t === 'text' && e.id === ultimo.id ? e.delta : '')).join('')
+}
+
 /** Los mensajes del final del hilo que el agente no llegó a leer: después de ellos no hay nada suyo. */
 function sinLeer(events: AgentEvent[]): Mensaje[] {
   const mensajes: Mensaje[] = []
@@ -102,7 +116,9 @@ export class Sessions {
     private crearAgente: (opts: Parameters<typeof startCodex>[0]) => AgentRun = (opts) => {
       const p = proveedorDe(opts.model)
       return conAgente(p, opts, { claude: startClaude, codex: startCodex, opencode: startOpenCode }[p])
-    }
+    },
+    /** Lo que le falta al video del hilo, leído de su carpeta (`queFalta`, etapas.ts); nada si no es de un estilo. */
+    private faltaDe: (meta: SessionMeta) => string[] = () => []
   ) {
     mkdirSync(dir, { recursive: true })
     for (const file of readdirSync(dir).filter((f) => f.endsWith('.json'))) {
@@ -435,8 +451,12 @@ export class Sessions {
    * agente suele cerrar su turno con «todo listo» mientras algo sigue, y sin esto había que preguntarle si ya acabó. Espera
    * `CALMA`: al terminar una tarea, Claude Code abre él solo un turno para leerla, y eso no es quedarse quieto. Solo con el
    * proceso del agente vivo: si se cerró o se reinició Sloth, lo de fondo se cortó, no terminó.
+   *
+   * Codex y OpenCode no abren ese turno: un video de Codex cerraba el suyo con sus subagentes trabajando y se quedaba
+   * parado cuando acababan (29 de octubre). A ellos se les despierta para que sigan (`DESPERTARES`).
    */
   private avisarFondo(id: string, meta: SessionMeta, event: AgentEvent, habia: number) {
+    if (event.t === 'user') this.despertados.delete(id)
     if (event.t === 'turn_start' || (event.t === 'background' && event.tasks.length)) {
       clearTimeout(this.fondoVacio.get(id))
       this.fondoVacio.delete(id)
@@ -445,14 +465,66 @@ export class Sessions {
     clearTimeout(this.fondoVacio.get(id))
     const reloj = setTimeout(() => {
       this.fondoVacio.delete(id)
-      if (!meta.running && !meta.background?.length && this.metas.has(id)) {
-        this.emit(id, { t: 'info', text: 'Terminó lo que seguía en segundo plano: ya no queda nada trabajando en este hilo.' })
+      if (meta.running || meta.background?.length || !this.metas.has(id)) return
+      // Solo si su último turno acabó bien: uno que detuviste, o que falló, no se retoma solo.
+      const veces = this.despertados.get(id) ?? 0
+      if (proveedorDe(meta.model) !== 'claude' && meta.acaboBien && veces < DESPERTARES && this.runs.has(id)) {
+        this.despertados.set(id, veces + 1)
+        this.emit(id, { t: 'info', text: 'Terminó lo que seguía en segundo plano: Sloth le pide al agente que siga.' })
+        return this.turno(meta, 'Terminó lo que tenías en segundo plano (tus subagentes o comandos). Si lo que pidió el usuario aún no está acabado, sigue con lo que falta sin preguntar; si ya lo está, no hagas nada más.')
       }
+      this.emit(id, { t: 'info', text: 'Terminó lo que seguía en segundo plano: ya no queda nada trabajando en este hilo.' })
     }, CALMA)
     reloj.unref()
     this.fondoVacio.set(id, reloj)
   }
   private fondoVacio = new Map<string, ReturnType<typeof setTimeout>>()
+  /** Cuántas veces seguidas se despertó a cada hilo sin que le escribiera el usuario. */
+  private despertados = new Map<string, number>()
+
+  /**
+   * Un agente que cierra su turno con el video a medias se queda parado hasta que le escribes: un video de Codex, con el
+   * borrador sin pasar la comprobación de movimiento, dijo «el video aún no está terminado» y acabó (29 de octubre).
+   * Pasados `CALMA`, si el turno acabó bien, trabajó (usó alguna herramienta), no acaba preguntándote algo, no deja nada
+   * en segundo plano (de eso se ocupa `avisarFondo`) y a la carpeta le falta algo que no tienes que dar tú (`faltaDe`),
+   * Sloth le pide que siga. Vale para todos los estilos, también los tuyos: lo que falta sale de las etapas de su card.
+   */
+  private sinAcabar(id: string, meta: SessionMeta, event: AgentEvent) {
+    if (event.t === 'turn_start' || event.t === 'user') {
+      clearTimeout(this.aMedias.get(id))
+      this.aMedias.delete(id)
+    }
+    if (event.t !== 'turn_end' || !event.ok || meta.background?.length || !this.runs.has(id)) return
+    const list = this.load(id)
+    const turno = list.slice(list.findLastIndex((e) => e.t === 'turn_start') + 1)
+    const suyas = turno.filter((e) => e.t === 'tool' && !e.parent)
+    if (!suyas.length || suyas.some((e) => e.t === 'tool' && PREGUNTAS.test(e.name)) || /\?[\s*_`)"»]*$/.test(ultimoTexto(turno))) return
+    clearTimeout(this.aMedias.get(id))
+    const reloj = setTimeout(() => {
+      this.aMedias.delete(id)
+      if (meta.running || meta.background?.length || !meta.acaboBien || !this.metas.has(id) || !this.runs.has(id)) return
+      let falta: string[]
+      try {
+        falta = this.faltaDe(meta)
+      } catch (error) {
+        return console.error(`No se pudo leer qué le falta a ${id}: ${error instanceof Error ? error.message : error}`)
+      }
+      if (!falta.length) return
+      const veces = this.despertados.get(id) ?? 0
+      if (veces >= DESPERTARES) {
+        return this.emit(id, { t: 'info', text: `El video sigue sin acabar (falta: ${falta.join(', ')}) y Sloth ya le pidió ${veces} veces seguidas que siguiera. Dile tú cómo seguir.` })
+      }
+      this.despertados.set(id, veces + 1)
+      this.emit(id, { t: 'info', text: `El agente cerró su turno con el video sin acabar (falta: ${falta.join(', ')}): Sloth le pide que siga.` })
+      this.turno(
+        meta,
+        `Cerraste tu turno, pero el video aún no está terminado: en su carpeta falta ${falta.join(', ')}. Sigue sin preguntar hasta terminarlo. Si una comprobación falla, arregla lo que dice y vuelve a probar; no cierres el turno con un borrador. Para solo si necesitas algo que únicamente puede darte el usuario, y entonces pídeselo con una pregunta.`
+      )
+    }, CALMA)
+    reloj.unref()
+    this.aMedias.set(id, reloj)
+  }
+  private aMedias = new Map<string, ReturnType<typeof setTimeout>>()
 
   /**
    * Cuenta el rato quieto de un video del lote. Cualquier cosa que haga anula el reloj, y se vuelve a armar cuando acaba
@@ -548,6 +620,7 @@ export class Sessions {
     // Nadie mira un video del lote mientras trabaja: si su turno acaba bien, su proceso se cierra en cuanto queda quieto.
     if (meta.lote) this.ocioso(id, meta, event)
     this.avisarFondo(id, meta, event, habia)
+    this.sinAcabar(id, meta, event)
     // Un agente que deja de trabajar libera sitio.
     if (event.t === 'turn_end' || event.t === 'background') setTimeout(() => this.repartir())
   }

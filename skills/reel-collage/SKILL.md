@@ -41,7 +41,9 @@ La evidencia (once reels de referencia, transcritos y mirados cuadro a cuadro) e
 
 ## Lo que el usuario pidió y no se negocia
 
-- **Lo haces solo, de punta a punta.** La voz es TTS (`scripts/voz.py`), la que eligió el usuario; el personaje sale de
+- **Lo haces solo, de punta a punta.** La voz es TTS (`scripts/voz.py`), la que eligió el usuario: la de
+  `personaje/POSES.md` o, si el mensaje trae `Voz:` con una voz de AI Studio, esa (ponla en `"studio"` de
+  `guion.json`; ver [`VOZ.md`](../video-base/VOZ.md)). El personaje sale de
   su biblioteca de poses (`personaje/POSES.md`). Al usuario solo se le piden las poses que falten y, en cada reel, su
   imagen de fondo. La primera vez, antes de nada, "El personaje" (abajo).
 - **Lo real se ve con su material original**: el clip de la situación, el logo, el producto. Las criaturas, la utilería y

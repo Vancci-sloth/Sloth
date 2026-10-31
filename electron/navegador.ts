@@ -8,7 +8,8 @@
  * agente las usa aunque no se vean. Una que nadie ve ni usa en `OCIOSA` se cierra; al volver a verla, se abre en su
  * última dirección. Todas comparten un perfil aparte del de la interfaz (`persist:navegador`): lo que inicies en una lo
  * tiene el agente en todas. La de las redes (`NAVEGADOR_REDES`), donde Sloth publica en TikTok, va con el suyo
- * (`persist:redes`): la sesión con la que publicas no la tiene ningún agente.
+ * (`persist:redes`): la sesión con la que publicas no la tiene ningún agente. La de la voz (`NAVEGADOR_VOZ`), donde Sloth
+ * genera las voces en AI Studio con tu cuenta de Google (`server/voz/`), también (`persist:voz`).
  *
  * El relevo escucha en 127.0.0.1, con un secreto en la ruta, y anota dónde en `data/navegador-integrado.json` (con el
  * pid de este proceso, para que el servidor sepa si sigue vivo). La próxima vez repite puerto y secreto: el agente de un
@@ -23,10 +24,13 @@ import { app, ipcMain, session, shell, WebContentsView, type BrowserWindow, type
 import { WebSocketServer, type WebSocket } from 'ws'
 import { guardar } from '../server/disco.ts'
 import { crearRelevo, type Relevo } from './relevo.ts'
-import { type AccionNavegador, type EstadoNavegador, NAVEGADOR_REDES } from '../shared/types.ts'
+import { type AccionNavegador, type EstadoNavegador, NAVEGADOR_REDES, NAVEGADOR_VOZ } from '../shared/types.ts'
 
 const PARTICION = 'persist:navegador'
 const PARTICION_REDES = 'persist:redes'
+const PARTICION_VOZ = 'persist:voz'
+/** Las páginas con su propio perfil: el de las demás lo comparten los agentes. */
+const PERFILES: Record<string, string> = { [NAVEGADOR_REDES]: PARTICION_REDES, [NAVEGADOR_VOZ]: PARTICION_VOZ }
 /** Lo que espera una página que nadie ve ni usa antes de cerrarse. */
 const OCIOSA = 20 * 60_000
 /** --bg de web/src/styles.css: lo que se ve mientras la página pinta. */
@@ -66,7 +70,7 @@ let medida = { width: 1280, height: 800 }
 
 /** Pone el navegador: lo que pide la interfaz, el perfil de las páginas y el relevo para el agente. */
 export function iniciarNavegador(appDir: string) {
-  for (const p of [PARTICION, PARTICION_REDES]) prepararPerfil(session.fromPartition(p))
+  for (const p of [PARTICION, PARTICION_REDES, PARTICION_VOZ]) prepararPerfil(session.fromPartition(p))
 
   ipcMain.on('navegador:ver', (_e, hilo: string | null, caja?: Caja) => ver(hilo, caja))
   ipcMain.on('navegador:ir', (_e, hilo: string, url: string) => {
@@ -92,10 +96,13 @@ function prepararPerfil(perfil: Session) {
   const permitidos = new Set(['clipboard-sanitized-write', 'fullscreen'])
   perfil.setPermissionRequestHandler((_wc, permiso, responder) => responder(permitidos.has(permiso)))
   perfil.setPermissionCheckHandler((_wc, permiso) => permitidos.has(permiso))
-  // Lo que pidió bajar el agente va a la carpeta que dijo; lo tuyo, donde elijas.
+  // Lo que pidió bajar el agente va a la carpeta que dijo, con el nombre que espera Playwright (el `guid` de CDP); lo
+  // tuyo, donde elijas. Lo que baja un marco de otro proceso (el WAV de AI Studio, de un `blob:null`) no avisa por CDP:
+  // va con su nombre.
   perfil.on('will-download', (_e, item, wc) => {
     const h = [...hojas.values()].find((x) => x.vista.webContents === wc)
-    if (h?.descargas && h.guid) item.setSavePath(join(h.descargas, h.guid))
+    if (h?.descargas) item.setSavePath(join(h.descargas, h.guid ?? `${Date.now()}-${item.getFilename().replace(/[^\w.-]+/g, '-')}`))
+    if (h) h.guid = null
   })
 }
 
@@ -113,14 +120,14 @@ export function ventanaDelNavegador(v: BrowserWindow) {
 
 /** Una página nueva para un hilo, en blanco y escondida. */
 function abrir(hilo: string): Hoja {
-  const partition = hilo === NAVEGADOR_REDES ? PARTICION_REDES : PARTICION
+  const partition = PERFILES[hilo] ?? PARTICION
   const v = new WebContentsView({ webPreferences: { partition, sandbox: true, backgroundThrottling: false } })
   v.setBackgroundColor(FONDO)
   v.setVisible(false)
   v.setBounds({ x: 0, y: 0, ...medida })
   const wc = v.webContents
-  // La de las redes publica escondida: el video que sube no suena.
-  if (hilo === NAVEGADOR_REDES) wc.setAudioMuted(true)
+  // La de las redes publica escondida: el video que sube no suena. La de la voz tampoco suena al generar.
+  if (PERFILES[hilo]) wc.setAudioMuted(true)
   // Lista en cuanto navega por primera vez (ya tiene proceso), aunque lo que carga tarde.
   const lista = new Promise<void>((r) => {
     wc.once('did-navigate', () => r())
@@ -279,8 +286,8 @@ function relevar(archivo: string) {
     else console.error('El navegador integrado no puede escuchar al agente:', e.message)
   })
   http.listen(puerto, '127.0.0.1', () => {
-    // `redes`: tiene la página de las redes, con su perfil y sus cookies (una ventana de antes no).
-    guardar(archivo, JSON.stringify({ puerto: (http.address() as AddressInfo).port, secreto, pid: process.pid, redes: true }))
+    // `redes` y `voz`: tiene esas páginas, cada una con su perfil y sus cookies (una ventana de antes no).
+    guardar(archivo, JSON.stringify({ puerto: (http.address() as AddressInfo).port, secreto, pid: process.pid, redes: true, voz: true }))
   })
 }
 

@@ -58,14 +58,14 @@ function cli(): string | null {
 }
 
 /**
- * La dirección del navegador integrado, si la ventana de Sloth que la anotó sigue abierta. `redes`: tiene la página de
- * las redes (`server/redes/navegador.ts`).
+ * La dirección del navegador integrado, si la ventana de Sloth que la anotó sigue abierta. `redes` y `voz`: tiene la
+ * página de las redes (`server/redes/navegador.ts`) o la de la voz (`server/voz/`), con su propio perfil.
  */
-export function integrado(): { puerto: number; secreto: string; redes: boolean } | null {
+export function integrado(): { puerto: number; secreto: string; redes: boolean; voz: boolean } | null {
   try {
-    const { puerto, secreto, pid, redes } = JSON.parse(readFileSync(INTEGRADO, 'utf8'))
+    const { puerto, secreto, pid, redes, voz } = JSON.parse(readFileSync(INTEGRADO, 'utf8'))
     process.kill(pid, 0)
-    return typeof puerto === 'number' && typeof secreto === 'string' ? { puerto, secreto, redes: redes === true } : null
+    return typeof puerto === 'number' && typeof secreto === 'string' ? { puerto, secreto, redes: redes === true, voz: voz === true } : null
   } catch {
     // No hay archivo, o la ventana que lo anotó ya se cerró.
     return null
