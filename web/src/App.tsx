@@ -1,6 +1,6 @@
 import { memo, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { CANAL_CARD, IDEAS_CARD } from '../../shared/ideas' // ideas
-import type { AvanceCorto, Card, Model, Previa, Serie, ServerPush, SessionMeta, VideoHecho } from '../../shared/types'
+import type { AvanceCorto, AvisoComunidad, Card, Model, Previa, Serie, ServerPush, SessionMeta, VideoHecho } from '../../shared/types'
 import { NOMBRE_AGENTE, proveedorDe } from '../../shared/providers'
 import { AvisoVideos } from './AvisoVideos'
 import { VENTA } from '../../shared/venta'
@@ -9,7 +9,7 @@ import { CuentaClaude, Opciones, Requisitos, useSinClaude } from './Opciones'
 import { api } from './api'
 import { eventos, useFallo, useResumen } from './eventos'
 import { useDesplazando } from './desplazando'
-import { useAvisos } from './avisos'
+import { avisarAnuncio, useAvisos } from './avisos'
 import { TituloDeFila, useBarraPlegada, vistaDeLote, vistaDeVideo, type Plegado, type Vista } from './Barra'
 import { Composer, Icon, Picker, type Choice, type Draft } from './Composer'
 import { LINK, pedirMejora, threadIcons, threadRef } from './etiquetas'
@@ -25,7 +25,7 @@ import { CON_CHATGPT, conOpenCode, elegirModelos, lineaSubagentes, Modelos, type
 import { AvisoEquipo } from './Equipo' // tu equipo
 import { MisVideos, Rejilla, VideoDe } from './MisVideos'
 import { Modelos3D } from './Modelos3D' // modelos 3D
-import { Comunidad } from './Comunidad' // comunidad
+import { abrirPublicacion, Comunidad } from './Comunidad' // comunidad
 import { PedirMejora } from './PedirMejora' // comunidad
 import { Icono } from './Iconos'
 import { Bienvenida } from './Bienvenida'
@@ -338,11 +338,25 @@ export function App() {
   // se filtra: no se ve qué se busca.
   const [busca, setBusca] = useState('')
   const campoBusca = useRef<HTMLInputElement>(null)
-  // comunidad: tus avisos sin leer, junto a «Comunidad». Se piden cada 2 minutos mientras se ve Sloth, y al leerlos.
+  // comunidad: tus avisos sin leer, junto a «Comunidad». Se piden cada 2 minutos mientras se ve Sloth, cada 10 con la
+  // ventana oculta (un anuncio avisa aunque no la estés mirando), y al leerlos. Si subieron, se mira si hay un anuncio.
   const [avisosComunidad, setAvisosComunidad] = useState(0)
   useEffect(() => {
-    const pedir = () => document.visibilityState === 'visible' && void api<{ sinLeer: number }>('/api/comunidad/avisos?cuenta').then((r) => setAvisosComunidad(r.sinLeer), () => {})
-    pedir()
+    let sabidos = 0
+    let pedida = 0
+    const pedir = async () => {
+      if (document.visibilityState !== 'visible' && Date.now() - pedida < 600_000) return
+      pedida = Date.now()
+      try {
+        const { sinLeer } = await api<{ sinLeer: number }>('/api/comunidad/avisos?cuenta')
+        setAvisosComunidad(sinLeer)
+        if (sinLeer > sabidos) avisarAnuncio((await api<{ avisos: AvisoComunidad[] }>('/api/comunidad/avisos')).avisos, abrirPublicacion)
+        sabidos = sinLeer
+      } catch {
+        // Sin conexión o sin cuenta: se vuelve a pedir.
+      }
+    }
+    void pedir()
     const t = setInterval(pedir, 120_000)
     addEventListener('sloth-comunidad-avisos', pedir)
     return () => (clearInterval(t), removeEventListener('sloth-comunidad-avisos', pedir))

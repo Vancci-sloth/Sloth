@@ -1034,8 +1034,8 @@ function Avisos() {
           <Icono de="campana" />
         </span>
         <div className="fila-nombre">
-          <strong>Cuando un hilo termina</strong>
-          <span>Te avisa si estás en otra cosa; la notificación abre el hilo.</span>
+          <strong>Cuando un hilo termina o hay un anuncio</strong>
+          <span>Te avisa si estás en otra cosa; la notificación abre el hilo o el anuncio.</span>
         </div>
         {permiso === 'denied' && <span className="estado falta">Bloqueadas en Edge</span>}
         <Interruptor on={activas} disabled={permiso === 'sin-api'} onCambiar={cambiar} etiqueta="Notificación" />

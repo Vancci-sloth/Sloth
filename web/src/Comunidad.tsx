@@ -23,7 +23,8 @@ import './Comunidad.css'
  * Los comentarios llevan imágenes, como el chat (se pegan, se sueltan o se eligen), se responden (un nivel) y se les da
  * me gusta. Lo de los demás se reporta, y lo reportado por 3 deja de
  * verse hasta que el creador lo revise. La campana junta tus avisos: te comentaron, te respondieron, te dieron me gusta,
- * cambió tu mejora o hay un anuncio; los que no has leído salen también junto a «Comunidad», en la barra lateral.
+ * cambió tu mejora o hay un anuncio; los que no has leído salen también junto a «Comunidad», en la barra lateral. Un
+ * anuncio, además, llega como notificación (`avisarAnuncio`).
  */
 
 export const SECCIONES: { id: CategoriaComunidad; nombre: string; icono: NombreIcono; escribe: string }[] = [
