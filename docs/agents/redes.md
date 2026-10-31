@@ -37,7 +37,9 @@ están en la cabecera de `scripts/redes.ts`: `nube` (lo que espera en el Worker 
 
 - `data/redes/redes.json`: cada publicación, con su `estado` y su `error`.
 - `data/redes/fallos/*.png`: la captura de la página de TikTok en el momento del fallo. Cuando TikTok cambia su página,
-  se rompen los selectores de `server/redes/tiktok.ts` (en octubre fue el de fecha y hora): empieza por la captura.
+  se rompen los selectores de `server/redes/tiktok.ts`: empieza por la captura. TikTok alterna dos páginas de fecha y
+  hora, y `ponerHora` usa la que le toque: `ponerEnCampos` (`14:30` y `2026-10-30`) o `ponerEnMenus` (`13:00` y
+  `23 oct 2026`).
 - Con la ventana de Sloth abierta, TikTok va en la página `redes` del navegador integrado, con su perfil
   (`persist:redes`), sin otra ventana: «Conectar» en Opciones → Redes la enseña ahí para iniciar sesión. Sin la ventana,
   va en un Edge con el perfil `data/redes/perfil` y el puerto CDP 9334. Las dos sesiones son aparte: la de una no vale

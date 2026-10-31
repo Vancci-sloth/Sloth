@@ -1,4 +1,4 @@
-import type { Page } from 'playwright-core'
+import type { Locator, Page } from 'playwright-core'
 import { cerrar, elegirArchivo, pestana, SinSesion } from './navegador.ts'
 import type { ModuloRed } from './index.ts'
 
@@ -148,11 +148,22 @@ async function ponerHora(page: Page, cuando: string) {
   }
   if (!(await programacion.isChecked())) throw new Error('No pude marcar «Programación».')
 
-  // Desde el 22 de octubre de 2026, la fecha y la hora son dos menús: un calendario y dos ruedas (horas y minutos). Cada
-  // uno enseña lo elegido en `.Picker__value`: `23 oct 2026` y `13:00`.
+  // TikTok alterna dos páginas para lo mismo, sin aviso (el 30 de octubre de 2026 volvió la vieja a media tarde).
+  const menus = cont.getByRole('combobox', { name: 'Select date' })
+  const campos = cont.locator('input[readonly]')
+  await menus.or(campos).first().waitFor({ timeout: 15000 }).catch(() => {
+    throw new Error('No encontré la fecha ni la hora: TikTok cambió su página.')
+  })
+  await ((await menus.isVisible()) ? ponerEnMenus : ponerEnCampos)(page, cont, fecha, hh, mm)
+  const visible = await page.locator('[data-e2e=video_visibility_container]').innerText()
+  if (!visible.includes('Todo el mundo')) throw new Error('La visibilidad no es «Todo el mundo».')
+}
+
+/** La página del 22 de octubre de 2026: un calendario y dos ruedas, que enseñan lo elegido en `.Picker__value` (`23 oct 2026` y `13:00`). */
+async function ponerEnMenus(page: Page, cont: Locator, fecha: string, hh: string, mm: string) {
   const campoFecha = cont.getByRole('combobox', { name: 'Select date' })
   const campoHora = cont.getByRole('combobox', { name: 'Select time' })
-  const valor = async (campo: typeof campoFecha) => (await campo.locator('.Picker__value').innerText()).trim()
+  const valor = async (campo: Locator) => (await campo.locator('.Picker__value').innerText()).trim()
   const [anio, mes, dia] = fecha.split('-').map(Number)
   await campoFecha.click()
   const cal = page.getByRole('dialog').filter({ has: page.locator('.DatePicker__panel') })
@@ -175,8 +186,33 @@ async function ponerHora(page: Page, cuando: string) {
   }
   const puesto = `${await valor(campoFecha)} ${await valor(campoHora)}`
   if (puesto !== `${dia} ${MESES3[mes - 1]} ${anio} ${hh}:${mm}`) throw new Error(`La hora no quedó: ${puesto}.`)
-  const visible = await page.locator('[data-e2e=video_visibility_container]').innerText()
-  if (!visible.includes('Todo el mundo')) throw new Error('La visibilidad no es «Todo el mundo».')
+}
+
+/** La página de siempre: dos campos, la hora (`14:30`) y la fecha (`2026-10-30`), con un calendario y dos listas. */
+async function ponerEnCampos(page: Page, cont: Locator, fecha: string, hh: string, mm: string) {
+  const [campoHora, campoFecha] = [cont.locator('input[readonly]').nth(0), cont.locator('input[readonly]').nth(1)]
+  const [, mes, dia] = fecha.split('-').map(Number)
+  await campoFecha.click()
+  const cal = page.locator('.calendar-wrapper')
+  for (let i = 0; i < 2 && (await cal.locator('.month-title').innerText()).trim() !== MESES[mes - 1]; i++) await cal.locator('[class*=arrow]').last().click()
+  const boton = cal.locator('span.day.valid', { hasText: new RegExp(`^${dia}$`) })
+  if (!(await boton.count())) throw new Error(`TikTok todavía no deja programar para el ${fecha}.`)
+  await boton.click()
+  await page.waitForTimeout(500)
+
+  // La lista se anima: el campo cambia un momento después del clic.
+  for (let i = 0; i < 3 && (await campoHora.inputValue()) !== `${hh}:${mm}`; i++) {
+    await campoHora.click()
+    await page.waitForTimeout(500)
+    await page.locator('.tiktok-timepicker-left', { hasText: new RegExp(`^${hh}$`) }).click()
+    await page.waitForTimeout(800)
+    await page.locator('.tiktok-timepicker-right', { hasText: new RegExp(`^${mm}$`) }).click()
+    await page.waitForTimeout(800)
+    await page.mouse.click(400, 20) // cierra las listas: un clic en la franja vacía de arriba
+    await page.waitForTimeout(500)
+  }
+  const puesto = `${await campoFecha.inputValue()} ${await campoHora.inputValue()}`
+  if (puesto !== `${fecha} ${hh}:${mm}`) throw new Error(`La hora no quedó: ${puesto}.`)
 }
 
 /**
