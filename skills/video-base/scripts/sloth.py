@@ -50,43 +50,92 @@ def sloth(*args: str, **kw) -> subprocess.CompletedProcess:
     return subprocess.run([str(python_sloth()), *BANDERAS, *args], **kw)
 
 
+def _tomar(f) -> bool:
+    """El candado del sistema sobre `f`, sin esperar. False si lo tiene otro."""
+    try:
+        f.seek(0)
+        if sys.platform == "win32":
+            msvcrt.locking(f.fileno(), msvcrt.LK_NBLCK, 1)
+        else:
+            fcntl.flock(f.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        return True
+    except OSError:
+        return False
+
+
+def _soltar(f) -> None:
+    f.seek(0)
+    if sys.platform == "win32":
+        msvcrt.locking(f.fileno(), msvcrt.LK_UNLCK, 1)
+    else:
+        fcntl.flock(f.fileno(), fcntl.LOCK_UN)
+
+
+class _Fila:
+    """
+    Quién sigue en un turno: el de menor `prioridad` y, entre iguales, el que llegó antes. Sin ella ganaba el primero en
+    mirar, y una voz que llegó a las 14:55 pasó por delante de otra de las 14:49 (ADR 0011). Cada uno que espera es un
+    archivo en %TEMP%/sloth-<nombre>.fila con su candado puesto: si su proceso muere, el siguiente lo ve suelto y lo quita.
+    """
+
+    def __init__(self, nombre: str, prioridad: int):
+        carpeta = Path(tempfile.gettempdir()) / f"sloth-{nombre}.fila"
+        carpeta.mkdir(exist_ok=True)
+        self.ruta = carpeta / f"{prioridad}-{time.time_ns()}-{os.getpid()}"
+        self.f = open(self.ruta, "a+b")
+        while not _tomar(self.f):  # otro lo está mirando en este instante
+            time.sleep(0.05)
+
+    def me_toca(self) -> bool:
+        for otro in sorted(self.ruta.parent.iterdir(), key=lambda r: r.name):
+            if otro.name >= self.ruta.name:
+                return True
+            try:
+                with open(otro, "r+b") as f:
+                    if not _tomar(f):
+                        return False
+                    _soltar(f)
+                otro.unlink()
+            except OSError:  # se fue mientras se miraba
+                continue
+        return True
+
+    def salir(self) -> None:
+        self.f.close()
+        self.ruta.unlink(missing_ok=True)
+
+
 @contextmanager
-def turno(nombre: str, espera: str):
+def turno(nombre: str, espera: str, prioridad: int | None = None):
     """
     Uno a la vez en toda la máquina: los procesos de un lote, que empiezan juntos, pasan de uno en uno. El candado es
-    del sistema (%TEMP%/sloth-<nombre>.lock): si el proceso muere, se suelta solo.
+    del sistema (%TEMP%/sloth-<nombre>.lock): si el proceso muere, se suelta solo. Con `prioridad`, se pasa en orden (`_Fila`).
     """
+    fila = _Fila(nombre, prioridad) if prioridad is not None else None
     with open(Path(tempfile.gettempdir()) / f"sloth-{nombre}.lock", "a+b") as f:
         avisado = False
-        while True:
-            try:
-                f.seek(0)
-                if sys.platform == "win32":
-                    msvcrt.locking(f.fileno(), msvcrt.LK_NBLCK, 1)
-                else:
-                    fcntl.flock(f.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
-                break
-            except OSError:
+        try:
+            while not ((fila is None or fila.me_toca()) and _tomar(f)):
                 if not avisado:
                     print(espera, flush=True)
                     avisado = True
                 time.sleep(3)
+        finally:
+            if fila:
+                fila.salir()
         try:
             yield
         finally:
-            f.seek(0)
-            if sys.platform == "win32":
-                msvcrt.locking(f.fileno(), msvcrt.LK_UNLCK, 1)
-            else:
-                fcntl.flock(f.fileno(), fcntl.LOCK_UN)
+            _soltar(f)
 
 
-def turno_gpu():
+def turno_gpu(voz: bool = False):
     """
     WhisperX ocupa unos 3 GB de los 6 de la GPU y el escritorio ya usa 1: dos a la vez no caben. Sin NVIDIA, WhisperX
-    transcribe en el procesador (`int8`) y usa todos sus núcleos: tampoco gana nada con dos a la vez.
+    transcribe en el procesador (`int8`) y usa todos sus núcleos: tampoco gana nada con dos a la vez. Con `voz`, la que
+    grabó el usuario, que tiene a su video esperando, pasa antes que el material de cualquier otro.
     """
-    return turno("gpu", "Esperando: otro vídeo está transcribiendo.")
+    return turno("gpu", "Esperando: otro vídeo está transcribiendo.", 0 if voz else 1)
 
 
 def turno_youtube():
@@ -283,6 +332,17 @@ def _con_voz_viva(nombre: str, archivos: list[str], opciones: dict, voz: float) 
     return r["ok"]
 
 
+def calentar_voz() -> None:
+    """
+    Deja Whisper cargado antes de que haga falta, con el turno de la GPU: lo lanza Sloth cuando un video empieza a
+    trabajar (`server/voz-viva.ts`). Sin NVIDIA no hace nada: Parakeet carga en 4 s.
+    """
+    if _whisper_en_gpu():
+        with turno_gpu():
+            if _pedir_voz({"ping": True}) is None:
+                _arrancar_voz()
+
+
 def proceso(nombre: str, archivos: list[str], opciones: dict) -> dict:
     """
     Corre un proceso de Sloth (python/procesos/<nombre>.py): JSON por stdin, JSON en la última línea de stdout. Con una
@@ -290,7 +350,7 @@ def proceso(nombre: str, archivos: list[str], opciones: dict) -> dict:
     """
     entrada = json.dumps({"files": archivos, "options": opciones})
     voz = _segundos(archivos) if nombre.startswith("transcribir") else 0
-    with turno_gpu():
+    with turno_gpu(voz=nombre == "transcribir.py"):
         if nombre in VOZ_PROCESOS and _whisper_en_gpu():
             r = _con_voz_viva(nombre, archivos, opciones, voz)
             if r is not None:
@@ -371,3 +431,7 @@ def transcribir(wav: Path) -> dict:
         return proceso("transcribir-ajeno.py", [str(v)], {"modelos": str(MODELOS)})
     finally:
         v.unlink(missing_ok=True)
+
+
+if __name__ == "__main__" and sys.argv[1:] == ["calentar-voz"]:
+    calentar_voz()

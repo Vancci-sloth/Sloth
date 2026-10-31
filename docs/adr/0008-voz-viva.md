@@ -43,3 +43,6 @@ siguientes; un video ajeno de esa duración, 15 s. Las palabras y sus tiempos sa
   eso Ideas la cierra.
 - Sin NVIDIA nada cambia: Parakeet carga en 4 s.
 - Los hilos todavía esperan en la fila uno detrás de otro, pero cada turno dura segundos y no minutos.
+
+El ADR 0011 lo amplía: con la memoria llena, la primera carga llegó a pasar de 15 min, y ahora se hace antes de que los
+agentes la llenen.

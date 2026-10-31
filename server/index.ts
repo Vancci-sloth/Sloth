@@ -36,6 +36,8 @@ import { espacio } from './espacio.ts' // espacio en disco
 import { equipo } from './equipo.ts' // tu equipo
 import { licencia } from './licencia.ts' // suscripción
 import { Sessions } from './sessions.ts'
+import { mantenerVoz } from './voz-viva.ts'
+import { avisoDeVideos } from '../shared/limites.ts'
 import { eventosEnVivo } from './eventos-en-vivo.ts'
 import { cambiosDeCard, carpetaSkill, configClaudeDev, duplicateCard, enlazarSkills, enlazarSkillsCodex, guardarSkillTuya, readCards, removeCard, seriesDe, SKILLS, skillRef, volverAOriginal } from './skills.ts'
 import { estaticos } from './estaticos.ts'
@@ -96,6 +98,9 @@ const sessions = new Sessions(
 
 /** Si el hilo es de un estilo de video: solo su estudio enseña lo que va escribiendo. */
 const conEtapas = (id: string) => !!cards().find((c) => c.id === sessions.meta(id)?.cardId)?.etapas?.length
+sessions.esVideo = (meta) => !!cards().find((c) => c.id === meta.cardId)?.etapas?.some((e) => e.fase)
+// Mientras un video trabaja, Whisper se queda cargado: el primero que empieza lo carga, antes de que sus agentes llenen la memoria.
+setInterval(() => { if (sessions.videosTrabajando()) void mantenerVoz(SKILLS) }, 60_000).unref()
 
 /**
  * Las cards de cards.json, más las tuyas (`CARDS_TUYAS`) si hay; una tuya sin `id` o con el de una de Sloth no cuenta.
@@ -282,6 +287,13 @@ function send(res: ServerResponse, status: number, data: unknown) {
   res.end(JSON.stringify(data))
 }
 
+/** Si arrancar `nuevos` videos pasa de los que van sin aviso y no lo han confirmado: lo contesta, y la interfaz pregunta. */
+function pideConfirmar(res: ServerResponse, confirmado: boolean | undefined, nuevos = 1): boolean {
+  const aviso = confirmado ? undefined : avisoDeVideos(sessions.videosTrabajando(), nuevos)
+  if (aviso) send(res, 409, { confirmar: true, error: aviso })
+  return !!aviso
+}
+
 async function api(req: IncomingMessage, res: ServerResponse, url: URL): Promise<boolean> {
   const path = url.pathname
   const method = req.method ?? 'GET'
@@ -441,9 +453,10 @@ async function api(req: IncomingMessage, res: ServerResponse, url: URL): Promise
   }
 
   if (path === '/api/sessions' && method === 'POST') {
-    const input = await body<{ cardId: string; model: string; effort?: string; text: string; images?: string[] }>(req)
+    const input = await body<{ cardId: string; model: string; effort?: string; text: string; images?: string[]; masDeDos?: boolean }>(req)
     const card = cards().find((c) => c.id === input.cardId)
     if (!card) return send(res, 404, { error: 'No existe esa card' }), true
+    if (card.etapas?.some((e) => e.fase) && pideConfirmar(res, input.masDeDos)) return true
     mkdirSync(card.cwd, { recursive: true })
     // Uno que sale de Ideas se llama como la idea (su línea `Título:`); los demás, como su primer mensaje, hasta que llegue
     // el título corto.
@@ -467,12 +480,13 @@ async function api(req: IncomingMessage, res: ServerResponse, url: URL): Promise
 
   // Un lote: un hilo por enlace, cada uno con su carpeta ya nombrada. Esperan su turno en `sessions`.
   if (path === '/api/lotes' && method === 'POST') {
-    const input = await body<{ cardId: string; model: string; effort?: string; text: string; enlaces: string[]; images?: string[] }>(req)
+    const input = await body<{ cardId: string; model: string; effort?: string; text: string; enlaces: string[]; images?: string[]; masDeDos?: boolean }>(req)
     const card = cards().find((c) => c.id === input.cardId)
     if (!card?.lote) return send(res, 404, { error: 'Esa card no hace lotes' }), true
     const n = input.enlaces.length
     if (n < 2) return send(res, 400, { error: 'Un lote lleva al menos dos enlaces' }), true
     // Todos los videos del lote copian a la misma carpeta, cada uno con el nombre de la suya.
+    if (pideConfirmar(res, input.masDeDos, n)) return true
     mkdirSync(card.cwd, { recursive: true })
     const videos = carpetasDeLote(card, n).map((carpeta, i) => ({
       carpeta,
@@ -492,6 +506,13 @@ async function api(req: IncomingMessage, res: ServerResponse, url: URL): Promise
     return true
   }
 
+  // «Haz otra versión» pone a trabajar otra vez un video que estaba quieto.
+  const otra = method === 'POST' && /^\/api\/sessions\/([\w-]+)\/version$/.exec(path)
+  if (otra) {
+    const meta = sessions.meta(otra[1])
+    const { masDeDos } = await body<{ masDeDos?: boolean }>(req)
+    if (meta && sessions.sumaVideo(meta) && pideConfirmar(res, masDeDos)) return true
+  }
   if (await etapasApi(req, res, url, sessions, cards(), broadcast, miniatura)) return true // panel de etapas
   if (await videosApi(req, res, url, sessions, cards(), publicar?.marcas, cuadro)) return true // panel de etapas; `publicar.marcas`, de redes
   if (publicar && (await publicar.api(req, res, url))) return true // redes
@@ -539,7 +560,9 @@ async function api(req: IncomingMessage, res: ServerResponse, url: URL): Promise
       }
     } else if (action === 'send') {
       // Con el agente trabajando, le llega ya, en mitad del turno; si no, abre uno.
-      const input = await body<{ text: string; images?: string[] }>(req)
+      const input = await body<{ text: string; images?: string[]; masDeDos?: boolean }>(req)
+      const meta = sessions.meta(id)
+      if (meta && sessions.sumaVideo(meta) && pideConfirmar(res, input.masDeDos)) return true
       try {
         sessions.steer(id, input.text, input.images)
         send(res, 200, { ok: true })
@@ -547,6 +570,9 @@ async function api(req: IncomingMessage, res: ServerResponse, url: URL): Promise
         send(res, 409, { error: error instanceof Error ? error.message : String(error) })
       }
     } else if (action === 'empezar') {
+      const input = await body<{ masDeDos?: boolean }>(req)
+      const meta = sessions.meta(id)
+      if (meta && sessions.sumaVideo(meta) && pideConfirmar(res, input.masDeDos)) return true
       sessions.empezarYa(id)
       send(res, 200, { ok: true })
     } else if (action === 'stop') {

@@ -1,8 +1,8 @@
 // Chrome sin interfaz, manejado por el protocolo de DevTools por tuberías, solo con Node. Sin puppeteer ni
 // playwright: no hay nada que instalar en la carpeta del vídeo.
 import { spawn } from 'node:child_process'
-import { existsSync, mkdtempSync, readdirSync, rmSync, statSync } from 'node:fs'
-import { homedir, tmpdir } from 'node:os'
+import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { cpus, freemem, homedir, tmpdir, totalmem } from 'node:os'
 import { join } from 'node:path'
 
 /** El más nuevo de `<raiz>/<version>/<sub>`, si hay alguno. */
@@ -100,12 +100,77 @@ export function banderasTarjeta(gpu, sistema = process.platform) {
 }
 
 /**
- * Abre un Chrome y una pestaña. Devuelve `{ enviar(metodo, params), alEvento(nombre, fn), capturar(formato, calidad), cerrar() }`.
+ * Cuántos de estos navegadores hay a la vez en toda la máquina, sumando los hilos (ADR 0011): uno por cada 5 GB. `procesos()`
+ * de El Diff mira solo su script: tres hilos abrían 12, y cada uno ocupa ~1 GB. Con 4 en 16 GB, los cuatro peores momentos
+ * de la prueba quedaron por debajo de 0,3 GB libres. Uno más no abre con menos de `LIBRE` libres, salvo que no haya ninguno.
+ * Tras `PACIENCIA` abre igual: un navegador de más es mejor que un agente colgado.
+ */
+export const NAVEGADORES = Math.max(1, Math.min(4, Math.floor(cpus().length / 3), Math.floor(totalmem() / 5e9)))
+const LIBRE = 1e9
+const PACIENCIA = 15 * 60 * 1000
+
+/** Si el dueño del sitio sigue vivo. El de un proceso muerto se borra: un sitio no se pierde porque se cortó un render. */
+function ocupado(ruta) {
+  let pid
+  try {
+    pid = Number(readFileSync(ruta, 'utf8'))
+    if (!pid) return true // recién tomado: aún no dice de quién es
+    process.kill(pid, 0)
+    return true
+  } catch (e) {
+    if (e.code === 'ENOENT') return false
+    if (e.code === 'EPERM') return true
+  }
+  rmSync(ruta, { force: true })
+  return false
+}
+
+/** Los sitios de este proceso: si acaba sin cerrar sus Chrome, se devuelven aquí. */
+const sitios = new Set()
+process.on('exit', () => {
+  for (const ruta of sitios) rmSync(ruta, { force: true })
+})
+
+/** Espera un sitio y devuelve con qué soltarlo. Cada sitio es un archivo con el pid de su dueño en %TEMP%. */
+export async function turnoNavegador({ carpeta = tmpdir(), tope = NAVEGADORES, memoria = freemem, paciencia = PACIENCIA, pausa = 2000 } = {}) {
+  const rutas = Array.from({ length: tope }, (_, i) => join(carpeta, `sloth-navegador-${i}.lock`))
+  for (const limite = Date.now() + paciencia; Date.now() < limite; await new Promise((r) => setTimeout(r, pausa))) {
+    const libres = rutas.filter((r) => !ocupado(r))
+    if (!libres.length || (libres.length < tope && memoria() < LIBRE)) continue
+    try {
+      writeFileSync(libres[0], String(process.pid), { flag: 'wx' })
+    } catch {
+      continue // otro lo tomó primero
+    }
+    sitios.add(libres[0])
+    return () => {
+      sitios.delete(libres[0])
+      rmSync(libres[0], { force: true })
+    }
+  }
+  return () => {}
+}
+
+/**
+ * Abre un Chrome y una pestaña, cuando haya sitio (`turnoNavegador`). Devuelve `{ enviar(metodo, params), alEvento(nombre, fn), capturar(formato, calidad), cerrar() }`.
  * `extra`: más banderas de arranque (las que solo necesita quien captura páginas de internet).
  * `gpu`: `true` dibuja con la tarjeta, `false` en la CPU y `'si-hay'` con la tarjeta si Chrome compone con ella; si no
  * puede (no hay tarjeta, o su controlador falla o Chrome no lo admite), vuelve a abrirlo en la CPU.
  */
-export async function abrirChrome({ ancho, alto, gpu = false, extra = [] } = {}) {
+export async function abrirChrome(opciones = {}) {
+  const soltar = await turnoNavegador()
+  try {
+    const chrome = await abrirUno(opciones)
+    const cerrar = chrome.cerrar
+    chrome.cerrar = () => cerrar().finally(soltar)
+    return chrome
+  } catch (e) {
+    soltar()
+    throw e
+  }
+}
+
+async function abrirUno({ ancho, alto, gpu = false, extra = [] } = {}) {
   const exe = buscarChrome()
   // El headless shell deja que quien lo maneja dé cada fotograma (HeadlessExperimental.beginFrame): dibuja y captura en
   // una pasada, sin esperar al vsync de Chrome (unos 50 ms por captura). Chrome normal no lo tiene: captura como siempre.
@@ -194,7 +259,7 @@ export async function abrirChrome({ ancho, alto, gpu = false, extra = [] } = {})
   await enviar('Runtime.enable')
   if (conTarjeta && !(await conTarjeta)) {
     await apagar()
-    return abrirChrome({ ancho, alto, gpu: false, extra })
+    return abrirUno({ ancho, alto, gpu: false, extra })
   }
   if (ancho && alto) await enviar('Emulation.setDeviceMetricsOverride', { width: ancho, height: alto, deviceScaleFactor: 1, mobile: false })
   let anterior = null

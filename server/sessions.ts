@@ -90,6 +90,8 @@ export class Sessions {
   private runs = new Map<string, AgentRun>()
   private compactarPendiente = new Set<string>()
   private compactando = new Set<string>()
+  /** Si el hilo hace un video: lo decide su card, que este módulo no conoce. */
+  esVideo: (meta: SessionMeta) => boolean = () => false
 
   constructor(
     private dir: string,
@@ -206,6 +208,16 @@ export class Sessions {
     }
     this.emit(id, { t: 'user', text, at: Date.now(), ...(images.length ? { images } : {}) })
     this.turno(meta, text, skill, images)
+  }
+
+  /** Cuántos videos tienen un agente trabajando, en su turno o en segundo plano. */
+  videosTrabajando(): number {
+    return [...this.metas.values()].filter((m) => (m.running || m.background?.length) && this.esVideo(m)).length
+  }
+
+  /** Si mandarle algo a este hilo pone a trabajar un video más: el que ya trabaja no suma, ni lo que no es video. */
+  sumaVideo(meta: SessionMeta): boolean {
+    return !meta.running && !meta.background?.length && this.esVideo(meta)
   }
 
   /**

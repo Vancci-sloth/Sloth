@@ -1,1 +1,1 @@
-La imagen que adjuntas entra al video desde el primer render: el agente ya sabe dónde está y su nombre no rompe las comillas.
+Sloth aguanta mejor varios videos a la vez: la voz ya no se queda atrás y te avisa antes de pasar de 2.

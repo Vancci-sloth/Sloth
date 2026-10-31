@@ -6,6 +6,14 @@ import { IMAGE_TYPES, Inbox, stringify, type AgentOptions, type AgentRun, type S
 import { herramientasIdeas } from './ideas/mcp.ts' // ideas
 import { navegadorAgente } from './navegador-agente.ts'
 import { programaClaude, rutaAgente } from './agentes.ts'
+import { sitiosDeAgente } from './tope-agentes.ts'
+
+/** Las herramientas que lanzan un subagente. */
+const AGENTE = 'Agent|Task'
+/** La que vuelve a poner a trabajar a un subagente que ya acabó. */
+const DESPIERTA = 'SendMessage'
+/** Lo más que un subagente espera su sitio, en segundos. Después arranca igual: un agente de más es mejor que uno colgado. */
+const ESPERA_AGENTE = 30 * 60
 
 /** Los modelos que conoce Claude Code, con lo que admite cada uno. Se pregunta una vez por arranque; si falla, en la siguiente. */
 let catalogo: Promise<ModelInfo[]> | null = null
@@ -64,6 +72,7 @@ Al pulsar una, te llega su texto como mensaje del usuario. No lo uses en pregunt
  */
 export function startClaude(opts: AgentOptions): AgentRun {
   const inbox = new Inbox<SDKUserMessage>()
+  const agentes = sitiosDeAgente()
   const run = query({
     prompt: inbox,
     options: {
@@ -81,13 +90,39 @@ export function startClaude(opts: AgentOptions): AgentRun {
       // El navegador del agente y, en un canal de Ideas, sus herramientas (`parecidos`; en uno vertical, también las de TikTok e
       // Instagram): se suman a los MCP del usuario.
       mcpServers: { ...navegadorAgente(opts.lote, opts.hilo), ...herramientasIdeas(opts.cwd) },
-      includePartialMessages: true
+      includePartialMessages: true,
+      // Un subagente espera su sitio en la máquina antes de arrancar (`TOPE_AGENTES`). El que lanza otro subagente ya tiene
+      // el suyo: si esperara, ninguno soltaría nada.
+      hooks: {
+        PreToolUse: [{
+          matcher: `${AGENTE}|${DESPIERTA}`,
+          timeout: ESPERA_AGENTE,
+          hooks: [async (entrada, id, { signal }) => {
+            if (id && !entrada.agent_id) await agentes.pedir(id, signal)
+            return {}
+          }]
+        }],
+        PostToolUse: [{
+          matcher: DESPIERTA,
+          hooks: [async (_, id) => {
+            if (id) agentes.siNoArranca(id)
+            return {}
+          }]
+        }],
+        PostToolUseFailure: [{
+          matcher: `${AGENTE}|${DESPIERTA}`,
+          hooks: [async (_, id) => {
+            if (id) agentes.soltar(id)
+            return {}
+          }]
+        }]
+      }
     }
   })
 
   // `max` es la ventana del modelo; se sabe la primera vez que se mide el contexto. `tareas`: los ids de lo que corre en
   // segundo plano, para pararlo. `detenido`: el turno lo cortaste tú, y su fin lo dice.
-  const state = { idle: true, max: 0, measure: () => {}, tareas: [] as string[], detenido: false }
+  const state = { idle: true, max: 0, measure: () => {}, tareas: [] as string[], detenido: false, agentes }
   // Todo evento sale por aquí, para que los trozos de texto viajen juntos y nada se les adelante.
   const emit = juntarTrozos(opts.onEvent)
   const read = reader({ ...opts, onEvent: emit }, state)
@@ -117,6 +152,7 @@ export function startClaude(opts: AgentOptions): AgentRun {
     if (turno) error ||= 'el proceso de Claude terminó a mitad del turno'
     if (turno) emit({ t: 'turn_end', at: Date.now(), ok: false, error, caida: true })
     else if (error) emit({ t: 'info', text: `El proceso de Claude se cerró (${error}). El siguiente mensaje lo vuelve a abrir.` })
+    agentes.cerrar()
     // Antes de vaciar el segundo plano: la sesión todavía sabe qué se cortó.
     opts.onExit?.(error ? { error, turno } : undefined)
     // Sin el proceso de Claude no queda nada corriendo en segundo plano.
@@ -274,7 +310,7 @@ export function heredocs(command: string): { path: string; text: string }[] {
 }
 
 /** Convierte los mensajes del SDK en eventos. El texto llega a trozos; las herramientas, completas en el mensaje. */
-export function reader(opts: AgentOptions, state: { idle: boolean; max: number; measure: () => void; tareas: string[]; detenido: boolean }) {
+export function reader(opts: AgentOptions, state: { idle: boolean; max: number; measure: () => void; tareas: string[]; detenido: boolean; agentes?: Pick<ReturnType<typeof sitiosDeAgente>, 'arranco' | 'soltar'> }) {
   const streamed = new Set<string>()
   // Los `Write` y `Bash` que el modelo está escribiendo, por bloque: su JSON a medias y cuándo salió el último borrador.
   const writing = new Map<string, { id: string; bash: boolean; json: string; sent: number }>()
@@ -327,6 +363,7 @@ export function reader(opts: AgentOptions, state: { idle: boolean; max: number; 
     if (m.type === 'system' && m.subtype === 'task_started') {
       if (m.task_type === 'local_agent' && m.tool_use_id) {
         subagentes.set(m.task_id, m.tool_use_id)
+        state.agentes?.arranco(m.tool_use_id)
         opts.onEvent({ t: 'subagent', id: m.tool_use_id, status: 'running', at: Date.now() })
       }
       return
@@ -334,7 +371,10 @@ export function reader(opts: AgentOptions, state: { idle: boolean; max: number; 
     if (m.type === 'system' && m.subtype === 'task_notification') {
       const id = subagentes.get(m.task_id)
       subagentes.delete(m.task_id)
-      if (id) opts.onEvent({ t: 'subagent', id, status: m.status, at: Date.now() })
+      if (id) {
+        state.agentes?.soltar(id)
+        opts.onEvent({ t: 'subagent', id, status: m.status, at: Date.now() })
+      }
       return
     }
 

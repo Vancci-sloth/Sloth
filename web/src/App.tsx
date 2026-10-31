@@ -2,6 +2,7 @@ import { memo, type ReactNode, useCallback, useEffect, useMemo, useRef, useState
 import { CANAL_CARD, IDEAS_CARD } from '../../shared/ideas' // ideas
 import type { AvanceCorto, Card, Model, Previa, Serie, ServerPush, SessionMeta, VideoHecho } from '../../shared/types'
 import { NOMBRE_AGENTE, proveedorDe } from '../../shared/providers'
+import { AvisoVideos } from './AvisoVideos'
 import { VENTA } from '../../shared/venta'
 import { Ideas, textoAHtml } from './Ideas' // ideas
 import { CuentaClaude, Opciones, Requisitos, useSinClaude } from './Opciones'
@@ -580,6 +581,7 @@ export function App() {
 
       <main className="main">
         <Bienvenida />
+        <AvisoVideos />
         {view.kind === 'opciones' && (
           <Opciones onDone={() => go({ kind: 'new' })} />
         )}
