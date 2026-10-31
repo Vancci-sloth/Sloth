@@ -1263,7 +1263,8 @@ export interface TrabajoVoz {
 
 /**
  * La página de un hilo en el navegador integrado (electron/navegador.ts). `url` vacía: aún no abrió nada. `agente`: el
- * agente la está usando. `error`: por qué no abrió la última dirección.
+ * agente la está usando. `error`: por qué no abrió la última dirección. `zoom`: el de la página, 1 sin zoom. `icono`: el
+ * de su sitio. Una pestaña más de un hilo es otra página, con `hilo` como `<hilo>~<n>` (`web/src/Navegador.tsx`).
  */
 export interface EstadoNavegador {
   hilo: string
@@ -1273,18 +1274,31 @@ export interface EstadoNavegador {
   atras: boolean
   adelante: boolean
   agente: boolean
+  zoom: number
+  icono?: string
   error?: string
 }
 
-export type AccionNavegador = 'atras' | 'adelante' | 'recargar' | 'parar' | 'fuera'
+/** El tamaño fijo de una página, en sus píxeles: se dibuja encogido si no cabe en su caja. */
+export interface PantallaNavegador {
+  ancho: number
+  alto: number
+}
+
+export type AccionNavegador = 'atras' | 'adelante' | 'recargar' | 'parar' | 'fuera' | 'acercar' | 'alejar' | 'zoomNormal' | 'menu' | 'cerrar'
 
 export interface PuenteNavegador {
-  /** Pone la página del hilo en `caja` (en píxeles de la interfaz), encima de todo; sin hilo, la esconde. */
-  ver(hilo: string | null, caja?: { x: number; y: number; width: number; height: number }): void
+  /**
+   * Pone la página del hilo en `caja` (en píxeles de la interfaz), encima de todo; sin hilo, la esconde. Con `pantalla`,
+   * la página mide eso y se encoge a la caja; sin ella, mide lo que la caja.
+   */
+  ver(hilo: string | null, caja?: { x: number; y: number; width: number; height: number }, pantalla?: PantallaNavegador | null): void
   ir(hilo: string, url: string): void
   hacer(hilo: string, accion: AccionNavegador): void
   /** Cada cambio de cualquier página. Devuelve con qué dejar de oír. */
   oir(cb: (e: EstadoNavegador) => void): () => void
+  /** Una página pide abrir una dirección en otra pestaña. Devuelve con qué dejar de oír. No está en una ventana de antes. */
+  oirPestana?(cb: (hilo: string, url: string) => void): () => void
   estados(): Promise<EstadoNavegador[]>
 }
 

@@ -2,7 +2,11 @@
  * El navegador integrado, como el de T3 Code: una página por hilo dentro de la ventana de Sloth, que la interfaz pone a
  * la derecha del chat (o en el centro del estudio) con el botón del globo (`web/src/Navegador.tsx`). La usan tú y el
  * agente a la vez: Playwright MCP (`server/navegador-agente.ts`) se conecta a la del hilo por el relevo CDP de aquí
- * (`relevo.ts`), y lo que abre se ve sin otra ventana.
+ * (`relevo.ts`), y lo que abre se ve sin otra ventana. Las pestañas de más son tuyas: páginas como cualquier otra, con
+ * `hilo` `<hilo>~<n>`, a las que el agente no entra.
+ *
+ * Una página puede tener un tamaño fijo (`PantallaNavegador`): la emula Chromium y se dibuja encogida a su caja. Como T3
+ * Code, pero T3 usa `<webview>` y lo encoge con CSS; aquí la vista es nativa y lo hace `enableDeviceEmulation`.
  *
  * Las páginas son de este proceso, no de la interfaz: siguen vivas si la interfaz se recarga o miras otro hilo, y el
  * agente las usa aunque no se vean. Una que nadie ve ni usa en `OCIOSA` se cierra; al volver a verla, se abre en su
@@ -20,11 +24,11 @@ import { mkdirSync, readFileSync } from 'node:fs'
 import { createServer } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { join } from 'node:path'
-import { app, ipcMain, session, shell, WebContentsView, type BrowserWindow, type Session } from 'electron'
+import { app, ipcMain, Menu, session, shell, WebContentsView, type BrowserWindow, type Session } from 'electron'
 import { WebSocketServer, type WebSocket } from 'ws'
 import { guardar } from '../server/disco.ts'
 import { crearRelevo, type Relevo } from './relevo.ts'
-import { type AccionNavegador, type EstadoNavegador, NAVEGADOR_REDES, NAVEGADOR_VOZ } from '../shared/types.ts'
+import { type AccionNavegador, type EstadoNavegador, NAVEGADOR_REDES, NAVEGADOR_VOZ, type PantallaNavegador } from '../shared/types.ts'
 
 const PARTICION = 'persist:navegador'
 const PARTICION_REDES = 'persist:redes'
@@ -35,6 +39,8 @@ const PERFILES: Record<string, string> = { [NAVEGADOR_REDES]: PARTICION_REDES, [
 const OCIOSA = 20 * 60_000
 /** --bg de web/src/styles.css: lo que se ve mientras la página pinta. */
 const FONDO = '#0f0e0c'
+/** Los escalones del zoom de una página. */
+const ZOOMS = [0.5, 0.67, 0.75, 0.9, 1, 1.1, 1.25, 1.5, 2]
 
 type Caja = { x: number; y: number; width: number; height: number }
 
@@ -45,8 +51,19 @@ interface Hoja {
   conexiones: Map<WebSocket, Relevo>
   /** La última vez que se vio o se usó. */
   usada: number
-  /** Por qué no abrió la última dirección. */
+  /** Por qué no abrió la última dirección, y cuál fue. */
   error?: string
+  fallida?: string
+  /** El icono de su sitio. */
+  icono?: string
+  /** Su zoom, que Chromium olvida al cambiar de sitio. */
+  zoom: number
+  /** Lo que se encoge: los clics del agente llegan en píxeles de la página. */
+  escala: number
+  /** La pantalla que tiene puesta, para no repetirla. */
+  emulada: string
+  /** Cuándo se cayó su proceso, para volver a abrirla sin insistir de más. */
+  caidas: number[]
   /** Lo que baja el agente: dónde, y el nombre que le puso Chromium a la descarga en curso. */
   descargas: string | null
   guid: string | null
@@ -60,8 +77,8 @@ const hojas = new Map<string, Hoja>()
 /** La última dirección de cada hilo, para volver a ella si su página se cerró por ociosa. */
 const ultimas = new Map<string, string>()
 let ventana: BrowserWindow | undefined
-/** El hilo que se ve y dónde. */
-let vista: { hilo: string; caja: Caja } | null = null
+/** El hilo que se ve, dónde y con qué tamaño fijo, si tiene. */
+let vista: { hilo: string; caja: Caja; pantalla: PantallaNavegador | null } | null = null
 /**
  * El tamaño de una página que no se ve: el del panel la última vez, en píxeles de la ventana. Sin tamaño mediría 0×0, y
  * el agente no podría pulsar nada en ella.
@@ -72,11 +89,10 @@ let medida = { width: 1280, height: 800 }
 export function iniciarNavegador(appDir: string) {
   for (const p of [PARTICION, PARTICION_REDES, PARTICION_VOZ]) prepararPerfil(session.fromPartition(p))
 
-  ipcMain.on('navegador:ver', (_e, hilo: string | null, caja?: Caja) => ver(hilo, caja))
+  ipcMain.on('navegador:ver', (_e, hilo: string | null, caja?: Caja, pantalla?: PantallaNavegador | null) => ver(hilo, caja, pantalla))
   ipcMain.on('navegador:ir', (_e, hilo: string, url: string) => {
     if (!/^https?:\/\//i.test(url)) return
-    const h = hojas.get(hilo) ?? abrir(hilo)
-    void h.vista.webContents.loadURL(url).catch(() => {}) // el error llega por did-fail-load
+    llevar(hojas.get(hilo) ?? abrir(hilo), url)
   })
   ipcMain.on('navegador:hacer', (_e, hilo: string, accion: AccionNavegador) => hacer(hilo, accion))
   ipcMain.handle('navegador:estados', () => [...hojas.values()].map(estado))
@@ -133,32 +149,74 @@ function abrir(hilo: string): Hoja {
     wc.once('did-navigate', () => r())
     wc.once('did-stop-loading', () => r())
   })
-  const h: Hoja = { hilo, vista: v, conexiones: new Map(), usada: Date.now(), descargas: null, guid: null, lista }
+  const h: Hoja = { hilo, vista: v, conexiones: new Map(), usada: Date.now(), zoom: 1, escala: 1, emulada: '', caidas: [], descargas: null, guid: null, lista }
   hojas.set(hilo, h)
   void wc.loadURL('about:blank')
-  // Una sola página por hilo: lo que abriría otra pestaña se abre en ella.
-  wc.setWindowOpenHandler(({ url }) => {
-    if (/^https?:\/\//i.test(url)) void wc.loadURL(url).catch(() => {})
+  wc.setWindowOpenHandler(({ url, disposition, postBody }) => {
+    // Una ventana en blanco se niega sin navegar: quien la pide (MSAL) tiene otro camino, y sobre la misma página lo perdería.
+    if (!/^https?:\/\//i.test(url)) return { action: 'deny' }
+    // Lo que usan las redes, la voz y el agente es una sola página: lo que abriría otra se abre en ella, o el agente lo
+    // perdería, y una pestaña ya no tendría el perfil de esa página.
+    if (!PERFILES[hilo] && !h.conexiones.size) {
+      // Los inicios de sesión con ventana (OAuth) necesitan que esta siga viva y conectada a la suya.
+      if (disposition === 'new-window')
+        return { action: 'allow', overrideBrowserWindowOptions: { parent: ventana, width: 520, height: 680, autoHideMenuBar: true, backgroundColor: FONDO } }
+      if (!postBody && (disposition === 'foreground-tab' || disposition === 'background-tab')) {
+        ventana?.webContents.send('navegador:pestana', hilo, url)
+        return { action: 'deny' }
+      }
+    }
+    void wc.loadURL(url).catch(() => {})
     return { action: 'deny' }
   })
   // El «¿Salir del sitio?» de una página: la ventana no lo enseña, y sin esto cancelaría cada navegación (la del agente,
   // la de las redes y la tuya). Se sale sin preguntar.
   wc.on('will-prevent-unload', (e) => e.preventDefault())
+  // Con el foco en la página, Ctrl+R es suyo: el menú de Sloth recargaría la interfaz.
+  wc.on('before-input-event', (e, t) => {
+    if (t.type !== 'keyDown' || !(t.control || t.meta) || t.alt || t.key.toLowerCase() !== 'r') return
+    e.preventDefault()
+    if (t.shift) wc.reloadIgnoringCache()
+    else wc.reload()
+  })
   wc.on('did-start-navigation', (d) => {
     if (!d.isMainFrame || d.isSameDocument) return
-    h.error = undefined
+    h.error = h.fallida = undefined
     avisar(h)
   })
   wc.on('did-fail-load', (_e, codigo, descripcion, url, principal) => {
     // -3 es una carga que otra cortó: no es un error.
     if (!principal || codigo === -3) return
     h.error = `${descripcion || `Error ${codigo}`} · ${url}`
+    h.fallida = url
     avisar(h)
   })
   wc.on('did-stop-loading', () => avisar(h))
-  wc.on('did-navigate', () => avisar(h))
+  wc.on('did-navigate', () => {
+    // Cambiar de sitio estrena proceso: sin esto perdería su tamaño y su zoom.
+    h.emulada = ''
+    if (h.zoom !== 1) wc.setZoomFactor(h.zoom)
+    h.icono = undefined
+    avisar(h)
+  })
   wc.on('did-navigate-in-page', () => avisar(h))
   wc.on('page-title-updated', () => avisar(h))
+  wc.on('page-favicon-updated', (_e, iconos) => {
+    h.icono = iconos[0]
+    avisar(h)
+  })
+  // Se cayó su proceso: se vuelve a abrir, cada vez más despacio. Si cae una y otra vez, se avisa y no se insiste.
+  wc.on('render-process-gone', (_e, d) => {
+    if (d.reason === 'clean-exit') return
+    h.caidas = [...h.caidas.filter((t) => Date.now() - t < 30_000), Date.now()]
+    h.emulada = ''
+    if (h.caidas.length <= 3) setTimeout(() => wc.isDestroyed() || wc.reload(), 250 * 2 ** h.caidas.length)
+    else {
+      h.error = `La página se cerró varias veces seguidas · ${wc.getURL()}`
+      h.fallida = wc.getURL()
+      avisar(h)
+    }
+  })
   wc.debugger.on('message', (_e, metodo, params, sesion) => {
     if (metodo === 'Browser.downloadWillBegin') h.guid = typeof params?.guid === 'string' ? params.guid : null
     for (const relevo of h.conexiones.values()) relevo.evento(metodo, params, sesion || undefined)
@@ -178,6 +236,15 @@ function abrir(hilo: string): Hoja {
   return h
 }
 
+/**
+ * Lleva una página a una dirección. Espera a que esté lista: en una recién nacida, su `about:blank` ganaba a esta carga y
+ * la página se quedaba en blanco. El error llega por did-fail-load.
+ */
+function llevar(h: Hoja, url: string) {
+  const wc = h.vista.webContents
+  void h.lista.then(() => (wc.isDestroyed() ? undefined : wc.loadURL(url))).catch(() => {})
+}
+
 /** Cierra la página de un hilo, que vuelve a su última dirección la próxima vez que se vea. */
 function cerrar(h: Hoja) {
   hojas.delete(h.hilo)
@@ -192,11 +259,13 @@ function estado(h: Hoja): EstadoNavegador {
   return {
     hilo: h.hilo,
     url: url === 'about:blank' ? '' : url,
-    titulo: wc.getTitle(),
+    titulo: url === 'about:blank' ? '' : wc.getTitle(),
     cargando: wc.isLoading(),
     atras: wc.navigationHistory.canGoBack(),
     adelante: wc.navigationHistory.canGoForward(),
     agente: h.conexiones.size > 0,
+    zoom: h.zoom,
+    ...(h.icono ? { icono: h.icono } : {}),
     ...(h.error ? { error: h.error } : {})
   }
 }
@@ -216,9 +285,9 @@ function avisar(h: Hoja) {
  * Lo que pide la interfaz: la página del hilo, en la caja del panel. Sin hilo (o con algo encima del panel, un modal),
  * ninguna. Si la página del hilo se cerró por ociosa, vuelve a abrirse en su última dirección.
  */
-function ver(hilo: string | null, caja?: Caja) {
+function ver(hilo: string | null, caja?: Caja, pantalla?: PantallaNavegador | null) {
   const antes = vista?.hilo
-  vista = hilo && caja && caja.width > 0 && caja.height > 0 ? { hilo, caja } : null
+  vista = hilo && caja && caja.width > 0 && caja.height > 0 ? { hilo, caja, pantalla: pantalla ?? null } : null
   if (antes && antes !== vista?.hilo) {
     const h = hojas.get(antes)
     if (h) colocar(h)
@@ -228,7 +297,7 @@ function ver(hilo: string | null, caja?: Caja) {
   const ultima = ultimas.get(vista.hilo)
   if (!h && ultima) {
     h = abrir(vista.hilo)
-    void h.vista.webContents.loadURL(ultima).catch(() => {})
+    llevar(h, ultima)
   }
   if (h) colocar(h)
 }
@@ -244,10 +313,26 @@ function colocar(h: Hoja) {
   const { x, y, width, height } = vista.caja
   medida = { width: Math.round(width * z), height: Math.round(height * z) }
   v.setBounds({ x: Math.round(x * z), y: Math.round(y * z), ...medida })
+  emular(h, vista.pantalla)
   // Encima de las demás páginas.
   ventana.contentView.addChildView(v)
   v.setVisible(true)
   h.usada = Date.now()
+}
+
+/** Le pone a la página su tamaño fijo, encogido a la medida de su caja; sin él, mide lo que su caja. */
+function emular(h: Hoja, pantalla: PantallaNavegador | null) {
+  const clave = pantalla ? `${pantalla.ancho}×${pantalla.alto}@${medida.width}` : ''
+  if (clave === h.emulada) return
+  h.emulada = clave
+  const wc = h.vista.webContents
+  if (!pantalla) {
+    h.escala = 1
+    return wc.disableDeviceEmulation()
+  }
+  h.escala = Math.min(1, medida.width / pantalla.ancho)
+  const tamano = { width: pantalla.ancho, height: pantalla.alto }
+  wc.enableDeviceEmulation({ screenPosition: 'desktop', screenSize: tamano, viewPosition: { x: 0, y: 0 }, deviceScaleFactor: 0, viewSize: tamano, scale: h.escala })
 }
 
 function hacer(hilo: string, accion: AccionNavegador) {
@@ -256,9 +341,26 @@ function hacer(hilo: string, accion: AccionNavegador) {
   const wc = h.vista.webContents
   if (accion === 'atras') wc.navigationHistory.goBack()
   if (accion === 'adelante') wc.navigationHistory.goForward()
-  if (accion === 'recargar') wc.reload()
+  if (accion === 'recargar') void (h.fallida ? wc.loadURL(h.fallida).catch(() => {}) : wc.reload())
   if (accion === 'parar') wc.stop()
   if (accion === 'fuera' && /^https?:\/\//i.test(wc.getURL())) void shell.openExternal(wc.getURL())
+  if (accion === 'acercar' || accion === 'alejar' || accion === 'zoomNormal') {
+    const paso = accion === 'acercar' ? ZOOMS.find((z) => z > h.zoom) : ZOOMS.findLast((z) => z < h.zoom)
+    h.zoom = accion === 'zoomNormal' ? 1 : (paso ?? h.zoom)
+    wc.setZoomFactor(h.zoom)
+    avisar(h)
+  }
+  // Un menú de la ventana, no de la interfaz: la página va encima de todo y taparía uno de HTML.
+  if (accion === 'menu')
+    Menu.buildFromTemplate([
+      { label: 'Recargar sin caché', click: () => wc.reloadIgnoringCache() },
+      { label: 'Herramientas de desarrollo', click: () => wc.openDevTools({ mode: 'detach' }) }
+    ]).popup(ventana ? { window: ventana } : {})
+  // La primera pestaña es la del hilo y no se cierra.
+  if (accion === 'cerrar' && hilo.includes('~')) {
+    ultimas.delete(hilo)
+    cerrar(h)
+  }
 }
 
 /**
@@ -314,8 +416,12 @@ async function conectar(ws: WebSocket, hilo: string) {
   const relevo = crearRelevo(
     {
       // Cerrar la página la deja en blanco: es la del hilo, y el panel la sigue enseñando.
-      enviar: (metodo, params, sesion) =>
-        metodo === 'Page.close' && !sesion ? wc.loadURL('about:blank').then(() => ({}), () => ({})) : wc.debugger.sendCommand(metodo, params, sesion),
+      enviar: (metodo, params, sesion) => {
+        if (metodo === 'Page.close' && !sesion) return wc.loadURL('about:blank').then(() => ({}), () => ({}))
+        // Con la página encogida, Chromium toma los clics en píxeles de la caja; el agente los manda en los de la página.
+        const clic = metodo === 'Input.dispatchMouseEvent' && h.escala !== 1
+        return wc.debugger.sendCommand(metodo, clic ? { ...params, x: Number(params.x) * h.escala, y: Number(params.y) * h.escala } : params, sesion)
+      },
       id: () => h.id!,
       url: () => wc.getURL(),
       titulo: () => wc.getTitle(),

@@ -68,7 +68,9 @@ Este es el mapa:
   siguen las skills (`skills/video-base/VOZ.md`). ADR 0011.
 - El navegador de cada hilo (`electron/navegador.ts`, el globo de `web/src/Navegador.tsx`): el Playwright MCP del agente
   (`server/navegador-agente.ts`) entra en él por CDP. Sin ventana, un Chrome con `data/navegador`; en lotes, uno limpio.
-  Sus capturas y los logs de consola quedan en `data/navegador-capturas/`.
+  Sus capturas y los logs de consola quedan en `data/navegador-capturas/`. Copia lo mejor del de T3 Code (`C:\dev\t3code`):
+  pestañas (el agente solo usa la primera), tamaños fijos (`navegador-medidas.ts`) y bordes que se arrastran. T3 usa
+  `<webview>` y Sloth una vista nativa: el tamaño fijo es `enableDeviceEmulation`, y por eso el relevo reescala los clics.
 - `server/ideas/` y `web/src/Ideas.tsx`: Ideas, qué video hacer: largo en YouTube o vertical en TikTok e Instagram
   (`formato: 'vertical'`), en `trabajo/ideas/<id>/`. Investigar mide cada video contra su canal (outlier: 3× o más),
   transcribe lo dicho (`transcribir.ts`) y agrupa temas con vectores locales (`vectores.ts`); en vertical busca con
