@@ -52,7 +52,7 @@ test('avisa del cobro cuando faltan 7 días o menos, una sola vez por cobro', ()
 })
 
 test('cada pago del año que vale suma un año desde que se aprobó, o desde que acaba lo pagado si se renueva antes', () => {
-  const f = { monto: 2990 }
+  const f = { monto: 2990, moneda: 'MXN' }
   const pago = (status: string, date_approved: string | null, transaction_amount = 2990, currency_id = 'MXN') => ({ status, date_approved, transaction_amount, currency_id })
   assert.deepEqual(leerPagos([pago('approved', '2026-10-28T10:00:00.000-06:00')], f), { estado: 'pagado', hasta: '2027-10-28T16:00:00.000Z' })
   // Renovado una semana antes de que se acabe: el año nuevo empieza cuando acaba el primero.
@@ -69,6 +69,10 @@ test('cada pago del año que vale suma un año desde que se aprobó, o desde que
   // Uno de menos o en otra moneda no cuenta.
   assert.equal(leerPagos([pago('approved', '2026-10-28T16:00:00Z', 299)], f).estado, 'pending')
   assert.equal(leerPagos([pago('approved', '2026-10-28T16:00:00Z', 2990, 'USD')], f).estado, 'pending')
+  // El año en dólares se paga en dólares: 150 USD valen, 150 pesos no.
+  const enDolares = { monto: 150, moneda: 'USD' }
+  assert.equal(leerPagos([pago('approved', '2026-10-30T16:00:00Z', 150, 'USD')], enDolares).estado, 'pagado')
+  assert.equal(leerPagos([pago('approved', '2026-10-30T16:00:00Z', 150, 'MXN')], enDolares).estado, 'pending')
 })
 
 test('una suscripción de PayPal se lee con los estados de Mercado Pago; solo activa dice su próximo cobro', () => {
@@ -92,10 +96,10 @@ test('un año pagado de una vez abre hasta su fin y avisa antes de que se acabe,
 })
 
 test('el precio es el mismo para todos; las 25 primeras personas que apoyan son fundadoras', () => {
-  const env = { FUNDADORES: 25, PRECIO_MENSUAL: 299, PRECIO_ANUAL: 2990 }
-  assert.deepEqual(tarifa({ fundadores: 0, apoyan: 0 }, env), { quedan: 25, mensual: 299, anual: 2990, apoyan: 0 })
-  assert.deepEqual(tarifa({ fundadores: 3, apoyan: 2 }, env), { quedan: 22, mensual: 299, anual: 2990, apoyan: 2 })
-  assert.deepEqual(tarifa({ fundadores: 25, apoyan: 80 }, env), { quedan: 0, mensual: 299, anual: 2990, apoyan: 80 })
+  const env = { FUNDADORES: 25, PRECIO_MENSUAL: 15, PRECIO_ANUAL: 150, MONEDA: 'USD' }
+  assert.deepEqual(tarifa({ fundadores: 0, apoyan: 0 }, env), { quedan: 25, mensual: 15, anual: 150, moneda: 'USD', apoyan: 0 })
+  assert.deepEqual(tarifa({ fundadores: 3, apoyan: 2 }, env), { quedan: 22, mensual: 15, anual: 150, moneda: 'USD', apoyan: 2 })
+  assert.deepEqual(tarifa({ fundadores: 25, apoyan: 80 }, env), { quedan: 0, mensual: 15, anual: 150, moneda: 'USD', apoyan: 80 })
   // Con la fecha de fundadores ya pasada, no queda ninguno.
   assert.equal(tarifa({ fundadores: 0, apoyan: 0 }, { ...env, FUNDADORES_HASTA: '2026-01-01T00:00:00Z' }).quedan, 0)
 })

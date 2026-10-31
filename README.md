@@ -136,7 +136,7 @@ El orden lo puede cambiar la comunidad: se vota dentro de Sloth, y el voto de un
 ## Apoya a Sloth
 
 Sloth es gratis y lo seguirá siendo. Si te sirve, puedes [apoyarla](https://sloth.vancci.org/#apoyar) desde
-$299 MXN al mes: con ese apoyo salen las metas del roadmap. Las primeras 25 personas que apoyan son **Fundadores**
+$15 USD al mes: con ese apoyo salen las metas del roadmap. Las primeras 25 personas que apoyan son **Fundadores**
 para siempre, con insignia en la comunidad, su nombre en los créditos de la página y voto doble.
 
 ## Aportar

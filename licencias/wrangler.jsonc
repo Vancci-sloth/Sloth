@@ -29,13 +29,14 @@
     "MP_MODO": "produccion",
     "ORIGEN": "https://api.sloth.vancci.org",
     // GRATIS: los lugares gratis de por vida que se dieron cuando Sloth se vendía (ya no se dan). El apoyo cuesta lo mismo
-    // para todos, en pesos e IVA incluido; las FUNDADORES primeras personas que apoyan (hasta FUNDADORES_HASTA si se pone,
-    // una fecha ISO) son fundadoras. Cada suscripción conserva su monto aunque estos cambien. Solo cuentan las pagadas de
-    // verdad (modo produccion), no las de prueba.
+    // para todos, en MONEDA e IVA incluido; las FUNDADORES primeras personas que apoyan (hasta FUNDADORES_HASTA si se pone,
+    // una fecha ISO) son fundadoras. Cada suscripción conserva su monto y su moneda aunque estos cambien. Solo cuentan las
+    // pagadas de verdad (modo produccion), no las de prueba.
     "GRATIS": 25,
     "FUNDADORES": 25,
-    "PRECIO_MENSUAL": 299,
-    "PRECIO_ANUAL": 2990,
+    "PRECIO_MENSUAL": 15,
+    "PRECIO_ANUAL": 150,
+    "MONEDA": "USD",
     // Los correos salen de un dominio verificado en Resend (con su RESEND_API_KEY como secreto) y se responden en soporte@vancci.org.
     "CORREO_DE": "Sloth <avisos@vancci.org>",
     "CORREO_RESPUESTA": "soporte@vancci.org"

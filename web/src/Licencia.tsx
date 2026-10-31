@@ -5,12 +5,12 @@ import { api } from './api'
 import { Confirm } from './Confirm'
 import './Licencia.css'
 
-const pesos = (n: number) => `$${n.toLocaleString('es-MX')}`
+const dinero = (n: number) => `$${n.toLocaleString('es-MX')}`
 const fecha = (iso?: string) => (iso ? new Date(iso).toLocaleDateString('es-MX', { day: 'numeric', month: 'long', year: 'numeric' }) : '')
 /** La página de Sloth: ahí se apoya, y tiene los términos y el aviso de privacidad. */
 const PAGINA = 'https://sloth.vancci.org'
 /** La versión de los términos que acepta quien crea su cuenta: la de `TERMINOS` en la página. */
-const TERMINOS = '2026-10-28'
+const TERMINOS = '2026-10-30'
 /** Cada cuántos inicios sale el recordatorio a quien no apoya. */
 const CADA = 10
 const INICIOS = 'sloth:inicios'
@@ -230,7 +230,7 @@ export function SuscripcionOpciones() {
           ? 'Tienes tu cuenta gratis de la comunidad'
           : 'Sloth es gratis: si te sirve, apóyala'
         : l.estado === 'authorized'
-          ? `${l.monto ? `${pesos(l.monto)} ${cada}` : 'Activo'}${l.pagadaHasta ? ` · próximo cobro el ${fecha(l.pagadaHasta)}` : ''}`
+          ? `${l.monto ? `${dinero(l.monto)} ${cada}` : 'Activo'}${l.pagadaHasta ? ` · próximo cobro el ${fecha(l.pagadaHasta)}` : ''}`
           : l.estado === 'pagado' && l.activa
             ? `Pagado hasta el ${fecha(l.pagadaHasta)} · no se renueva solo`
             : l.activa

@@ -25,7 +25,7 @@
  *
  * El apoyo cuesta lo mismo para todos (`PRECIO_MENSUAL` o `PRECIO_ANUAL`). Las `FUNDADORES` primeras personas que apoyan
  * son fundadoras (`fundador`) para siempre: más beneficios que quien llega después. Cada suscripción conserva el monto
- * con que se creó.
+ * y la moneda con que se creó: las de antes del 30 de octubre de 2026 siguen en pesos; las nuevas, en `MONEDA`.
  * Cuando Sloth se vendía, las primeras personas se unieron gratis de por vida (plan `gratis`, `GRATIS` como mucho): son
  * fundadoras como las primeras que apoyan (`esFundador`), con lo nuevo `ANTICIPO` antes y sin el recordatorio. Ya no se
  * dan.
@@ -72,6 +72,8 @@ export interface Env {
   ORIGEN: string
   PRECIO_MENSUAL: number
   PRECIO_ANUAL: number
+  /** La moneda de esos precios, con su código de PayPal. */
+  MONEDA: string
   /** Los lugares gratis de por vida que se dieron cuando Sloth se vendía: ya no se dan. */
   GRATIS: number
   /** Las primeras personas que apoyan, fundadoras (hasta `FUNDADORES_HASTA` si se pone, una fecha ISO). */
@@ -98,6 +100,8 @@ export interface Fila {
   email: string
   plan: Plan
   monto: number
+  /** La moneda de `monto`, con su código de PayPal: la de `MONEDA` al crearse. */
+  moneda: string
   fundador: number
   preapproval: string | null
   enlace: string | null
@@ -139,7 +143,7 @@ export interface Cuenta {
   apoyan: number
 }
 
-type Tarifas = Pick<Env, 'FUNDADORES' | 'FUNDADORES_HASTA' | 'PRECIO_MENSUAL' | 'PRECIO_ANUAL'>
+type Tarifas = Pick<Env, 'FUNDADORES' | 'FUNDADORES_HASTA' | 'PRECIO_MENSUAL' | 'PRECIO_ANUAL' | 'MONEDA'>
 
 interface Preapproval {
   id: string
@@ -537,6 +541,7 @@ export function tarifa(c: Cuenta, env: Tarifas, ahora = Date.now()) {
     quedan: abierto ? Math.max(0, Number(env.FUNDADORES) - c.fundadores) : 0,
     mensual: Number(env.PRECIO_MENSUAL),
     anual: Number(env.PRECIO_ANUAL),
+    moneda: env.MONEDA,
     apoyan: c.apoyan
   }
 }
@@ -560,11 +565,11 @@ async function suscribir(env: Env, c: Record<string, unknown>): Promise<Response
   // Con una ya pagada, otra cobraría dos veces; con un lugar gratis de por vida, no hace falta. Con una cuenta, sí se apoya.
   await sinOtra(env, email, true)
   const p = await precios(env)
-  // Un doble clic, o volver a abrir el pago: la misma suscripción pendiente de la última hora.
+  // Un doble clic, o volver a abrir el pago: la misma suscripción pendiente de la última hora, si sigue en la moneda de hoy.
   const previa = await env.DB.prepare(
-    "SELECT * FROM licencias WHERE email = ? AND plan = ? AND estado = 'pending' AND enlace IS NOT NULL AND (paypal IS NOT NULL OR orden IS NOT NULL) AND creada > ? ORDER BY creada DESC LIMIT 1"
+    "SELECT * FROM licencias WHERE email = ? AND plan = ? AND moneda = ? AND estado = 'pending' AND enlace IS NOT NULL AND (paypal IS NOT NULL OR orden IS NOT NULL) AND creada > ? ORDER BY creada DESC LIMIT 1"
   )
-    .bind(email, plan, new Date(Date.now() - 3600_000).toISOString())
+    .bind(email, plan, p.moneda, new Date(Date.now() - 3600_000).toISOString())
     .first<Fila>()
   if (previa) {
     await env.DB.prepare('UPDATE licencias SET acepto = ?, terminos = ? WHERE id = ?').bind(acepto, terminos, previa.id).run()
@@ -577,6 +582,7 @@ async function suscribir(env: Env, c: Record<string, unknown>): Promise<Response
     email,
     plan,
     monto: plan === 'anual' ? p.anual : p.mensual,
+    moneda: p.moneda,
     fundador: p.quedan > 0 ? 1 : 0,
     preapproval: null,
     enlace: null,
@@ -595,8 +601,8 @@ async function suscribir(env: Env, c: Record<string, unknown>): Promise<Response
     paypal: null,
     orden: null
   }
-  await env.DB.prepare('INSERT INTO licencias (id, clave, email, plan, monto, fundador, estado, creada, acepto, terminos, modo) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
-    .bind(fila.id, fila.clave, email, plan, fila.monto, fila.fundador, fila.estado, fila.creada, acepto, terminos, fila.modo)
+  await env.DB.prepare('INSERT INTO licencias (id, clave, email, plan, monto, moneda, fundador, estado, creada, acepto, terminos, modo) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+    .bind(fila.id, fila.clave, email, plan, fila.monto, fila.moneda, fila.fundador, fila.estado, fila.creada, acepto, terminos, fila.modo)
     .run()
   // Dónde se paga y en qué columna queda: la orden del año o la suscripción mensual.
   let abierto: { columna: 'orden' | 'paypal'; id: string; enlace: string }
@@ -630,7 +636,7 @@ function enlacePaypal(links: { rel: string; href: string }[] | undefined, rel: s
 /** La suscripción mensual en PayPal, al plan de su monto. Lleva la fila en `custom_id`. */
 async function suscripcionPaypal(env: Env, f: Fila): Promise<{ id: string; enlace: string }> {
   const s = await paypal<SuscripcionPaypal>(env, 'POST', '/v1/billing/subscriptions', {
-    plan_id: await planPaypal(env, f.monto),
+    plan_id: await planPaypal(env, f.monto, f.moneda),
     custom_id: f.id,
     subscriber: { email_address: f.email },
     application_context: experiencia(env, f, 'SUBSCRIBE_NOW')
@@ -642,15 +648,15 @@ async function suscripcionPaypal(env: Env, f: Fila): Promise<{ id: string; enlac
 async function ordenPaypal(env: Env, f: Fila): Promise<{ id: string; enlace: string }> {
   const o = await paypal<OrdenPaypal>(env, 'POST', '/v2/checkout/orders', {
     intent: 'CAPTURE',
-    purchase_units: [{ custom_id: f.id, description: 'Sloth - plan anual', soft_descriptor: 'SLOTH', amount: { currency_code: 'MXN', value: f.monto.toFixed(2) } }],
+    purchase_units: [{ custom_id: f.id, description: 'Sloth - plan anual', soft_descriptor: 'SLOTH', amount: { currency_code: f.moneda, value: f.monto.toFixed(2) } }],
     payment_source: { paypal: { experience_context: experiencia(env, f, 'PAY_NOW') } }
   })
   return { id: o.id, enlace: enlacePaypal(o.links, 'payer-action') }
 }
 
-/** El plan mensual de PayPal de `monto`, que se crea la primera vez (y el producto «Sloth», también una vez). */
-async function planPaypal(env: Env, monto: number): Promise<string> {
-  const llave = `${env.PAYPAL_MODO}:mensual:${monto}`
+/** El plan mensual de PayPal de `monto` en `moneda`, que se crea la primera vez (y el producto «Sloth», también una vez). */
+async function planPaypal(env: Env, monto: number, moneda: string): Promise<string> {
+  const llave = `${env.PAYPAL_MODO}:mensual:${moneda}:${monto}`
   const plan = await idPaypal(env, llave)
   if (plan) return plan
   const deProducto = `${env.PAYPAL_MODO}:producto`
@@ -667,7 +673,7 @@ async function planPaypal(env: Env, monto: number): Promise<string> {
         tenure_type: 'REGULAR',
         sequence: 1,
         total_cycles: 0,
-        pricing_scheme: { fixed_price: { value: monto.toFixed(2), currency_code: 'MXN' } }
+        pricing_scheme: { fixed_price: { value: monto.toFixed(2), currency_code: moneda } }
       }
     ],
     // Un cobro que falla se reintenta; tras tres, PayPal la suspende (`paused`) y vale hasta lo pagado.
@@ -941,13 +947,13 @@ async function pagosMp(env: Env, f: Fila, avisado?: PagoMp): Promise<PagoMp[]> {
 }
 
 /**
- * Un año pagado de una vez, como lo guarda el cobro: cada pago que vale, en pesos y de su monto, suma un año desde que
- * se aprobó, o desde que acaba lo ya pagado si se renovó antes. Sin ninguno que valga: reembolsado o con contracargo,
+ * Un año pagado de una vez, como lo guarda el cobro: cada pago que vale, en su moneda y de su monto, suma un año desde
+ * que se aprobó, o desde que acaba lo ya pagado si se renovó antes. Sin ninguno que valga: reembolsado o con contracargo,
  * se acabó; si no, espera el pago.
  */
-export function leerPagos(pagos: Pick<PagoMp, 'status' | 'transaction_amount' | 'currency_id' | 'date_approved'>[], f: Pick<Fila, 'monto'>): Lectura {
+export function leerPagos(pagos: Pick<PagoMp, 'status' | 'transaction_amount' | 'currency_id' | 'date_approved'>[], f: Pick<Fila, 'monto' | 'moneda'>): Lectura {
   const aprobados = pagos
-    .filter((p) => VALEN.has(p.status) && p.currency_id === 'MXN' && p.transaction_amount >= f.monto && p.date_approved)
+    .filter((p) => VALEN.has(p.status) && p.currency_id === f.moneda && p.transaction_amount >= f.monto && p.date_approved)
     .map((p) => Date.parse(p.date_approved!))
     .sort((a, b) => a - b)
   let fin = 0
@@ -1172,12 +1178,12 @@ export async function avisarCobros(env: Env, ahora = Date.now()) {
       ? correo(env, f.email, `Tu año de Sloth se acaba el ${fecha(f.pagado_hasta!)}`, [
           'Hola:',
           `Tu año de apoyo a Sloth se acaba el ${fecha(f.pagado_hasta!)}. No se renueva solo: no te vamos a cobrar nada.`,
-          `Si quieres seguir apoyando, paga el año siguiente (${f.monto.toLocaleString('es-MX')} MXN, IVA incluido) con PayPal: ${env.ORIGEN}/renovar?s=${f.id}. Tu clave es la misma y el año nuevo empieza cuando se acabe este.`,
+          `Si quieres seguir apoyando, paga el año siguiente (${f.monto.toLocaleString('es-MX')} ${f.moneda}, IVA incluido) con PayPal: ${env.ORIGEN}/renovar?s=${f.id}. Tu clave es la misma y el año nuevo empieza cuando se acabe este.`,
           'También lo renuevas desde Sloth: Opciones, Apoyo, «Renovar». Si tienes dudas, responde a este correo.'
         ])
       : correo(env, f.email, `Tu próximo cobro de Sloth: ${fecha(f.pagado_hasta!)}`, [
           'Hola:',
-          `El ${fecha(f.pagado_hasta!)} ${pasarela(f)} te cobrará ${f.monto.toLocaleString('es-MX')} MXN (IVA incluido) por tu suscripción ${cada} a Sloth.`,
+          `El ${fecha(f.pagado_hasta!)} ${pasarela(f)} te cobrará ${f.monto.toLocaleString('es-MX')} ${f.moneda} (IVA incluido) por tu suscripción ${cada} a Sloth.`,
           'Si no quieres que se renueve, cancélala antes de esa fecha en Sloth: Opciones, Suscripción, «Cancelar suscripción». También puedes responder a este correo o escribirnos por WhatsApp. Lo ya pagado sigue valiendo hasta su fecha.'
         ])
     ).catch((e) => (console.error('Aviso de cobro', e instanceof Error ? e.message : e), false))

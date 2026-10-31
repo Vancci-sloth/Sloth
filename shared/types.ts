@@ -1170,7 +1170,7 @@ export interface Licencia {
   email?: string
   /** `mensual` o `anual`: un apoyo; `gratis`: uno de los lugares gratis de por vida (de cuando Sloth se vendía); `cuenta`: una cuenta gratis. */
   plan?: 'mensual' | 'anual' | 'gratis' | 'cuenta'
-  /** Lo que se cobra cada mes o cada año, en pesos. */
+  /** Lo que se cobra cada mes o cada año, en la moneda con que empezó el apoyo. */
   monto?: number
   /**
    * Con los nombres de Mercado Pago, también los de PayPal: `pending` (sin pagar), `authorized`, `paused` o `cancelled`;
