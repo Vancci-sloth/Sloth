@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { Model, ModelosConf, ModeloTarea } from '../../shared/types'
-import { proveedorDe } from '../../shared/providers'
+import { NOMBRE_AGENTE, proveedorDe, type Proveedor } from '../../shared/providers'
 import { gruposModelos, Picker, type Choice } from './Composer'
 import { Segmento } from './Segmento'
 
@@ -24,6 +24,11 @@ export function conOpenCode(models: Model[]): Avanzado | undefined {
   const gratis = models.filter((m) => proveedorDe(m.id) === 'opencode' && !m.precio)
   const m = gratis.find((x) => x.id === OPENCODE_PRIMERO) ?? gratis[0]
   return m && { principal: { model: m.id }, tareas: {} }
+}
+/** Con otro agente (Grok, Cursor…) y sin Claude, ChatGPT ni OpenCode: su primer modelo, con su esfuerzo de siempre. */
+export function conPrimero(models: Model[], p: Proveedor): Avanzado | undefined {
+  const m = models.find((x) => proveedorDe(x.id) === p)
+  return m && { principal: { model: m.id, effort: m.defaultEffort }, tareas: {} }
 }
 const SUBAGENTES = ['opus', 'sonnet', 'haiku']
 const ESFUERZOS = ['low', 'medium', 'high', 'xhigh']
@@ -66,7 +71,7 @@ export function Modelos(props: {
   choice?: Choice
   tareas: Tarea[]
   /** Sin cuenta de Claude, con qué va: «Optimizado», medido con Claude, no se puede elegir. */
-  sinClaude?: 'codex' | 'opencode' | false
+  sinClaude?: Proveedor | false
   onAvanzado(a: Avanzado | undefined): void
 }) {
   const [open, setOpen] = useState(false)
@@ -176,6 +181,8 @@ export function Modelos(props: {
               ? 'Con tu cuenta de ChatGPT, el hilo va en uno de sus modelos: GPT-6.1 Terra, si no eliges otro. «Optimizado» va con Claude: se puede elegir al conectar tu cuenta de Claude en Opciones.'
               : props.sinClaude === 'opencode'
               ? 'Con tu cuenta de OpenCode, el hilo va en uno de sus modelos gratis: Big Pickle, si no eliges otro. «Optimizado» va con Claude: se puede elegir al conectar tu cuenta de Claude en Opciones.'
+              : props.sinClaude
+              ? `Sin Claude, el hilo va con ${NOMBRE_AGENTE[props.sinClaude]}, en el modelo que elijas. «Optimizado» va con Claude: se puede elegir al conectar tu cuenta de Claude en Opciones.`
               : avanzado
                 ? 'Tus elecciones se quedan para esta card. «Optimizado» vuelve a lo medido o, si la skill no se ha medido, a lo último que elegiste.'
                 : tareas.length || principalMedido

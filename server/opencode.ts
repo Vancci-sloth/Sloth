@@ -7,7 +7,7 @@ import { OpenCode, type OpenCodeClient, type OpenCodeEvent } from '@opencode/cli
 import type { Model, Tokens } from '../shared/types.ts'
 import type { AgentOptions, AgentRun, SkillRef } from './agent.ts'
 import { asegurarAgente, rutaAgente } from './agentes.ts'
-import { OPCIONES } from './claude.ts'
+import { INSTRUCCIONES } from './instrucciones.ts'
 import { navegadorAgente } from './navegador-agente.ts'
 import { mcpVoz } from './voz/index.ts'
 import { SKILLS } from './skills.ts'
@@ -33,10 +33,6 @@ const DATOS = join(APP, 'data', 'opencode')
 const ZEN = ['opencode', 'opencode-go']
 /** La integración de la cuenta de OpenCode (su consola): la que se conecta en el navegador. */
 export const CONSOLA = 'opencode'
-
-/** Lo que Sloth le dice al agente, como a Codex (`developerInstructions`). */
-const INSTRUCCIONES = `${OPCIONES}
-La interfaz y tus respuestas van en español, también lo que dices mientras trabajas (en una prueba con Big Pickle, las notas de avance salían en inglés). Haz las preguntas en mensajes normales, sin herramientas de preguntas interactivas. Las skills de Sloth están en ${SKILLS}. La skill invocada es siempre la de esa carpeta: si ves otra con el mismo nombre, es una copia vieja y no se usa. Respeta la skill invocada y lee sus referencias cuando hagan falta.`
 
 /**
  * Sloth no pide permisos (como Claude con `bypassPermissions` y Codex con `approvalPolicy: never`). La pregunta interactiva

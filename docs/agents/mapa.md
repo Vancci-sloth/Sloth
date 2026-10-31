@@ -15,9 +15,16 @@ Este es el mapa:
   como el de T3 Code: un solo `opencode serve` para todos los hilos, con sus datos en `data/opencode`; cada hilo es una
   sesión en su carpeta, con las instrucciones de Sloth y su navegador (un MCP que solo él puede usar). Se prueba con un
   turno grabado (`opencode.grabacion.json`). ADR 0009 y 0010.
-- `server/agentes.ts`: el programa de Claude Code, Codex y OpenCode no viene en el instalador: se baja al elegir el agente
-  (bienvenida, Opciones o el primer mensaje de un hilo suyo, `conAgente`) a `%APPDATA%\sloth\piezas\agentes`. En el repo
-  ya está en node_modules. Un proveedor nuevo es una entrada más en `AGENTES`.
+- `server/agentes.ts`: el programa de cada agente no viene en el instalador: se baja al elegirlo (bienvenida, Opciones o
+  el primer mensaje de un hilo suyo, `conAgente`) a `%APPDATA%\sloth\piezas\agentes`. En el repo, Claude Code, Codex y
+  OpenCode ya están en node_modules. Un proveedor nuevo es una entrada más en `AGENTES` y en `PROVEEDORES`
+  (`shared/providers.ts`).
+- Los demás agentes, como en T3 Code (ADR 0012), cada uno con su cuenta y su catálogo en `server/proveedores.ts` y su fila
+  en Opciones (`CuentaAgente`): DeepSeek es Claude Code con la API de DeepSeek (`server/deepseek.ts`); Grok y
+  Antigravity hablan ACP (`server/acp.ts`, `grok.ts`, `antigravity.ts`; Antigravity, un proceso para todos sus hilos); Cursor corre su SDK en un puente aparte
+  (`cursor.ts`, `cursor-puente.mjs`); Muse Code, su MSP (`muse.ts`); Pi, su RPC con una extensión que le pasa los MCP de
+  Sloth (`pi.ts`). Lo que comparten (las instrucciones, la skill por su ruta, los MCP del hilo) está en
+  `server/instrucciones.ts`; el JSON-RPC por líneas, en `server/rpc-lineas.ts`.
 - `server/sessions.ts`: cada hilo es `data/sessions/<id>.json` (qué es) y `<id>.jsonl` (lo que pasó). Retoma la sesión
   del proveedor tras reiniciar, reparte los lotes según la máquina y cierra el proceso de un video del lote al acabar.
   `npm run hilo -- <id>` (`scripts/hilo.mjs`) resume un hilo desde esos archivos.

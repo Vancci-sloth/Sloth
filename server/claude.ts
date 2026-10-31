@@ -2,12 +2,15 @@ import { readFileSync } from 'node:fs'
 import { extname } from 'node:path'
 import { query, type ModelInfo, type SDKMessage, type SDKUserMessage } from '@anthropic-ai/claude-agent-sdk'
 import type { AgentEvent, Model, Tokens } from '../shared/types.ts'
-import { IMAGE_TYPES, Inbox, stringify, type AgentOptions, type AgentRun, type SkillRef } from './agent.ts'
+import { IMAGE_TYPES, Inbox, sinArrancar, stringify, type AgentOptions, type AgentRun, type SkillRef } from './agent.ts'
 import { herramientasIdeas } from './ideas/mcp.ts' // ideas
 import { navegadorAgente } from './navegador-agente.ts'
 import { mcpVoz } from './voz/index.ts'
 import { programaClaude, rutaAgente } from './agentes.ts'
 import { sitiosDeAgente } from './tope-agentes.ts'
+import { dolaresDeepSeek, entornoDeepSeek, modeloDeepSeek, SIN_LLAVE, tarifaDeepSeek } from './deepseek.ts'
+import { llaveGuardada } from './acceso.ts'
+import { proveedorDe } from '../shared/providers.ts'
 
 /** Las herramientas que lanzan un subagente. */
 const AGENTE = 'Agent|Task'
@@ -73,16 +76,20 @@ Al pulsar una, te llega su texto como mensaje del usuario. No lo uses en pregunt
  */
 export function startClaude(opts: AgentOptions): AgentRun {
   const inbox = new Inbox<SDKUserMessage>()
+  // DeepSeek es el mismo Claude Code contra la API de DeepSeek (`server/deepseek.ts`), que piensa a su manera.
+  const deepseek = proveedorDe(opts.model) === 'deepseek'
+  if (deepseek && !llaveGuardada('deepseek')) return sinArrancar(opts, SIN_LLAVE)
   const agentes = sitiosDeAgente()
   const run = query({
     prompt: inbox,
     options: {
       ...programaClaude(),
       cwd: opts.cwd,
-      model: opts.model,
+      model: deepseek ? `${modeloDeepSeek(opts.model)}[1m]` : opts.model,
       effort: opts.effort as never,
+      ...(deepseek ? { env: entornoDeepSeek(opts.model, opts.effort) } : {}),
       // Sin `summarized`, los modelos nuevos piensan en silencio: el texto del pensamiento llega vacío.
-      thinking: sinAdaptativo.has(opts.model) ? undefined : { type: 'adaptive', display: 'summarized' },
+      thinking: deepseek || sinAdaptativo.has(opts.model) ? undefined : { type: 'adaptive', display: 'summarized' },
       resume: opts.resume,
       permissionMode: 'bypassPermissions',
       allowDangerouslySkipPermissions: true,
@@ -126,7 +133,11 @@ export function startClaude(opts: AgentOptions): AgentRun {
   const state = { idle: true, max: 0, measure: () => {}, tareas: [] as string[], detenido: false, agentes }
   // Todo evento sale por aquí, para que los trozos de texto viajen juntos y nada se les adelante.
   const emit = juntarTrozos(opts.onEvent)
-  const read = reader({ ...opts, onEvent: emit }, state)
+  // Con DeepSeek, los dólares de Claude Code serían los de un modelo de Claude: se cuentan con los precios de DeepSeek, en
+  // hora valle, y el turno que acaba en hora pico cuesta el doble.
+  const read = deepseek
+    ? reader({ ...opts, onEvent: (e) => emit(e.t === 'turn_end' && e.costUsd ? { ...e, costUsd: e.costUsd * tarifaDeepSeek() } : e) }, state, dolaresDeepSeek)
+    : reader({ ...opts, onEvent: emit }, state)
 
   /** Lo que ocupa la conversación, contado por Claude Code como en `/context`. */
   async function measure() {
@@ -238,15 +249,18 @@ interface Gasto {
 const CERO: Gasto = { usd: 0, tokens: { input: 0, output: 0, cacheRead: 0 } }
 type PorModelo = Record<string, { inputTokens: number; outputTokens: number; cacheReadInputTokens: number; cacheCreationInputTokens: number }>
 
-/** Los dólares y los tokens de todos los modelos juntos. La escritura en caché cuenta como entrada, como en el resto de Sloth. */
-function gastoDe(usd: number, modelos: PorModelo | undefined): Gasto {
+/**
+ * Los dólares y los tokens de todos los modelos juntos. La escritura en caché cuenta como entrada, como en el resto de Sloth.
+ * Con `precio`, los dólares salen de los tokens de cada modelo y no de lo que calcula Claude Code (DeepSeek).
+ */
+function gastoDe(usd: number, modelos: PorModelo | undefined, precio?: (modelos: PorModelo) => number): Gasto {
   const tokens = { input: 0, output: 0, cacheRead: 0 }
   for (const m of Object.values(modelos ?? {})) {
     tokens.input += (m.inputTokens ?? 0) + (m.cacheCreationInputTokens ?? 0)
     tokens.output += m.outputTokens ?? 0
     tokens.cacheRead += m.cacheReadInputTokens ?? 0
   }
-  return { usd: usd || 0, tokens }
+  return { usd: (precio ? precio(modelos ?? {}) : usd) || 0, tokens }
 }
 
 const vacio = (g: Gasto) => !g.usd && !g.tokens.input && !g.tokens.output && !g.tokens.cacheRead
@@ -310,8 +324,11 @@ export function heredocs(command: string): { path: string; text: string }[] {
   return hechos
 }
 
-/** Convierte los mensajes del SDK en eventos. El texto llega a trozos; las herramientas, completas en el mensaje. */
-export function reader(opts: AgentOptions, state: { idle: boolean; max: number; measure: () => void; tareas: string[]; detenido: boolean; agentes?: Pick<ReturnType<typeof sitiosDeAgente>, 'arranco' | 'soltar'> }) {
+/**
+ * Convierte los mensajes del SDK en eventos. El texto llega a trozos; las herramientas, completas en el mensaje. `precio`:
+ * cuánto cuestan los tokens de cada modelo, si no es Claude (`gastoDe`).
+ */
+export function reader(opts: AgentOptions, state: { idle: boolean; max: number; measure: () => void; tareas: string[]; detenido: boolean; agentes?: Pick<ReturnType<typeof sitiosDeAgente>, 'arranco' | 'soltar'> }, precio?: (modelos: PorModelo) => number) {
   const streamed = new Set<string>()
   // Los `Write` y `Bash` que el modelo está escribiendo, por bloque: su JSON a medias y cuándo salió el último borrador.
   const writing = new Map<string, { id: string; bash: boolean; json: string; sent: number }>()
@@ -452,7 +469,7 @@ export function reader(opts: AgentOptions, state: { idle: boolean; max: number; 
       state.idle = true
       const detenido = state.detenido
       state.detenido = false
-      const ahora = gastoDe(m.total_cost_usd, m.modelUsage)
+      const ahora = gastoDe(m.total_cost_usd, m.modelUsage, precio)
       const turno = delTurno(ahora, antes, m.is_error)
       if (!vacio(ahora)) antes = ahora
       opts.onEvent({

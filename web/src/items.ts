@@ -9,6 +9,7 @@ export type Item =
   | { kind: 'tool'; key: string; id: string; name: string; input: any; output: string; done: boolean; error: boolean; parent?: string; subagente?: Subagente }
   | { kind: 'turn_end'; key: string; ok: boolean; error?: string; caida?: boolean; costUsd?: number; ms: number }
   | { kind: 'info'; key: string; text: string }
+  | { kind: 'arranque'; key: string; nombre: string; desde: number; dura: number; acabado?: boolean }
 
 export type EstadoSubagente = Extract<AgentEvent, { t: 'subagent' }>['status']
 
@@ -56,6 +57,8 @@ type Armado = {
   avisos: Map<string, Aviso>
   fondo: string[]
   turnStart: number
+  /** Dónde está la barra del arranque que sigue en curso. */
+  arranque?: number
   /** El subagente de cada lanzador la vez anterior: si nada suyo cambió, va el mismo. */
   previos: Map<number, { bloque: Item; estado: EstadoSubagente; aviso?: Aviso; sub: Subagente; fila: Item }>
 }
@@ -81,9 +84,17 @@ export function buildTimeline(events: AgentEvent[]): Item[] {
   for (let i = a.n; i < events.length; i++) leer(a, events[i], i)
   a.n = events.length
   a.ultimo = events[events.length - 1]
-  const items = colgarSubagentes(a, a.bloques.map(partido))
+  const items = colgarSubagentes(a, a.bloques.map(partido)).filter((i) => i.kind !== 'arranque' || !i.acabado)
   salidas.set(events, items)
   return items
+}
+
+/** El agente ya arrancó, o el turno acabó sin que arrancara: su barra deja de verse. */
+function acabarArranque(a: Armado) {
+  const k = a.arranque
+  const it = k === undefined ? undefined : a.bloques[k]
+  if (it?.kind === 'arranque') a.bloques[k!] = { ...it, acabado: true }
+  a.arranque = undefined
 }
 
 /** Suma un evento a lo armado. */
@@ -142,6 +153,7 @@ function leer(a: Armado, e: AgentEvent, i: number) {
       break
     }
     case 'turn_end':
+      acabarArranque(a)
       poner({ kind: 'turn_end', key: `end${i}`, ok: e.ok, error: e.error, caida: e.caida, costUsd: e.costUsd, ms: a.turnStart ? e.at - a.turnStart : 0 })
       // Lo que quedó a medias cuando el turno acabó (cortado o con error) ya no va a terminar. Lo de un subagente sí
       // puede: trabaja aparte, y lo suyo se cierra con él.
@@ -154,6 +166,10 @@ function leer(a: Armado, e: AgentEvent, i: number) {
       break
     case 'info':
       poner({ kind: 'info', key: `i${i}`, text: e.text })
+      break
+    case 'arranque':
+      if (e.listo) acabarArranque(a)
+      else a.arranque = poner({ kind: 'arranque', key: `a${i}`, nombre: e.nombre, desde: e.desde, dura: e.dura })
       break
     case 'subagent': {
       const aviso = a.avisos.get(e.id)

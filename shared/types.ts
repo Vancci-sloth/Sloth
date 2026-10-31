@@ -224,7 +224,7 @@ export interface Model {
   label: string
   efforts: string[]
   defaultEffort?: string
-  /** Los de OpenCode que no son gratis: se cobran del saldo de la cuenta. Lo que cuesta, en dólares por millón de tokens. */
+  /** Los de OpenCode y Pi que no son gratis: lo que cuestan, en dólares por millón de tokens. OpenCode lo cobra del saldo de la cuenta. */
   precio?: string
 }
 
@@ -245,6 +245,8 @@ export type AgentEvent =
    */
   | { t: 'turn_end'; at: number; ok: boolean; error?: string; costUsd?: number; tokens?: Tokens; caida?: boolean }
   | { t: 'info'; text: string }
+  /** El agente tarda en arrancar: `dura`, lo que se espera en ms, desde `desde`. `listo`: ya arrancó. El fin del turno también lo acaba. */
+  | { t: 'arranque'; nombre: string; desde: number; dura: number; listo?: boolean }
   /** Cuánto ocupa la conversación en la ventana del modelo, en tokens. Reemplaza al anterior. */
   | { t: 'context'; used: number; max: number }
   /** Lo que sigue corriendo en segundo plano (subagentes, comandos), aunque el turno ya haya terminado. Reemplaza al anterior. */
@@ -545,8 +547,8 @@ export interface CuentaClaude {
   quien?: string
   /** `pro`, `max`… */
   plan?: string
-  /** `codigo`: el que OpenCode pide confirmar en su página al autorizar. */
-  conectando?: { url?: string; codigo?: string }
+  /** `codigo`: el que OpenCode pide confirmar en su página al autorizar. `arranque`: el agente aún arranca (`Arranque.tsx`). */
+  conectando?: { url?: string; codigo?: string; arranque?: { desde: number; dura: number } }
   error?: string
   /** La llave de API guardada, si la hay (`server/acceso.ts`); `activa`, si se paga con ella en vez de con la cuenta. */
   llave?: LlaveAgente
@@ -554,6 +556,11 @@ export interface CuentaClaude {
   cuentas?: { id: string; quien: string; activa: boolean }[]
   /** Dónde se ven el saldo y el uso de la cuenta, en su página (OpenCode). */
   uso?: string
+  /**
+   * Pi: las llaves de API guardadas en Sloth (de Claude, ChatGPT, DeepSeek) que puede usar, y si se las da. Sin dárselas no
+   * las ve (`server/acceso.ts`).
+   */
+  llavesSloth?: { usar: boolean; de: string[] }
 }
 
 export interface LlaveAgente {

@@ -21,7 +21,7 @@ import { esDeEstudio, Estudio } from './Estudio' // panel de etapas
 import { BotonNavegador, PanelNavegador, useNavegadorAbierto } from './Navegador' // navegador de cada hilo
 import { conReferencia, ReferenciaVideo } from './Referencia'
 import { useSoltar } from './Soltar'
-import { CON_CHATGPT, conOpenCode, elegirModelos, lineaSubagentes, Modelos, type Avanzado } from './Modelos'
+import { CON_CHATGPT, conOpenCode, conPrimero, elegirModelos, lineaSubagentes, Modelos, type Avanzado } from './Modelos'
 import { AvisoEquipo } from './Equipo' // tu equipo
 import { MisVideos, Rejilla, VideoDe } from './MisVideos'
 import { Modelos3D } from './Modelos3D' // modelos 3D
@@ -759,9 +759,10 @@ function NewSession(props: {
   // El modelo: «Optimizado» usa lo medido para esta card (el hilo y cada subagente) o, sin medir, lo último que elegiste
   // a mano; «Avanzado», lo que elegiste para ella.
   const [avanzados, setAvanzados] = useStored<Record<string, Avanzado>>('modelos', {})
-  // Sin Claude, lo medido no podría empezar: sin elección tuya, la card va en «Avanzado» con ChatGPT o, sin él, con OpenCode.
-  const sinClaude = useSinClaude()
-  const avanzado = avanzados[card.id] ?? (sinClaude === 'codex' ? CON_CHATGPT : sinClaude === 'opencode' ? conOpenCode(models) : undefined)
+  // Sin Claude, lo medido no podría empezar: sin elección tuya, la card va en «Avanzado» con ChatGPT, con OpenCode o con
+  // el primer modelo del agente que tengas.
+  const sinClaude = useSinClaude(models)
+  const avanzado = avanzados[card.id] ?? (sinClaude === 'codex' ? CON_CHATGPT : sinClaude === 'opencode' ? conOpenCode(models) : sinClaude ? conPrimero(models, sinClaude) : undefined)
   const { choice, tareas } = useMemo(() => elegirModelos(card.modelos, models, avanzado, lastChoice(models)), [card.modelos, models, avanzado])
   function cambiarModelos(a: Avanzado | undefined) {
     const { [card.id]: _, ...resto } = avanzados

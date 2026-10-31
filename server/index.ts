@@ -14,7 +14,8 @@ import { claudeModels, tituloCorto } from './claude.ts'
 import { codexModels } from './codex.ts'
 import { alBajarAgente, asegurarAgente, bajandoAgente, estadoAgentes, rutaAgente } from './agentes.ts'
 import { opencodeModels } from './opencode.ts'
-import { type Proveedor, proveedorDe } from '../shared/providers.ts'
+import { conectandoOtro, OTROS, sinLimites } from './proveedores.ts'
+import { PROVEEDORES, type Proveedor, proveedorDe } from '../shared/providers.ts'
 import { paraMandar } from '../shared/historial.ts'
 import { conectandoCodex, conectarCodex, cuentaCodex, limitesCodex } from './cuenta-codex.ts'
 import { conectando, conectarClaude, cuentaClaude, limitesClaude } from './cuenta.ts'
@@ -190,7 +191,7 @@ function ocupado(): string | null {
   if (subirLargos?.ocupado()) return subirLargos.ocupado()
   if (idear?.ocupado()) return idear.ocupado() // ideas: una investigación en curso
   if (narrar.ocupado()) return narrar.ocupado() // voz de AI Studio: una a medias
-  return maquina.ocupado() ?? instalandoAlgo() ?? bajandoAgente() ?? conectando() ?? conectandoCodex() ?? conectandoOpenCode()
+  return maquina.ocupado() ?? instalandoAlgo() ?? bajandoAgente() ?? conectando() ?? conectandoCodex() ?? conectandoOpenCode() ?? conectandoOtro()
 }
 
 /** Vuelve a levantar el servidor (lo hace scripts/start.mjs), con lo que haya cambiado. Los agentes se retoman al volver. */
@@ -200,7 +201,7 @@ function reiniciar() {
 }
 
 /**
- * Los modelos se preguntan a Claude Code, a Codex y a OpenCode, a los que ya se bajaron (`server/agentes.ts`). La
+ * Los modelos se preguntan a cada agente que ya se bajó (`server/agentes.ts`), y a DeepSeek con su llave. La
  * interfaz no los espera para enseñar cards y hilos: le llegan por el WebSocket. Se piden al arrancar, al bajar un agente
  * y, si fallaron, otra vez cuando alguien abre la app.
  */
@@ -212,11 +213,16 @@ function pedirModelos() {
   if (cargandoModelos) return void (otraVez = true)
   cargandoModelos = true
   // Cada proveedor llega por separado: el que tarda no tapa los modelos que ya se pueden elegir.
-  const pedidos: [Proveedor, () => Promise<Model[]>][] = [['claude', claudeModels], ['codex', codexModels], ['opencode', opencodeModels]]
+  const pedidos: [Proveedor, () => Promise<Model[]>][] = [
+    ['claude', claudeModels],
+    ['codex', codexModels],
+    ['opencode', opencodeModels],
+    ...Object.entries(OTROS).map(([p, o]): [Proveedor, () => Promise<Model[]>] => [p as Proveedor, o!.modelos])
+  ]
   void Promise.allSettled(pedidos.map(async ([p, pedir]) => {
     const lista = await pedir()
-    // Sin cuenta de OpenCode no hay sus modelos: quitarla los quita.
-    if (!lista.length && (p !== 'opencode' || !modelos.some((m) => proveedorDe(m.id) === p))) return
+    // Sin cuenta de OpenCode (o de los demás que no son Claude ni Codex) no hay sus modelos: quitarla los quita.
+    if (!lista.length && (p === 'claude' || p === 'codex' || !modelos.some((m) => proveedorDe(m.id) === p))) return
     modelos = [...modelos.filter((m) => proveedorDe(m.id) !== p), ...lista]
     broadcast({ type: 'models', models: modelos })
   })).finally(() => {
@@ -350,12 +356,30 @@ async function api(req: IncomingMessage, res: ServerResponse, url: URL): Promise
     return true
   }
 
+  // La cuenta de los demás agentes (`server/proveedores.ts`): mirarla (`?fresco` vuelve a mirar), conectarla, dejar de
+  // esperarla, quitarla o darle las llaves de Sloth (`{usar}`). Sus modelos dependen de la cuenta: cada cambio los vuelve a pedir.
+  const otro = /^\/api\/(\w+)\/(cuenta|conectar|cancelar|salir|llaves)$/.exec(path)
+  const o = otro && OTROS[otro[1] as Proveedor]
+  if (otro && o && method === (otro[2] === 'cuenta' ? 'GET' : 'POST')) {
+    try {
+      const usar = otro[2] === 'llaves' && !!(await body<{ usar?: boolean }>(req)).usar
+      const llaves = o.llaves
+      const hacer = { cuenta: () => o.cuenta(url.searchParams.has('fresco')), conectar: o.conectar, cancelar: o.cancelar, salir: o.salir, llaves: llaves && (() => llaves(usar)) }[otro[2] as 'cuenta']
+      if (!hacer) throw new Error('Este agente no admite eso.')
+      send(res, 200, await hacer())
+      if (otro[2] !== 'cuenta' || url.searchParams.has('fresco')) pedirModelos()
+    } catch (error) {
+      send(res, 400, { error: error instanceof Error ? error.message : String(error) })
+    }
+    return true
+  }
+
   // `meta` es un token, no una llave, pero llega igual: `{ llave }`.
-  const o = /^\/api\/opciones\/(youtube|meta)$/.exec(path)
-  if (o && method === 'POST') {
+  const op = /^\/api\/opciones\/(youtube|meta)$/.exec(path)
+  if (op && method === 'POST') {
     const { llave } = await body<{ llave: string | null }>(req)
     try {
-      send(res, 200, await { youtube: guardarYoutube, meta: guardarMeta }[o[1] as 'youtube' | 'meta'](llave?.trim() || null))
+      send(res, 200, await { youtube: guardarYoutube, meta: guardarMeta }[op[1] as 'youtube' | 'meta'](llave?.trim() || null))
     } catch (error) {
       send(res, 400, { error: error instanceof Error ? error.message : String(error) })
     }
@@ -374,13 +398,14 @@ async function api(req: IncomingMessage, res: ServerResponse, url: URL): Promise
   }
 
   // Pagar con la cuenta o con una llave de API (`server/acceso.ts`). Devuelve la cuenta como queda.
-  const acceso = /^\/api\/(claude|codex)\/acceso$/.exec(path)
+  const acceso = /^\/api\/(claude|codex|deepseek)\/acceso$/.exec(path)
   if (acceso && method === 'POST') {
     const { api, llave } = await body<{ api: boolean; llave?: string | null }>(req)
     const p = acceso[1] as Proveedor
     try {
       await cambiarAcceso(p, !!api, llave)
-      send(res, 200, await (p === 'codex' ? cuentaCodex() : cuentaClaude(APP, true)))
+      send(res, 200, await (p === 'codex' ? cuentaCodex() : p === 'deepseek' ? OTROS.deepseek!.cuenta() : cuentaClaude(APP, true)))
+      if (p === 'deepseek') pedirModelos()
     } catch (error) {
       send(res, 400, { error: error instanceof Error ? error.message : String(error) })
     }
@@ -388,9 +413,10 @@ async function api(req: IncomingMessage, res: ServerResponse, url: URL): Promise
   }
 
   // Opciones y hover del contexto: cuotas reales de cada plan, como mucho una consulta por minuto.
-  if ((path === '/api/claude/limites' || path === '/api/codex/limites' || path === '/api/opencode/limites') && method === 'GET') {
+  const lim = /^\/api\/(\w+)\/limites$/.exec(path)
+  if (lim && PROVEEDORES.includes(lim[1] as Proveedor) && method === 'GET') {
     try {
-      send(res, 200, await (path === '/api/codex/limites' ? limitesCodex() : path === '/api/opencode/limites' ? limitesOpenCode() : limitesClaude()))
+      send(res, 200, await (lim[1] === 'codex' ? limitesCodex() : lim[1] === 'opencode' ? limitesOpenCode() : lim[1] === 'claude' ? limitesClaude() : sinLimites()))
     } catch (error) {
       send(res, 500, { error: error instanceof Error ? error.message : String(error) })
     }
@@ -411,14 +437,14 @@ async function api(req: IncomingMessage, res: ServerResponse, url: URL): Promise
 
   // El programa de cada agente, que se baja al elegirlo (`server/agentes.ts`). Al acabar, su catálogo de modelos.
   if (path === '/api/agentes' && method === 'GET') return send(res, 200, estadoAgentes()), true
-  const baja = /^\/api\/(claude|codex|opencode)\/descargar$/.exec(path)
-  if (baja && method === 'POST') {
+  const baja = /^\/api\/(\w+)\/descargar$/.exec(path)
+  if (baja && PROVEEDORES.includes(baja[1] as Proveedor) && method === 'POST') {
     void asegurarAgente(baja[1] as Proveedor).catch(() => {})
     return send(res, 200, estadoAgentes()), true
   }
 
-  const ver = /^\/api\/(claude|codex|opencode)\/version$/.exec(path)
-  if (ver && method === 'GET') return send(res, 200, version(APP, ver[1] as Agente)), true
+  const ver = /^\/api\/(\w+)\/version$/.exec(path)
+  if (ver && PROVEEDORES.includes(ver[1] as Proveedor) && method === 'GET') return send(res, 200, version(APP, ver[1] as Agente)), true
 
   // Las series de la skill de una card, para elegir una al crear un video. Se leen cada vez: viven en las skills, y
   // todo estilo de video (la card con `etapas`) tiene las de video-base.

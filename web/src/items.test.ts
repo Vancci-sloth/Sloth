@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import type { AgentEvent } from '../../shared/types.ts'
+import { porcentaje } from './Arranque.tsx'
 import { buildTimeline, errorLlano, partirOpciones, toolSummary, type EstadoSubagente, type Item, type Subagente } from './items.ts'
 
 /** Como se armaba el hilo antes de leerlo por partes: todo de cero cada vez. Es la referencia. */
@@ -146,6 +147,20 @@ test('Timeline: leer el hilo por partes da lo mismo que armarlo de cero', () => 
       assert.deepEqual(plano(buildTimeline(lista)), plano(deCero(structuredClone(lista))), `semilla ${semilla}, ${lista.length} eventos`)
     }
   }
+})
+
+test('Timeline: la barra del arranque se ve hasta que arranca o acaba el turno', () => {
+  const inicio: AgentEvent = { t: 'arranque', nombre: 'Antigravity', desde: 1, dura: 1000 }
+  const barras = (events: AgentEvent[]) => buildTimeline(events).filter((i) => i.kind === 'arranque').length
+  assert.equal(barras([inicio]), 1)
+  assert.equal(barras([inicio, { ...inicio, listo: true }]), 0)
+  assert.equal(barras([inicio, { t: 'turn_end', at: 2, ok: false, error: 'falló' }]), 0)
+})
+
+test('Arranque: el porcentaje sube con el tiempo y para en 95 hasta que acabe de verdad', () => {
+  assert.equal(porcentaje(0, 1000, 0), 1)
+  assert.equal(porcentaje(0, 1000, 500), 50)
+  assert.equal(porcentaje(0, 1000, 5000), 95)
 })
 
 test('Timeline: lo que no cambió sigue siendo el mismo objeto', () => {

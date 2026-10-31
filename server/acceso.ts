@@ -20,6 +20,7 @@ import { guardar } from './disco.ts'
  *   el servidor que lo hizo, el de ChatGPT o la API, y no se puede pasar de uno a otro.
  * - Claude sí se cambia a media conversación: el razonamiento que hizo otra cuenta (Sonnet 5.5, Haiku 5.5) la API lo
  *   descarta sin error, y el hilo sigue con sus mensajes y herramientas.
+ * - Los agentes nuevos no ven estas llaves (`entornoSinLlaves`); a Pi se le pueden prestar en Opciones (`entornoAgente`).
  */
 const ARCHIVO = join(resolve(dirname(fileURLToPath(import.meta.url)), '..'), 'data', 'agentes.json')
 const ENTORNO = { claude: 'ANTHROPIC_API_KEY', codex: 'CODEX_API_KEY' } as const
@@ -27,7 +28,8 @@ const ENTORNO = { claude: 'ANTHROPIC_API_KEY', codex: 'CODEX_API_KEY' } as const
 const CODEX_API = 'sloth-api'
 const CODEX_ENV = 'SLOTH_OPENAI_API_KEY'
 
-type Guardado = Partial<Record<Proveedor, { llave?: string; api?: boolean }>>
+/** `prestar`: el agente (Pi) usa las llaves que guardaste para los demás (`entornoAgente`). */
+type Guardado = Partial<Record<Proveedor, { llave?: string; api?: boolean; prestar?: boolean }>>
 
 let datos: Guardado = {}
 try {
@@ -49,6 +51,54 @@ function aplicar() {
 export function llaveEnUso(p: Proveedor) {
   return (datos[p]?.api && datos[p]?.llave) || undefined
 }
+
+/**
+ * El entorno de Sloth sin las llaves que puso él (`aplicar`): las de Claude y Codex son para ellos. Pi, por ejemplo, usa
+ * `ANTHROPIC_API_KEY` si la ve, y cobraría en tu llave de Anthropic sin que lo eligieras.
+ */
+export function entornoSinLlaves(): NodeJS.ProcessEnv {
+  const env = { ...process.env }
+  for (const p of ['claude', 'codex'] as const) if (llaveEnUso(p) && env[ENTORNO[p]] === llaveEnUso(p)) delete env[ENTORNO[p]]
+  return env
+}
+
+/** Las llaves que se le pueden prestar a un agente, con la variable donde Pi (y casi todos) las busca. */
+const PRESTABLES = { claude: ['Claude', 'ANTHROPIC_API_KEY'], codex: ['ChatGPT', 'OPENAI_API_KEY'], deepseek: ['DeepSeek', 'DEEPSEEK_API_KEY'] } as const
+
+/** Las llaves que elegiste prestarle en Opciones (`prestarLlaves`): van todas las guardadas, se pague o no con ellas en su agente. */
+export function llavesPrestadas(p: Proveedor) {
+  const env: Record<string, string> = {}
+  if (!datos[p]?.prestar) return env
+  for (const [de, [, variable]] of Object.entries(PRESTABLES)) {
+    const llave = datos[de as Proveedor]?.llave
+    if (llave) env[variable] = llave
+  }
+  return env
+}
+
+/** El entorno de un agente nuevo: sin las llaves de Sloth (`entornoSinLlaves`), salvo las que le prestaste. */
+export const entornoAgente = (p: Proveedor): NodeJS.ProcessEnv => ({ ...entornoSinLlaves(), ...llavesPrestadas(p) })
+
+/** Lo que Opciones enseña de las llaves que se le pueden prestar a `p`: si se le prestan y de quién son. */
+export function llavesPrestables(p: Proveedor) {
+  const de = Object.entries(PRESTABLES).flatMap(([q, [nombre]]) => (datos[q as Proveedor]?.llave ? [nombre] : []))
+  return { usar: !!datos[p]?.prestar, de }
+}
+
+export function prestarLlaves(p: Proveedor, usar: boolean) {
+  datos = { ...datos, [p]: { ...datos[p], prestar: usar || undefined } }
+  escribir()
+}
+
+function escribir() {
+  mkdirSync(dirname(ARCHIVO), { recursive: true })
+  guardar(ARCHIVO, JSON.stringify(datos, null, 2))
+  // Solo de quien la guardó: son llaves.
+  if (process.platform !== 'win32') chmodSync(ARCHIVO, 0o600)
+}
+
+/** La llave guardada, aunque ahora se pague con la cuenta. DeepSeek solo trabaja con ella (`server/deepseek.ts`). */
+export const llaveGuardada = (p: Proveedor) => datos[p]?.llave
 
 /** Lo que Opciones sabe de la llave guardada: su final y si es con ella como se paga. */
 export function llaveDe(p: Proveedor): LlaveAgente | undefined {
@@ -86,11 +136,8 @@ export async function cambiarAcceso(p: Proveedor, api: boolean, llave?: string |
   const nueva = llave === undefined ? datos[p]?.llave : llave?.trim() || undefined
   if (api && !nueva) throw new Error('Pega primero tu llave de API.')
   if (llave && nueva) await probar(p, nueva)
-  datos = { ...datos, [p]: nueva ? { llave: nueva, api } : {} }
-  mkdirSync(dirname(ARCHIVO), { recursive: true })
-  guardar(ARCHIVO, JSON.stringify(datos, null, 2))
-  // Solo de quien la guardó: son llaves.
-  if (process.platform !== 'win32') chmodSync(ARCHIVO, 0o600)
+  datos = { ...datos, [p]: { ...(nueva ? { llave: nueva, api } : {}), prestar: datos[p]?.prestar } }
+  escribir()
   aplicar()
 }
 
@@ -99,9 +146,9 @@ async function probar(p: Proveedor, llave: string) {
   const res =
     p === 'claude'
       ? await fetch('https://api.anthropic.com/v1/models', { headers: { 'x-api-key': llave, 'anthropic-version': '2023-06-01' } })
-      : await fetch('https://api.openai.com/v1/models', { headers: { authorization: `Bearer ${llave}` } })
+      : await fetch(p === 'deepseek' ? 'https://api.deepseek.com/models' : 'https://api.openai.com/v1/models', { headers: { authorization: `Bearer ${llave}` } })
   if (res.ok) return
-  const marca = p === 'claude' ? 'Anthropic' : 'OpenAI'
+  const marca = p === 'claude' ? 'Anthropic' : p === 'deepseek' ? 'DeepSeek' : 'OpenAI'
   if (res.status === 401 || res.status === 403) throw new Error(`${marca} no aceptó esa llave. Revísala y vuelve a pegarla.`)
   throw new Error(`${marca} respondió ${res.status}. Vuelve a intentarlo en un momento.`)
 }

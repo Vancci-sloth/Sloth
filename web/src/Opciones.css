@@ -20,6 +20,7 @@
 .fila { display: flex; align-items: center; gap: 10px; min-height: 46px; padding: 8px 16px; }
 .fila-nombre { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
 .fila-nombre strong { font-size: 13.5px; font-weight: 600; }
+.beta { margin-left: 7px; padding: 1px 6px; border-radius: 999px; background: var(--amber-tinte); color: var(--amber); font-size: 10.5px; }
 .fila-nombre > span { color: var(--muted); font-size: 12px; }
 .fila-nombre > span.falta { color: var(--amber); }
 .una-linea { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -49,10 +50,13 @@
 .logo-claude { background: #d97757; box-shadow: none; }
 .logo-codex { background: #000; box-shadow: none; }
 .logo-opencode { background: #f1ecec; box-shadow: none; }
+.logo-deepseek { background: #4d6bfe; box-shadow: none; }
+.logo-cursor, .logo-grok { background: #000; box-shadow: none; }
+.logo-muse { background: #0467df; box-shadow: none; }
 .logo-ffmpeg { background: #007808; box-shadow: none; }
 .logo-paquetes { background: #3775a9; box-shadow: none; }
 .logo-instagram { background: radial-gradient(circle at 30% 107%, #fdf497 0%, #fdf497 5%, #fd5949 45%, #d6249f 60%, #285aeb 90%); box-shadow: none; }
-.logo.chico:is(.logo-claude, .logo-codex, .logo-opencode, .logo-ffmpeg, .logo-paquetes, .logo-instagram) { box-shadow: 0 0 0 2px var(--panel-2); }
+.logo.chico:is(.logo-claude, .logo-codex, .logo-opencode, .logo-deepseek, .logo-cursor, .logo-grok, .logo-muse, .logo-ffmpeg, .logo-paquetes, .logo-instagram) { box-shadow: 0 0 0 2px var(--panel-2); }
 
 /* La línea de debajo del nombre cuando se abre (las herramientas) o despliega (la cuenta de Claude). */
 .resumen, .sub .picker-trigger { align-self: flex-start; display: inline-flex; align-items: center; gap: 6px; height: auto; margin-left: -6px; padding: 1px 6px; border-radius: 6px; color: var(--muted); font-size: 12px; transition: color 0.15s, background 0.15s; }

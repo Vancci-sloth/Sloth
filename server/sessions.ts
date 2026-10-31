@@ -4,13 +4,14 @@ import { join } from 'node:path'
 import { historialLigero } from '../shared/historial.ts'
 import { leerHistorial, primerUsuario } from './historial.ts'
 import type { AgentEvent, FileDraft, SessionMeta } from '../shared/types.ts'
-import { NOMBRE_AGENTE, proveedorDe } from '../shared/providers.ts'
+import { NOMBRE_AGENTE, programaDe, proveedorDe } from '../shared/providers.ts'
 import { llaveEnUso } from './acceso.ts'
 import { conRutas, type AgentRun, type SkillRef } from './agent.ts'
 import { conAgente } from './agentes.ts'
 import { startClaude } from './claude.ts'
 import { startCodex } from './codex.ts'
 import { startOpenCode } from './opencode.ts'
+import { OTROS } from './proveedores.ts'
 import { guardar } from './disco.ts'
 
 /**
@@ -115,7 +116,8 @@ export class Sessions {
     private pushDraft: (sessionId: string, draft: FileDraft) => void,
     private crearAgente: (opts: Parameters<typeof startCodex>[0]) => AgentRun = (opts) => {
       const p = proveedorDe(opts.model)
-      return conAgente(p, opts, { claude: startClaude, codex: startCodex, opencode: startOpenCode }[p])
+      const start = OTROS[p]?.start ?? (p === 'codex' ? startCodex : p === 'opencode' ? startOpenCode : startClaude)
+      return conAgente(p, opts, (o) => start(o))
     },
     /** Lo que le falta al video del hilo, leído de su carpeta (`queFalta`, etapas.ts); nada si no es de un estilo. */
     private faltaDe: (meta: SessionMeta) => string[] = () => []
@@ -377,7 +379,7 @@ export class Sessions {
     const run = this.runFor(meta)
     if (!run.compact) throw new Error('Este agente no admite compactación manual.')
     this.compactando.add(id)
-    this.emit(id, { t: 'info', text: `Compactando el contexto de ${{ claude: 'Claude', codex: 'Codex', opencode: 'OpenCode' }[proveedorDe(meta.model)]}…` })
+    this.emit(id, { t: 'info', text: `Compactando el contexto de ${proveedorDe(meta.model) === 'codex' ? 'Codex' : NOMBRE_AGENTE[proveedorDe(meta.model)]}…` })
     this.emit(id, { t: 'turn_start', at: Date.now() })
     try { run.compact() }
     catch (error) {
@@ -468,7 +470,7 @@ export class Sessions {
       if (meta.running || meta.background?.length || !this.metas.has(id)) return
       // Solo si su último turno acabó bien: uno que detuviste, o que falló, no se retoma solo.
       const veces = this.despertados.get(id) ?? 0
-      if (proveedorDe(meta.model) !== 'claude' && meta.acaboBien && veces < DESPERTARES && this.runs.has(id)) {
+      if (programaDe(proveedorDe(meta.model)) !== 'claude' && meta.acaboBien && veces < DESPERTARES && this.runs.has(id)) {
         this.despertados.set(id, veces + 1)
         this.emit(id, { t: 'info', text: 'Terminó lo que seguía en segundo plano: Sloth le pide al agente que siga.' })
         return this.turno(meta, 'Terminó lo que tenías en segundo plano (tus subagentes o comandos). Si lo que pidió el usuario aún no está acabado, sigue con lo que falta sin preguntar; si ya lo está, no hagas nada más.')

@@ -401,6 +401,12 @@ span.sub-avatar > .logo.chico svg { width: 13px; height: 13px; }
 .turn-ayuda { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 6px 12px; margin-bottom: 6px; color: var(--muted); font-size: 12.5px; text-align: center; }
 .turn-ayuda .primary { padding: 5px 14px; font-size: 12.5px; }
 .info { color: var(--muted); font-size: 12.5px; font-style: italic; }
+/* El agente que tarda en arrancar (`Arranque.tsx`): la barra crece a saltos, una vez por segundo. */
+.arranque { display: flex; flex-direction: column; gap: 6px; max-width: 420px; }
+.arranque-texto { display: flex; justify-content: space-between; gap: 12px; font-size: 12.5px; }
+.arranque-texto b { color: var(--amber); font-variant-numeric: tabular-nums; }
+.arranque-barra { display: block; height: 5px; border-radius: 99px; background: var(--line); overflow: hidden; }
+.arranque-barra span { display: block; height: 100%; border-radius: inherit; background: var(--amber); }
 .working { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 13px; margin-top: 10px; }
 .spinner { width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--amber-tinte); border-top-color: var(--amber); animation: spin 0.8s steps(12) infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }

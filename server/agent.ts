@@ -43,6 +43,25 @@ export interface AgentOptions {
   onExit?(caida?: { error: string; turno: boolean }): void
 }
 
+/**
+ * Un agente que no puede arrancar (falta la cuenta o la llave): cada mensaje acaba su turno con `error`, sin mandar nada,
+ * y el siguiente vuelve a intentarlo con un agente nuevo.
+ */
+export function sinArrancar(opts: AgentOptions, error: string): AgentRun {
+  return {
+    send() {
+      opts.onEvent({ t: 'turn_end', at: Date.now(), ok: false, error })
+      opts.onExit?.()
+    },
+    steer() {},
+    compact() {
+      this.send('')
+    },
+    async interrupt() {},
+    close() {}
+  }
+}
+
 /** Las imágenes que se pueden adjuntar, por extensión. */
 export const IMAGE_TYPES: Record<string, string> = { '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.gif': 'image/gif', '.webp': 'image/webp' }
 

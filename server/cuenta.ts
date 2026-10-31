@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os'
 import { delimiter, join } from 'node:path'
 import { query, type Query, type SDKUserMessage } from '@anthropic-ai/claude-agent-sdk'
 import type { CuentaClaude, LimitesClaude } from '../shared/types.ts'
-import { conLlave, llaveDe, llaveEnUso } from './acceso.ts'
+import { conLlave, entornoSinLlaves, llaveDe, llaveEnUso } from './acceso.ts'
 import { Inbox } from './agent.ts'
 import { asegurarAgente, programaClaude, rutaAgente } from './agentes.ts'
 
@@ -109,18 +109,35 @@ const ESPERA = 15 * 60_000
  * `comando` en su propia terminal (Terminal en Mac; en Linux, la primera de `TERMINALES` que haya). Ninguna dice cuándo
  * se cierra: el guion deja una marca al acabar, también si se cierra la ventana a medias, y aquí se espera a verla.
  */
-function enTerminal(comando: string[]): Promise<void> {
+/**
+ * Un comando en su propia ventana, para iniciar sesión en un agente (`grok login`, `muse login`, `/login` de Pi): en
+ * Windows con `start /wait`, que espera a que se cierre; en Mac y Linux, en una terminal (`enTerminal`). `env`, lo que se
+ * le añade al entorno de Sloth, que va sin sus llaves (en Mac, la Terminal no lo hereda: va en el guion). `start` solo lee el título si va entre
+ * comillas, y Node solo se las pone si lleva un espacio: «Pi» a secas lo intenta abrir como programa.
+ */
+export function enVentana(titulo: string, comando: string[], env: Record<string, string> = {}): Promise<void> {
+  if (process.platform === 'win32')
+    return new Promise<void>((ok, falla) =>
+      spawn('cmd', ['/c', 'start', `Cuenta de ${titulo}`, '/wait', ...comando], { stdio: 'ignore', env: { ...entornoSinLlaves(), ...env } })
+        .on('error', falla)
+        .on('exit', () => ok())
+    )
+  return enTerminal(comando, env)
+}
+
+function enTerminal(comando: string[], env: Record<string, string> = {}): Promise<void> {
   const carpeta = mkdtempSync(join(tmpdir(), 'sloth-claude-'))
   const fin = join(carpeta, 'fin')
   const guion = join(carpeta, 'Claude Code.command')
   const q = (s: string) => `'${s.replaceAll("'", `'\\''`)}'`
   // La Terminal de Mac no hereda el entorno de Sloth: la configuración de Claude de la copia del repo va en el guion.
-  const config = process.env.CLAUDE_CONFIG_DIR ? `export CLAUDE_CONFIG_DIR=${q(process.env.CLAUDE_CONFIG_DIR)}\n` : ''
+  const variables = { ...(process.env.CLAUDE_CONFIG_DIR ? { CLAUDE_CONFIG_DIR: process.env.CLAUDE_CONFIG_DIR } : {}), ...env }
+  const config = Object.entries(variables).map(([k, v]) => `export ${k}=${q(v)}\n`).join('')
   writeFileSync(guion, `#!/bin/sh\ntrap 'touch ${q(fin)}' EXIT HUP INT TERM\n${config}${comando.map(q).join(' ')}\n`, { mode: 0o755 })
   const enElPath = (p: string) => (process.env.PATH ?? '').split(delimiter).some((d) => d && existsSync(join(d, p)))
   const terminal = process.platform === 'darwin' ? ['open', '-a', 'Terminal'] : TERMINALES.find(([t]) => enElPath(t))
   return new Promise<void>((ok, falla) => {
-    if (!terminal) return falla(new Error('No encontré una terminal donde autorizar la cuenta. Corre «claude auth login» en la tuya.'))
+    if (!terminal) return falla(new Error(`No encontré una terminal donde autorizar la cuenta. Corre «${comando.map((c) => c.split('/').pop()).join(' ')}» en la tuya.`))
     const desde = Date.now()
     const reloj = setInterval(() => {
       if (!existsSync(fin) && Date.now() - desde < ESPERA) return
@@ -128,7 +145,7 @@ function enTerminal(comando: string[]): Promise<void> {
       rmSync(carpeta, { recursive: true, force: true })
       ok()
     }, 2000)
-    spawn(terminal[0], [...terminal.slice(1), guion], { stdio: 'ignore', detached: true })
+    spawn(terminal[0], [...terminal.slice(1), guion], { stdio: 'ignore', detached: true, env: entornoSinLlaves() })
       .on('error', (e) => {
         clearInterval(reloj)
         falla(e)

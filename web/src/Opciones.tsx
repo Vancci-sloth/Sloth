@@ -1,6 +1,7 @@
 import { type ReactNode, useEffect, useRef, useState } from 'react'
-import { type CuentaClaude as Cuenta, type Opciones as Datos, type EstadoAgente, type LimitesClaude, NAVEGADOR_REDES, type Requisito, type VersionClaude } from '../../shared/types'
+import { type CuentaClaude as Cuenta, type Opciones as Datos, type EstadoAgente, type LimitesClaude, type Model, NAVEGADOR_REDES, type Requisito, type VersionClaude } from '../../shared/types'
 import { api } from './api'
+import { Arranque } from './Arranque'
 import { type Proveedor, proveedorDe } from '../../shared/providers'
 import { encender, encendido, notificar, sonar, usePermiso } from './avisos'
 import { abrirBienvenida } from './Bienvenida'
@@ -73,10 +74,13 @@ function Ajustes({ onDone, iniciando, onIniciando }: { onDone(): void; iniciando
           <SuscripcionOpciones />
         </Grupo>
       )}
-      <Grupo titulo="Agentes" nota="Cada agente se descarga la primera vez que lo eliges. Claude y ChatGPT necesitan un plan de pago o una llave de API; OpenCode, solo tu cuenta, que es gratis.">
+      <Grupo titulo="Agentes" nota="Cada agente se descarga la primera vez que lo eliges. Claude y ChatGPT necesitan un plan de pago o una llave de API; OpenCode, solo tu cuenta, que es gratis. Los demás, la cuenta o la llave de cada uno.">
         <Agentes />
         <CuentaCodex />
         <CuentaOpenCode />
+        {OTROS_AGENTES.map((p) => (
+          <CuentaAgente key={p} p={p} />
+        ))}
       </Grupo>
       <Grupo titulo="Voz" nota="Al pedir un video eliges en «Voz» si la mandas tú o si el agente la genera aquí. La sesión de Google vive en un perfil aparte del navegador de Sloth: ningún agente la usa.">
         <VozOpciones />
@@ -416,6 +420,7 @@ function useLlave(c: UsoCuenta, proveedor: 'claude' | 'codex') {
  */
 export function CuentaClaude({ model, onFalta }: { model?: string; onFalta?(falta?: boolean): void }) {
   const p = proveedorDe(model ?? '')
+  if ((OTROS_AGENTES as readonly string[]).includes(p)) return <CuentaAgente key={p} p={p as OtroAgente} aviso onFalta={onFalta} />
   return p === 'codex' ? <CuentaCodex aviso onFalta={onFalta} /> : p === 'opencode' ? <CuentaOpenCode aviso onFalta={onFalta} /> : <AvisoClaude onFalta={onFalta} />
 }
 
@@ -423,17 +428,20 @@ const CUENTA_CONECTADA = 'sloth-cuenta-conectada'
 
 /**
  * Con qué va un hilo nuevo si no está la cuenta de Claude (`undefined` mientras no se sabe; `false`, con Claude o sin
- * ninguno): con ChatGPT si está su cuenta y, si no, con OpenCode si está la suya. «Optimizado» se midió con Claude y no
- * podría empezar. Se vuelve a mirar al conectar una cuenta.
+ * ninguno): con ChatGPT si está su cuenta, con OpenCode si está la suya y, si no, con el primero de los demás agentes que
+ * tenga modelos (solo los tiene con su cuenta). «Optimizado» se midió con Claude y no podría empezar. Se vuelve a mirar
+ * al conectar una cuenta.
  */
-export function useSinClaude() {
-  const [sin, setSin] = useState<'codex' | 'opencode' | false>()
+export function useSinClaude(models: Model[] = []) {
+  const [cuentas, setCuentas] = useState<'codex' | 'opencode' | 'ninguna' | false>()
+  const otro = OTROS_AGENTES.find((p) => models.some((m) => proveedorDe(m.id) === p))
+  const sin: Proveedor | false | undefined = cuentas === 'ninguna' ? (otro ?? false) : cuentas
   useEffect(() => {
     let vivo = true
     const leer = () =>
       Promise.all([api<Cuenta>('/api/claude/cuenta'), api<Cuenta>('/api/codex/cuenta'), api<Cuenta>('/api/opencode/cuenta')]).then(
-        ([claude, codex, opencode]) => vivo && setSin(claude.conectada ? false : codex.conectada ? 'codex' : opencode.conectada ? 'opencode' : false),
-        () => vivo && setSin(false)
+        ([claude, codex, opencode]) => vivo && setCuentas(claude.conectada ? false : codex.conectada ? 'codex' : opencode.conectada ? 'opencode' : 'ninguna'),
+        () => vivo && setCuentas(false)
       )
     void leer()
     addEventListener(CUENTA_CONECTADA, leer)
@@ -586,6 +594,204 @@ export function CuentaOpenCode({ aviso = false, onFalta }: { aviso?: boolean; on
           </a>
         </p>
       </div>
+      {(c.error || error || a?.error) && <p className="bad small fila-extra">{c.error || error || a?.error}</p>}
+      {version.aviso}
+    </div>
+  )
+  return aviso ? <section className="panel cuenta-aviso">{contenido}</section> : contenido
+}
+
+/** Los agentes que llegaron después de Claude, Codex y OpenCode (`server/proveedores.ts`), en el orden de Opciones. */
+export const OTROS_AGENTES = ['deepseek', 'grok', 'antigravity', 'cursor', 'muse', 'pi'] as const satisfies readonly Proveedor[]
+type OtroAgente = (typeof OTROS_AGENTES)[number]
+
+/**
+ * Cómo se conecta cada uno y qué hay que saber antes, a la vista. `ventana`: el agente abre su propia ventana para
+ * iniciar sesión; `navegador`: da un enlace que se autoriza en el navegador; `llave`: se pega una llave de API.
+ */
+const OTROS: Record<OtroAgente, { titulo: string; logo: string; como: 'ventana' | 'navegador' | 'llave'; texto: ReactNode; ayuda?: ReactNode; uso?: string; abreSolo?: string; beta?: boolean }> = {
+  deepseek: {
+    titulo: 'DeepSeek · con tu llave de API',
+    logo: 'deepseek',
+    como: 'llave',
+    beta: true,
+    texto: 'Trabaja en el mismo Claude Code de Sloth, con los modelos de DeepSeek: las skills, los subagentes y el navegador van igual que con Claude. Se cobra por uso, del saldo de tu cuenta de DeepSeek.',
+    ayuda: (
+      <>
+        Créala en{' '}
+        <a href="https://platform.deepseek.com/api_keys" target="_blank" rel="noreferrer">
+          platform.deepseek.com
+        </a>{' '}
+        y ponle saldo. Se guarda solo en Sloth, en esta computadora.
+      </>
+    )
+  },
+  grok: {
+    titulo: 'Grok · xAI',
+    logo: 'grok',
+    como: 'ventana',
+    beta: true,
+    texto: 'Sloth trabaja con tu cuenta de Grok. Al conectar se abre una ventana de Grok que te lleva a autorizarla en el navegador.',
+    uso: 'https://grok.com'
+  },
+  antigravity: {
+    titulo: 'Antigravity · Google',
+    logo: 'antigravity',
+    como: 'navegador',
+    beta: true,
+    abreSolo: 'Abriendo Antigravity: al terminar se abre sola la página de Google',
+    texto: 'Sloth trabaja con tu cuenta de Google en Antigravity, con sus modelos de Gemini. La cuenta se autoriza en el navegador.'
+  },
+  cursor: {
+    titulo: 'Cursor',
+    logo: 'cursor',
+    como: 'navegador',
+    texto: 'Sloth trabaja con tu cuenta de Cursor, que pide un plan de pago para su agente. La cuenta se autoriza en el navegador.'
+  },
+  muse: {
+    titulo: 'Muse Code · Meta',
+    logo: 'muse',
+    como: 'ventana',
+    texto: 'Sloth trabaja con tu cuenta de Meta. Al conectar se abre una ventana de Muse Code que te lleva a autorizarla.'
+  },
+  pi: {
+    titulo: 'Pi',
+    logo: 'pi',
+    como: 'ventana',
+    beta: true,
+    texto: 'Pi trabaja con el proveedor que conectes en él: tu plan de Claude, de ChatGPT o de Copilot, Gemini o una llave de API (DeepSeek, OpenRouter…).',
+    ayuda: (
+      <>
+        En la ventana de Pi, elige tu proveedor y sigue sus pasos: se cierra sola al terminar. Pi también usa las llaves de API que tengas en las variables
+        de tu usuario, pero no las que guardaste en Sloth, salvo que se lo elijas aquí.
+      </>
+    )
+  }
+}
+
+/**
+ * Un agente de los demás: su cuenta, su versión y el botón para conectarla, según cómo se conecta. `aviso`: encima del
+ * compositor y en la bienvenida, solo mientras falte la cuenta.
+ */
+export function CuentaAgente({ p, aviso = false, onFalta }: { p: OtroAgente; aviso?: boolean; onFalta?(falta?: boolean): void }) {
+  const o = OTROS[p]
+  const c = useCuenta(true, p)
+  const { agentes, error } = useAgentes(c.ocupado || !!c.cuenta?.conectando)
+  const a = agentes?.[p]
+  const version = useVersion(p, !aviso, a?.instalado)
+  const [pegando, setPegando] = useState(false)
+  const [llave, setLlave] = useState('')
+  const cuenta = c.cuenta
+  const falta = cuenta ? !cuenta.conectada : undefined
+  useEffect(() => onFalta?.(falta), [falta])
+  if (aviso && !falta) return null
+  const espera = cuenta?.conectando
+  const guardarLlave = (nueva: string | null) =>
+    c.pedir(`/api/${p}/acceso`, { api: !!nueva, llave: nueva }).then((x) => x && (setPegando(false), setLlave('')))
+  const conectar = () => {
+    if (o.como === 'llave') return setPegando(true)
+    if (o.como === 'ventana') return void c.conectar()
+    if (o.abreSolo) return void c.conectar()
+    // En el navegador: la pestaña se abre en el clic para que no la bloqueen, y va al enlace cuando llega.
+    const ventana = window.open('about:blank', '_blank')
+    if (ventana) ventana.opener = null
+    void c.conectar().then((x) => {
+      const url = x?.conectando?.url
+      if (ventana && url) ventana.location.href = url
+      else ventana?.close()
+    })
+  }
+  const elegir = (que: string) => {
+    if (que === 'uso') window.open(cuenta?.uso ?? o.uso, '_blank', 'noreferrer')
+    else if (que === 'cambiar') o.como === 'llave' ? setPegando(true) : conectar()
+    else if (que === 'quitar') void (o.como === 'llave' ? guardarLlave(null) : c.pedir(`/api/${p}/salir`, {}))
+  }
+  const contenido = (
+    <div className="item">
+      <div className="fila">
+        <Logo de={o.logo} nombre={o.titulo} />
+        <div className="fila-nombre">
+          <strong>
+            {o.titulo}
+            {o.beta && <span className="beta">Beta</span>}
+          </strong>
+          {cuenta?.conectada ? (
+            <Picker
+              className="sub"
+              label={cuenta.quien || 'Cuenta conectada'}
+              value=""
+              disabled={c.ocupado}
+              groups={[
+                {
+                  label: o.como === 'llave' ? 'Llave' : 'Cuenta',
+                  options: [
+                    ...(cuenta.uso || o.uso ? [{ value: 'uso', label: o.como === 'llave' ? 'Ver tu saldo ↗' : 'Ver tu uso ↗' }] : []),
+                    { value: 'cambiar', label: o.como === 'llave' ? 'Cambiar de llave' : 'Cambiar de cuenta' },
+                    ...(o.como !== 'ventana' ? [{ value: 'quitar', label: o.como === 'llave' ? 'Quitar la llave' : 'Cerrar sesión' }] : []),
+                  ],
+                },
+              ]}
+              onChange={elegir}
+            />
+          ) : (
+            <span>{o.texto}</span>
+          )}
+        </div>
+        {a?.instalando ? <Bajando a={a} /> : a?.instalado && !aviso ? version.estado : null}
+        {a?.instalando ? null : espera ? (
+          <>
+            <span className="estado moviendo">{o.como === 'ventana' ? 'Esperando a la ventana…' : 'Esperando al navegador…'}</span>
+            {o.como === 'navegador' && (
+              <button className="ghost small" disabled={c.ocupado} onClick={() => void c.pedir(`/api/${p}/cancelar`, {})}>
+                Cancelar
+              </button>
+            )}
+          </>
+        ) : (
+          cuenta &&
+          !cuenta.conectada &&
+          !pegando && (
+            <button className="primary" disabled={c.ocupado} onClick={conectar}>
+              {c.ocupado ? 'Conectando…' : o.como === 'llave' ? 'Añadir llave' : `Conectar con ${o.titulo.split(' ·')[0]}`}
+            </button>
+          )
+        )}
+      </div>
+      {o.beta && <p className="fila-extra muted small">Está en beta: puedes probarlo, pero puede tener errores. Si te topas con uno, repórtalo en la Comunidad, en Ayuda.</p>}
+      {pegando && (
+        <form className="fila-extra" onSubmit={(e) => (e.preventDefault(), llave.trim() && void guardarLlave(llave.trim()))}>
+          <div className="opcion-fila">
+            <input type="password" autoFocus placeholder="Pega tu llave de API" value={llave} onChange={(e) => setLlave(e.target.value)} autoComplete="off" />
+            <button className="primary" disabled={c.ocupado || !llave.trim()}>
+              {c.ocupado ? 'Probando…' : 'Guardar'}
+            </button>
+            <button type="button" className="ghost" onClick={() => (setPegando(false), setLlave(''))}>
+              Cancelar
+            </button>
+          </div>
+          {o.ayuda && <p className="muted small">{o.ayuda}</p>}
+        </form>
+      )}
+      {espera && o.como === 'ventana' && <p className="fila-extra small"><span>{o.ayuda ?? `Sigue lo que dice la ventana de ${o.titulo.split(' ·')[0]}. Al cerrarla, esto se actualiza solo.`}</span></p>}
+      {espera && !espera.url && o.abreSolo && <div className="fila-extra small">{espera.arranque ? <Arranque texto={o.abreSolo} {...espera.arranque} /> : o.abreSolo}</div>}
+      {espera?.url && (
+        <p className="fila-extra small">
+          Autoriza la cuenta en la pestaña que se abrió. Al terminar, esto se actualiza solo.{' '}
+          <a href={espera.url} target="_blank" rel="noreferrer">
+            Abrir la página de inicio de sesión ↗
+          </a>
+        </p>
+      )}
+      {!cuenta?.conectada && !espera && !pegando && o.como === 'ventana' && o.ayuda && !aviso && <p className="fila-extra muted small"><span>{o.ayuda}</span></p>}
+      {cuenta?.llavesSloth && !!cuenta.llavesSloth.de.length && !aviso && (
+        <div className="fila-extra pago">
+          <span className="muted small">
+            Tienes en Sloth llaves de {cuenta.llavesSloth.de.join(', ')}.{' '}
+            {cuenta.llavesSloth.usar ? `${o.titulo} las usa, y lo que hagas con esos modelos se cobra por uso en ellas.` : `${o.titulo} no las ve: así no cobra en ellas sin que lo elijas.`}
+          </span>
+          <Interruptor on={cuenta.llavesSloth.usar} disabled={c.ocupado} onCambiar={(usar) => void c.pedir(`/api/${p}/llaves`, { usar })} etiqueta="Usarlas en Pi" />
+        </div>
+      )}
       {(c.error || error || a?.error) && <p className="bad small fila-extra">{c.error || error || a?.error}</p>}
       {version.aviso}
     </div>

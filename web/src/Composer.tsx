@@ -53,6 +53,13 @@ export function gruposModelos(models: Model[]) {
     { id: 'opencode', label: 'OpenCode · gratis' },
     // Los de pago de OpenCode, debajo de los gratis: se cobran del saldo de la cuenta.
     { id: 'opencode', label: 'OpenCode · de pago (de tu saldo, por millón de tokens)', pago: true },
+    { id: 'deepseek', label: 'DeepSeek · beta' },
+    { id: 'grok', label: 'Grok · beta' },
+    { id: 'antigravity', label: 'Antigravity · beta' },
+    { id: 'cursor', label: 'Cursor' },
+    { id: 'muse', label: 'Muse Code (Meta)' },
+    { id: 'pi', label: 'Pi · beta · gratis' },
+    { id: 'pi', label: 'Pi · beta · de pago (por millón de tokens)', pago: true },
   ].map((p) => ({
     label: p.label,
     options: models

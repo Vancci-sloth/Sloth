@@ -1,6 +1,7 @@
 import { Fragment, memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { NOMBRE_AGENTE, proveedorDe } from '../../shared/providers'
 import type { AgentEvent } from '../../shared/types'
+import { Arranque } from './Arranque'
 import { useEventos } from './eventos'
 import { Icon } from './Composer'
 import { LINK, LINK_ICON, linkParts, pedirMejora, QUOTE, QUOTE_EVENT, QUOTE_ICON, quoteText, THREAD, THREAD_ICON, threadIconOf } from './etiquetas'
@@ -500,6 +501,8 @@ const Row = memo(function Row({ item, sessionId, anidado, proveedor, onAbrir, on
     }
     case 'info':
       return <div className="info">{item.text}</div>
+    case 'arranque':
+      return <Arranque texto={`${item.nombre} está arrancando: la primera vez tarda cerca de un minuto`} desde={item.desde} dura={item.dura} />
   }
 })
 

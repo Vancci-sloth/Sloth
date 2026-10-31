@@ -74,7 +74,8 @@ export function Bienvenida() {
           se paga por uso). Sloth no te cobra aparte, y con ellos salen los mejores videos; con ChatGPT, además, hace las
           imágenes: portadas y personajes. <b>OpenCode es gratis</b> con tu cuenta de OpenCode, que se crea gratis: sus modelos
           gratis pueden equivocarse más y a veces se saturan, y si le pones saldo a tu cuenta, también usas los de pago. Cada
-          uno se descarga al elegirlo.
+          uno se descarga al elegirlo. También trabaja con DeepSeek, Grok, Antigravity, Cursor, Muse Code y Pi: se conectan en
+          Opciones → Agentes.
           <CuentaClaude onFalta={(falta) => setClaude(falta === undefined ? undefined : !falta)} />
           <CuentaChatGPT onFalta={(falta) => setChatgpt(falta === undefined ? undefined : !falta)} />
           <CuentaOpenCode aviso onFalta={(falta) => setOpencode(falta === undefined ? undefined : !falta)} />
