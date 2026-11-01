@@ -42,6 +42,7 @@ import { Sessions } from './sessions.ts'
 import { mantenerVoz } from './voz-viva.ts'
 import { avisoDeVideos } from '../shared/limites.ts'
 import { eventosEnVivo } from './eventos-en-vivo.ts'
+import { enviarCliente } from './enviar-cliente.ts'
 import { cambiosDeCard, carpetaSkill, configClaudeDev, duplicateCard, enlazarSkills, enlazarSkillsCodex, guardarSkillTuya, readCards, removeCard, seriesDe, SKILLS, skillRef, volverAOriginal } from './skills.ts'
 import { estaticos } from './estaticos.ts'
 import { type Agente, version } from './version.ts'
@@ -86,7 +87,7 @@ function broadcast(msg: ServerPush) {
   let text: string | undefined
   for (const ws of clients) {
     if ((msg.type === 'events' || msg.type === 'draft') && suscripciones.has(ws) && suscripciones.get(ws) !== msg.sessionId) continue
-    ws.send(text ??= JSON.stringify(msg))
+    enviarCliente(ws, text ??= JSON.stringify(msg))
   }
   avance?.oir(msg)
 }

@@ -92,7 +92,7 @@ export function usePasos(avance: Avance | null, events: AgentEvent[], escritos: 
     if (!e.espera || e.hecha) return undefined
     const ext = /\.\w+$/.exec(e.listo)?.[0]
     const since = etapas[i - 1]?.hechaEn ?? 0
-    const file = new RegExp(`[A-Za-z]:\\\\[^"\\n]*?${ext ? ext.replace('.', '\\.') : '\\.\\w+'}(?=["\\s]|$)`, 'i')
+    const file = new RegExp(`(?:[A-Za-z]:\\\\|(?<![\\w:/])/(?:Users|home|Volumes|media|mnt|tmp)/)[^"\\n]*?${ext ? ext.replace('.', '\\.') : '\\.\\w+'}(?=["\\s]|$)`, 'i')
     const sent = events.findLast((ev): ev is Extract<AgentEvent, { t: 'user' }> => ev.t === 'user' && ev.at >= since && file.test(ev.text))
     return sent?.text.match(file)?.[0]
   })

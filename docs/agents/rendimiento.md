@@ -38,6 +38,7 @@ nada de lo que recibe la gente. Varias ideas razonables de abajo no sirvieron: p
 | Memoria tras abrirlo                       | 15,4 MB   | 5,9 MB    |
 | MCP del navegador en un hilo que no lo usa | 662 ms, 114 MB | 281 ms, 49 MB |
 | Página oculta con timers                   | 36 % de un núcleo | 0,6 % |
+| La misma, con el agente conectado          | 1,36 s de CPU en 2,5 s | 0,06 s |
 | Rutas de `/api` al recargar                | 160 ms    | 10 ms     |
 | Parón del servidor al abrir                | 625 ms    | 94 ms     |
 
@@ -56,6 +57,9 @@ nada de lo que recibe la gente. Varias ideas razonables de abajo no sirvieron: p
 - El 76 % de lo que se bajaba al abrir un hilo eran salidas de herramientas, que solo se ven al abrir su fila: se piden
   entonces (`sinSalidasLargas`). Lo que sigue trabajando va entero.
 - Con Playwright a demanda (`server/navegador-mcp.mjs`), el hilo que sí usa el navegador paga 1,1 s la primera vez.
+- Estar conectado no es usar la página: despierta mientras dura una operación y 5 s más (`electron/actividad-navegador.ts`).
+- Un chat quieto suelta su proceso a los 30 minutos y un cliente con más de 8 MiB sin leer se desconecta y relee el historial.
+  No hay medida de la RAM que ahorra lo primero.
 - Lo que queda antes del servidor (unos 350 ms) es Electron y Node.
 
 En Linux (Docker, xvfb, 42 hilos reales, hasta la interfaz montada):
@@ -85,6 +89,9 @@ estos cambios); con `USA_EL_NAVEGADOR`, 6 de 6. La prueba es una página cuyo c�
 - `writeSync` de los registros: 0,005 ms de mediana, 2 ms como máximo en este disco. T3 Code lo hace asíncrono por los
   discos lentos; aquí no se ha medido uno.
 - Frenar páginas con solo animación o video: Chromium ya las detiene al esconderlas.
+- Una fila de memoria para los renders (rama `t3/7d02d58e`): evita caídas con varios videos a la vez, pero 2 de 30 s tardan
+  un 48 % más y su reserva con `os.freemem()` puede rechazar el render: en Mac esa cifra no cuenta la caché y se queda baja.
+  Si se retoma, al vencer debe dejar pasar, como `turnoNavegador` (ADR 0011), no fallar.
 - Limitar lo que devuelve el navegador al agente: la mediana es de 0,5 a 1,4 KB.
 
 ## Sin explicar

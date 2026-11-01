@@ -43,6 +43,8 @@ const RETOMAS = 2
  * terminó mientras tanto. El siguiente mensaje lo retoma.
  */
 const OCIOSO = 30_000
+/** Un chat conserva el proceso para volver pronto; tras media hora quieto, el siguiente mensaje retoma la sesión. */
+export const AGENTE_OCIOSO = 30 * 60_000
 /**
  * Cuántos historiales de hilos quietos se quedan en memoria, los últimos que se leyeron. Los de los hilos que trabajan o
  * esperan se quedan siempre. Sin límite, mirar los videos de un estilo dejaba en memoria los de todos sus hilos.
@@ -433,8 +435,12 @@ export class Sessions {
 
   /** Cierra el proceso del agente de un hilo. El siguiente mensaje abre otro que retoma la sesión (`providerSessionId`). */
   private cerrar(id: string) {
-    this.runs.get(id)?.close()
+    clearTimeout(this.relojes.get(id))
+    this.relojes.delete(id)
+    this.despertadores.delete(id)
+    const run = this.runs.get(id)
     this.runs.delete(id)
+    run?.close()
   }
 
   /** Cierra el proceso de un hilo quieto: sin turno en curso ni nada en segundo plano, que se cortaría. */
@@ -443,7 +449,7 @@ export class Sessions {
     if (meta && !meta.running && !meta.background?.length) this.cerrar(id)
   }
 
-  /** El reloj de cada video del lote que espera para cerrar su proceso (`OCIOSO`). */
+  /** El reloj de un proceso quieto: corto en un lote, largo en un chat. */
   private relojes = new Map<string, ReturnType<typeof setTimeout>>()
   /** Los que dejaron un despertador (ScheduleWakeup, CronCreate): vive dentro del proceso, y cerrarlo lo perdería. */
   private despertadores = new Set<string>()
@@ -529,29 +535,31 @@ export class Sessions {
   private aMedias = new Map<string, ReturnType<typeof setTimeout>>()
 
   /**
-   * Cuenta el rato quieto de un video del lote. Cualquier cosa que haga anula el reloj, y se vuelve a armar cuando acaba
-   * bien un turno o se le vacía el segundo plano: Claude Code puede abrir un turno él solo cuando termina una tarea.
+   * Conserva calientes los chats recientes y libera los quietos. Una tarea de fondo o un despertador impiden cerrarlo:
+   * Claude Code puede abrir un turno él solo cuando termina una tarea. Los avisos tardíos renuevan el reposo.
    */
   private ocioso(id: string, meta: SessionMeta, event: AgentEvent) {
     clearTimeout(this.relojes.get(id))
     this.relojes.delete(id)
-    if (event.t === 'turn_start') this.despertadores.delete(id)
+    if (event.t === 'turn_start' && meta.lote) this.despertadores.delete(id)
     if (event.t === 'tool' && (event.name === 'ScheduleWakeup' || event.name === 'CronCreate') && !(event.input as { stop?: boolean } | null)?.stop) {
       this.despertadores.add(id)
     }
-    const quieto = (event.t === 'turn_end' && event.ok) || (event.t === 'background' && !event.tasks.length && !meta.running && meta.acaboBien)
-    if (!quieto || this.despertadores.has(id)) return
+    if (meta.running || meta.background?.length || meta.pendiente || (meta.lote && !meta.acaboBien) || this.despertadores.has(id) || !this.runs.has(id)) return
     const reloj = setTimeout(() => {
       this.relojes.delete(id)
       this.cerrarQuieto(id)
-    }, OCIOSO)
+    }, meta.lote ? OCIOSO : AGENTE_OCIOSO)
     reloj.unref()
     this.relojes.set(id, reloj)
   }
 
   closeAll() {
+    for (const reloj of this.relojes.values()) clearTimeout(reloj)
+    this.relojes.clear()
+    this.despertadores.clear()
     this.cerrarRegistros(true)
-    for (const run of this.runs.values()) run.close()
+    for (const id of [...this.runs.keys()]) this.cerrar(id)
     // Si Sloth no se reinicia después (una actualización que falló), el siguiente mensaje retoma la sesión.
     this.runs.clear()
   }
@@ -619,8 +627,8 @@ export class Sessions {
     }
     // Una caída es de este hilo y se retoma sola; un error del proveedor (un límite de uso) le pasaría a todos.
     if (event.t === 'turn_end' && !event.ok && !event.caida && meta.lote) this.pausar(meta.lote.id, `«${meta.title}»: ${event.error ?? 'se detuvo'}`)
-    // Nadie mira un video del lote mientras trabaja: si su turno acaba bien, su proceso se cierra en cuanto queda quieto.
-    if (meta.lote) this.ocioso(id, meta, event)
+    // Los lotes liberan pronto su proceso; un chat lo conserva para volver y se cierra tras un reposo más largo.
+    this.ocioso(id, meta, event)
     this.avisarFondo(id, meta, event, habia)
     this.sinAcabar(id, meta, event)
     // Un agente que deja de trabajar libera sitio.

@@ -9,9 +9,10 @@
  * Code, pero T3 usa `<webview>` y lo encoge con CSS; aquí la vista es nativa y lo hace `enableDeviceEmulation`.
  *
  * Las páginas son de este proceso, no de la interfaz: siguen vivas si la interfaz se recarga o miras otro hilo, y el
- * agente las usa aunque no se vean. Escondida y sin agente, Chromium la frena como a una pestaña de fondo (de un tercio de
- * núcleo a casi nada con una que corre timers). Las de las redes y la voz nunca: trabajan escondidas. Una que nadie ve ni
- * usa en `OCIOSA` se cierra; al volver a verla, o si vuelve el agente, se abre en su última dirección. Todas comparten un perfil aparte del de la interfaz (`persist:navegador`): lo que inicies en una lo
+ * agente las usa aunque no se vean. Escondida, Chromium la frena como a una pestaña de fondo (de un tercio de núcleo a casi
+ * nada con una que corre timers), aunque el agente siga conectado: solo se despierta mientras una operación suya está en
+ * curso, y unos segundos después (`actividad-navegador.ts`). Las de las redes y la voz nunca: trabajan escondidas. Una que
+ * nadie ve ni usa en `OCIOSA` se cierra; al volver a verla, o si vuelve el agente, se abre en su última dirección. Todas comparten un perfil aparte del de la interfaz (`persist:navegador`): lo que inicies en una lo
  * tiene el agente en todas. La de las redes (`NAVEGADOR_REDES`), donde Sloth publica en TikTok, va con el suyo
  * (`persist:redes`): la sesión con la que publicas no la tiene ningún agente. La de la voz (`NAVEGADOR_VOZ`), donde Sloth
  * genera las voces en AI Studio con tu cuenta de Google (`server/voz/`), también (`persist:voz`).
@@ -29,6 +30,7 @@ import { app, ipcMain, Menu, session, shell, WebContentsView, type BrowserWindow
 import { WebSocketServer, type WebSocket } from 'ws'
 import { guardar } from '../server/disco.ts'
 import { crearRelevo, type Relevo } from './relevo.ts'
+import { actividadNavegador } from './actividad-navegador.ts'
 import { type AccionNavegador, type EstadoNavegador, NAVEGADOR_REDES, NAVEGADOR_VOZ, type PantallaNavegador } from '../shared/types.ts'
 
 const PARTICION = 'persist:navegador'
@@ -52,6 +54,7 @@ interface Hoja {
   vista: WebContentsView
   /** Las conexiones del agente, cada una con su relevo. */
   conexiones: Map<WebSocket, Relevo>
+  actividad: ReturnType<typeof actividadNavegador>
   /** La última vez que se vio o se usó. */
   usada: number
   /** Por qué no abrió la última dirección, y cuál fue. */
@@ -100,7 +103,7 @@ export function iniciarNavegador(appDir: string) {
   ipcMain.on('navegador:hacer', (_e, hilo: string, accion: AccionNavegador) => hacer(hilo, accion))
   ipcMain.handle('navegador:estados', () => [...hojas.values()].map(estado))
   setInterval(() => {
-    for (const h of hojas.values()) if (vista?.hilo !== h.hilo && !h.conexiones.size && Date.now() - h.usada > OCIOSA) cerrar(h)
+    for (const h of hojas.values()) if (vista?.hilo !== h.hilo && !h.conexiones.size && !h.actividad.ocupada() && Date.now() - h.usada > OCIOSA) cerrar(h)
   }, 60_000).unref()
 
   mkdirSync(join(appDir, 'data'), { recursive: true })
@@ -122,6 +125,10 @@ function prepararPerfil(perfil: Session) {
     const h = [...hojas.values()].find((x) => x.vista.webContents === wc)
     if (h?.descargas) item.setSavePath(join(h.descargas, h.guid ?? `${Date.now()}-${item.getFilename().replace(/[^\w.-]+/g, '-')}`))
     if (h) h.guid = null
+    if (h) {
+      const terminada = new Promise<void>((ok) => item.once('done', () => ok()))
+      void h.actividad.usar(() => terminada)
+    }
   })
 }
 
@@ -145,6 +152,11 @@ function abrir(hilo: string): Hoja {
   v.setVisible(false)
   v.setBounds({ x: 0, y: 0, ...medida })
   const wc = v.webContents
+  const actividad = actividadNavegador(async (ahorro) => {
+    if (wc.isDestroyed()) return
+    wc.setBackgroundThrottling(frenable(hilo) && ahorro)
+    if (wc.debugger.isAttached()) await wc.debugger.sendCommand('Emulation.setFocusEmulationEnabled', { enabled: !ahorro })
+  })
   // La de las redes publica escondida: el video que sube no suena. La de la voz tampoco suena al generar.
   if (PERFILES[hilo]) wc.setAudioMuted(true)
   // Lista en cuanto navega por primera vez (ya tiene proceso), aunque lo que carga tarde.
@@ -152,7 +164,7 @@ function abrir(hilo: string): Hoja {
     wc.once('did-navigate', () => r())
     wc.once('did-stop-loading', () => r())
   })
-  const h: Hoja = { hilo, vista: v, conexiones: new Map(), usada: Date.now(), zoom: 1, escala: 1, emulada: '', caidas: [], descargas: null, guid: null, lista }
+  const h: Hoja = { hilo, vista: v, conexiones: new Map(), actividad, usada: Date.now(), zoom: 1, escala: 1, emulada: '', caidas: [], descargas: null, guid: null, lista }
   hojas.set(hilo, h)
   void wc.loadURL('about:blank')
   wc.setWindowOpenHandler(({ url, disposition, postBody }) => {
@@ -169,7 +181,7 @@ function abrir(hilo: string): Hoja {
         return { action: 'deny' }
       }
     }
-    void wc.loadURL(url).catch(() => {})
+    llevar(h, url)
     return { action: 'deny' }
   })
   // El «¿Salir del sitio?» de una página: la ventana no lo enseña, y sin esto cancelaría cada navegación (la del agente,
@@ -198,6 +210,7 @@ function abrir(hilo: string): Hoja {
   wc.on('did-navigate', () => {
     // Cambiar de sitio estrena proceso: sin esto perdería su tamaño y su zoom.
     h.emulada = ''
+    h.actividad.refrescar()
     if (h.zoom !== 1) wc.setZoomFactor(h.zoom)
     h.icono = undefined
     avisar(h)
@@ -230,6 +243,7 @@ function abrir(hilo: string): Hoja {
   })
   // Si aun así se cerró, la siguiente vez que se pida nace otra.
   wc.once('destroyed', () => {
+    actividad.cerrar()
     if (hojas.get(hilo) !== h) return
     hojas.delete(hilo)
     for (const ws of h.conexiones.keys()) ws.close()
@@ -245,11 +259,12 @@ function abrir(hilo: string): Hoja {
  */
 function llevar(h: Hoja, url: string) {
   const wc = h.vista.webContents
-  void h.lista.then(() => (wc.isDestroyed() ? undefined : wc.loadURL(url))).catch(() => {})
+  void h.lista.then(() => (wc.isDestroyed() ? undefined : h.actividad.usar(() => wc.loadURL(url)))).catch(() => {})
 }
 
 /** Cierra la página de un hilo, que vuelve a su última dirección la próxima vez que se vea. */
 function cerrar(h: Hoja) {
+  h.actividad.cerrar()
   hojas.delete(h.hilo)
   for (const ws of h.conexiones.keys()) ws.close()
   ventana?.contentView.removeChildView(h.vista)
@@ -313,6 +328,7 @@ function colocar(h: Hoja) {
   const v = h.vista
   const e = estado(h)
   const visible = !!ventana && vista?.hilo === h.hilo && !!e.url && !e.error
+  h.actividad.ver(visible)
   if (!visible || !ventana || !vista) return v.setVisible(false)
   // La caja llega en píxeles de la interfaz: con zoom, no son los de la ventana.
   const z = ventana.webContents.getZoomFactor()
@@ -409,7 +425,6 @@ async function conectar(ws: WebSocket, hilo: string) {
   ws.on('message', guardarlo)
   const h = hojas.get(hilo) ?? reabrir(hilo)
   const wc = h.vista.webContents
-  wc.setBackgroundThrottling(false)
   await h.lista
   ws.off('message', guardarlo)
   if (ws.readyState !== ws.OPEN || wc.isDestroyed()) return ws.close()
@@ -420,15 +435,17 @@ async function conectar(ws: WebSocket, hilo: string) {
     return ws.close(1011)
   }
   h.id ??= wc.debugger.sendCommand('Target.getTargetInfo').then((r: { targetInfo: { targetId: string } }) => r.targetInfo.targetId)
+  h.actividad.refrescar()
   const relevo = crearRelevo(
     {
       // Cerrar la página la deja en blanco: es la del hilo, y el panel la sigue enseñando.
-      enviar: (metodo, params, sesion) => {
+      enviar: (metodo, params, sesion) => h.actividad.usar(async () => {
+        h.usada = Date.now()
         if (metodo === 'Page.close' && !sesion) return wc.loadURL('about:blank').then(() => ({}), () => ({}))
         // Con la página encogida, Chromium toma los clics en píxeles de la caja; el agente los manda en los de la página.
         const clic = metodo === 'Input.dispatchMouseEvent' && h.escala !== 1
         return wc.debugger.sendCommand(metodo, clic ? { ...params, x: Number(params.x) * h.escala, y: Number(params.y) * h.escala } : params, sesion)
-      },
+      }),
       id: () => h.id!,
       url: () => wc.getURL(),
       titulo: () => wc.getTitle(),
@@ -444,7 +461,6 @@ async function conectar(ws: WebSocket, hilo: string) {
     h.conexiones.delete(ws)
     h.usada = Date.now()
     if (h.conexiones.size || wc.isDestroyed()) return
-    wc.setBackgroundThrottling(frenable(hilo))
     try {
       wc.debugger.detach()
     } catch {
