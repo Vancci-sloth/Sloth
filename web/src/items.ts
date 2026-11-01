@@ -6,7 +6,7 @@ export type Item =
   | { kind: 'user'; key: string; text: string; images: string[] }
   | { kind: 'text'; key: string; text: string; parent?: string; opciones?: string[] }
   | { kind: 'thinking'; key: string; text: string; parent?: string; at?: number }
-  | { kind: 'tool'; key: string; id: string; name: string; input: any; output: string; done: boolean; error: boolean; parent?: string; subagente?: Subagente }
+  | { kind: 'tool'; key: string; id: string; name: string; input: any; output: string; largo?: number; done: boolean; error: boolean; parent?: string; subagente?: Subagente }
   | { kind: 'turn_end'; key: string; ok: boolean; error?: string; caida?: boolean; costUsd?: number; ms: number }
   | { kind: 'info'; key: string; text: string }
   | { kind: 'arranque'; key: string; nombre: string; desde: number; dura: number; acabado?: boolean }
@@ -142,10 +142,11 @@ function leer(a: Armado, e: AgentEvent, i: number) {
       const k = donde.get(`tool:${e.id}`)
       const item = k === undefined ? undefined : bloques[k]
       // Uno que no trae nada (las salidas viejas que quita `historialLigero`) deja el bloque como estaba.
-      if (item?.kind !== 'tool' || (e.output === undefined && !e.delta && !e.done && !e.error)) break
+      if (item?.kind !== 'tool' || (e.output === undefined && !e.delta && !e.done && !e.error && !e.largo)) break
       const nuevo = { ...item }
       if (e.output !== undefined) nuevo.output = e.output
       if (e.delta) nuevo.output += e.delta
+      if (e.largo) nuevo.largo = e.largo
       if (e.done) nuevo.done = true
       if (e.error) nuevo.error = true
       bloques[k!] = nuevo

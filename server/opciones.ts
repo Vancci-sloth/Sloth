@@ -3,6 +3,7 @@ import { chmodSync, mkdirSync, readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import type { Opciones } from '../shared/types.ts'
 import { guardar } from './disco.ts'
+import { preguntarAlRegistro } from './registro.ts'
 
 /**
  * Las llaves de API no viven en la app: van a las variables de entorno del usuario de Windows, donde las leen los
@@ -20,6 +21,23 @@ const GRAPH = 'https://graph.facebook.com/v25.0'
  * Una variable que cambies fuera de Sloth se ve al reiniciarlo.
  */
 const leidas = new Map<string, string>()
+
+/** Ya se leyeron todas: la que no esté en `leidas`, no existe. */
+let todas = false
+
+/** Las variables de una respuesta de `reg query HKCU\Environment`. Separa con cuatro espacios. */
+export const variablesDeReg = (salida: string) => [...salida.matchAll(/^ {4}(.+?) {4}REG_\w+ {4}(.*?)\s*$/gm)].map((m) => [m[1], m[2]] as const)
+
+/** Todas de una vez, sin detener el arranque: lo que corre al abrir Sloth espera a esto antes de `leer`. */
+export const variablesListas: Promise<void> = process.platform !== 'win32'
+  ? Promise.resolve()
+  : preguntarAlRegistro(['query', 'HKCU\\Environment']).then(
+      (salida) => {
+        for (const [nombre, valor] of variablesDeReg(salida)) if (!leidas.has(nombre)) leidas.set(nombre, valor)
+        todas = true
+      },
+      () => {} // Se preguntará una por una.
+    )
 
 /**
  * Fuera de Windows no hay variables del usuario que lean todos los programas: van a este archivo, que scripts/start.mjs
@@ -42,6 +60,7 @@ export function leer(nombre: string): string {
     leidas.set(nombre, valor)
     return valor
   }
+  if (todas) return ''
   try {
     // Sin stderr: si no existe, `reg` lo dice ahí, y llenaba la consola del servidor.
     const salida = execFileSync('reg', ['query', 'HKCU\\Environment', '/v', nombre], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] })
@@ -144,4 +163,6 @@ export async function guardarMeta(token: string | null): Promise<Opciones> {
 }
 
 // Si ya había token, se pregunta al arrancar cuándo caduca, para que Opciones lo sepa al abrirse.
-if (tokenMeta()) void mirarCaduca(tokenMeta())
+void variablesListas.then(() => {
+  if (tokenMeta()) void mirarCaduca(tokenMeta())
+})

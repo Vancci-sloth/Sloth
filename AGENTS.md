@@ -12,7 +12,7 @@ Para mirar o mover la cola de TikTok e Instagram, o decidir qué se publica, lee
 o fue un hilo (turnos, costo, errores, lo que sigue de fondo, disco libre): `npm run hilo -- <id>`.
 
 Al comprobar una compilación o publicar la app, el cobro, la nube o la página de venta, lee `docs/agents/publicacion.md`.
-Ahí están los repos, los comandos y cómo verificar cada despliegue.
+Ahí están los repos, los comandos y cómo verificar cada despliegue. Si algo va lento o calienta: `docs/agents/rendimiento.md`.
 
 ## Al editar la app
 

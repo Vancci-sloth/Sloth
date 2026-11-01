@@ -1,5 +1,7 @@
 import { createHash } from 'node:crypto'
 import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmdirSync, rmSync, statSync } from 'node:fs'
+import type { Dirent } from 'node:fs'
+import { readdir, readFile, stat } from 'node:fs/promises'
 import { dirname, join, relative } from 'node:path'
 import type { CambioSkill } from '../shared/types.ts'
 
@@ -17,15 +19,34 @@ import type { CambioSkill } from '../shared/types.ts'
 const BASURA = new Set(['__pycache__', 'node_modules', '.git', '.cache'])
 
 /** La huella de un archivo, sin contar los finales de línea: un agente en Windows puede guardarlo con CRLF sin cambiarlo. */
-export function huella(file: string) {
-  const texto = readFileSync(file).toString('latin1').replaceAll('\r\n', '\n')
-  return createHash('sha256').update(texto, 'latin1').digest('hex').slice(0, 16)
+export const huella = (file: string) => resumir(readFileSync(file))
+
+function resumir(datos: Buffer) {
+  return createHash('sha256').update(datos.toString('latin1').replaceAll('\r\n', '\n'), 'latin1').digest('hex').slice(0, 16)
+}
+
+/** Las huellas ya sacadas, con el tamaño y la fecha que tenía cada archivo: lo que no cambió no se vuelve a leer. */
+const sabidas = new Map<string, { firma: string; huella: string }>()
+
+/** La huella de un archivo, sin detener el servidor. Ver una card la pide de todos los de su skill. `undefined` si no está. */
+async function huellaDe(file: string): Promise<string | undefined> {
+  const s = await stat(file).catch(() => undefined)
+  if (!s?.isFile()) return
+  const firma = `${s.size}:${s.mtimeMs}`
+  const sabida = sabidas.get(file)
+  if (sabida?.firma === firma) return sabida.huella
+  const nueva = resumir(await readFile(file))
+  sabidas.set(file, { firma, huella: nueva })
+  return nueva
 }
 
 /** Los archivos de una carpeta, con su ruta relativa y `/`. */
 export function archivos(dir: string): string[] {
-  if (!existsSync(dir)) return []
-  return readdirSync(dir, { recursive: true, withFileTypes: true })
+  return existsSync(dir) ? deLaCarpeta(dir, readdirSync(dir, { recursive: true, withFileTypes: true })) : []
+}
+
+function deLaCarpeta(dir: string, entradas: Dirent[]) {
+  return entradas
     .filter((f) => f.isFile())
     .map((f) => relative(dir, join(f.parentPath, f.name)).replaceAll('\\', '/'))
     .filter((r) => !r.split('/').some((p) => BASURA.has(p)))
@@ -37,12 +58,14 @@ export function huellas(raiz: string): Record<string, string> {
 }
 
 /** Lo de la skill `original` que ya no es igual en `actual` o que ya no está. */
-export function cambiosDe(original: string, actual: string, skill: string): CambioSkill[] {
-  return archivos(original).flatMap((archivo) => {
-    const f = join(actual, archivo)
-    if (!existsSync(f)) return [{ skill, archivo, borrado: true }]
-    return huella(f) === huella(join(original, archivo)) ? [] : [{ skill, archivo }]
-  })
+export async function cambiosDe(original: string, actual: string, skill: string): Promise<CambioSkill[]> {
+  const entradas = await readdir(original, { recursive: true, withFileTypes: true }).catch(() => [])
+  const cambios = await Promise.all(deLaCarpeta(original, entradas).map(async (archivo): Promise<CambioSkill[]> => {
+    const [tuya, suya] = await Promise.all([huellaDe(join(actual, archivo)), huellaDe(join(original, archivo))])
+    if (tuya === undefined) return [{ skill, archivo, borrado: true }]
+    return tuya === suya ? [] : [{ skill, archivo }]
+  }))
+  return cambios.flat()
 }
 
 /** El nombre de la carpeta de una copia: la fecha, que ordena, y por qué se hizo. */

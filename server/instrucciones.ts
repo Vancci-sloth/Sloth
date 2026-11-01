@@ -3,16 +3,17 @@ import { join } from 'node:path'
 import type { SkillRef } from './agent.ts'
 import { OPCIONES } from './claude.ts'
 import { mcpVoz } from './voz/index.ts'
-import { navegadorAgente } from './navegador-agente.ts'
+import { navegadorAgente, USA_EL_NAVEGADOR } from './navegador-agente.ts'
 import { SKILLS } from './skills.ts'
 
 /**
  * Lo que Sloth le dice a los agentes que no son Claude (Codex lo recibe en `developerInstructions`; OpenCode, Grok,
  * Antigravity, Cursor, Muse y Pi, como instrucciones de su sesión o al principio del primer mensaje): los botones de las
- * respuestas, el español, sin preguntas interactivas y dónde están las skills de Sloth.
+ * respuestas, el español, sin preguntas interactivas, dónde están las skills de Sloth y que el navegador es el suyo.
  */
 export const INSTRUCCIONES = `${OPCIONES}
-La interfaz y tus respuestas van en español, también lo que dices mientras trabajas (en una prueba con Big Pickle, las notas de avance salían en inglés). Haz las preguntas en mensajes normales, sin herramientas de preguntas interactivas. Las skills de Sloth están en ${SKILLS}. La skill invocada es siempre la de esa carpeta: si ves otra con el mismo nombre, es una copia vieja y no se usa. Respeta la skill invocada y lee sus referencias cuando hagan falta.`
+La interfaz y tus respuestas van en español, también lo que dices mientras trabajas (en una prueba con Big Pickle, las notas de avance salían en inglés). Haz las preguntas en mensajes normales, sin herramientas de preguntas interactivas. Las skills de Sloth están en ${SKILLS}. La skill invocada es siempre la de esa carpeta: si ves otra con el mismo nombre, es una copia vieja y no se usa. Respeta la skill invocada y lee sus referencias cuando hagan falta.
+${USA_EL_NAVEGADOR}`
 
 /** La ruta del SKILL.md de la skill que invoca el mensaje. Falla si no está. */
 function rutaSkill(skill: SkillRef): string {

@@ -1,6 +1,6 @@
 import { createHash, randomBytes } from 'node:crypto'
 import { join } from 'node:path'
-import { escribir, leer } from '../opciones.ts'
+import { escribir, leer, variablesListas } from '../opciones.ts'
 import { NUBE, SECRETO } from './instagram.ts'
 
 /**
@@ -126,6 +126,7 @@ export async function desplegar(token: string, nombre: string, secreto: string):
  * no se toca. Si falla, sigue la de antes, y se intenta en el siguiente arranque.
  */
 export async function nubeAlDia() {
+  await variablesListas
   const token = leer(TOKEN)
   if (!token || !leer(NUBE)) return
   if (leer(VERSION) === version(await codigo())) return

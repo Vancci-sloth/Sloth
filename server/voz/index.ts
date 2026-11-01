@@ -6,7 +6,8 @@ import { homedir } from 'node:os'
 import { dirname, isAbsolute, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type { McpStdioServerConfig } from '@anthropic-ai/claude-agent-sdk'
-import { chromium, type Browser, type Page } from 'playwright-core'
+import type { Browser, Page } from 'playwright-core'
+import { conectarCDP } from '../playwright.ts'
 import { type EstadoVoz, NAVEGADOR_VOZ, type TrabajoVoz, type VozStudio } from '../../shared/types.ts'
 import { VENTA } from '../../shared/venta.ts'
 import { segundosWav, textoParaVoz, vocesDelPanel } from '../../shared/voz.ts'
@@ -92,7 +93,7 @@ export function voz(app: string) {
   /** El Edge del perfil: el que ya está abierto o uno nuevo. `ventana`, para entrar; si no, sin ventana ni sonido. */
   async function abrirEdge(ventana: boolean): Promise<Browser> {
     if (await responde()) {
-      const b = await chromium.connectOverCDP(`http://127.0.0.1:${PUERTO}`)
+      const b = await conectarCDP(`http://127.0.0.1:${PUERTO}`)
       if (!ventana) return b
       // Para entrar hace falta la ventana: se cierra el de sin ventana (la sesión vive en el perfil).
       await cerrarEdge(b)
@@ -103,7 +104,7 @@ export function voz(app: string) {
     const extra = ventana ? [ENTRAR] : ['--headless=new', '--mute-audio', 'about:blank']
     spawn(edge, [`--remote-debugging-port=${PUERTO}`, `--user-data-dir=${perfil()}`, '--no-first-run', '--no-default-browser-check', ...extra], { detached: true, stdio: 'ignore' }).unref()
     for (let i = 0; i < 40 && !(await responde()); i++) await espera(500)
-    return chromium.connectOverCDP(`http://127.0.0.1:${PUERTO}`)
+    return conectarCDP(`http://127.0.0.1:${PUERTO}`)
   }
 
   async function cerrarEdge(b: Browser) {
@@ -138,7 +139,7 @@ export function voz(app: string) {
     if (!leidas.sesion) return false
     const ventana = integrado()
     if (!ventana?.voz) return true
-    const enApp = await chromium.connectOverCDP(`ws://127.0.0.1:${ventana.puerto}/${ventana.secreto}/${NAVEGADOR_VOZ}`)
+    const enApp = await conectarCDP(`ws://127.0.0.1:${ventana.puerto}/${ventana.secreto}/${NAVEGADOR_VOZ}`)
     try {
       // Las de un solo sitio van con su dirección: con `domain`, Chromium las haría de todo el dominio (y las `__Host-`
       // no se dejarían poner).
@@ -168,7 +169,7 @@ export function voz(app: string) {
   async function pagina(): Promise<{ page: Page; bajarA(carpeta: string): Promise<void>; soltar(): Promise<void> }> {
     const ventana = integrado()
     if (ventana?.voz) {
-      const b = await chromium.connectOverCDP(`ws://127.0.0.1:${ventana.puerto}/${ventana.secreto}/${NAVEGADOR_VOZ}`)
+      const b = await conectarCDP(`ws://127.0.0.1:${ventana.puerto}/${ventana.secreto}/${NAVEGADOR_VOZ}`)
       const ctx = b.contexts()[0]
       const page = ctx.pages()[0] ?? (await ctx.waitForEvent('page'))
       // Playwright, al conectarse, la pone en tema claro: se deja como estaba.
@@ -311,7 +312,7 @@ export function voz(app: string) {
     const ventana = integrado()
     if (ventana?.voz)
       await enTurno(async () => {
-        const b = await chromium.connectOverCDP(`ws://127.0.0.1:${ventana.puerto}/${ventana.secreto}/${NAVEGADOR_VOZ}`)
+        const b = await conectarCDP(`ws://127.0.0.1:${ventana.puerto}/${ventana.secreto}/${NAVEGADOR_VOZ}`)
         await b.contexts()[0].clearCookies().catch(() => {})
         await b.close().catch(() => {})
       })

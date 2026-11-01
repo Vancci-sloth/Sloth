@@ -152,13 +152,13 @@ function skillsDeCard(card: Card, todas: Card[]): string[] {
 }
 
 /** Lo que cambiaste en las skills de una card y tu copia más nueva de ellas. `null` sin original con qué comparar. */
-export function cambiosDeCard(card: Card, todas: Card[], datos: string): CambiosCard | null {
+export async function cambiosDeCard(card: Card, todas: Card[], datos: string): Promise<CambiosCard | null> {
   if (!ORIGINALES) return null
   const skills = skillsDeCard(card, todas)
-  const cambios = skills.flatMap((s) => {
+  const cambios = (await Promise.all(skills.map((s) => {
     const dir = carpetaSkill(s)
     return dir ? cambiosDe(join(ORIGINALES, s), dir, s) : []
-  })
+  }))).flat()
   const tuyas = join(datos, 'skills-tuyas')
   const copia = existsSync(tuyas)
     ? readdirSync(tuyas).sort().reverse().find((c) => skills.some((s) => existsSync(join(tuyas, c, s))))
@@ -170,8 +170,8 @@ export function cambiosDeCard(card: Card, todas: Card[], datos: string): Cambios
  * Vuelve a la original las skills de una card, o solo `uno` de sus archivos. Lo que se pisa se copia antes a
  * `data/skills-tuyas`, por si te arrepientes.
  */
-export function volverAOriginal(card: Card, todas: Card[], datos: string, uno?: { skill: string; archivo: string }) {
-  const cambios = (cambiosDeCard(card, todas, datos)?.cambios ?? []).filter((c) => !uno || (c.skill === uno.skill && c.archivo === uno.archivo))
+export async function volverAOriginal(card: Card, todas: Card[], datos: string, uno?: { skill: string; archivo: string }) {
+  const cambios = ((await cambiosDeCard(card, todas, datos))?.cambios ?? []).filter((c) => !uno || (c.skill === uno.skill && c.archivo === uno.archivo))
   if (!ORIGINALES || !cambios.length) return
   respaldar(cambios, (s) => carpetaSkill(s)!, join(datos, 'skills-tuyas', nombreCopia('antes de volver a la original')))
   for (const s of new Set(cambios.map((c) => c.skill))) {

@@ -121,6 +121,8 @@ if (faltan.size) throw new Error(`El servidor importa paquetes que no van en la 
 cpSync(join(REPO, 'server', 'motor-pagina.jsx'), join(APP, 'server', 'motor-pagina.jsx'))
 // El MCP de la voz lo lanza cada agente con el Node de Sloth: va tal cual, sin paquetes.
 cpSync(join(REPO, 'server', 'voz', 'mcp.mjs'), join(APP, 'server', 'voz', 'mcp.mjs'))
+// El que lanza Playwright MCP a demanda, igual.
+cpSync(join(REPO, 'server', 'navegador-mcp.mjs'), join(APP, 'server', 'navegador-mcp.mjs'))
 // El puente con el SDK de Cursor: server/cursor.ts lo copia junto al SDK que se baja y lo corre con el Node de Sloth.
 cpSync(join(REPO, 'server', 'cursor-puente.mjs'), join(APP, 'server', 'cursor-puente.mjs'))
 

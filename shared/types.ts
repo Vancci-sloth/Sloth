@@ -237,7 +237,7 @@ export type AgentEvent =
   /** `at`: cuándo lo guardó el servidor. */
   | { t: 'thinking'; id: string; delta: string; parent?: string; at?: number }
   | { t: 'tool'; id: string; name: string; input: unknown; parent?: string }
-  | { t: 'tool_update'; id: string; output?: string; delta?: string; done?: boolean; error?: boolean }
+  | { t: 'tool_update'; id: string; output?: string; delta?: string; done?: boolean; error?: boolean; largo?: number }
   /**
    * `caida`: no lo cerró el modelo, se cayó el proceso del agente o el servidor. `costUsd` y `tokens` son lo que gastó el
    * turno según el SDK, con los subagentes (con Codex, a precio de la API: server/precios.ts); faltan si no se

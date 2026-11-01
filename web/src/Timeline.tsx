@@ -1,6 +1,7 @@
 import { Fragment, memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { NOMBRE_AGENTE, proveedorDe } from '../../shared/providers'
 import type { AgentEvent } from '../../shared/types'
+import { api } from './api'
 import { Arranque } from './Arranque'
 import { useEventos } from './eventos'
 import { Icon } from './Composer'
@@ -619,6 +620,19 @@ function Tool({ item, nested, sessionId }: { item: Extract<Item, { kind: 'tool' 
   const imagen = sessionId && /\.(png|jpe?g|gif|webp)$/i.test(ruta) ? `/api/sessions/${sessionId}/imagen?ruta=${encodeURIComponent(ruta)}` : ''
   const { verb, detail } = toolSummary(item.name, item.input)
   const state = !item.done ? 'running' : item.error ? 'error' : 'ok'
+  // Las salidas largas no vienen con el hilo: se piden al abrir la fila.
+  const [pedida, setPedida] = useState<string>()
+  const falta = open && !item.output && !!item.largo && !!sessionId && pedida === undefined
+  useEffect(() => {
+    if (!falta) return
+    let vivo = true
+    api<{ output: string }>(`/api/sessions/${sessionId}/salida?tool=${encodeURIComponent(item.id)}`).then(
+      (r) => vivo && setPedida(r.output),
+      (e) => vivo && setPedida(`No se pudo leer la salida: ${e instanceof Error ? e.message : e}`)
+    )
+    return () => void (vivo = false)
+  }, [falta, sessionId, item.id])
+  const salida = item.output || pedida
 
   return (
     <div className={`tool ${state} ${nested}`}>
@@ -632,7 +646,7 @@ function Tool({ item, nested, sessionId }: { item: Extract<Item, { kind: 'tool' 
       {open && (
         <div className="tool-body">
           <pre className="tool-input">{typeof item.input === 'string' ? item.input : JSON.stringify(item.input, null, 2)}</pre>
-          {item.output && <Output text={item.output} />}
+          {salida ? <Output text={salida} /> : falta && <pre className="tool-output">Cargando…</pre>}
         </div>
       )}
     </div>

@@ -21,6 +21,8 @@ import { fileURLToPath } from 'node:url'
  * no chocan entre ellos ni te llenan la pantalla.
  *
  * Si el paquete no está instalado o no se encuentra, los hilos arrancan igual, sin navegador.
+ *
+ * Playwright no se lanza con el hilo: `navegador-mcp.mjs` le contesta al agente hasta que usa una herramienta.
  */
 
 const APP = resolve(dirname(fileURLToPath(import.meta.url)), '..')
@@ -31,6 +33,14 @@ const CAPTURAS = join(APP, 'data', 'navegador-capturas')
 const TOPE_CAPTURAS = 200 * 1024 * 1024
 /** Lo que espera la ventana de un hilo normal sin que el agente la use antes de cerrarse y soltar el perfil. */
 const OCIOSO = 10 * 60_000
+/** El intermediario que lanza Playwright a demanda, y lo que tarda en soltarlo: con el navegador integrado, lo de `OCIOSO`. */
+const A_DEMANDA = join(APP, 'server', 'navegador-mcp.mjs')
+
+/**
+ * Lo que se les dice a los agentes que no son Claude. Sin esto, Codex abría las páginas con curl o con su propio navegador
+ * (5 de 6 veces): no se veían en el hilo, y lo que pinta la página con JavaScript no siempre llegaba.
+ */
+export const USA_EL_NAVEGADOR = 'Para abrir o leer una página web usa siempre las herramientas browser_ del servidor MCP navegador de Sloth (browser_navigate para abrirla, browser_snapshot para leerla): lo que abres ahí se ve en el hilo y carga como en un navegador de verdad. No uses curl ni otro navegador para eso, ni contestes de memoria lo que hay en una página.'
 
 /** Donde se instalan Chrome y Edge en cada sistema: donde los busca Playwright. */
 const programas = [process.env.LOCALAPPDATA, process.env.PROGRAMFILES, process.env['PROGRAMFILES(X86)']].filter((p): p is string => !!p)
@@ -47,11 +57,12 @@ function delSistema(): 'chrome' | 'msedge' | null {
   return EDGE.some((p) => existsSync(p)) ? 'msedge' : null
 }
 
-/** El CLI de Playwright MCP. El paquete solo exporta su package.json: el CLI está a su lado. `null` si no está instalado. */
-function cli(): string | null {
+/** El CLI de Playwright MCP y su versión. El paquete solo exporta su package.json: el CLI está a su lado. `null` si no está instalado. */
+function cli(): { js: string; version: string } | null {
   try {
-    const js = join(dirname(createRequire(import.meta.url).resolve('@playwright/mcp/package.json')), 'cli.js')
-    return existsSync(js) ? js : null
+    const paquete = createRequire(import.meta.url).resolve('@playwright/mcp/package.json')
+    const js = join(dirname(paquete), 'cli.js')
+    return existsSync(js) ? { js, version: JSON.parse(readFileSync(paquete, 'utf8')).version } : null
   } catch {
     return null
   }
@@ -77,24 +88,28 @@ export function integrado(): { puerto: number; secreto: string; redes: boolean; 
  * cuya página del navegador integrado usa, si la ventana de Sloth está abierta.
  */
 export function navegadorAgente(lote?: boolean, hilo?: string): Record<string, McpStdioServerConfig> {
-  const js = cli()
-  if (!js) return {}
+  const playwright = cli()
+  if (!playwright) return {}
+  const { js, version } = playwright
+  const mcp = (args: string[], suelta = 0): Record<string, McpStdioServerConfig> => ({
+    navegador: { type: 'stdio', command: process.execPath, args: [A_DEMANDA, join(APP, 'data', `navegador-herramientas-${version}.json`), String(suelta), js, ...args] }
+  })
   // Rutas absolutas: las capturas quedan fuera de la carpeta del hilo, y Read de Claude Code las pide así.
   const salida = ['--output-dir', CAPTURAS, '--output-max-size', String(TOPE_CAPTURAS), '--file-paths', 'absolute']
   const ventana = !lote && hilo ? integrado() : null
   if (ventana) {
     const cdp = `ws://127.0.0.1:${ventana.puerto}/${ventana.secreto}/${encodeURIComponent(hilo!)}`
-    return { navegador: { type: 'stdio', command: process.execPath, args: [js, '--cdp-endpoint', cdp, ...salida] } }
+    return mcp(['--cdp-endpoint', cdp, ...salida], OCIOSO)
   }
   const canal = delSistema()
   if (!canal) return {}
-  const args = [js, '--browser', canal, ...salida]
+  const args = ['--browser', canal, ...salida]
   if (lote) args.push('--isolated', '--headless')
   // Si otro hilo ya tiene abierto el perfil, este arranca con uno limpio, con ventana: con el de Sloth, Playwright le
   // contestaría «Browser is already in use» en cuanto lo usara.
   else if (existsSync(PERFIL) && perfilAbierto()) args.push('--isolated')
   else args.push('--user-data-dir', PERFIL, '--idle-timeout', String(OCIOSO))
-  return { navegador: { type: 'stdio', command: process.execPath, args } }
+  return mcp(args)
 }
 
 /** Si hay un navegador abierto con el perfil: Chrome tiene tomado su `lockfile` mientras vive (como lo mira Playwright). */

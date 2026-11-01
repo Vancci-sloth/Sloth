@@ -6,13 +6,16 @@
  * internet, vale hasta su `hasta` (una semana como mucho), y editar el archivo no la alarga. Se vuelve a preguntar al
  * abrir y cada 6 horas.
  */
-import { execFileSync } from 'node:child_process'
+import { execFile } from 'node:child_process'
 import { createHash, createPublicKey, randomUUID, verify } from 'node:crypto'
 import { mkdirSync, readFileSync } from 'node:fs'
+import { readFile } from 'node:fs/promises'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { dirname, join } from 'node:path'
+import { promisify } from 'node:util'
 import type { Licencia } from '../shared/types.ts'
 import { guardar } from './disco.ts'
+import { preguntarAlRegistro } from './registro.ts'
 
 /** El Worker de `licencias/`. */
 export const COBRO = 'https://api.sloth.vancci.org'
@@ -38,6 +41,8 @@ interface Firmado extends Omit<Licencia, 'error'> {
   hasta: string
 }
 
+const correr = promisify(execFile)
+
 class Rechazo extends Error {
   status: number
   constructor(status: number, mensaje: string) {
@@ -50,7 +55,11 @@ export function licencia(app: string) {
   const archivo = join(app, 'data', 'licencia.json')
   let a: Archivo = leer()
   // De Windows cada vez: copiada a otra computadora, la licencia no vale ahí hasta volver a preguntar, y cuenta como otra.
-  const equipo = equipoDeEstaComputadora() ?? a.equipo ?? nuevoEquipo()
+  // Sin detener el arranque, que preguntarle costaba 300 ms: lo que necesita saberlo espera a `listo`.
+  let equipo = ''
+  const listo = equipoDeEstaComputadora().then((id) => {
+    equipo = id ?? a.equipo ?? nuevoEquipo()
+  })
   let error = ''
 
   void revisar()
@@ -112,6 +121,7 @@ export function licencia(app: string) {
 
   /** Pregunta al cobro si la clave sigue activa y guarda lo que firme. Sin conexión, vale lo guardado. */
   async function revisar(): Promise<Licencia> {
+    await listo
     if (!a.clave) return estado()
     try {
       const { datos, firma } = await cobro<{ datos: string; firma: string }>('/licencia', { clave: a.clave, equipo })
@@ -131,6 +141,7 @@ export function licencia(app: string) {
   async function api(req: IncomingMessage, res: ServerResponse, url: URL): Promise<boolean> {
     const ruta = url.pathname
     const metodo = req.method ?? 'GET'
+    if (ruta.startsWith('/api/licencia')) await listo
     try {
       // `?fresco`: la suscripción en Opciones, recién leída.
       if (ruta === '/api/licencia' && metodo === 'GET') return enviar(res, 200, url.searchParams.has('fresco') ? await revisar() : estado())
@@ -162,7 +173,7 @@ export function licencia(app: string) {
         return enviar(res, 200, estado())
       }
       // Para la ventana de Electron, al buscar la versión nueva: quien apoya la recibe antes (licencias/, `ANTICIPO`).
-      if (ruta === '/api/licencia/credencial' && metodo === 'GET') return enviar(res, 200, credencial() ?? {})
+      if (ruta === '/api/licencia/credencial' && metodo === 'GET') return enviar(res, 200, (await credencial()) ?? {})
       // Con un año pagado de una vez: el pago del siguiente.
       if (ruta === '/api/licencia/pago' && metodo === 'POST') {
         if (!a.clave) throw new Rechazo(400, 'No hay una suscripción en esta computadora.')
@@ -175,7 +186,10 @@ export function licencia(app: string) {
   }
 
   /** Con qué entra a la comunidad (`server/comunidad.ts`): la clave y esta computadora, mientras esté activa. */
-  const credencial = () => (activa() && a.clave ? { clave: a.clave, equipo } : undefined)
+  const credencial = async () => {
+    await listo
+    return activa() && a.clave ? { clave: a.clave, equipo } : undefined
+  }
 
   return { api, credencial }
 }
@@ -184,14 +198,14 @@ export function licencia(app: string) {
  * El id del sistema de esta computadora, resumido: no cambia al reinstalar Sloth. En Windows, MachineGuid; en Mac, el
  * IOPlatformUUID; en Linux, /etc/machine-id.
  */
-function equipoDeEstaComputadora(): string | undefined {
+export async function equipoDeEstaComputadora(): Promise<string | undefined> {
   try {
     const id =
       process.platform === 'win32'
-        ? /MachineGuid\s+REG_SZ\s+(\S+)/.exec(execFileSync('reg', ['query', 'HKLM\\SOFTWARE\\Microsoft\\Cryptography', '/v', 'MachineGuid'], { encoding: 'utf8', windowsHide: true, timeout: 5000 }))?.[1]
+        ? /MachineGuid\s+REG_SZ\s+(\S+)/.exec(await preguntarAlRegistro(['query', 'HKLM\\SOFTWARE\\Microsoft\\Cryptography', '/v', 'MachineGuid']))?.[1]
         : process.platform === 'darwin'
-          ? /"IOPlatformUUID" = "([^"]+)"/.exec(execFileSync('ioreg', ['-rd1', '-c', 'IOPlatformExpertDevice'], { encoding: 'utf8', timeout: 5000 }))?.[1]
-          : readFileSync('/etc/machine-id', 'utf8').trim()
+          ? /"IOPlatformUUID" = "([^"]+)"/.exec((await correr('ioreg', ['-rd1', '-c', 'IOPlatformExpertDevice'], { encoding: 'utf8', timeout: 5000 })).stdout)?.[1]
+          : (await readFile('/etc/machine-id', 'utf8')).trim()
     return id ? createHash('sha256').update(`sloth:${id}`).digest('hex').slice(0, 32) : undefined
   } catch {
     return

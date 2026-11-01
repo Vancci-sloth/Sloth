@@ -1,7 +1,8 @@
 import { spawn } from 'node:child_process'
 import { existsSync, mkdirSync } from 'node:fs'
 import { join } from 'node:path'
-import { chromium, type Browser, type BrowserContext, type Page } from 'playwright-core'
+import type { Browser, BrowserContext, Page } from 'playwright-core'
+import { conectarCDP } from '../playwright.ts'
 import type { CuentaInvestigacion, RedVertical } from '../../shared/types.ts'
 import { cerrar } from '../redes/navegador.ts'
 import { Detenido } from './youtube.ts'
@@ -52,7 +53,7 @@ let conectando: Promise<Browser> | null = null
 let lanzando: Promise<void> | null = null
 
 async function conectar(): Promise<BrowserContext> {
-  if (!conectado?.isConnected()) conectado = await (conectando ??= chromium.connectOverCDP(`http://127.0.0.1:${PUERTO}`).finally(() => (conectando = null)))
+  if (!conectado?.isConnected()) conectado = await (conectando ??= conectarCDP(`http://127.0.0.1:${PUERTO}`).finally(() => (conectando = null)))
   return conectado.contexts()[0]
 }
 

@@ -9,8 +9,9 @@
  * Code, pero T3 usa `<webview>` y lo encoge con CSS; aquí la vista es nativa y lo hace `enableDeviceEmulation`.
  *
  * Las páginas son de este proceso, no de la interfaz: siguen vivas si la interfaz se recarga o miras otro hilo, y el
- * agente las usa aunque no se vean. Una que nadie ve ni usa en `OCIOSA` se cierra; al volver a verla, se abre en su
- * última dirección. Todas comparten un perfil aparte del de la interfaz (`persist:navegador`): lo que inicies en una lo
+ * agente las usa aunque no se vean. Escondida y sin agente, Chromium la frena como a una pestaña de fondo (de un tercio de
+ * núcleo a casi nada con una que corre timers). Las de las redes y la voz nunca: trabajan escondidas. Una que nadie ve ni
+ * usa en `OCIOSA` se cierra; al volver a verla, o si vuelve el agente, se abre en su última dirección. Todas comparten un perfil aparte del de la interfaz (`persist:navegador`): lo que inicies en una lo
  * tiene el agente en todas. La de las redes (`NAVEGADOR_REDES`), donde Sloth publica en TikTok, va con el suyo
  * (`persist:redes`): la sesión con la que publicas no la tiene ningún agente. La de la voz (`NAVEGADOR_VOZ`), donde Sloth
  * genera las voces en AI Studio con tu cuenta de Google (`server/voz/`), también (`persist:voz`).
@@ -35,6 +36,8 @@ const PARTICION_REDES = 'persist:redes'
 const PARTICION_VOZ = 'persist:voz'
 /** Las páginas con su propio perfil: el de las demás lo comparten los agentes. */
 const PERFILES: Record<string, string> = { [NAVEGADOR_REDES]: PARTICION_REDES, [NAVEGADOR_VOZ]: PARTICION_VOZ }
+/** Si Chromium puede frenar una página cuando no se ve y nadie la usa. */
+const frenable = (hilo: string) => !PERFILES[hilo]
 /** Lo que espera una página que nadie ve ni usa antes de cerrarse. */
 const OCIOSA = 20 * 60_000
 /** --bg de web/src/styles.css: lo que se ve mientras la página pinta. */
@@ -137,7 +140,7 @@ export function ventanaDelNavegador(v: BrowserWindow) {
 /** Una página nueva para un hilo, en blanco y escondida. */
 function abrir(hilo: string): Hoja {
   const partition = PERFILES[hilo] ?? PARTICION
-  const v = new WebContentsView({ webPreferences: { partition, sandbox: true, backgroundThrottling: false } })
+  const v = new WebContentsView({ webPreferences: { partition, sandbox: true, backgroundThrottling: frenable(hilo) } })
   v.setBackgroundColor(FONDO)
   v.setVisible(false)
   v.setBounds({ x: 0, y: 0, ...medida })
@@ -293,13 +296,16 @@ function ver(hilo: string | null, caja?: Caja, pantalla?: PantallaNavegador | nu
     if (h) colocar(h)
   }
   if (!vista) return
-  let h = hojas.get(vista.hilo)
-  const ultima = ultimas.get(vista.hilo)
-  if (!h && ultima) {
-    h = abrir(vista.hilo)
-    llevar(h, ultima)
-  }
+  const h = hojas.get(vista.hilo) ?? (ultimas.has(vista.hilo) ? reabrir(vista.hilo) : undefined)
   if (h) colocar(h)
+}
+
+/** La página de un hilo que se cerró por ociosa, en su última dirección. */
+function reabrir(hilo: string): Hoja {
+  const h = abrir(hilo)
+  const ultima = ultimas.get(hilo)
+  if (ultima) llevar(h, ultima)
+  return h
 }
 
 /** Se ve si es la del hilo que se ve y tiene algo que enseñar; si no, la interfaz enseña su aviso o su error. */
@@ -401,8 +407,9 @@ async function conectar(ws: WebSocket, hilo: string) {
   const antes: string[] = []
   const guardarlo = (d: unknown) => antes.push(String(d))
   ws.on('message', guardarlo)
-  const h = hojas.get(hilo) ?? abrir(hilo)
+  const h = hojas.get(hilo) ?? reabrir(hilo)
   const wc = h.vista.webContents
+  wc.setBackgroundThrottling(false)
   await h.lista
   ws.off('message', guardarlo)
   if (ws.readyState !== ws.OPEN || wc.isDestroyed()) return ws.close()
@@ -437,6 +444,7 @@ async function conectar(ws: WebSocket, hilo: string) {
     h.conexiones.delete(ws)
     h.usada = Date.now()
     if (h.conexiones.size || wc.isDestroyed()) return
+    wc.setBackgroundThrottling(frenable(hilo))
     try {
       wc.debugger.detach()
     } catch {

@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, utimesSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { test } from 'node:test'
@@ -14,11 +14,11 @@ process.env.SLOTH_SKILLS = join(casa, '.claude', 'skills')
 const originales = join(casa, 'resources', 'skills')
 process.env.SLOTH_SKILLS_ORIGINALES = originales
 const { cambiosDeCard, volverAOriginal } = await import('./skills.ts')
-const { huellas, quitarViejos } = await import('./originales.ts')
+const { cambiosDe, huellas, quitarViejos } = await import('./originales.ts')
 
 const escribir = (f: string, texto: string) => (mkdirSync(dirname(f), { recursive: true }), writeFileSync(f, texto))
 
-test('la card dice qué cambiaste en su skill y en video-base, y vuelve a la original sin perder lo tuyo', (t) => {
+test('la card dice qué cambiaste en su skill y en video-base, y vuelve a la original sin perder lo tuyo', async (t) => {
   t.after(() => rmSync(casa, { recursive: true, force: true }))
   for (const raiz of [originales, join(casa, '.claude', 'skills')]) {
     escribir(join(raiz, 'video-el-diff', 'SKILL.md'), '# El Diff\nLee video-base.\n')
@@ -39,30 +39,57 @@ test('la card dice qué cambiaste en su skill y en video-base, y vuelve a la ori
 
   const cards = [{ id: 'el-diff', skill: 'video-el-diff' }, { id: 'otra', skill: 'otra' }] as Card[]
   const datos = join(casa, 'data')
-  const cambios = () => cambiosDeCard(cards[0], cards, datos)!.cambios
-  assert.deepEqual(new Set(cambios()), new Set([
+  const cambios = async () => (await cambiosDeCard(cards[0], cards, datos))!.cambios
+  assert.deepEqual(new Set(await cambios()), new Set([
     { skill: 'video-el-diff', archivo: 'guion/tono.md' },
     { skill: 'video-el-diff', archivo: 'logo.png', borrado: true },
     { skill: 'video-base', archivo: 'PORTADA.md' }
   ]))
 
   // Un archivo solo: los demás siguen cambiados, y lo que tenías queda en la copia.
-  volverAOriginal(cards[0], cards, datos, { skill: 'video-base', archivo: 'PORTADA.md' })
+  await volverAOriginal(cards[0], cards, datos, { skill: 'video-base', archivo: 'PORTADA.md' })
   assert.equal(readFileSync(join(skills, 'video-base', 'PORTADA.md'), 'utf8'), 'portada\n')
-  assert.equal(cambios().length, 2)
-  const { copia } = cambiosDeCard(cards[0], cards, datos)!
+  assert.equal((await cambios()).length, 2)
+  const { copia } = (await cambiosDeCard(cards[0], cards, datos))!
   assert.match(copia!, /antes de volver a la original$/)
   assert.equal(readFileSync(join(copia!, 'video-base', 'PORTADA.md'), 'utf8'), 'portada roja\n')
 
   // Entera: vuelve lo borrado, lo de tus videos se queda y la otra skill no se toca.
-  volverAOriginal(cards[0], cards, datos)
-  assert.deepEqual(cambios(), [])
+  await volverAOriginal(cards[0], cards, datos)
+  assert.deepEqual(await cambios(), [])
   assert.equal(readFileSync(join(skills, 'video-el-diff', 'guion', 'tono.md'), 'utf8'), 'seco\n')
   assert.ok(existsSync(join(skills, 'video-el-diff', 'logo.png')))
   assert.ok(existsSync(join(skills, 'video-el-diff', 'huellas', 'registro.jsonl')))
   assert.equal(readFileSync(join(skills, 'otra', 'SKILL.md'), 'utf8'), '# cambiada\n')
   const copias = readdirSync(join(datos, 'skills-tuyas'))
   assert.ok(copias.some((c) => existsSync(join(datos, 'skills-tuyas', c, 'video-el-diff', 'guion', 'tono.md'))))
+})
+
+test('ver qué cambió no detiene el servidor, y ve lo que cambia después aunque mida lo mismo', async (t) => {
+  const raiz = mkdtempSync(join(tmpdir(), 'sloth-huellas-'))
+  t.after(() => rmSync(raiz, { recursive: true, force: true }))
+  for (const base of ['original', 'actual']) for (let i = 0; i < 200; i++) escribir(join(raiz, base, `${i}.md`), `texto ${i}\n`)
+  const ver = async () => {
+    let vueltas = 0
+    let acabo = false
+    const girar = () => {
+      vueltas++
+      if (!acabo) setImmediate(girar)
+    }
+    girar()
+    const cambios = await cambiosDe(join(raiz, 'original'), join(raiz, 'actual'), 'skill').finally(() => (acabo = true))
+    return { cambios, vueltas }
+  }
+  const primera = await ver()
+  assert.deepEqual(primera.cambios, [])
+  assert.ok(primera.vueltas > 10, 'el servidor sigue atendiendo mientras tanto')
+
+  const f = join(raiz, 'actual', '7.md')
+  writeFileSync(f, 'cambiado\n'.padEnd(statSync(f).size))
+  utimesSync(f, new Date(), new Date(Date.now() + 5000))
+  assert.deepEqual((await ver()).cambios, [{ skill: 'skill', archivo: '7.md' }])
+  rmSync(f)
+  assert.deepEqual((await ver()).cambios, [{ skill: 'skill', archivo: '7.md', borrado: true }])
 })
 
 test('al estrenar una versión se va lo que ya no trae, pero no lo que cambiaste ni lo tuyo', (t) => {

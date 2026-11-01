@@ -16,7 +16,7 @@ import { alBajarAgente, asegurarAgente, bajandoAgente, estadoAgentes, rutaAgente
 import { opencodeModels } from './opencode.ts'
 import { conectandoOtro, OTROS, sinLimites } from './proveedores.ts'
 import { PROVEEDORES, type Proveedor, proveedorDe } from '../shared/providers.ts'
-import { paraMandar } from '../shared/historial.ts'
+import { paraMandar, salidaDe, sinSalidasLargas } from '../shared/historial.ts'
 import { conectandoCodex, conectarCodex, cuentaCodex, limitesCodex } from './cuenta-codex.ts'
 import { conectando, conectarClaude, cuentaClaude, limitesClaude } from './cuenta.ts'
 import { cancelarOpenCode, conectandoOpenCode, conectarOpenCode, cuentaOpenCode, limitesOpenCode, quitarCuentaOpenCode, usarCuentaOpenCode } from './cuenta-opencode.ts'
@@ -204,9 +204,15 @@ function reiniciar() {
  * Los modelos se preguntan a cada agente que ya se bajó (`server/agentes.ts`), y a DeepSeek con su llave. La
  * interfaz no los espera para enseñar cards y hilos: le llegan por el WebSocket. Se piden al arrancar, al bajar un agente
  * y, si fallaron, otra vez cuando alguien abre la app.
+ *
+ * Lanzar un programa suele detener el servidor unos 200 ms (docs/agents/rendimiento.md). Con todos los agentes de
+ * golpe al abrir Sloth, la interfaz se quedaba sin sus datos: primero la interfaz (`TRAS_ABRIR`) y luego uno por uno.
  */
+const TRAS_ABRIR = 1000
+const ENTRE_AGENTES = 150
 let modelos: Model[] = []
-let cargandoModelos = false
+/** Empieza en `true`: hasta `TRAS_ABRIR` nadie los pide. */
+let cargandoModelos = true
 /** Se pidieron mientras llegaban: al cambiar la cuenta de OpenCode, lo que llegaba ya no vale. */
 let otraVez = false
 function pedirModelos() {
@@ -219,7 +225,8 @@ function pedirModelos() {
     ['opencode', opencodeModels],
     ...Object.entries(OTROS).map(([p, o]): [Proveedor, () => Promise<Model[]>] => [p as Proveedor, o!.modelos])
   ]
-  void Promise.allSettled(pedidos.map(async ([p, pedir]) => {
+  void Promise.allSettled(pedidos.map(async ([p, pedir], i) => {
+    await new Promise((listo) => setTimeout(listo, i * ENTRE_AGENTES))
     const lista = await pedir()
     // Sin cuenta de OpenCode (o de los demás que no son Claude ni Codex) no hay sus modelos: quitarla los quita.
     if (!lista.length && (p === 'claude' || p === 'codex' || !modelos.some((m) => proveedorDe(m.id) === p))) return
@@ -233,7 +240,6 @@ function pedirModelos() {
     }
   })
 }
-pedirModelos()
 // Al bajarse un agente, desde donde sea (Opciones, el primer mensaje de un hilo, conectar su cuenta), llegan sus modelos:
 // si no, quien actualizaba desde una versión que traía Claude Code veía el menú de modelos vacío hasta reabrir Sloth.
 alBajarAgente(pedirModelos)
@@ -317,7 +323,7 @@ async function api(req: IncomingMessage, res: ServerResponse, url: URL): Promise
   const method = req.method ?? 'GET'
 
   if (path === '/api/state' && method === 'GET') {
-    if ((['claude', 'codex', 'opencode'] as const).some((p) => rutaAgente(p) && !modelos.some((m) => proveedorDe(m.id) === p))) pedirModelos()
+    if (!cargandoModelos && (['claude', 'codex', 'opencode'] as const).some((p) => rutaAgente(p) && !modelos.some((m) => proveedorDe(m.id) === p))) pedirModelos()
     send(res, 200, { cards: cards(), sessions: sessions.list(), models: modelos, app: APP, avances: avance?.todos() ?? {} })
     return true
   }
@@ -461,11 +467,11 @@ async function api(req: IncomingMessage, res: ServerResponse, url: URL): Promise
     const todas = cards()
     const card = todas.find((c) => c.id === cam[1])
     if (!card) return send(res, 404, { error: 'No existe esa card' }), true
-    if (cam[2] === 'cambios' && method === 'GET') return send(res, 200, cambiosDeCard(card, todas, join(APP, 'data'))), true
+    if (cam[2] === 'cambios' && method === 'GET') return send(res, 200, await cambiosDeCard(card, todas, join(APP, 'data'))), true
     if (cam[2] === 'original' && method === 'POST') {
       const { skill, archivo } = await body<{ skill?: string; archivo?: string }>(req)
-      volverAOriginal(card, todas, join(APP, 'data'), skill && archivo ? { skill, archivo } : undefined)
-      return send(res, 200, cambiosDeCard(card, todas, join(APP, 'data'))), true
+      await volverAOriginal(card, todas, join(APP, 'data'), skill && archivo ? { skill, archivo } : undefined)
+      return send(res, 200, await cambiosDeCard(card, todas, join(APP, 'data'))), true
     }
   }
 
@@ -568,8 +574,11 @@ async function api(req: IncomingMessage, res: ServerResponse, url: URL): Promise
     const [, id, action] = m
     if (action === 'historial' && method === 'GET') {
       const found = await sessions.historial(id)
-      // Lo que no cambia nada va como hueco (`paraMandar`): la pantalla lo rellena.
-      send(res, found ? 200 : 404, found ? { ...found, events: paraMandar(found.events) } : { error: 'No existe' })
+      // Lo que no cambia nada va como hueco (`paraMandar`), y las salidas largas se piden al abrir su fila.
+      send(res, found ? 200 : 404, found ? { ...found, events: paraMandar(sinSalidasLargas(found.events)) } : { error: 'No existe' })
+    } else if (action === 'salida' && method === 'GET') {
+      const found = await sessions.historial(id)
+      send(res, found ? 200 : 404, found ? { output: salidaDe(found.events, url.searchParams.get('tool') ?? '') } : { error: 'No existe' })
     } else if (!action && method === 'GET') {
       const found = sessions.get(id)
       send(res, found ? 200 : 404, found ?? { error: 'No existe' })
@@ -752,6 +761,10 @@ v6.on('error', () => {})
 v6.listen(PORT, '::1')
 server.listen(PORT, '127.0.0.1', () => {
   console.log(`Sloth en http://localhost:${PORT}`)
+  setTimeout(() => {
+    cargandoModelos = false
+    pedirModelos()
+  }, TRAS_ABRIR)
   // yt-dlp al día, una vez al día: se mira cada hora por si a esa hora trabajaba algo.
   const ytDlp = () => void actualizarYtDlp(APP, () => !ocupado())
   setTimeout(ytDlp, 30_000)

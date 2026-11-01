@@ -1,7 +1,8 @@
 import { spawn } from 'node:child_process'
 import { existsSync, mkdirSync } from 'node:fs'
 import { join } from 'node:path'
-import { chromium, type Browser, type BrowserContext, type Page } from 'playwright-core'
+import type { Browser, BrowserContext, Page } from 'playwright-core'
+import { conectarCDP } from '../playwright.ts'
 import { NAVEGADOR_REDES } from '../../shared/types.ts'
 import { integrado } from '../navegador-agente.ts'
 
@@ -51,7 +52,7 @@ export async function navegador(app: string, url = 'about:blank'): Promise<Brows
   if (conectado?.isConnected()) return conectado.contexts()[0]
   const ventana = integrado()
   if (ventana?.redes) {
-    conectado = await chromium.connectOverCDP(`ws://127.0.0.1:${ventana.puerto}/${ventana.secreto}/${NAVEGADOR_REDES}`)
+    conectado = await conectarCDP(`ws://127.0.0.1:${ventana.puerto}/${ventana.secreto}/${NAVEGADOR_REDES}`)
     enLaApp = true
     // Playwright, al conectarse, pone la página en tema claro; se deja en el de la app, que es el que tenía.
     await Promise.all(conectado.contexts()[0].pages().map((p) => p.emulateMedia({ colorScheme: null })))
@@ -72,7 +73,7 @@ async function abrirEdge(app: string, url: string): Promise<Browser> {
     spawn(edge, [`--remote-debugging-port=${PUERTO}`, `--user-data-dir=${perfil}`, '--no-first-run', '--no-default-browser-check', url], { detached: true, stdio: 'ignore' }).unref()
     for (let i = 0; i < 40 && !(await responde()); i++) await new Promise((r) => setTimeout(r, 500))
   }
-  return chromium.connectOverCDP(`http://127.0.0.1:${PUERTO}`)
+  return conectarCDP(`http://127.0.0.1:${PUERTO}`)
 }
 
 /** La página va a iniciar sesión con Google, que no lo deja hacer dentro de la app. */

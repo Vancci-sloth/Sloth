@@ -52,7 +52,7 @@ class Rechazo extends Error {
 }
 
 interface Opciones {
-  credencial(): Credencial | undefined
+  credencial(): Credencial | undefined | Promise<Credencial | undefined>
   sessions: Sessions
   /** El video terminado con esa ruta, si lo es (los de «Mis videos»). */
   video(ruta: string): VideoHecho | undefined
@@ -66,7 +66,7 @@ export function comunidad(app: string, o: Opciones) {
 
   /** Una petición al Worker, con quién eres. */
   async function nube(ruta: string, init: { metodo?: string; cuerpo?: string | Buffer; tipo?: string } = {}): Promise<Response> {
-    const c = o.credencial()
+    const c = await o.credencial()
     if (!c) throw new Rechazo(401, SIN_LICENCIA)
     const quien: Record<string, string> = 'llave' in c ? { authorization: `Bearer ${c.llave}` } : { 'x-sloth-clave': c.clave, 'x-sloth-equipo': c.equipo }
     try {
