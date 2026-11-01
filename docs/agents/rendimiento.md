@@ -46,6 +46,9 @@ nada de lo que recibe la gente. Varias ideas razonables de abajo no sirvieron: p
   Por eso `reg` va en un `Worker` (`server/registro.ts`), y los agentes, uno por uno y después de la interfaz (`pedirModelos`).
 - Lo que corra en un `Worker` no use tuberías si el servidor puede lanzar algo a la vez: el programa nuevo hereda la tubería, y
   `spawnSync` caduca con `status` 0 aunque ya acabara. Le pasó a `reg`: tardaba 5 s y el id de la computadora salía otro.
+- Con todos los núcleos ocupados, `reg` tarda 1,3 s de mediana (0,3 s libre), igual antes y después de estos cambios, y a veces
+  llegó a caducar a los 5 s: por eso su tope es de 15 s. Un test con tiempos córrelo así antes de subirlo: tres de estos
+  pasaban solo en esta máquina, de 12 núcleos. Mejor contar lo que pasó (vueltas, programas lanzados) que medir milisegundos.
 - `/api/cards/:id/cambios` leía 370 archivos en cada vista de una card, y todo lo demás esperaba. Ahora va sin detener el
   servidor, y lo que no cambió no se relee (`cambiosDe`). Si varias rutas tardan lo mismo a la vez, busca qué las detiene.
 - Importar `playwright-core` costaba casi 400 ms de cada arranque: se carga al usarlo (`server/playwright.ts`). No importes

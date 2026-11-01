@@ -82,7 +82,8 @@ test('ver qué cambió no detiene el servidor, y ve lo que cambia después aunqu
   }
   const primera = await ver()
   assert.deepEqual(primera.cambios, [])
-  assert.ok(primera.vueltas > 10, 'el servidor sigue atendiendo mientras tanto')
+  // Cuántas depende de la máquina, de 3 a miles; de golpe serían 1 o 2.
+  assert.ok(primera.vueltas > 2, 'el servidor sigue atendiendo mientras tanto')
 
   const f = join(raiz, 'actual', '7.md')
   writeFileSync(f, 'cambiado\n'.padEnd(statSync(f).size))

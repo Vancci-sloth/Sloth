@@ -8,7 +8,7 @@ const CODIGO = `const { parentPort, workerData, threadId } = require('node:worke
 const fs = require('node:fs')
 const archivo = require('node:path').join(require('node:os').tmpdir(), 'sloth-reg-' + process.pid + '-' + threadId + '.txt')
 const salida = fs.openSync(archivo, 'w')
-const { error, status } = require('node:child_process').spawnSync('reg', workerData, { stdio: ['ignore', salida, 'ignore'], windowsHide: true, timeout: 5000 })
+const { error, status } = require('node:child_process').spawnSync('reg', workerData, { stdio: ['ignore', salida, 'ignore'], windowsHide: true, timeout: 15000 })
 fs.closeSync(salida)
 const texto = fs.readFileSync(archivo, 'utf8')
 try { fs.rmSync(archivo) } catch {}
@@ -17,7 +17,8 @@ parentPort.postMessage(texto)`
 
 /**
  * Pregunta al registro de Windows desde otro hilo: Node no sabe leerlo, y lanzar un programa suele detener de 150 a 300 ms
- * a quien lo lanza, aunque sea asíncrono (docs/agents/rendimiento.md).
+ * a quien lo lanza, aunque sea asíncrono (docs/agents/rendimiento.md). Aquí esperar no detiene nada, y con la máquina
+ * ocupada `reg` tarda segundos: el tope es largo porque caducar sale caro (id de respaldo, variables de una en una).
  */
 export const preguntarAlRegistro = (args: string[]) =>
   new Promise<string>((listo, fallo) => {
