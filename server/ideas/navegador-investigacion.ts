@@ -45,9 +45,6 @@ const responde = () =>
     () => false
   )
 
-/** ¿Está abierto el navegador de las cuentas de investigación? Sin abrirlo. */
-export const abiertoInvestigacion = responde
-
 let conectado: Browser | null = null
 let conectando: Promise<Browser> | null = null
 let lanzando: Promise<void> | null = null

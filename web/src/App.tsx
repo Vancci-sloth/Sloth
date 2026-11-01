@@ -4,7 +4,8 @@ import type { AvanceCorto, AvisoComunidad, Card, Model, Previa, Serie, ServerPus
 import { NOMBRE_AGENTE, proveedorDe } from '../../shared/providers'
 import { AvisoVideos } from './AvisoVideos'
 import { VENTA } from '../../shared/venta'
-import { Ideas, textoAHtml } from './Ideas' // ideas
+import { Ideas } from './Ideas' // ideas
+import { textoAHtml } from './markdown'
 import { CuentaClaude, Opciones, Requisitos, useSinClaude } from './Opciones'
 import { api } from './api'
 import { eventos, useFallo, useResumen } from './eventos'

@@ -3,6 +3,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 import { basename, extname, isAbsolute, join, matchesGlob, relative, resolve, sep } from 'node:path'
 import { enCurso } from '../shared/etapas.ts'
 import type { Archivo, Avance, AvanceCorto, Card, CarpetaDeVideo, MarcasDeRedes, Render, ServerPush, SessionMeta, VideoFinal, VideoHecho, VideosDeTodos } from '../shared/types.ts'
+import { cuerpo, json } from './http.ts'
 import { IMAGE_TYPES } from './agent.ts'
 import { aLaPapelera, huella } from './disco.ts'
 import { motorDe, servirMotor, servirOnda } from './motor.ts'
@@ -582,9 +583,7 @@ export async function etapasApi(
   if (m[2] === 'carpeta') {
     if (!card?.etapas?.length) return json(res, 400, { error: 'Este hilo no tiene carpeta de video' })
     if (req.method === 'GET') return json(res, 200, { actual: carpetaDe(meta), carpetas: carpetasDeVideo(meta.cwd, sessions) })
-    let text = ''
-    for await (const chunk of req) text += chunk
-    const pide = String((JSON.parse(text || '{}') as { carpeta?: string }).carpeta ?? '')
+    const pide = String((await cuerpo<{ carpeta?: string }>(req)).carpeta ?? '')
     const carpeta = carpetaValida(meta.cwd, pide)
     if (!carpeta) return json(res, 400, { error: `No hay una carpeta «${pide}» en ${meta.cwd}` })
     sessions.setCarpeta(meta.id, carpeta)
@@ -675,8 +674,3 @@ export function servir(req: IncomingMessage, res: ServerResponse, file: string, 
   return true
 }
 
-function json(res: ServerResponse, status: number, data: unknown): true {
-  res.writeHead(status, { 'content-type': 'application/json' })
-  res.end(JSON.stringify(data))
-  return true
-}

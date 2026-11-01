@@ -10,6 +10,6 @@
     "lib": ["ES2023"],
     "types": []
   },
-  "include": ["src", "worker-configuration.d.ts"],
+  "include": ["src", "worker-configuration.d.ts", "worker-runtime.d.ts"],
   "exclude": ["src/**/*.test.ts"]
 }

@@ -9,5 +9,5 @@
     "lib": ["ES2023"],
     "types": []
   },
-  "include": ["src", "worker-configuration.d.ts"]
+  "include": ["src", "worker-configuration.d.ts", "../licencias/worker-runtime.d.ts"]
 }

@@ -14,6 +14,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 import { dirname, join } from 'node:path'
 import { promisify } from 'node:util'
 import type { Licencia } from '../shared/types.ts'
+import { cuerpo, json as enviar } from './http.ts'
 import { guardar } from './disco.ts'
 import { preguntarAlRegistro } from './registro.ts'
 
@@ -212,14 +213,3 @@ export async function equipoDeEstaComputadora(): Promise<string | undefined> {
   }
 }
 
-async function cuerpo<T>(req: IncomingMessage): Promise<T> {
-  let texto = ''
-  for await (const parte of req) texto += parte
-  return (texto ? JSON.parse(texto) : {}) as T
-}
-
-function enviar(res: ServerResponse, status: number, datos: unknown): true {
-  res.writeHead(status, { 'content-type': 'application/json' })
-  res.end(JSON.stringify(datos))
-  return true
-}

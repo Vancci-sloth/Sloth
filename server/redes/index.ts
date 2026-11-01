@@ -12,6 +12,7 @@ import type { AvisoRedes, Borrador, CalendarioRed, Card, EstadoRitmo, MarcasDeRe
 import { aLaPapelera, guardar as guardarArchivo, huella } from '../disco.ts'
 import { folderOf, servir, videosDe } from '../etapas.ts'
 import type { Sessions } from '../sessions.ts'
+import { cuerpo as body, json } from '../http.ts'
 import { montarNube, nubeAlDia } from './cloudflare.ts'
 import { hayNube, instagram } from './instagram.ts'
 import { abierto, conGoogle, contextoDeGoogle, deGoogle, deLaApp, desconectar, enGoogle, navegador, pasarDeEdge, pestana, SinSesion, sinAviso, soltar } from './navegador.ts'
@@ -632,17 +633,6 @@ export function redes(app: string, sessions: Sessions, cards: () => Card[], avis
     if (escribiendoTextos) return 'Claude está escribiendo el texto de un video para redes. Espera a que termine.'
     if (enGoogle()) return 'Estás iniciando sesión con Google en Edge. Espera a que termine.'
     return null
-  }
-
-  async function body<T>(req: IncomingMessage): Promise<T> {
-    let text = ''
-    for await (const chunk of req) text += chunk
-    return (text ? JSON.parse(text) : {}) as T
-  }
-  function json(res: ServerResponse, status: number, data: unknown) {
-    res.writeHead(status, { 'content-type': 'application/json' })
-    res.end(JSON.stringify(data))
-    return true
   }
 
   /** Las rutas `/api/redes/…`. Devuelve si atendió la petición. */

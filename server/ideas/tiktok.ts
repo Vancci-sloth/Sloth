@@ -13,9 +13,6 @@ import { correr, Detenido } from './youtube.ts'
  * herramientas de desarrollo. Las cuentas van por yt-dlp, sin sesión y sin el navegador.
  */
 
-// Lo del navegador se pedía aquí antes de que Instagram también buscara: sigue saliendo de aquí.
-export { abiertoInvestigacion, abrirInvestigacion, cuentaInvestigacion } from './navegador-investigacion.ts'
-
 const CAMBIO = 'TikTok no devolvió resultados de búsqueda: ¿cambió su página?'
 
 export class SinSesionTikTok extends Error {

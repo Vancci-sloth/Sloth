@@ -36,7 +36,7 @@
 .estudio-columna { max-width: 760px; margin: 0 auto; padding: 22px 28px 40px; display: flex; flex-direction: column; }
 .estudio-etapa { display: flex; flex-direction: column; gap: 12px; padding-bottom: 28px; }
 .estudio-etapa + .estudio-etapa { padding-top: 24px; border-top: 1px solid var(--line); }
-.estudio-fase audio, .monitor-etapa audio { width: 100%; }
+.estudio-fase audio { width: 100%; }
 /* Una imagen o un video solo (una portada vertical) no pasa del alto de la pantalla. */
 .estudio-columna .etapa-rejilla img, .estudio-columna .etapa-rejilla video { max-height: 70vh; object-fit: contain; }
 .estudio-columna .etapa-rejilla.c2 img, .estudio-columna .etapa-rejilla.c3 img { object-fit: cover; }

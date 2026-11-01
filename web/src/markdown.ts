@@ -25,6 +25,9 @@ marked.use({
   }
 })
 
+/** El texto de un borrador del compositor: el campo lo lee tal cual, con sus saltos de línea. */
+export const textoAHtml = (t: string) => t.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;')
+
 export const markdown = (texto: string) => marked.parse(texto, { async: false }) as string
 
 /**

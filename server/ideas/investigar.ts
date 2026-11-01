@@ -1,5 +1,6 @@
 import { esLargo, esOutlier, LARGO, MIN_MUESTRA, origenes, porMil, sospechoso, TU_CANAL, veces } from '../../shared/ideas.ts'
 import type { Canal, CanalYT, Investigacion, PasoYT, TerminoYT, VideoYT } from '../../shared/types.ts'
+import { dormir } from './navegador-investigacion.ts'
 import { mediana, medir, mil } from './resumen.ts'
 import { transcribirVideos } from './transcribir.ts'
 import { vectorizar } from './vectores.ts'
@@ -40,14 +41,6 @@ export interface Ctx {
 
 /** Lo que dice yt-dlp de un video que ya no está: no hay fecha que leer, y no se vuelve a intentar. */
 const NO_ESTA = /unavailable|private video|has been removed|no longer available|not available/i
-
-function dormir(ms: number, signal: AbortSignal) {
-  return new Promise<void>((ok, mal) => {
-    if (signal.aborted) return mal(new Detenido('Detenida'))
-    const t = setTimeout(ok, ms)
-    signal.addEventListener('abort', () => (clearTimeout(t), mal(new Detenido('Detenida'))), { once: true })
-  })
-}
 
 /**
  * Con `solo`, investiga únicamente esos orígenes del perfil (términos, referencias o tu canal): lo que le falta a la

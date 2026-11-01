@@ -46,7 +46,7 @@ const SKILLS_BASE = ['video-base', 'modelos-3d']
  * Los paquetes que el servidor carga o lanza. Lo demás ya va dentro de server/index.mjs o de la interfaz. De los agentes
  * van solo su SDK y su lanzador: su programa (cientos de MB cada uno) se baja al elegirlo (`server/agentes.ts`).
  */
-const PAQUETES = ['@anthropic-ai/claude-agent-sdk', '@openai/codex', '@opencode/client', '@playwright/mcp', 'playwright-core', 'ws', 'zod']
+const PAQUETES = ['@anthropic-ai/claude-agent-sdk', '@openai/codex', '@opencode/client', '@playwright/mcp', 'playwright-core', 'ws']
 /** Lo que no se copia de las skills ni de los procesos de Python. */
 const BASURA = new Set(['__pycache__', 'node_modules', '.git', '.cache'])
 /**
@@ -62,6 +62,10 @@ const esBanco = (ruta) => basename(ruta) === 'banco' && basename(dirname(ruta)) 
  */
 const MODELOS = join(REPO, 'skills', 'modelos-3d', 'modelos')
 const limpio = (ruta) => !BASURA.has(basename(ruta)) && !TUYO.includes(ruta) && !esBanco(ruta) && dirname(ruta) !== MODELOS
+
+/** Ideas no se vende: `VENTA` nunca la abre, y aquí su código se cambia por nada para que no viaje en la app. */
+const IDEAS = /[\\/](server[\\/]ideas[\\/](index|mcp)\.ts|web[\\/]src[\\/]Ideas\.tsx)$/
+const SIN_IDEAS = 'export const Ideas = null, ideas = null, herramientasIdeas = () => ({})'
 
 const paso = (texto) => console.log(`\n· ${texto}`)
 // Compilada desde un hilo de Sloth, heredaría el `development` de su Vite, y React saldría en modo desarrollo.
@@ -83,7 +87,7 @@ await vite({
   configFile: false,
   mode: 'production',
   logLevel: 'warn',
-  plugins: [react()],
+  plugins: [react(), { name: 'sin-ideas', enforce: 'pre', load: (id) => (IDEAS.test(id) ? SIN_IDEAS : undefined) }],
   define: { __VENTA__: 'true' },
   build: { outDir: join(APP, 'web'), emptyOutDir: true, chunkSizeWarningLimit: 4000 }
 })
@@ -105,6 +109,7 @@ const { metafile } = await esbuild({
   packages: 'external',
   define: { __VENTA__: 'true', __NUBE__: JSON.stringify(nube.outputFiles[0].text) },
   minifySyntax: true,
+  plugins: [{ name: 'sin-ideas', setup: (b) => b.onLoad({ filter: IDEAS }, () => ({ contents: SIN_IDEAS, loader: 'js' })) }],
   metafile: true,
   logLevel: 'warning'
 })
@@ -132,6 +137,8 @@ const dependencias = Object.fromEntries(PAQUETES.map((p) => [p, instalada(p)]))
 writeFileSync(join(APP, 'package.json'), `${JSON.stringify({ name: 'sloth', version: VERSION, private: true, type: 'module', dependencies: dependencias }, null, 2)}\n`)
 // Sin los opcionales: son los programas de Claude y Codex para cada sistema, que se bajan al elegirlos.
 execSync('npm install --omit=dev --omit=optional --no-audit --no-fund --prefer-offline', { cwd: APP, stdio: 'inherit' })
+// Lo que corre es el .js: los tipos, las fuentes y sus mapas son la mitad de node_modules.
+for (const f of readdirSync(join(APP, 'node_modules'), { recursive: true, withFileTypes: true })) if (f.isFile() && /\.([cm]?ts|map)$/.test(f.name)) rmSync(join(f.parentPath, f.name))
 
 // Las skills van aparte, en resources: la app las pone en app\skills al estrenar cada versión sin pisar lo que llevan de
 // tus videos (`prepararSkills` en electron/main.ts).
@@ -315,6 +322,8 @@ const hechos = await empaquetar({
       artifactName: 'Sloth-${version}-linux-${arch}.${ext}',
       syncDesktopName: true
     },
+    // La app va en español: de los 55 idiomas de Chromium solo hacen falta el suyo y el inglés, al que recurre.
+    electronLanguages: ['es', 'es-419', 'en-US'],
     afterPack: linuxSinAislamiento,
     // Las actualizaciones (electron-updater): el cobro sirve un pedazo por petición, no varios.
     publish: [{ provider: 'generic', url: `${COBRO}/actualizaciones`, useMultipleRangeRequest: false }],

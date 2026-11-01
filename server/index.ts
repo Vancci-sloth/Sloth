@@ -8,6 +8,8 @@ import { WebSocketServer, type WebSocket } from 'ws'
 import type { Card, Model, ServerPush } from '../shared/types.ts'
 import { VENTA } from '../shared/venta.ts'
 import { cambiarAcceso } from './acceso.ts'
+import { cuerpo as body, json as send } from './http.ts'
+import { ideas } from './ideas/index.ts' // ideas
 import { IMAGE_TYPES, nombreAdjunto } from './agent.ts'
 import { avances } from './avances.ts'
 import { claudeModels, tituloCorto } from './claude.ts'
@@ -22,7 +24,6 @@ import { conectando, conectarClaude, cuentaClaude, limitesClaude } from './cuent
 import { cancelarOpenCode, conectandoOpenCode, conectarOpenCode, cuentaOpenCode, limitesOpenCode, quitarCuentaOpenCode, usarCuentaOpenCode } from './cuenta-opencode.ts'
 import { enlacesApi } from './enlaces.ts' // tarjeta de los enlaces
 import { etapasApi, mismaCwd, queFalta, videosApi, videosDe } from './etapas.ts' // panel de etapas
-import { ideas } from './ideas/index.ts' // ideas
 import { modelos3d } from './modelos3d.ts' // modelos 3D
 import { miniaturas } from './miniaturas.ts' // panel de etapas
 import { guardarMeta, guardarYoutube, opciones } from './opciones.ts'
@@ -298,17 +299,6 @@ function aWav(file: string): Promise<string | null> {
     ffmpeg.on('error', () => ok(null))
     ffmpeg.on('exit', (codigo) => ok(codigo === 0 ? wav : null))
   })
-}
-
-async function body<T>(req: IncomingMessage): Promise<T> {
-  let text = ''
-  for await (const chunk of req) text += chunk
-  return (text ? JSON.parse(text) : {}) as T
-}
-
-function send(res: ServerResponse, status: number, data: unknown) {
-  res.writeHead(status, { 'content-type': 'application/json' })
-  res.end(JSON.stringify(data))
 }
 
 /** Si arrancar `nuevos` videos pasa de los que van sin aviso y no lo han confirmado: lo contesta, y la interfaz pregunta. */

@@ -12,6 +12,7 @@ import { type EstadoVoz, NAVEGADOR_VOZ, type TrabajoVoz, type VozStudio } from '
 import { VENTA } from '../../shared/venta.ts'
 import { segundosWav, textoParaVoz, vocesDelPanel } from '../../shared/voz.ts'
 import { guardar } from '../disco.ts'
+import { cuerpo } from '../http.ts'
 import { integrado } from '../navegador-agente.ts'
 
 /**
@@ -488,12 +489,6 @@ async function avisos(page: Page): Promise<string> {
     .evaluate(() => [...document.querySelectorAll('mat-snack-bar-container, [role=alert], .error, .error-message')].map((d) => (d as HTMLElement).innerText.trim()).filter(Boolean).join(' · '))
     .catch(() => '')
   return texto ? `: ${texto}` : ''
-}
-
-async function cuerpo<T>(req: IncomingMessage): Promise<T> {
-  let texto = ''
-  for await (const parte of req) texto += parte
-  return (texto ? JSON.parse(texto) : {}) as T
 }
 
 const espera = (ms: number) => new Promise((r) => setTimeout(r, ms))

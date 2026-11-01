@@ -8,11 +8,12 @@ import { llaveYoutube, tokenMeta } from '../opciones.ts'
 import { carpetaTrabajo } from '../trabajo.ts'
 import type { Sessions } from '../sessions.ts'
 import { skillRef } from '../skills.ts'
+import { cuerpo as body, json } from '../http.ts'
 import { investigar } from './investigar.ts'
 import { investigarVertical } from './investigar-vertical.ts'
 import { medirRendimiento } from './rendimiento.ts'
 import { enLineas, resumir } from './resumen.ts'
-import { abrirInvestigacion, cuentaInvestigacion } from './tiktok.ts'
+import { abrirInvestigacion, cuentaInvestigacion } from './navegador-investigacion.ts'
 import { Detenido, ytdlp } from './youtube.ts'
 
 /**
@@ -575,17 +576,6 @@ export function ideas(app: string, sessions: Sessions, avisar: (push: ServerPush
     el.hilos.push({ cardId: 'grabar', id: meta.id, en: Date.now() })
     escribir(id, 'estado.json', e)
     return meta
-  }
-
-  async function body<T>(req: IncomingMessage): Promise<T> {
-    let text = ''
-    for await (const chunk of req) text += chunk
-    return (text ? JSON.parse(text) : {}) as T
-  }
-  function json(res: ServerResponse, status: number, data: unknown) {
-    res.writeHead(status, { 'content-type': 'application/json' })
-    res.end(JSON.stringify(data))
-    return true
   }
 
   /** Las rutas `/api/ideas/…`. Devuelve si atendió la petición. */

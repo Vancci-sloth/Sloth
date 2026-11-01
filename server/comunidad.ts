@@ -8,6 +8,7 @@ import { promisify } from 'node:util'
 import { query } from '@anthropic-ai/claude-agent-sdk'
 import { NOMBRE_AGENTE, proveedorDe } from '../shared/providers.ts'
 import type { AdjuntoComunidad, AyudaMejora, OrigenMejora, PublicacionComunidad, ServerPush, VideoHecho } from '../shared/types.ts'
+import { bytes, cuerpo, json as enviar } from './http.ts'
 import { COBRO } from './licencia.ts'
 import type { Sessions } from './sessions.ts'
 import { redactarCodexYoutube } from './youtube-redactor.ts'
@@ -327,22 +328,6 @@ export function llaveDelCreador(): Credencial | undefined {
   }
 }
 
-async function bytes(req: IncomingMessage): Promise<Buffer> {
-  const trozos: Buffer[] = []
-  for await (const t of req) trozos.push(t as Buffer)
-  return Buffer.concat(trozos)
-}
-
-async function cuerpo<T>(req: IncomingMessage): Promise<T> {
-  const texto = (await bytes(req)).toString('utf8')
-  return (texto ? JSON.parse(texto) : {}) as T
-}
-
-function enviar(res: ServerResponse, estado: number, datos: unknown): true {
-  res.writeHead(estado, { 'content-type': 'application/json' })
-  res.end(JSON.stringify(datos))
-  return true
-}
 
 /** La forma de la ayuda, que Codex respeta al pie de la letra (`outputSchema`). */
 const ESQUEMA_AYUDA = {

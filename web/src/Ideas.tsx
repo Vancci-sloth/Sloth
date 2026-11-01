@@ -119,9 +119,6 @@ function Portada({ canalId, v, className = '' }: { canalId: string; v: VideoYT; 
   )
 }
 
-/** El texto de un borrador del compositor: el campo lo lee tal cual, con sus saltos de línea. */
-export const textoAHtml = (t: string) => t.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;')
-
 /** El modelo para los hilos de la sección: el último que elegiste, o el primero del catálogo. */
 function eleccion(models: Model[]): Choice | undefined {
   try {
