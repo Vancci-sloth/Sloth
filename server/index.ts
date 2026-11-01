@@ -23,7 +23,8 @@ import { conectandoCodex, conectarCodex, cuentaCodex, limitesCodex } from './cue
 import { conectando, conectarClaude, cuentaClaude, limitesClaude } from './cuenta.ts'
 import { cancelarOpenCode, conectandoOpenCode, conectarOpenCode, cuentaOpenCode, limitesOpenCode, quitarCuentaOpenCode, usarCuentaOpenCode } from './cuenta-opencode.ts'
 import { enlacesApi } from './enlaces.ts' // tarjeta de los enlaces
-import { etapasApi, mismaCwd, queFalta, videosApi, videosDe } from './etapas.ts' // panel de etapas
+import { cerrarVigilantesOciosos, etapasApi, folderOf, mismaCwd, queFalta, videosApi, videosDe } from './etapas.ts' // panel de etapas
+import { cerrarMotoresOciosos } from './motor.ts'
 import { modelos3d } from './modelos3d.ts' // modelos 3D
 import { miniaturas } from './miniaturas.ts' // panel de etapas
 import { guardarMeta, guardarYoutube, opciones } from './opciones.ts'
@@ -112,7 +113,15 @@ const sessions = new Sessions(
 const conEtapas = (id: string) => !!cards().find((c) => c.id === sessions.meta(id)?.cardId)?.etapas?.length
 sessions.esVideo = (meta) => !!cards().find((c) => c.id === meta.cardId)?.etapas?.some((e) => e.fase)
 // Mientras un video trabaja, Whisper se queda cargado: el primero que empieza lo carga, antes de que sus agentes llenen la memoria.
-setInterval(() => { if (sessions.videosTrabajando()) void mantenerVoz(SKILLS) }, 60_000).unref()
+setInterval(() => {
+  if (sessions.videosTrabajando()) void mantenerVoz(SKILLS)
+  const abiertas = [...suscripciones.values()].flatMap((id) => {
+    const meta = id && sessions.meta(id)
+    return meta ? [meta] : []
+  })
+  cerrarMotoresOciosos(abiertas.map(folderOf))
+  cerrarVigilantesOciosos([...abiertas, ...sessions.list().filter((s) => s.running || s.background?.length)].map((s) => s.cwd))
+}, 60_000).unref()
 
 /**
  * Las cards de cards.json, más las tuyas (`CARDS_TUYAS`) si hay; una tuya sin `id` o con el de una de Sloth no cuenta.

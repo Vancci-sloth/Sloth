@@ -22,6 +22,8 @@ import { SKILLS } from './skills.ts'
  *
  * Lo de OpenCode (sus sesiones, su caché) vive en `data/opencode`, no en el OpenCode que tenga instalado el usuario: así
  * no se toca su configuración ni su base, que OpenCode 2 convierte a su formato al abrirla.
+ * `conexion` toma una reserva, que se devuelve con `soltarConexion`: un minuto sin reservas cierra el servidor.
+ * Las sesiones y las autorizaciones pendientes conservan la suya hasta terminar o cancelarse.
  */
 
 const APP = resolve(dirname(fileURLToPath(import.meta.url)), '..')
@@ -57,17 +59,45 @@ interface Servidor {
   oyentes: Map<string, (e: Evento) => void>
   /** La sesión de Sloth de cada subagente (sesión hija), hasta la del agente principal. */
   raiz: Map<string, string>
+  usos: number
+  reloj?: ReturnType<typeof setTimeout>
+  cerrado: boolean
+  fin: Promise<void>
 }
 
 let servidor: Promise<Servidor> | null = null
+const SIN_HILOS = 60_000
+/** Un hilo que se retoma espera a que su proceso anterior retire sus MCP, que llevan el mismo nombre. */
+const cierres = new Map<string, Promise<void>>()
 
-/** El servidor de OpenCode, que se abre la primera vez que hace falta (y se baja, si falta). */
-export function conexion(): Promise<Servidor> {
-  servidor ??= abrir().catch((error) => {
-    servidor = null
-    throw error
-  })
-  return servidor
+/** Toma el servidor compartido. Cada uso debe terminar en `soltarConexion`, también si falla. */
+export async function conexion(): Promise<Servidor> {
+  if (!servidor) {
+    const abriendo = abrir()
+    servidor = abriendo
+    const olvidar = () => { if (servidor === abriendo) servidor = null }
+    void abriendo.then((s) => s.cerrado ? olvidar() : s.proc.once('exit', olvidar), olvidar)
+  }
+  const actual = servidor
+  const s = await actual
+  if (s.cerrado) {
+    await s.fin
+    if (servidor === actual) servidor = null
+    return conexion()
+  }
+  clearTimeout(s.reloj)
+  s.usos++
+  return s
+}
+
+/** Sin hilos ni consultas pendientes, termina el servidor y sus MCP al cabo de un minuto. */
+export function soltarConexion(s: Servidor) {
+  if (--s.usos || s.cerrado) return
+  s.reloj = setTimeout(() => {
+    s.cerrado = true
+    s.proc.kill()
+  }, SIN_HILOS)
+  s.reloj.unref()
 }
 
 async function abrir(): Promise<Servidor> {
@@ -82,46 +112,59 @@ async function abrir(): Promise<Servidor> {
     stdio: ['ignore', 'pipe', 'pipe'],
     windowsHide: true
   })
-  const url = await new Promise<string>((ok, mal) => {
-    let salida = ''
-    const reloj = setTimeout(() => mal(new Error('OpenCode tardó demasiado en arrancar.')), 60_000)
-    const leer = (d: Buffer) => {
-      // Solo hasta saber la dirección: luego se drena sin guardar, para que no se llenen los tubos.
-      if (salida === null) return
-      salida = (salida + d).slice(-64 * 1024)
-      const m = /listening on\s+(https?:\/\/\S+)/i.exec(salida)
-      if (m) {
-        clearTimeout(reloj)
-        ok(m[1])
+  // `exit` y no `close`: un MCP que sobrevive con su tubo abierto no debe dejar esperando a todos los hilos.
+  const fin = new Promise<void>((ok) => {
+    proc.once('exit', () => ok())
+    proc.once('error', () => ok())
+  })
+  try {
+    const url = await new Promise<string>((ok, mal) => {
+      let salida: string | null = ''
+      const reloj = setTimeout(() => mal(new Error('OpenCode tardó demasiado en arrancar.')), 60_000)
+      const leer = (d: Buffer) => {
+        // Solo hasta saber la dirección: luego se drena sin guardar, para que no se llenen los tubos.
+        if (salida === null) return
+        salida = (salida + d).slice(-64 * 1024)
+        const m = /listening on\s+(https?:\/\/\S+)/i.exec(salida)
+        if (m) {
+          clearTimeout(reloj)
+          salida = null
+          ok(m[1])
+        }
       }
-    }
-    proc.stdout!.on('data', leer)
-    proc.stderr!.on('data', leer)
-    proc.once('error', (e) => (clearTimeout(reloj), mal(e)))
-    proc.once('exit', (code) => (clearTimeout(reloj), mal(new Error(`OpenCode se cerró al arrancar (código ${code}): ${salida.trim().slice(-600)}`))))
-  })
-  const client = OpenCode.make({ baseUrl: url, headers: { authorization: `Basic ${Buffer.from(`opencode:${password}`, 'utf8').toString('base64')}` } })
-  await client.server.info()
-  const s: Servidor = { client, proc, oyentes: new Map(), raiz: new Map() }
-  const corte = new AbortController()
-  const cerrar = () => proc.kill()
-  process.once('exit', cerrar)
-  proc.once('exit', () => {
-    process.off('exit', cerrar)
-    corte.abort()
-    if (servidor) servidor = null
-    for (const oye of s.oyentes.values()) oye({ type: 'sloth.caida', data: {} } as never)
-    s.oyentes.clear()
-  })
-  void (async () => {
-    try {
-      for await (const e of client.event.subscribe({ signal: corte.signal })) repartir(s, e)
-    } catch {
-      // Se cerró el servidor o se cortó la conexión: `exit` avisa a las sesiones.
-    }
+      proc.stdout!.on('data', leer)
+      proc.stderr!.on('data', leer)
+      proc.once('error', (e) => (clearTimeout(reloj), mal(e)))
+      proc.once('exit', (code) => (clearTimeout(reloj), mal(new Error(`OpenCode se cerró al arrancar (código ${code}): ${salida?.trim().slice(-600) ?? ''}`))))
+    })
+    const client = OpenCode.make({ baseUrl: url, headers: { authorization: `Basic ${Buffer.from(`opencode:${password}`, 'utf8').toString('base64')}` } })
+    await client.server.info()
+    const s: Servidor = { client, proc, oyentes: new Map(), raiz: new Map(), usos: 0, cerrado: false, fin }
+    const corte = new AbortController()
+    const cerrar = () => proc.kill()
+    process.once('exit', cerrar)
+    proc.once('exit', () => {
+      s.cerrado = true
+      clearTimeout(s.reloj)
+      process.off('exit', cerrar)
+      corte.abort()
+      for (const oye of s.oyentes.values()) oye({ type: 'sloth.caida', data: {} } as never)
+      s.oyentes.clear()
+    })
+    void (async () => {
+      try {
+        for await (const e of client.event.subscribe({ signal: corte.signal })) repartir(s, e)
+      } catch {
+        // Se cerró el servidor o se cortó la conexión: `exit` avisa a las sesiones.
+      }
+      proc.kill()
+    })()
+    return s
+  } catch (error) {
     proc.kill()
-  })()
-  return s
+    await fin
+    throw error
+  }
 }
 
 /** Cada evento a su sesión de Sloth: el de un subagente, a la del agente que lo lanzó. */
@@ -191,6 +234,7 @@ export function startOpenCode(opts: AgentOptions, conectar: () => Promise<Servid
   let cerrado = false
   let serie = Promise.resolve()
   let servidorDe: Servidor | undefined
+  let liberacion: Promise<void> | undefined
   /** Lo que gastó el turno, paso a paso, también lo de sus subagentes. */
   let tokens: Tokens = CERO
   let costo = 0
@@ -348,12 +392,14 @@ export function startOpenCode(opts: AgentOptions, conectar: () => Promise<Servid
   }
 
   const ready = (async () => {
+    await cierres.get(mcp)
     const s = await conectar()
     servidorDe = s
     if (cerrado) return
     const c = s.client
     const location = { directory: opts.cwd }
     const lista = await c.model.list({ location }).catch(() => undefined)
+    if (cerrado) return
     ventana = lista?.data.find((m) => m.providerID === providerID && m.id === modelo)?.limit.context ?? 0
     let viva = opts.resume ? await c.session.get({ sessionID: opts.resume }).then((x) => x.id, () => '') : ''
     if (!viva) {
@@ -362,6 +408,7 @@ export function startOpenCode(opts: AgentOptions, conectar: () => Promise<Servid
       viva = nueva.id
     }
     sesion = viva
+    if (cerrado) return
     s.oyentes.set(sesion, oir)
     await c.session.instructions.entry.put({ sessionID: sesion, key: 'sloth', value: INSTRUCCIONES })
     // Si el navegador no arranca, el hilo sigue sin él.
@@ -372,9 +419,29 @@ export function startOpenCode(opts: AgentOptions, conectar: () => Promise<Servid
           .catch(() => {})
       )
     )
-    opts.onProviderSession(sesion)
+    if (!cerrado) opts.onProviderSession(sesion)
   })()
-  void ready.catch(() => {})
+  void ready.catch(async () => {
+    await liberar()
+    opts.onExit?.()
+  })
+
+  function liberar(): Promise<void> {
+    if (liberacion) return liberacion
+    const s = servidorDe
+    if (!s) return Promise.resolve()
+    liberacion = (async () => {
+      s.oyentes.delete(sesion)
+      for (const [hijo, raiz] of s.raiz) if (raiz === sesion) s.raiz.delete(hijo)
+      try {
+        await Promise.all(Object.keys(servidoresMcp).map((nombre) => s.client.mcp.remove({ server: `${mcp}-${nombre}`, location: { directory: opts.cwd } }).catch(() => {})))
+        if (busy && sesion) await s.client.session.interrupt({ sessionID: sesion }).catch(() => {})
+      } finally {
+        soltarConexion(s)
+      }
+    })()
+    return liberacion
+  }
 
   const enOrden = (fn: () => Promise<void>, cerrarTurno = true) => {
     serie = serie.then(fn).catch((error) => {
@@ -436,13 +503,12 @@ export function startOpenCode(opts: AgentOptions, conectar: () => Promise<Servid
       await serie
     },
     close() {
+      if (cerrado) return
       cerrado = true
-      const s = servidorDe
-      if (!s) return
-      s.oyentes.delete(sesion)
-      for (const [hijo, raiz] of s.raiz) if (raiz === sesion) s.raiz.delete(hijo)
-      for (const nombre of Object.keys(servidoresMcp)) void s.client.mcp.remove({ server: `${mcp}-${nombre}`, location: { directory: opts.cwd } }).catch(() => {})
-      if (busy) void s.client.session.interrupt({ sessionID: sesion }).catch(() => {})
+      const cierre = ready.then(liberar, liberar)
+      cierres.set(mcp, cierre)
+      const olvidar = () => { if (cierres.get(mcp) === cierre) cierres.delete(mcp) }
+      void cierre.then(olvidar, olvidar)
     }
   }
 }
@@ -471,8 +537,10 @@ const suma = (a: Tokens, b: Tokens): Tokens => ({ input: a.input + b.input, outp
  */
 export async function opencodeModels(): Promise<Model[]> {
   if (!rutaAgente('opencode')) return []
+  let s: Servidor | undefined
   try {
-    const { client } = await conexion()
+    s = await conexion()
+    const { client } = s
     if (!(await conCuenta(client))) return []
     const lista = await client.model.list({ location: { directory: APP } })
     const usables = lista.data.filter((m) => ZEN.includes(m.providerID) && m.enabled && m.status !== 'deprecated' && m.capabilities.tools !== false)
@@ -487,6 +555,8 @@ export async function opencodeModels(): Promise<Model[]> {
     return [...usables.filter(gratis).map(modelo), ...usables.filter((m) => !gratis(m)).map(modelo).sort((a, b) => a.label.localeCompare(b.label))]
   } catch {
     return []
+  } finally {
+    if (s) soltarConexion(s)
   }
 }
 
@@ -502,31 +572,38 @@ export const SIN_CUENTA = 'Conecta tu cuenta de OpenCode en Opciones: es gratis.
  */
 export async function redactarOpenCode(model: string | undefined, cwd: string, prompt: string, imagenes: string[], instruccion: string): Promise<string> {
   const s = await conexion()
-  const c = s.client
-  if (!(await conCuenta(c))) throw new Error(SIN_CUENTA)
-  const elegido = model ?? (await opencodeModels())[0]?.id
-  if (!elegido) throw new Error('OpenCode no tiene modelos gratis ahora. Intenta más tarde.')
-  const { providerID, id } = modeloDe(elegido)
-  const sesion = await c.session.create({ location: { directory: cwd }, title: 'Sloth', model: { providerID, id }, permissions: [{ action: '*', resource: '*', effect: 'deny' }] })
-  const textos = new Map<string, string>()
   try {
-    const listo = new Promise<string>((ok, mal) => {
-      const reloj = setTimeout(() => mal(new Error('OpenCode tardó demasiado en responder. Intenta otra vez.')), 180_000)
-      s.oyentes.set(sesion.id, (e) => {
-        const d = e.data
-        if (e.type === 'session.text.ended') textos.set(`${d.assistantMessageID}:${d.ordinal}`, d.text)
-        if (e.type === 'session.execution.succeeded') (clearTimeout(reloj), ok([...textos.values()].join('\n').trim()))
-        if (e.type === 'session.execution.failed' || e.type === 'session.execution.interrupted' || e.type === ('sloth.caida' as string)) {
-          clearTimeout(reloj)
-          mal(new Error(errorDe(d.error, 'OpenCode no pudo responder. Intenta otra vez.')))
-        }
+    const c = s.client
+    if (!(await conCuenta(c))) throw new Error(SIN_CUENTA)
+    const elegido = model ?? (await opencodeModels())[0]?.id
+    if (!elegido) throw new Error('OpenCode no tiene modelos gratis ahora. Intenta más tarde.')
+    const { providerID, id } = modeloDe(elegido)
+    const sesion = await c.session.create({ location: { directory: cwd }, title: 'Sloth', model: { providerID, id }, permissions: [{ action: '*', resource: '*', effect: 'deny' }] })
+    const textos = new Map<string, string>()
+    let reloj: ReturnType<typeof setTimeout> | undefined
+    try {
+      const listo = new Promise<string>((ok, mal) => {
+        reloj = setTimeout(() => mal(new Error('OpenCode tardó demasiado en responder. Intenta otra vez.')), 180_000)
+        s.oyentes.set(sesion.id, (e) => {
+          const d = e.data
+          if (e.type === 'session.text.ended') textos.set(`${d.assistantMessageID}:${d.ordinal}`, d.text)
+          if (e.type === 'session.execution.succeeded') (clearTimeout(reloj), ok([...textos.values()].join('\n').trim()))
+          if (e.type === 'session.execution.failed' || e.type === 'session.execution.interrupted' || e.type === ('sloth.caida' as string)) {
+            clearTimeout(reloj)
+            mal(new Error(errorDe(d.error, 'OpenCode no pudo responder. Intenta otra vez.')))
+          }
+        })
       })
-    })
-    await c.session.instructions.entry.put({ sessionID: sesion.id, key: 'sloth', value: instruccion })
-    await c.session.prompt({ sessionID: sesion.id, text: prompt, files: imagenes.filter((p) => existsSync(p)).map((p) => ({ uri: pathToFileURL(p).href })) })
-    return await listo
+      void listo.catch(() => {})
+      await c.session.instructions.entry.put({ sessionID: sesion.id, key: 'sloth', value: instruccion })
+      await c.session.prompt({ sessionID: sesion.id, text: prompt, files: imagenes.filter((p) => existsSync(p)).map((p) => ({ uri: pathToFileURL(p).href })) })
+      return await listo
+    } finally {
+      clearTimeout(reloj)
+      s.oyentes.delete(sesion.id)
+      await c.session.remove({ sessionID: sesion.id }).catch(() => {})
+    }
   } finally {
-    s.oyentes.delete(sesion.id)
-    void c.session.remove({ sessionID: sesion.id }).catch(() => {})
+    soltarConexion(s)
   }
 }

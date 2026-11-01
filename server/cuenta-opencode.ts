@@ -1,6 +1,6 @@
 import type { CuentaClaude, LimitesClaude } from '../shared/types.ts'
 import { asegurarAgente, rutaAgente } from './agentes.ts'
-import { CONSOLA, conexion } from './opencode.ts'
+import { CONSOLA, conexion, soltarConexion } from './opencode.ts'
 
 /**
  * La cuenta de OpenCode con la que trabaja Sloth: sin ella no hay OpenCode (sin cuenta, el uso gratis es de toda la
@@ -15,24 +15,29 @@ import { CONSOLA, conexion } from './opencode.ts'
 const SERVIDOR = 'https://opencode.ai/console'
 
 /** El inicio de sesión que espera al navegador. */
-let intento: { id: string; url: string; codigo?: string } | undefined
+let intento: { id: string; url: string; codigo?: string; soltar(): void } | undefined
 let fallo: string | undefined
+let iniciando: Promise<Cuenta> | undefined
 
 /** `cambio`: la cuenta se conectó en esta lectura, y hay que volver a pedir los modelos. */
 type Cuenta = CuentaClaude & { cambio?: boolean }
 
-export const conectandoOpenCode = () => (intento ? 'Se está conectando la cuenta de OpenCode. Termina de autorizarla primero.' : null)
+export const conectandoOpenCode = () => (intento || iniciando ? 'Se está conectando la cuenta de OpenCode. Termina de autorizarla primero.' : null)
 
 export async function cuentaOpenCode(): Promise<Cuenta> {
   // Sin el programa (aún no se bajó, `server/agentes.ts`) no hay cuenta: mirarla no lo baja; conectarla, sí.
   if (!rutaAgente('opencode')) return { conectada: false }
+  let s: Awaited<ReturnType<typeof conexion>> | undefined
   try {
-    const { client } = await conexion()
+    s = await conexion()
+    const { client } = s
     let cambio = false
     if (intento) {
-      const estado = await client.integration.oauth.status({ integrationID: CONSOLA, attemptID: intento.id }).then((r) => r.data, () => null)
-      if (estado?.status !== 'pending') {
+      const pendiente = intento
+      const estado = await client.integration.oauth.status({ integrationID: CONSOLA, attemptID: pendiente.id }).then((r) => r.data, () => null)
+      if (estado?.status !== 'pending' && intento === pendiente) {
         intento = undefined
+        pendiente.soltar()
         cambio = estado?.status === 'complete'
         fallo = estado?.status === 'failed' ? estado.message : estado?.status === 'expired' || !estado ? 'El código venció antes de autorizarlo. Vuelve a conectar.' : undefined
       }
@@ -57,14 +62,24 @@ export async function cuentaOpenCode(): Promise<Cuenta> {
     }
   } catch (error) {
     return { conectada: false, error: error instanceof Error ? error.message : String(error) }
+  } finally {
+    if (s) soltarConexion(s)
   }
 }
 
 /** Baja OpenCode si falta y pide el código. Conectar otra vez agrega otra cuenta, que queda como la activa. */
-export async function conectarOpenCode(): Promise<Cuenta> {
+export function conectarOpenCode(): Promise<Cuenta> {
+  if (intento) return cuentaOpenCode()
+  iniciando ??= iniciarCuenta().finally(() => { iniciando = undefined })
+  return iniciando
+}
+
+async function iniciarCuenta(): Promise<Cuenta> {
   await asegurarAgente('opencode')
-  const { client } = await conexion()
-  if (!intento) {
+  const s = await conexion()
+  const { client } = s
+  let reservada = false
+  try {
     fallo = undefined
     // OpenCode carga sus integraciones al arrancar, un momento después de contestar: antes, `connect` da 500 («OAuth
     // method not found»). Se espera a que la de su cuenta tenga el método.
@@ -74,7 +89,13 @@ export async function conectarOpenCode(): Promise<Cuenta> {
       if (Date.now() > fin) throw new Error('OpenCode no ofrece conectar la cuenta ahora. Intenta otra vez en un momento.')
     }
     const r = await client.integration.oauth.connect({ integrationID: CONSOLA, methodID: 'device', answer: { server: SERVIDOR } })
-    intento = { id: r.data.attemptID, url: r.data.url, codigo: /code:\s*(\S+)/i.exec(r.data.instructions)?.[1] }
+    // Si se deja Opciones, comprueba también cuándo termina o vence el código y libera su reserva del servidor.
+    const reloj = setInterval(() => void cuentaOpenCode(), 30_000)
+    reloj.unref()
+    intento = { id: r.data.attemptID, url: r.data.url, codigo: /code:\s*(\S+)/i.exec(r.data.instructions)?.[1], soltar: () => { clearInterval(reloj); soltarConexion(s) } }
+    reservada = true
+  } finally {
+    if (!reservada) soltarConexion(s)
   }
   return cuentaOpenCode()
 }
@@ -82,24 +103,41 @@ export async function conectarOpenCode(): Promise<Cuenta> {
 /** Deja de esperar al navegador. */
 export async function cancelarOpenCode(): Promise<Cuenta> {
   if (intento) {
-    const { client } = await conexion()
-    await client.integration.oauth.cancel({ integrationID: CONSOLA, attemptID: intento.id }).catch(() => {})
+    const pendiente = intento
     intento = undefined
+    try {
+      const s = await conexion()
+      try {
+        await s.client.integration.oauth.cancel({ integrationID: CONSOLA, attemptID: pendiente.id }).catch(() => {})
+      } finally {
+        soltarConexion(s)
+      }
+    } finally {
+      pendiente.soltar()
+    }
   }
   return cuentaOpenCode()
 }
 
 /** Trabajar con otra de las cuentas conectadas. */
 export async function usarCuentaOpenCode(id: string): Promise<Cuenta> {
-  const { client } = await conexion()
-  await client.credential.activate({ credentialID: id })
+  const s = await conexion()
+  try {
+    await s.client.credential.activate({ credentialID: id })
+  } finally {
+    soltarConexion(s)
+  }
   return cuentaOpenCode()
 }
 
 /** Quitar una cuenta de Sloth. La cuenta sigue en opencode.ai; se puede volver a conectar. */
 export async function quitarCuentaOpenCode(id: string): Promise<Cuenta> {
-  const { client } = await conexion()
-  await client.credential.remove({ credentialID: id })
+  const s = await conexion()
+  try {
+    await s.client.credential.remove({ credentialID: id })
+  } finally {
+    soltarConexion(s)
+  }
   return cuentaOpenCode()
 }
 
@@ -114,17 +152,22 @@ export function limitesOpenCode(): Promise<LimitesClaude> {
     limites = {
       leido: Date.now(),
       valor: (async () => {
-        const { client } = await conexion()
-        const go = (await client.experimental.usage.limits()).data?.go
-        if (!go) return { ventanas: [] }
-        // `resetsAt` llega en segundos o en milisegundos según la versión.
-        const fecha = (n: number) => new Date(n < 1e12 ? n * 1000 : n).toISOString()
-        return {
-          ventanas: [
-            { nombre: 'Sesión de 5 horas', uso: go.rolling.percent, reinicia: fecha(go.rolling.resetsAt) },
-            { nombre: 'Semana', uso: go.weekly.percent, reinicia: fecha(go.weekly.resetsAt) },
-            { nombre: 'Mes', uso: go.monthly.percent, reinicia: fecha(go.monthly.resetsAt) }
-          ]
+        const s = await conexion()
+        try {
+          const { client } = s
+          const go = (await client.experimental.usage.limits()).data?.go
+          if (!go) return { ventanas: [] }
+          // `resetsAt` llega en segundos o en milisegundos según la versión.
+          const fecha = (n: number) => new Date(n < 1e12 ? n * 1000 : n).toISOString()
+          return {
+            ventanas: [
+              { nombre: 'Sesión de 5 horas', uso: go.rolling.percent, reinicia: fecha(go.rolling.resetsAt) },
+              { nombre: 'Semana', uso: go.weekly.percent, reinicia: fecha(go.weekly.resetsAt) },
+              { nombre: 'Mes', uso: go.monthly.percent, reinicia: fecha(go.monthly.resetsAt) }
+            ]
+          }
+        } finally {
+          soltarConexion(s)
         }
       })()
     }

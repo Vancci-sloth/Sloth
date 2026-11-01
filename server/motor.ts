@@ -9,7 +9,8 @@ import { pathToFileURL } from 'node:url'
  * estilo, mientras esté hecho con Remotion. Sloth arma la página él solo, con el esbuild y el Player que ya trae el
  * proyecto, y la vuelve a armar en cuanto cambia algo de lo que entra en el video: el agente escribe una escena y en un
  * segundo se puede ver y recorrer. Las skills no hacen nada para tenerlo. La página es `motor-pagina.jsx`; el monitor la
- * cambia por la nueva sin parpadear ni perder el segundo (`web/src/Monitor.tsx`).
+ * cambia por la nueva sin parpadear ni perder el segundo (`web/src/Monitor.tsx`). Los motores que ya no se ven se
+ * liberan tras cinco minutos; al volver, su versión sigue avanzando para que el monitor recargue el código correcto.
  */
 
 /** Cómo va el motor de una carpeta: `v` sube con cada versión que se puede ver; `error`, por qué no salió la última. */
@@ -38,6 +39,14 @@ type Motor = EstadoMotor & {
 /** Los motores abiertos, por carpeta. Como mucho `MAX`: el que lleva más tiempo sin mirarse se cierra. */
 const motores = new Map<string, Motor>()
 const MAX = 6
+const OCIOSO = 5 * 60_000
+let version = 0
+
+/** Libera compiladores y vigilantes de los videos que ya no se ven, conservando los abiertos en otras ventanas. */
+export function cerrarMotoresOciosos(abiertos: string[]) {
+  const viendo = new Set(abiertos.map((f) => clave(resolve(f))))
+  for (const [ruta, m] of motores) if (!viendo.has(ruta) && Date.now() - m.usado >= OCIOSO) m.cerrar()
+}
 
 const ENTRADAS = ['src/index.ts', 'src/index.tsx', 'src/index.js', 'src/index.jsx']
 const PAGINA = new URL('./motor-pagina.jsx', import.meta.url)
@@ -95,7 +104,7 @@ function abrir(folder: string, entrada: string): Motor {
         rearmar = false
         if (todo) return void armar(m)
         m.desde = Date.now()
-        m.v++
+        m.v = ++version
         m.avisar()
       }, 250)
     })
@@ -104,8 +113,10 @@ function abrir(folder: string, entrada: string): Motor {
   function cerrar() {
     clearTimeout(timer)
     w?.close()
+    m.otraVez = false
+    m.avisar = () => {}
     void m.ctx?.then((c) => c.dispose()).catch(() => {})
-    motores.delete(clave(folder))
+    if (motores.get(clave(folder)) === m) motores.delete(clave(folder))
   }
   motores.set(clave(folder), m)
   void armar(m)
@@ -167,6 +178,7 @@ async function contexto(m: Motor) {
 
 /** Arma la página. Si ya se está armando, lo vuelve a hacer al acabar, con lo último. */
 async function armar(m: Motor) {
+  if (motores.get(clave(m.folder)) !== m) return
   if (m.armando) return void (m.otraVez = true)
   m.armando = true
   m.avisar()
@@ -180,11 +192,12 @@ async function armar(m: Motor) {
     m.pagina = pagina
     m.ctx ??= contexto(m)
     const r = await (await m.ctx).rebuild()
+    if (motores.get(clave(m.folder)) !== m) return
     m.js = r.outputFiles[0].text
     m.entradas = new Set(Object.keys(r.metafile.inputs).filter((i) => !i.includes('node_modules') && !i.includes(':')).map(clave))
     m.error = undefined
     m.desde = inicio
-    m.v++
+    m.v = ++version
   } catch (e: any) {
     // Si ni siquiera empezó (falta algo del proyecto), la próxima vez se intenta desde cero.
     if (!e?.errors) m.ctx = undefined
@@ -237,29 +250,67 @@ function texto(res: ServerResponse, status: number, tipo: string, cuerpo: string
 
 /** Cuántos picos por segundo lleva la onda de un audio. */
 const POR_SEGUNDO = 50
-const ondas = new Map<string, Promise<number[]>>()
+const MAX_ONDAS = 32
+/** Solo una versión por archivo, en bytes; lo que ya no se mira sale por antigüedad. */
+const ondas = new Map<string, { marca: string; picos: Uint8Array }>()
+type OndaPendiente = { lectores: Set<ServerResponse>; valor: Promise<Uint8Array | undefined> }
+const ondasEnCurso = new Map<string, OndaPendiente>()
+let colaOndas: Promise<unknown> = Promise.resolve()
+
+function ondaDe(file: string, marca: string, res: ServerResponse): Promise<Uint8Array | undefined> {
+  const guardada = ondas.get(file)
+  if (guardada?.marca === marca) {
+    ondas.delete(file)
+    ondas.set(file, guardada)
+    return Promise.resolve(guardada.picos)
+  }
+  const k = `${file}|${marca}`
+  let pedido = ondasEnCurso.get(k)
+  if (!pedido) {
+    // FFmpeg de uno en uno: abrir un video con muchas pistas no compite con su render por todos los núcleos.
+    const nuevo: OndaPendiente = {
+      lectores: new Set(),
+      valor: colaOndas.then(() => nuevo.lectores.size ? picos(file) : undefined).then((p) => {
+        if (p) {
+          ondas.delete(file)
+          ondas.set(file, { marca, picos: p })
+          if (ondas.size > MAX_ONDAS) ondas.delete(ondas.keys().next().value!)
+        }
+        return p
+      }).finally(() => ondasEnCurso.delete(k))
+    }
+    pedido = nuevo
+    ondasEnCurso.set(k, pedido)
+    colaOndas = pedido.valor.catch(() => {})
+  }
+  const actual = pedido
+  const soltar = () => actual.lectores.delete(res)
+  if (!res.destroyed) actual.lectores.add(res)
+  res.once('close', soltar)
+  return actual.valor.finally(() => { soltar(); res.off('close', soltar) })
+}
 
 /**
  * `GET /api/sessions/<id>/onda?ruta=…`: la onda de un audio de la carpeta del hilo, para la línea de tiempo: un pico por
- * cada 20 ms, de 0 a 255. Sale de ffmpeg y se guarda por archivo y fecha.
+ * cada 20 ms, de 0 a 255. FFmpeg trabaja de uno en uno, compartido entre peticiones. La caché conserva 32 archivos en
+ * bytes, una versión por archivo; las ondas que esperan sin lectores ya no se calculan.
  */
 export async function servirOnda(res: ServerResponse, file: string): Promise<true> {
   const st = statSync(file, { throwIfNoEntry: false })
   if (!st?.isFile()) return texto(res, 404, 'application/json', JSON.stringify({ error: 'No existe' }))
-  const k = `${file}|${st.mtimeMs}`
-  if (!ondas.has(k)) ondas.set(k, picos(file))
   try {
-    const p = await ondas.get(k)!
-    res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'max-age=31536000, immutable' })
-    res.end(JSON.stringify({ porSegundo: POR_SEGUNDO, picos: p }))
+    const p = await ondaDe(file, `${st.mtimeMs}|${st.size}`, res)
+    if (!p || res.destroyed) return true
+    // La URL no lleva versión: el archivo puede cambiar mientras se edita el video.
+    res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-cache' })
+    res.end(JSON.stringify({ porSegundo: POR_SEGUNDO, picos: Array.from(p) }))
   } catch (e) {
-    ondas.delete(k)
     texto(res, 500, 'application/json', JSON.stringify({ error: e instanceof Error ? e.message : String(e) }))
   }
   return true
 }
 
-function picos(file: string): Promise<number[]> {
+function picos(file: string): Promise<Uint8Array> {
   const RATE = 8000
   const cada = RATE / POR_SEGUNDO
   return new Promise((ok, mal) => {
@@ -283,6 +334,6 @@ function picos(file: string): Promise<number[]> {
       resto = par < b.length ? b.subarray(par) : undefined
     })
     p.on('error', mal)
-    p.on('close', (code) => (code === 0 ? ok(out) : mal(new Error(`ffmpeg salió con ${code}`))))
+    p.on('close', (code) => (code === 0 ? ok(Uint8Array.from(out)) : mal(new Error(`ffmpeg salió con ${code}`))))
   })
 }

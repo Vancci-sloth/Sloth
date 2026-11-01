@@ -39,7 +39,7 @@ function preparar(resume?: string, conCuenta = true) {
     permission: { reply: pedir('permission.reply') },
     credential: { list: pedir('credential.list', () => (conCuenta ? [{ id: 'cred-1', integrationID: 'opencode', label: 'yo@correo.com', active: true }] : [])) }
   }
-  const servidor = { client, proc: {}, oyentes, raiz: new Map() } as any
+  const servidor = { client, proc: { kill() {} }, oyentes, raiz: new Map(), usos: 1, cerrado: false } as any
   const run = startOpenCode(
     {
       cwd: process.cwd(), model: 'opencode:opencode/big-pickle', effort: 'high', hilo: 'hilo-1', resume,

@@ -14,7 +14,8 @@ Este es el mapa:
   gratis y se conecta en `server/cuenta-opencode.ts`; primero sus modelos gratis de Zen y luego los de pago), hecho
   como el de T3 Code: un solo `opencode serve` para todos los hilos, con sus datos en `data/opencode`; cada hilo es una
   sesión en su carpeta, con las instrucciones de Sloth y su navegador (un MCP que solo él puede usar). Se prueba con un
-  turno grabado (`opencode.grabacion.json`). ADR 0009 y 0010.
+  turno grabado (`opencode.grabacion.json`). Cada `conexion` se devuelve con `soltarConexion`: un minuto sin hilos ni
+  consultas cierra el servidor, y un inicio de sesión lo conserva hasta autorizarse, cancelarse o vencer. ADR 0009 y 0010.
 - `server/agentes.ts`: el programa de cada agente no viene en el instalador: se baja al elegirlo (bienvenida, Opciones o
   el primer mensaje de un hilo suyo, `conAgente`) a `%APPDATA%\sloth\piezas\agentes`. En el repo, Claude Code, Codex y
   OpenCode ya están en node_modules. Un proveedor nuevo es una entrada más en `AGENTES` y en `PROVEEDORES`
@@ -27,7 +28,8 @@ Este es el mapa:
   `server/instrucciones.ts`; el JSON-RPC por líneas, en `server/rpc-lineas.ts`.
 - `server/sessions.ts`: cada hilo es `data/sessions/<id>.json` (qué es) y `<id>.jsonl` (lo que pasó). Retoma la sesión
   del proveedor tras reiniciar, reparte los lotes según la máquina y cierra el proceso de un video del lote al acabar.
-  `npm run hilo -- <id>` (`scripts/hilo.mjs`) resume un hilo desde esos archivos.
+  Un chat de Claude, DeepSeek, Codex u OpenCode con su sesión guardada suelta el proceso a la media hora; los demás
+  agentes lo conservan hasta comprobar que retoman. `npm run hilo -- <id>` (`scripts/hilo.mjs`) resume un hilo desde esos archivos.
 - Lo que aguanta la máquina (ADR 0011): el aviso antes de pasar de dos videos a la vez (`shared/limites.ts`,
   `web/src/AvisoVideos.tsx`), el tope de subagentes de Claude (`server/tope-agentes.ts`), el de navegadores (`turnoNavegador` en `video-base/scripts/chrome.mjs`),
   Whisper cargado mientras trabaja un video (`server/voz-viva.ts`) y la fila de la GPU, con la voz primero (`sloth.py`).
@@ -46,6 +48,8 @@ Este es el mapa:
   arriba, la elegida al centro, la línea de tiempo abajo y el chat a la derecha. En la fase Video (`Editor.tsx`), el motor
   en vivo (`server/motor.ts`, ADR 0005) reproduce sin renderizar cualquier proyecto de Remotion y se rehace solo con cada
   cambio; un clic en el cuadro, una escena o un tramo va al chat como referencia (`Referencia.tsx`).
+  Los motores y los vigilantes de carpetas se liberan tras cinco minutos sin uso; los hilos a la vista conservan ambos, y
+  los que trabajan, sus vigilantes. Las ondas de audio se calculan de una en una y se guardan en bytes, 32 archivos como máximo.
 - La carpeta del video: un hilo de video nace con su carpeta nombrada por Sloth, y el mensaje lleva la línea
   `Carpeta: <nombre>`, que leen las skills. Con `lote`, varios enlaces pueden ser un video cada uno
   (`lote-MMDD-HHMM-NN`, ver `skills/video-base/LOTE.md`). Cambiar la carpeta desde el estudio usa una que ya existe.

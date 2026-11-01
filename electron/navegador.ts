@@ -138,6 +138,13 @@ export function ventanaDelNavegador(v: BrowserWindow) {
   for (const h of hojas.values()) v.contentView.addChildView(h.vista)
   // Si la interfaz se recarga, vuelve a decir qué hilo se ve; mientras tanto, nada tapa su arranque.
   v.webContents.on('did-start-navigation', (d) => d.isMainFrame && !d.isSameDocument && ver(null))
+  const recolocar = () => {
+    for (const h of hojas.values()) colocar(h)
+  }
+  v.on('show', recolocar)
+  v.on('hide', recolocar)
+  v.on('minimize', recolocar)
+  v.on('restore', recolocar)
   v.on('closed', () => {
     if (ventana === v) ventana = undefined
     vista = null
@@ -328,7 +335,8 @@ function colocar(h: Hoja) {
   const v = h.vista
   const e = estado(h)
   const visible = !!ventana && vista?.hilo === h.hilo && !!e.url && !e.error
-  h.actividad.ver(visible)
+  // Con Sloth minimizada o escondida tampoco la ve nadie: la vista sigue puesta, pero la página puede descansar.
+  h.actividad.ver(visible && ventana!.isVisible() && !ventana!.isMinimized())
   if (!visible || !ventana || !vista) return v.setVisible(false)
   // La caja llega en píxeles de la interfaz: con zoom, no son los de la ventana.
   const z = ventana.webContents.getZoomFactor()

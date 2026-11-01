@@ -292,7 +292,6 @@ const Piezas = memo(function Piezas({ piezas, carriles, porSeg, elegida }: { pie
 })
 
 type Onda = { porSegundo: number; picos: number[] }
-const ondas = new Map<string, Promise<Onda>>()
 
 /**
  * La onda de cada audio que suena, en su tramo: la voz arriba y el resto debajo. Se dibuja en un lienzo del ancho de la
@@ -305,19 +304,18 @@ function Ondas({ sessionId, pistas, porSeg, izq, ancho }: { sessionId: string; p
   const clave = orden.map((p) => p.ruta).join('|')
 
   useEffect(() => {
-    let vivo = true
-    for (const p of orden) {
-      const url = `/api/sessions/${sessionId}/onda?ruta=${encodeURIComponent(p.ruta)}`
-      if (!ondas.has(url)) ondas.set(url, fetch(url).then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status))))))
-      ondas
-        .get(url)!
-        .then((o) => vivo && setDatos((d) => ({ ...d, [p.ruta]: o })))
-        .catch(() => ondas.delete(url))
+    const corte = new AbortController()
+    const rutas = [...new Set(pistas.map((p) => p.ruta))]
+    setDatos((d) => Object.fromEntries(rutas.filter((r) => d[r]).map((r) => [r, d[r]])))
+    for (const ruta of rutas) {
+      const url = `/api/sessions/${sessionId}/onda?ruta=${encodeURIComponent(ruta)}`
+      fetch(url, { signal: corte.signal })
+        .then((r) => r.ok ? r.json() as Promise<Onda> : Promise.reject(new Error(String(r.status))))
+        .then((o) => { if (!corte.signal.aborted) setDatos((d) => ({ ...d, [ruta]: o })) })
+        .catch(() => {})
     }
-    return () => {
-      vivo = false
-    }
-  }, [sessionId, clave])
+    return () => corte.abort()
+  }, [sessionId, pistas])
 
   useLayoutEffect(() => {
     const c = lienzo.current

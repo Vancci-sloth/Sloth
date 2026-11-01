@@ -536,7 +536,9 @@ export class Sessions {
 
   /**
    * Conserva calientes los chats recientes y libera los quietos. Una tarea de fondo o un despertador impiden cerrarlo:
-   * Claude Code puede abrir un turno él solo cuando termina una tarea. Los avisos tardíos renuevan el reposo.
+   * Claude Code puede abrir un turno él solo cuando termina una tarea. Los avisos tardíos renuevan el reposo. Un chat
+   * solo se libera si retomarlo está comprobado: sin sesión guardada, o con un agente que abre una nueva si no sabe
+   * retomar (ACP), perdería lo hablado.
    */
   private ocioso(id: string, meta: SessionMeta, event: AgentEvent) {
     clearTimeout(this.relojes.get(id))
@@ -546,6 +548,8 @@ export class Sessions {
       this.despertadores.add(id)
     }
     if (meta.running || meta.background?.length || meta.pendiente || (meta.lote && !meta.acaboBien) || this.despertadores.has(id) || !this.runs.has(id)) return
+    const programa = programaDe(proveedorDe(meta.model))
+    if (!meta.lote && (!meta.providerSessionId || (programa !== 'claude' && programa !== 'codex' && programa !== 'opencode'))) return
     const reloj = setTimeout(() => {
       this.relojes.delete(id)
       this.cerrarQuieto(id)
@@ -582,7 +586,12 @@ export class Sessions {
       // Un proceso muerto no recibe nada: se olvida, y el siguiente mensaje abre otro que retoma la sesión. Si se cayó,
       // lo que no leyó o lo que cortó sigue como tras una caída del servidor.
       onExit: (caida) => {
-        if (this.runs.get(meta.id) === run) this.runs.delete(meta.id)
+        if (this.runs.get(meta.id) === run) {
+          clearTimeout(this.relojes.get(meta.id))
+          this.relojes.delete(meta.id)
+          this.despertadores.delete(meta.id)
+          this.runs.delete(meta.id)
+        }
         if (caida && this.metas.has(meta.id)) this.retomar(meta, caida.turno ? sinLeer(this.load(meta.id)) : [], caida.turno, meta.background ?? [])
       },
       onProviderSession: (providerId) => {

@@ -61,6 +61,12 @@ nada de lo que recibe la gente. Varias ideas razonables de abajo no sirvieron: p
 - Un chat quieto suelta su proceso a los 30 minutos y un cliente con más de 8 MiB sin leer se desconecta y relee el historial.
   No hay medida de la RAM que ahorra lo primero.
 - Lo que queda antes del servidor (unos 350 ms) es Electron y Node.
+- Liberar lo que ya nadie usa (1 de noviembre; probado con simulaciones, sin medida de RAM ni CPU en la app real):
+  `opencode serve` se cierra a un minuto de quedarse sin hilos ni consultas, también cuando solo se abrió para listar
+  modelos; los motores y los `fs.watch` de carpetas, a los cinco minutos; las ondas de audio van a un máximo de 32 archivos
+  en bytes, con FFmpeg de uno en uno. Una página a la vista también descansa con Sloth minimizada o escondida.
+- Para comparar: la memoria y la CPU de todo el árbol de procesos al abrir, tras acabar varios hilos y diez minutos después,
+  con las mismas cuentas, videos y pestañas. Los bytes de una compilación no sustituyen esa medida.
 
 En Linux (Docker, xvfb, 42 hilos reales, hasta la interfaz montada):
 

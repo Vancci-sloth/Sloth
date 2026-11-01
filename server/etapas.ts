@@ -442,7 +442,16 @@ export function queFalta(meta: SessionMeta, card: Card): string[] {
 }
 
 /** Los `cwd` que se vigilan, con los globs de su card. */
-const vigiladas = new Map<string, { globs: string[] }>()
+const vigiladas = new Map<string, { globs: string[]; usada: number; cerrar(): void }>()
+
+/** Deja de vigilar las carpetas que ya no se ven ni tienen agentes trabajando. Se reabren al mirar sus etapas. */
+export function cerrarVigilantesOciosos(activos: string[]) {
+  const usadas = new Set(activos.map(normal))
+  for (const [ruta, v] of vigiladas) {
+    if (usadas.has(ruta)) v.usada = Date.now()
+    else if (Date.now() - v.usada >= 5 * 60_000) v.cerrar()
+  }
+}
 
 /**
  * Avisa a la interfaz cuando cambia la carpeta de un hilo (`{ type: 'etapas' }`), para que relea su avance solo entonces
@@ -452,8 +461,12 @@ const vigiladas = new Map<string, { globs: string[] }>()
 function vigilar(cwd: string, card: Card, sessions: Sessions, avisar: Avisar) {
   const clave = normal(cwd)
   const ya = vigiladas.get(clave)
-  if (ya) return void (ya.globs = globsDe(card))
-  const vigilada = { globs: globsDe(card) }
+  if (ya) {
+    ya.globs = globsDe(card)
+    ya.usada = Date.now()
+    return
+  }
+  const vigilada = { globs: globsDe(card), usada: Date.now(), cerrar }
   // La primera parte de cada ruta que cambió, que es la carpeta del hilo; `*` si no se sabe cuál.
   let partes = new Set<string>()
   let timer: ReturnType<typeof setTimeout> | undefined
@@ -488,10 +501,12 @@ function vigilar(cwd: string, card: Card, sessions: Sessions, avisar: Avisar) {
   } catch {
     return // Aún no existe: se vuelve a intentar cuando alguien mire otra vez.
   }
-  w.on('error', () => {
+  function cerrar() {
+    clearTimeout(timer)
     w.close()
-    vigiladas.delete(clave)
-  })
+    if (vigiladas.get(clave) === vigilada) vigiladas.delete(clave)
+  }
+  w.on('error', cerrar)
   vigiladas.set(clave, vigilada)
 }
 
