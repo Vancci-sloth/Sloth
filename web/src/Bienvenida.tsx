@@ -15,6 +15,7 @@ const OPCIONES = [
       ['claude', 'Claude'],
       ['codex', 'ChatGPT'],
       ['deepseek', 'DeepSeek'],
+      ['gemini', 'Gemini'],
       ['cursor', 'Cursor'],
       ['muse', 'Muse Code'],
       ['pi', 'Pi']

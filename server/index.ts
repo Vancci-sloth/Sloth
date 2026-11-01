@@ -404,14 +404,15 @@ async function api(req: IncomingMessage, res: ServerResponse, url: URL): Promise
   }
 
   // Pagar con la cuenta o con una llave de API (`server/acceso.ts`). Devuelve la cuenta como queda.
-  const acceso = /^\/api\/(claude|codex|deepseek)\/acceso$/.exec(path)
+  const acceso = /^\/api\/(claude|codex|deepseek|gemini)\/acceso$/.exec(path)
   if (acceso && method === 'POST') {
     const { api, llave } = await body<{ api: boolean; llave?: string | null }>(req)
     const p = acceso[1] as Proveedor
     try {
       await cambiarAcceso(p, !!api, llave)
-      send(res, 200, await (p === 'codex' ? cuentaCodex() : p === 'deepseek' ? OTROS.deepseek!.cuenta() : cuentaClaude(APP, true)))
-      if (p === 'deepseek') pedirModelos()
+      const soloLlave = p === 'deepseek' || p === 'gemini'
+      send(res, 200, await (p === 'codex' ? cuentaCodex() : soloLlave ? OTROS[p]!.cuenta() : cuentaClaude(APP, true)))
+      if (soloLlave) pedirModelos()
     } catch (error) {
       send(res, 400, { error: error instanceof Error ? error.message : String(error) })
     }

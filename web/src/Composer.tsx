@@ -56,6 +56,7 @@ export function gruposModelos(models: Model[]) {
     { id: 'deepseek', label: 'DeepSeek · beta' },
     { id: 'grok', label: 'Grok · beta' },
     { id: 'antigravity', label: 'Antigravity · beta' },
+    { id: 'gemini', label: 'Gemini · beta' },
     { id: 'cursor', label: 'Cursor' },
     { id: 'muse', label: 'Muse Code (Meta)' },
     { id: 'pi', label: 'Pi · beta · gratis' },

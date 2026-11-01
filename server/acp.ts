@@ -7,10 +7,11 @@ import { conSkill, INSTRUCCIONES, mcpSloth } from './instrucciones.ts'
 import { RpcLineas } from './rpc-lineas.ts'
 
 /**
- * Los agentes que hablan ACP (Agent Client Protocol) por stdio: Grok (`grok agent stdio`) y Antigravity (el servidor ACP
- * de Google). Como lo hace T3 Code (`packages/provider-acp`), pero solo lo que usa Sloth: sin permisos (se acepta cada
- * herramienta, como con los demás agentes), sin terminal ni escritura de archivos del lado de Sloth (el agente las hace
- * él mismo) y un proceso por hilo, salvo los `compartido`: uno para todos sus hilos, cada uno en su sesión.
+ * Los agentes que hablan ACP (Agent Client Protocol) por stdio: Grok (`grok agent stdio`), Antigravity (el servidor ACP
+ * de Google) y Gemini CLI (`gemini --acp`). Como lo hace T3 Code (`packages/provider-acp`), pero solo lo que usa Sloth:
+ * sin permisos (se acepta cada herramienta, como con los demás agentes), sin terminal ni escritura de archivos del lado
+ * de Sloth (el agente las hace él mismo) y un proceso por hilo, salvo los `compartido`: uno para todos sus hilos, cada
+ * uno en su sesión.
  *
  * ACP no tiene instrucciones de sistema: las de Sloth van al principio del primer mensaje de cada proceso. El modelo y su
  * esfuerzo se eligen con las opciones de la sesión (`configOptions`), o con `session/set_model` si no las trae.
@@ -29,12 +30,16 @@ export interface SaborAcp {
   leeArchivos?: boolean
   /** Inicia sesión antes de abrirla, cada vez (Antigravity). */
   autenticar?: string
-  /** El modo que se elige al abrir la sesión, si lo tiene como opción (`yolo` en Antigravity: sin preguntar). */
+  /** El modo que se elige al abrir la sesión, como opción o con `session/set_mode` (`yolo`: sin preguntar). */
   modo?: string
+  /** No sabe compactar cuando se le pide (Gemini comprime solo). */
+  sinCompactar?: boolean
   /** Lo que lleva `session/cancel` (Grok: `ctrl_c`, que no deja que las tareas de fondo lo despierten). */
   cancelarMeta?: Record<string, unknown>
   /** Un error que dice que falta iniciar sesión, en palabras de Sloth. */
   sinCuenta: string
+  /** El error de un turno en palabras de Sloth, si lo reconoce. */
+  traducir?(mensaje: string): string | undefined
   /** Los modelos que dio la sesión, para guardarlos (Antigravity no tiene otra forma de listarlos). */
   alVerModelos?(opciones: OpcionAcp[]): void
   /**
@@ -265,11 +270,11 @@ export function startAcp(sabor: SaborAcp, opts: AgentOptions): AgentRun {
     }
   }
 
-  /** Los tokens y el costo de un turno, como los da Grok. */
+  /** Los tokens y el costo de un turno, como los dan Grok y Gemini (que cuenta aparte lo que piensa). */
   function contar(u: any) {
     if (!u) return
     const cache = (u.cachedReadTokens ?? 0) + (u.cacheCreationTokens ?? 0)
-    tokens = { input: tokens.input + Math.max(0, (u.inputTokens ?? 0) - cache) + (u.cacheCreationTokens ?? 0), output: tokens.output + (u.outputTokens ?? 0), cacheRead: tokens.cacheRead + (u.cachedReadTokens ?? 0) }
+    tokens = { input: tokens.input + Math.max(0, (u.inputTokens ?? 0) - cache) + (u.cacheCreationTokens ?? 0), output: tokens.output + (u.outputTokens ?? 0) + (u.thoughtTokens ?? 0), cacheRead: tokens.cacheRead + (u.cachedReadTokens ?? 0) }
     // Grok cuenta el costo en diezmilmillonésimas de dólar.
     if (typeof u.costUsdTicks === 'number') costo += u.costUsdTicks / 10_000_000_000
   }
@@ -319,7 +324,7 @@ export function startAcp(sabor: SaborAcp, opts: AgentOptions): AgentRun {
     const ini = await c.ini
     // Los MCP de Sloth, como los pide ACP 1: `env` es una lista.
     const mcpServers = Object.entries(mcpSloth(opts.lote, opts.hilo)).map(([name, s]) => ({ name, command: s.command, args: s.args ?? [], env: Object.entries(s.env ?? {}).map(([n, value]) => ({ name: n, value })) }))
-    let abierta: { sessionId?: string; configOptions?: OpcionAcp[]; models?: { availableModels?: { modelId: string; _meta?: any }[] } } | undefined
+    let abierta: { sessionId?: string; configOptions?: OpcionAcp[]; modes?: { currentModeId?: string; availableModes?: { id: string }[] }; models?: { availableModels?: { modelId: string; _meta?: any }[] } } | undefined
     if (opts.resume) {
       const cap = ini?.agentCapabilities ?? {}
       const metodo = cap.sessionCapabilities?.resume ? 'session/resume' : cap.loadSession ? 'session/load' : ''
@@ -354,7 +359,13 @@ export function startAcp(sabor: SaborAcp, opts: AgentOptions): AgentRun {
       config = res?.configOptions ?? config
       return true
     }
-    if (sabor.modo) await elegir('mode', sabor.modo).catch(() => {})
+    const modos = abierta!.modes
+    if (sabor.modo && !(await elegir('mode', sabor.modo).catch(() => false)) && modos?.currentModeId !== sabor.modo && modos?.availableModes?.some((m) => m.id === sabor.modo)) {
+      // Gemini lo confirma con un mensaje suyo (`[MODE_UPDATE] yolo`), que abriría un turno.
+      cargando = true
+      await r.request('session/set_mode', { sessionId: sesion, modeId: sabor.modo }).catch(() => {})
+      cargando = false
+    }
     if (!(await elegir('model', modelo).catch(() => false)) && modelo) await r.request('session/set_model', { sessionId: sesion, modelId: modelo }).catch(() => {})
     if (opts.effort) await elegir('thought_level', opts.effort).catch(() => {})
     ventana = abierta!.models?.availableModels?.find((m) => m.modelId === modelo)?._meta?.totalContextTokens ?? ventana
@@ -395,7 +406,7 @@ export function startAcp(sabor: SaborAcp, opts: AgentOptions): AgentRun {
       pidiendo = false
       // Uno que se dio por detenido sin que el agente cortara (`interrupt`): lo de ahora ya es de otro turno.
       if (turno !== mio) return
-      contar(res?._meta?.usage)
+      contar(res?._meta?.usage ?? res?.usage)
       const siguiente = pendiente.shift()
       if (siguiente && !detenido) return void (await mandar(siguiente.text, siguiente.images))
       const fin = res?.stopReason
@@ -404,7 +415,8 @@ export function startAcp(sabor: SaborAcp, opts: AgentOptions): AgentRun {
       pidiendo = false
       if (turno !== mio) return
       pendiente = []
-      terminar(false, detenido ? 'lo detuviste' : e?.code === -32000 ? sabor.sinCuenta : e instanceof Error ? e.message : String(e))
+      const mensaje = e instanceof Error ? e.message : String(e)
+      terminar(false, detenido ? 'lo detuviste' : (sabor.traducir?.(mensaje) ?? (e?.code === -32000 ? sabor.sinCuenta : mensaje)))
     }
   }
 
@@ -425,9 +437,7 @@ export function startAcp(sabor: SaborAcp, opts: AgentOptions): AgentRun {
       if (busy) pendiente.push({ text, images })
       else void mandar(text, images)
     },
-    compact() {
-      void mandar('/compact', [])
-    },
+    compact: sabor.sinCompactar ? undefined : () => void mandar('/compact', []),
     async interrupt() {
       detenido = true
       pendiente = []

@@ -5,9 +5,10 @@ import { dirname, join } from 'node:path'
 import test from 'node:test'
 import type { AgentEvent } from '../shared/types.ts'
 import { startAcp, type SaborAcp } from './acp.ts'
+import { errorGemini } from './gemini.ts'
 
 /**
- * El cliente ACP (Grok, Antigravity) contra un agente de mentira que contesta como Grok 1.0.70 (el `initialize`, las
+ * El cliente ACP (Grok, Antigravity, Gemini) contra un agente de mentira que contesta como Grok 1.0.70 (el `initialize`, las
  * opciones de la sesión y el uso de `_meta.usage`, vistos en vivo y en las grabaciones de T3 Code). Sin red ni cuenta.
  */
 const AGENTE = `
@@ -203,6 +204,88 @@ test('ACP compartido: dos hilos a la vez van en un solo proceso, cada uno con su
   assert.deepEqual(c.barra, [])
   c.run.close()
   process.kill(Number(pidA))
+})
+
+/** Uno que contesta como Gemini CLI 0.66.0: modo y modelo fuera de `configOptions`, y el uso en `result.usage`. */
+const COMO_GEMINI = `
+let resto = ''
+const decir = (m) => process.stdout.write(JSON.stringify({ jsonrpc: '2.0', ...m }) + '\\n')
+const u = (update) => decir({ method: 'session/update', params: { sessionId: 'g1', update } })
+const pedidos = []
+process.stdin.on('data', (d) => {
+  resto += d
+  let i
+  while ((i = resto.indexOf('\\n')) >= 0) {
+    const m = JSON.parse(resto.slice(0, i))
+    resto = resto.slice(i + 1)
+    pedidos.push(m.method)
+    if (m.method === 'session/new') decir({ id: m.id, result: { sessionId: 'g1', modes: { currentModeId: 'default', availableModes: [{ id: 'default' }, { id: 'yolo' }] }, models: { availableModels: [{ modelId: 'auto' }] } } })
+    else if (m.method === 'session/set_mode') {
+      u({ sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: '[MODE_UPDATE] yolo' } })
+      decir({ id: m.id, result: {} })
+    } else if (m.method === 'session/prompt') {
+      if (process.env.LLAVE_MALA) decir({ id: m.id, error: { code: 400, message: 'API key not valid. Please pass a valid API key.' } })
+      else {
+        u({ sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: pedidos.join(',') } })
+        decir({ id: m.id, result: { stopReason: 'end_turn', usage: { inputTokens: 1000, cachedReadTokens: 600, outputTokens: 20, thoughtTokens: 30 } } })
+      }
+    } else if (m.id !== undefined) decir({ id: m.id, result: {} })
+  }
+})
+`
+const SCRIPT_GEMINI = join(dirname(SCRIPT), 'gemini.mjs')
+writeFileSync(SCRIPT_GEMINI, COMO_GEMINI)
+
+function correrGemini(env: Record<string, string> = {}) {
+  const events: AgentEvent[] = []
+  const sabor: SaborAcp = {
+    nombre: 'Gemini',
+    prefijo: 'gemini',
+    lanzar: () => ({ command: process.execPath, args: [SCRIPT_GEMINI], env: { ...process.env, ...env } }),
+    autenticar: 'gemini-api-key',
+    modo: 'yolo',
+    sinCompactar: true,
+    sinCuenta: 'Pega tu llave.',
+    traducir: errorGemini
+  }
+  let fin!: () => void
+  const listo = new Promise<void>((ok) => (fin = ok))
+  const run = startAcp(sabor, {
+    cwd: tmpdir(),
+    model: 'gemini:auto',
+    onEvent(e) {
+      events.push(e)
+      if (e.t === 'turn_end') fin()
+    },
+    onProviderSession() {}
+  })
+  return { run, events, listo }
+}
+
+test('ACP como Gemini: el modo va con set_mode sin abrir un turno, y cuenta como salida lo que piensa', async () => {
+  const { run, events, listo } = correrGemini()
+  run.send('hola')
+  await listo
+  run.close()
+  assert.deepEqual(events.flatMap((e) => (e.t === 'text' ? [e.delta] : [])), ['initialize,authenticate,session/new,session/set_mode,session/set_model,session/prompt'])
+  assert.equal(events.filter((e) => e.t === 'turn_end').length, 1)
+  const fin = events.find((e) => e.t === 'turn_end')
+  assert.deepEqual(fin && fin.t === 'turn_end' && { ok: fin.ok, tokens: fin.tokens }, { ok: true, tokens: { input: 400, output: 50, cacheRead: 600 } })
+  assert.equal(run.compact, undefined)
+})
+
+test('ACP como Gemini: una llave que Google rechaza acaba el turno en palabras de Sloth', async () => {
+  const { run, events, listo } = correrGemini({ LLAVE_MALA: '1' })
+  run.send('hola')
+  await listo
+  run.close()
+  const fin = events.find((e) => e.t === 'turn_end')
+  assert.deepEqual(fin && fin.t === 'turn_end' && { ok: fin.ok, error: fin.error }, { ok: false, error: 'Google no aceptó tu llave de Gemini. Cámbiala en Opciones.' })
+})
+
+test('Gemini: el límite de la llave se dice en palabras de Sloth, y lo demás no se toca', () => {
+  assert.match(errorGemini('{"error":{"code":429,"status":"RESOURCE_EXHAUSTED"}}') ?? '', /límite de tu llave/)
+  assert.equal(errorGemini('otro fallo'), undefined)
 })
 
 test('ACP: sin cuenta, el turno acaba pidiendo conectarla', async () => {

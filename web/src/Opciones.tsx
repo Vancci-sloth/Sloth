@@ -602,7 +602,7 @@ export function CuentaOpenCode({ aviso = false, onFalta }: { aviso?: boolean; on
 }
 
 /** Los agentes que llegaron después de Claude, Codex y OpenCode (`server/proveedores.ts`), en el orden de Opciones. */
-export const OTROS_AGENTES = ['deepseek', 'grok', 'antigravity', 'cursor', 'muse', 'pi'] as const satisfies readonly Proveedor[]
+export const OTROS_AGENTES = ['deepseek', 'grok', 'antigravity', 'gemini', 'cursor', 'muse', 'pi'] as const satisfies readonly Proveedor[]
 type OtroAgente = (typeof OTROS_AGENTES)[number]
 
 /**
@@ -641,6 +641,22 @@ const OTROS: Record<OtroAgente, { titulo: string; logo: string; como: 'ventana' 
     beta: true,
     abreSolo: 'Abriendo Antigravity: al terminar se abre sola la página de Google',
     texto: 'Sloth trabaja con tu cuenta de Google en Antigravity, con sus modelos de Gemini. La cuenta se autoriza en el navegador.'
+  },
+  gemini: {
+    titulo: 'Gemini · con tu llave de API',
+    logo: 'gemini',
+    como: 'llave',
+    beta: true,
+    texto: 'Trabaja con Gemini CLI y tu llave de AI Studio: no con tu cuenta ni tu plan de Google, que Gemini CLI ya no acepta. La llave gratis alcanza para probar; para trabajar, actívale la facturación.',
+    ayuda: (
+      <>
+        Créala en{' '}
+        <a href="https://aistudio.google.com/apikey" target="_blank" rel="noreferrer">
+          aistudio.google.com
+        </a>
+        . Se guarda solo en Sloth, en esta computadora.
+      </>
+    )
   },
   cursor: {
     titulo: 'Cursor',

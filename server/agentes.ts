@@ -122,6 +122,16 @@ const AGENTES: Record<Programa, Agente> = {
     exe: (r) => join(r, 'node_modules', '@earendil-works', 'pi-coding-agent', 'dist', 'bundle', 'cli.js'),
     pesa: '140 MB'
   },
+  gemini: {
+    nombre: 'Gemini CLI',
+    version: '0.66.0',
+    // También es de Node.
+    paquete() {
+      return `@google/gemini-cli@${this.version}`
+    },
+    exe: (r) => join(r, 'node_modules', '@google', 'gemini-cli', 'bundle', 'gemini.js'),
+    pesa: '110 MB'
+  },
   cursor: {
     nombre: 'Cursor',
     version: '1.2.0',
