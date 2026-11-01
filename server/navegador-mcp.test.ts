@@ -97,12 +97,17 @@ test('la primera vez pregunta a Playwright y guarda lo que contesta', async (t) 
   assert.deepEqual(JSON.parse(readFileSync(h.cache, 'utf8')), { capabilities: { tools: {} }, serverInfo: { name: 'falso', version: '1' }, tools: [{ name: 'browser_navigate' }] })
 })
 
+/** Hasta 5 s: en una máquina ocupada, soltarlo tarda lo que tarde. */
+const soltado = async (huella: string) => {
+  for (let i = 0; i < 200 && !readFileSync(huella, 'utf8').split('\n').includes('cerrado'); i++) await new Promise((r) => setTimeout(r, 25))
+}
+
 test('el hilo que aprendió la lista también suelta Playwright, aunque el agente no llegue a usarlo', async (t) => {
   const h = preparar(t, { suelta: 80 })
   await h.pedir('initialize', hola)
   h.avisar('notifications/initialized')
   await h.pedir('tools/list')
-  await new Promise((r) => setTimeout(r, 300))
+  await soltado(h.huella)
   assert.ok(readFileSync(h.huella, 'utf8').split('\n').includes('cerrado'))
   await h.terminar()
 })
@@ -111,7 +116,7 @@ test('sin llamadas suelta Playwright, y la siguiente lo vuelve a lanzar', async 
   const h = preparar(t, { guardado: true, suelta: 80 })
   await h.pedir('initialize', hola)
   await h.pedir('tools/call', { name: 'uno' })
-  await new Promise((r) => setTimeout(r, 300))
+  await soltado(h.huella)
   assert.equal(readFileSync(h.huella, 'utf8').split('\n').filter((l) => l === 'tools/call').length, 1)
   assert.equal((await h.pedir('tools/list')).result.tools.length, 1, 'mientras tanto contesta solo')
   assert.equal(h.arranques(), 1)
