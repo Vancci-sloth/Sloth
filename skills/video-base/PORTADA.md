@@ -23,7 +23,12 @@ renderizado, y no se pregunta: va siempre. El vídeo horizontal no la lleva dent
 En la raíz del proyecto, `portada.png` (si el proyecto entrega varios vídeos, uno por vídeo en
 `portada/<nombre del vídeo>.png`).
 
-Primero, `codex login status`: sale con 0 si hay una cuenta de ChatGPT conectada. **Sin ella** (sale con otro código,
+Si el mensaje trae `Imágenes: genéralas en Google Flow…`, la imagen va con `generar_imagen` y formato `9:16`
+([FLOW.md](FLOW.md)): los pasos de abajo, con los tres cuadros en `referencias` y el pedido sin su primer párrafo,
+diciendo `vertical 9:16` en vez de `vertical 2:3 (1024x1536)`, a `portada.jpg`. Pásala a `portada.png` y sigue en el
+paso 4.
+
+Si no, primero `codex login status`: sale con 0 si hay una cuenta de ChatGPT conectada. **Sin ella** (sale con otro código,
 o `codex` no está), la imagen no se genera: la portada es un cuadro del propio vídeo con el título encima, y se le dice
 al usuario una vez, en llano, que con su cuenta de ChatGPT conectada (Opciones → Agentes) la portada sale mejor:
 
@@ -51,6 +56,10 @@ Mírala (paso 4) y sigue en el paso 5. **Con ella:**
 4. **Mírala** entera y en chico (`-vf scale=120:-2`): que el título diga exactamente lo pedido, con sus acentos, que
    se lea en chico y que nada importante quede en los bordes. Si falla, pídela otra vez diciendo qué corregir: lo que
    más falla es el título o el protagonista demasiado grandes (se salen por arriba o bajan a la zona del texto).
+   Con Flow, pedirla otra vez corrige el título y los lados, pero el piso se queda donde lo trae la referencia (1 de
+   noviembre). Si lo de abajo pasa poco de los 1350 px y arriba sobra aire, súbela sin generar otra: 60 px, con la calle
+   reflejada debajo, y `subida.png` reemplaza a `portada.png`:
+   `ffmpeg -nostdin -v error -y -i portada.png -vf "scale=1080:1920,split[a][b];[b]crop=1080:60:0:1860,vflip[p];[a]crop=1080:1860:0:60,pad=1080:1920:0:0[c];[c][p]overlay=0:1860" subida.png`
 5. `node <base>/scripts/portada.mjs out/<video>.mp4 portada.png`. La pone como primer fotograma, en el mismo archivo;
    correrlo otra vez cambia la portada, no suma otra. El `final.py` de cada estilo la vuelve a poner sola si
    `portada.png` ya existe, así que un render nuevo no la pierde. Codifica solo ese fotograma, con los mismos ajustes

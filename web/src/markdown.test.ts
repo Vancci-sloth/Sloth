@@ -23,3 +23,13 @@ test('Markdown: mientras el texto crece, solo cambia el último bloque', () => {
   assert.deepEqual(despues.slice(0, -1), antes.slice(0, -1))
   assert.notEqual(despues.at(-1), antes.at(-1))
 })
+
+test('Markdown: una imagen del disco se pide al servidor del hilo; sin hilo, queda su texto', () => {
+  const pedir = (ruta: string) => `/api/sessions/s/imagen?ruta=${encodeURIComponent(ruta)}`
+  const [windows] = bloquesDeMarkdown('![Perro](C:\\v\\perro.jpg)', pedir)
+  assert.match(windows, /<img src="\/api\/sessions\/s\/imagen\?ruta=C%3A%5Cv%5Cperro\.jpg" alt="Perro">/)
+  assert.match(bloquesDeMarkdown('![Perro](file:///C:/v/mi%20perro.jpg)', pedir)[0], /ruta=C%3A%2Fv%2Fmi%20perro\.jpg"/)
+  assert.match(bloquesDeMarkdown('![Perro](/Users/ana/perro.png)', pedir)[0], /ruta=%2FUsers%2Fana%2Fperro\.png"/)
+  assert.equal(markdown('![Perro](C:\\v\\perro.jpg)'), '<p>Perro</p>\n')
+  assert.match(bloquesDeMarkdown('![web](https://x.example/a.png)', pedir)[0], /src="https:\/\/x\.example\/a\.png"/)
+})

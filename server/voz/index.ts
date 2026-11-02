@@ -92,7 +92,7 @@ export function voz(app: string) {
   const responde = () => fetch(`http://127.0.0.1:${PUERTO}/json/version`).then((r) => r.ok, () => false)
 
   /** El Edge del perfil: el que ya está abierto o uno nuevo. `ventana`, para entrar; si no, sin ventana ni sonido. */
-  async function abrirEdge(ventana: boolean): Promise<Browser> {
+  async function abrirEdge(ventana: boolean, url = ENTRAR): Promise<Browser> {
     if (await responde()) {
       const b = await conectarCDP(`http://127.0.0.1:${PUERTO}`)
       if (!ventana) return b
@@ -102,7 +102,7 @@ export function voz(app: string) {
     const edge = EDGE.find((e) => existsSync(e))
     if (!edge) throw new Error(process.platform === 'win32' ? 'No encontré Microsoft Edge, donde se entra con Google.' : 'No encontré Microsoft Edge ni Google Chrome: instala uno para entrar con Google.')
     mkdirSync(perfil(), { recursive: true })
-    const extra = ventana ? [ENTRAR] : ['--headless=new', '--mute-audio', 'about:blank']
+    const extra = ventana ? [url] : ['--headless=new', '--mute-audio', 'about:blank']
     spawn(edge, [`--remote-debugging-port=${PUERTO}`, `--user-data-dir=${perfil()}`, '--no-first-run', '--no-default-browser-check', ...extra], { detached: true, stdio: 'ignore' }).unref()
     for (let i = 0; i < 40 && !(await responde()); i++) await espera(500)
     return conectarCDP(`http://127.0.0.1:${PUERTO}`)
@@ -470,7 +470,21 @@ export function voz(app: string) {
   return {
     api,
     /** Por qué no se puede reiniciar el servidor: cortaría una voz a medias. */
-    ocupado: () => (trabajando ? 'Sloth está generando una voz en AI Studio. Espera a que termine.' : null)
+    ocupado: () => (trabajando ? 'Sloth está generando una voz en AI Studio. Espera a que termine.' : null),
+    /** Lo que Flow (`server/flow/`) toma de aquí: la cuenta y el Edge con la sesión, en el turno de la voz (ver `enTurno`). */
+    google: {
+      cuenta: () => cuenta,
+      enEdge: <T>(fn: (b: Browser) => Promise<T>) =>
+        enTurno(async () => {
+          const b = await abrirEdge(false)
+          try {
+            return await fn(b)
+          } finally {
+            await cerrarEdge(b)
+          }
+        }),
+      abrirEnEdge: (url: string) => enTurno(async () => void (await (await abrirEdge(true, url)).close()))
+    }
   }
 }
 

@@ -37,16 +37,18 @@ function onMarkdownClick(e: React.MouseEvent) {
  * en la página tal cual, sin volver a armarlos ni a medirlos, y lo que tengas seleccionado en ellos sigue seleccionado.
  * Van sin envoltorio, como si fueran un solo HTML (el CSS mira a los hijos de `.md`).
  */
-const Markdown = memo(function Markdown({ text }: { text: string }) {
+const Markdown = memo(function Markdown({ text, sessionId }: { text: string; sessionId?: string }) {
   const caja = useRef<HTMLDivElement>(null)
+  const [grande, setGrande] = useState<string>()
   const pintados = useRef<{ html: string; nodos: ChildNode[] }[]>([])
   // Cada bloque de código lleva su botón «Copiar», fuera del <pre> para que no se desplace con él.
   const bloques = useMemo(
     () =>
-      bloquesDeMarkdown(text).map((html) =>
+      // Una imagen del disco (`![](C:\…\perro.jpg)`) se pide al servidor, como las que lee el agente.
+      bloquesDeMarkdown(text, sessionId ? (ruta) => `/api/sessions/${sessionId}/imagen?ruta=${encodeURIComponent(ruta)}` : undefined).map((html) =>
         html.replaceAll('<pre>', '<div class="code-block"><button class="copy" type="button">Copiar</button><pre>').replaceAll('</pre>', '</pre></div>')
       ),
-    [text]
+    [text, sessionId]
   )
   useLayoutEffect(() => {
     const el = caja.current!
@@ -64,7 +66,16 @@ const Markdown = memo(function Markdown({ text }: { text: string }) {
     })
     pintados.current = [...antes.slice(0, k), ...nuevos]
   }, [bloques])
-  return <div className="md" ref={caja} onClick={onMarkdownClick} />
+  return (
+    <>
+      <div className="md" ref={caja} onClick={(e) => (e.target instanceof HTMLImageElement ? setGrande(e.target.src) : onMarkdownClick(e))} />
+      {grande && (
+        <div className="lightbox" onClick={() => setGrande(undefined)}>
+          <img src={grande} alt="" />
+        </div>
+      )}
+    </>
+  )
 })
 
 /** Lo que el agente hizo para llegar a su respuesta (pensar, herramientas…), plegado en una fila, como en T3 Code. */
@@ -485,7 +496,7 @@ const Row = memo(function Row({ item, sessionId, anidado, proveedor, onAbrir, on
     case 'text':
       return (
         <div className={`assistant ${nested}`}>
-          <Markdown text={item.text} />
+          <Markdown text={item.text} sessionId={sessionId} />
           {item.opciones && <Respuestas opciones={item.opciones} onElegir={onResponder} />}
         </div>
       )

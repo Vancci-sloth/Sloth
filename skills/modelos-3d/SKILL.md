@@ -63,7 +63,7 @@ Se escribe directo en `src/modelos/<id>.tsx` del proyecto, con estas reglas, par
   se van de un cuadro a otro (`pantalla-inicio` en nuevo-10).
 - **Sus archivos** (texturas, un `.glb`, un SVG) en `public/modelos/<id>/`, leídos con
   `staticFile("modelos/<id>/…")` y `useLoader` (`TextureLoader`, `GLTFLoader`, `SVGLoader`). Las texturas, con Codex
-  (como las caras de la moneda); un `.glb` hecho fuera vale si su licencia deja usarlo. Un ícono de Phosphor no se
+  (como las caras de la moneda) o con lo que diga la línea `Imágenes:` (`video-base/FLOW.md`); un `.glb` hecho fuera vale si su licencia deja usarlo. Un ícono de Phosphor no se
   modela: es `Icono3D` (`modelos.py iconos <nombre>` lo deja en public/iconos).
 - **Su `Muestra`**: `export const Muestra: React.FC` con el modelo solo, en el estado que mejor lo explica (abierto, a
   medio llenar, con dos variantes al lado). Es su miniatura; si se anima, `--cuadro` dice qué cuadro sale.

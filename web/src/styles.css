@@ -230,7 +230,8 @@ input, textarea, select { font: inherit; color: inherit; }
 .quote-chip .chip-name { font-weight: 400; font-style: italic; }
 .link-chip small { margin-left: 1px; }
 a.link-chip:hover { border-color: var(--amber); }
-.composer-bar { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
+.composer-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 6px; }
+.composer-bar .picker-trigger { white-space: nowrap; }
 /* Un grupo de botones donde solo uno está elegido (`Segmento`): el formato, la duración, el modo del modelo… */
 .segmento { display: flex; border: 1px solid var(--line); border-radius: 999px; padding: 2px; font-size: 12px; }
 .segmento button { padding: 2px 10px; border-radius: 999px; color: var(--muted); transition: background 0.15s, color 0.15s; white-space: nowrap; }
@@ -324,6 +325,7 @@ a.link-chip:hover { border-color: var(--amber); }
 .md .code-block { position: relative; }
 .md .code-block pre { padding-right: 80px; }
 .md .copy { position: absolute; top: 8px; right: 8px; font-size: 12px; color: var(--muted); background: var(--panel-2); border: 1px solid var(--line); border-radius: 6px; padding: 3px 9px; }
+.md img { display: block; max-width: min(100%, 420px); max-height: 420px; object-fit: contain; border: 1px solid var(--line); border-radius: var(--radio); background: var(--panel); cursor: zoom-in; }
 .md .copy:hover { color: var(--amber-2); border-color: var(--amber); }
 .md code:is([title], *) { cursor: text; }
 .md a { color: var(--amber-2); }
@@ -423,6 +425,7 @@ span.sub-avatar > .logo.chico svg { width: 13px; height: 13px; }
 /* Modal de confirmación */
 .modal-backdrop { position: fixed; inset: 0; z-index: 80; display: grid; place-items: center; background: rgba(0, 0, 0, 0.55); }
 .modal { width: min(420px, calc(100vw - 32px)); padding: 22px 24px 18px; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; box-shadow: 0 20px 48px rgba(0, 0, 0, 0.5); }
+.modal-body a { color: var(--amber); }
 .modal h2 { margin: 0 0 8px; font-size: 17px; font-weight: 650; }
 .modal-body { color: var(--muted); font-size: 13.5px; }
 .modal-body code { font-family: var(--mono); font-size: 12.5px; color: var(--amber); }

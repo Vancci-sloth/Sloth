@@ -9,6 +9,7 @@ import { rutaAgente } from './agentes.ts'
 import { CodexRpc } from './codex-rpc.ts'
 import { navegadorAgente, USA_EL_NAVEGADOR } from './navegador-agente.ts'
 import { mcpVoz } from './voz/index.ts'
+import { mcpFlow } from './flow/index.ts'
 import { costoCodex } from './precios.ts'
 import { SKILLS } from './skills.ts'
 
@@ -205,7 +206,7 @@ export function startCodex(opts: AgentOptions, connect: Conectar = (notify, exit
     padreDe.clear()
     segundoPlano()
   }, {
-    mcp_servers: Object.fromEntries(Object.entries({ ...navegadorAgente(opts.lote, opts.hilo), ...mcpVoz() }).map(([name, server]) => [name, { command: server.command, args: server.args ?? [], ...(server.env ? { env: server.env } : {}) }]))
+    mcp_servers: Object.fromEntries(Object.entries({ ...navegadorAgente(opts.lote, opts.hilo), ...mcpVoz(), ...mcpFlow() }).map(([name, server]) => [name, { command: server.command, args: server.args ?? [], ...(server.env ? { env: server.env } : {}) }]))
   }, llave)
   const ready = (async () => {
     await rpc.ready

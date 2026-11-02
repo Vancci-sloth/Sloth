@@ -33,6 +33,7 @@ import { radar } from './radar/index.ts' // radar
 import { comunidad, llaveDelCreador } from './comunidad.ts' // comunidad
 import { redes } from './redes/index.ts' // redes
 import { voz } from './voz/index.ts' // voz de AI Studio
+import { flow } from './flow/index.ts' // Google Flow
 import { youtube } from './youtube.ts'
 import { peticionDeConfianza } from './origen.ts'
 import { actualizarYtDlp, instalandoAlgo, instalar, pythonSlothEntero, requisitos } from './requisitos.ts'
@@ -185,6 +186,8 @@ const disco = espacio({ app: APP, sessions, cards, ocupado, python: () => python
 const maquina = equipo({ app: APP, ocupado }) // tu equipo
 // La voz de los videos, que los agentes piden a Sloth y Sloth genera en AI Studio con la cuenta de Google del usuario.
 const narrar = voz(APP) // voz de AI Studio
+// Las imágenes y videos de Google Flow, con esa misma cuenta y en ese mismo Edge.
+const generarFlow = flow(APP, narrar.google) // Google Flow
 
 // Si el agente (o tú) edita cards.json, las cards se actualizan solas.
 watch(CARDS, () => broadcast({ type: 'cards', cards: cards() }))
@@ -202,6 +205,7 @@ function ocupado(): string | null {
   if (subirLargos?.ocupado()) return subirLargos.ocupado()
   if (idear?.ocupado()) return idear.ocupado() // ideas: una investigación en curso
   if (narrar.ocupado()) return narrar.ocupado() // voz de AI Studio: una a medias
+  if (generarFlow.ocupado()) return generarFlow.ocupado() // Google Flow: un pedido a medias
   return maquina.ocupado() ?? instalandoAlgo() ?? bajandoAgente() ?? conectando() ?? conectandoCodex() ?? conectandoOpenCode() ?? conectandoOtro()
 }
 
@@ -331,6 +335,7 @@ async function api(req: IncomingMessage, res: ServerResponse, url: URL): Promise
   if (await disco.api(req, res, path)) return true // espacio en disco
   if (await maquina.api(req, res, path)) return true // tu equipo
   if (await narrar.api(req, res, path)) return true // voz de AI Studio
+  if (await generarFlow.api(req, res, path)) return true // Google Flow
 
   if (path === '/api/opciones' && method === 'GET') {
     send(res, 200, opciones())

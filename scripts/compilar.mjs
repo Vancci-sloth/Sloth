@@ -124,8 +124,9 @@ const faltan = new Set(
 if (faltan.size) throw new Error(`El servidor importa paquetes que no van en la app: ${[...faltan].join(', ')}. Añádelos a PAQUETES.`)
 // La página del motor en vivo no va dentro del servidor: la arma cada proyecto de video con sus propios paquetes.
 cpSync(join(REPO, 'server', 'motor-pagina.jsx'), join(APP, 'server', 'motor-pagina.jsx'))
-// El MCP de la voz lo lanza cada agente con el Node de Sloth: va tal cual, sin paquetes.
+// Los MCP de la voz y de Flow los lanza cada agente con el Node de Sloth: van tal cual, sin paquetes.
 cpSync(join(REPO, 'server', 'voz', 'mcp.mjs'), join(APP, 'server', 'voz', 'mcp.mjs'))
+cpSync(join(REPO, 'server', 'flow', 'mcp.mjs'), join(APP, 'server', 'flow', 'mcp.mjs'))
 // El que lanza Playwright MCP a demanda, igual.
 cpSync(join(REPO, 'server', 'navegador-mcp.mjs'), join(APP, 'server', 'navegador-mcp.mjs'))
 // El puente con el SDK de Cursor: server/cursor.ts lo copia junto al SDK que se baja y lo corre con el Node de Sloth.

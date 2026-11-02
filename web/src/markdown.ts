@@ -12,6 +12,18 @@ const segura = (href: string) => {
   const limpia = href.replace(/[\u0000-\u0020]/g, '').toLowerCase()
   return !/^[a-z][a-z0-9+.-]+:/.test(limpia) || /^(https?|mailto):/.test(limpia)
 }
+/** La ruta del disco de una imagen (`C:\…`, `/Users/…` o `file:///…`); si no es del disco, vacía. */
+const deDisco = (href: string) => {
+  let ruta = href
+  try {
+    if (/^file:\/\//i.test(href)) ruta = decodeURI(href.replace(/^file:\/\/\/?(?=[a-z]:)|^file:\/\//i, ''))
+  } catch {
+    // Un `%` suelto: se queda como venía.
+  }
+  return /^([A-Za-z]:[\\/]|\/(Users|home|Volumes|media|mnt|tmp)\/)/.test(ruta) ? ruta : ''
+}
+/** Cómo se pide al servidor una imagen del disco; solo durante `bloquesDeMarkdown` con hilo (el navegador no abre `C:\…`). */
+let imagenDelDisco: ((ruta: string) => string) | undefined
 
 marked.use({
   gfm: true,
@@ -21,7 +33,11 @@ marked.use({
     link(token: Tokens.Link) {
       return segura(token.href) ? false : this.parser.parseInline(token.tokens)
     },
-    image: (token: Tokens.Image) => (segura(token.href) ? false : escapar(token.text))
+    image(token: Tokens.Image) {
+      const ruta = deDisco(token.href)
+      if (ruta && imagenDelDisco) return `<img src="${escapar(imagenDelDisco(ruta))}" alt="${escapar(token.text)}">`
+      return segura(token.href) && !ruta ? false : escapar(token.text)
+    }
   }
 })
 
@@ -32,10 +48,16 @@ export const markdown = (texto: string) => marked.parse(texto, { async: false })
 
 /**
  * El mismo HTML que `markdown`, partido en sus bloques (párrafos, listas, código…). Un mensaje que el agente aún escribe
- * solo cambia en el último: el chat pinta cada bloque una vez y rehace solo ese (`Timeline.tsx`).
+ * solo cambia en el último: el chat pinta cada bloque una vez y rehace solo ese (`Timeline.tsx`). Con `imagen`, una
+ * imagen del disco se pide por esa URL.
  */
-export function bloquesDeMarkdown(texto: string): string[] {
+export function bloquesDeMarkdown(texto: string, imagen?: (ruta: string) => string): string[] {
   const tokens = marked.lexer(texto)
-  // Cada bloque con las definiciones de enlaces del texto entero (`[uno][1]` … `[1]: https://…`).
-  return tokens.flatMap((t) => (t.type === 'space' ? [] : [marked.parser(Object.assign([t], { links: tokens.links }))]))
+  imagenDelDisco = imagen
+  try {
+    // Cada bloque con las definiciones de enlaces del texto entero (`[uno][1]` … `[1]: https://…`).
+    return tokens.flatMap((t) => (t.type === 'space' ? [] : [marked.parser(Object.assign([t], { links: tokens.links }))]))
+  } finally {
+    imagenDelDisco = undefined
+  }
 }

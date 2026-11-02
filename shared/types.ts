@@ -1262,6 +1262,32 @@ export interface TrabajoVoz {
 }
 
 /**
+ * `GET /api/flow`: la cuenta de Google con que Sloth genera en Google Flow (la de la voz), cuántos pedidos esperan y si
+ * deja que Google use lo generado («Ayudar a mejorar Flow», apagado salvo que lo enciendas). `derechos`: si confirmó que
+ * tiene los derechos de lo que manda de referencia; sin eso, Flow solo recibe texto.
+ */
+export interface EstadoFlow {
+  cuenta: string | null
+  enFila: number
+  aportar: boolean
+  derechos: boolean
+}
+
+/**
+ * Un pedido a Flow (`POST /api/flow/generar`). `archivo`: lo generado ya en su sitio; `creditos`, lo que gastó. `error`:
+ * por qué no salió, dicho para el agente.
+ */
+export interface TrabajoFlow {
+  id: string
+  estado: 'en-fila' | 'generando' | 'lista' | 'error'
+  tipo: 'imagen' | 'video'
+  modelo: string
+  archivo?: string
+  creditos?: number
+  error?: string
+}
+
+/**
  * La página de un hilo en el navegador integrado (electron/navegador.ts). `url` vacía: aún no abrió nada. `agente`: el
  * agente la está usando. `error`: por qué no abrió la última dirección. `zoom`: el de la página, 1 sin zoom. `icono`: el
  * de su sitio. Una pestaña más de un hilo es otra página, con `hilo` como `<hilo>~<n>` (`web/src/Navegador.tsx`).

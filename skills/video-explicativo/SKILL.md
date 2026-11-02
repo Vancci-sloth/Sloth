@@ -77,9 +77,9 @@ mundo y la imagen siguen siendo de cada video (ver "Cada video es único").
   blanco (el que trae la skill: la foto de un salchicha negro y fuego con sudadera naranja, cadena de oro y puro). Nada de papel,
   stickers ni letra de meme en el resto (lo único escrito a mano es el cartel que sostiene el personaje). Con
   `personaje: ninguno`, el video va sin narrador.
-- **Las imágenes nuevas se hacen con Codex** (`codex exec` con su herramienta `image_gen`), nunca con Gemini: poses del
-  personaje, bocas abiertas, las caras o texturas del protagonista. Solo con ChatGPT conectado; cómo, en "Imágenes con
-  Codex".
+- **Las imágenes nuevas se hacen con Codex** (`codex exec` con su herramienta `image_gen`): poses del personaje, bocas
+  abiertas, las caras o texturas del protagonista. Solo con ChatGPT conectado; cómo, en "Imágenes con Codex". Si el
+  mensaje trae `Imágenes: genéralas en Google Flow…`, van con Flow (`<base>/FLOW.md`).
 - **La voz la graba el usuario**, o la generas tú en AI Studio si el mensaje trae `Voz:` con una voz
   ([`<base>/VOZ.md`](../video-base/VOZ.md)). Ninguna otra voz sintética.
 - **El cierre es el de la marca.** La última frase del guion, en todos los videos y de cualquier tema, es `cierre.frase`
@@ -250,8 +250,8 @@ scripts dicen al empezar cuánto tardarán aquí y luego cuánto falta. Lánzalo
    El protagonista, en 3D (ver "El protagonista" en [`MUNDO.md`](MUNDO.md)): si es una moneda, una medalla
    o un sello, sus dos caras con Codex (`texturas/pedido-moneda.txt` y `pedido-otra-cara.txt`) a
    `public/img/moneda_frente.png` y `moneda_atras.png`, que se le pasan a `Moneda` (mientras, lleva unas lisas; sin
-   ChatGPT, en su cara va el logo real del tema). Las poses del personaje que falten, con Codex ("Poses nuevas"); sin
-   ChatGPT, la más parecida de las que tiene. Listo cuando cada cosa que nombra el guion tiene su imagen o su modelo y
+   con qué generar, en su cara va el logo real del tema). Las poses del personaje que falten, con Codex ("Poses nuevas"); sin
+   con qué generar, la más parecida de las que tiene. Listo cuando cada cosa que nombra el guion tiene su imagen o su modelo y
    los miraste.
 6. **El mundo.** Arma `guion.ts`, `Escena3D.tsx`, los capítulos 2D y las poses según [`MUNDO.md`](MUNDO.md). Corre
    `npx tsc --noEmit -p .`, con la primera versión de cada modelo de los subagentes. Cuando llegue la final, compila y
@@ -298,7 +298,7 @@ hay sesión). Sin sesión no se genera ninguna: se usa lo que ya hay (las poses 
 vez de una textura) y se le dice al usuario una vez, en una frase llana, qué quedó sin hacer y que conectando ChatGPT
 en Sloth (Opciones → Codex) sale completo.
 
-Siempre Codex, con su `image_gen` (no dibuja con código ni con Gemini). El pedido va en un `.txt`, en inglés, y dice
+Con su `image_gen` (no dibuja con código). El pedido va en un `.txt`, en inglés, y dice
 qué archivo dejar:
 
 ```
@@ -315,7 +315,8 @@ boca) y `ejemplos/berachain/texturas/`.
 ## Poses nuevas
 
 El perro tiene 19 poses; uno propio, las que se le hicieron ([`personaje/POSES.md`](personaje/POSES.md)): elige la que
-dice lo mismo que la frase. Si el guion pide una que no está (sostener algo nuevo, otro gesto) y hay ChatGPT:
+dice lo mismo que la frase. Si el guion pide una que no está (sostener algo nuevo, otro gesto) y hay ChatGPT, o Flow si lo trae la línea `Imágenes:`
+(los mismos pasos, con `<base>/FLOW.md` en vez de Codex):
 
 1. Codex la hace con la foto base del personaje de referencia (el perro: `<skill>/personaje/perro.png`; uno propio:
    `personajes/<id>/base.png`) y `personaje/pedidos/pose.txt` (la misma foto, el mismo personaje, solo cambia la pose)
