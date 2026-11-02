@@ -22,6 +22,7 @@ import { app, BrowserWindow, dialog, ipcMain, Menu, nativeTheme, net, screen, se
 import { autoUpdater, CancellationToken } from 'electron-updater'
 import { guardar } from '../server/disco.ts'
 import { anclada, anclar } from './barra.ts'
+import { opcionesClicDerecho } from './clic-derecho.ts'
 import { archivos, huella, huellas, nombreCopia, quitarViejos, respaldar } from '../server/originales.ts'
 import { MODELOS_VIEJOS } from './modelos-viejos.ts'
 import { iniciarNavegador, ventanaDelNavegador } from './navegador.ts'
@@ -160,6 +161,10 @@ function abrir() {
   v.setMenuBarVisibility(false)
   enlaces(v.webContents)
   ventanaDelNavegador(v)
+  v.webContents.on('context-menu', (_e, p) => {
+    const opciones = opcionesClicDerecho(v.webContents, p)
+    if (opciones.length) Menu.buildFromTemplate(opciones).popup({ window: v })
+  })
   // Si la interfaz se cae, se recarga. Si se cae una y otra vez, recargarla sin parar solo calentaba la máquina: tras la
   // tercera en un minuto se avisa, y Ctrl+R la vuelve a cargar.
   let caidas: number[] = []
