@@ -13,6 +13,7 @@ import { startCodex } from './codex.ts'
 import { startOpenCode } from './opencode.ts'
 import { OTROS } from './proveedores.ts'
 import { guardar } from './disco.ts'
+import { resumenDelHilo } from './relevo.ts'
 
 /**
  * Cuántos agentes trabajan a la vez mientras un lote espera: uno por cada 3 hilos de CPU (un render ya abre un Chrome por
@@ -247,8 +248,9 @@ export class Sessions {
   private turno(meta: SessionMeta, text: string, skill?: SkillRef, images: string[] = []) {
     if (skill) meta.skill = skill.name
     const pide = skill ?? (!meta.providerSessionId && meta.skill ? { name: meta.skill } : undefined)
+    const antes = meta.resumir ? `${resumenDelHilo(this.load(meta.id), meta.carpeta ?? meta.lote?.carpeta)}\n\n` : ''
     this.emit(meta.id, { t: 'turn_start', at: Date.now() })
-    this.runFor(meta).send(conRutas(text, images), pide, images)
+    this.runFor(meta).send(antes + conRutas(text, images), pide, images)
   }
 
   /**
@@ -338,6 +340,24 @@ export class Sessions {
     meta.pendiente = { text, ...(images.length ? { images } : {}) }
     this.save(meta)
     setTimeout(() => this.repartir())
+  }
+
+  /**
+   * Una sesión del agente que ya no sirve: se pasó del tamaño del modelo o se colgó, y retomarla no la arregla. El hilo
+   * sigue en otra, que empieza con el resumen de lo hablado. Si el fallo cortó el trabajo (`seguir`), arranca sola.
+   */
+  private relevar(meta: SessionMeta, seguir: boolean) {
+    this.cerrar(meta.id)
+    delete meta.providerSessionId
+    meta.resumir = true
+    const sola = seguir && (meta.retomas ?? 0) < RETOMAS
+    if (sola) {
+      meta.retomas = (meta.retomas ?? 0) + 1
+      meta.pendiente = { text: 'Sigue con lo que estabas haciendo, sin preguntar si no hace falta.' }
+    }
+    this.save(meta)
+    this.emit(meta.id, { t: 'info', text: sola ? 'Sloth abrió una sesión nueva con un resumen de lo hablado, y sigue desde ahí.' : 'Tu próximo mensaje abre una sesión nueva con un resumen de lo hablado.' })
+    if (sola) setTimeout(() => this.repartir())
   }
 
   /**
@@ -597,6 +617,7 @@ export class Sessions {
       onProviderSession: (providerId) => {
         meta.providerSessionId = providerId
         meta.conLlave = conLlave || undefined
+        delete meta.resumir
         this.save(meta)
       }
     })
@@ -640,6 +661,7 @@ export class Sessions {
     this.ocioso(id, meta, event)
     this.avisarFondo(id, meta, event, habia)
     this.sinAcabar(id, meta, event)
+    if (event.t === 'turn_end' && event.relevo) this.relevar(meta, event.relevo === 'sigue')
     // Un agente que deja de trabajar libera sitio.
     if (event.t === 'turn_end' || event.t === 'background') setTimeout(() => this.repartir())
   }

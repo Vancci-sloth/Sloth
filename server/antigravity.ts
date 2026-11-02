@@ -83,6 +83,25 @@ function lanzar(exe: string) {
   return { command: exe, args: process.platform === 'linux' ? ['--uid='] : [], env, alCerrar }
 }
 
+/** En un turno: diez minutos sin decir nada ya no es pensar; con una herramienta abierta, una hora, por los renders. */
+const MUDO = { sin: 10 * 60_000, con: 60 * 60_000 }
+
+/**
+ * Antigravity convierte en texto los errores del modelo y cierra el turno con `end_turn`, como si fueran su respuesta.
+ * Se conoce por ser todo su último mensaje y empezar así. La cuota es semanal y por grupo: los Gemini, y Claude con GPT.
+ */
+export function errorAntigravity(texto: string): { error: string; relevo?: boolean } | undefined {
+  const t = texto.trim()
+  if (t.length > 2000) return
+  if (/^Usage Limit Reached\b/i.test(t)) {
+    const cuando = /reset in ([^.\n]+)/i.exec(t)?.[1].replace(/\bdays?\b/g, (d) => (d === 'day' ? 'día' : 'días')).replace(/\bhours?\b/g, (h) => (h === 'hour' ? 'hora' : 'horas')).replace(/\bminutes?\b/g, (m) => (m === 'minute' ? 'minuto' : 'minutos'))
+    return { error: `Se acabó tu cuota de este grupo de modelos.${cuando ? ` Se renueva en ${cuando}.` : ''} Mientras, elige abajo un modelo del otro grupo (Gemini, o Claude y GPT) y pulsa «Reintentar».` }
+  }
+  if (/^(?:Error:?\s*)?(?:Requested token count|The input\b|Prompt is too long|Input length)/i.test(t) && /\btokens?\b/i.test(t) && /exceed|too long|maximum/i.test(t)) {
+    return { error: 'La conversación se pasó del tamaño que aguanta el modelo.', relevo: true }
+  }
+}
+
 /** Lo que la sesión dice de los modelos, como los guarda Sloth para el catálogo. */
 function guardarModelos(opciones: OpcionAcp[]) {
   const modelo = opciones.find((o) => o.category === 'model' || o.id === 'model')
@@ -133,7 +152,10 @@ const SABOR: SaborAcp = {
   modo: 'yolo',
   sinCuenta: 'Conecta tu cuenta de Google en Opciones → Antigravity.',
   alVerModelos: guardarModelos,
-  compartido: true
+  compartido: true,
+  errorDe: errorAntigravity,
+  mudo: MUDO,
+  contextoOpaco: true
 }
 
 const SIN_CUENTA = SABOR.sinCuenta
