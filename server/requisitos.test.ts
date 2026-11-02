@@ -3,7 +3,7 @@ import { closeSync, existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, 
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { test } from 'node:test'
-import { aguantaCuda, elegirPython, motorDe, moverPython, pasoDePip } from './requisitos.ts'
+import { aguantaCuda, elegirPython, motorDe, moverPython, pasoDePip, sinRueda } from './requisitos.ts'
 
 function carpetas() {
   const raiz = mkdtempSync(join(tmpdir(), 'sloth-mover-'))
@@ -40,6 +40,14 @@ test('dice en qué va pip: qué baja y cuánto pesa, y los modelos', () => {
   assert.equal(pasoDePip('Installing collected packages: torch, whisperx'), 'Instalando los paquetes')
   assert.equal(pasoDePip('Bajando large-v3'), 'Bajando el modelo large-v3')
   assert.equal(pasoDePip('Requirement already satisfied: numpy in c:\python'), undefined)
+})
+
+test('pasa al Python de Sloth si no hay rueda para el tuyo, no por cualquier fallo de pip', () => {
+  assert.ok(sinRueda('ERROR: Could not find a version that satisfies the requirement onnxruntime (from versions: none)'))
+  assert.ok(sinRueda('ERROR: No matching distribution found for onnxruntime'))
+  assert.ok(sinRueda('ERROR: ResolutionImpossible: for help visit https://pip.pypa.io/en/latest/topics/dependency-resolution/')) // el de Python 3.15
+  assert.ok(!sinRueda('ERROR: Could not install packages due to an OSError: [Errno 28] No space left on device'))
+  assert.ok(!sinRueda('WARNING: Retrying after connection broken by NewConnectionError'))
 })
 
 test('el torch de CUDA solo con una NVIDIA, un controlador y una memoria que lo aguantan', () => {

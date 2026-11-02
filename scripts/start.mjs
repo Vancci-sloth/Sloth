@@ -32,6 +32,8 @@ if (process.platform !== 'win32') {
     // Aún no se guardó ninguna.
   }
 }
+// En Windows solo existe si tu Python no servía (server/requisitos.ts): entonces va delante del que haya en el sistema.
+else camino.push(join(process.env.APPDATA ?? '', 'sloth', 'piezas', 'python', 'python'), join(process.env.APPDATA ?? '', 'sloth', 'piezas', 'python', 'python', 'Scripts'))
 process.env.PATH = [...camino, process.env.PATH].join(delimiter)
 
 /**

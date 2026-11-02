@@ -12,11 +12,13 @@ import { correr } from './version.ts'
 /**
  * Lo que las skills necesitan fuera de Sloth: FFmpeg, Python y sus paquetes, el Python de Sloth y, opcional, la cuenta de
  * ChatGPT. Quien abre la app por primera vez ve encima del compositor lo que le falta al estilo elegido (de los paquetes,
- * solo los que importa su skill), y «Descargar todo» lo instala uno tras otro con winget y pip, sin permisos de
- * administrador (todo va a su usuario). ChatGPT no se instala: se conecta en Opciones.
+ * solo los que importa su skill), y «Descargar todo» lo instala uno tras otro, sin permisos de administrador (todo va a
+ * su usuario). ChatGPT no se instala: se conecta en Opciones.
  *
- * En Mac y Linux no hay winget: FFmpeg y Python se bajan, ya armados, a `BAJADAS` (que scripts/start.mjs pone primero en
- * el PATH). El Python es siempre el de Sloth: el del sistema falta (Mac) o no deja instalar paquetes con pip (Ubuntu).
+ * FFmpeg se baja con winget en Windows y, en Mac y Linux, ya armado a `BAJADAS`. El Python de las skills se baja también
+ * ya armado a `BAJADAS` (que scripts/start.mjs pone primero en el PATH). En Mac y Linux es siempre ese: el del sistema
+ * falta (Mac) o no deja instalar paquetes con pip (Ubuntu). En Windows sirve el que ya tengas mientras haya paquetes
+ * compilados para él; si no, `paquetes` pasa al de Sloth.
  */
 
 /**
@@ -77,6 +79,8 @@ export const BANDERAS = ['-E', '-s', '-B', '-X', 'utf8']
 /** Fuera de Windows: lo que Sloth baja para las skills (Python, FFmpeg). `bin` va primero en el PATH (scripts/start.mjs). */
 const BAJADAS = join(process.env.APPDATA ?? '', 'sloth', 'piezas')
 const BAJADAS_BIN = join(BAJADAS, 'bin')
+/** El Python propio con que corren las skills: en Windows, su carpeta va en el PATH (scripts/start.mjs). */
+const PYTHON_BAJADO = join(BAJADAS, 'python', 'python', EXE_PY)
 
 /**
  * El `python.exe` del Python de Sloth, o null. Trae yt-dlp y WhisperX y se lanza siempre con `-E -s -B -X utf8`: sin
@@ -295,15 +299,18 @@ async function pythonStandalone(carpeta: string, app: string): Promise<string> {
 }
 
 /**
- * Fuera de Windows, el Python con que corren los scripts de las skills (`python` en el PATH): uno propio en `BAJADAS`, el
- * mismo de python-build-standalone, con `python`, `python3` y `pip` en `BAJADAS_BIN`.
+ * El Python con que corren los scripts de las skills (`python` en el PATH): uno propio en `BAJADAS`, el mismo de
+ * python-build-standalone. Fuera de Windows, con `python`, `python3` y `pip` en `BAJADAS_BIN`; en Windows, scripts/start.mjs
+ * ya pone su carpeta en el PATH.
  */
 async function instalarPython(app: string) {
   const python = await pythonStandalone(join(BAJADAS, 'python'), app)
-  mkdirSync(BAJADAS_BIN, { recursive: true })
-  for (const [nombre, destino] of [['python', python], ['python3', python], ['pip', join(dirname(python), 'pip3')]]) {
-    rmSync(join(BAJADAS_BIN, nombre), { force: true })
-    symlinkSync(destino, join(BAJADAS_BIN, nombre))
+  if (!WINDOWS) {
+    mkdirSync(BAJADAS_BIN, { recursive: true })
+    for (const [nombre, destino] of [['python', python], ['python3', python], ['pip', join(dirname(python), 'pip3')]]) {
+      rmSync(join(BAJADAS_BIN, nombre), { force: true })
+      symlinkSync(destino, join(BAJADAS_BIN, nombre))
+    }
   }
   return ejecutar(python, ['-m', 'pip', 'install', '--disable-pip-version-check', '--upgrade', 'pip'], app)
 }
@@ -388,68 +395,6 @@ function ejecutar(exe: string, args: string[], cwd: string, alLeer?: (linea: str
   })
 }
 
-/**
- * En Windows, un Python que ya estaba pero no en el PATH (se instaló sin «Add python.exe to PATH»): `python` es entonces
- * el atajo de la Microsoft Store, y winget no pone otro 3.13 encima (sale con 1638, «ya hay otra versión»). Se busca donde
- * lo registra su instalador y en sus carpetas de siempre, y el más nuevo (3.10 o más) entra en el PATH de este proceso y
- * en el del usuario, como lo habría puesto su instalador. Devuelve su versión, o null.
- */
-export async function pythonFueraDelPath(): Promise<string | null> {
-  const carpetas = new Set(registroPython())
-  const raices = [join(process.env.LOCALAPPDATA ?? '', 'Programs', 'Python'), process.env.ProgramFiles ?? 'C:\\Program Files', 'C:\\']
-  for (const raiz of raices) {
-    try {
-      for (const d of readdirSync(raiz)) if (/^Python3\d+$/i.test(d)) carpetas.add(join(raiz, d))
-    } catch {}
-  }
-  let mejor: { carpeta: string; version: string; orden: number[] } | null = null
-  for (const carpeta of carpetas) {
-    const exe = join(carpeta, 'python.exe')
-    if (!existsSync(exe)) continue
-    const v = await new Promise<string | undefined>((ok) => execFile(exe, ['--version'], { windowsHide: true }, (e, s) => ok(e ? undefined : /Python (3\.\S+)/.exec(s)?.[1])))
-    const orden = v?.split('.').map((n) => parseInt(n)) ?? []
-    if (!v || orden[1] < 10) continue
-    if (!mejor || orden[1] > mejor.orden[1] || (orden[1] === mejor.orden[1] && orden[2] > mejor.orden[2])) mejor = { carpeta, version: v, orden }
-  }
-  if (!mejor) return null
-  const nuevas = [mejor.carpeta, join(mejor.carpeta, 'Scripts')]
-  process.env.PATH = [...nuevas, process.env.PATH].join(';')
-  try {
-    const usuario = execFileSync('powershell.exe', ['-NoProfile', '-Command', "[Environment]::GetEnvironmentVariable('Path', 'User')"], { encoding: 'utf8', windowsHide: true }).trim()
-    const sinBarra = (c: string) => c.toLowerCase().replace(/\\$/, '')
-    const faltan = nuevas.filter((n) => !usuario.split(';').map(sinBarra).includes(sinBarra(n)))
-    if (faltan.length) {
-      const script = "[Environment]::SetEnvironmentVariable('Path', $env:SLOTH_PATH, 'User')"
-      execFileSync('powershell.exe', ['-NoProfile', '-Command', script], { windowsHide: true, env: { ...process.env, SLOTH_PATH: [...faltan, usuario].filter(Boolean).join(';') } })
-    }
-  } catch {
-    // Sin PowerShell, vale para esta vez: al volver a abrir Sloth se busca de nuevo.
-  }
-  return mejor.version
-}
-
-/** Las carpetas donde los instaladores de Python dicen que lo pusieron (`HK*\Software\Python\PythonCore\*\InstallPath`). */
-function registroPython(): string[] {
-  const carpetas: string[] = []
-  for (const clave of ['HKCU\\Software\\Python\\PythonCore', 'HKLM\\Software\\Python\\PythonCore', 'HKLM\\Software\\WOW6432Node\\Python\\PythonCore']) {
-    let salida = ''
-    try {
-      salida = execFileSync('reg.exe', ['query', clave, '/s', '/ve'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], windowsHide: true })
-    } catch {
-      continue
-    }
-    let enInstallPath = false
-    for (const linea of salida.split(/\r?\n/)) {
-      if (/^HKEY_/.test(linea)) enInstallPath = /\\InstallPath$/i.test(linea.trim())
-      else if (enInstallPath) {
-        const valor = /REG_SZ\s+(.+)$/.exec(linea)?.[1].trim()
-        if (valor) carpetas.push(valor.replace(/\\$/, ''))
-      }
-    }
-  }
-  return carpetas
-}
-
 /** En orden: los paquetes van después de Python. */
 const PIEZAS: Pieza[] = [
   {
@@ -464,16 +409,8 @@ const PIEZAS: Pieza[] = [
     nombre: 'Python',
     para: 'Corre los scripts de los estilos de video.',
     // Sin Python, `python` es el atajo de la Microsoft Store, que sale con 9009. Fuera de Windows cuenta solo el propio.
-    mirar: async (app) =>
-      WINDOWS
-        ? ((await version('python --version', /Python (3\.\S+)/)(app)) ?? pythonFueraDelPath())
-        : existsSync(join(BAJADAS_BIN, 'python'))
-          ? version('python --version', /Python (3\.\S+)/)(app)
-          : null,
-    instalar: (app) =>
-      WINDOWS
-        ? correr(`winget install --id Python.Python.3.13 --scope user ${WINGET} --override "/quiet InstallAllUsers=0 PrependPath=1 Include_launcher=0"`, app)
-        : instalarPython(app)
+    mirar: async (app) => (WINDOWS || existsSync(join(BAJADAS_BIN, 'python')) ? version('python --version', /Python (3\.\S+)/)(app) : null),
+    instalar: instalarPython
   },
   paquetes(Object.keys(PAQUETES)),
   {
@@ -500,6 +437,17 @@ const PIEZAS: Pieza[] = [
   }
 ]
 
+/** Lo que dice pip cuando un paquete no tiene rueda para este Python. */
+export const sinRueda = (error: string) => /No matching distribution found|Could not find a version|ResolutionImpossible/i.test(error)
+
+/**
+ * Lo que pip no compila. Fuera de Windows, numba y llvmlite (de rembg, por pymatting): desde la 0.63 y la 0.46 no salen
+ * para Mac con Intel, y compilar llvmlite pide LLVM. En Windows, nada: el Python puede ser el tuyo, y en uno recién salido
+ * (3.15) pip compilaba scikit-image, también de rembg, y fallaba con un error que nadie entiende. Con esto se queda con la
+ * última versión que trae rueda o, si ninguna la trae para tu Python, `paquetes` sigue con el de Sloth.
+ */
+const SOLO_RUEDAS = WINDOWS ? ':all:' : 'numba,llvmlite'
+
 /** Los paquetes de `modulos` en una sola fila, que los baja todos con pip. */
 function paquetes(modulos: string[]): Pieza {
   const y = (xs: string[]) => [...new Set(xs)].join(', ').replace(/, ([^,]*)$/, ' y $1')
@@ -512,11 +460,20 @@ function paquetes(modulos: string[]): Pieza {
       const faltan = await modulosQueFaltan(app, modulos)
       return faltan ? `Faltan ${faltan.map((m) => PAQUETES[m].pip).join(', ')}` : 'Antes hace falta Python'
     },
-    // numba y llvmlite (de rembg, por pymatting) solo de rueda: desde la 0.63 y la 0.46 no salen para Mac con Intel, y
-    // pip compilaba llvmlite, que pide LLVM, y fallaba. Así se queda con la última que trae rueda.
     instalar: async (app) => {
-      const faltan = (await modulosQueFaltan(app, modulos)) ?? modulos
-      return correr(`python -m pip install --disable-pip-version-check --only-binary=numba,llvmlite ${faltan.map((m) => `"${PAQUETES[m].pip}"`).join(' ')}`, app)
+      const pip = async () => {
+        const faltan = (await modulosQueFaltan(app, modulos)) ?? modulos
+        return correr(`python -m pip install --disable-pip-version-check --only-binary=${SOLO_RUEDAS} ${faltan.map((m) => `"${PAQUETES[m].pip}"`).join(' ')}`, app)
+      }
+      try {
+        return await pip()
+      } catch (e) {
+        if (!WINDOWS || existsSync(PYTHON_BAJADO) || !sinRueda(String(e))) throw e
+        paso = 'Bajando Python'
+        await instalarPython(app)
+        paso = 'Instalando los paquetes'
+        return pip()
+      }
     }
   }
 }
@@ -643,7 +600,8 @@ function refrescarPath() {
   const leer = (de: string) =>
     execFileSync('powershell.exe', ['-NoProfile', '-Command', `[Environment]::GetEnvironmentVariable('Path', '${de}')`], { encoding: 'utf8' }).trim()
   try {
-    const nuevo = [leer('Machine'), leer('User'), process.env.PATH ?? ''].join(';').split(';').filter(Boolean)
+    // Lo de este proceso va primero: el Python de Sloth debe seguir delante del que haya en el sistema.
+    const nuevo = [process.env.PATH ?? '', leer('Machine'), leer('User')].join(';').split(';').filter(Boolean)
     process.env.PATH = [...new Set(nuevo)].join(';')
   } catch {
     // Sin PowerShell se queda como estaba: se verá al reiniciar.
