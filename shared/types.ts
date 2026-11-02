@@ -1245,6 +1245,8 @@ export interface VozStudio {
 export interface EstadoVoz {
   cuenta: string | null
   conectando: boolean
+  /** Donde se entra con Google: Edge, o Chrome en Mac. */
+  navegador: string
   voces: VozStudio[]
   enFila: number
   error?: string

@@ -70,7 +70,7 @@ export function SelectorImagenes({ valor, hayChatGPT, voz, onCambio }: { valor: 
   const [pidiendo, setPidiendo] = useState<string | null>(null)
   const cuenta = voz.estado?.cuenta
   const falta = !!valor && valor !== IMAGEN_CHATGPT && flow.estado?.derechos === false
-  const label = voz.estado?.conectando ? 'Imágenes: entra con Google en Edge…' : valor === IMAGEN_CHATGPT ? 'Imágenes: ChatGPT' : valor ? `Imágenes: ${valor}` : 'Imágenes: sin generar'
+  const label = voz.estado?.conectando ? `Imágenes: entra con Google en ${voz.estado.navegador}…` : valor === IMAGEN_CHATGPT ? 'Imágenes: ChatGPT' : valor ? `Imágenes: ${valor}` : 'Imágenes: sin generar'
   return (
     <>
       <Picker
