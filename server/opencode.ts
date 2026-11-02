@@ -362,8 +362,8 @@ export function startOpenCode(opts: AgentOptions, conectar: () => Promise<Servid
         if (!propio) return
         if (compactando) {
           compactando = false
-          terminar(e.type === 'session.compaction.ended', e.type === 'session.compaction.failed' ? 'OpenCode no pudo compactar el contexto.' : undefined)
-        } else if (e.type === 'session.compaction.ended') emit({ t: 'info', text: 'OpenCode compactó el contexto para continuar.' })
+          terminar(e.type === 'session.compaction.ended', e.type === 'session.compaction.failed' ? 'OpenCode no pudo resumir el chat.' : undefined)
+        } else if (e.type === 'session.compaction.ended') emit({ t: 'info', text: 'OpenCode resumió lo antiguo del chat para seguir.' })
         return
       case 'form.created':
         // Un formulario que pide elegir algo (un buscador, una respuesta): la interfaz no sabe contestarlo y el turno se

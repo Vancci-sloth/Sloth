@@ -1,8 +1,7 @@
 import { type ReactNode, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { Model } from '../../shared/types'
-import { proveedorDe } from '../../shared/providers'
+import { proveedorDe, type Proveedor } from '../../shared/providers'
 import { imageUrl, Thumbs, type Attached } from './Images'
-import { compact } from './items'
 import { esIcono, Icono } from './Iconos'
 import { LimitesContexto } from './LimitesContexto'
 import { invocacion, LINK, LINK_ICON, linkParts, QUOTE_EVENT, QUOTE_ICON, quoteRef, THREAD, THREAD_ICON, threadIconOf } from './etiquetas'
@@ -252,48 +251,58 @@ function withLinks(text: string): Node[] {
 }
 
 /**
- * Un círculo que se llena con el contexto, con el porcentaje dentro. Cerca del tope se pone rojo: ahí el agente compacta
- * o se corta. Aunque vaya casi vacío, el arco nunca baja de un trazo que se vea. Al pasar el ratón abre una tarjeta
- * con el detalle, con la cara del menú de modelos en vez del `title` del sistema.
+ * «Uso»: cuánto le queda al agente para recordar este chat y cuánto queda de tu plan, a un clic. Antes era un círculo con
+ * un % junto a Enviar, y se leía como el avance del video. Todo se mide en lo que queda. Con el chat casi lleno sale un
+ * punto ámbar y se puede resumir ya (lo mismo que escribir /compact); si no, el agente lo resume solo al llenarse. El plan
+ * se consulta solo con la tarjeta abierta: pedirlo abre Claude Code o Codex.
  */
-function ContextRing({ used, max, opencode }: { used: number; max: number; opencode?: boolean }) {
-  const [hover, setHover] = useState(false)
-  const [foco, setFoco] = useState(false)
-  const abierto = hover || foco
-  const [leyendo, setLeyendo] = useState(false)
+function Uso({ used, max, proveedor, onCompactar }: { used: number; max: number; proveedor: Proveedor; onCompactar?(): Promise<unknown> }) {
+  const [open, setOpen] = useState(false)
+  const [error, setError] = useState('')
+  const root = useRef<HTMLSpanElement>(null)
+  const queda = Math.max(0, 1 - used / max)
+  const pct = Math.round(queda * 100)
+  const full = queda < 0.15
+
   useEffect(() => {
-    if (!abierto) { setLeyendo(false); return }
-    const reloj = setTimeout(() => setLeyendo(true), 150)
-    return () => clearTimeout(reloj)
-  }, [abierto])
-  const share = Math.min(1, used / max)
-  const percent = Math.round(share * 100)
-  const full = share > 0.85
-  const r = 14
-  const length = 2 * Math.PI * r
-  const shown = used > 0 ? Math.max(share, 0.04) : 0
+    if (!open) return
+    const away = (e: PointerEvent) => !root.current?.contains(e.target as Node) && setOpen(false)
+    const esc = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return
+      setOpen(false)
+      root.current?.querySelector('button')?.focus()
+    }
+    addEventListener('pointerdown', away)
+    addEventListener('keydown', esc)
+    return () => {
+      removeEventListener('pointerdown', away)
+      removeEventListener('keydown', esc)
+    }
+  }, [open])
+
   return (
-    <span className={`context-ring ${full ? 'full' : ''}`} tabIndex={0} aria-label={`Contexto: ${percent}% usado. Límites del plan al enfocar.`} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)} onFocus={() => setFoco(true)} onBlur={() => setFoco(false)}>
-      <svg width="34" height="34" viewBox="0 0 34 34">
-        <circle cx="17" cy="17" r={r} />
-        <circle cx="17" cy="17" r={r} className="fill" strokeDasharray={length} strokeDashoffset={length * (1 - shown)} />
-      </svg>
-      <b>{percent}%</b>
-      <span className="context-card" role="tooltip">
-        <span className="picker-label">Contexto</span>
-        <span className="context-figure">
-          <strong>{percent}%</strong> usado
+    <span ref={root} className={`uso ${full ? 'full' : ''} ${open ? 'open' : ''}`}>
+      <button className="picker-trigger" aria-expanded={open} title="Memoria de este chat y tu plan" onClick={() => (setError(''), setOpen(!open))}>
+        {full && <span className="punto" aria-label="Chat casi lleno" />}
+        Uso
+      </button>
+      {open && (
+        <span className="context-card" role="dialog" aria-label="Uso">
+          <span className="picker-label">Memoria de este chat</span>
+          <span className="context-figure">{full ? 'Casi llena' : `Queda ${pct} %`}</span>
+          <span className="context-bar">
+            <span style={{ width: `${queda * 100}%` }} />
+          </span>
+          <span className="context-nota">Es lo que el agente recuerda de esta conversación. Si se llena, resume lo antiguo solo y sigue trabajando.</span>
+          {full && onCompactar && (
+            <button className="context-resumir" onClick={() => onCompactar().then(() => setOpen(false), (e) => setError(e instanceof Error ? e.message : String(e)))}>
+              Resumir ahora
+            </button>
+          )}
+          {error && <span className="bad small">{error}</span>}
+          <LimitesContexto proveedor={proveedor} />
         </span>
-        <span className="context-bar">
-          <span style={{ width: `${shown * 100}%` }} />
-        </span>
-        <span className="context-numbers">
-          <span>{compact(used)} de {compact(max)} tokens</span>
-          <span>quedan {compact(Math.max(0, max - used))}</span>
-        </span>
-        {full && <span className="context-warn">Casi lleno: el agente compactará la conversación pronto.</span>}
-        {leyendo && <LimitesContexto opencode={opencode} />}
-      </span>
+      )}
     </span>
   )
 }
@@ -436,8 +445,10 @@ export function Composer(props: {
   /** Cambiar de modelo cierra el agente, y con él lo que corre en segundo plano. */
   lockModel?: boolean
   autoFocus?: boolean
-  /** Lo que ocupa la conversación en la ventana del modelo. Sin él no sale el círculo. */
+  /** Lo que ocupa la conversación en la ventana del modelo. Sin él no sale «Uso». */
   context?: { used: number; max: number }
+  /** «Resumir ahora» en «Uso», con el chat casi lleno: lo mismo que escribir /compact. */
+  onCompactar?(): Promise<unknown>
   /** Lo que la card añade a la barra, junto al modelo (la serie, la carpeta, el lote…). */
   extra?: ReactNode
   /** Se puede mandar sin escribir nada: lo que se pide ya va en la barra (una serie, que elige sola su tema). */
@@ -728,7 +739,7 @@ export function Composer(props: {
         )}
         {props.extra}
         <span className="spacer" />
-        {props.context && <ContextRing {...props.context} opencode={!!choice && proveedorDe(choice.model) === 'opencode'} />}
+        {props.context && <Uso {...props.context} proveedor={proveedorDe(choice?.model ?? '')} onCompactar={props.onCompactar} />}
         {uploading > 0 && <span className="muted small">Subiendo…</span>}
         {error && <span className="bad small">{error}</span>}
         {(!trabajando || !empty) && (

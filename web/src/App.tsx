@@ -1213,6 +1213,7 @@ const SessionView = memo(function SessionView({ id, session, card, models }: { i
           background={!!session.background?.length}
           lockModel={!!session.background?.length}
           context={totals.context}
+          onCompactar={() => api(`/api/sessions/${session.id}/compactar`, {})}
           placeholder="Responde, pide un cambio, pega una imagen o suelta un archivo…"
           draft={leerRespuesta(session.id)}
           onDraft={(d) => guardarRespuesta(session.id, d)}

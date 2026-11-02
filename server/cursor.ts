@@ -188,7 +188,7 @@ export function startCursor(opts: AgentOptions): AgentRun {
         return
       }
       case 'summary-completed':
-        emit({ t: 'info', text: 'Cursor compactó el contexto para continuar.' })
+        emit({ t: 'info', text: 'Cursor resumió lo antiguo del chat para seguir.' })
         return
     }
   }

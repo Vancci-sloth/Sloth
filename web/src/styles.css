@@ -171,40 +171,30 @@ input, textarea, select { font: inherit; color: inherit; }
 .tool-mirada img { display: block; width: 100%; max-height: 220px; object-fit: contain; }
 .lightbox { position: fixed; inset: 0; z-index: 50; background: rgba(15, 14, 12, 0.88); display: grid; place-items: center; padding: 40px; cursor: zoom-out; }
 .lightbox img, .lightbox video { max-width: 100%; max-height: 100%; border-radius: var(--radio); box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5); }
-/* El círculo del contexto: empieza arriba y se llena en el sentido del reloj. */
-.context-ring { position: relative; display: grid; place-items: center; cursor: default; }
-.context-ring > svg { transform: rotate(-90deg); }
-.context-ring circle { fill: none; stroke: #4a4236; stroke-width: 3.5; }
-.context-ring > b { position: absolute; font-size: 10px; font-weight: 700; color: var(--text); letter-spacing: -0.02em; }
-.context-ring circle.fill { stroke: var(--amber); stroke-linecap: round; transition: stroke-dashoffset 0.4s ease; }
-.context-ring.full circle.fill { stroke: var(--bad); }
-.context-ring:focus-visible { outline: none; }
-.context-ring:focus-visible svg circle:first-child { stroke: var(--muted); }
-/* La tarjeta del hover: sale hacia arriba, alineada a la derecha (el anillo vive en el borde del compositor). */
-.context-card { position: absolute; bottom: calc(100% + 10px); right: -6px; z-index: 30; display: flex; flex-direction: column; gap: 8px; width: min(320px, calc(100vw - 32px)); max-height: min(520px, 70vh); overflow-y: auto; padding: 4px 14px 14px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45); opacity: 0; visibility: hidden; transform: translateY(4px); transition: opacity 0.12s ease-out, transform 0.12s ease-out, visibility 0s linear 0.12s; pointer-events: none; }
-.context-ring::before { content: ''; position: absolute; bottom: 100%; right: -6px; width: 40px; height: 12px; }
+/* «Uso»: un botón con cara de botón (no un % que parezca avance); abre con clic la tarjeta del chat y del plan. */
+.uso { position: relative; flex: none; }
+.uso > .picker-trigger { gap: 6px; padding: 0 10px; background: var(--panel); color: var(--text); }
+.uso > .picker-trigger:hover, .uso.open > .picker-trigger { background: var(--line); }
+.uso .punto { flex: none; width: 6px; height: 6px; border-radius: 50%; background: var(--amber); }
+/* La tarjeta sale hacia arriba, alineada a la derecha («Uso» vive en el borde del compositor). */
+.context-card { position: absolute; bottom: calc(100% + 10px); right: -6px; z-index: 30; display: flex; flex-direction: column; gap: 8px; width: min(320px, calc(100vw - 32px)); max-height: min(520px, 70vh); overflow-y: auto; padding: 4px 14px 14px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45); }
 .context-card > * { flex-shrink: 0; }
-.context-ring:hover .context-card, .context-ring:focus-visible .context-card { pointer-events: auto; }
-.context-ring:hover .context-card, .context-ring:focus-visible .context-card { opacity: 1; visibility: visible; transform: none; transition-delay: 0.15s, 0.15s, 0s; }
 .context-card .picker-label { padding: 6px 0 0; }
-.context-figure { font-size: 12.5px; color: var(--muted); }
-.context-figure strong { margin-right: 2px; font-size: 20px; font-weight: 700; color: var(--text); letter-spacing: -0.02em; }
+.context-figure { font-size: 15px; font-weight: 600; color: var(--text); letter-spacing: -0.01em; }
 .context-bar { height: 5px; border-radius: 99px; background: var(--panel-2); overflow: hidden; }
 .context-bar span { display: block; height: 100%; border-radius: inherit; background: var(--amber); transition: width 0.4s ease; }
-.context-ring.full .context-bar span { background: var(--bad); }
-.context-numbers { display: flex; justify-content: space-between; gap: 8px; font-size: 11.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
-.context-warn { padding-top: 8px; border-top: 1px solid var(--line); font-size: 12px; line-height: 1.45; color: var(--bad); }
+.uso.full .context-bar span { background: var(--bad); }
+.context-nota { font-size: 11.5px; line-height: 1.45; color: var(--muted); }
+.context-resumir { align-self: flex-start; padding: 3px 10px; border: 1px solid var(--amber); border-radius: 999px; font-size: 12px; color: var(--amber); }
+.context-resumir:hover { background: var(--panel-2); }
 .context-limits { display: flex; flex-direction: column; gap: 14px; margin-top: 4px; padding-top: 8px; border-top: 1px solid var(--line); }
 .context-limits .picker-label { padding: 0; }
 .context-provider { display: flex; flex-direction: column; gap: 10px; }
-.context-provider-name { color: var(--text); font-size: 12px; }
-.context-provider-claude .context-provider-name { color: var(--amber-2); }
 .context-limit { display: flex; flex-direction: column; gap: 5px; }
 .context-limit-heading { display: flex; justify-content: space-between; gap: 10px; font-size: 11.5px; color: var(--muted); }
 .context-limit-heading b { color: var(--text); font-weight: 500; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .context-limit-bar { display: block; height: 7px; border-radius: 4px; overflow: hidden; background: repeating-linear-gradient(135deg, var(--line) 0 1px, var(--panel-2) 1px 5px); }
-.context-limit-bar > span { display: block; height: 100%; border-radius: inherit; background: var(--muted); }
-.context-provider-claude .context-limit-bar > span { background: var(--amber); }
+.context-limit-bar > span { display: block; height: 100%; border-radius: inherit; background: var(--amber); }
 .context-limit.agotandose .context-limit-bar > span { background: var(--bad); }
 .context-limit.agotandose b { color: var(--bad); }
 .context-limit-reset, .context-limit-note { font-size: 10.5px; color: var(--muted); }

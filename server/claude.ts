@@ -365,7 +365,7 @@ export function reader(opts: AgentOptions, state: { idle: boolean; max: number; 
       const { trigger, pre_tokens, post_tokens } = m.compact_metadata
       const cifra = (n: number) => n.toLocaleString('es-MX')
       const cuanto = post_tokens === undefined ? '' : `: de ${cifra(pre_tokens)} a ${cifra(post_tokens)} tokens`
-      opts.onEvent({ t: 'info', text: `Claude compactó el contexto${trigger === 'auto' ? ' para continuar' : ''}${cuanto}.` })
+      opts.onEvent({ t: 'info', text: `Claude resumió lo antiguo del chat${trigger === 'auto' ? ' para seguir' : ''}${cuanto}.` })
       state.measure()
       return
     }

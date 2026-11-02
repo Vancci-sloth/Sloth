@@ -244,7 +244,7 @@ export function startPi(opts: AgentOptions): AgentRun {
         if (compactando) {
           compactando = false
           terminar(!e.aborted && !e.errorMessage, e.errorMessage)
-        } else if (!e.aborted && !e.errorMessage) emit({ t: 'info', text: 'Pi compactó el contexto para continuar.' })
+        } else if (!e.aborted && !e.errorMessage) emit({ t: 'info', text: 'Pi resumió lo antiguo del chat para seguir.' })
         return
       case 'agent_settled':
         if (!compactando) terminar(!errorTurno && !e.aborted && !detenido, detenido || e.aborted ? 'lo detuviste' : errorTurno)

@@ -375,13 +375,13 @@ export class Sessions {
     if (this.compactando.has(id) || this.compactarPendiente.has(id)) return
     if (meta.running || meta.background?.length) {
       this.compactarPendiente.add(id)
-      this.emit(id, { t: 'info', text: 'Se compactará el contexto cuando termine el trabajo en curso.' })
+      this.emit(id, { t: 'info', text: 'Se resumirá lo antiguo del chat cuando termine el trabajo en curso.' })
       return
     }
     const run = this.runFor(meta)
     if (!run.compact) throw new Error('Este agente no admite compactación manual.')
     this.compactando.add(id)
-    this.emit(id, { t: 'info', text: `Compactando el contexto de ${proveedorDe(meta.model) === 'codex' ? 'Codex' : NOMBRE_AGENTE[proveedorDe(meta.model)]}…` })
+    this.emit(id, { t: 'info', text: `${proveedorDe(meta.model) === 'codex' ? 'Codex' : NOMBRE_AGENTE[proveedorDe(meta.model)]} está resumiendo lo antiguo del chat…` })
     this.emit(id, { t: 'turn_start', at: Date.now() })
     try { run.compact() }
     catch (error) {

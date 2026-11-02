@@ -141,7 +141,7 @@ export function startCodex(opts: AgentOptions, connect: Conectar = (notify, exit
     if (item.type === 'subAgentActivity') actividad(item, parent, hijo)
     else if (done && item.type === 'agentMessage') completo(item.id, item.text ?? '')
     else if (done && item.type === 'reasoning') completo(`${item.id}:pensamiento`, (item.summary ?? []).join('\n'), true)
-    else if (item.type === 'contextCompaction' && done) emit({ t: 'info', text: 'Codex compactó el contexto para continuar.' })
+    else if (item.type === 'contextCompaction' && done) emit({ t: 'info', text: 'Codex resumió lo antiguo del chat para seguir.' })
     else if (!['agentMessage', 'reasoning', 'userMessage', 'contextCompaction', 'hookPrompt'].includes(item.type)) {
       if (!herramientas.has(id)) {
         herramientas.add(id)

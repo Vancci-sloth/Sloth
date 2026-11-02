@@ -27,7 +27,7 @@ test('Claude: la compactación avisa cuántos tokens quedaron y vuelve a medir e
   const leer = reader({ cwd: '.', model: 'haiku', onEvent: (e) => events.push(e), onProviderSession: () => {} }, { idle: false, max: 0, measure: () => medidas++, tareas: [], detenido: false })
   // Lo que mandó el SDK en una prueba real con /compact.
   leer(sistema({ subtype: 'compact_boundary', compact_metadata: { trigger: 'manual', pre_tokens: 20017, post_tokens: 1773 } }))
-  assert.deepEqual(events, [{ t: 'info', text: 'Claude compactó el contexto: de 20,017 a 1,773 tokens.' }])
+  assert.deepEqual(events, [{ t: 'info', text: 'Claude resumió lo antiguo del chat: de 20,017 a 1,773 tokens.' }])
   assert.equal(medidas, 1)
 })
 

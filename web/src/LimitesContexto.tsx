@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { NOMBRE_AGENTE, type Proveedor } from '../../shared/providers'
 import type { LimitesClaude } from '../../shared/types'
 import { api } from './api'
 
@@ -14,8 +15,8 @@ function reinicio(fecha: string, ahora: number): string {
   return `${minutos} min`
 }
 
-/** `opcional` (Codex): si no hay cuenta conectada o no da límites, no sale. `sinPlan`: lo que se dice si no da límites. */
-function Proveedor({ id, nombre, ahora, opcional, sinPlan = 'El proveedor no informa límites del plan.' }: { id: string; nombre: string; ahora: number; opcional?: boolean; sinPlan?: string }) {
+/** `sinPlan`: lo que se dice si no da límites. */
+function Cuenta({ id, nombre, ahora, sinPlan = 'El proveedor no informa límites del plan.' }: { id: string; nombre: string; ahora: number; sinPlan?: string }) {
   const [limites, setLimites] = useState<LimitesClaude>()
   const [error, setError] = useState(false)
   useEffect(() => {
@@ -28,10 +29,8 @@ function Proveedor({ id, nombre, ahora, opcional, sinPlan = 'El proveedor no inf
     const reloj = setInterval(leer, 60_000)
     return () => { vigente = false; clearInterval(reloj) }
   }, [id])
-  if (opcional && (error || (!limites?.ventanas.length && !limites?.llave))) return null
   return (
-    <span className={`context-provider context-provider-${id}`}>
-      <strong className="context-provider-name">{nombre}</strong>
+    <span className="context-provider">
       {error ? <span className="context-limit-note">No se pudieron consultar los límites.</span>
         : !limites ? <span className="context-limit-note">Consultando límites…</span>
         : limites.llave ? <span className="context-limit-note">Pagas con tu llave de API: se cobra por uso y no hay límites del plan. Para verlos, cambia a «Tu suscripción» en Opciones → Agentes.</span>
@@ -52,25 +51,29 @@ function Proveedor({ id, nombre, ahora, opcional, sinPlan = 'El proveedor no inf
   )
 }
 
+/** Los que dicen cuánto queda del plan; los demás no tienen qué enseñar. */
+const CON_PLAN: Proveedor[] = ['claude', 'codex', 'opencode']
+
 /**
- * Se monta solo al abrir el hover del contexto: consulta las cuentas, sin bloquear una si falla otra. En un hilo de
- * OpenCode va primero lo suyo: los límites de Go si la cuenta lo tiene; si no, que su uso gratis tiene un tope que
- * OpenCode no enseña.
+ * Se monta solo al abrir «Uso»: consulta el plan del agente del hilo, el único que importa ahí. En OpenCode, los límites
+ * de Go si la cuenta lo tiene; si no, que su uso gratis tiene un tope que OpenCode no enseña.
  */
-export function LimitesContexto({ opencode }: { opencode?: boolean }) {
+export function LimitesContexto({ proveedor }: { proveedor: Proveedor }) {
   const [ahora, setAhora] = useState(Date.now)
   useEffect(() => {
     const reloj = setInterval(() => setAhora(Date.now()), 60_000)
     return () => clearInterval(reloj)
   }, [])
+  if (!CON_PLAN.includes(proveedor)) return null
   return (
     <span className="context-limits">
-      <span className="picker-label">Límites del plan</span>
-      {opencode && (
-        <Proveedor id="opencode" nombre="OpenCode" ahora={ahora} sinPlan="Sin OpenCode Go: el uso gratis tiene un tope que OpenCode no publica ni deja ver, y es de tu computadora: cambiar de cuenta no lo repone. Al acabarse, vuelve solo en unas horas o al día siguiente. Los modelos de pago se cobran de tu saldo." />
-      )}
-      <Proveedor id="codex" nombre="Codex" ahora={ahora} opcional />
-      <Proveedor id="claude" nombre="Claude" ahora={ahora} />
+      <span className="picker-label">Tu plan de {NOMBRE_AGENTE[proveedor]}</span>
+      <Cuenta
+        id={proveedor}
+        nombre={NOMBRE_AGENTE[proveedor]}
+        ahora={ahora}
+        sinPlan={proveedor === 'opencode' ? 'Sin OpenCode Go: el uso gratis tiene un tope que OpenCode no publica ni deja ver, y es de tu computadora: cambiar de cuenta no lo repone. Al acabarse, vuelve solo en unas horas o al día siguiente. Los modelos de pago se cobran de tu saldo.' : undefined}
+      />
     </span>
   )
 }

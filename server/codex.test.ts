@@ -223,13 +223,13 @@ test('compactar usa el comando nativo, espera su fin y muestra el contexto medid
   h.run.close()
 })
 
-test('un fallo al compactar cierra la operación sin afirmar que se compactó', async () => {
+test('un fallo al compactar cierra la operación sin afirmar que se resumió', async () => {
   const h = preparar('guardado')
   h.fallar('thread/compact/start')
   h.run.compact!()
   await setImmediate()
   assert.equal(h.events.find((e) => e.t === 'turn_end')!.ok, false)
-  assert.equal(h.events.some((e) => e.t === 'info' && e.text.includes('compactó')), false)
+  assert.equal(h.events.some((e) => e.t === 'info' && e.text.includes('resumió')), false)
   h.run.close()
 })
 
