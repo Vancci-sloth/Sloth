@@ -865,7 +865,8 @@ function Programar({ videos, redes, fijos = [], onClose, onHecho }: { videos: Vi
                   <p className="muted small">{f.incluir ? 'Escribiendo…' : 'Márcalo y Claude escribe su texto.'}</p>
                 ) : (
                   <>
-                    <textarea rows={3} value={f.borrador.texto} onChange={(e) => cambiar(f.video.ruta, { texto: e.target.value })} />
+                    {f.borrador.aviso && <p className="muted small">No se pudo escribir solo ({f.borrador.aviso}). Escríbelo tú:</p>}
+                    <textarea rows={3} value={f.borrador.texto} placeholder="El texto del video" onChange={(e) => cambiar(f.video.ruta, { texto: e.target.value })} />
                     <Tags tags={f.borrador.tags} onCambio={(tags) => cambiar(f.video.ruta, { tags })} placeholder="Añadir hashtag…" />
                   </>
                 )}

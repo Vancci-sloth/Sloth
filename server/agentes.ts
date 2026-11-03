@@ -1,11 +1,11 @@
 import { execFile, type ExecFileException } from 'node:child_process'
 import { createHash } from 'node:crypto'
-import { chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { delimiter, dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { brotliDecompressSync } from 'node:zlib'
 import { programaDe, type Programa, type Proveedor } from '../shared/providers.ts'
-import type { EstadoAgente } from '../shared/types.ts'
+import type { AgentesAlDia, EstadoAgente } from '../shared/types.ts'
 import type { AgentOptions, AgentRun } from './agent.ts'
 import { correr } from './version.ts'
 
@@ -46,8 +46,8 @@ interface Agente {
   version?: string
   /** Lo baja a `dir`. Sin él, con npm, `paquete()`. */
   instalar?(dir: string): Promise<void>
-  /** Lo que se instala con npm, con su versión. */
-  paquete?(): string
+  /** Lo que se instala con npm, con su versión: la que trae la app o, al actualizar (`AL_DIA`), `version`. */
+  paquete?(version?: string): string
   /** El ejecutable dentro de la carpeta del agente o de la app, o `null` si el sistema no lo admite. */
   exe(raiz: string): string | null
   /** Lo que pesa, para decirlo antes de bajarlo. */
@@ -81,20 +81,20 @@ const AGENTES: Record<Programa, Agente> = {
   claude: {
     nombre: 'Claude Code',
     // Solo el programa: el SDK, que importa el servidor, viene en la app.
-    paquete: () => `@anthropic-ai/claude-agent-sdk-${plataforma}@${versionDe('@anthropic-ai/claude-agent-sdk')}`,
+    paquete: (v = versionDe('@anthropic-ai/claude-agent-sdk')) => `@anthropic-ai/claude-agent-sdk-${plataforma}@${v}`,
     exe: (r) => join(r, 'node_modules', '@anthropic-ai', `claude-agent-sdk-${plataforma}`, WINDOWS ? 'claude.exe' : 'claude'),
     pesa: '290 MB'
   },
   codex: {
     nombre: 'Codex',
     // Entero: las skills corren `codex exec` (las imágenes), y su lanzador busca el programa a su lado.
-    paquete: () => `@openai/codex@${versionDe('@openai/codex')}`,
+    paquete: (v = versionDe('@openai/codex')) => `@openai/codex@${v}`,
     exe: (r) => (CODEX[plataforma] ? join(r, 'node_modules', '@openai', `codex-${plataforma}`, 'vendor', CODEX[plataforma], 'bin', WINDOWS ? 'codex.exe' : 'codex') : null),
     pesa: '460 MB'
   },
   opencode: {
     nombre: 'OpenCode',
-    paquete: () => `${OPENCODE}@${versionDe('@opencode/client')}`,
+    paquete: (v = versionDe('@opencode/client')) => `${OPENCODE}@${v}`,
     exe: (r) => {
       const exe = WINDOWS ? 'opencode.exe' : 'opencode'
       const normal = join(r, 'node_modules', OPENCODE, 'bin', exe)
@@ -205,14 +205,69 @@ const BAJANDO = '.bajando'
  */
 export const rutaAgente = (p: Proveedor): string | null => (instalando.has(programaDe(p)) ? null : buscar(programaDe(p)))
 
-function buscar(p: Programa): string | null {
+const buscar = (p: Programa): string | null => elegido(p)?.exe ?? null
+
+/** Las versiones que «Actualizar los agentes» bajó de uno (`AL_DIA`), cada una en su carpeta. */
+const versiones = (p: Programa) => join(carpeta(p), 'versiones')
+/** Lo que se aparta para borrarlo (`soltarViejas`). */
+const APARTE = '.borrando'
+
+/**
+ * Dónde está el programa de un agente: en la app (repo), en su carpeta o, si se actualizó, en la de cada versión que
+ * bajó. Va el más nuevo; así una Sloth que trae uno más nuevo que el bajado usa el suyo. `bajados`: sin el de la app.
+ */
+function elegido(p: Programa, bajados = false): { raiz: string; exe: string; version: string } | null {
   // Muse se instala en `muse/` dentro de su carpeta (su instalador no deja elegir el nombre del lanzador).
-  const raices = (AGENTES[p].version || p === 'muse' ? [carpeta(p)] : [APP, carpeta(p)]).filter((r) => r === APP || !existsSync(join(carpeta(p), BAJANDO)))
-  for (const raiz of raices) {
-    const exe = AGENTES[p].exe(raiz)
-    if (exe && existsSync(exe)) return exe
+  const fijo = !!AGENTES[p].version || p === 'muse'
+  let otras: string[] = []
+  try {
+    if (!fijo) otras = readdirSync(versiones(p)).filter((v) => !v.endsWith(APARTE)).map((v) => join(versiones(p), v))
+  } catch {
+    // Nunca se actualizó.
   }
-  return null
+  let mejor: { raiz: string; exe: string; version: string } | null = null
+  for (const raiz of fijo ? [carpeta(p)] : [...(bajados ? [] : [APP]), carpeta(p), ...otras]) {
+    if (raiz !== APP && existsSync(join(raiz, BAJANDO))) continue
+    const exe = AGENTES[p].exe(raiz)
+    if (!exe || !existsSync(exe)) continue
+    if (fijo) return { raiz, exe, version: '' }
+    const version = versionJunto(exe)
+    if (!mejor || masNueva(version, mejor.version)) mejor = { raiz, exe, version }
+  }
+  return mejor
+}
+
+/** La versión del paquete de npm que trae `exe`: el package.json más cercano hacia arriba (`0.164.0-win32-x64` → `0.164.0`). */
+function versionJunto(exe: string): string {
+  for (let dir = dirname(exe), i = 0; i < 6; dir = dirname(dir), i++) {
+    try {
+      return /^\d+\.\d+\.\d+/.exec(JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8')).version)?.[0] ?? ''
+    } catch {
+      // Más arriba.
+    }
+  }
+  return ''
+}
+
+const cifras = (v: string) => /^(\d+)\.(\d+)\.(\d+)/.exec(v)?.slice(1).map(Number) ?? null
+/** Si `a` es más nueva que `b`. Una que no se pudo leer es la más vieja. */
+export function masNueva(a: string, b: string): boolean {
+  const x = cifras(a)
+  const y = cifras(b)
+  if (!x) return false
+  if (!y) return true
+  for (let i = 0; i < 3; i++) if (x[i] !== y[i]) return x[i] > y[i]
+  return false
+}
+
+/**
+ * Si `v` es más nueva que `base` sin cambiar sus primeras `fijas` cifras: con `fijas` 2, de 0.3.311 a 0.3.317 sí, a 0.4.0
+ * no.
+ */
+export function cabe(v: string, base: string, fijas: number): boolean {
+  const x = cifras(v)
+  const y = cifras(base)
+  return !!x && !!y && x.slice(0, fijas).every((c, i) => c === y[i]) && masNueva(v, base)
 }
 
 /** La versión de un agente que no trae la app: la que fija Sloth o, la de Muse, la que dejó su instalador. */
@@ -240,7 +295,9 @@ export function comandoAgente(p: Proveedor): { command: string; args: string[] }
  * node_modules/.bin, que scripts/start.mjs pone en el PATH) no tiene el programa a su lado.
  */
 export function caminoDeAgentes() {
-  const bin = join(carpeta('codex'), 'node_modules', '.bin')
+  const raiz = elegido('codex')?.raiz
+  if (!raiz || raiz === APP) return
+  const bin = join(raiz, 'node_modules', '.bin')
   if (existsSync(bin) && !process.env.PATH?.split(delimiter).includes(bin)) process.env.PATH = [bin, process.env.PATH].join(delimiter)
 }
 caminoDeAgentes()
@@ -259,10 +316,10 @@ export function estadoAgente(p: Proveedor): EstadoAgente {
 export const estadoAgentes = () =>
   Object.fromEntries((['claude', 'codex', 'opencode', 'deepseek', ...(Object.keys(AGENTES) as Programa[]).filter((p) => !['claude', 'codex', 'opencode'].includes(p))] as Proveedor[]).map((p) => [p, estadoAgente(p)])) as Record<Proveedor, EstadoAgente>
 
-/** Qué agente se está bajando: reiniciar el servidor cortaría la descarga. */
+/** Qué agente se está bajando o actualizando: reiniciar el servidor cortaría la descarga. */
 export const bajandoAgente = () => {
   const p = [...instalando.keys()][0]
-  return p ? `Se está descargando ${AGENTES[p].nombre}. Espera a que termine.` : null
+  return p ? `Se está descargando ${AGENTES[p].nombre}. Espera a que termine.` : actualizando && `${actualizando} Espera a que termine.`
 }
 
 /**
@@ -311,6 +368,151 @@ export function asegurarAgente(proveedor: Proveedor): Promise<string> {
   )
   return descarga
 }
+
+/**
+ * Claude Code, Codex y OpenCode llegan con cada versión de Sloth (su paquete en package.json), pero sacan otra casi a
+ * diario, con los modelos nuevos. «Actualizar los agentes», arriba del hilo nuevo, baja la más nueva de los que ya están,
+ * sin esperar a la siguiente Sloth. Cada versión va en su carpeta (`versiones`): los hilos abiertos siguen con la de antes
+ * y los nuevos van con la nueva. Solo dentro de las cifras que fija Sloth (`fijas`): el SDK de Claude cambia su API en la
+ * 0.4 y el cliente de OpenCode es de la 2.2; Codex pasa a cualquier 0.x, porque Sloth solo le habla a su app-server.
+ * `registro` es el paquete que se pregunta a npm; `base`, el que trae la app.
+ */
+const AL_DIA: Partial<Record<Programa, { registro: string; base: string; fijas: number }>> = {
+  claude: { registro: '@anthropic-ai/claude-agent-sdk', base: '@anthropic-ai/claude-agent-sdk', fijas: 2 },
+  codex: { registro: '@openai/codex', base: '@openai/codex', fijas: 1 },
+  opencode: { registro: OPENCODE, base: '@opencode/client', fijas: 2 }
+}
+/** En la carpeta de una versión actualizada, la que se enseña: la de Claude Code, no la de su paquete. */
+const MOSTRAR = 'version.txt'
+/** Lo publicado se pregunta a npm cada hora como mucho. */
+const CADA_HORA = 60 * 60_000
+
+type Publicada = { version: string; claudeCodeVersion?: string }
+let publicadas: { t: number; de: Promise<Partial<Record<Programa, Publicada>>> } | undefined
+let actualizando: string | null = null
+let errorAlDia: string | undefined
+
+function preguntarANpm() {
+  if (publicadas && Date.now() - publicadas.t < CADA_HORA) return publicadas.de
+  const de = Promise.all(
+    Object.entries(AL_DIA).map(async ([p, a]) => {
+      try {
+        const res = await fetch(`https://registry.npmjs.org/${a.registro}/latest`, { signal: AbortSignal.timeout(8000) })
+        return res.ok ? ([p, (await res.json()) as Publicada] as const) : null
+      } catch {
+        return null
+      }
+    })
+  ).then((r) => Object.fromEntries(r.filter((x) => !!x)) as Partial<Record<Programa, Publicada>>)
+  publicadas = { t: Date.now(), de }
+  // Sin internet no se espera una hora: se vuelve a preguntar la próxima vez.
+  void de.then((r) => !Object.keys(r).length && (publicadas = undefined))
+  return de
+}
+
+/** La versión que se enseña del agente que se usa; la de Claude Code, para Claude. `null` si no está. */
+export function versionVisible(p: Programa): string | null {
+  const e = elegido(p)
+  if (!e) return null
+  try {
+    return readFileSync(join(e.raiz, MOSTRAR), 'utf8').trim()
+  } catch {
+    // El de la app o el que se bajó al elegirlo: el de la versión que trae la app.
+  }
+  if (p !== 'claude') return e.version || null
+  const sdk = JSON.parse(readFileSync(join(APP, 'node_modules', '@anthropic-ai', 'claude-agent-sdk', 'package.json'), 'utf8')) as Publicada
+  return sdk.version === e.version ? (sdk.claudeCodeVersion ?? e.version) : e.version
+}
+
+/** Los agentes que ya están y tienen versión nueva, y cómo va la actualización. */
+export async function agentesAlDia(): Promise<AgentesAlDia> {
+  const de = await preguntarANpm()
+  const nuevos: AgentesAlDia['nuevos'] = []
+  for (const [p, a] of Object.entries(AL_DIA) as [Programa, NonNullable<(typeof AL_DIA)[Programa]>][]) {
+    const e = elegido(p)
+    const n = de[p]
+    if (!e || !n || instalando.has(p) || !cabe(n.version, versionDe(a.base), a.fijas) || !masNueva(n.version, e.version)) continue
+    nuevos.push({ id: p, nombre: AGENTES[p].nombre, de: versionVisible(p) ?? e.version, a: n.claudeCodeVersion ?? n.version, pesa: AGENTES[p].pesa })
+  }
+  return { nuevos, actualizando: actualizando ?? undefined, error: errorAlDia }
+}
+
+/** Baja la versión nueva de cada agente que la tiene, de uno en uno. No espera: `agentesAlDia` dice cómo va. */
+export async function actualizarAgentes(): Promise<AgentesAlDia> {
+  if (actualizando) return agentesAlDia()
+  const { nuevos } = await agentesAlDia()
+  if (!nuevos.length) return agentesAlDia()
+  errorAlDia = undefined
+  actualizando = `Actualizando ${nuevos[0].nombre}…`
+  void (async () => {
+    const de = await preguntarANpm()
+    const fallos: string[] = []
+    for (const { id, nombre } of nuevos) {
+      actualizando = `Actualizando ${nombre}…`
+      try {
+        await bajarVersion(id as Programa, de[id as Programa]!)
+      } catch (e) {
+        fallos.push(`${nombre}: ${e instanceof Error ? e.message : e}`)
+      }
+    }
+    actualizando = null
+    if (fallos.length) errorAlDia = `No se pudo actualizar ${fallos.join('; ')}`
+    for (const fn of alBajarse) fn()
+  })()
+  return agentesAlDia()
+}
+
+/** Una versión de un agente, en su carpeta. Si no arranca, se borra y sigue la de antes. */
+async function bajarVersion(p: Programa, n: Publicada) {
+  const dir = join(versiones(p), n.version)
+  rmSync(dir, { recursive: true, force: true })
+  mkdirSync(dir, { recursive: true })
+  writeFileSync(join(dir, BAJANDO), '')
+  try {
+    await npm(dir, AGENTES[p].paquete!(n.version))
+    let exe = AGENTES[p].exe(dir)
+    if (exe && existsSync(exe) && !(await arranca(exe)) && p === 'opencode') {
+      rmSync(join(dir, 'node_modules', OPENCODE), { recursive: true, force: true })
+      await npm(dir, AGENTES[p].paquete!(n.version).replace(OPENCODE, `${OPENCODE}-baseline`))
+      exe = AGENTES[p].exe(dir)
+      if (!exe || !existsSync(exe) || !(await arranca(exe))) throw new Error('la versión nueva no arranca en esta computadora')
+    }
+    if (!exe || !existsSync(exe)) throw new Error(`no trae un programa para esta computadora (${plataforma})`)
+    writeFileSync(join(dir, MOSTRAR), n.claudeCodeVersion ?? n.version)
+    rmSync(join(dir, BAJANDO))
+  } catch (e) {
+    rmSync(dir, { recursive: true, force: true })
+    throw e
+  }
+  soltarViejas(p)
+  if (p === 'codex') caminoDeAgentes()
+}
+
+/**
+ * Borra las versiones bajadas que ya no se usan. Una que algún hilo tiene abierta (Windows no deja mover un programa que
+ * corre) se queda para la próxima: primero se mueve aparte, para no borrar a medias la que sigue en uso.
+ */
+function soltarViejas(p: Programa) {
+  // La que queda es la más nueva de las bajadas, no la de la app: en el repo, la Sloth instalada usa estas mismas.
+  const queda = elegido(p, true)?.raiz
+  const viejas = queda === carpeta(p) ? [] : [join(carpeta(p), 'node_modules')]
+  try {
+    viejas.push(...readdirSync(versiones(p)).map((v) => join(versiones(p), v)))
+  } catch {
+    // No hay.
+  }
+  for (const vieja of viejas) {
+    if (vieja === queda || !existsSync(vieja) || existsSync(join(vieja, BAJANDO))) continue
+    const aparte = vieja.endsWith(APARTE) ? vieja : `${vieja}${APARTE}`
+    try {
+      if (aparte !== vieja) renameSync(vieja, aparte)
+      rmSync(aparte, { recursive: true, force: true })
+    } catch {
+      // En uso.
+    }
+  }
+}
+for (const p of Object.keys(AL_DIA) as Programa[]) if (existsSync(versiones(p))) soltarViejas(p)
 
 
 /**

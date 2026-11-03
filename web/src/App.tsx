@@ -16,7 +16,7 @@ import { Composer, Icon, Picker, type Choice, type Draft } from './Composer'
 import { LINK, pedirMejora, threadIcons, threadRef } from './etiquetas'
 import { Confirm } from './Confirm'
 import { TusCambios } from './TusCambios'
-import { ActualizarSloth } from './Actualizar' // versiones nuevas
+import { ActualizarSloth, AvisoAgentes } from './Actualizar' // versiones nuevas
 import { TarjetasEnlaces } from './Enlaces' // tarjeta de los enlaces
 import { esDeEstudio, Estudio } from './Estudio' // panel de etapas
 import { BotonNavegador, PanelNavegador, useNavegadorAbierto } from './Navegador' // navegador de cada hilo
@@ -632,6 +632,7 @@ export function App() {
         )}
         {newCard && draftId && (
           <div className="avisos-nuevo">
+            <AvisoAgentes /> {/* versiones nuevas de los agentes */}
             <AvisoEquipo /> {/* tu equipo */}
           </div>
         )}

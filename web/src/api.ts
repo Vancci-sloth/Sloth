@@ -9,8 +9,24 @@ export class ErrorApi extends Error {
 let preguntar: ((aviso: string) => Promise<boolean>) | undefined
 export const alPreguntar = (f: typeof preguntar) => void (preguntar = f)
 
+/**
+ * Si el servidor se está levantando otra vez (tras «Reiniciar backend» o una caída, scripts/start.mjs), `fetch` falla
+ * sin respuesta, «Failed to fetch». Lo que solo lee se vuelve a pedir durante unos 15 s; lo que cambia algo no, porque
+ * pudo haber llegado.
+ */
+async function pedir(path: string, body?: unknown): Promise<Response> {
+  for (let i = 0; ; i++) {
+    try {
+      return await fetch(path, body === undefined ? undefined : { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
+    } catch {
+      if (body !== undefined || i >= 10) throw new Error('No se pudo hablar con Sloth: puede que se esté reiniciando. Intenta otra vez en unos segundos.')
+      await new Promise((r) => setTimeout(r, 1500))
+    }
+  }
+}
+
 export async function api<T = any>(path: string, body?: unknown): Promise<T> {
-  const res = await fetch(path, body === undefined ? undefined : { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
+  const res = await pedir(path, body)
   // Sin JSON es que el servidor no conoce la ruta: casi siempre, un cambio en server/ que aún no se ha reiniciado. Vite
   // contesta esas rutas con la página (200, HTML) o con un 404.
   const data = await res.json().catch(() => {

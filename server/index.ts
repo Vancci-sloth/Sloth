@@ -14,7 +14,7 @@ import { IMAGE_TYPES, nombreAdjunto } from './agent.ts'
 import { avances } from './avances.ts'
 import { claudeModels, tituloCorto } from './claude.ts'
 import { codexModels } from './codex.ts'
-import { alBajarAgente, asegurarAgente, bajandoAgente, estadoAgentes, rutaAgente } from './agentes.ts'
+import { actualizarAgentes, agentesAlDia, alBajarAgente, asegurarAgente, bajandoAgente, estadoAgentes, rutaAgente } from './agentes.ts'
 import { opencodeModels } from './opencode.ts'
 import { conectandoOtro, OTROS, sinLimites } from './proveedores.ts'
 import { PROVEEDORES, type Proveedor, proveedorDe } from '../shared/providers.ts'
@@ -456,7 +456,10 @@ async function api(req: IncomingMessage, res: ServerResponse, url: URL): Promise
   }
 
   const ver = /^\/api\/(\w+)\/version$/.exec(path)
-  if (ver && PROVEEDORES.includes(ver[1] as Proveedor) && method === 'GET') return send(res, 200, version(APP, ver[1] as Agente)), true
+  if (ver && PROVEEDORES.includes(ver[1] as Proveedor) && method === 'GET') return send(res, 200, version(ver[1] as Agente)), true
+  // «Actualizar los agentes», arriba del hilo nuevo: Claude Code, Codex y OpenCode en su versión más nueva.
+  if (path === '/api/agentes/al-dia' && method === 'GET') return send(res, 200, await agentesAlDia()), true
+  if (path === '/api/agentes/actualizar' && method === 'POST') return send(res, 200, await actualizarAgentes()), true
 
   // Las series de la skill de una card, para elegir una al crear un video. Se leen cada vez: viven en las skills, y
   // todo estilo de video (la card con `etapas`) tiene las de video-base.

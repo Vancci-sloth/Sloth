@@ -17,7 +17,9 @@ import { montarNube, nubeAlDia } from './cloudflare.ts'
 import { hayNube, instagram } from './instagram.ts'
 import { abierto, conGoogle, contextoDeGoogle, deGoogle, deLaApp, desconectar, enGoogle, navegador, pasarDeEdge, pestana, SinSesion, sinAviso, soltar } from './navegador.ts'
 import { tiktok } from './tiktok.ts'
-import { programaClaude } from '../agentes.ts'
+import { programaClaude, rutaAgente } from '../agentes.ts'
+import { redactarOpenCode } from '../opencode.ts'
+import { NOMBRE_AGENTE } from '../../shared/providers.ts'
 
 /**
  * Publicar en redes: los videos verticales terminados de cada estilo se programan en las redes, uno por hueco del
@@ -116,6 +118,31 @@ const pausa = (ms: number) => new Promise((r) => setTimeout(r, ms))
 const mensaje = (e: unknown) => (e instanceof Error ? e.message : String(e)).split('\n')[0]
 /** Un hashtag como lo quieren las redes: letras, números y guion bajo, sin `#`. */
 const limpiarTag = (t: string) => t.replace(/[^\p{L}\p{N}_]/gu, '')
+
+/**
+ * El texto de un video, con Claude Code sin herramientas. Si no está (quien usa otro agente no lo bajó) o no pudo, con
+ * OpenCode, si está.
+ */
+async function escribir(prompt: string, carpeta: string): Promise<{ texto: string; tags?: string[] }> {
+  const agentes = (['claude', 'opencode'] as const).filter((p) => rutaAgente(p))
+  if (!agentes.length) throw new Error('Sloth escribe estos textos con Claude u OpenCode, y no tienes ninguno en Opciones')
+  let error: unknown
+  for (const p of agentes) {
+    try {
+      let salida = ''
+      if (p === 'opencode') salida = await redactarOpenCode(undefined, carpeta, prompt, [], 'Escribes el texto de videos para redes. No uses herramientas ni abras archivos: contesta solo con el JSON que se pide.')
+      else
+        for await (const m of query({ prompt, options: { ...programaClaude(), model: 'sonnet', tools: [], maxTurns: 1, settingSources: [], persistSession: false, cwd: carpeta } }))
+          if (m.type === 'result' && m.subtype === 'success' && !m.is_error) salida = m.result
+      const json = JSON.parse(/\{[\s\S]*\}/.exec(salida)?.[0] ?? 'null') as { texto?: string; tags?: string[] } | null
+      if (json?.texto) return { texto: json.texto, tags: json.tags }
+      error = new Error(`${NOMBRE_AGENTE[p]} no devolvió el texto`)
+    } catch (e) {
+      error = e
+    }
+  }
+  throw error
+}
 
 export function redes(app: string, sessions: Sessions, cards: () => Card[], avisar: (msg: ServerPush) => void) {
   const archivo = join(app, 'data', 'redes', 'redes.json')
@@ -407,17 +434,16 @@ export function redes(app: string, sessions: Sessions, cards: () => Card[], avis
       `Responde solo con JSON: {"texto": "…", "tags": ["…"]}`,
       contexto
     ].join('\n')
-    let salida = ''
     escribiendoTextos++
     try {
-      for await (const m of query({ prompt, options: { ...programaClaude(), model: 'sonnet', tools: [], maxTurns: 1, settingSources: [], persistSession: false, cwd: carpeta } }))
-        if (m.type === 'result' && m.subtype === 'success') salida = m.result
+      const json = await escribir(prompt, carpeta)
+      return { ruta, texto: json.texto.trim(), tags: unirTags(a.tags, json.tags ?? []) }
+    } catch (e) {
+      // Sin quien lo escriba, el video no se queda fuera: va vacío, para escribirlo a mano.
+      return { ruta, texto: '', tags: unirTags(a.tags, []), aviso: mensaje(e) }
     } finally {
       escribiendoTextos--
     }
-    const json = JSON.parse(/\{[\s\S]*\}/.exec(salida)?.[0] ?? 'null') as { texto?: string; tags?: string[] } | null
-    if (!json?.texto) throw new Error('Claude no devolvió el texto.')
-    return { ruta, texto: json.texto.trim(), tags: unirTags(a.tags, json.tags ?? []) }
   }
 
   /**

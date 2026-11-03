@@ -7,7 +7,7 @@ import { herramientasIdeas } from './ideas/mcp.ts' // ideas
 import { navegadorAgente } from './navegador-agente.ts'
 import { mcpVoz } from './voz/index.ts'
 import { mcpFlow } from './flow/index.ts'
-import { descartarRoto, programaClaude, rutaAgente } from './agentes.ts'
+import { alBajarAgente, descartarRoto, programaClaude, rutaAgente } from './agentes.ts'
 import { sitiosDeAgente } from './tope-agentes.ts'
 import { dolaresDeepSeek, entornoDeepSeek, modeloDeepSeek, SIN_LLAVE, tarifaDeepSeek } from './deepseek.ts'
 import { llaveGuardada } from './acceso.ts'
@@ -41,6 +41,8 @@ function catalogoClaude() {
   })
   return catalogo
 }
+// Un Claude Code más nuevo puede traer modelos nuevos: se le vuelve a preguntar.
+alBajarAgente(() => void (catalogo = null))
 
 /**
  * Los de la familia vigente. Claude Code los da como alias (`opus`, `sonnet`, `haiku`…) que apuntan siempre a la última

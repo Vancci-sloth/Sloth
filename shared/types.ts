@@ -391,11 +391,15 @@ export interface RedesDelEstilo {
   tags: string[]
 }
 
-/** El texto de un video antes de programarlo: lo escribe Claude y se puede cambiar. */
+/**
+ * El texto de un video antes de programarlo: lo escribe Claude (u OpenCode, sin Claude) y se puede cambiar. Si ninguno
+ * pudo, va vacío para escribirlo a mano, y `aviso` dice por qué.
+ */
 export interface Borrador {
   ruta: string
   texto: string
   tags: string[]
+  aviso?: string
 }
 
 /**
@@ -478,6 +482,16 @@ export interface TandaRedes {
 /** `GET /api/claude/version` (y la de Codex y OpenCode): la versión que trae Sloth. `null` si no está instalado. */
 export interface VersionClaude {
   instalada: string | null
+}
+
+/**
+ * `GET /api/agentes/al-dia`: los agentes ya bajados que tienen versión nueva (`de` → `a`), mientras se ponen al día, en
+ * cuál va (`actualizando`), y lo que falló la última vez. Lo enseña «Actualizar los agentes», arriba del hilo nuevo.
+ */
+export interface AgentesAlDia {
+  nuevos: { id: string; nombre: string; de: string; a: string; pesa: string }[]
+  actualizando?: string
+  error?: string
 }
 
 /**

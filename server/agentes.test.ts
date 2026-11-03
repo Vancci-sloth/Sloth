@@ -7,7 +7,7 @@ import test from 'node:test'
 // Las piezas van a una carpeta de prueba: `agentes.ts` la lee al importarse.
 const appdata = mkdtempSync(join(tmpdir(), 'sloth-agentes-'))
 process.env.APPDATA = appdata
-const { descartarRoto, rutaAgente } = await import('./agentes.ts')
+const { cabe, descartarRoto, masNueva, rutaAgente, versionVisible } = await import('./agentes.ts')
 test.after(() => rmSync(appdata, { recursive: true, force: true }))
 
 // Grok no viene en la app: solo se busca en lo bajado.
@@ -37,4 +37,35 @@ test('un programa que no arranca por no ser programa se borra; otro error, no', 
   assert.equal(descartarRoto('grok', Object.assign(new Error('spawn EFTYPE'), { code: 'EFTYPE' })), true)
   assert.equal(existsSync(raiz), false)
   assert.equal(rutaAgente('grok'), null)
+})
+
+test('«Actualizar los agentes» solo sube dentro de las cifras que fija Sloth', () => {
+  assert.equal(cabe('0.3.317', '0.3.311', 2), true)
+  assert.equal(cabe('0.4.0', '0.3.311', 2), false)
+  assert.equal(cabe('0.166.0', '0.164.0', 1), true)
+  assert.equal(cabe('0.3.311', '0.3.311', 2), false)
+  assert.equal(masNueva('0.3.10', '0.3.9'), true)
+  assert.equal(masNueva('', '0.3.9'), false)
+  assert.equal(masNueva('0.3.9', ''), true)
+})
+
+test('de Claude Code va el más nuevo: el de la app o el que se actualizó', () => {
+  const versiones = join(appdata, 'sloth', 'piezas', arm ? 'agentes-arm64' : 'agentes', 'claude', 'versiones')
+  const bajar = (v: string) => {
+    const dir = join(versiones, v)
+    const paquete = join(dir, 'node_modules', '@anthropic-ai', `claude-agent-sdk-${plataforma}`)
+    mkdirSync(paquete, { recursive: true })
+    writeFileSync(join(paquete, 'package.json'), JSON.stringify({ version: v }))
+    writeFileSync(join(paquete, process.platform === 'win32' ? 'claude.exe' : 'claude'), '')
+    writeFileSync(join(dir, 'version.txt'), `2.${v}`)
+    return join(paquete, process.platform === 'win32' ? 'claude.exe' : 'claude')
+  }
+  const app = rutaAgente('claude')
+  // Una más vieja que la de la app no la tapa.
+  bajar('0.0.1')
+  assert.equal(rutaAgente('claude'), app)
+  const nueva = bajar('99.0.0')
+  assert.equal(rutaAgente('claude'), nueva)
+  assert.equal(versionVisible('claude'), '2.99.0.0')
+  rmSync(versiones, { recursive: true, force: true })
 })

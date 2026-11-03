@@ -19,7 +19,9 @@ Este es el mapa:
 - `server/agentes.ts`: el programa de cada agente no viene en el instalador: se baja al elegirlo (bienvenida, Opciones o
   el primer mensaje de un hilo suyo, `conAgente`) a `%APPDATA%\sloth\piezas\agentes`. En el repo, Claude Code, Codex y
   OpenCode ya están en node_modules. Un proveedor nuevo es una entrada más en `AGENTES` y en `PROVEEDORES`
-  (`shared/providers.ts`).
+  (`shared/providers.ts`). «Actualizar los agentes», arriba a la derecha del hilo nuevo (`AvisoAgentes`), baja la versión
+  más nueva de npm de Claude Code, Codex y OpenCode a `<agente>/versiones/<versión>` (`AL_DIA`); se usa siempre la más
+  nueva, la de la app o la bajada.
 - Los demás agentes, como en T3 Code (ADR 0012), cada uno con su cuenta y su catálogo en `server/proveedores.ts` y su fila
   en Opciones (`CuentaAgente`): DeepSeek es Claude Code con la API de DeepSeek (`server/deepseek.ts`); Grok,
   Antigravity y Gemini CLI hablan ACP (`server/acp.ts`, `grok.ts`, `antigravity.ts`, `gemini.ts`; Antigravity, un proceso para todos sus hilos; Gemini, con llave de API, ADR 0013); Cursor corre su SDK en un puente aparte
