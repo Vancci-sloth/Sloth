@@ -6,7 +6,7 @@ import { query, type Query, type SDKUserMessage } from '@anthropic-ai/claude-age
 import type { CuentaClaude, LimitesClaude } from '../shared/types.ts'
 import { conLlave, entornoSinLlaves, llaveDe, llaveEnUso } from './acceso.ts'
 import { Inbox } from './agent.ts'
-import { asegurarAgente, programaClaude, rutaAgente } from './agentes.ts'
+import { asegurarAgente, descartarRoto, programaClaude, rutaAgente } from './agentes.ts'
 
 /**
  * La cuenta de Claude con la que trabaja Sloth. Es la del Claude Code que trae el SDK, que la guarda en `~/.claude`: si ya
@@ -41,13 +41,21 @@ function estado(_app: string): Promise<{ loggedIn?: boolean; email?: string; sub
   return new Promise((ok) => {
     const exe = rutaAgente('claude')
     if (!exe) return ok({})
-    execFile(exe, ['auth', 'status', '--json'], { timeout: 10000 }, (_error, salida) => {
-      try {
-        ok(JSON.parse(salida))
-      } catch {
-        ok({})
-      }
-    })
+    try {
+      execFile(exe, ['auth', 'status', '--json'], { timeout: 10000 }, (_error, salida) => {
+        try {
+          ok(JSON.parse(salida))
+        } catch {
+          ok({})
+        }
+      })
+    } catch (e) {
+      // No arrancó (EFTYPE sale de golpe): si se bajó a medias, se borra y «Conectar con Claude» lo baja otra vez.
+      fallo = descartarRoto('claude', e)
+        ? 'El programa de Claude Code se había bajado a medias. «Conectar con Claude» lo baja otra vez.'
+        : `No se pudo abrir Claude Code (${e instanceof Error ? e.message : e}).`
+      ok({})
+    }
   })
 }
 

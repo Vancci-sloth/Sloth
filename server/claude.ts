@@ -7,7 +7,7 @@ import { herramientasIdeas } from './ideas/mcp.ts' // ideas
 import { navegadorAgente } from './navegador-agente.ts'
 import { mcpVoz } from './voz/index.ts'
 import { mcpFlow } from './flow/index.ts'
-import { programaClaude, rutaAgente } from './agentes.ts'
+import { descartarRoto, programaClaude, rutaAgente } from './agentes.ts'
 import { sitiosDeAgente } from './tope-agentes.ts'
 import { dolaresDeepSeek, entornoDeepSeek, modeloDeepSeek, SIN_LLAVE, tarifaDeepSeek } from './deepseek.ts'
 import { llaveGuardada } from './acceso.ts'
@@ -159,6 +159,8 @@ export function startClaude(opts: AgentOptions): AgentRun {
       }
     } catch (e) {
       error = e instanceof Error ? e.message : String(e)
+      // Si se bajó a medias, se borra: el siguiente mensaje lo baja otra vez (`conAgente`).
+      if (descartarRoto('claude', e)) error = 'el programa de Claude Code se había bajado a medias; el siguiente mensaje lo baja otra vez'
     }
     // Un turno abierto se cierra con el error. Con el hilo quieto no hay turno que cerrar: solo se avisa.
     const turno = !state.idle

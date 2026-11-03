@@ -193,6 +193,11 @@ const AGENTES: Record<Programa, Agente> = {
 
 /** Donde queda lo que se bajó de cada agente; con su versión, si la fija Sloth. */
 const carpeta = (p: Programa) => join(PIEZAS, p, ...(AGENTES[p].version ? [AGENTES[p].version!] : []))
+/**
+ * Va en la carpeta del agente mientras se baja. Si Sloth se cierra a media descarga, el programa queda a medias y no
+ * arranca (en Windows, `spawn EFTYPE`): con la marca, no cuenta como bajado y se baja otra vez.
+ */
+const BAJANDO = '.bajando'
 
 /**
  * El ejecutable del agente, si está: el de la app (repo) o el que se bajó. `null` si falta o aún se está bajando: el
@@ -202,7 +207,7 @@ export const rutaAgente = (p: Proveedor): string | null => (instalando.has(progr
 
 function buscar(p: Programa): string | null {
   // Muse se instala en `muse/` dentro de su carpeta (su instalador no deja elegir el nombre del lanzador).
-  const raices = AGENTES[p].version || p === 'muse' ? [carpeta(p)] : [APP, carpeta(p)]
+  const raices = (AGENTES[p].version || p === 'muse' ? [carpeta(p)] : [APP, carpeta(p)]).filter((r) => r === APP || !existsSync(join(carpeta(p), BAJANDO)))
   for (const raiz of raices) {
     const exe = AGENTES[p].exe(raiz)
     if (exe && existsSync(exe)) return exe
@@ -274,10 +279,12 @@ export function asegurarAgente(proveedor: Proveedor): Promise<string> {
   const a = AGENTES[p]
   const descarga = (async () => {
     const dir = carpeta(p)
-    // Lo que quedó de otra versión, o de una descarga cortada, se va.
-    if (a.version) rmSync(join(PIEZAS, p), { recursive: true, force: true })
+    // Lo que quedó de otra versión, o de una descarga cortada, se va: npm daría por instalado un paquete a medias.
+    rmSync(join(PIEZAS, p), { recursive: true, force: true })
     mkdirSync(dir, { recursive: true })
+    writeFileSync(join(dir, BAJANDO), '')
     await (a.instalar ? a.instalar(p === 'muse' ? join(dir, 'muse') : dir) : npm(dir, a.paquete!()))
+    rmSync(join(dir, BAJANDO))
     let exe = buscar(p)
     // Que arranque una vez antes de darlo por bajado: así nadie lo abre mientras el antivirus lo revisa. Cursor no es un
     // programa (se importa), y Antigravity desempaca 1 GB cada vez que arranca: T3 Code tampoco lo prueba.
@@ -369,12 +376,31 @@ async function arranca(exe: string): Promise<boolean> {
   for (let i = 0; i < 30; i++) {
     // Pi es de Node: corre con el de Sloth.
     const [comando, args] = exe.endsWith('.js') ? [process.execPath, [exe, '--version']] : [exe, ['--version']]
-    const error = await new Promise<ExecFileException | null>((ok) => execFile(comando, args, { timeout: 30000, windowsHide: true }, ok))
+    // EFTYPE sale de golpe, no por el callback.
+    const error = await new Promise<ExecFileException | null>((ok) => execFile(comando, args, { timeout: 30000, windowsHide: true }, ok)).catch((e: ExecFileException) => e)
     if (!error) return true
     if (error.code !== 'EBUSY') return false
     await new Promise((r) => setTimeout(r, 1000))
   }
   return false
+}
+
+/**
+ * Si el programa bajado de un agente no arranca porque no es un programa (Windows: EFTYPE; Linux: ENOEXEC), quedó a
+ * medias de una descarga cortada en una Sloth que aún no ponía `BAJANDO`: se borra, y la próxima vez que se pida se baja
+ * otra vez. Dice si lo borró. El de la app (repo) no se toca.
+ */
+export function descartarRoto(p: Proveedor, e: unknown): boolean {
+  const g = programaDe(p)
+  const exe = buscar(g)
+  const texto = e instanceof Error ? `${(e as NodeJS.ErrnoException).code ?? ''} ${e.message}` : String(e)
+  if (!exe?.startsWith(PIEZAS) || !/\b(EFTYPE|ENOEXEC)\b/.test(texto)) return false
+  try {
+    rmSync(join(PIEZAS, g), { recursive: true, force: true })
+    return true
+  } catch {
+    return false
+  }
 }
 
 /** Para `query()` del SDK de Claude: su programa, que el SDK solo busca a su lado y puede estar bajado aparte. */
