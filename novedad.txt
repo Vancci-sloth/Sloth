@@ -1,1 +1,1 @@
-Sloth para Mac con Apple Silicon, nativa y sin Rosetta, y en Mac entrar con Google ya abre Chrome al frente, o te dice que lo instales.
+Conectar AI Studio ya te deja aceptar sus términos la primera vez, FFmpeg se instala sin winget y Claude Code ya no se queda en «spawn EFTYPE».
