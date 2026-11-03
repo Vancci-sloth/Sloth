@@ -27,6 +27,8 @@ const AJUSTES = join(DATOS, 'antigravity-acp', 'settings.json')
 const TOKEN = join(DATOS, 'antigravity-acp', 'acp_token.json')
 const MODELOS = join(DATOS, 'modelos.json')
 const ARRANQUE = join(DATOS, 'arranque.json')
+/** Lo que escribió Antigravity en el último inicio de sesión que falló: dice por qué. */
+const REGISTRO = join(DATOS, 'inicio-de-sesion.log')
 /** Con la cuenta personal de Google. */
 const METODO = 'oauth-personal'
 /** El aviso con que pide abrir el navegador para iniciar sesión. */
@@ -139,6 +141,7 @@ const SABOR: SaborAcp = {
     return lanzar(exe)
   },
   alTexto(linea) {
+    if (login && login.lineas.length < 400) login.lineas.push(linea)
     const m = ENLACE.exec(linea)
     if (!m || !login) return
     login.url = m[1]
@@ -172,8 +175,8 @@ export async function modelosAntigravity(): Promise<Model[]> {
   }
 }
 
-/** Mientras se inicia sesión: el enlace de Google, si ya lo dio, y el proceso que espera. */
-type Login = { url?: string; c?: Conexion }
+/** Mientras se inicia sesión: el enlace de Google, si ya lo dio, el proceso que espera y lo que va escribiendo. */
+type Login = { url?: string; c?: Conexion; lineas: string[] }
 let login: Login | undefined
 let fallo = ''
 
@@ -192,7 +195,7 @@ export const conectandoAntigravity = () => (login ? 'Se está conectando la cuen
  */
 export async function conectarAntigravity(): Promise<CuentaClaude> {
   if (login) return cuentaAntigravity()
-  const este: Login = (login = {})
+  const este: Login = (login = { lineas: [] })
   fallo = ''
   void (async () => {
     await asegurarAgente('antigravity')
@@ -207,8 +210,17 @@ export async function conectarAntigravity(): Promise<CuentaClaude> {
     }
   })()
     .catch((e) => {
-      // Si lo cancelaste, no hay nada que avisar.
-      if (login === este) fallo = este.c?.rpc.terminado && !existsSync(TOKEN) ? 'No se terminó de iniciar sesión. Vuelve a intentarlo.' : e instanceof Error ? e.message : String(e)
+      // Si lo cancelaste, no hay nada que avisar. Si no, el porqué va en el mensaje y, entero, en `REGISTRO`: «No se
+      // terminó» a secas no decía nada de lo que pasa en las computadoras donde no entra.
+      if (login !== este) return
+      const porque = e instanceof Error ? e.message : String(e)
+      fallo = este.c?.rpc.terminado && !existsSync(TOKEN) ? `No se terminó de iniciar sesión (${porque}). Vuelve a intentarlo.` : porque
+      try {
+        mkdirSync(DATOS, { recursive: true })
+        guardar(REGISTRO, [new Date().toISOString(), porque, '', ...este.lineas].join('\n'))
+      } catch {
+        // Sin registro: el mensaje basta.
+      }
     })
     .finally(() => {
       if (login === este) login = undefined
