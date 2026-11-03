@@ -3,7 +3,8 @@
  * (`server/licencia.ts`). Sloth es gratis: el apoyo es opcional y quita el recordatorio de la app. La página
  * (sloth.vancci.org) suscribe desde el navegador (`POST /suscribir`, que da el enlace de pago de PayPal) y,
  * pagada, `/gracias` enseña la clave y el instalador; la clave llega también por correo. La
- * app crea una cuenta gratis con su `equipo` (`plan: 'gratis'`, que da una de plan `cuenta`) para entrar a la comunidad.
+ * app crea una cuenta gratis con su `equipo` (`plan: 'gratis'`, que da una de plan `cuenta`) para entrar a la comunidad;
+ * su clave solo llega por correo (`unirse`).
  * Al abrir y cada pocas horas, Sloth pregunta cómo va su clave (`POST /licencia`). La respuesta va firmada con `FIRMA`
  * (Ed25519): Sloth la guarda y, sin internet, vale hasta su `hasta` sin que se pueda alargar a mano.
  *
@@ -215,6 +216,8 @@ const REVISAR_PENDIENTE = 10_000
 /** Las computadoras que pueden usar una clave a la vez: las que preguntaron en los últimos `VISTO`. */
 const EQUIPOS = 2
 const VISTO = 30 * DIA
+/** Las cuentas gratis que se piden (o se vuelven a pedir) desde una misma conexión en un día. */
+const CUENTAS_AL_DIA = 5
 /** 32 letras y números sin los que se confunden (0, 1, I, O). */
 const ALFABETO = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ'
 export const CLAVE = /^SLOTH(-[2-9A-HJ-NP-Z]{4}){4}$/
@@ -314,6 +317,7 @@ export default {
   /** Cada mañana: el aviso de los cobros que vienen. */
   async scheduled(_evento: ScheduledController, env: Env, ctx: ExecutionContext) {
     ctx.waitUntil(avisarCobros(env).catch((e) => console.error('Avisos de cobro', e instanceof Error ? e.message : e)))
+    ctx.waitUntil(env.DB.prepare('DELETE FROM cupos WHERE creado < ?').bind(new Date(Date.now() - 2 * DIA).toISOString()).run())
   }
 } satisfies ExportedHandler<Env>
 
@@ -342,7 +346,7 @@ async function atender(req: Request, env: Env, ctx: ExecutionContext, url: URL):
     if (req.method === 'GET' && url.pathname === '/renovar') return await renovacion(env, url)
     if (req.method === 'POST' && url.pathname === '/webhook/paypal') return await webhookPaypal(req, env, ctx)
     if (req.method === 'POST' && url.pathname === '/webhook') return await webhook(req, env, ctx, url)
-    if (req.method === 'POST' && url.pathname === '/suscribir') return await suscribir(env, await cuerpo(req))
+    if (req.method === 'POST' && url.pathname === '/suscribir') return await suscribir(env, await cuerpo(req), await conexion(req))
     if (req.method === 'POST' && url.pathname === '/licencia') return await licencia(env, await cuerpo(req))
     if (req.method === 'POST' && url.pathname === '/cancelar') return await cancelar(env, await cuerpo(req))
     if (req.method === 'POST' && url.pathname === '/pago') return await pago(env, await cuerpo(req))
@@ -569,7 +573,7 @@ export function tarifa(c: Cuenta, env: Tarifas, ahora = Date.now()) {
  * escribir el correo de otro. Desde la app de antes, con su `equipo`, también la clave, que espera el pago. Con `plan`
  * `gratis`, una cuenta gratis (solo desde la app): la clave, ya activa.
  */
-async function suscribir(env: Env, c: Record<string, unknown>): Promise<Response> {
+async function suscribir(env: Env, c: Record<string, unknown>, desde: string): Promise<Response> {
   const email = String(c.email ?? '').trim().toLowerCase()
   if (!EMAIL.test(email) || email.length > 254) throw new Rechazo(400, 'Escribe un correo válido.')
   const plan: Plan = c.plan === 'gratis' ? 'gratis' : c.plan === 'anual' ? 'anual' : 'mensual'
@@ -579,7 +583,7 @@ async function suscribir(env: Env, c: Record<string, unknown>): Promise<Response
   if (c.acepto !== true || !TERMINOS.test(terminos))
     throw new Rechazo(400, plan === 'gratis' ? 'Para unirte, acepta los términos.' : 'Para suscribirte, acepta el cobro automático y los términos.')
   const acepto = new Date().toISOString()
-  if (plan === 'gratis') return unirse(env, email, equipo!, acepto, terminos)
+  if (plan === 'gratis') return unirse(env, email, equipo!, acepto, terminos, desde, c.porCorreo === true)
   // Con una ya pagada, otra cobraría dos veces; con un lugar gratis de por vida, no hace falta. Con una cuenta, sí se apoya.
   await sinOtra(env, email, true)
   const p = await precios(env)
@@ -722,30 +726,37 @@ async function renovar(env: Env, f: Fila): Promise<string> {
 }
 
 /**
- * Una cuenta gratis, para la comunidad: sin pago, activa desde ya. Una por computadora y por correo; la misma
- * computadora (reinstaló Sloth) recupera la suya, y también un lugar gratis de por vida que ya tuviera.
+ * Una cuenta gratis, para la comunidad, activa desde ya. Su clave solo va al correo: así cada cuenta es de un correo
+ * de verdad, y quien escribe uno ajeno no entra. Pedirla otra vez la vuelve a mandar. La misma computadora (reinstaló
+ * Sloth) recupera la suya, y también un lugar gratis de por vida que ya tuviera. `desde` (su conexión) pide pocas al
+ * día. La app de antes no manda `porCorreo` y espera la clave: se le dice dónde escribirla.
  */
-async function unirse(env: Env, email: string, equipo: string, acepto: string, terminos: string): Promise<Response> {
+async function unirse(env: Env, email: string, equipo: string, acepto: string, terminos: string, desde: string, porCorreo: boolean): Promise<Response> {
   const suya = await env.DB.prepare("SELECT l.clave FROM licencias l JOIN equipos e ON e.clave = l.clave WHERE e.equipo = ? AND l.estado = 'gratis' LIMIT 1")
     .bind(equipo)
     .first<{ clave: string }>()
   if (suya) return json({ clave: suya.clave })
-  await sinOtra(env, email, false)
-  const clave = nuevaClave()
-  await env.DB.prepare(
-    `INSERT INTO licencias (id, clave, email, plan, monto, fundador, estado, autorizada, creada, acepto, terminos, modo)
-     VALUES (?, ?, ?, 'cuenta', 0, 0, 'gratis', ?, ?, ?, ?, ?)`
-  )
-    .bind(crypto.randomUUID(), clave, email, acepto, acepto, acepto, terminos, env.PAYPAL_MODO)
-    .run()
-  await recordarEquipo(env, clave, equipo, Date.now())
-  await correo(env, email, 'Tu cuenta de Sloth', [
+  if (!(await cupo(env, desde, 'cuenta', CUENTAS_AL_DIA))) throw new Rechazo(429, 'Desde esta conexión ya se pidieron muchas cuentas hoy. Prueba mañana.')
+  let clave = (await env.DB.prepare("SELECT clave FROM licencias WHERE email = ? AND plan = 'cuenta' AND estado = 'gratis' LIMIT 1").bind(email).first<{ clave: string }>())?.clave
+  if (!clave) {
+    await sinOtra(env, email, false)
+    clave = nuevaClave()
+    await env.DB.prepare(
+      `INSERT INTO licencias (id, clave, email, plan, monto, fundador, estado, autorizada, creada, acepto, terminos, modo)
+       VALUES (?, ?, ?, 'cuenta', 0, 0, 'gratis', ?, ?, ?, ?, ?)`
+    )
+      .bind(crypto.randomUUID(), clave, email, acepto, acepto, acepto, terminos, env.PAYPAL_MODO)
+      .run()
+  }
+  const enviada = await correo(env, email, 'Tu cuenta de Sloth', [
     'Hola:',
     'Ya tienes tu cuenta de Sloth: con ella entras a la comunidad. Sloth es gratis y lo seguirá siendo.',
-    `Tu clave es ${clave}. Guárdala: con ella entras desde otra computadora (dos a la vez). También está en Opciones de Sloth.`,
+    `Tu clave es ${clave}. Escríbela en Sloth para entrar, y guárdala: con ella entras desde otra computadora (dos a la vez). También queda en Opciones de Sloth.`,
     'Sloth trabaja con tu propia cuenta de Claude Pro o Max, que pagas aparte a Anthropic. Si tienes dudas, responde a este correo.'
-  ]).catch((e) => console.error('Correo de bienvenida', e instanceof Error ? e.message : e))
-  return json({ clave })
+  ]).catch((e) => (console.error('Correo de la cuenta', e instanceof Error ? e.message : e), false))
+  if (!enviada) throw new Rechazo(502, 'No pudimos mandarte el correo con tu clave. Prueba en un rato.')
+  if (!porCorreo) throw new Rechazo(409, `Te mandamos tu clave a ${email}. Escríbela en Opciones de Sloth, en «Ya apoyo».`)
+  return json({ enviada: true })
 }
 
 /**
@@ -1100,6 +1111,24 @@ export async function firmaDeMercadoPago(cabecera: string | null, solicitud: str
   const llave = await crypto.subtle.importKey('raw', new TextEncoder().encode(secreto), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign'])
   const firma = [...new Uint8Array(await crypto.subtle.sign('HMAC', llave, new TextEncoder().encode(manifiesto)))].map((b) => b.toString(16).padStart(2, '0')).join('')
   return iguales(firma, partes.v1)
+}
+
+/**
+ * Anota algo que `quien` hizo (`tipo`) si en el último día lleva menos de `max`: contar y anotar es un solo paso, así
+ * que varias peticiones a la vez no se lo saltan, y borrar lo hecho no lo devuelve (migración 0012).
+ */
+export const CUPO = 'INSERT INTO cupos (quien, tipo, creado) SELECT ?1, ?2, ?3 WHERE (SELECT COUNT(*) FROM cupos WHERE quien = ?1 AND tipo = ?2 AND creado > ?4) < ?5'
+
+export async function cupo(env: Env, quien: string, tipo: string, max: number): Promise<boolean> {
+  const ahora = Date.now()
+  const r = await env.DB.prepare(CUPO).bind(quien, tipo, new Date(ahora).toISOString(), new Date(ahora - DIA).toISOString(), max).run()
+  return r.meta.changes > 0
+}
+
+/** La conexión de quien pide, resumida: para su cupo, sin guardar su IP. */
+async function conexion(req: Request): Promise<string> {
+  const ip = new TextEncoder().encode(`sloth:${req.headers.get('cf-connecting-ip') ?? ''}`)
+  return `ip:${[...new Uint8Array(await crypto.subtle.digest('SHA-256', ip))].slice(0, 12).map((b) => b.toString(16).padStart(2, '0')).join('')}`
 }
 
 /** Compara sin cortar en la primera diferencia: el tiempo no dice cuánto se acertó. */

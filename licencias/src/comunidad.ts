@@ -29,7 +29,7 @@
  *   `POST` la da a todos ya (`liberar` en `index.ts`), cuando el chat de un live cumple su meta.
  */
 import type { AdjuntoComunidad, Autor, AvisoComunidad, CategoriaComunidad, ComentarioComunidad, FeedComunidad, PublicacionComunidad, RoadmapComunidad } from '../../shared/types.ts'
-import { CLAVE, EQUIPO, esFundador, type Env, type Fila, Rechazo, cuerpo, iguales, json, letras, liberar, servir, vigencia } from './index.ts'
+import { CLAVE, EQUIPO, cupo, esFundador, type Env, type Fila, Rechazo, cuerpo, iguales, json, letras, liberar, servir, vigencia } from './index.ts'
 
 export const CATEGORIAS: CategoriaComunidad[] = ['general', 'hice', 'ayuda', 'mejoras', 'anuncios']
 
@@ -61,7 +61,7 @@ const TIPOS: Record<string, { tipo: 'imagen' | 'video'; ext: string }> = {
 const LLAVE = /^[a-z0-9]{20}\.(png|jpg|webp|gif|mp4|webm|mov)$/
 const IMAGEN = /\.(png|jpg|webp|gif)$/
 const ID = /^[a-z0-9]+$/
-/** Lo más que publica, comenta o reporta cada miembro en un día: que un error o un abuso no llene la comunidad. */
+/** Lo más que publica, comenta o reporta cada miembro en un día (`cupo`): que un error o un abuso no llene la comunidad. */
 const AL_DIA = { publicaciones: 10, comentarios: 100, reportes: 20 }
 /** Con tantos reportes de personas distintas, una publicación o un comentario deja de verse hasta que el creador lo revise. */
 export const OCULTAR = 3
@@ -408,13 +408,6 @@ function sinNombre(yo: Miembro) {
   if (!yo.nombre) throw new Rechazo(400, 'Antes, dinos cómo te llamas: así te ven los demás.')
 }
 
-async function hoyHizo(env: Env, tabla: 'publicaciones' | 'comentarios' | 'reportes', yo: Miembro): Promise<number> {
-  const quien = tabla === 'reportes' ? 'miembro' : 'autor'
-  const cuando = tabla === 'reportes' ? 'creado' : 'creada'
-  const r = await env.DB.prepare(`SELECT COUNT(*) AS n FROM ${tabla} WHERE ${quien} = ? AND ${cuando} > ?`).bind(yo.id, new Date(Date.now() - DIA).toISOString()).first<{ n: number }>()
-  return r?.n ?? 0
-}
-
 async function publicar(env: Env, yo: Miembro, c: Record<string, unknown>): Promise<PublicacionComunidad> {
   sinNombre(yo)
   const categoria = categoriaDe(c.categoria, yo)
@@ -422,7 +415,7 @@ async function publicar(env: Env, yo: Miembro, c: Record<string, unknown>): Prom
   const cuerpoTexto = texto(c.texto, 20_000)
   const adjuntos = adjuntosDe(c.adjuntos)
   if (!titulo && !cuerpoTexto && !adjuntos.length) throw new Rechazo(400, 'Escribe algo o agrega una imagen.')
-  if (!esCreador(yo) && (await hoyHizo(env, 'publicaciones', yo)) >= AL_DIA.publicaciones)
+  if (!esCreador(yo) && !(await cupo(env, yo.id, 'publicaciones', AL_DIA.publicaciones)))
     throw new Rechazo(429, `Ya publicaste ${AL_DIA.publicaciones} veces hoy. Mañana sigues.`)
   const ahora = new Date().toISOString()
   const f: Guardada = { id: nuevoId(), autor: yo.id, categoria, titulo, texto: cuerpoTexto, adjuntos: JSON.stringify(adjuntos), fijada: 0, estado: null, creada: ahora, editada: null, actividad: ahora, comentarios: 0, likes: 0, reportes: 0, ultimo_comentario: null }
@@ -531,7 +524,7 @@ async function comentar(env: Env, yo: Miembro, f: Guardada, c: Record<string, un
   const t = texto(c.texto, 5000)
   const fotos = fotosDeComentario(c.adjuntos)
   if (!t && !fotos.length) throw new Rechazo(400, 'Escribe tu comentario o agrega una imagen.')
-  if (!esCreador(yo) && (await hoyHizo(env, 'comentarios', yo)) >= AL_DIA.comentarios) throw new Rechazo(429, 'Ya comentaste mucho hoy. Mañana sigues.')
+  if (!esCreador(yo) && !(await cupo(env, yo.id, 'comentarios', AL_DIA.comentarios))) throw new Rechazo(429, 'Ya comentaste mucho hoy. Mañana sigues.')
   let padre: ComentarioGuardado | null = null
   if (c.responde) {
     padre = ID.test(String(c.responde)) ? await env.DB.prepare('SELECT * FROM comentarios WHERE id = ? AND publicacion = ?').bind(String(c.responde), f.id).first<ComentarioGuardado>() : null
@@ -579,7 +572,7 @@ async function reportar(env: Env, yo: Miembro, tabla: 'publicaciones' | 'comenta
   if (x.autor === yo.id) throw new Rechazo(400, 'No puedes reportar lo tuyo: bórralo.')
   const motivo = texto(c.motivo, 300)
   if (!motivo) throw new Rechazo(400, 'Dinos por qué lo reportas.')
-  if ((await hoyHizo(env, 'reportes', yo)) >= AL_DIA.reportes) throw new Rechazo(429, 'Ya reportaste mucho hoy. Si algo es grave, escríbele al creador.')
+  if (!(await cupo(env, yo.id, 'reportes', AL_DIA.reportes))) throw new Rechazo(429, 'Ya reportaste mucho hoy. Si algo es grave, escríbele al creador.')
   const puesto = await env.DB.prepare('INSERT INTO reportes (objeto, miembro, motivo, creado) VALUES (?, ?, ?, ?) ON CONFLICT DO NOTHING').bind(x.id, yo.id, motivo, new Date().toISOString()).run()
   if (!puesto.meta.changes) return { ok: true }
   const publicacion = x.publicacion ?? x.id

@@ -1,8 +1,9 @@
 import assert from 'node:assert/strict'
 import { createHmac } from 'node:crypto'
 import test from 'node:test'
+import { readFileSync } from 'node:fs'
 import { DatabaseSync } from 'node:sqlite'
-import { deTodos, esFundador, faltaAvisar, firmaDeMercadoPago, instaladorDe, leerPagos, leerPaypal, liberada, rangoDe, sistema, sistemaDelYml, sobran, tarifa, vigencia } from './index.ts'
+import { CUPO, deTodos, esFundador, faltaAvisar, firmaDeMercadoPago, instaladorDe, leerPagos, leerPaypal, liberada, rangoDe, sistema, sistemaDelYml, sobran, tarifa, vigencia } from './index.ts'
 
 const SECRETO = 'secreto-de-prueba'
 const firmar = (manifiesto: string) => createHmac('sha256', SECRETO).update(manifiesto).digest('hex')
@@ -173,4 +174,17 @@ test('liberar en un live da a todos ya la versión que aún era de quien apoya; 
   assert.equal(liberada(yaDeTodos, ahora), yaDeTodos)
   const deAntes = { version: '0.3.2' }
   assert.equal(liberada(deAntes, ahora), deAntes)
+})
+
+test('el cupo del día no deja pasar de su máximo, y cada quien tiene el suyo', () => {
+  const db = new DatabaseSync(':memory:')
+  db.exec(readFileSync(new URL('../migrations/0012_cupos.sql', import.meta.url), 'utf8'))
+  const ahora = Date.parse('2026-11-03T19:48:00Z')
+  const anotar = (quien: string, max: number, cuando = ahora) =>
+    db.prepare(CUPO).run(quien, 'publicaciones', new Date(cuando).toISOString(), new Date(cuando - 24 * 3600_000).toISOString(), max).changes > 0
+  const hechas = Array.from({ length: 15 }, () => anotar('probe', 10))
+  assert.equal(hechas.filter(Boolean).length, 10)
+  // Otro miembro tiene su propio cupo; lo de hace más de un día ya no cuenta.
+  assert.equal(anotar('otro', 10), true)
+  assert.equal(anotar('probe', 10, ahora + 25 * 3600_000), true)
 })

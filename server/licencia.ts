@@ -155,10 +155,12 @@ export function licencia(app: string) {
         escribir()
         return enviar(res, 200, estado())
       }
-      // La cuenta gratis, con su correo: el cobro da su clave, ya activa, y la manda también por correo.
+      // La cuenta gratis, con su correo: el cobro le manda su clave, que se escribe luego en `/api/licencia/clave`
+      // (`enviada`). Solo la da aquí si esta computadora ya tenía una.
       if (ruta === '/api/licencia/unirse' && metodo === 'POST') {
         const { email, terminos } = await cuerpo<{ email?: string; terminos?: string }>(req)
-        const { clave } = await cobro<{ clave: string }>('/suscribir', { email, plan: 'gratis', equipo, acepto: true, terminos })
+        const { clave } = await cobro<{ clave?: string }>('/suscribir', { email, plan: 'gratis', equipo, acepto: true, terminos, porCorreo: true })
+        if (!clave) return enviar(res, 200, { ...estado(), enviada: true })
         const { datos, firma } = await cobro<{ datos: string; firma: string }>('/licencia', { clave, equipo })
         a = { clave, datos, firma, equipo: a.equipo }
         error = ''

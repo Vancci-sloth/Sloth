@@ -74,8 +74,8 @@ export function Recordatorio() {
   )
 }
 
-/** Pegar la clave del apoyo, la de otra computadora o la de antes de reinstalar. */
-function Clave({ licencia, onCambio, onVolver }: { licencia: Licencia; onCambio(l: Licencia): void; onVolver(): void }) {
+/** Pegar la clave del apoyo, la de otra computadora, la de antes de reinstalar o la de la cuenta gratis recién creada (`aviso`). */
+function Clave({ licencia, aviso, onCambio, onVolver }: { licencia: Licencia; aviso?: ReactNode; onCambio(l: Licencia): void; onVolver(): void }) {
   const [clave, setClave] = useState('')
   const [ocupado, setOcupado] = useState(false)
   const [error, setError] = useState('')
@@ -99,8 +99,12 @@ function Clave({ licencia, onCambio, onVolver }: { licencia: Licencia; onCambio(
   return (
     <>
       <Cabeza titulo="Escribe tu clave">
-        <b>Te llegó a tu correo</b> al apoyar en sloth.vancci.org, en «Tu clave de Sloth» (si no lo ves, revisa spam o promociones).
-        {licencia.plan === 'cuenta' && ' Tu cuenta de la comunidad se queda: es la misma con tu correo.'}
+        {aviso ?? (
+          <>
+            <b>Te llegó a tu correo</b> al apoyar en sloth.vancci.org, en «Tu clave de Sloth» (si no lo ves, revisa spam o promociones).
+            {licencia.plan === 'cuenta' && ' Tu cuenta de la comunidad se queda: es la misma con tu correo.'}
+          </>
+        )}
       </Cabeza>
       <form onSubmit={usarClave}>
         <label>
@@ -129,6 +133,8 @@ export function Unirse({ onListo }: { onListo(): void }) {
   const [acepto, setAcepto] = useState(false)
   const [ocupado, setOcupado] = useState(false)
   const [error, setError] = useState('')
+  // La clave va al correo: se escribe aquí para entrar.
+  const [enviada, setEnviada] = useState<Licencia>()
 
   async function unirse(e: FormEvent) {
     e.preventDefault()
@@ -136,13 +142,30 @@ export function Unirse({ onListo }: { onListo(): void }) {
     setOcupado(true)
     setError('')
     try {
-      await api<Licencia>('/api/licencia/unirse', { email, terminos: TERMINOS })
-      onListo()
+      const l = await api<Licencia & { enviada?: boolean }>('/api/licencia/unirse', { email, terminos: TERMINOS })
+      if (!l.enviada) return onListo()
+      setEnviada(l)
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
-      setOcupado(false)
     }
+    setOcupado(false)
   }
+
+  if (enviada)
+    return (
+      <div className="licencia-caja licencia-unirse">
+        <Clave
+          licencia={enviada}
+          aviso={
+            <>
+              <b>Te la mandamos a {email.trim()}</b>, en «Tu cuenta de Sloth» (si no lo ves, revisa spam o promociones).
+            </>
+          }
+          onCambio={(l) => l.activa && onListo()}
+          onVolver={() => setEnviada(undefined)}
+        />
+      </div>
+    )
 
   return (
     <div className="licencia-caja licencia-unirse">
