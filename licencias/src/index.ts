@@ -30,8 +30,8 @@
  * fundadoras como las primeras que apoyan (`esFundador`), con lo nuevo `ANTICIPO` antes y sin el recordatorio. Ya no se
  * dan.
  *
- * También da el instalador: `GET /descargar` es la última versión, libre; la de Mac y la de
- * Linux, con `?so=mac` y `?so=linux` (también en `/version`). Está en R2
+ * También da el instalador: `GET /descargar` es la última versión, libre; la de Mac (Intel), la de Mac con Apple Silicon
+ * y la de Linux, con `?so=mac`, `?so=mac-arm64` y `?so=linux` (también en `/version`). Está en R2
  * (`DESCARGAS`) y lo sube `npm run publicar` por partes, con `PUBLICAR`: pesa más de lo que aceptan wrangler (300 MiB)
  * y una petición a un Worker (100 MB). `ultima.json` dice cuál es la última. Y las actualizaciones de la app instalada
  * (electron-updater): `GET /actualizaciones/latest.yml` dice cuál es la nueva (quien apoya la recibe `ANTICIPO` antes:
@@ -226,17 +226,26 @@ const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
  * que lee electron-updater. `tipo` es lo que va tras la versión: el de cada archivo que se poda.
  */
 const BINARIO = /^Sloth-(?:Setup-)?\d+\.\d+\.\d+(?<tipo>\.exe|-mac-(?:arm64|x64)\.(?:dmg|zip)|-linux-(?:arm64|x86_64)\.AppImage)$/
-const AL_DIA = /^latest(-mac|-linux)?\.yml$/
+const AL_DIA = /^latest(-mac|-arm64-mac|-linux)?\.yml$/
 const publicable = (archivo: string) => AL_DIA.test(archivo) || BINARIO.test(archivo.replace(/\.blockmap$/, ''))
-/** Cada sistema que se descarga (`?so=`) y dónde dice cuál es su última versión. Sin `so`, Windows. */
-const ULTIMAS = { windows: 'ultima.json', mac: 'ultima-mac.json', linux: 'ultima-linux.json' } as const
+/**
+ * Cada sistema que se descarga (`?so=`) y dónde dice cuál es su última versión. Sin `so`, Windows. La de Mac con Apple
+ * Silicon sale en su propia máquina y tiene su última aparte; `mac` es la de Intel.
+ */
+const ULTIMAS = { windows: 'ultima.json', mac: 'ultima-mac.json', 'mac-arm64': 'ultima-mac-arm64.json', linux: 'ultima-linux.json' } as const
+/** Lo que lee electron-updater de cada sistema. */
+const YML = { windows: 'latest.yml', mac: 'latest-mac.yml', 'mac-arm64': 'latest-arm64-mac.yml', linux: 'latest-linux.yml' } as const
+const NOMBRES = { windows: 'Windows', mac: 'Mac con Intel', 'mac-arm64': 'Mac con Apple Silicon', linux: 'Linux' } as const
 type Sistema = keyof typeof ULTIMAS
-const sistema = (so: string | null): Sistema => (so === 'mac' || so === 'linux' ? so : 'windows')
+export const sistema = (so: string | null): Sistema => (so && so !== 'windows' && Object.hasOwn(ULTIMAS, so) ? (so as Sistema) : 'windows')
 /** El sistema del que `archivo` es el instalador; `undefined` si no es uno (el .zip de Mac, un mapa, latest.yml). */
 export function instaladorDe(archivo: string): Sistema | undefined {
   const tipo = BINARIO.exec(archivo)?.groups?.tipo
-  return tipo === '.exe' ? 'windows' : tipo?.endsWith('.dmg') ? 'mac' : tipo?.endsWith('.AppImage') ? 'linux' : undefined
+  if (tipo?.endsWith('.dmg')) return tipo.includes('arm64') ? 'mac-arm64' : 'mac'
+  return tipo === '.exe' ? 'windows' : tipo?.endsWith('.AppImage') ? 'linux' : undefined
 }
+/** El sistema de un `latest*.yml`. */
+export const sistemaDelYml = (archivo: string): Sistema => (Object.entries(YML).find(([, y]) => y === archivo)?.[0] as Sistema | undefined) ?? 'windows'
 /** De cada tipo de archivo (el .exe, el .dmg y el .zip de Mac, el AppImage) se quedan el último y el de antes en R2, por si alguien lo está bajando al publicar. */
 const INSTALADORES = 3
 
@@ -277,6 +286,8 @@ interface Ultima {
   publicado: string
   /** Desde cuándo la recibe todo el mundo; antes, solo quien apoya. Sin él (las de antes), ya es de todos. */
   todos?: string
+  /** La de Mac, firmada y notarizada por Apple: abre a la primera, sin «Abrir de todos modos». */
+  firmada?: boolean
 }
 
 export class Rechazo extends Error {
@@ -316,8 +327,13 @@ async function atender(req: Request, env: Env, ctx: ExecutionContext, url: URL):
     if ((req.method === 'GET' || req.method === 'HEAD') && url.pathname === '/descargar') {
       const so = sistema(url.searchParams.get('so'))
       const u = await ultimaPara(req, env, so)
-      // La de Mac aún no va firmada por Apple: antes de bajarla, cómo se abre la primera vez.
-      if (so === 'mac' && !url.searchParams.has('visto')) return avisoMac(u)
+      // `?so=mac` (el enlace de la página y de los correos) deja elegir entre la de Apple Silicon y la de Intel; la que
+      // aún no va firmada por Apple dice antes cómo se abre la primera vez.
+      if ((so === 'mac' || so === 'mac-arm64') && !url.searchParams.has('visto')) {
+        const arm = so === 'mac-arm64' ? u : await ultimaPara(req, env, 'mac-arm64').catch(() => undefined)
+        const intel = so === 'mac' ? u : undefined
+        if ([intel, arm].some((m) => m && !m.firmada) || (intel && arm)) return avisoMac(intel, arm)
+      }
       return servir(req, env, u.archivo, u.bytes, { 'content-disposition': `attachment; filename="${u.archivo}"` })
     }
     if ((req.method === 'GET' || req.method === 'HEAD') && url.pathname.startsWith('/actualizaciones/')) return await actualizaciones(req, env, url)
@@ -341,7 +357,7 @@ async function atender(req: Request, env: Env, ctx: ExecutionContext, url: URL):
 
 async function ultima(env: Env, so: Sistema = 'windows'): Promise<Ultima> {
   const u = await env.DESCARGAS.get(ULTIMAS[so])
-  if (!u) throw new Rechazo(404, so === 'windows' ? 'Todavía no hay una versión de Sloth para descargar.' : `Todavía no hay una versión de Sloth para ${so === 'mac' ? 'Mac' : 'Linux'}.`)
+  if (!u) throw new Rechazo(404, so === 'windows' ? 'Todavía no hay una versión de Sloth para descargar.' : `Todavía no hay una versión de Sloth para ${NOMBRES[so]}.`)
   return u.json<Ultima>()
 }
 
@@ -433,7 +449,7 @@ async function actualizaciones(req: Request, env: Env, url: URL): Promise<Respon
   let llave = archivo
   // latest.yml: a quien no apoya, el de la anterior mientras la última sea solo de quien apoya.
   if (yml) {
-    const so: Sistema = archivo.includes('-mac') ? 'mac' : archivo.includes('-linux') ? 'linux' : 'windows'
+    const so = sistemaDelYml(archivo)
     const u = await env.DESCARGAS.get(ULTIMAS[so])
     if (u && !deTodos(await u.json<Ultima>()) && !(await apoya(req, env)) && (await anteriorDe(env, so)) && (await env.DESCARGAS.head(`anterior/${archivo}`)))
       llave = `anterior/${archivo}`
@@ -490,14 +506,16 @@ async function publicar(req: Request, env: Env, url: URL): Promise<Response> {
     return json(await subida.uploadPart(n, req.body))
   }
   if (req.method === 'POST' && url.pathname === '/publicar/fin') {
-    const { partes, version, paraTodos } = (await cuerpo(req)) as { partes: R2UploadedPart[]; version: string; paraTodos?: boolean }
+    const { partes, version, paraTodos, firmada } = (await cuerpo(req)) as { partes: R2UploadedPart[]; version: string; paraTodos?: boolean; firmada?: boolean }
     // Una versión nueva: la que había pasa a `anterior/` (su ultima.json y su latest.yml, que aún no se reemplaza: va al
     // final), salvo que aún fuera solo de quien apoya; entonces la anterior sigue siendo la de antes. Si esa ya no tiene
     // instalador, a quien no apoya se le estaba dando la que había: pasa a ser la anterior, o la nueva le llegaría ya.
     const so = instaladorDe(archivo)
     const previa = so ? await (await env.DESCARGAS.get(ULTIMAS[so]))?.json<Ultima>() : undefined
+    // macOS solo pone encima una versión firmada por el mismo equipo de Apple: una sin firma dejaría a todos sin actualizar.
+    if (previa?.firmada && !firmada) throw new Rechazo(409, `La última de ${NOMBRES[so!]} va firmada por Apple: una sin firma no se podría poner encima. Faltan los secretos de Apple en GitHub.`)
     if (so && previa && previa.version !== String(version) && (deTodos(previa) || !(await anteriorDe(env, so)))) {
-      const yml = { windows: 'latest.yml', mac: 'latest-mac.yml', linux: 'latest-linux.yml' }[so]
+      const yml = YML[so]
       const actual = await env.DESCARGAS.get(yml)
       // Sin `todos`: la anterior ya es de todos, aunque su fecha no hubiera llegado.
       const { todos: _, ...anterior } = previa
@@ -517,7 +535,7 @@ async function publicar(req: Request, env: Env, url: URL): Promise<Response> {
     const misma = previa?.version === String(version)
     const publicado = misma ? previa.publicado : new Date().toISOString()
     const todos = paraTodos ? undefined : misma ? previa.todos : new Date(Date.parse(publicado) + ANTICIPO).toISOString()
-    const u: Ultima = { archivo, version: String(version), bytes: obj.size, publicado, ...(todos ? { todos } : {}) }
+    const u: Ultima = { archivo, version: String(version), bytes: obj.size, publicado, ...(todos ? { todos } : {}), ...(firmada ? { firmada: true } : {}) }
     await env.DESCARGAS.put(ULTIMAS[so], JSON.stringify(u), { httpMetadata: { contentType: 'application/json' } })
     return json(u)
   }
@@ -1280,18 +1298,29 @@ async function renovacion(env: Env, url: URL): Promise<Response> {
 }
 
 /**
- * Lo que se lee antes de bajar la de Mac: sin la firma de Apple (docs/adr/0006-mac-y-linux.md), macOS no la deja abrir a
- * la primera ni se actualiza sola. Cuando vaya firmada, esta página sobra.
+ * Lo que se lee antes de bajar la de Mac: cuál de las dos, si están la de Apple Silicon (`arm`) y la de Intel
+ * (`intel`), y cómo se abre la primera vez la que aún no lleva la firma de Apple (docs/adr/0006-mac-y-linux.md): sin
+ * ella, macOS no la deja abrir a la primera ni se actualiza sola.
  */
-function avisoMac(u: Ultima): Response {
+function avisoMac(intel: Ultima | undefined, arm: Ultima | undefined): Response {
+  const boton = (u: Ultima, so: Sistema, cual: string, principal: boolean) =>
+    `<a class="${principal ? 'boton' : 'boton otro'}" href="/descargar?so=${so}&amp;visto">Descargar Sloth ${u.version} para ${cual}</a>`
+  const elegir = intel && arm
+  const sinFirma = [intel, arm].some((u) => u && !u.firmada)
+  const pasos = sinFirma
+    ? `<ol><li>Abre el archivo que se baja y arrastra <b>Sloth</b> a <b>Aplicaciones</b>.</li>
+<li>Ábrela. macOS dirá que no puede comprobarla: cierra ese aviso, ve a <b>Configuración del Sistema → Privacidad y seguridad</b> y pulsa <b>«Abrir de todos modos»</b>. Solo la primera vez.</li>
+<li>Cuando salga una versión nueva, Sloth te avisa y la bajas aquí otra vez, encima de la que tienes: tus videos y tus hilos se quedan.</li></ol>`
+    : `<ol><li>Abre el archivo que se baja y arrastra <b>Sloth</b> a <b>Aplicaciones</b>.</li>
+<li>Ábrela. Las versiones nuevas se ponen solas: Sloth te avisa y basta con «Actualizar».</li></ol>`
   return pagina(
     'Sloth para Mac',
-    `<p>Sloth para Mac todavía no lleva la firma de Apple: ya estamos trabajando en eso. Mientras, macOS pide un paso más la primera vez.</p>
-<a class="boton" href="/descargar?so=mac&amp;visto">Descargar Sloth ${u.version} para Mac</a>
-<ol><li>Abre el archivo que se baja y arrastra <b>Sloth</b> a <b>Aplicaciones</b>.</li>
-<li>Ábrela. macOS dirá que no puede comprobarla: cierra ese aviso, ve a <b>Configuración del Sistema → Privacidad y seguridad</b> y pulsa <b>«Abrir de todos modos»</b>. Solo la primera vez.</li>
-<li>Cuando salga una versión nueva, Sloth te avisa y la bajas aquí otra vez, encima de la que tienes: tus videos y tus hilos se quedan.</li></ol>
-<p class="otros">Para Mac con Intel. En un Mac con M1 o más nuevo también abre: la primera vez, macOS pide instalar Rosetta.</p>`
+    `${elegir ? '<p>Elige la de tu Mac: en el menú de Apple → <b>Acerca de esta Mac</b>, si dice <b>Chip Apple M1</b> o más nuevo, es Apple Silicon; si dice <b>Procesador Intel</b>, es Intel.</p>' : ''}
+${sinFirma ? `<p>${elegir && intel?.firmada ? 'La de Apple Silicon' : elegir && arm?.firmada ? 'La de Intel' : 'Sloth para Mac'} todavía no lleva la firma de Apple: macOS pide un paso más la primera vez.</p>` : ''}
+${arm ? boton(arm, 'mac-arm64', elegir ? 'Mac con Apple Silicon' : 'Mac', true) : ''}
+${intel ? boton(intel, 'mac', elegir ? 'Mac con Intel' : 'Mac', !arm) : ''}
+${pasos}
+${!elegir && intel ? '<p class="otros">Para Mac con Intel. En un Mac con M1 o más nuevo también abre: la primera vez, macOS pide instalar Rosetta.</p>' : ''}`
   )
 }
 
@@ -1312,6 +1341,7 @@ main{max-width:460px;padding:32px}h1{font-size:22px;margin:0 0 10px}p,li{color:#
 .correo{display:flex;gap:12px;align-items:flex-start;margin:0 0 16px;padding:14px 16px;border:1px solid #e8a33d;border-radius:10px;background:rgba(232,163,61,.13);color:#ede6d6;font-size:15px}
 .correo svg{flex:none;width:22px;height:22px;margin-top:1px;color:#e8a33d}.correo b{color:#e8a33d}
 .boton{display:block;padding:14px;border-radius:10px;background:#e8a33d;color:#1b1408;font-weight:800;text-align:center;text-decoration:none}
+.boton.otro{margin-top:10px;background:none;border:1px solid #e8a33d;color:#e8a33d}
 .otros{margin:10px 0 0;font-size:14px;text-align:center}</style></head>
 <body><main><h1>${titulo}</h1>${cuerpo}</main></body></html>`,
     // Con la clave a la vista: que no se guarde en ninguna caché.

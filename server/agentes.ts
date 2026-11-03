@@ -23,7 +23,11 @@ import { correr } from './version.ts'
  */
 
 const APP = resolve(dirname(fileURLToPath(import.meta.url)), '..')
-const PIEZAS = join(process.env.APPDATA ?? '', 'sloth', 'piezas', 'agentes')
+/**
+ * En un Mac con Apple Silicon, la Sloth de Intel (con Rosetta) dejó aquí programas de Intel con la misma versión: la de
+ * ARM baja los suyos aparte, o usaría esos.
+ */
+const PIEZAS = join(process.env.APPDATA ?? '', 'sloth', 'piezas', process.platform === 'darwin' && process.arch === 'arm64' ? 'agentes-arm64' : 'agentes')
 const WINDOWS = process.platform === 'win32'
 const plataforma = `${process.platform}-${process.arch}`
 

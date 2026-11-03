@@ -1,11 +1,12 @@
-# La app que se vende sale de la rama `venta`: cada push compila Sloth en Windows, Mac (Intel) y Linux, y publica
-# sus instaladores en el cobro (`npm run compilar` y `npm run publicar` en cada sistema), los que da sloth.vancci.org.
-# Cada push sale como versión nueva (scripts/version-venta.mjs, una sola vez para los tres), y la app instalada ofrece
+# La app que se vende sale de la rama `venta`: cada push compila Sloth en Windows, Mac (Intel y Apple Silicon) y Linux,
+# y publica sus instaladores en el cobro (`npm run compilar` y `npm run publicar` en cada sistema), los que da sloth.vancci.org.
+# Cada push sale como versión nueva (scripts/version-venta.mjs, una sola vez para todos), y la app instalada ofrece
 # «Actualizar a Sloth X» y baja solo lo que cambió (electron/main.ts).
 # Para publicar lo de main: `git push origin main:venta`. La llave para publicar es el secreto PUBLICAR del repo. La firma
 # de Apple, si está, va en los secretos CSC_LINK, CSC_KEY_PASSWORD, APPLE_ID, APPLE_APP_SPECIFIC_PASSWORD y APPLE_TEAM_ID
-# (docs/adr/0006-mac-y-linux.md); sin ellos, la de Mac sale sin firma. Quien apoya recibe cada versión 7 días antes; un
-# arreglo urgente sale para todos de inmediato con `[para todos]` en el mensaje del commit, o con esa opción a mano.
+# (docs/adr/0006-mac-y-linux.md); sin ellos, la de Mac sale sin firma (y la de Apple Silicon no se publica). Siempre el
+# mismo certificado: macOS solo se actualiza a una versión firmada por el mismo equipo de Apple que la instalada. Quien
+# apoya recibe cada versión 7 días antes; un arreglo urgente sale para todos de inmediato con `[para todos]` en el mensaje del commit, o con esa opción a mano.
 name: Publicar Sloth
 
 on:
@@ -41,8 +42,8 @@ jobs:
       # Si uno falla, los otros publican igual: cada sistema tiene su propia última versión.
       fail-fast: false
       matrix:
-        # La de Mac, en Intel: abre en los Mac con i5/i7 y, con Rosetta, en los de Apple Silicon (docs/adr/0006).
-        os: [windows-latest, macos-15-intel, ubuntu-latest]
+        # Dos de Mac, cada una en su procesador y con su última versión en el cobro (docs/adr/0006).
+        os: [windows-latest, macos-15-intel, macos-15, ubuntu-latest]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 60
     steps:
@@ -68,3 +69,5 @@ jobs:
         env:
           PUBLICAR: ${{ secrets.PUBLICAR }}
           PARA_TODOS: ${{ (inputs.para_todos || contains(github.event.head_commit.message, '[para todos]')) && '1' || '' }}
+          # Para que el cobro sepa si la de Mac se abre a la primera.
+          FIRMADA: ${{ secrets.CSC_LINK != '' && '1' || '' }}

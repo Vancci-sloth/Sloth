@@ -326,8 +326,10 @@ const hechos = await empaquetar({
     // La app va en español: de los 55 idiomas de Chromium solo hacen falta el suyo y el inglés, al que recurre.
     electronLanguages: ['es', 'es-419', 'en-US'],
     afterPack: linuxSinAislamiento,
-    // Las actualizaciones (electron-updater): el cobro sirve un pedazo por petición, no varios.
-    publish: [{ provider: 'generic', url: `${COBRO}/actualizaciones`, useMultipleRangeRequest: false }],
+    // Las actualizaciones (electron-updater): el cobro sirve un pedazo por petición, no varios. La de Mac con Apple
+    // Silicon sale en otra máquina y lee su propio latest-arm64-mac.yml; el canal va aquí y no en electron/main.ts, que
+    // le dejaría instalar una versión más vieja.
+    publish: [{ provider: 'generic', url: `${COBRO}/actualizaciones`, useMultipleRangeRequest: false, ...(MAC && ARCH === Arch.arm64 ? { channel: 'latest-arm64' } : {}) }],
     releaseInfo: { releaseNotes: NOVEDAD },
     // Los de Linux, en linuxSinAislamiento.
     electronFuses: WINDOWS || MAC ? FUSIBLES : undefined,

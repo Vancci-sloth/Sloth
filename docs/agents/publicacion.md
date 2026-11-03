@@ -41,13 +41,14 @@ ramas ni bloquea por sí solo un push a `venta`.
    último commit que llega a `venta`, o con la opción `para_todos` al correr el workflow a mano. Ya publicada, el
    creador la da a todos antes de sus 7 días (cuando el chat de un live cumple su meta) con «Liberar para todos», arriba
    de la Comunidad en su Sloth: no compila nada, y las apps abiertas la ven en unos 5 minutos (`/ultima`).
-4. Comprueba los tres jobs y la versión que ofrece el cobro: `/version`, `/version?so=mac` y `/version?so=linux` en
-   `https://api.sloth.vancci.org` (sin apoyo, durante sus 7 días, dicen la anterior). Pedido sin llave, `/version` es
+4. Comprueba los cuatro jobs y la versión que ofrece el cobro: `/version`, `/version?so=mac`, `/version?so=mac-arm64`
+   y `/version?so=linux` en `https://api.sloth.vancci.org` (sin apoyo, durante sus 7 días, dicen la anterior). Pedido sin llave, `/version` es
    lo que se le da a quien no apoya: si trae `nueva`, sigue con la anterior; si no, ya tiene esa. Qué arreglo le llegó
    a un cliente se mira ahí y en `git log origin/venta`, no en las fechas de los commits. Verifica también los metadatos
-   de `/actualizaciones/latest.yml`, `latest-mac.yml` y `latest-linux.yml`, y los enlaces de descarga de cada sistema.
+   de `/actualizaciones/latest.yml`, `latest-mac.yml`, `latest-arm64-mac.yml` y `latest-linux.yml`, y los enlaces de
+   descarga de cada sistema.
    Para esperar el flujo, `gh run watch <id> --exit-status` de fondo.
-5. Cuando los tres salieron bien, cuéntalo en Anuncios de la comunidad, sin preguntar: escribe el anuncio como lo
+5. Cuando los cuatro salieron bien, cuéntalo en Anuncios de la comunidad, sin preguntar: escribe el anuncio como lo
    escribe Vancci ([anuncios.md](anuncios.md)) y publícalo con `node scripts/anuncio.mjs <archivo>`.
 
 La llave `PUBLICAR` del workflow autoriza la subida. Los secretos de Apple y el comportamiento sin firma están en

@@ -6,7 +6,8 @@
 // Va por partes de 64 MB: el instalador pesa más de lo que aceptan wrangler y un Worker de una vez. La llave está en
 // %APPDATA%\sloth\licencias\publicar.txt (es el secreto PUBLICAR del Worker); en GitHub, la rama `venta` la pasa en la
 // variable PUBLICAR (.github/workflows/venta.yml). Una versión nueva la recibe primero quien apoya (7 días antes, en el
-// cobro); con PARA_TODOS=1 (un arreglo urgente) es de todos desde ya.
+// cobro); con PARA_TODOS=1 (un arreglo urgente) es de todos desde ya. FIRMADA=1: la de Mac va firmada por Apple, y el
+// cobro deja de explicar cómo abrirla la primera vez.
 import { closeSync, existsSync, openSync, readFileSync, readSync, statSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -19,11 +20,19 @@ const ARCH = process.arch === 'arm64' ? 'arm64' : 'x64'
 /** Por sistema: el instalador, lo demás que usa al actualizarse, lo que lee electron-updater y su enlace de descarga. */
 const { instalador, otros, ultimo, so } = {
   win32: { instalador: `Sloth-Setup-${VERSION}.exe`, otros: [], ultimo: 'latest.yml', so: '' },
-  darwin: { instalador: `Sloth-${VERSION}-mac-${ARCH}.dmg`, otros: [`Sloth-${VERSION}-mac-${ARCH}.zip`], ultimo: 'latest-mac.yml', so: '?so=mac' },
+  // La de Apple Silicon, con su canal (scripts/compilar.mjs): cada Mac tiene su última versión.
+  darwin: {
+    instalador: `Sloth-${VERSION}-mac-${ARCH}.dmg`,
+    otros: [`Sloth-${VERSION}-mac-${ARCH}.zip`],
+    ultimo: ARCH === 'arm64' ? 'latest-arm64-mac.yml' : 'latest-mac.yml',
+    so: ARCH === 'arm64' ? '?so=mac-arm64' : '?so=mac'
+  },
   // electron-builder llama x86_64 al AppImage de x64.
   linux: { instalador: `Sloth-${VERSION}-linux-${ARCH === 'x64' ? 'x86_64' : ARCH}.AppImage`, otros: [], ultimo: 'latest-linux.yml', so: '?so=linux' }
 }[process.platform]
-const LLAVE = (process.env.PUBLICAR || readFileSync(join(process.env.APPDATA ?? '', 'sloth', 'licencias', 'publicar.txt'), 'utf8')).trim()
+// La 0.3.43 de Apple Silicon ya salió firmada: macOS no pondría encima una sin firma.
+if (process.platform === 'darwin' && ARCH === 'arm64' && process.env.FIRMADA !== '1') throw new Error('La de Mac con Apple Silicon solo se publica firmada por Apple: faltan sus secretos (docs/adr/0006-mac-y-linux.md).')
+const LLAVE =(process.env.PUBLICAR || readFileSync(join(process.env.APPDATA ?? '', 'sloth', 'licencias', 'publicar.txt'), 'utf8')).trim()
 
 /** Una petición al cobro; si falla, se corta con su error. */
 async function cobro(ruta, metodo, cuerpo) {
@@ -53,7 +62,7 @@ async function subir(archivo) {
   } finally {
     closeSync(fd)
   }
-  return cobro(`fin?${q(`&upload=${encodeURIComponent(upload)}`)}`, 'POST', JSON.stringify({ partes, version: VERSION, paraTodos: process.env.PARA_TODOS === '1' }))
+  return cobro(`fin?${q(`&upload=${encodeURIComponent(upload)}`)}`, 'POST', JSON.stringify({ partes, version: VERSION, paraTodos: process.env.PARA_TODOS === '1', firmada: process.platform === 'darwin' && process.env.FIRMADA === '1' }))
 }
 
 const u = await subir(instalador)

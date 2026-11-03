@@ -33,6 +33,8 @@ const SOLO_VENTANA = process.env.SLOTH_VENTANA
 const URL_SLOTH = SOLO_VENTANA ?? `http://localhost:${process.env.PORT ?? '4848'}`
 const WINDOWS = process.platform === 'win32'
 const MAC = process.platform === 'darwin'
+/** El sistema ante el cobro (`?so=`): la de Mac con Apple Silicon tiene su propia última versión. */
+const SO = MAC ? (process.arch === 'arm64' ? 'mac-arm64' : 'mac') : WINDOWS ? 'windows' : 'linux'
 /** Fuera de Windows, dónde viven Sloth y lo tuyo: la app no se puede escribir. */
 const DATOS = MAC ? join(homedir(), 'Library', 'Application Support', 'Sloth') : join(process.env.XDG_DATA_HOME || join(homedir(), '.local', 'share'), 'sloth')
 /** La carpeta de Sloth.exe. */
@@ -109,7 +111,7 @@ else {
     return actualizacion
   })
   ipcMain.handle('actualizar', () => {
-    if (A_MANO) fuera(`${COBRO}/descargar?so=mac`)
+    if (A_MANO) fuera(`${COBRO}/descargar?so=${SO}&visto`)
     else if (actualizacion.nueva && actualizacion.avance === undefined) {
       actualizacion = { ...actualizacion, avance: 0, error: undefined }
       fallos = 0
@@ -565,10 +567,9 @@ function actualizaciones() {
   primera = revisar()
   setInterval(revisar, CADA)
   // La primera vez solo se anota cómo está: la pregunta de al abrir ya la ve.
-  const so = MAC ? 'mac' : WINDOWS ? 'windows' : 'linux'
   let vista: string | undefined
   const vistazo = async () => {
-    const ahora = await fetch(`${COBRO}/ultima?so=${so}`)
+    const ahora = await fetch(`${COBRO}/ultima?so=${SO}`)
       .then((r) => (r.ok ? r.text() : undefined))
       .catch(() => undefined)
     if (!ahora) return

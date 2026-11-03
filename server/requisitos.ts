@@ -162,9 +162,9 @@ const SISTEMA: Record<string, string> = {
 }
 
 /**
- * Para qué procesador se baja lo de fuera (Python, FFmpeg). La app de Mac es de Intel y en los Mac con Apple Silicon corre
- * con Rosetta (`sysctl.proc_translated` vale 1): ahí se bajan los de ARM, que corren nativos y tienen torch (el de Intel
- * dejó de salir en la 2.3).
+ * Para qué procesador se baja lo de fuera (Python, FFmpeg). La de Mac con Intel, en un Mac con Apple Silicon, corre con
+ * Rosetta (`sysctl.proc_translated` vale 1): ahí se bajan los de ARM, que corren nativos y tienen torch (el de Intel
+ * dejó de salir en la 2.3). La de Apple Silicon ya es de ARM.
  */
 export const ARQUITECTURA = (() => {
   if (process.platform !== 'darwin' || process.arch !== 'x64') return process.arch

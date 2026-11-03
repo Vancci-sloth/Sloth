@@ -1109,7 +1109,7 @@ export interface FeedComunidad {
 
 /** `/api/comunidad/liberar`, solo del creador: la última versión de un sistema y, mientras es solo de quien apoya, desde cuándo será de todos. */
 export interface VersionLiberable {
-  so: 'windows' | 'mac' | 'linux'
+  so: 'windows' | 'mac' | 'mac-arm64' | 'linux'
   version: string
   todos?: string
 }

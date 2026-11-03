@@ -102,6 +102,11 @@ export function voz(app: string) {
     fetch(`http://127.0.0.1:${PUERTO}/json/list`)
       .then((r) => r.json() as Promise<{ type: string }[]>)
       .then((l) => l.some((t) => t.type === 'page'), () => false)
+  /** ¿Ya volvió a AI Studio? Google pone la sesión antes de llegar ahí, y lo que falta lo pone al llegar. */
+  const enAIStudio = () =>
+    fetch(`http://127.0.0.1:${PUERTO}/json/list`)
+      .then((r) => r.json() as Promise<{ type: string; url: string }[]>)
+      .then((l) => l.some((t) => t.type === 'page' && t.url.startsWith('https://aistudio.google.com/')), () => false)
 
   /**
    * Abre Edge con el perfil, si no lo estaba. `ventana`, con `url`, para entrar: ahí no se engancha Playwright (que toca
@@ -322,21 +327,23 @@ export function voz(app: string) {
     conectando = true
     error = undefined
     try {
-      if (!(await enTurno(copiarSesion))) {
+      // Una sesión vieja en el perfil también se copia, pero AI Studio no abre con ella: entonces se entra otra vez.
+      const lista = (await enTurno(copiarSesion)) && (await enTurno(leerVoces).then(() => !!cuenta, () => false))
+      if (!lista) {
         await lanzarEdge(true)
         let sesion = false
         for (let i = 0; i < 400 && !sesion; i++) {
           await espera(1500)
           if (!(await conVentana())) break
-          sesion = await cookiesDeEdge().then((c) => c.sesion, () => false)
+          sesion = (await enAIStudio()) && (await cookiesDeEdge().then((c) => c.sesion, () => false))
         }
         // Lo que Google pone justo después de entrar.
         if (sesion) await espera(3000)
         await cerrarEdge()
         if (!sesion) throw new Error(`No entraste con Google en ${nombreEdge()}. Vuelve a intentarlo.`)
         if (!(await enTurno(copiarSesion))) throw new Error(`${nombreEdge()} no guardó la sesión de Google. Vuelve a intentarlo.`)
+        await enTurno(leerVoces)
       }
-      await enTurno(leerVoces)
       if (!cuenta) throw new Error('AI Studio no abrió con tu cuenta de Google.')
     } catch (e) {
       error = mensaje(e)

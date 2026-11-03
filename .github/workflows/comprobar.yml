@@ -1,5 +1,5 @@
 # Comprueba lo que llegaría a la app instalada antes de publicar desde venta.
-# Usa el empaquetado real en los tres sistemas; deja los archivos en el runner.
+# Usa el empaquetado real en cada sistema (las dos de Mac, Intel y Apple Silicon); deja los archivos en el runner.
 name: Comprobar Sloth
 
 on:
@@ -21,7 +21,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [windows-latest, macos-15-intel, ubuntu-latest]
+        os: [windows-latest, macos-15-intel, macos-15, ubuntu-latest]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 60
     steps:

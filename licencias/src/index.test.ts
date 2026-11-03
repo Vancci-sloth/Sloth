@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { createHmac } from 'node:crypto'
 import test from 'node:test'
 import { DatabaseSync } from 'node:sqlite'
-import { deTodos, esFundador, faltaAvisar, firmaDeMercadoPago, instaladorDe, leerPagos, leerPaypal, liberada, rangoDe, sobran, tarifa, vigencia } from './index.ts'
+import { deTodos, esFundador, faltaAvisar, firmaDeMercadoPago, instaladorDe, leerPagos, leerPaypal, liberada, rangoDe, sistema, sistemaDelYml, sobran, tarifa, vigencia } from './index.ts'
 
 const SECRETO = 'secreto-de-prueba'
 const firmar = (manifiesto: string) => createHmac('sha256', SECRETO).update(manifiesto).digest('hex')
@@ -128,12 +128,25 @@ test('son fundadoras para siempre los primeros apoyos pagados y los lugares grat
 
 test('reconoce el instalador de cada sistema, y nada más pasa por la última versión', () => {
   assert.equal(instaladorDe('Sloth-Setup-0.3.4.exe'), 'windows')
-  assert.equal(instaladorDe('Sloth-0.3.4-mac-arm64.dmg'), 'mac')
+  assert.equal(instaladorDe('Sloth-0.3.4-mac-x64.dmg'), 'mac')
+  assert.equal(instaladorDe('Sloth-0.3.4-mac-arm64.dmg'), 'mac-arm64')
   assert.equal(instaladorDe('Sloth-0.3.4-linux-x86_64.AppImage'), 'linux')
   assert.equal(instaladorDe('Sloth-0.3.4-mac-arm64.zip'), undefined)
   assert.equal(instaladorDe('Sloth-0.3.4-mac-arm64.dmg.blockmap'), undefined)
   assert.equal(instaladorDe('latest-mac.yml'), undefined)
   assert.equal(instaladorDe('Sloth-0.3.4-linux-x86_64.AppImage/../x'), undefined)
+})
+
+test('cada Mac tiene su sistema: la de Apple Silicon, su última y su latest.yml', () => {
+  assert.equal(sistema('mac'), 'mac')
+  assert.equal(sistema('mac-arm64'), 'mac-arm64')
+  assert.equal(sistema('linux'), 'linux')
+  assert.equal(sistema(null), 'windows')
+  assert.equal(sistema('toString'), 'windows')
+  assert.equal(sistemaDelYml('latest.yml'), 'windows')
+  assert.equal(sistemaDelYml('latest-mac.yml'), 'mac')
+  assert.equal(sistemaDelYml('latest-arm64-mac.yml'), 'mac-arm64')
+  assert.equal(sistemaDelYml('latest-linux.yml'), 'linux')
 })
 
 test('al publicar se borran los instaladores de más, pero no el de la versión que aún se da a quien no apoya', () => {
