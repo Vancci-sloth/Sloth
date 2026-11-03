@@ -1,4 +1,3 @@
-import { spawn } from 'node:child_process'
 import { createHash, randomBytes } from 'node:crypto'
 import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync } from 'node:fs'
 import type { IncomingMessage, ServerResponse } from 'node:http'
@@ -12,6 +11,7 @@ import { conectarCDP } from '../playwright.ts'
 import { type EstadoVoz, NAVEGADOR_VOZ, type TrabajoVoz, type VozStudio } from '../../shared/types.ts'
 import { VENTA } from '../../shared/venta.ts'
 import { segundosWav, textoParaVoz, vocesDelPanel } from '../../shared/voz.ts'
+import { chromiumDelSistema, lanzarChromium, nombreDe, SIN_CHROMIUM } from '../chromium.ts'
 import { guardar } from '../disco.ts'
 import { cuerpo } from '../http.ts'
 import { integrado } from '../navegador-agente.ts'
@@ -43,17 +43,11 @@ const ENTRAR = `https://accounts.google.com/ServiceLogin?continue=${encodeURICom
 const PUERTO = 9336
 /**
  * Donde se entra con Google, el primero que haya: en Windows Edge, que viene con el sistema; en Mac Chrome, que es el que
- * suele haber (allí la comunidad no podía entrar en Edge). Safari no sirve: no se deja manejar por CDP, y sin eso la
- * sesión no tiene cómo pasar a Sloth.
+ * suele haber (allí la comunidad no podía entrar en Edge). Safari no sirve (`server/chromium.ts`).
  */
-const EDGE =
-  process.platform === 'win32'
-    ? ['C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe', 'C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe']
-    : process.platform === 'darwin'
-      ? ['/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', '/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge']
-      : ['/opt/microsoft/msedge/msedge', '/opt/google/chrome/chrome', '/usr/bin/google-chrome', '/usr/bin/chromium']
+const navegadorDeGoogle = () => chromiumDelSistema(process.platform === 'darwin')
 /** Su nombre, para decirte dónde entrar. */
-const nombreEdge = () => (/edge/i.test(EDGE.find((e) => existsSync(e)) ?? EDGE[0]) ? 'Edge' : 'Chrome')
+const nombreEdge = () => nombreDe(navegadorDeGoogle() ?? (process.platform === 'win32' ? 'msedge' : undefined))
 /** Lo más que espera una petición a que acabe su voz: el MCP repite, y Codex corta una herramienta a los 60 s. */
 const ESPERA_MAXIMA = 50_000
 
@@ -118,11 +112,11 @@ export function voz(app: string) {
       // Para entrar hace falta la ventana: se cierra el de sin ventana (la sesión vive en el perfil).
       await cerrarEdge()
     }
-    const edge = EDGE.find((e) => existsSync(e))
-    if (!edge) throw new Error(process.platform === 'win32' ? 'No encontré Microsoft Edge, donde se entra con Google.' : 'No encontré Google Chrome ni Microsoft Edge: instala uno para entrar con Google.')
+    const edge = navegadorDeGoogle()
+    if (!edge) throw new Error(SIN_CHROMIUM)
     mkdirSync(perfil(), { recursive: true })
     const extra = ventana ? [url] : ['--headless=new', '--mute-audio', 'about:blank']
-    spawn(edge, [`--remote-debugging-port=${PUERTO}`, `--user-data-dir=${perfil()}`, '--no-first-run', '--no-default-browser-check', ...extra], { detached: true, stdio: 'ignore' }).unref()
+    lanzarChromium(edge, [`--remote-debugging-port=${PUERTO}`, `--user-data-dir=${perfil()}`, '--no-first-run', '--no-default-browser-check', ...extra], ventana)
     for (let i = 0; i < 40 && !(await responde()); i++) await espera(500)
   }
 

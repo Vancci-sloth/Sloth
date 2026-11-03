@@ -1,7 +1,7 @@
-import { spawn } from 'node:child_process'
-import { existsSync, mkdirSync } from 'node:fs'
+import { mkdirSync } from 'node:fs'
 import { join } from 'node:path'
 import type { Browser, BrowserContext, Page } from 'playwright-core'
+import { chromiumDelSistema, lanzarChromium, SIN_CHROMIUM } from '../chromium.ts'
 import { conectarCDP } from '../playwright.ts'
 import { NAVEGADOR_REDES } from '../../shared/types.ts'
 import { integrado } from '../navegador-agente.ts'
@@ -20,13 +20,6 @@ import { integrado } from '../navegador-agente.ts'
  */
 
 const PUERTO = 9334
-/** Edge donde lo instala cada sistema y, si no está (lo normal en Mac y Linux), Chrome: Google deja entrar en los dos. */
-const EDGE =
-  process.platform === 'win32'
-    ? ['C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe', 'C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe']
-    : process.platform === 'darwin'
-      ? ['/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge', '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome']
-      : ['/opt/microsoft/msedge/msedge', '/opt/google/chrome/chrome', '/usr/bin/google-chrome', '/usr/bin/chromium']
 
 /**
  * La red cerró la sesión. No es un fallo del video: lo que espera en la cola de esa red se queda ahí hasta que se vuelva a
@@ -66,11 +59,12 @@ export async function navegador(app: string, url = 'about:blank'): Promise<Brows
 /** Edge con el perfil de las redes, abriéndolo con `url` si no estaba. */
 async function abrirEdge(app: string, url: string): Promise<Browser> {
   if (!(await responde())) {
-    const edge = EDGE.find((e) => existsSync(e))
-    if (!edge) throw new Error(process.platform === 'win32' ? 'No encontré Microsoft Edge, que es el navegador con el que Sloth publica.' : 'No encontré Microsoft Edge ni Google Chrome: instala uno para entrar con Google.')
+    // Edge si está y, si no (lo normal en Mac y Linux), Chrome: Google deja entrar en los dos.
+    const edge = chromiumDelSistema(false)
+    if (!edge) throw new Error(process.platform === 'win32' ? 'No encontré Microsoft Edge, que es el navegador con el que Sloth publica.' : SIN_CHROMIUM)
     const perfil = join(app, 'data', 'redes', 'perfil')
     mkdirSync(perfil, { recursive: true })
-    spawn(edge, [`--remote-debugging-port=${PUERTO}`, `--user-data-dir=${perfil}`, '--no-first-run', '--no-default-browser-check', url], { detached: true, stdio: 'ignore' }).unref()
+    lanzarChromium(edge, [`--remote-debugging-port=${PUERTO}`, `--user-data-dir=${perfil}`, '--no-first-run', '--no-default-browser-check', url], true)
     for (let i = 0; i < 40 && !(await responde()); i++) await new Promise((r) => setTimeout(r, 500))
   }
   return conectarCDP(`http://127.0.0.1:${PUERTO}`)
