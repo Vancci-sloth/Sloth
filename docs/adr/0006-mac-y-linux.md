@@ -41,9 +41,10 @@ su `.zip`, con el que se actualiza) y un AppImage para Linux x64. El cobro los d
   (electron-updater solo pone versiones nuevas en una app firmada). Con los secretos de Apple en GitHub (`CSC_LINK`,
   `CSC_KEY_PASSWORD`, `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD`, `APPLE_TEAM_ID`), las dos salen firmadas y notarizadas
   y se actualizan solas, sin tocar nada más; el cobro lo sabe (`firmada`) y deja de explicar el paso de la primera vez.
-  macOS solo pone una versión nueva si la firma el mismo equipo de Apple que la instalada: la 0.3.43 de Apple Silicon
-  la firmó un colaborador (Developer ID `BV4282V244`), y a quien la tiene solo le llega lo que firme ese equipo.
-  Cambiar de certificado deja sin actualizar a quien ya tiene una firmada.
+  macOS solo pone una versión nueva si la firma el mismo equipo de Apple que la instalada: cambiar de certificado deja
+  sin actualizar a quien ya tiene una firmada, y una sin firma no se publica encima de una firmada (el cobro la
+  rechaza). La 0.3.43 de Apple Silicon, que se armó a mano, la firmó una sola vez un colaborador (Developer ID
+  `BV4282V244`) y no pasó por el cobro: quien la tenga baja a mano la siguiente.
 - **Linux sin aislamiento de Chromium** solo donde no hay otra: Ubuntu 24.04 no deja a un AppImage crear el suyo, y
   Sloth no abriría. Un guion junto al ejecutable lo mira antes de abrirla (`linuxSinAislamiento` en scripts/compilar.mjs).
 

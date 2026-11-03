@@ -30,8 +30,6 @@ const { instalador, otros, ultimo, so } = {
   // electron-builder llama x86_64 al AppImage de x64.
   linux: { instalador: `Sloth-${VERSION}-linux-${ARCH === 'x64' ? 'x86_64' : ARCH}.AppImage`, otros: [], ultimo: 'latest-linux.yml', so: '?so=linux' }
 }[process.platform]
-// La 0.3.43 de Apple Silicon ya salió firmada: macOS no pondría encima una sin firma.
-if (process.platform === 'darwin' && ARCH === 'arm64' && process.env.FIRMADA !== '1') throw new Error('La de Mac con Apple Silicon solo se publica firmada por Apple: faltan sus secretos (docs/adr/0006-mac-y-linux.md).')
 const LLAVE =(process.env.PUBLICAR || readFileSync(join(process.env.APPDATA ?? '', 'sloth', 'licencias', 'publicar.txt'), 'utf8')).trim()
 
 /** Una petición al cobro; si falla, se corta con su error. */

@@ -1,1 +1,1 @@
-Sloth para Mac con Apple Silicon, nativa y firmada por Apple, y entrar con Google para la voz ya no se queda a medias.
+Sloth para Mac con Apple Silicon, nativa y sin Rosetta, y entrar con Google para la voz ya no se queda a medias.

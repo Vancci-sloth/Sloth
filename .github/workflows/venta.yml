@@ -4,7 +4,7 @@
 # «Actualizar a Sloth X» y baja solo lo que cambió (electron/main.ts).
 # Para publicar lo de main: `git push origin main:venta`. La llave para publicar es el secreto PUBLICAR del repo. La firma
 # de Apple, si está, va en los secretos CSC_LINK, CSC_KEY_PASSWORD, APPLE_ID, APPLE_APP_SPECIFIC_PASSWORD y APPLE_TEAM_ID
-# (docs/adr/0006-mac-y-linux.md); sin ellos, la de Mac sale sin firma (y la de Apple Silicon no se publica). Siempre el
+# (docs/adr/0006-mac-y-linux.md); sin ellos, las de Mac salen sin firma. Siempre el
 # mismo certificado: macOS solo se actualiza a una versión firmada por el mismo equipo de Apple que la instalada. Quien
 # apoya recibe cada versión 7 días antes; un arreglo urgente sale para todos de inmediato con `[para todos]` en el mensaje del commit, o con esa opción a mano.
 name: Publicar Sloth
