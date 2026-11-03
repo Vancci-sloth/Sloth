@@ -613,7 +613,8 @@ type OtroAgente = (typeof OTROS_AGENTES)[number]
  * Cómo se conecta cada uno y qué hay que saber antes, a la vista. `ventana`: el agente abre su propia ventana para
  * iniciar sesión; `navegador`: da un enlace que se autoriza en el navegador; `llave`: se pega una llave de API.
  */
-const OTROS: Record<OtroAgente, { titulo: string; logo: string; como: 'ventana' | 'navegador' | 'llave'; texto: ReactNode; ayuda?: ReactNode; uso?: string; abreSolo?: string; beta?: boolean }> = {
+/** `salir`: el de ventana que sabe cerrar su sesión (los de navegador y llave siempre pueden). */
+const OTROS: Record<OtroAgente, { titulo: string; logo: string; como: 'ventana' | 'navegador' | 'llave'; texto: ReactNode; ayuda?: ReactNode; uso?: string; abreSolo?: string; beta?: boolean; salir?: true }> = {
   deepseek: {
     titulo: 'DeepSeek · con tu llave de API',
     logo: 'deepseek',
@@ -636,7 +637,8 @@ const OTROS: Record<OtroAgente, { titulo: string; logo: string; como: 'ventana' 
     como: 'ventana',
     beta: true,
     texto: 'Sloth trabaja con tu cuenta de Grok. Al conectar se abre una ventana de Grok que te lleva a autorizarla en el navegador.',
-    uso: 'https://grok.com'
+    uso: 'https://grok.com',
+    salir: true
   },
   antigravity: {
     titulo: 'Antigravity · Google',
@@ -747,7 +749,7 @@ export function CuentaAgente({ p, aviso = false, onFalta }: { p: OtroAgente; avi
                   options: [
                     ...(cuenta.uso || o.uso ? [{ value: 'uso', label: o.como === 'llave' ? 'Ver tu saldo ↗' : 'Ver tu uso ↗' }] : []),
                     { value: 'cambiar', label: o.como === 'llave' ? 'Cambiar de llave' : 'Cambiar de cuenta' },
-                    ...(o.como !== 'ventana' ? [{ value: 'quitar', label: o.como === 'llave' ? 'Quitar la llave' : 'Cerrar sesión' }] : []),
+                    ...(o.como !== 'ventana' || o.salir ? [{ value: 'quitar', label: o.como === 'llave' ? 'Quitar la llave' : 'Cerrar sesión' }] : []),
                   ],
                 },
               ]}

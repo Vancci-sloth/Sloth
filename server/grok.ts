@@ -40,6 +40,7 @@ function salidaModels(): Promise<string> {
 
 export const cuentaGrok = cuentaConVentana('grok', {
   comando: (exe) => ({ command: [exe, 'login'], env: { GROK_DISABLE_AUTOUPDATER: '1' } }),
+  salir: (exe) => ({ command: [exe, 'logout'], env: { GROK_DISABLE_AUTOUPDATER: '1' } }),
   async estado() {
     const s = await salidaModels()
     // Con la sesión vencida dice que no y la renueva en el mismo proceso: se pregunta otra vez (T3 Code).

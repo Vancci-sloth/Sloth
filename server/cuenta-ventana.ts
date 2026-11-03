@@ -1,6 +1,8 @@
 import type { Proveedor } from '../shared/providers.ts'
 import { NOMBRE_AGENTE } from '../shared/providers.ts'
 import type { CuentaClaude } from '../shared/types.ts'
+import { execFile } from 'node:child_process'
+import { entornoSinLlaves } from './acceso.ts'
 import { asegurarAgente, rutaAgente } from './agentes.ts'
 import { enVentana } from './cuenta.ts'
 
@@ -18,6 +20,8 @@ export function cuentaConVentana(
     comando(exe: string): { command: string[]; env?: Record<string, string> }
     /** Si hay sesión, sin abrir nada que se vea. */
     estado(): Promise<Estado>
+    /** Lo que cierra la sesión, sin ventana (`grok logout`), si el agente lo tiene. */
+    salir?(exe: string): { command: string[]; env?: Record<string, string> }
   }
 ) {
   let login = false
@@ -55,9 +59,21 @@ export function cuentaConVentana(
     return cuenta()
   }
 
+  /** Cierra la sesión con el comando del agente, que borra sus credenciales, y mira cómo quedó. */
+  const salir = o.salir && (async () => {
+    const exe = rutaAgente(p)
+    if (exe) {
+      const [command, ...args] = o.salir!(exe).command
+      await new Promise<void>((ok) => execFile(command, args, { timeout: 30_000, windowsHide: true, env: { ...entornoSinLlaves(), ...o.salir!(exe).env } }, () => ok()))
+    }
+    conocida = null
+    return cuenta(true)
+  })
+
   return {
     cuenta,
     conectar,
+    ...(salir ? { salir } : {}),
     conectando: () => (login ? `Se está conectando la cuenta de ${NOMBRE_AGENTE[p]}. Termina de autorizarla primero.` : null)
   }
 }
