@@ -38,6 +38,12 @@ import { integrado } from '../navegador-agente.ts'
  */
 
 const URL_VOZ = 'https://aistudio.google.com/generate-speech'
+/**
+ * La bienvenida de AI Studio («Welcome to AI Studio»): la primera vez que una cuenta entra, la página la manda ahí a
+ * aceptar sus términos, y hasta entonces no deja generar. Solo se aceptan a mano, en la ventana donde se entra.
+ */
+const BIENVENIDA = /^https:\/\/aistudio\.google\.com\/(onboarding|welcome)\b/
+const SIN_BIENVENIDA = 'AI Studio te pide aceptar sus términos la primera vez. Pulsa «Conectar con Google» (Opciones → Voz) y acéptalos en la ventana que se abre: se cierra sola al terminar.'
 const ENTRAR = `https://accounts.google.com/ServiceLogin?continue=${encodeURIComponent(URL_VOZ)}`
 /** El del script con que El Diff generaba antes la voz: si dejó abierto su Edge, con el mismo perfil, se usa ese. */
 const PUERTO = 9336
@@ -96,11 +102,14 @@ export function voz(app: string) {
     fetch(`http://127.0.0.1:${PUERTO}/json/list`)
       .then((r) => r.json() as Promise<{ type: string }[]>)
       .then((l) => l.some((t) => t.type === 'page'), () => false)
-  /** ¿Ya volvió a AI Studio? Google pone la sesión antes de llegar ahí, y lo que falta lo pone al llegar. */
+  /**
+   * ¿Ya volvió a AI Studio, y no a su bienvenida? Google pone la sesión antes de llegar ahí, y lo que falta lo pone al
+   * llegar.
+   */
   const enAIStudio = () =>
     fetch(`http://127.0.0.1:${PUERTO}/json/list`)
       .then((r) => r.json() as Promise<{ type: string; url: string }[]>)
-      .then((l) => l.some((t) => t.type === 'page' && t.url.startsWith('https://aistudio.google.com/')), () => false)
+      .then((l) => l.some((t) => t.type === 'page' && t.url.startsWith('https://aistudio.google.com/') && !BIENVENIDA.test(t.url)), () => false)
 
   /**
    * Abre Edge con el perfil, si no lo estaba. `ventana`, con `url`, para entrar: ahí no se engancha Playwright (que toca
@@ -250,6 +259,12 @@ export function voz(app: string) {
     for (let intento = 0; ; intento++) {
       await page.goto(URL_VOZ, { waitUntil: 'domcontentloaded', timeout: 60_000 })
       await page.waitForLoadState('networkidle', { timeout: 20_000 }).catch(() => {})
+      // Con la sesión, pero sin aceptar la bienvenida: pasarla otra vez no sirve.
+      if (BIENVENIDA.test(page.url())) {
+        cuenta = null
+        guardarCuenta()
+        throw new Error(SIN_BIENVENIDA)
+      }
       const correo = page.url().startsWith('https://accounts.google.com/') ? null : await correoDe(page)
       if (correo) {
         if (correo !== cuenta) (cuenta = correo), guardarCuenta()
@@ -325,14 +340,16 @@ export function voz(app: string) {
       const lista = (await enTurno(copiarSesion)) && (await enTurno(leerVoces).then(() => !!cuenta, () => false))
       if (!lista) {
         await lanzarEdge(true)
+        // Se cierra cuando lleva unos 4 s en AI Studio con la sesión: a una cuenta nueva, AI Studio la abre y un momento
+        // después la manda a su bienvenida, que hay que aceptar antes (cerrarla ahí la dejaba sin conectar). En esos
+        // segundos Google pone lo que falta después de entrar.
         let sesion = false
-        for (let i = 0; i < 400 && !sesion; i++) {
+        for (let i = 0, seguidas = 0; i < 400 && !sesion; i++) {
           await espera(1500)
           if (!(await conVentana())) break
-          sesion = (await enAIStudio()) && (await cookiesDeEdge().then((c) => c.sesion, () => false))
+          seguidas = (await enAIStudio()) && (await cookiesDeEdge().then((c) => c.sesion, () => false)) ? seguidas + 1 : 0
+          sesion = seguidas >= 3
         }
-        // Lo que Google pone justo después de entrar.
-        if (sesion) await espera(3000)
         await cerrarEdge()
         if (!sesion) throw new Error(`No entraste con Google en ${nombreEdge()}. Vuelve a intentarlo.`)
         if (!(await enTurno(copiarSesion))) throw new Error(`${nombreEdge()} no guardó la sesión de Google. Vuelve a intentarlo.`)

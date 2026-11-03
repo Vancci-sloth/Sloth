@@ -151,7 +151,7 @@ export function VozOpciones() {
           )
         )}
       </div>
-      {e?.conectando && <p className="muted small fila-extra">Google no deja entrar desde una app. Al entrar en {e.navegador}, la ventana se cierra y la sesión pasa sola a Sloth.</p>}
+      {e?.conectando && <p className="muted small fila-extra">Google no deja entrar desde una app. Al entrar en {e.navegador} (la primera vez, AI Studio te pide aceptar sus términos), la ventana se cierra y la sesión pasa sola a Sloth.</p>}
       {voz.error && !e?.conectando && <p className="bad small fila-extra">{voz.error}</p>}
     </div>
   )
