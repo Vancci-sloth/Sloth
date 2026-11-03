@@ -1315,10 +1315,10 @@ function avisoMac(intel: Ultima | undefined, arm: Ultima | undefined): Response 
 <li>Ábrela. Las versiones nuevas se ponen solas: Sloth te avisa y basta con «Actualizar».</li></ol>`
   return pagina(
     'Sloth para Mac',
-    `${elegir ? '<p>Elige la de tu Mac: en el menú de Apple → <b>Acerca de esta Mac</b>, si dice <b>Chip Apple M1</b> o más nuevo, es Apple Silicon; si dice <b>Procesador Intel</b>, es Intel.</p>' : ''}
+    `${elegir ? '<p>Elige la de tu Mac: en el menú de Apple → <b>Acerca de esta Mac</b>, si dice <b>Chip Apple M1</b> o más nuevo, es Apple Silicon; si dice <b>Procesador Intel</b>, es Intel. Las dos piden macOS 13 o más nuevo.</p>' : '<p>Pide macOS 13 o más nuevo.</p>'}
 ${sinFirma ? `<p>${elegir && intel?.firmada ? 'La de Apple Silicon' : elegir && arm?.firmada ? 'La de Intel' : 'Sloth para Mac'} todavía no lleva la firma de Apple: macOS pide un paso más la primera vez.</p>` : ''}
-${arm ? boton(arm, 'mac-arm64', elegir ? 'Mac con Apple Silicon' : 'Mac', true) : ''}
-${intel ? boton(intel, 'mac', elegir ? 'Mac con Intel' : 'Mac', !arm) : ''}
+${arm ? boton(arm, 'mac-arm64', elegir ? 'Mac con Apple Silicon (M1 o más nuevo)' : 'Mac', true) : ''}
+${intel ? boton(intel, 'mac', elegir ? 'Mac con Intel (i5, i7 o i9)' : 'Mac', !arm) : ''}
 ${pasos}
 ${!elegir && intel ? '<p class="otros">Para Mac con Intel. En un Mac con M1 o más nuevo también abre: la primera vez, macOS pide instalar Rosetta.</p>' : ''}`
   )
