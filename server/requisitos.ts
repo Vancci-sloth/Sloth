@@ -15,8 +15,8 @@ import { correr } from './version.ts'
  * solo los que importa su skill), y «Descargar todo» lo instala uno tras otro, sin permisos de administrador (todo va a
  * su usuario). ChatGPT no se instala: se conecta en Opciones.
  *
- * FFmpeg se baja con winget en Windows y, en Mac y Linux, ya armado a `BAJADAS`. El Python de las skills se baja también
- * ya armado a `BAJADAS` (que scripts/start.mjs pone primero en el PATH). En Mac y Linux es siempre ese: el del sistema
+ * FFmpeg y el Python de las skills se bajan ya armados a `BAJADAS` (que scripts/start.mjs pone primero en el PATH). El
+ * Python, en Mac y Linux, es siempre ese: el del sistema
  * falta (Mac) o no deja instalar paquetes con pip (Ubuntu). En Windows sirve el que ya tengas mientras haya paquetes
  * compilados para él; si no, `paquetes` pasa al de Sloth.
  */
@@ -38,8 +38,6 @@ const PAQUETES: Record<string, { pip: string; nombre: string; uso: string; skill
   // El OCR de `ubicar.py` en Mac y Linux (en Windows usa el del sistema). Corre con el onnxruntime que trae rembg[cpu].
   rapidocr: { pip: 'rapidocr', nombre: 'RapidOCR', uso: 'leer texto en imágenes', skills: ['video-el-diff'], fueraDeWindows: true }
 }
-
-const WINGET = '--exact --silent --accept-package-agreements --accept-source-agreements --disable-interactivity'
 
 interface Pieza {
   id: string
@@ -76,7 +74,7 @@ const EXE_PY = WINDOWS ? 'python.exe' : join('bin', 'python3')
 /** Los modelos de la transcripción y de los vectores, en una carpeta por modelo (`modelos_transcripcion.py`). */
 export const MODELOS = join(process.env.APPDATA ?? '', 'youtube', 'modelos')
 export const BANDERAS = ['-E', '-s', '-B', '-X', 'utf8']
-/** Fuera de Windows: lo que Sloth baja para las skills (Python, FFmpeg). `bin` va primero en el PATH (scripts/start.mjs). */
+/** Lo que Sloth baja para las skills (FFmpeg; fuera de Windows, también Python). `bin` va primero en el PATH (scripts/start.mjs). */
 const BAJADAS = join(process.env.APPDATA ?? '', 'sloth', 'piezas')
 const BAJADAS_BIN = join(BAJADAS, 'bin')
 /** El Python propio con que corren las skills: en Windows, su carpeta va en el PATH (scripts/start.mjs). */
@@ -316,15 +314,23 @@ async function instalarPython(app: string) {
 }
 
 /**
- * Fuera de Windows, FFmpeg y FFprobe ya compilados, en `BAJADAS_BIN`: en Mac, los de Martin Riedl (para Apple Silicon o
- * Intel); en Linux, los de BtbN, estáticos. Los dos de la 9.0, como el de Windows (Gyan).
+ * FFmpeg y FFprobe ya compilados, de la 9.0, en `BAJADAS_BIN`: en Mac, los de Martin Riedl (para Apple Silicon o Intel);
+ * en Windows y Linux, los de BtbN, estáticos. En Windows antes iban con winget, pero el que trae un Windows sin
+ * actualizar (la 1.3) no conoce sus opciones y solo enseñaba su ayuda, y hay Windows sin winget.
  */
 async function instalarFfmpeg(app: string) {
   const aparte = join(tmpdir(), `sloth-ffmpeg-${Date.now()}`)
   mkdirSync(aparte, { recursive: true })
   mkdirSync(BAJADAS_BIN, { recursive: true })
+  const exe = WINDOWS ? '.exe' : ''
   try {
-    if (process.platform === 'darwin') {
+    if (WINDOWS) {
+      const zip = join(aparte, 'ffmpeg.zip')
+      await bajar(`https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-n9.0-latest-win${ARQUITECTURA === 'arm64' ? 'arm64' : '64'}-gpl-9.0.zip`, zip)
+      // El `tar` de Windows abre zips; el de Git, si va antes en el PATH, no.
+      const tar = join(process.env.SystemRoot ?? 'C:\\Windows', 'System32', 'tar.exe')
+      await ejecutar(tar, ['-xf', zip, '-C', aparte, '--strip-components=2', '*/bin/ffmpeg.exe', '*/bin/ffprobe.exe'], app)
+    } else if (process.platform === 'darwin') {
       for (const f of ['ffmpeg', 'ffprobe']) {
         const zip = join(aparte, `${f}.zip`)
         await bajar(`https://ffmpeg.martin-riedl.de/redirect/latest/macos/${ARQUITECTURA === 'arm64' ? 'arm64' : 'amd64'}/release/${f}.zip`, zip)
@@ -336,11 +342,11 @@ async function instalarFfmpeg(app: string) {
       await ejecutar('tar', ['-xJf', tar, '-C', aparte, '--strip-components=2', '--wildcards', '*/bin/ffmpeg', '*/bin/ffprobe'], app)
     }
     for (const f of ['ffmpeg', 'ffprobe']) {
-      await copyFile(join(aparte, f), join(BAJADAS_BIN, f))
-      chmodSync(join(BAJADAS_BIN, f), 0o755)
+      await copyFile(join(aparte, f + exe), join(BAJADAS_BIN, f + exe))
+      if (!WINDOWS) chmodSync(join(BAJADAS_BIN, f), 0o755)
     }
   } finally {
-    rmSync(aparte, { recursive: true, force: true })
+    rmSync(aparte, { recursive: true, force: true, ...REINTENTOS })
   }
   return 'listo'
 }
@@ -402,7 +408,7 @@ const PIEZAS: Pieza[] = [
     nombre: 'FFmpeg',
     para: 'Arma, mide y comprime los videos. Lo usan todos los estilos.',
     mirar: version('ffmpeg -version', /ffmpeg version n?(\d+(?:\.\d+)+)/),
-    instalar: (app) => (WINDOWS ? correr(`winget install --id Gyan.FFmpeg ${WINGET}`, app) : instalarFfmpeg(app))
+    instalar: instalarFfmpeg
   },
   {
     id: 'python',
@@ -492,7 +498,7 @@ function piezas(app: string, skill?: string): Pieza[] {
 /** La que se está instalando y las que esperan su turno. */
 let instalando: Pieza | null = null
 let cola: Pieza[] = []
-/** Si se está instalando algo: reiniciar el servidor mataría a winget o pip a la mitad. */
+/** Si se está instalando algo: reiniciar el servidor cortaría una descarga o pip a la mitad. */
 export const instalandoAlgo = () => (instalando ? `Se está instalando ${instalando.nombre}. Espera a que termine.` : ytDlp ? 'Se está poniendo al día yt-dlp. Espera a que termine.' : null)
 const fallos: Record<string, string> = {}
 /**
@@ -584,7 +590,7 @@ async function siguiente(app: string) {
   }
   paso = undefined
   refrescarPath()
-  // winget sale con error si ya estaba (fuera del PATH de este proceso): lo que cuenta es si ahora se encuentra.
+  // Lo que cuenta es si ahora se encuentra: un instalador puede salir con error si ya estaba (fuera del PATH de este proceso).
   if ((await pieza.mirar(app)) !== null) delete fallos[pieza.id]
   else fallos[pieza.id] ??= 'Se instaló, pero no aparece. Cierra Sloth y vuelve a abrirlo.'
   await siguiente(app)
@@ -595,7 +601,7 @@ async function siguiente(app: string) {
  * para encontrarlo sin reiniciar Sloth, y así lo heredan también los agentes que se lancen desde ahora.
  */
 function refrescarPath() {
-  // Fuera de Windows, lo que se instala va a `BAJADAS_BIN`, que ya estaba en el PATH.
+  // Fuera de Windows, todo va a `BAJADAS_BIN`, que ya estaba en el PATH.
   if (!WINDOWS) return
   const leer = (de: string) =>
     execFileSync('powershell.exe', ['-NoProfile', '-Command', `[Environment]::GetEnvironmentVariable('Path', '${de}')`], { encoding: 'utf8' }).trim()

@@ -32,8 +32,12 @@ if (process.platform !== 'win32') {
     // Aún no se guardó ninguna.
   }
 }
-// En Windows solo existe si tu Python no servía (server/requisitos.ts): entonces va delante del que haya en el sistema.
-else camino.push(join(process.env.APPDATA ?? '', 'sloth', 'piezas', 'python', 'python'), join(process.env.APPDATA ?? '', 'sloth', 'piezas', 'python', 'python', 'Scripts'))
+// En Windows, el Python solo existe si el tuyo no servía (server/requisitos.ts): entonces va delante del que haya en el
+// sistema. En `bin`, el FFmpeg que baja Sloth.
+else {
+  const piezas = join(process.env.APPDATA ?? '', 'sloth', 'piezas')
+  camino.push(join(piezas, 'python', 'python'), join(piezas, 'python', 'python', 'Scripts'), join(piezas, 'bin'))
+}
 process.env.PATH = [...camino, process.env.PATH].join(delimiter)
 
 /**
