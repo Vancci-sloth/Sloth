@@ -768,6 +768,9 @@ async function suscribir(env: Env, c: Record<string, unknown>, desde: string): P
   } catch (error) {
     await env.DB.prepare('DELETE FROM licencias WHERE id = ?').bind(fila.id).run()
     const quien = { mercadopago: 'Mercado Pago', paypal: 'PayPal', cripto: 'NOWPayments' }[pasa]
+    // La suscripción de Mercado Pago rechaza (400) un correo que no es de una cuenta suya, o con «+»: se dice cuál poner.
+    if (error instanceof Rechazo && pasa === 'mercadopago' && plan === 'mensual' && error.status === 400)
+      throw new Rechazo(400, 'Mercado Pago no aceptó ese correo. Escribe el de tu cuenta de Mercado Pago (sin «+»), o paga una sola vez, que acepta cualquiera.')
     throw error instanceof Rechazo ? new Rechazo(502, `${quien} no pudo abrir el pago. Revisa tu correo e intenta otra vez.`) : error
   }
   await env.DB.prepare(`UPDATE licencias SET ${abierto.columna} = ?, enlace = ?, revisada = ? WHERE id = ?`)
