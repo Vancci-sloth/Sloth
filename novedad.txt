@@ -1,1 +1,1 @@
-Si pides otro video en el mismo hilo, el agente te avisa que lo hagas en un hilo nuevo.
+Programar en TikTok ya funciona con ChatGPT y cualquier agente, sin trabarse con los #hashtags; y si pides otro video en el mismo hilo, el agente te avisa que uses uno nuevo.

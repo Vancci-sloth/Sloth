@@ -780,9 +780,9 @@ function Tags({ tags, onCambio, placeholder }: { tags: string[]; onCambio(t: str
 type Fila = { video: VideoHecho; incluir: boolean; borrador?: Borrador; error?: string }
 
 /**
- * Los que faltan, con el texto que propone Claude para cada uno (o el que ya lleva en otra red): se eligen los que van
+ * Los que faltan, con el texto que propone tu agente para cada uno (o el que ya lleva en otra red): se eligen los que van
  * ahora (los demás siguen faltando, para otra vez), se cambia el texto, se quitan o añaden hashtags, y se programa en
- * cada red conectada donde aún no está. Pueden ser de varios estilos («Mis videos»). Claude solo escribe los marcados.
+ * cada red conectada donde aún no está. Pueden ser de varios estilos («Mis videos»). El agente solo escribe los marcados.
  */
 function Programar({ videos, redes, fijos = [], onClose, onHecho }: { videos: VideoHecho[]; redes: RedId[]; fijos?: string[]; onClose(): void; onHecho(): void }) {
   const [filas, setFilas] = useState<Fila[]>(videos.map((video) => ({ video, incluir: true })))
@@ -794,7 +794,7 @@ function Programar({ videos, redes, fijos = [], onClose, onHecho }: { videos: Vi
   const elegidos = marcados.filter((f) => f.borrador?.texto.trim())
   const todos = marcados.length === filas.filter((f) => !f.error).length
 
-  // Claude escribe de tres en tres, del mismo estilo, solo los marcados; cada texto aparece en cuanto llega.
+  // El agente escribe de tres en tres, del mismo estilo, solo los marcados; cada texto aparece en cuanto llega.
   const vivo = useRef(true)
   useEffect(() => () => void (vivo.current = false), [])
   useEffect(() => {
@@ -838,7 +838,7 @@ function Programar({ videos, redes, fijos = [], onClose, onHecho }: { videos: Vi
       <div className="modal programar" onClick={(e) => e.stopPropagation()}>
         <h2>Programar en {nombres(redes)}</h2>
         <p className="modal-body">
-          {listos < marcados.length ? `Claude está escribiendo los textos… ${listos} de ${marcados.length}. ` : 'Cambia lo que quieras. '}
+          {listos < marcados.length ? `Tu agente está escribiendo los textos… ${listos} de ${marcados.length}. ` : 'Cambia lo que quieras. '}
           Marca solo los que quieras subir ahora: los demás siguen esperando. Cada uno va en el siguiente hueco libre del calendario de cada red (el ritmo se cambia en
           «Mis videos» → Ritmo de publicación). Si un video ya va a otra red, lleva su mismo texto.
           {fijos.length > 0 && ` Los hashtags fijos del estilo ya van puestos.`}
@@ -862,7 +862,7 @@ function Programar({ videos, redes, fijos = [], onClose, onHecho }: { videos: Vi
                 {f.error ? (
                   <p className="bad small">{f.error}</p>
                 ) : !f.borrador ? (
-                  <p className="muted small">{f.incluir ? 'Escribiendo…' : 'Márcalo y Claude escribe su texto.'}</p>
+                  <p className="muted small">{f.incluir ? 'Escribiendo…' : 'Márcalo y tu agente escribe su texto.'}</p>
                 ) : (
                   <>
                     {f.borrador.aviso && <p className="muted small">No se pudo escribir solo ({f.borrador.aviso}). Escríbelo tú:</p>}

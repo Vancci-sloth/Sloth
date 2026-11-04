@@ -98,8 +98,10 @@ async function subir(page: Page, ruta: string) {
  */
 async function escribir(page: Page, texto: string, tags: string[]) {
   const esperado = [texto, ...tags.map((t) => '#' + t)].join(' ').replace(/\s+/g, ' ').trim().toLowerCase()
-  for (let intento = 0; intento < 3; intento++) if ((await escribirUnaVez(page, texto, tags)) === esperado) return
-  throw new Error('El texto no quedó como debía en TikTok.')
+  let quedo = ''
+  for (let intento = 0; intento < 3; intento++) if ((quedo = await escribirUnaVez(page, texto, tags)) === esperado) return
+  // Lo que quedó, para ver en el error qué se comió TikTok.
+  throw new Error(`El texto no quedó como debía en TikTok: «${quedo.slice(-120)}».`)
 }
 
 async function escribirUnaVez(page: Page, texto: string, tags: string[]) {

@@ -19,7 +19,9 @@ están en la cabecera de `scripts/redes.ts`: `nube` (lo que espera en el Worker 
 
 - Mover una ya programada es `quitar` y volver a programarla: la API no cambia la hora de una publicación.
 - Programar es `POST /api/redes/borradores` (los textos que escribe Claude) y después `POST /api/redes/programar`, con la
-  `cardId` y las rutas. Cada una cae en el siguiente hueco libre del ritmo (`ritmo` en `data/redes/redes.json`).
+  `cardId` y las rutas. Cada una cae en el siguiente hueco libre del ritmo (`ritmo` en `data/redes/redes.json`). El
+  texto lo escribe el agente del hilo que hizo el video, el que sea (`server/redactar.ts`), y los `#hashtags` que trae
+  el texto pasan a `tags` (`sinTagsEnTexto`): escritos de corrido, TikTok se come letras y el texto no queda.
 - El ritmo lo elige el usuario en «Mis videos» → Ritmo de publicación (`/api/redes/ritmo`; el de YouTube,
   `/api/youtube/ritmo`). Cambiarlo no mueve lo ya programado: eso es `POST /api/redes/reacomodar`, que solo se hace si
   el usuario lo pide. Mueve lo de la cola y lo de Instagram (otra vez a la nube con su `ref`, sin subir el video); lo
