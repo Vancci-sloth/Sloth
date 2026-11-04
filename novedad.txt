@@ -1,1 +1,1 @@
-Entrar con Google en el navegador de los hilos ya funciona (se hace en Edge o Chrome), y Antigravity espera más en compus lentas.
+Instalar el Python de Sloth con una NVIDIA ya no se cae cuando una descarga llega dañada: se vuelve a bajar sola.
