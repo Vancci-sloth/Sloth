@@ -434,7 +434,14 @@ export function PanelNavegador({ hilo, trabajando }: { hilo: string; trabajando:
             {arrastre.ancho} × {arrastre.alto}
           </span>
         )}
-        {e?.error ? (
+        {e?.google ? (
+          <div className="navegador-vacio">
+            <strong>Entra con Google en {e.google}</strong>
+            <span className="muted small">
+              Google no deja iniciar sesión dentro de una app. Se abrió una ventana de {e.google}: entra ahí con tu cuenta y esta página sigue sola, ya con la sesión.
+            </span>
+          </div>
+        ) : e?.error ? (
           <div className="navegador-vacio">
             <strong>No se pudo abrir la página</strong>
             <span className="muted small">{e.error}</span>

@@ -18,7 +18,11 @@ import { guardar } from './disco.ts'
  * Todo lo suyo va en `data/antigravity` (`GEMINI_HOME`), no en el Gemini o el Antigravity que tenga el usuario: su sesión
  * de Google (`acp_token.json`), sus conversaciones y la lista de modelos que vio la última vez. Cada vez que arranca
  * desempaca cientos de MB en su carpeta temporal (va en una propia y se borra al cerrar) y tarda unos 40 s: por eso un
- * solo proceso sirve a todos sus hilos (`compartido`), y no uno por hilo como en T3 Code.
+ * solo proceso sirve a todos sus hilos (`compartido`), y no uno por hilo como en T3 Code. En una computadora lenta, o
+ * con el antivirus revisando cada archivo, pasa de los 3 min: se le esperan 10 (`DESEMPACAR`).
+ *
+ * No se puede desempacar una sola vez y reusarlo: es un PyInstaller de un solo archivo, y la copia de sí mismo que lanza
+ * solo acepta la carpeta si el proceso que la desempacó (su PID va en el nombre, `_MEI…`) sigue vivo.
  */
 
 const APP = resolve(dirname(fileURLToPath(import.meta.url)), '..')
@@ -27,6 +31,13 @@ const AJUSTES = join(DATOS, 'antigravity-acp', 'settings.json')
 const TOKEN = join(DATOS, 'antigravity-acp', 'acp_token.json')
 const MODELOS = join(DATOS, 'modelos.json')
 const ARRANQUE = join(DATOS, 'arranque.json')
+/** Lo que se espera a `initialize`, casi todo desempacando. */
+const DESEMPACAR = 10 * 60_000
+/** Su primera línea, ya desempacado. */
+const ARRANCO = /Starting AGY ACP Server/
+/** Si el último que se lanzó ya terminó de desempacar. */
+let arranco = false
+
 /** Lo que escribió Antigravity en el último inicio de sesión que falló: dice por qué. */
 const REGISTRO = join(DATOS, 'inicio-de-sesion.log')
 /** Con la cuenta personal de Google. */
@@ -65,6 +76,7 @@ function lanzar(exe: string) {
     mkdirSync(dirname(AJUSTES), { recursive: true })
     guardar(AJUSTES, JSON.stringify({ auth: { type: METODO } }, null, 2))
   }
+  arranco = false
   const temporal = join(tmpdir(), `sloth-agy-${randomBytes(3).toString('hex')}`)
   mkdirSync(temporal, { recursive: true })
   temporales.add(temporal)
@@ -142,12 +154,14 @@ const SABOR: SaborAcp = {
   },
   alTexto(linea) {
     if (login && login.lineas.length < 400) login.lineas.push(linea)
+    if (ARRANCO.test(linea)) arranco = true
     const m = ENLACE.exec(linea)
     if (!m || !login) return
     login.url = m[1]
     if (login.c) medido('login', Date.now() - login.c.desde)
   },
   arranque: { dura: () => dura('hilo'), medido: (ms) => medido('hilo', ms) },
+  esperaInicio: () => DESEMPACAR,
   // Solo ofrece los modelos que no son de Gemini a clientes que conoce, como Zed (T3 Code).
   clientInfo: { name: 'zed', version: '0.0.0' },
   leeArchivos: true,
@@ -214,7 +228,11 @@ export async function conectarAntigravity(): Promise<CuentaClaude> {
       // terminó» a secas no decía nada de lo que pasa en las computadoras donde no entra.
       if (login !== este) return
       const porque = e instanceof Error ? e.message : String(e)
-      fallo = este.c?.rpc.terminado && !existsSync(TOKEN) ? `No se terminó de iniciar sesión (${porque}). Vuelve a intentarlo.` : porque
+      fallo = !arranco && porque.includes('(initialize)')
+        ? 'Antigravity no terminó de arrancar en 10 minutos. Cada vez que se abre desempaca 335 MB en la carpeta temporal, y en esta computadora no le alcanzó el tiempo: suele ser el antivirus revisando cada archivo, o el disco casi lleno. Vuelve a intentarlo con menos programas abiertos.'
+        : este.c?.rpc.terminado && !existsSync(TOKEN)
+          ? `No se terminó de iniciar sesión (${porque}). Vuelve a intentarlo.`
+          : porque
       try {
         mkdirSync(DATOS, { recursive: true })
         guardar(REGISTRO, [new Date().toISOString(), porque, '', ...este.lineas].join('\n'))

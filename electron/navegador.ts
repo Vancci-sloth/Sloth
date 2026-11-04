@@ -26,11 +26,12 @@ import { mkdirSync, readFileSync } from 'node:fs'
 import { createServer } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { join } from 'node:path'
-import { app, ipcMain, Menu, session, shell, WebContentsView, type BrowserWindow, type Session } from 'electron'
+import { app, ipcMain, Menu, session, shell, WebContentsView, type BrowserWindow, type Session, type WebContents } from 'electron'
 import { WebSocketServer, type WebSocket } from 'ws'
 import { guardar } from '../server/disco.ts'
 import { crearRelevo, type Relevo } from './relevo.ts'
 import { actividadNavegador } from './actividad-navegador.ts'
+import { type EnGoogle, vigilarGoogle } from './google.ts'
 import { type AccionNavegador, type EstadoNavegador, NAVEGADOR_REDES, NAVEGADOR_VOZ, type PantallaNavegador } from '../shared/types.ts'
 
 const PARTICION = 'persist:navegador'
@@ -57,6 +58,8 @@ interface Hoja {
   actividad: ReturnType<typeof actividadNavegador>
   /** La última vez que se vio o se usó. */
   usada: number
+  /** El navegador donde estás entrando con Google (`google.ts`), mientras tanto. */
+  google?: string
   /** Por qué no abrió la última dirección, y cuál fue. */
   error?: string
   fallida?: string
@@ -90,9 +93,42 @@ let vista: { hilo: string; caja: Caja; pantalla: PantallaNavegador | null } | nu
  * el agente no podría pulsar nada en ella.
  */
 let medida = { width: 1280, height: 800 }
+/** Donde va lo de Sloth (`data/`). */
+let carpeta = ''
+/** Las ventanas que abrió una página (las de OAuth), por su contenido. */
+const ventanasDeGoogle = new WeakMap<WebContents, BrowserWindow>()
+
+/**
+ * Mientras entras con Google en Edge, la página del hilo se esconde y la interfaz lo explica; la ventana de un «Entrar
+ * con Google» (OAuth), también. Al entrar, vuelven a la dirección de Google que pedían.
+ */
+const enGoogle: EnGoogle = {
+  esperar(wc, navegador) {
+    const h = [...hojas.values()].find((x) => x.vista.webContents === wc)
+    if (!h) return ventanasDeGoogle.get(wc)?.hide()
+    h.google = navegador
+    avisar(h)
+  },
+  listo(wc, url, error) {
+    const h = [...hojas.values()].find((x) => x.vista.webContents === wc)
+    if (!h) {
+      if (error) return wc.close()
+      ventanasDeGoogle.get(wc)?.show()
+      return void wc.loadURL(url).catch(() => {})
+    }
+    h.google = undefined
+    if (error) {
+      h.error = `${error} · ${url}`
+      h.fallida = url
+      return avisar(h)
+    }
+    llevar(h, url)
+  }
+}
 
 /** Pone el navegador: lo que pide la interfaz, el perfil de las páginas y el relevo para el agente. */
 export function iniciarNavegador(appDir: string) {
+  carpeta = appDir
   for (const p of [PARTICION, PARTICION_REDES, PARTICION_VOZ]) prepararPerfil(session.fromPartition(p))
 
   ipcMain.on('navegador:ver', (_e, hilo: string | null, caja?: Caja, pantalla?: PantallaNavegador | null) => ver(hilo, caja, pantalla))
@@ -166,6 +202,14 @@ function abrir(hilo: string): Hoja {
   })
   // La de las redes publica escondida: el video que sube no suena. La de la voz tampoco suena al generar.
   if (PERFILES[hilo]) wc.setAudioMuted(true)
+  // Google no deja entrar dentro de la app: se entra en Edge (`google.ts`). Las redes y la voz lo hacen a su manera.
+  if (!PERFILES[hilo]) {
+    vigilarGoogle(wc.session, carpeta, wc, enGoogle)
+    wc.on('did-create-window', (w) => {
+      ventanasDeGoogle.set(w.webContents, w)
+      vigilarGoogle(wc.session, carpeta, w.webContents, enGoogle)
+    })
+  }
   // Lista en cuanto navega por primera vez (ya tiene proceso), aunque lo que carga tarde.
   const lista = new Promise<void>((r) => {
     wc.once('did-navigate', () => r())
@@ -291,6 +335,7 @@ function estado(h: Hoja): EstadoNavegador {
     agente: h.conexiones.size > 0,
     zoom: h.zoom,
     ...(h.icono ? { icono: h.icono } : {}),
+    ...(h.google ? { google: h.google } : {}),
     ...(h.error ? { error: h.error } : {})
   }
 }
@@ -334,7 +379,7 @@ function reabrir(hilo: string): Hoja {
 function colocar(h: Hoja) {
   const v = h.vista
   const e = estado(h)
-  const visible = !!ventana && vista?.hilo === h.hilo && !!e.url && !e.error
+  const visible = !!ventana && vista?.hilo === h.hilo && !!e.url && !e.error && !e.google
   // Con Sloth minimizada o escondida tampoco la ve nadie: la vista sigue puesta, pero la página puede descansar.
   h.actividad.ver(visible && ventana!.isVisible() && !ventana!.isMinimized())
   if (!visible || !ventana || !vista) return v.setVisible(false)

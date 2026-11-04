@@ -51,6 +51,8 @@ export interface SaborAcp {
   silencio?: number
   /** Si tarda en arrancar: lo que se espera que tarde, en ms, para la barra del hilo, y lo que tardó. */
   arranque?: { dura(): number; medido(ms: number): void }
+  /** Lo que se espera a que conteste `initialize`, en ms (3 min si no se dice). */
+  esperaInicio?(): number
   /** Una línea que no es del protocolo. */
   alTexto?(linea: string): void
   /** Un error que llega como si fuera su respuesta (Antigravity: un texto y `end_turn`). `relevo`: esa sesión ya no sirve. */
@@ -121,7 +123,7 @@ export function conectar(sabor: SaborAcp, opts: AgentOptions): Conexion {
       protocolVersion: 1,
       clientCapabilities: { fs: { readTextFile: !!sabor.leeArchivos, writeTextFile: false }, terminal: false },
       clientInfo: sabor.clientInfo ?? { name: 'sloth', version: '1' }
-    }, 180_000)
+    }, sabor.esperaInicio?.() ?? 180_000)
     if (sabor.autenticar) await c.rpc.request('authenticate', { methodId: sabor.autenticar }, 300_000)
     c.lista = true
     return ini
