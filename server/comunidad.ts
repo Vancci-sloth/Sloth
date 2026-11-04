@@ -12,7 +12,7 @@ import { bytes, cuerpo, json as enviar } from './http.ts'
 import { COBRO } from './licencia.ts'
 import type { Sessions } from './sessions.ts'
 import { redactarCodexYoutube } from './youtube-redactor.ts'
-import { conAgente, programaClaude, rutaAgente } from './agentes.ts'
+import { asegurarAgente, conAgente, programaClaude, rutaAgente } from './agentes.ts'
 import { llaveGuardada } from './acceso.ts'
 import { entornoDeepSeek, SIN_LLAVE } from './deepseek.ts'
 import { redactarOpenCode } from './opencode.ts'
@@ -203,6 +203,9 @@ export function comunidad(app: string, o: Opciones) {
   async function redactarConClaude(prompt: string, deepseek = false): Promise<string> {
     const nombre = deepseek ? 'DeepSeek' : 'Claude'
     if (deepseek && !llaveGuardada('deepseek')) throw new Error(SIN_LLAVE)
+    // Quien trabaja con otro agente puede no tener aún el programa de Claude: sin él, el SDK solo dice «Native CLI binary
+    // for darwin-arm64 not found».
+    await asegurarAgente('claude')
     const q = query({
       prompt,
       options: {

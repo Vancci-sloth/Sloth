@@ -4,7 +4,7 @@ import { query, type SDKUserMessage } from '@anthropic-ai/claude-agent-sdk'
 import { proveedorDe } from '../shared/providers.ts'
 import { codexConLlave } from './acceso.ts'
 import { CodexRpc } from './codex-rpc.ts'
-import { programaClaude } from './agentes.ts'
+import { asegurarAgente, programaClaude } from './agentes.ts'
 import { redactarOpenCode } from './opencode.ts'
 
 /** Una redacción con imágenes reales, sin herramientas ni sesión persistente, usando el proveedor elegido en el hilo. */
@@ -20,6 +20,8 @@ export async function redactarYoutube(model: string, cwd: string, prompt: string
       ...imagenes.map((path) => ({ type: 'image' as const, source: { type: 'base64' as const, media_type: extname(path).toLowerCase() === '.png' ? 'image/png' as const : 'image/jpeg' as const, data: readFileSync(path).toString('base64') } }))
     ] } }
   }
+  // Con otro agente en los hilos, el programa de Claude puede no estar bajado aún.
+  await asegurarAgente('claude')
   const q = query({ prompt: entrada(), options: { ...programaClaude(), cwd, model, effort: effort as never, systemPrompt: INSTRUCCION, tools: [], maxTurns: esquema ? 2 : 1, settingSources: [], persistSession: false, ...(esquema ? { outputFormat: { type: 'json_schema', schema: esquema } } : {}) } })
   const reloj = setTimeout(() => q.close(), 180_000)
   try {
