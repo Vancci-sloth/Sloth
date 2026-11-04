@@ -1,5 +1,6 @@
 import { useSyncExternalStore } from 'react'
 import type { AgentEvent, FileDraft } from '../../shared/types'
+import { HERRAMIENTA_FLOW, hechoDeFlow, MODELOS_IMAGEN } from '../../shared/flow'
 import { historialLigero, rellenar } from '../../shared/historial'
 import { api } from './api'
 
@@ -197,7 +198,10 @@ export function useEscritos(id: string): FileDraft[] {
   )
 }
 
-/** Lo que dice la cabecera de un hilo: lo que costó, lo que leyó y escribió, y cuánto ocupa su contexto. */
+/**
+ * Lo que dice la cabecera de un hilo: lo que costó, lo que leyó y escribió, cuánto ocupa su contexto y los videos que
+ * hizo en Google Flow (`flowVideos`, que gastaron `flowCreditos`), leídos de lo que respondió su MCP.
+ */
 export type Resumen = {
   cost: number
   read: number
@@ -206,18 +210,20 @@ export type Resumen = {
   ms: number
   /** Los turnos sin costo (se cortaron antes de saberlo, fueron el primero tras retomar el hilo o Codex sin precio). */
   sinCosto: number
+  flowVideos: number
+  flowCreditos: number
   context?: { used: number; max: number }
 }
 
 /** Por el primer evento de cada hilo: lo sumado hasta ahora. Solo se suma lo nuevo, y si nada cambia va el mismo objeto. */
-const sumas = new WeakMap<AgentEvent, { n: number; ultimo: AgentEvent; turnStart: number; r: Resumen }>()
-const VACIO: Resumen = { cost: 0, read: 0, out: 0, ms: 0, sinCosto: 0 }
+const sumas = new WeakMap<AgentEvent, { n: number; ultimo: AgentEvent; turnStart: number; r: Resumen; deFlow: Set<string>; pedidos: Set<string> }>()
+const VACIO: Resumen = { cost: 0, read: 0, out: 0, ms: 0, sinCosto: 0, flowVideos: 0, flowCreditos: 0 }
 
 export function resumenDe(events?: AgentEvent[]): Resumen {
   if (!events?.length) return VACIO
   let s = sumas.get(events[0])
   if (!s || s.n > events.length || events[s.n - 1] !== s.ultimo) {
-    s = { n: 0, ultimo: events[0], turnStart: 0, r: VACIO }
+    s = { n: 0, ultimo: events[0], turnStart: 0, r: VACIO, deFlow: new Set(), pedidos: new Set() }
     sumas.set(events[0], s)
   }
   if (s.n === events.length) return s.r
@@ -226,6 +232,16 @@ export function resumenDe(events?: AgentEvent[]): Resumen {
     const e = events[i]
     if (e.t === 'context') r.context = e
     if (e.t === 'turn_start') s.turnStart = e.at
+    if (e.t === 'tool' && HERRAMIENTA_FLOW.test(e.name)) s.deFlow.add(e.id)
+    if (e.t === 'tool_update' && e.output && s.deFlow.has(e.id)) {
+      // Un video ya hecho que se vuelve a pedir sale con 0 créditos: no es otro video. Las imágenes no gastan.
+      const h = hechoDeFlow(e.output)
+      if (h && h.creditos > 0 && !MODELOS_IMAGEN.includes(h.modelo) && !s.pedidos.has(h.pedido ?? e.id)) {
+        s.pedidos.add(h.pedido ?? e.id)
+        r.flowVideos++
+        r.flowCreditos += h.creditos
+      }
+    }
     if (e.t !== 'turn_end') continue
     r.cost += e.costUsd ?? 0
     if (e.costUsd === undefined) r.sinCosto++

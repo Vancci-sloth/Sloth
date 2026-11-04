@@ -243,6 +243,41 @@
     ]
   },
   {
+    "id": "frutinovela",
+    "title": "Frutinovela",
+    "description": "Una telenovela de frutas en 3D que hablan con sus propias voces: los mismos personajes en cada escena, drama de traición o familia y un final que pide la siguiente parte. Se hace en Google Flow con tus cuentas de Google.",
+    "skill": "frutinovela",
+    "icon": "personas",
+    "voz": false,
+    "etapas": [
+      {
+        "nombre": "Guion",
+        "listo": "guion.md",
+        "fase": "guion"
+      },
+      {
+        "nombre": "Cuadros",
+        "listo": "cuadros/esc-*.jpg",
+        "fase": "video"
+      },
+      {
+        "nombre": "Clips",
+        "listo": "clips/esc-*.mp4",
+        "fase": "video"
+      },
+      {
+        "nombre": "Video",
+        "listo": "out/frutinovela-*.mp4",
+        "fase": "video"
+      },
+      {
+        "nombre": "Portada",
+        "listo": "{portada.png,portada/*.png}",
+        "fase": "entrega"
+      }
+    ]
+  },
+  {
     "id": "nuevo-estilo",
     "title": "Nuevo estilo",
     "description": "Cuéntale el video que quieres hacer, o pásale ejemplos, y Sloth arma tu propio estilo con su card, listo para usarlo como los demás.",

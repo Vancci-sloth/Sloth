@@ -1,9 +1,9 @@
 import { type ReactNode, useEffect, useLayoutEffect, useRef, useState } from 'react'
-import type { Model } from '../../shared/types'
+import type { GastoFlow, Model } from '../../shared/types'
 import { proveedorDe, type Proveedor } from '../../shared/providers'
 import { imageUrl, Thumbs, type Attached } from './Images'
 import { esIcono, Icono } from './Iconos'
-import { LimitesContexto } from './LimitesContexto'
+import { FlowEnUso, LimitesContexto } from './LimitesContexto'
 import { invocacion, LINK, LINK_ICON, linkParts, QUOTE_EVENT, QUOTE_ICON, quoteRef, THREAD, THREAD_ICON, threadIconOf } from './etiquetas'
 
 /**
@@ -256,7 +256,7 @@ function withLinks(text: string): Node[] {
  * punto ámbar y se puede resumir ya (lo mismo que escribir /compact); si no, el agente lo resume solo al llenarse. El plan
  * se consulta solo con la tarjeta abierta: pedirlo abre Claude Code o Codex.
  */
-function Uso({ used, max, proveedor, onCompactar }: { used: number; max: number; proveedor: Proveedor; onCompactar?(): Promise<unknown> }) {
+function Uso({ used, max, proveedor, flow, onCompactar }: { used: number; max: number; proveedor: Proveedor; flow?: GastoFlow; onCompactar?(): Promise<unknown> }) {
   const [open, setOpen] = useState(false)
   const [error, setError] = useState('')
   const root = useRef<HTMLSpanElement>(null)
@@ -301,6 +301,7 @@ function Uso({ used, max, proveedor, onCompactar }: { used: number; max: number;
           )}
           {error && <span className="bad small">{error}</span>}
           <LimitesContexto proveedor={proveedor} />
+          <FlowEnUso delChat={flow} />
         </span>
       )}
     </span>
@@ -447,6 +448,8 @@ export function Composer(props: {
   autoFocus?: boolean
   /** Lo que ocupa la conversación en la ventana del modelo. Sin él no sale «Uso». */
   context?: { used: number; max: number }
+  /** Los videos de Google Flow de este chat y sus créditos, para «Uso». */
+  flow?: GastoFlow
   /** «Resumir ahora» en «Uso», con el chat casi lleno: lo mismo que escribir /compact. */
   onCompactar?(): Promise<unknown>
   /** Lo que la card añade a la barra, junto al modelo (la serie, la carpeta, el lote…). */
@@ -739,7 +742,7 @@ export function Composer(props: {
         )}
         {props.extra}
         <span className="spacer" />
-        {props.context && <Uso {...props.context} proveedor={proveedorDe(choice?.model ?? '')} onCompactar={props.onCompactar} />}
+        {props.context && <Uso {...props.context} proveedor={proveedorDe(choice?.model ?? '')} flow={props.flow} onCompactar={props.onCompactar} />}
         {uploading > 0 && <span className="muted small">Subiendo…</span>}
         {error && <span className="bad small">{error}</span>}
         {(!trabajando || !empty) && (

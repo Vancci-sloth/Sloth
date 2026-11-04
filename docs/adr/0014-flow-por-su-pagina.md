@@ -2,6 +2,9 @@
 
 Fecha: 2026-11-01
 
+Lo amplía el [ADR 0015](0015-flow-con-varias-cuentas.md): varias cuentas, cada una en su Edge, y videos desde un
+fotograma o con referencias.
+
 ## Contexto
 
 Flow genera imágenes (Nano Banana) y videos (Veo) con la cuenta de Google del usuario, y no tiene API: Veo oficial se

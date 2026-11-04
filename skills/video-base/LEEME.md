@@ -4,7 +4,8 @@ Lo que comparten los estilos de vídeo: el lote, los errores ya vistos y los scr
 `SKILL.md` ni card): la leen y la usan las skills de cada estilo, que se quedan solo con lo suyo.
 
 - **La usan:** `reel-collage` y `video-explicativo` (sus scripts, `LOTE.md` y este archivo; `video-explicativo`, también
-  las huellas), `video-documental` (`sloth.py`, `chrome.mjs`, la hoja, masterizar y comprobar), los estilos que hace
+  las huellas), `video-documental` (`sloth.py`, `chrome.mjs`, la hoja, masterizar y comprobar), `frutinovela`
+  (`FLOW.md`, `sloth.py`, la hoja, masterizar, comprobar y la portada), los estilos que hace
   cada quien con `crear-estilo` y los procesos de Python de Sloth (`sloth.py`).
 - **`video-el-diff`** es un estilo propio que el usuario afina a mano: ni lo toques desde aquí ni le muevas nada. Solo
   toma prestados `chrome.mjs`, `recorte.py` y la portada (`PORTADA.md`, `portada.mjs`), así que un cambio en ellos

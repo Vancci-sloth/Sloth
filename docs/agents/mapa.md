@@ -74,11 +74,12 @@ Este es el mapa:
   Google de cada quien (Opciones → Voz). La genera el servidor en la página `voz` del navegador integrado, con su propio
   perfil; los agentes la piden con el MCP `voz` (`mcp.mjs`), y el menú «Voz» del compositor manda la línea `Voz:` que
   siguen las skills (`skills/video-base/VOZ.md`). ADR 0011.
-- `server/flow/` y `web/src/Flow.tsx`: imágenes (Nano Banana) y videos (Veo) de Google Flow, con la cuenta de la voz y en
-  el Edge sin ventana de la voz, en su mismo turno (`voz().google`). `pagina.ts` maneja la página, por sus iconos. Los
-  agentes piden con el MCP `flow` (`mcp.mjs`, `skills/video-base/FLOW.md`). Lee el costo antes de generar y no pasa del
-  tope. «Ayudar a mejorar Flow» se apaga para todos y se cambia en Opciones → Google Flow. El menú «Imágenes» del
-  compositor manda la línea `Imágenes:` (ChatGPT o un modelo de Flow). ADR 0014.
+- `server/flow/` y `web/src/Flow.tsx`: imágenes (Nano Banana) y videos (Veo) de Google Flow, con la cuenta de la voz (en
+  su Edge y su turno, `voz().google`) y las que se agregan en Opciones (`cuentas.ts`, cada una en su Edge), hasta tres a la
+  vez. `elegirCuenta` y los descansos están en `shared/flow.ts`. `pagina.ts` maneja la página, por sus iconos: texto,
+  referencias («Ingredientes») o fotogramas. Los agentes piden con el MCP `flow` (`mcp.mjs`, `skills/video-base/FLOW.md`).
+  Lee el costo antes de generar y no pasa del tope. «Ayudar a mejorar Flow» se apaga para todos y se cambia en Opciones →
+  Google Flow. El menú «Imágenes» del compositor manda la línea `Imágenes:` (ChatGPT o un modelo de Flow). ADR 0014 y 0015.
 - El navegador de cada hilo (`electron/navegador.ts`, el globo de `web/src/Navegador.tsx`): el Playwright MCP del agente
   (`server/navegador-agente.ts`, lanzado a demanda por `server/navegador-mcp.mjs`) entra en él por CDP. Sin ventana, un Chrome con `data/navegador`; en lotes, uno limpio.
   Sus capturas y los logs de consola quedan en `data/navegador-capturas/`. Copia lo mejor del de T3 Code (`C:\dev\t3code`):

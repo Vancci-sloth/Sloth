@@ -86,7 +86,10 @@ function Ajustes({ onDone, iniciando, onIniciando }: { onDone(): void; iniciando
       <Grupo titulo="Voz" nota="Al pedir un video eliges en «Voz» si la mandas tú o si el agente la genera aquí. La sesión de Google vive en un perfil aparte del navegador de Sloth: ningún agente la usa.">
         <VozOpciones />
       </Grupo>
-      <Grupo titulo="Google Flow" nota="Los agentes generan imágenes y videos con tu cuenta de Google, la misma de la Voz. Las imágenes son gratis; los videos gastan tus créditos de Flow.">
+      <Grupo
+        titulo="Google Flow"
+        nota="Los agentes generan imágenes y videos con tus cuentas de Google: la de la Voz y las que agregues aquí, hasta 50. Las imágenes son gratis; los videos gastan créditos de Flow, y si una cuenta se queda sin ellos, Sloth sigue con otra. Agrega solo cuentas tuyas: Google puede limitar o bloquear las que usa de más."
+      >
         <FlowOpciones />
       </Grupo>
       {/* Solo sirven a Ideas: sin la de YouTube, las recomendaciones van con el canal conectado. */}

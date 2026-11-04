@@ -423,6 +423,9 @@ const CON_SUBAGENTES: Record<string, string> = {
   listAgents: 'Mira sus subagentes'
 }
 
+/** El final de una ruta, que es lo que cambia de un clip a otro (`clips/esc-03.mp4`). */
+export const finDeRuta = (ruta: string) => ruta.split(/[\\/]/).slice(-2).join('/')
+
 /** Una línea que dice qué hizo la herramienta, como en T3 Code: el verbo y su objeto. */
 export function toolSummary(name: string, input: any): { verb: string; detail: string } {
   const i = input ?? {}
@@ -460,6 +463,11 @@ export function toolSummary(name: string, input: any): { verb: string; detail: s
       const s = Number(i.delaySeconds) || 0
       return { verb: 'Vuelve en', detail: `${s < 60 ? `${s} s` : `${Math.round(s / 60)} min`}${i.reason ? ` · ${i.reason}` : ''}` }
     }
+    case 'mcp__flow__generar_video':
+    case 'mcp__flow__generar_imagen':
+      return { verb: name.endsWith('video') ? 'Video' : 'Imagen', detail: finDeRuta(String(i.salida ?? '')) }
+    case 'mcp__flow__estado_flow':
+      return i.id ? { verb: 'Espera en Flow', detail: `pedido ${i.id}` } : { verb: 'Créditos de Flow', detail: 'lo que les queda a tus cuentas' }
     case 'ToolSearch':
       // `select:WebSearch,WebFetch` dice qué herramientas carga.
       return { verb: 'Carga herramientas', detail: String(i.query ?? '').replace(/^select:/, '').replaceAll(',', ', ') }

@@ -1,4 +1,5 @@
 import { Fragment, memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { HERRAMIENTA_FLOW, hechoDeFlow, MODELOS_IMAGEN } from '../../shared/flow'
 import { NOMBRE_AGENTE, proveedorDe } from '../../shared/providers'
 import type { AgentEvent } from '../../shared/types'
 import { api } from './api'
@@ -8,7 +9,7 @@ import { Icon } from './Composer'
 import { LINK, LINK_ICON, linkParts, pedirMejora, QUOTE, QUOTE_EVENT, QUOTE_ICON, quoteText, THREAD, THREAD_ICON, threadIconOf } from './etiquetas'
 import { MarcaAgente } from './Logos'
 import { imageUrl, Thumbs } from './Images'
-import { buildTimeline, compact, delHilo, duration, errorLlano, REINTENTAR, toolSummary, type Item, type Subagente } from './items'
+import { buildTimeline, compact, delHilo, duration, errorLlano, finDeRuta, REINTENTAR, toolSummary, type Item, type Subagente } from './items'
 import { bloquesDeMarkdown } from './markdown'
 import { BarraSubagente, FilaSubagente, GrupoSubagentes } from './Subagentes'
 
@@ -629,7 +630,9 @@ function Tool({ item, nested, sessionId }: { item: Extract<Item, { kind: 'tool' 
   // Una imagen que el agente lee (una captura, un recorte, una hoja de cuadros) se ve aquí: es lo que está mirando.
   const ruta = item.name === 'Read' && typeof item.input?.file_path === 'string' ? (item.input.file_path as string) : ''
   const imagen = sessionId && /\.(png|jpe?g|gif|webp)$/i.test(ruta) ? `/api/sessions/${sessionId}/imagen?ruta=${encodeURIComponent(ruta)}` : ''
-  const { verb, detail } = toolSummary(item.name, item.input)
+  const flow = HERRAMIENTA_FLOW.test(item.name) && item.output ? hechoDeFlow(item.output) : null
+  // Un pedido que tardó sale hecho en su `estado_flow`: esa fila dice qué clip fue, no el id con que se esperó.
+  const { verb, detail } = flow ? { verb: MODELOS_IMAGEN.includes(flow.modelo) ? 'Imagen' : 'Video', detail: finDeRuta(flow.archivo) } : toolSummary(item.name, item.input)
   const state = !item.done ? 'running' : item.error ? 'error' : 'ok'
   // Las salidas largas no vienen con el hilo: se piden al abrir la fila.
   const [pedida, setPedida] = useState<string>()
@@ -651,6 +654,7 @@ function Tool({ item, nested, sessionId }: { item: Extract<Item, { kind: 'tool' 
         <span className="tool-icon">{ICONS[item.name] ?? '⚙'}</span>
         <span className="tool-verb">{verb}</span>
         <span className="tool-detail">{detail}</span>
+        {flow && <FlowHecho h={flow} />}
         <span className={`dot ${state}`} />
       </button>
       {imagen && <Mirada src={imagen} />}
@@ -661,6 +665,22 @@ function Tool({ item, nested, sessionId }: { item: Extract<Item, { kind: 'tool' 
         </div>
       )}
     </div>
+  )
+}
+
+/**
+ * Lo que gastó un pedido de Flow ya hecho y con qué cuenta (`hechoDeFlow`). Lo que les quedó a todas va en su título: el
+ * chat es angosto, y el nombre del clip es lo que más importa de la fila.
+ */
+function FlowHecho({ h }: { h: NonNullable<ReturnType<typeof hechoDeFlow>> }) {
+  if (MODELOS_IMAGEN.includes(h.modelo)) return <span className="tool-flow gris">gratis</span>
+  if (!h.creditos) return <span className="tool-flow gris" title="No cambió nada desde la última vez: no se volvió a pedir">sin gastar</span>
+  const cuenta = h.cuenta?.replace(/@gmail\.com$/, '')
+  const titulo = `${h.modelo}${h.cuenta ? `, con ${h.cuenta}` : ''}${h.quedan === undefined ? '' : `. Les quedaron ${h.quedan} créditos a tus cuentas`}`
+  return (
+    <span className="tool-flow" title={titulo}>
+      {h.creditos} créditos{cuenta ? ` · ${cuenta}` : ''}
+    </span>
   )
 }
 

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { IMAGEN_CHATGPT, MODELOS_IMAGEN } from '../../shared/flow'
-import type { CuentaClaude, EstadoFlow } from '../../shared/types'
+import type { CuentaClaude, CuentaEnFlow, EstadoFlow, GastoFlow } from '../../shared/types'
 import { api } from './api'
 import { Picker } from './Composer'
 import { Confirm } from './Confirm'
@@ -8,8 +8,8 @@ import { Logo } from './Logos'
 import type { UsoVoz } from './Voz'
 
 /**
- * Google Flow en la interfaz (`server/flow/`). En Opciones: usa la cuenta de la voz, y la primera vez hay que abrir Flow y
- * aceptar su aviso, que es de cada quien. «Ayudar a mejorar Flow» sale apagado: cada quien decide si Google usa lo que
+ * Google Flow en la interfaz (`server/flow/`). En Opciones: usa la cuenta de la voz y las que agregues, y la primera vez
+ * con cada una hay que abrir Flow y aceptar su aviso, que es de cada quien. «Ayudar a mejorar Flow» sale apagado: cada quien decide si Google usa lo que
  * genera. Quien manda referencias confirma que tiene sus derechos (`AvisoDerechos`). En el compositor de un video, el menú
  * «Imágenes»: con ChatGPT o con un modelo de Flow (`lineaImagenes`, `shared/flow.ts`).
  */
@@ -36,13 +36,43 @@ function AvisoDerechos({ onHecho, onCerrar }: { onHecho(e: EstadoFlow): void; on
   )
 }
 
-/** El estado de Flow que comparten el menú y Opciones. */
-function useFlow() {
+/** El estado de Flow que comparten el compositor y Opciones. Mientras entras con otra cuenta o genera, se va leyendo. */
+export function useFlow() {
   const [estado, setEstado] = useState<EstadoFlow>()
   const [error, setError] = useState<string>()
   const recibir = (p: Promise<EstadoFlow>) => p.then((n) => (setEstado(n), setError(undefined)), (x: Error) => setError(x.message))
   useEffect(() => void recibir(api('/api/flow')), [])
+  const cada = estado?.agregando ? 2000 : estado?.leyendo ? 3000 : estado?.enFila ? 5000 : 0
+  useEffect(() => {
+    if (!cada) return
+    const t = setInterval(() => void recibir(api('/api/flow')), cada)
+    return () => clearInterval(t)
+  }, [cada])
   return { estado, error, recibir, poner: setEstado }
+}
+
+export type UsoFlow = ReturnType<typeof useFlow>
+
+const POR_QUE: Record<NonNullable<CuentaEnFlow['descansa']>['motivo'], string> = { creditos: 'Sin créditos de video', frenada: 'Flow la frenó', sesion: 'Sin sesión' }
+const hora = (ms: number) => new Date(ms).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })
+
+const videos = (g: GastoFlow) => `${g.videos} ${g.videos === 1 ? 'video' : 'videos'} (${g.creditos} créditos)`
+
+/** Lo que le queda a una cuenta, de lo último que se leyó en su Flow. */
+function cuantoLeQueda(c: CuentaEnFlow): string {
+  const s = c.saldo
+  if (!s) return 'créditos sin leer'
+  if (s.renueva && s.renueva <= Date.now()) return `créditos renovados a las ${hora(s.renueva)}`
+  return `${s.creditos} créditos${s.renueva ? ` · se renuevan a las ${hora(s.renueva)}` : ''}`
+}
+
+/** Cómo está una cuenta, y la clase de su punto (`.estado`). */
+function comoEsta(c: CuentaEnFlow): [string, string] {
+  const hoy = c.hoy.videos ? ` · hoy ${c.hoy.videos} ${c.hoy.videos === 1 ? 'video' : 'videos'}` : ''
+  const extra = ` · ${cuantoLeQueda(c)}${hoy}`
+  if (c.generando) return [`Generando${extra}`, 'moviendo']
+  if (c.descansa) return [`${POR_QUE[c.descansa.motivo]} · vuelve a probar a las ${hora(c.descansa.hasta)}${hoy}`, 'falta']
+  return [`${c.deLaVoz ? 'Lista · la de la voz' : 'Lista'}${extra}`, '']
 }
 
 /** La cuenta de ChatGPT de hace poco: mirarla lanza Codex, y el compositor se abre a cada rato. */
@@ -64,11 +94,10 @@ export function useChatGPT(): boolean {
 const CONECTAR = ' conectar'
 
 /** El menú «Imágenes» del compositor de un video. `valor`: lo que se usará (`imagenPosible`); vacío, no hay con qué. */
-export function SelectorImagenes({ valor, hayChatGPT, voz, onCambio }: { valor: string; hayChatGPT: boolean; voz: UsoVoz; onCambio(imagen: string): void }) {
-  const flow = useFlow()
+export function SelectorImagenes({ valor, hayChatGPT, voz, flow, onCambio }: { valor: string; hayChatGPT: boolean; voz: UsoVoz; flow: UsoFlow; onCambio(imagen: string): void }) {
   // Con un modelo de Flow elegido o puesto solo, sin confirmar los derechos, las referencias no se pueden mandar.
   const [pidiendo, setPidiendo] = useState<string | null>(null)
-  const cuenta = voz.estado?.cuenta
+  const cuenta = voz.estado?.cuenta || flow.estado?.cuentas.length
   const falta = !!valor && valor !== IMAGEN_CHATGPT && flow.estado?.derechos === false
   const label = voz.estado?.conectando ? `Imágenes: entra con Google en ${voz.estado.navegador}…` : valor === IMAGEN_CHATGPT ? 'Imágenes: ChatGPT' : valor ? `Imágenes: ${valor}` : 'Imágenes: sin generar'
   return (
@@ -106,23 +135,88 @@ export function SelectorImagenes({ valor, hayChatGPT, voz, onCambio }: { valor: 
   )
 }
 
+/**
+ * Opciones → Google Flow: las cuentas de Google con que genera (la de la voz y las que agregues, para tener más créditos),
+ * cada una con cómo está, lo que le queda y su menú; lo gastado en videos hoy y este mes, y los dos ajustes. Al abrirse
+ * lee lo que les queda a las que nunca se leyeron; a todas, con «Actualizar créditos» (abre su Flow sin ventana).
+ */
 export function FlowOpciones() {
   const { estado: e, error, recibir, poner } = useFlow()
   const [pidiendo, setPidiendo] = useState(false)
+  const [quitando, setQuitando] = useState<string>()
+  const n = e?.cuentas.length ?? 0
+  const agregar = () => void recibir(api('/api/flow/cuentas/agregar', {}))
+  const leer = (faltan: boolean) => void recibir(api('/api/flow/saldos', { faltan }))
+  // Al abrirse, en cuanto se sabe cuáles faltan: las que se agreguen después se leen solas en el servidor.
+  const cargado = !!e
+  useEffect(() => {
+    if (e?.cuentas.some((c) => !c.saldo)) leer(true)
+  }, [cargado])
   return (
     <div className="item">
       <div className="fila">
         <Logo de="gemini" />
         <div className="fila-nombre">
           <strong>Google Flow</strong>
-          <span>{e?.cuenta ? `Veo y Nano Banana con ${e.cuenta}${e.enFila ? ` · generando ${e.enFila}` : ''}` : 'Conecta arriba tu cuenta de Google: Flow usa la misma.'}</span>
+          <span>
+            {n
+              ? `Veo y Nano Banana con ${n === 1 ? 'una cuenta' : `${n} cuentas`} · quedan ${e?.quedan ?? 0} créditos${e?.enFila ? ` · generando ${e.enFila}` : ''}`
+              : 'Conecta arriba la cuenta de la voz o agrega aquí una cuenta de Google.'}
+          </span>
         </div>
-        {e?.cuenta && (
-          <button onClick={() => void recibir(api('/api/flow/abrir', {}))}>
-            Abrir Flow
-          </button>
+        {e?.agregando ? (
+          <span className="estado moviendo">Entra con Google en la ventana de {e.navegador}…</span>
+        ) : (
+          e && (
+            <button className={n ? 'boton' : 'primary'} onClick={agregar}>
+              Agregar cuenta
+            </button>
+          )
         )}
       </div>
+      {e?.agregando && (
+        <p className="muted small fila-extra">
+          Al llegar a Flow, acepta su aviso si te lo enseña y cierra la ventana: la cuenta queda en Sloth. Cada cuenta gratis da 50 créditos al día; cuando una se queda sin ellos, Sloth sigue con otra.
+        </p>
+      )}
+      {n > 0 && e && (
+        <div className="fila-extra">
+          <div className="opcion-fila">
+            <span className="muted small una-linea">
+              Hoy: {videos(e.uso.hoy)} · este mes: {videos(e.uso.mes)}
+            </span>
+            {e.leyendo ? (
+              <span className="estado moviendo small">Leyendo créditos…</span>
+            ) : (
+              <button className="link small" title="Abre el Flow de cada cuenta, sin ventana, y lee cuánto le queda. No gasta." onClick={() => leer(false)}>
+                Actualizar créditos
+              </button>
+            )}
+          </div>
+          {e.cuentas.map((c) => {
+            const [texto, clase] = comoEsta(c)
+            return (
+              <div className="opcion-fila" key={c.correo}>
+                <Picker
+                  className="acciones"
+                  label={<span className={`estado ${clase}`}>{c.correo}</span>}
+                  value=""
+                  groups={[
+                    {
+                      label: 'Cuenta',
+                      options: [{ value: 'abrir', label: 'Abrir Flow' }, ...(c.deLaVoz ? [] : [{ value: 'conectar', label: 'Volver a conectar' }, { value: 'quitar', label: 'Quitar de Sloth' }])]
+                    }
+                  ]}
+                  onChange={(q) => (q === 'quitar' ? setQuitando(c.correo) : q === 'conectar' ? agregar() : void recibir(api('/api/flow/abrir', { correo: c.correo })))}
+                />
+                <span className="muted small una-linea" title={c.saldo ? `${texto}. Leído a las ${hora(c.saldo.leido)}.` : texto}>
+                  {texto}
+                </span>
+              </div>
+            )
+          })}
+        </div>
+      )}
       {e && (
         <div className="fila-extra">
           <label className="con-interruptor">
@@ -149,7 +243,12 @@ export function FlowOpciones() {
         </div>
       )}
       {pidiendo && <AvisoDerechos onHecho={poner} onCerrar={() => setPidiendo(false)} />}
-      {error && <p className="bad small fila-extra">{error}</p>}
+      {quitando && (
+        <Confirm title="Quitar la cuenta" action="Quitar" danger onConfirm={() => api<EstadoFlow>('/api/flow/cuentas/quitar', { correo: quitando }).then(poner)} onClose={() => setQuitando(undefined)}>
+          Sloth deja de generar con {quitando} y borra su sesión. Lo que ya generó sigue en su Flow. Para volver a usarla, agrégala otra vez.
+        </Confirm>
+      )}
+      {(error ?? e?.error) && !e?.agregando && <p className="bad small fila-extra">{error ?? e?.error}</p>}
     </div>
   )
 }

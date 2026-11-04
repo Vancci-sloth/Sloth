@@ -1,6 +1,6 @@
 /**
  * El MCP `flow`: las herramientas con que un agente pide a Sloth una imagen o un video de Google Flow, que los genera con
- * la cuenta del usuario (`index.ts`). Solo habla con la API del servidor (`SLOTH_URL`): la sesión de Google no pasa por
+ * las cuentas del usuario (`index.ts`). Solo habla con la API del servidor (`SLOTH_URL`): la sesión de Google no pasa por
  * aquí. Es JavaScript sin paquetes, como el de la voz, para que el Node de Sloth lo corra igual en el repo y en la app
  * compilada (`scripts/compilar.mjs` lo copia tal cual). Habla MCP por stdio, un JSON por renglón.
  *
@@ -17,7 +17,7 @@ const HERRAMIENTAS = [
   {
     name: 'generar_imagen',
     description:
-      'Genera UNA imagen en Google Flow, en la cuenta de Google del usuario, y deja el JPEG en `salida` (1024×1024 en 1:1, 768×1376 en 9:16). Con `referencias`, edita esas fotos o sigue su estilo: el mismo personaje, la misma escena. Las imágenes no gastan créditos. Tarda de 20 a 90 s, más con referencias; si no acaba en 40 s, devuelve un id para esperarla con estado_flow. Si nada cambió desde el último archivo de esa ruta, sale al momento.',
+      'Genera UNA imagen en Google Flow, con las cuentas de Google del usuario, y deja el JPEG en `salida` (1024×1024 en 1:1, 768×1376 en 9:16). Con `referencias`, edita esas fotos o sigue su estilo: el mismo personaje, la misma escena. Las imágenes no gastan créditos. Tarda de 20 a 90 s, más con referencias; si no acaba en 40 s, devuelve un id para esperarla con estado_flow. Si nada cambió desde el último archivo de esa ruta, sale al momento.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -33,13 +33,16 @@ const HERRAMIENTAS = [
   {
     name: 'generar_video',
     description:
-      'Genera UN video de 8 s con audio en Google Flow, en la cuenta de Google del usuario, y deja el MP4 (720p) en `salida`. GASTA los créditos del usuario: Lite 10, Fast 20, Quality 100. Lee el costo antes de generar y, si pasa de `tope`, no genera. Tarda cerca de un minuto; si no acaba en 40 s, devuelve un id para esperarlo con estado_flow. Si nada cambió desde el último archivo de esa ruta, sale al momento y sin gastar.',
+      'Genera UN video de 8 s con audio (y las voces que diga el prompt) en Google Flow, con las cuentas de Google del usuario, y deja el MP4 en `salida` (720p; Omni, 360p). GASTA los créditos del usuario: Omni Flash 6, Lite 10, Fast 20, Quality 100. Lee el costo antes de generar y, si pasa de `tope`, no genera. Con `primerCuadro`, el video empieza en esa imagen (y acaba en `ultimoCuadro`, si lo pasas): así salen iguales los personajes y el lugar. Con `referencias`, sigue a esos personajes sin partir de una imagen. Las dos cosas a la vez, no. Tarda cerca de un minuto; si no acaba en 40 s, devuelve un id para esperarlo con estado_flow. Si una cuenta se quedó sin créditos, pasa sola a otra. Si nada cambió desde el último archivo de esa ruta, sale al momento y sin gastar.',
     inputSchema: {
       type: 'object',
       properties: {
         prompt: PROMPT,
-        formato: { type: 'string', enum: ['9:16', '16:9'], description: 'La proporción; sin ella, 9:16' },
+        formato: { type: 'string', enum: ['9:16', '16:9'], description: 'La proporción; sin ella, 9:16. La del primer cuadro tiene que ser la misma' },
         modelo: { type: 'string', enum: ['Veo 3.1 - Lite', 'Veo 3.1 - Fast', 'Veo 3.1 - Quality', 'Omni 1.1 Flash'], description: 'Sin él, Veo 3.1 - Lite' },
+        primerCuadro: { type: 'string', description: 'La ruta absoluta de la imagen (.png, .jpg o .webp) donde empieza el video' },
+        ultimoCuadro: { type: 'string', description: 'La ruta absoluta de la imagen donde acaba; solo con primerCuadro' },
+        referencias: { type: 'array', items: { type: 'string' }, description: 'Las rutas absolutas de hasta 3 imágenes de los personajes u objetos que salen; sin primerCuadro' },
         salida: { type: 'string', description: 'La ruta absoluta del .mp4 que deja' },
         tope: { type: 'number', description: 'Lo más que puede costar, en créditos; sin él, 20. Súbelo solo si el usuario lo pidió.' }
       },
@@ -48,8 +51,9 @@ const HERRAMIENTAS = [
   },
   {
     name: 'estado_flow',
-    description: 'Espera hasta 40 s a lo que pediste con generar_imagen o generar_video y dice si ya está (y dónde) o por qué falló.',
-    inputSchema: { type: 'object', properties: { id: { type: 'string', description: 'El id que dio la herramienta' } }, required: ['id'] }
+    description:
+      'Con `id`, espera hasta 40 s a lo que pediste con generar_imagen o generar_video y dice si ya está (y dónde) o por qué falló. Sin `id`, dice cuántos créditos le quedan a cada cuenta de Google del usuario y cuántos videos van hoy: úsalo antes de pedir varios clips, para saber si alcanzan.',
+    inputSchema: { type: 'object', properties: { id: { type: 'string', description: 'El id que dio la herramienta; sin él, los créditos de las cuentas' } } }
   }
 ]
 
@@ -60,10 +64,26 @@ async function pedir(ruta, datos) {
   return json
 }
 
+/** El chat de Sloth lee de vuelta lo de «Lista» (`hechoDeFlow` en shared/flow.ts): si cambia, cambia allá también. */
 function contar(t) {
-  if (t.estado === 'lista') return `Lista: ${t.archivo} (${t.modelo}, ${t.creditos} créditos gastados).`
+  if (t.estado === 'lista') return `Lista: ${t.archivo} (${t.modelo}, ${t.creditos} créditos gastados${t.cuenta ? `, con ${t.cuenta}` : ''}, pedido ${t.id}).${t.quedan === undefined ? '' : ` Les quedan ${t.quedan} créditos a las cuentas.`}`
   if (t.estado === 'error') throw new Error(`No salió: ${t.error}`)
   return `Sigue ${t.estado === 'en-fila' ? 'esperando su turno' : 'generándose'} (${t.modelo}). Llama a estado_flow con id "${t.id}" para esperarlo; mientras, sigue con lo que no lo necesita.`
+}
+
+const hora = (ms) => new Date(ms).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })
+
+/** Los créditos de cada cuenta, de lo último que se leyó en su Flow. */
+function saldos(e) {
+  if (!e.cuentas.length) return 'No hay cuentas de Google en Flow: el usuario las conecta en Opciones → Google Flow.'
+  const ahora = Date.now()
+  const renglones = e.cuentas.map((c) => {
+    const s = c.saldo
+    const cuanto = !s ? 'aún no se sabe cuánto le queda' : s.renueva && s.renueva <= ahora ? `ya se le renovaron los créditos (a las ${hora(s.renueva)})` : `${s.creditos} créditos${s.renueva ? `, se renuevan a las ${hora(s.renueva)}` : ''}`
+    const descansa = c.descansa ? `; no genera videos hasta las ${hora(c.descansa.hasta)}` : ''
+    return `- ${c.correo}: ${cuanto}${descansa}. Hoy, ${c.hoy.videos} ${c.hoy.videos === 1 ? 'video' : 'videos'}.`
+  })
+  return `${renglones.join('\n')}\nEntre las que se saben, quedan ${e.quedan} créditos. Hoy van ${e.uso.hoy.videos} videos (${e.uso.hoy.creditos} créditos); este mes, ${e.uso.mes.videos} (${e.uso.mes.creditos}).`
 }
 
 async function generar(tipo, datos) {
@@ -75,6 +95,7 @@ const LLAMADAS = {
   generar_imagen: (datos) => generar('imagen', datos),
   generar_video: (datos) => generar('video', datos),
   async estado_flow({ id }) {
+    if (!id) return saldos(await pedir('/api/flow'))
     return contar(await pedir(`/api/flow/trabajos/${encodeURIComponent(id)}?esperar=${ESPERA}`))
   }
 }

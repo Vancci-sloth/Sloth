@@ -38,7 +38,7 @@ import { NombreDelHilo, Renombrar } from './Renombrar'
 import { Segmento } from './Segmento'
 import { SelectorVoz, useVoz } from './Voz' // voz de AI Studio
 import { lineaVoz } from '../../shared/voz'
-import { SelectorImagenes, useChatGPT } from './Flow' // Google Flow
+import { SelectorImagenes, useChatGPT, useFlow } from './Flow' // Google Flow
 import { imagenPosible, lineaImagenes } from '../../shared/flow'
 import { Timeline } from './Timeline'
 import { compact, duration } from './items'
@@ -824,7 +824,8 @@ function NewSession(props: {
   // Las imágenes: con ChatGPT o con un modelo de Google Flow (`Flow.tsx`), según lo que tengas conectado.
   const hayChatGPT = useChatGPT()
   const [imagenes, setImagenes] = useStored<string>('imagenes', '')
-  const imagenElegida = imagenPosible(imagenes, { chatgpt: hayChatGPT, google: !!voz.estado?.cuenta })
+  const flow = useFlow()
+  const imagenElegida = imagenPosible(imagenes, { chatgpt: hayChatGPT, google: !!voz.estado?.cuenta || !!flow.estado?.cuentas.length })
   // Un archivo o un enlace soltado en cualquier parte del inicio va al mensaje.
   const soltar = useSoltar()
 
@@ -876,7 +877,7 @@ function NewSession(props: {
               />
             )}
             {conFormato && <SelectorVoz card={card} voz={voz} valor={vozElegida} onCambio={(v) => setVoces({ ...voces, [card.id]: v })} />}
-            {conFormato && <SelectorImagenes valor={imagenElegida} hayChatGPT={hayChatGPT} voz={voz} onCambio={setImagenes} />}
+            {conFormato && <SelectorImagenes valor={imagenElegida} hayChatGPT={hayChatGPT} voz={voz} flow={flow} onCambio={setImagenes} />}
             {card.lote && enlaces.length > 1 && (
               <Segmento
                 label="Lote"
@@ -1162,6 +1163,11 @@ const SessionView = memo(function SessionView({ id, session, card, models }: { i
           {totals.sinCosto ? '≥ ' : ''}${totals.cost.toFixed(2)}
         </span>
       )}
+      {totals.flowCreditos > 0 && (
+        <span className="muted small" title={`${totals.flowVideos} ${totals.flowVideos === 1 ? 'video' : 'videos'} de Google Flow en este chat`}>
+          {totals.flowCreditos} créditos de Flow
+        </span>
+      )}
       {totals.read > 0 && <span className="muted small">{compact(totals.read)} tokens leídos</span>}
       {totals.out > 0 && <span className="muted small">{compact(totals.out)} tokens escritos</span>}
       {/* El símbolo del agente del hilo: pide una mejora sobre él. Solo el símbolo: el encabezado de un video va justo. */}
@@ -1214,6 +1220,7 @@ const SessionView = memo(function SessionView({ id, session, card, models }: { i
           background={!!session.background?.length}
           lockModel={!!session.background?.length}
           context={totals.context}
+          flow={{ videos: totals.flowVideos, creditos: totals.flowCreditos }}
           onCompactar={() => api(`/api/sessions/${session.id}/compactar`, {})}
           placeholder="Responde, pide un cambio, pega una imagen o suelta un archivo…"
           draft={leerRespuesta(session.id)}

@@ -22,7 +22,8 @@ export interface Card {
   tuya?: boolean
   /**
    * La voz del video. Sin esto, un estilo (con `etapas`) deja elegir en el compositor entre mandarla tú o que el agente la
-   * genere en AI Studio (`shared/voz.ts`). `false`: no hay qué elegir, la voz es tu grabación a cámara. `propia`: cómo la
+   * genere en AI Studio (`shared/voz.ts`). `false`: no hay qué elegir, la voz es tu grabación a cámara o la de cada clip
+   * de Veo (la frutinovela). `propia`: cómo la
    * hace el estilo si no eliges AI Studio, cuando no es mandándola tú.
    */
   voz?: false | { propia: string }
@@ -1285,11 +1286,54 @@ export interface TrabajoVoz {
  * deja que Google use lo generado («Ayudar a mejorar Flow», apagado salvo que lo enciendas). `derechos`: si confirmó que
  * tiene los derechos de lo que manda de referencia; sin eso, Flow solo recibe texto.
  */
+/**
+ * `GET /api/flow`. `cuentas`: las de Google con que genera, primero la de la voz; `agregando`, si hay una ventana abierta
+ * para entrar con otra. `error`: por qué no se pudo agregar la última. `uso`: los videos hechos hoy y este mes, entre
+ * todas. `quedan`: los créditos que les quedan a las que tienen su saldo al día. `leyendo`: si se está leyendo el saldo
+ * de las cuentas (`POST /api/flow/saldos`).
+ */
 export interface EstadoFlow {
-  cuenta: string | null
+  cuentas: CuentaEnFlow[]
+  uso: { hoy: GastoFlow; mes: GastoFlow }
+  quedan: number
+  leyendo: boolean
+  agregando: boolean
+  /** Donde se entra con Google: Edge, o Chrome en Mac. */
+  navegador: string
   enFila: number
   aportar: boolean
   derechos: boolean
+  error?: string
+}
+
+/**
+ * Una cuenta de Google en Flow. `descansa`: hasta cuándo no genera (ms) y por qué (`Motivo` de `shared/flow.ts`).
+ * `saldo`: lo que le quedaba al leerlo, sin él si aún no se leyó. `hoy`: sus videos de hoy.
+ */
+export interface CuentaEnFlow {
+  correo: string
+  deLaVoz: boolean
+  generando: boolean
+  descansa?: { hasta: number; motivo: 'creditos' | 'frenada' | 'sesion' }
+  saldo?: SaldoFlow
+  hoy: GastoFlow
+}
+
+/**
+ * Los créditos que le quedaban a una cuenta en Flow, cuándo se leyeron y, si se renuevan cada día, cuándo (todo en ms).
+ * `maximo`: lo más que se le ha leído, para dibujar cuánto le queda (Flow no dice de cuánto).
+ */
+export interface SaldoFlow {
+  creditos: number
+  renueva?: number
+  leido: number
+  maximo?: number
+}
+
+/** Los videos que se hicieron en Flow y los créditos que gastaron. */
+export interface GastoFlow {
+  videos: number
+  creditos: number
 }
 
 /**
@@ -1301,8 +1345,12 @@ export interface TrabajoFlow {
   estado: 'en-fila' | 'generando' | 'lista' | 'error'
   tipo: 'imagen' | 'video'
   modelo: string
+  /** La cuenta de Google con que se genera o se generó. */
+  cuenta?: string
   archivo?: string
   creditos?: number
+  /** En un video ya hecho: lo que les queda a las cuentas con su saldo al día (`EstadoFlow.quedan`). */
+  quedan?: number
   error?: string
 }
 

@@ -99,3 +99,22 @@ test('el resumen suma solo lo nuevo y no cambia de objeto si nada cambió', () =
   assert.equal(r2.sinCosto, 1)
   assert.equal(r2.ms, 3000)
 })
+
+test('el resumen cuenta los videos de Flow del chat, una vez cada pedido y sin imágenes ni repetidos', () => {
+  const lista = (texto: string) => JSON.stringify({ content: [{ type: 'text', text: texto }] })
+  const ev: AgentEvent[] = [
+    { t: 'tool', id: 'a', name: 'mcp__flow__generar_video', input: {} },
+    { t: 'tool_update', id: 'a', done: true, output: lista('Sigue generándose (Veo 3.1 - Lite). Llama a estado_flow con id "p1"') },
+    { t: 'tool', id: 'b', name: 'mcp__flow__estado_flow', input: { id: 'p1' } },
+    { t: 'tool_update', id: 'b', done: true, output: lista('Lista: C:\\v\\esc-01.mp4 (Veo 3.1 - Lite, 10 créditos gastados, con una@gmail.com, pedido p1).') },
+    // Un estado_flow de más sobre el mismo pedido no es otro video.
+    { t: 'tool', id: 'c', name: 'mcp__flow__estado_flow', input: { id: 'p1' } },
+    { t: 'tool_update', id: 'c', done: true, output: lista('Lista: C:\\v\\esc-01.mp4 (Veo 3.1 - Lite, 10 créditos gastados, con una@gmail.com, pedido p1).') },
+    { t: 'tool', id: 'd', name: 'mcp__flow__generar_imagen', input: {} },
+    { t: 'tool_update', id: 'd', done: true, output: 'Lista: C:\\v\\cuadro.jpg (Nano Banana 2.1, 0 créditos gastados, con una@gmail.com, pedido p2).' },
+    { t: 'tool', id: 'e', name: 'mcp__flow__generar_video', input: {} },
+    { t: 'tool_update', id: 'e', done: true, output: 'Lista: C:\\v\\esc-02.mp4 (Veo 3.1 - Fast, 20 créditos gastados, con otra@gmail.com, pedido p3). Les quedan 20 créditos a las cuentas.' }
+  ]
+  const r = resumenDe(ev)
+  assert.deepEqual({ videos: r.flowVideos, creditos: r.flowCreditos }, { videos: 2, creditos: 30 })
+})
