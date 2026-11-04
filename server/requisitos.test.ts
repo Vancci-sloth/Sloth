@@ -3,7 +3,7 @@ import { closeSync, existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, 
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { test } from 'node:test'
-import { aguantaCuda, elegirPython, motorDe, moverPython, pasoDePip, sinRueda } from './requisitos.ts'
+import { aguantaCuda, descargaDanada, elegirPython, motorDe, moverPython, pasoDePip, sinRueda } from './requisitos.ts'
 
 function carpetas() {
   const raiz = mkdtempSync(join(tmpdir(), 'sloth-mover-'))
@@ -40,6 +40,12 @@ test('dice en qué va pip: qué baja y cuánto pesa, y los modelos', () => {
   assert.equal(pasoDePip('Installing collected packages: torch, whisperx'), 'Instalando los paquetes')
   assert.equal(pasoDePip('Bajando large-v3'), 'Bajando el modelo large-v3')
   assert.equal(pasoDePip('Requirement already satisfied: numpy in c:\python'), undefined)
+})
+
+test('reconoce una descarga dañada de pip, aunque el error venga recortado', () => {
+  assert.ok(descargaDanada('ERROR: THESE PACKAGES DO NOT MATCH THE HASHES FROM THE REQUIREMENTS FILE. If you have updated'))
+  assert.ok(descargaDanada('    unknown package:\n        Expected sha256 0ad925202387f4e7314302a1b4f8860fa824357f9b1466d7992bf276370ebcbf\n             Got        06759c3286f1'))
+  assert.ok(!descargaDanada('ERROR: Could not install packages due to an OSError: [Errno 28] No space left on device'))
 })
 
 test('pasa al Python de Sloth si no hay rueda para el tuyo, no por cualquier fallo de pip', () => {

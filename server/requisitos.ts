@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { Readable } from 'node:stream'
 import { pipeline } from 'node:stream/promises'
+import { setTimeout as esperar } from 'node:timers/promises'
 import type { MotorVoz as Motor, Requisito } from '../shared/types.ts'
 import { llaveEnUso } from './acceso.ts'
 import { correr } from './version.ts'
@@ -215,14 +216,24 @@ export async function instalarPythonSloth(app: string, { raiz = PYTHONES, modelo
   paso = 'Bajando Python'
   const python = await pythonStandalone(carpeta, app)
   paso = 'Preparando los paquetes'
-  const pip = (...args: string[]) =>
+  const pipUnaVez = (...args: string[]) =>
     ejecutar(python, ['-E', '-s', '-X', 'utf8', '-m', 'pip', 'install', '--disable-pip-version-check', '--no-warn-script-location', ...args], app, verPaso)
+  // Una descarga dañada se reintenta una vez sin la caché de pip, que la guardaría: casi siempre es el espejo de PyTorch,
+  // que rehace sus páginas varias veces al día y por unos minutos anuncia huellas que no son las de sus archivos.
+  const pip = (...args: string[]) =>
+    pipUnaVez(...args).catch(async (e) => {
+      if (!descargaDanada(String(e))) throw e
+      paso = 'La descarga llegó dañada: se vuelve a bajar en un momento'
+      await esperar(60_000)
+      return pipUnaVez('--no-cache-dir', ...args)
+    })
   if (motor === 'parakeet-solo') await pip(...PIP_SIN_TORCH)
   else {
     // En Windows y Mac, el torch de PyPI es el de CPU (en Mac, con la GPU de Apple); en Linux, el de CUDA, que pesa gigas
-    // de más sin una NVIDIA: ahí va antes el de CPU.
+    // de más sin una NVIDIA: ahí va antes el de CPU. Del espejo de PyTorch salen solo los tres torch (`--no-deps`): sus
+    // dependencias, como todo lo demás, vienen de PyPI en el pip siguiente.
     const indice = cuda ? 'cu128' : process.platform === 'linux' ? 'cpu' : null
-    if (indice) await pip(...TORCH, '--index-url', `https://download.pytorch.org/whl/${indice}`)
+    if (indice) await pip(...TORCH, '--no-deps', '--index-url', `https://download.pytorch.org/whl/${indice}`)
     await pip(...TORCH, ...PIP_SLOTH, ...(motor === 'parakeet' ? [PARAKEET] : []))
   }
   mkdirSync(modelos, { recursive: true })
@@ -257,6 +268,9 @@ let ytDlp = false
  */
 let paso: string | undefined
 const verPaso = (linea: string) => void (paso = pasoDePip(linea) ?? paso)
+
+/** Lo que dice pip cuando un archivo no tiene la huella (sha256) que anuncia el índice: llegó dañado o cambiado. */
+export const descargaDanada = (salida: string) => /DO NOT MATCH THE HASHES|Expected sha256/.test(salida)
 
 /** «Bajando torch (3,4 GB)» de las líneas de pip (y de `BAJAR_MODELOS`) que dicen en qué va; `undefined` de las demás. */
 export function pasoDePip(linea: string): string | undefined {
