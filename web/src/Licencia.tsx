@@ -241,8 +241,8 @@ export function SuscripcionOpciones() {
   // Un año pagado de una vez: el pago del siguiente.
   const renovar = () => api<{ enlace: string }>('/api/licencia/pago', {}).then((r) => window.open(r.enlace, '_blank'), (e) => setError(e.message))
   const cada = l.plan === 'anual' ? 'al año' : 'al mes'
-  const pagado = l.plan === 'mensual' || l.plan === 'anual'
-  const titulo = `${l.plan === 'gratis' ? 'Gratis de por vida' : pagado ? `Apoyo ${l.plan}` : 'Sin apoyo'}${l.fundador ? ' · Fundador' : ''}`
+  const pagado = l.plan === 'mensual' || l.plan === 'anual' || l.plan === 'unico'
+  const titulo = `${l.plan === 'gratis' ? 'Gratis de por vida' : l.plan === 'unico' ? 'Apoyo de una vez' : pagado ? `Apoyo ${l.plan}` : 'Sin apoyo'}${l.fundador ? ' · Fundador' : ''}`
   const resumen =
     l.plan === 'gratis'
       ? l.activa
@@ -269,7 +269,7 @@ export function SuscripcionOpciones() {
         {/* Pagado de una vez: se renueva con la misma clave, también cuando ya se acabó. */}
         {l.estado === 'pagado' && (
           <button className={apoya(l) ? 'ghost small' : 'primary small'} onClick={renovar}>
-            Renovar
+            {l.plan === 'unico' ? 'Apoyar otra vez' : 'Renovar'}
           </button>
         )}
         {!apoya(l) && (

@@ -36,6 +36,10 @@
     "FUNDADORES": 25,
     "PRECIO_MENSUAL": 15,
     "PRECIO_ANUAL": 150,
+    // El mensual y el de una vez también van con el monto que elija cada quien, desde APOYO_MINIMO; desde APOYO_GRANDE al
+    // mes, con la insignia de apoyo grande en la comunidad.
+    "APOYO_MINIMO": 1,
+    "APOYO_GRANDE": 30,
     "MONEDA": "USD",
     // Los correos salen de un dominio verificado en Resend (con su RESEND_API_KEY como secreto) y se responden en soporte@vancci.org.
     "CORREO_DE": "Sloth <avisos@vancci.org>",

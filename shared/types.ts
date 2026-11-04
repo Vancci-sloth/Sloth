@@ -1029,8 +1029,8 @@ export interface Autor {
   foto?: string
   /** El creador de Sloth. */
   creador?: boolean
-  /** Fundador (de las primeras personas que apoyaron, para siempre) o Apoya (mientras apoya). */
-  insignia?: 'fundador' | 'apoya'
+  /** Fundador (de las primeras personas que apoyaron, para siempre), Apoyo grande o Apoya (mientras apoya). */
+  insignia?: 'fundador' | 'grande' | 'apoya'
   /** Solo en tu perfil: si sales en los créditos de sloth.vancci.org (los Fundadores que lo piden). */
   creditos?: boolean
 }
@@ -1188,8 +1188,11 @@ export interface Licencia {
   activa: boolean
   clave?: string
   email?: string
-  /** `mensual` o `anual`: un apoyo; `gratis`: uno de los lugares gratis de por vida (de cuando Sloth se vendía); `cuenta`: una cuenta gratis. */
-  plan?: 'mensual' | 'anual' | 'gratis' | 'cuenta'
+  /**
+   * `mensual`, `anual` o `unico` (de una vez, vale un mes): un apoyo; `gratis`: uno de los lugares gratis de por vida
+   * (de cuando Sloth se vendía); `cuenta`: una cuenta gratis.
+   */
+  plan?: 'mensual' | 'anual' | 'unico' | 'gratis' | 'cuenta'
   /** Lo que se cobra cada mes o cada año, en la moneda con que empezó el apoyo. */
   monto?: number
   /**

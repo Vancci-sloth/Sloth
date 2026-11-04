@@ -93,7 +93,7 @@ interface Miembro {
   visto: string
   /** 1: un Fundador que quiere salir en los créditos de sloth.vancci.org. */
   creditos: number
-  /** No es columna: la calcula `INSIGNIA` al leerlo. */
+  /** No es columna: la calcula `insignia` al leerlo. */
   insignia?: Autor['insignia'] | null
 }
 
@@ -213,25 +213,28 @@ async function quien(req: Request, env: Env): Promise<Miembro> {
     }
   }
   const m =
-    (await env.DB.prepare(`SELECT m.*, ${INSIGNIA} FROM miembros m JOIN licencias l ON l.clave = m.clave WHERE l.email = (SELECT email FROM licencias WHERE clave = ?) ORDER BY m.creado LIMIT 1`)
+    (await env.DB.prepare(`SELECT m.*, ${insignia(env)} FROM miembros m JOIN licencias l ON l.clave = m.clave WHERE l.email = (SELECT email FROM licencias WHERE clave = ?) ORDER BY m.creado LIMIT 1`)
       .bind(clave)
-      .first<Miembro>()) ?? (await env.DB.prepare(`SELECT m.*, ${INSIGNIA} FROM miembros m WHERE m.clave = ?`).bind(clave).first<Miembro>())
+      .first<Miembro>()) ?? (await env.DB.prepare(`SELECT m.*, ${insignia(env)} FROM miembros m WHERE m.clave = ?`).bind(clave).first<Miembro>())
   if (m) {
     if (ahora - Date.parse(m.visto) > VISTO) await env.DB.prepare('UPDATE miembros SET visto = ? WHERE id = ?').bind(new Date(ahora).toISOString(), m.id).run()
     return m
   }
   const hoy = new Date(ahora).toISOString()
   await env.DB.prepare('INSERT INTO miembros (id, clave, creado, visto) VALUES (?, ?, ?, ?) ON CONFLICT (clave) DO NOTHING').bind(nuevoId(), clave, hoy, hoy).run()
-  return (await env.DB.prepare(`SELECT m.*, ${INSIGNIA} FROM miembros m WHERE m.clave = ?`).bind(clave).first<Miembro>())!
+  return (await env.DB.prepare(`SELECT m.*, ${insignia(env)} FROM miembros m WHERE m.clave = ?`).bind(clave).first<Miembro>())!
 }
 
 /**
  * La insignia del miembro `m`, por el correo de su clave: `fundador` si un apoyo suyo entró entre los primeros y se
- * pagó, o si tiene un lugar gratis de por vida (para siempre, `esFundador`), `apoya` mientras tenga uno pagado y sin vencer.
+ * pagó, o si tiene un lugar gratis de por vida (para siempre, `esFundador`); mientras tenga uno pagado y sin vencer,
+ * `grande` si es de `APOYO_GRANDE` o más al mes (o de una vez) en `MONEDA`, y si no, `apoya`.
  */
-const INSIGNIA = `(SELECT CASE WHEN MAX(${esFundador('li')}) THEN 'fundador'
+const insignia = (env: Env) => `(SELECT CASE WHEN MAX(${esFundador('li')}) THEN 'fundador'
+  WHEN MAX(julianday(li.pagado_hasta) > julianday('now') AND li.plan IN ('mensual', 'unico') AND li.moneda = '${env.MONEDA.replace(/[^A-Z]/g, '')}'
+    AND li.monto >= ${Number(env.APOYO_GRANDE) || 30}) THEN 'grande'
   WHEN MAX(julianday(li.pagado_hasta) > julianday('now')) THEN 'apoya' END
-  FROM licencias li WHERE li.plan IN ('mensual', 'anual', 'gratis') AND li.modo = 'produccion'
+  FROM licencias li WHERE li.plan IN ('mensual', 'anual', 'unico', 'gratis') AND li.modo = 'produccion'
   AND li.email = (SELECT lc.email FROM licencias lc WHERE lc.clave = m.clave)) AS insignia`
 
 const nuevoId = () => letras(12).toLowerCase()
@@ -349,7 +352,7 @@ async function miembros(env: Env, ids: string[]): Promise<Map<string, Autor>> {
   // D1 acepta hasta 100 valores por consulta.
   for (let i = 0; i < unicos.length; i += 90) {
     const parte = unicos.slice(i, i + 90)
-    const { results } = await env.DB.prepare(`SELECT m.id, m.clave, m.nombre, m.foto, ${INSIGNIA} FROM miembros m WHERE m.id IN (${parte.map(() => '?').join(', ')})`).bind(...parte).all<Miembro>()
+    const { results } = await env.DB.prepare(`SELECT m.id, m.clave, m.nombre, m.foto, ${insignia(env)} FROM miembros m WHERE m.id IN (${parte.map(() => '?').join(', ')})`).bind(...parte).all<Miembro>()
     for (const m of results) mapa.set(m.id, autor(env, m))
   }
   return mapa
@@ -662,7 +665,7 @@ async function perfil(env: Env, yo: Miembro, c: Record<string, unknown>): Promis
 
 /** La votación del roadmap, como la ve `yo`: los votos de cada meta (el de un Fundador vale dos) y el suyo. */
 async function roadmap(env: Env, yo: Miembro): Promise<RoadmapComunidad> {
-  const { results } = await env.DB.prepare(`SELECT v.miembro, v.meta, ${INSIGNIA} FROM votos v JOIN miembros m ON m.id = v.miembro`).all<{ miembro: string; meta: string; insignia: string | null }>()
+  const { results } = await env.DB.prepare(`SELECT v.miembro, v.meta, ${insignia(env)} FROM votos v JOIN miembros m ON m.id = v.miembro`).all<{ miembro: string; meta: string; insignia: string | null }>()
   const votos = new Map<string, number>()
   for (const v of results) votos.set(v.meta, (votos.get(v.meta) ?? 0) + (v.insignia === 'fundador' ? 2 : 1))
   const mio = results.find((v) => v.miembro === yo.id)?.meta
@@ -671,7 +674,7 @@ async function roadmap(env: Env, yo: Miembro): Promise<RoadmapComunidad> {
 
 /** Los nombres de los Fundadores que pidieron salir en los créditos de sloth.vancci.org, del primero al último. */
 export async function creditos(env: Env): Promise<string[]> {
-  const { results } = await env.DB.prepare(`SELECT m.nombre, ${INSIGNIA} FROM miembros m WHERE m.creditos = 1 AND m.nombre != '' ORDER BY m.creado`).all<Pick<Miembro, 'nombre' | 'insignia'>>()
+  const { results } = await env.DB.prepare(`SELECT m.nombre, ${insignia(env)} FROM miembros m WHERE m.creditos = 1 AND m.nombre != '' ORDER BY m.creado`).all<Pick<Miembro, 'nombre' | 'insignia'>>()
   return results.filter((m) => m.insignia === 'fundador').map((m) => m.nombre)
 }
 

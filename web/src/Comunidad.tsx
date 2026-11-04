@@ -444,7 +444,7 @@ function Nombre({ autor }: { autor: Autor }) {
     <span className="com-nombre">
       {autor.nombre || 'Sin nombre'}
       {autor.creador && <span className="com-creador">Creador</span>}
-      {autor.insignia && <span className="com-creador">{autor.insignia === 'fundador' ? 'Fundador' : 'Apoya'}</span>}
+      {autor.insignia && <span className="com-creador">{autor.insignia === 'fundador' ? 'Fundador' : autor.insignia === 'grande' ? 'Apoyo grande' : 'Apoya'}</span>}
     </span>
   )
 }

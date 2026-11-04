@@ -24,9 +24,12 @@
  * Del 24 al 28 de octubre de 2026 también se pudo pagar con Stripe; nadie llegó a pagar y se quitó. De entonces queda
  * la columna `stripe`, vacía.
  *
- * El apoyo cuesta lo mismo para todos (`PRECIO_MENSUAL` o `PRECIO_ANUAL`). Las `FUNDADORES` primeras personas que apoyan
- * son fundadoras (`fundador`) para siempre: más beneficios que quien llega después. Cada suscripción conserva el monto
- * y la moneda con que se creó: las de antes del 30 de octubre de 2026 siguen en pesos; las nuevas, en `MONEDA`.
+ * El apoyo sugerido cuesta lo mismo para todos (`PRECIO_MENSUAL` o `PRECIO_ANUAL`). Desde el 4 de noviembre de 2026 el
+ * mensual también va con el monto que elija cada quien (desde `APOYO_MINIMO`; con `APOYO_GRANDE` o más, la insignia
+ * de apoyo grande), y hay un apoyo de una vez (`unico`): una orden como la del año, de cualquier monto, que vale un mes.
+ * Las `FUNDADORES` primeras personas que apoyan con el precio sugerido o más son fundadoras (`fundador`) para siempre:
+ * más beneficios que quien llega después. Cada suscripción conserva el monto y la moneda con que se creó: las de antes
+ * del 30 de octubre de 2026 siguen en pesos; las nuevas, en `MONEDA`.
  * Cuando Sloth se vendía, las primeras personas se unieron gratis de por vida (plan `gratis`, `GRATIS` como mucho): son
  * fundadoras como las primeras que apoyan (`esFundador`), con lo nuevo `ANTICIPO` antes y sin el recordatorio. Ya no se
  * dan.
@@ -73,6 +76,10 @@ export interface Env {
   ORIGEN: string
   PRECIO_MENSUAL: number
   PRECIO_ANUAL: number
+  /** Lo menos que se apoya con el monto que elija cada quien, al mes o de una vez. */
+  APOYO_MINIMO: number
+  /** Desde cuánto al mes es un apoyo grande: su insignia en la comunidad. */
+  APOYO_GRANDE: number
   /** La moneda de esos precios, con su código de PayPal. */
   MONEDA: string
   /** Los lugares gratis de por vida que se dieron cuando Sloth se vendía: ya no se dan. */
@@ -87,8 +94,11 @@ export interface Env {
   CORREO_RESPUESTA: string
 }
 
-/** `gratis`: un lugar gratis de por vida, de cuando Sloth se vendía; `cuenta`: una cuenta gratis, sin apoyo. */
-type Plan = 'mensual' | 'anual' | 'gratis' | 'cuenta'
+/**
+ * `unico`: un apoyo de una vez, que vale un mes; `gratis`: un lugar gratis de por vida, de cuando Sloth se vendía;
+ * `cuenta`: una cuenta gratis, sin apoyo.
+ */
+type Plan = 'mensual' | 'anual' | 'unico' | 'gratis' | 'cuenta'
 /**
  * Los de Mercado Pago, `gratis` para un lugar gratis de por vida o una cuenta (para quitárselos, `cancelled`) y
  * `pagado` para un año pagado de una vez, que vale hasta `pagado_hasta` sin renovarse.
@@ -133,8 +143,10 @@ export interface Lectura {
   hasta?: string
 }
 
-/** Un año pagado de una vez, con Mercado Pago o con PayPal: no se renueva solo. */
+/** Un año (o un mes, el apoyo `unico`) pagado de una vez, con Mercado Pago o con PayPal: no se renueva solo. */
 const deUnaVez = (f: Pick<Fila, 'preferencia' | 'orden'>) => !!(f.preferencia || f.orden)
+/** Lo más que se apoya de una sola vez con el monto que elija cada quien. */
+const APOYO_MAXIMO = 1000
 /** Quién cobra la suscripción de la fila, o quién cobró el primer año: para los correos y la página de gracias. */
 const pasarela = (f: Pick<Fila, 'preapproval' | 'preferencia'>) => (f.preapproval || f.preferencia ? 'Mercado Pago' : 'PayPal')
 
@@ -145,7 +157,7 @@ export interface Cuenta {
   apoyan: number
 }
 
-type Tarifas = Pick<Env, 'FUNDADORES' | 'FUNDADORES_HASTA' | 'PRECIO_MENSUAL' | 'PRECIO_ANUAL' | 'MONEDA'>
+type Tarifas = Pick<Env, 'FUNDADORES' | 'FUNDADORES_HASTA' | 'PRECIO_MENSUAL' | 'PRECIO_ANUAL' | 'APOYO_MINIMO' | 'APOYO_GRANDE' | 'MONEDA'>
 
 interface Preapproval {
   id: string
@@ -413,13 +425,13 @@ async function ultimaLigera(req: Request, env: Env, ctx: ExecutionContext, so: S
 
 /**
  * Si quien pregunta apoya hoy: la app manda su clave y su computadora (`x-sloth-clave`, `x-sloth-equipo`), y la clave
- * es de un apoyo mensual o anual vigente, o de un lugar gratis de por vida, en esa computadora.
+ * es de un apoyo vigente (mensual, anual o de una vez), o de un lugar gratis de por vida, en esa computadora.
  */
 async function apoya(req: Request, env: Env): Promise<boolean> {
   const clave = (req.headers.get('x-sloth-clave') ?? '').replace(/\s+/g, '').toUpperCase()
   const equipo = req.headers.get('x-sloth-equipo') ?? ''
   if (!CLAVE.test(clave) || !EQUIPO.test(equipo)) return false
-  const f = await env.DB.prepare("SELECT l.estado, l.pagado_hasta FROM licencias l JOIN equipos e ON e.clave = l.clave WHERE l.clave = ? AND e.equipo = ? AND l.plan IN ('mensual', 'anual', 'gratis')")
+  const f = await env.DB.prepare("SELECT l.estado, l.pagado_hasta FROM licencias l JOIN equipos e ON e.clave = l.clave WHERE l.clave = ? AND e.equipo = ? AND l.plan IN ('mensual', 'anual', 'unico', 'gratis')")
     .bind(clave, equipo)
     .first<Pick<Fila, 'estado' | 'pagado_hasta'>>()
   return !!f && vigencia(f, Date.now()).activa
@@ -553,21 +565,39 @@ async function precios(env: Env) {
   const c = await env.DB.prepare(
     `SELECT COUNT(CASE WHEN autorizada IS NOT NULL AND fundador = 1 THEN 1 END) AS fundadores,
             COUNT(CASE WHEN julianday(pagado_hasta) > julianday('now') THEN 1 END) AS apoyan
-     FROM licencias WHERE plan IN ('mensual', 'anual') AND modo = 'produccion'`
+     FROM licencias WHERE plan IN ('mensual', 'anual', 'unico') AND modo = 'produccion'`
   ).first<Cuenta>()
   return tarifa(c ?? { fundadores: 0, apoyan: 0 }, env)
 }
 
-/** El precio, el mismo para todos. `quedan`: los lugares de fundador que quedan; `apoyan`, para las metas del roadmap. */
+/**
+ * El precio sugerido, el mismo para todos, y desde cuánto se apoya con el monto que elija cada quien (`minimo`) o es un
+ * apoyo grande (`grande`). `quedan`: los lugares de fundador que quedan; `apoyan`, para las metas del roadmap.
+ */
 export function tarifa(c: Cuenta, env: Tarifas, ahora = Date.now()) {
   const abierto = !env.FUNDADORES_HASTA || ahora < Date.parse(env.FUNDADORES_HASTA)
   return {
     quedan: abierto ? Math.max(0, Number(env.FUNDADORES) - c.fundadores) : 0,
     mensual: Number(env.PRECIO_MENSUAL),
     anual: Number(env.PRECIO_ANUAL),
+    minimo: Number(env.APOYO_MINIMO),
+    grande: Number(env.APOYO_GRANDE),
     moneda: env.MONEDA,
     apoyan: c.apoyan
   }
+}
+
+/**
+ * Cuánto se cobra: el anual, su precio; el mensual, el sugerido si no se elige otro; el de una vez, el que se elija.
+ * El elegido va en dólares enteros, de `minimo` a `APOYO_MAXIMO`: cada monto mensual es un plan de PayPal.
+ */
+export function montoDe(plan: 'mensual' | 'anual' | 'unico', elegido: unknown, p: Pick<ReturnType<typeof tarifa>, 'mensual' | 'anual' | 'minimo' | 'moneda'>): number {
+  if (plan === 'anual') return p.anual
+  if (elegido === undefined && plan === 'mensual') return p.mensual
+  const monto = Number(elegido)
+  if (!Number.isInteger(monto) || monto < p.minimo || monto > APOYO_MAXIMO)
+    throw new Rechazo(400, `Elige un monto entero de $${p.minimo} a $${APOYO_MAXIMO.toLocaleString('es-MX')} ${p.moneda}.`)
+  return monto
 }
 
 /**
@@ -578,22 +608,23 @@ export function tarifa(c: Cuenta, env: Tarifas, ahora = Date.now()) {
 async function suscribir(env: Env, c: Record<string, unknown>, desde: string): Promise<Response> {
   const email = String(c.email ?? '').trim().toLowerCase()
   if (!EMAIL.test(email) || email.length > 254) throw new Rechazo(400, 'Escribe un correo válido.')
-  const plan: Plan = c.plan === 'gratis' ? 'gratis' : c.plan === 'anual' ? 'anual' : 'mensual'
+  const plan: Plan = c.plan === 'gratis' ? 'gratis' : c.plan === 'anual' ? 'anual' : c.plan === 'unico' ? 'unico' : 'mensual'
   const equipo = c.equipo === undefined && plan !== 'gratis' ? undefined : equipoDe(c)
-  // El consentimiento expreso de los términos y, si se paga, del cobro automático (LFPC art. 76 Bis VIII), con la versión aceptada.
+  // El consentimiento expreso de los términos y, si se paga cada mes, del cobro automático (LFPC art. 76 Bis VIII), con la versión aceptada.
   const terminos = String(c.terminos ?? '')
   if (c.acepto !== true || !TERMINOS.test(terminos))
-    throw new Rechazo(400, plan === 'gratis' ? 'Para unirte, acepta los términos.' : 'Para suscribirte, acepta el cobro automático y los términos.')
+    throw new Rechazo(400, plan === 'gratis' ? 'Para unirte, acepta los términos.' : plan === 'mensual' ? 'Para suscribirte, acepta el cobro automático y los términos.' : 'Para apoyar, acepta el pago y los términos.')
   const acepto = new Date().toISOString()
   if (plan === 'gratis') return unirse(env, email, equipo!, acepto, terminos, desde, c.porCorreo === true)
+  const p = await precios(env)
+  const monto = montoDe(plan, c.monto, p)
   // Con una ya pagada, otra cobraría dos veces; con un lugar gratis de por vida, no hace falta. Con una cuenta, sí se apoya.
   await sinOtra(env, email, true)
-  const p = await precios(env)
-  // Un doble clic, o volver a abrir el pago: la misma suscripción pendiente de la última hora, si sigue en la moneda de hoy.
+  // Un doble clic, o volver a abrir el pago: la misma suscripción pendiente de la última hora, si sigue en el monto y la moneda de hoy.
   const previa = await env.DB.prepare(
-    "SELECT * FROM licencias WHERE email = ? AND plan = ? AND moneda = ? AND estado = 'pending' AND enlace IS NOT NULL AND (paypal IS NOT NULL OR orden IS NOT NULL) AND creada > ? ORDER BY creada DESC LIMIT 1"
+    "SELECT * FROM licencias WHERE email = ? AND plan = ? AND monto = ? AND moneda = ? AND estado = 'pending' AND enlace IS NOT NULL AND (paypal IS NOT NULL OR orden IS NOT NULL) AND creada > ? ORDER BY creada DESC LIMIT 1"
   )
-    .bind(email, plan, p.moneda, new Date(Date.now() - 3600_000).toISOString())
+    .bind(email, plan, monto, p.moneda, new Date(Date.now() - 3600_000).toISOString())
     .first<Fila>()
   if (previa) {
     await env.DB.prepare('UPDATE licencias SET acepto = ?, terminos = ? WHERE id = ?').bind(acepto, terminos, previa.id).run()
@@ -605,9 +636,10 @@ async function suscribir(env: Env, c: Record<string, unknown>, desde: string): P
     clave: nuevaClave(),
     email,
     plan,
-    monto: plan === 'anual' ? p.anual : p.mensual,
+    monto,
     moneda: p.moneda,
-    fundador: p.quedan > 0 ? 1 : 0,
+    // Fundador, con el precio sugerido o más: el anual, o desde `PRECIO_MENSUAL` al mes o de una vez.
+    fundador: p.quedan > 0 && (plan === 'anual' || monto >= p.mensual) ? 1 : 0,
     preapproval: null,
     enlace: null,
     estado: 'pending',
@@ -628,10 +660,10 @@ async function suscribir(env: Env, c: Record<string, unknown>, desde: string): P
   await env.DB.prepare('INSERT INTO licencias (id, clave, email, plan, monto, moneda, fundador, estado, creada, acepto, terminos, modo) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
     .bind(fila.id, fila.clave, email, plan, fila.monto, fila.moneda, fila.fundador, fila.estado, fila.creada, acepto, terminos, fila.modo)
     .run()
-  // Dónde se paga y en qué columna queda: la orden del año o la suscripción mensual.
+  // Dónde se paga y en qué columna queda: la orden del año o del apoyo de una vez, o la suscripción mensual.
   let abierto: { columna: 'orden' | 'paypal'; id: string; enlace: string }
   try {
-    abierto = plan === 'anual' ? { columna: 'orden', ...(await ordenPaypal(env, fila)) } : { columna: 'paypal', ...(await suscripcionPaypal(env, fila)) }
+    abierto = plan === 'mensual' ? { columna: 'paypal', ...(await suscripcionPaypal(env, fila)) } : { columna: 'orden', ...(await ordenPaypal(env, fila)) }
   } catch (error) {
     await env.DB.prepare('DELETE FROM licencias WHERE id = ?').bind(fila.id).run()
     throw error instanceof Rechazo ? new Rechazo(502, 'PayPal no pudo abrir el pago. Revisa tu correo e intenta otra vez.') : error
@@ -668,11 +700,12 @@ async function suscripcionPaypal(env: Env, f: Fila): Promise<{ id: string; enlac
   return { id: s.id, enlace: enlacePaypal(s.links, 'approve') }
 }
 
-/** Un año pagado de una vez: una orden de PayPal con la fila en `custom_id`, que se cobra cuando el cliente la aprueba. */
+/** Un año, o un apoyo de una vez: una orden de PayPal con la fila en `custom_id`, que se cobra cuando el cliente la aprueba. */
 async function ordenPaypal(env: Env, f: Fila): Promise<{ id: string; enlace: string }> {
+  const description = f.plan === 'unico' ? 'Sloth - apoyo de una vez' : 'Sloth - plan anual'
   const o = await paypal<OrdenPaypal>(env, 'POST', '/v2/checkout/orders', {
     intent: 'CAPTURE',
-    purchase_units: [{ custom_id: f.id, description: 'Sloth - plan anual', soft_descriptor: 'SLOTH', amount: { currency_code: f.moneda, value: f.monto.toFixed(2) } }],
+    purchase_units: [{ custom_id: f.id, description, soft_descriptor: 'SLOTH', amount: { currency_code: f.moneda, value: f.monto.toFixed(2) } }],
     payment_source: { paypal: { experience_context: experiencia(env, f, 'PAY_NOW') } }
   })
   return { id: o.id, enlace: enlacePaypal(o.links, 'payer-action') }
@@ -717,8 +750,9 @@ async function guardarIdPaypal(env: Env, llave: string, id: string): Promise<str
 }
 
 /**
- * Abre el pago del año siguiente de un año pagado de una vez, con PayPal aunque el primero fuera con Mercado Pago: la
- * misma fila y la misma clave. Antes guarda lo cobrado de la orden que deja de ser la última. Da adónde ir a pagar.
+ * Abre el pago del año siguiente de un año pagado de una vez (o de otro mes, el de una vez), con PayPal aunque el primero
+ * fuera con Mercado Pago: la misma fila y la misma clave. Antes guarda lo cobrado de la orden que deja de ser la última.
+ * Da adónde ir a pagar.
  */
 async function renovar(env: Env, f: Fila): Promise<string> {
   if (f.orden) await cobrarOrden(env, f, f.orden)
@@ -826,8 +860,8 @@ async function cancelar(env: Env, c: Record<string, unknown>): Promise<Response>
 }
 
 /**
- * Adónde se va a pagar desde Sloth: con un año pagado de una vez, el pago del año siguiente. La tarjeta de la
- * suscripción mensual se cambia en la cuenta de PayPal (o de Mercado Pago) del cliente.
+ * Adónde se va a pagar desde Sloth: con un año pagado de una vez, el pago del año siguiente (con el de una vez, otro
+ * mes). La tarjeta de la suscripción mensual se cambia en la cuenta de PayPal (o de Mercado Pago) del cliente.
  */
 async function pago(env: Env, c: Record<string, unknown>): Promise<Response> {
   const equipo = equipoDe(c)
@@ -982,11 +1016,11 @@ async function pagosMp(env: Env, f: Fila, avisado?: PagoMp): Promise<PagoMp[]> {
 }
 
 /**
- * Un año pagado de una vez, como lo guarda el cobro: cada pago que vale, en su moneda y de su monto, suma un año desde
- * que se aprobó, o desde que acaba lo ya pagado si se renovó antes. Sin ninguno que valga: reembolsado o con contracargo,
- * se acabó; si no, espera el pago.
+ * Un año pagado de una vez, como lo guarda el cobro: cada pago que vale, en su moneda y de su monto, suma un año (un
+ * mes, el apoyo de una vez) desde que se aprobó, o desde que acaba lo ya pagado si se renovó antes. Sin ninguno que
+ * valga: reembolsado o con contracargo, se acabó; si no, espera el pago.
  */
-export function leerPagos(pagos: Pick<PagoMp, 'status' | 'transaction_amount' | 'currency_id' | 'date_approved'>[], f: Pick<Fila, 'monto' | 'moneda'>): Lectura {
+export function leerPagos(pagos: Pick<PagoMp, 'status' | 'transaction_amount' | 'currency_id' | 'date_approved'>[], f: Pick<Fila, 'monto' | 'moneda' | 'plan'>): Lectura {
   const aprobados = pagos
     .filter((p) => VALEN.has(p.status) && p.currency_id === f.moneda && p.transaction_amount >= f.monto && p.date_approved)
     .map((p) => Date.parse(p.date_approved!))
@@ -994,7 +1028,7 @@ export function leerPagos(pagos: Pick<PagoMp, 'status' | 'transaction_amount' | 
   let fin = 0
   for (const aprobado of aprobados) {
     const d = new Date(Math.max(fin, aprobado))
-    fin = d.setUTCFullYear(d.getUTCFullYear() + 1)
+    fin = f.plan === 'unico' ? d.setUTCMonth(d.getUTCMonth() + 1) : d.setUTCFullYear(d.getUTCFullYear() + 1)
   }
   if (fin) return { estado: 'pagado', hasta: new Date(fin).toISOString() }
   return { estado: pagos.some((p) => p.status === 'refunded' || p.status === 'charged_back') ? 'cancelled' : 'pending' }
@@ -1242,8 +1276,9 @@ export function json(datos: unknown, status = 200, cabeceras: Record<string, str
  * canceló, cambió la fecha o ya se renovó, no se avisa de algo que no va a pasar.
  */
 export async function avisarCobros(env: Env, ahora = Date.now()) {
+  // El apoyo de una vez no tiene cobro ni año que se acabe: no se avisa.
   const { results } = await env.DB.prepare(
-    "SELECT * FROM licencias WHERE estado IN ('authorized', 'pagado') AND pagado_hasta IS NOT NULL AND (avisado_para IS NULL OR avisado_para != pagado_hasta)"
+    "SELECT * FROM licencias WHERE estado IN ('authorized', 'pagado') AND plan != 'unico' AND pagado_hasta IS NOT NULL AND (avisado_para IS NULL OR avisado_para != pagado_hasta)"
   ).all<Fila>()
   for (const vieja of results) {
     if (!faltaAvisar(vieja, ahora)) continue
@@ -1350,7 +1385,7 @@ ${correoAviso(escapar(fila.email))}
 async function renovacion(env: Env, url: URL): Promise<Response> {
   const id = url.searchParams.get('s') ?? ''
   const fila = /^[\w-]{36}$/.test(id) ? await env.DB.prepare('SELECT * FROM licencias WHERE id = ?').bind(id).first<Fila>() : null
-  if (!fila?.preferencia || fila.estado !== 'pagado')
+  if (!fila || !deUnaVez(fila) || fila.estado !== 'pagado')
     return pagina('Este enlace ya no sirve', '<p>Para apoyar a Sloth, entra a <a href="https://sloth.vancci.org">sloth.vancci.org</a>, o responde al correo y te ayudamos.</p>')
   return Response.redirect(await renovar(env, fila), 303)
 }
