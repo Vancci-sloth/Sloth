@@ -18,9 +18,11 @@
  * misma clave. Lo cobrado de cada orden se guarda en `paypal_pagos`, así que un aviso repetido no suma dos veces. La
  * orden aprobada hay que cobrarla (`capture`): lo hace quien se entere primero, `/gracias` o el aviso.
  *
- * Hasta el 29 de octubre de 2026 se cobró con Mercado Pago. Lo de entonces sigue sin cambios: sus suscripciones
- * (`preapproval`) cobran, se leen y se cancelan en Mercado Pago, con su aviso (`POST /webhook`), y un año pagado ahí de
- * una vez (`preferencia`) cuenta sus pagos, aunque el siguiente se pague con PayPal.
+ * También se paga con Mercado Pago (`pasarela: 'mercadopago'`), que solo cobra en pesos (`mxn` en `/precio`): el
+ * mensual es una suscripción (`preapproval`) y el año o el apoyo de una vez, un pago de Checkout Pro (`preferencia`),
+ * con OXXO, SPEI y meses sin intereses. Se leen, se cancelan y avisan (`POST /webhook`) en Mercado Pago. Del 29 de
+ * octubre al 4 de noviembre de 2026 solo se pudo pagar con PayPal; un año de Mercado Pago que se renovó entonces con
+ * PayPal sigue renovándose con PayPal.
  * Del 24 al 28 de octubre de 2026 también se pudo pagar con Stripe; nadie llegó a pagar y se quitó. De entonces queda
  * la columna `stripe`, vacía.
  *
@@ -82,6 +84,11 @@ export interface Env {
   APOYO_GRANDE: number
   /** La moneda de esos precios, con su código de PayPal. */
   MONEDA: string
+  /** Los mismos, en pesos, para quien paga con Mercado Pago (solo cobra en MXN). */
+  PRECIO_MENSUAL_MXN: number
+  PRECIO_ANUAL_MXN: number
+  APOYO_MINIMO_MXN: number
+  APOYO_GRANDE_MXN: number
   /** Los lugares gratis de por vida que se dieron cuando Sloth se vendía: ya no se dan. */
   GRATIS: number
   /** Las primeras personas que apoyan, fundadoras (hasta `FUNDADORES_HASTA` si se pone, una fecha ISO). */
@@ -145,8 +152,8 @@ export interface Lectura {
 
 /** Un año (o un mes, el apoyo `unico`) pagado de una vez, con Mercado Pago o con PayPal: no se renueva solo. */
 const deUnaVez = (f: Pick<Fila, 'preferencia' | 'orden'>) => !!(f.preferencia || f.orden)
-/** Lo más que se apoya de una sola vez con el monto que elija cada quien. */
-const APOYO_MAXIMO = 1000
+/** Lo más que se apoya de una sola vez con el monto que elija cada quien, en cada moneda. */
+const APOYO_MAXIMO: Record<string, number> = { USD: 1000, MXN: 20000 }
 /** Quién cobra la suscripción de la fila, o quién cobró el primer año: para los correos y la página de gracias. */
 const pasarela = (f: Pick<Fila, 'preapproval' | 'preferencia'>) => (f.preapproval || f.preferencia ? 'Mercado Pago' : 'PayPal')
 
@@ -157,7 +164,31 @@ export interface Cuenta {
   apoyan: number
 }
 
-type Tarifas = Pick<Env, 'FUNDADORES' | 'FUNDADORES_HASTA' | 'PRECIO_MENSUAL' | 'PRECIO_ANUAL' | 'APOYO_MINIMO' | 'APOYO_GRANDE' | 'MONEDA'>
+type Tarifas = Pick<
+  Env,
+  | 'FUNDADORES'
+  | 'FUNDADORES_HASTA'
+  | 'PRECIO_MENSUAL'
+  | 'PRECIO_ANUAL'
+  | 'APOYO_MINIMO'
+  | 'APOYO_GRANDE'
+  | 'MONEDA'
+  | 'PRECIO_MENSUAL_MXN'
+  | 'PRECIO_ANUAL_MXN'
+  | 'APOYO_MINIMO_MXN'
+  | 'APOYO_GRANDE_MXN'
+>
+/** Lo que cuesta el apoyo en una moneda: el sugerido al mes y al año, y de cuánto a cuánto se elige. */
+export interface Precios {
+  mensual: number
+  anual: number
+  minimo: number
+  grande: number
+  maximo: number
+  moneda: string
+}
+/** Con qué se paga: PayPal (en `MONEDA`) o Mercado Pago (en pesos). */
+type Pasarela = 'paypal' | 'mercadopago'
 
 interface Preapproval {
   id: string
@@ -567,36 +598,49 @@ async function precios(env: Env) {
             COUNT(CASE WHEN julianday(pagado_hasta) > julianday('now') THEN 1 END) AS apoyan
      FROM licencias WHERE plan IN ('mensual', 'anual', 'unico') AND modo = 'produccion'`
   ).first<Cuenta>()
-  return tarifa(c ?? { fundadores: 0, apoyan: 0 }, env)
+  // Mercado Pago solo se ofrece con su token del modo de hoy.
+  const conMp = !!(env.MP_MODO === 'produccion' ? env.MP_ACCESS_TOKEN_PRODUCCION : env.MP_ACCESS_TOKEN)
+  return tarifa(c ?? { fundadores: 0, apoyan: 0 }, env, conMp)
 }
 
 /**
  * El precio sugerido, el mismo para todos, y desde cuánto se apoya con el monto que elija cada quien (`minimo`) o es un
- * apoyo grande (`grande`). `quedan`: los lugares de fundador que quedan; `apoyan`, para las metas del roadmap.
+ * apoyo grande (`grande`), en `MONEDA` (con PayPal) y, con `conMp`, en pesos (`mxn`, con Mercado Pago). `quedan`: los
+ * lugares de fundador que quedan; `apoyan`, para las metas del roadmap.
  */
-export function tarifa(c: Cuenta, env: Tarifas, ahora = Date.now()) {
+export function tarifa(c: Cuenta, env: Tarifas, conMp = false, ahora = Date.now()) {
   const abierto = !env.FUNDADORES_HASTA || ahora < Date.parse(env.FUNDADORES_HASTA)
+  const mxn: Precios = {
+    mensual: Number(env.PRECIO_MENSUAL_MXN),
+    anual: Number(env.PRECIO_ANUAL_MXN),
+    minimo: Number(env.APOYO_MINIMO_MXN),
+    grande: Number(env.APOYO_GRANDE_MXN),
+    maximo: APOYO_MAXIMO.MXN,
+    moneda: 'MXN'
+  }
   return {
     quedan: abierto ? Math.max(0, Number(env.FUNDADORES) - c.fundadores) : 0,
     mensual: Number(env.PRECIO_MENSUAL),
     anual: Number(env.PRECIO_ANUAL),
     minimo: Number(env.APOYO_MINIMO),
     grande: Number(env.APOYO_GRANDE),
+    maximo: APOYO_MAXIMO[env.MONEDA] ?? APOYO_MAXIMO.USD,
     moneda: env.MONEDA,
+    ...(conMp && mxn.mensual ? { mxn } : {}),
     apoyan: c.apoyan
   }
 }
 
 /**
  * Cuánto se cobra: el anual, su precio; el mensual, el sugerido si no se elige otro; el de una vez, el que se elija.
- * El elegido va en dólares enteros, de `minimo` a `APOYO_MAXIMO`: cada monto mensual es un plan de PayPal.
+ * El elegido va en enteros de su moneda, de `minimo` a `maximo`: cada monto mensual de PayPal es un plan.
  */
-export function montoDe(plan: 'mensual' | 'anual' | 'unico', elegido: unknown, p: Pick<ReturnType<typeof tarifa>, 'mensual' | 'anual' | 'minimo' | 'moneda'>): number {
+export function montoDe(plan: 'mensual' | 'anual' | 'unico', elegido: unknown, p: Pick<Precios, 'mensual' | 'anual' | 'minimo' | 'maximo' | 'moneda'>): number {
   if (plan === 'anual') return p.anual
   if (elegido === undefined && plan === 'mensual') return p.mensual
   const monto = Number(elegido)
-  if (!Number.isInteger(monto) || monto < p.minimo || monto > APOYO_MAXIMO)
-    throw new Rechazo(400, `Elige un monto entero de $${p.minimo} a $${APOYO_MAXIMO.toLocaleString('es-MX')} ${p.moneda}.`)
+  if (!Number.isInteger(monto) || monto < p.minimo || monto > p.maximo)
+    throw new Rechazo(400, `Elige un monto entero de $${p.minimo.toLocaleString('es-MX')} a $${p.maximo.toLocaleString('es-MX')} ${p.moneda}.`)
   return monto
 }
 
@@ -616,13 +660,19 @@ async function suscribir(env: Env, c: Record<string, unknown>, desde: string): P
     throw new Rechazo(400, plan === 'gratis' ? 'Para unirte, acepta los términos.' : plan === 'mensual' ? 'Para suscribirte, acepta el cobro automático y los términos.' : 'Para apoyar, acepta el pago y los términos.')
   const acepto = new Date().toISOString()
   if (plan === 'gratis') return unirse(env, email, equipo!, acepto, terminos, desde, c.porCorreo === true)
-  const p = await precios(env)
+  const t = await precios(env)
+  // Con Mercado Pago, en pesos; con PayPal, en `MONEDA`. La app de antes no manda `pasarela`: PayPal.
+  const pasa: Pasarela = c.pasarela === 'mercadopago' ? 'mercadopago' : 'paypal'
+  if (pasa === 'mercadopago' && !t.mxn) throw new Rechazo(400, 'Por ahora solo se puede pagar con PayPal.')
+  const p: Precios = pasa === 'mercadopago' ? t.mxn! : t
   const monto = montoDe(plan, c.monto, p)
   // Con una ya pagada, otra cobraría dos veces; con un lugar gratis de por vida, no hace falta. Con una cuenta, sí se apoya.
   await sinOtra(env, email, true)
-  // Un doble clic, o volver a abrir el pago: la misma suscripción pendiente de la última hora, si sigue en el monto y la moneda de hoy.
+  // Un doble clic, o volver a abrir el pago: la misma suscripción pendiente de la última hora, si sigue en el monto, la
+  // moneda y la pasarela de hoy.
+  const columnas = pasa === 'mercadopago' ? '(preapproval IS NOT NULL OR preferencia IS NOT NULL)' : '(paypal IS NOT NULL OR orden IS NOT NULL)'
   const previa = await env.DB.prepare(
-    "SELECT * FROM licencias WHERE email = ? AND plan = ? AND monto = ? AND moneda = ? AND estado = 'pending' AND enlace IS NOT NULL AND (paypal IS NOT NULL OR orden IS NOT NULL) AND creada > ? ORDER BY creada DESC LIMIT 1"
+    `SELECT * FROM licencias WHERE email = ? AND plan = ? AND monto = ? AND moneda = ? AND estado = 'pending' AND enlace IS NOT NULL AND ${columnas} AND creada > ? ORDER BY creada DESC LIMIT 1`
   )
     .bind(email, plan, monto, p.moneda, new Date(Date.now() - 3600_000).toISOString())
     .first<Fila>()
@@ -638,8 +688,8 @@ async function suscribir(env: Env, c: Record<string, unknown>, desde: string): P
     plan,
     monto,
     moneda: p.moneda,
-    // Fundador, con el precio sugerido o más: el anual, o desde `PRECIO_MENSUAL` al mes o de una vez.
-    fundador: p.quedan > 0 && (plan === 'anual' || monto >= p.mensual) ? 1 : 0,
+    // Fundador, con el precio sugerido o más: el anual, o desde el mensual sugerido de su moneda, al mes o de una vez.
+    fundador: t.quedan > 0 && (plan === 'anual' || monto >= p.mensual) ? 1 : 0,
     preapproval: null,
     enlace: null,
     estado: 'pending',
@@ -652,7 +702,7 @@ async function suscribir(env: Env, c: Record<string, unknown>, desde: string): P
     folio: null,
     cancelada: null,
     avisado_para: null,
-    modo: env.PAYPAL_MODO,
+    modo: pasa === 'mercadopago' ? env.MP_MODO : env.PAYPAL_MODO,
     preferencia: null,
     paypal: null,
     orden: null
@@ -660,13 +710,16 @@ async function suscribir(env: Env, c: Record<string, unknown>, desde: string): P
   await env.DB.prepare('INSERT INTO licencias (id, clave, email, plan, monto, moneda, fundador, estado, creada, acepto, terminos, modo) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
     .bind(fila.id, fila.clave, email, plan, fila.monto, fila.moneda, fila.fundador, fila.estado, fila.creada, acepto, terminos, fila.modo)
     .run()
-  // Dónde se paga y en qué columna queda: la orden del año o del apoyo de una vez, o la suscripción mensual.
-  let abierto: { columna: 'orden' | 'paypal'; id: string; enlace: string }
+  // Dónde se paga y en qué columna queda: la suscripción mensual, o el pago del año o del apoyo de una vez.
+  let abierto: { columna: 'orden' | 'paypal' | 'preapproval' | 'preferencia'; id: string; enlace: string }
   try {
-    abierto = plan === 'mensual' ? { columna: 'paypal', ...(await suscripcionPaypal(env, fila)) } : { columna: 'orden', ...(await ordenPaypal(env, fila)) }
+    if (pasa === 'mercadopago')
+      abierto = plan === 'mensual' ? { columna: 'preapproval', ...(await suscripcionMp(env, fila)) } : { columna: 'preferencia', ...(await preferenciaMp(env, fila)) }
+    else abierto = plan === 'mensual' ? { columna: 'paypal', ...(await suscripcionPaypal(env, fila)) } : { columna: 'orden', ...(await ordenPaypal(env, fila)) }
   } catch (error) {
     await env.DB.prepare('DELETE FROM licencias WHERE id = ?').bind(fila.id).run()
-    throw error instanceof Rechazo ? new Rechazo(502, 'PayPal no pudo abrir el pago. Revisa tu correo e intenta otra vez.') : error
+    const quien = pasa === 'mercadopago' ? 'Mercado Pago' : 'PayPal'
+    throw error instanceof Rechazo ? new Rechazo(502, `${quien} no pudo abrir el pago. Revisa tu correo e intenta otra vez.`) : error
   }
   await env.DB.prepare(`UPDATE licencias SET ${abierto.columna} = ?, enlace = ?, revisada = ? WHERE id = ?`)
     .bind(abierto.id, abierto.enlace ?? null, new Date().toISOString(), fila.id)
@@ -711,6 +764,41 @@ async function ordenPaypal(env: Env, f: Fila): Promise<{ id: string; enlace: str
   return { id: o.id, enlace: enlacePaypal(o.links, 'payer-action') }
 }
 
+/** La suscripción mensual en Mercado Pago, de su monto en pesos (con tarjeta). Lleva la fila en `external_reference`. */
+async function suscripcionMp(env: Env, f: Fila): Promise<{ id: string; enlace: string }> {
+  const p = await mp<Preapproval>(env, 'POST', '/preapproval', {
+    // Sin acentos ni «·»: con ellos, Mercado Pago contesta «Parameters passed are invalid».
+    reason: 'Sloth - plan mensual',
+    external_reference: f.id,
+    payer_email: f.email,
+    auto_recurring: { frequency: 1, frequency_type: 'months', transaction_amount: f.monto, currency_id: f.moneda },
+    back_url: `${env.ORIGEN}/gracias?s=${f.id}`,
+    status: 'pending'
+  })
+  if (!p.init_point) throw new Rechazo(502, 'Mercado Pago no dio el enlace de pago')
+  return { id: p.id, enlace: p.init_point }
+}
+
+/**
+ * Un año, o un apoyo de una vez, en Checkout Pro de Mercado Pago: con todos sus medios (tarjeta, OXXO, SPEI, meses sin
+ * intereses en el año). Sus pagos se buscan por la fila (`external_reference`).
+ */
+async function preferenciaMp(env: Env, f: Fila): Promise<{ id: string; enlace: string }> {
+  const vuelta = `${env.ORIGEN}/gracias?s=${f.id}`
+  const unico = f.plan === 'unico'
+  const p = await mp<{ id: string; init_point: string }>(env, 'POST', '/checkout/preferences', {
+    items: [{ id: unico ? 'sloth-una-vez' : 'sloth-anual', title: unico ? 'Sloth - apoyo de una vez' : 'Sloth - plan anual', quantity: 1, unit_price: f.monto, currency_id: f.moneda }],
+    payer: { email: f.email },
+    external_reference: f.id,
+    back_urls: { success: vuelta, pending: vuelta, failure: vuelta },
+    auto_return: 'approved',
+    // El año, hasta 12 meses; sin intereses, los que se ofrezcan en «Comisiones y MSI» del panel de Mercado Pago.
+    payment_methods: { installments: unico ? 1 : 12 },
+    statement_descriptor: 'SLOTH'
+  })
+  return { id: p.id, enlace: p.init_point }
+}
+
 /** El plan mensual de PayPal de `monto` en `moneda`, que se crea la primera vez (y el producto «Sloth», también una vez). */
 async function planPaypal(env: Env, monto: number, moneda: string): Promise<string> {
   const llave = `${env.PAYPAL_MODO}:mensual:${moneda}:${monto}`
@@ -750,11 +838,17 @@ async function guardarIdPaypal(env: Env, llave: string, id: string): Promise<str
 }
 
 /**
- * Abre el pago del año siguiente de un año pagado de una vez (o de otro mes, el de una vez), con PayPal aunque el primero
- * fuera con Mercado Pago: la misma fila y la misma clave. Antes guarda lo cobrado de la orden que deja de ser la última.
- * Da adónde ir a pagar.
+ * Abre el pago del año siguiente de un año pagado de una vez (o de otro mes, el de una vez), con la misma pasarela: la
+ * misma fila y la misma clave. Uno de Mercado Pago que ya se renovó con PayPal sigue con PayPal. Antes guarda lo
+ * cobrado de la orden que deja de ser la última. Da adónde ir a pagar.
  */
 async function renovar(env: Env, f: Fila): Promise<string> {
+  // Pagado con Mercado Pago, y nunca renovado con PayPal: otra vez con Mercado Pago, en pesos.
+  if (f.preferencia && !f.orden) {
+    const p = await preferenciaMp(env, f)
+    await env.DB.prepare('UPDATE licencias SET preferencia = ?, enlace = ? WHERE id = ?').bind(p.id, p.enlace, f.id).run()
+    return p.enlace
+  }
   if (f.orden) await cobrarOrden(env, f, f.orden)
   const o = await ordenPaypal(env, f)
   await env.DB.prepare('UPDATE licencias SET orden = ?, enlace = ? WHERE id = ?').bind(o.id, o.enlace, f.id).run()
@@ -1289,7 +1383,7 @@ export async function avisarCobros(env: Env, ahora = Date.now()) {
       ? correo(env, f.email, `Tu año de Sloth se acaba el ${fecha(f.pagado_hasta!)}`, [
           'Hola:',
           `Tu año de apoyo a Sloth se acaba el ${fecha(f.pagado_hasta!)}. No se renueva solo: no te vamos a cobrar nada.`,
-          `Si quieres seguir apoyando, paga el año siguiente (${f.monto.toLocaleString('es-MX')} ${f.moneda}, IVA incluido) con PayPal: ${env.ORIGEN}/renovar?s=${f.id}. Tu clave es la misma y el año nuevo empieza cuando se acabe este.`,
+          `Si quieres seguir apoyando, paga el año siguiente (${f.monto.toLocaleString('es-MX')} ${f.moneda}, IVA incluido) con ${f.preferencia && !f.orden ? 'Mercado Pago' : 'PayPal'}: ${env.ORIGEN}/renovar?s=${f.id}. Tu clave es la misma y el año nuevo empieza cuando se acabe este.`,
           'También lo renuevas desde Sloth: Opciones, Apoyo, «Renovar». Si tienes dudas, responde a este correo.'
         ])
       : correo(env, f.email, `Tu próximo cobro de Sloth: ${fecha(f.pagado_hasta!)}`, [

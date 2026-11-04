@@ -228,11 +228,13 @@ async function quien(req: Request, env: Env): Promise<Miembro> {
 /**
  * La insignia del miembro `m`, por el correo de su clave: `fundador` si un apoyo suyo entró entre los primeros y se
  * pagó, o si tiene un lugar gratis de por vida (para siempre, `esFundador`); mientras tenga uno pagado y sin vencer,
- * `grande` si es de `APOYO_GRANDE` o más al mes (o de una vez) en `MONEDA`, y si no, `apoya`.
+ * `grande` si es de `APOYO_GRANDE` o más al mes (o de una vez) en `MONEDA`, o de `APOYO_GRANDE_MXN` en pesos, y si no,
+ * `apoya`.
  */
 const insignia = (env: Env) => `(SELECT CASE WHEN MAX(${esFundador('li')}) THEN 'fundador'
-  WHEN MAX(julianday(li.pagado_hasta) > julianday('now') AND li.plan IN ('mensual', 'unico') AND li.moneda = '${env.MONEDA.replace(/[^A-Z]/g, '')}'
-    AND li.monto >= ${Number(env.APOYO_GRANDE) || 30}) THEN 'grande'
+  WHEN MAX(julianday(li.pagado_hasta) > julianday('now') AND li.plan IN ('mensual', 'unico')
+    AND ((li.moneda = '${env.MONEDA.replace(/[^A-Z]/g, '')}' AND li.monto >= ${Number(env.APOYO_GRANDE) || 30})
+      OR (li.moneda = 'MXN' AND li.monto >= ${Number(env.APOYO_GRANDE_MXN) || 599}))) THEN 'grande'
   WHEN MAX(julianday(li.pagado_hasta) > julianday('now')) THEN 'apoya' END
   FROM licencias li WHERE li.plan IN ('mensual', 'anual', 'unico', 'gratis') AND li.modo = 'produccion'
   AND li.email = (SELECT lc.email FROM licencias lc WHERE lc.clave = m.clave)) AS insignia`

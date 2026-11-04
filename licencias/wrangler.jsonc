@@ -40,6 +40,11 @@
     // mes, con la insignia de apoyo grande en la comunidad.
     "APOYO_MINIMO": 1,
     "APOYO_GRANDE": 30,
+    // Con Mercado Pago, que solo cobra en pesos: los mismos, en MXN (la página dice a cuántos dólares equivalen).
+    "PRECIO_MENSUAL_MXN": 299,
+    "PRECIO_ANUAL_MXN": 2990,
+    "APOYO_MINIMO_MXN": 20,
+    "APOYO_GRANDE_MXN": 599,
     "MONEDA": "USD",
     // Los correos salen de un dominio verificado en Resend (con su RESEND_API_KEY como secreto) y se responden en soporte@vancci.org.
     "CORREO_DE": "Sloth <avisos@vancci.org>",

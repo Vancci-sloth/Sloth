@@ -87,7 +87,7 @@ test('el apoyo de una vez vale un mes por pago, con el monto que se eligió', ()
 })
 
 test('el mensual va con el sugerido o con el monto que se elija; el anual, siempre con su precio', () => {
-  const p = { mensual: 15, anual: 150, minimo: 1, moneda: 'USD' }
+  const p = { mensual: 15, anual: 150, minimo: 1, maximo: 1000, moneda: 'USD' }
   assert.equal(montoDe('mensual', undefined, p), 15)
   assert.equal(montoDe('mensual', 30, p), 30)
   assert.equal(montoDe('mensual', '1', p), 1)
@@ -95,6 +95,11 @@ test('el mensual va con el sugerido o con el monto que se elija; el anual, siemp
   assert.equal(montoDe('anual', 5, p), 150)
   for (const malo of [0, 0.5, 2.5, -3, 1001, 'diez', null, undefined]) assert.throws(() => montoDe('unico', malo, p), /monto entero de \$1 a \$1,000 USD/)
   assert.throws(() => montoDe('mensual', 0, p))
+  // En pesos, con Mercado Pago: desde $20 hasta $20,000.
+  const mxn = { mensual: 299, anual: 2990, minimo: 20, maximo: 20000, moneda: 'MXN' }
+  assert.equal(montoDe('mensual', undefined, mxn), 299)
+  assert.equal(montoDe('unico', 5000, mxn), 5000)
+  assert.throws(() => montoDe('unico', 19, mxn), /monto entero de \$20 a \$20,000 MXN/)
 })
 
 test('una suscripción de PayPal se lee con los estados de Mercado Pago; solo activa dice su próximo cobro', () => {
@@ -118,13 +123,26 @@ test('un año pagado de una vez abre hasta su fin y avisa antes de que se acabe,
 })
 
 test('el precio es el mismo para todos; las 25 primeras personas que apoyan son fundadoras', () => {
-  const env = { FUNDADORES: 25, PRECIO_MENSUAL: 15, PRECIO_ANUAL: 150, APOYO_MINIMO: 1, APOYO_GRANDE: 30, MONEDA: 'USD' }
-  const precio = { mensual: 15, anual: 150, minimo: 1, grande: 30, moneda: 'USD' }
+  const env = {
+    FUNDADORES: 25,
+    PRECIO_MENSUAL: 15,
+    PRECIO_ANUAL: 150,
+    APOYO_MINIMO: 1,
+    APOYO_GRANDE: 30,
+    MONEDA: 'USD',
+    PRECIO_MENSUAL_MXN: 299,
+    PRECIO_ANUAL_MXN: 2990,
+    APOYO_MINIMO_MXN: 20,
+    APOYO_GRANDE_MXN: 599
+  }
+  const precio = { mensual: 15, anual: 150, minimo: 1, grande: 30, maximo: 1000, moneda: 'USD' }
   assert.deepEqual(tarifa({ fundadores: 0, apoyan: 0 }, env), { quedan: 25, ...precio, apoyan: 0 })
   assert.deepEqual(tarifa({ fundadores: 3, apoyan: 2 }, env), { quedan: 22, ...precio, apoyan: 2 })
   assert.deepEqual(tarifa({ fundadores: 25, apoyan: 80 }, env), { quedan: 0, ...precio, apoyan: 80 })
   // Con la fecha de fundadores ya pasada, no queda ninguno.
   assert.equal(tarifa({ fundadores: 0, apoyan: 0 }, { ...env, FUNDADORES_HASTA: '2026-01-01T00:00:00Z' }).quedan, 0)
+  // Con Mercado Pago, los mismos en pesos.
+  assert.deepEqual(tarifa({ fundadores: 0, apoyan: 0 }, env, true).mxn, { mensual: 299, anual: 2990, minimo: 20, grande: 599, maximo: 20000, moneda: 'MXN' })
 })
 
 test('un lugar gratis abre siempre; quitado (cancelled, sin nada pagado), ya no', () => {
