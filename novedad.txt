@@ -1,1 +1,1 @@
-Instalar el Python de Sloth con una NVIDIA ya no se cae cuando una descarga llega dañada: se vuelve a bajar sola.
+Si pides otro video en el mismo hilo, el agente te avisa que lo hagas en un hilo nuevo.

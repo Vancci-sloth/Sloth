@@ -74,6 +74,12 @@ No, cámbialo
 Al pulsar una, te llega su texto como mensaje del usuario. No lo uses en preguntas abiertas, ni si la skill dice cómo preguntar.`
 
 /**
+ * Un hilo es un video: su carpeta, sus etapas y su avance son de ese. Quien pide el siguiente en el mismo hilo no sabe
+ * si debe abrir otro (pasó en el grupo de WhatsApp), así que el agente se lo dice, sea cual sea.
+ */
+export const UN_VIDEO_POR_HILO = `En Sloth, cada hilo es un solo video. Si en un hilo donde ya hiciste o empezaste uno el usuario pide otro video distinto (otro tema, otro episodio, otra parte), no lo empieces aquí: dile en una línea que el siguiente video lo haga en un hilo nuevo, con «Nuevo chat» arriba a la izquierda y la card del estilo, y que este hilo se queda con el video que ya tiene. Los cambios al mismo video, sus shorts o sus subidas sí siguen aquí.`
+
+/**
  * Claude con el Agent SDK, como lo usa T3 Code: el mismo Claude Code, con tus skills, tu CLAUDE.md y sin pedir
  * permisos. Los mensajes del usuario entran por una cola, así la sesión sigue viva entre turnos.
  */
@@ -97,7 +103,7 @@ export function startClaude(opts: AgentOptions): AgentRun {
       permissionMode: 'bypassPermissions',
       allowDangerouslySkipPermissions: true,
       settingSources: ['user', 'project', 'local'],
-      systemPrompt: { type: 'preset', preset: 'claude_code', append: OPCIONES },
+      systemPrompt: { type: 'preset', preset: 'claude_code', append: `${OPCIONES}\n\n${UN_VIDEO_POR_HILO}` },
       // El navegador del agente, la voz de AI Studio, Google Flow y, en un canal de Ideas, sus herramientas (`parecidos`; en uno vertical,
       // también las de TikTok e Instagram): se suman a los MCP del usuario.
       mcpServers: { ...navegadorAgente(opts.lote, opts.hilo), ...mcpVoz(), ...mcpFlow(), ...herramientasIdeas(opts.cwd) },

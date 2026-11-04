@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import type { Model, Tokens } from '../shared/types.ts'
 import { codexConLlave, llaveEnUso, type CodexLlave } from './acceso.ts'
 import type { AgentOptions, AgentRun, SkillRef } from './agent.ts'
-import { OPCIONES } from './claude.ts'
+import { OPCIONES, UN_VIDEO_POR_HILO } from './claude.ts'
 import { rutaAgente } from './agentes.ts'
 import { CodexRpc } from './codex-rpc.ts'
 import { navegadorAgente, USA_EL_NAVEGADOR } from './navegador-agente.ts'
@@ -221,6 +221,7 @@ export function startCodex(opts: AgentOptions, connect: Conectar = (notify, exit
       ...(opts.resume ? { threadId: opts.resume } : {}), model: modelo, modelProvider: llave?.proveedor ?? 'openai', cwd: opts.cwd,
       approvalPolicy: 'never', sandbox: 'danger-full-access',
       developerInstructions: `${OPCIONES}\nLa interfaz y tus respuestas van en español. Haz las preguntas en mensajes normales, sin herramientas de preguntas interactivas. Las skills de Sloth están en ${SKILLS}. La skill invocada es siempre la de esa carpeta: si ves otra con el mismo nombre (en ${join(homedir(), '.codex', 'skills')} u otra), es una copia vieja y no se usa. Respeta la skill invocada y lee sus referencias cuando hagan falta.
+${UN_VIDEO_POR_HILO}
 ${USA_EL_NAVEGADOR}`
     })
     threadId = r.thread.id
