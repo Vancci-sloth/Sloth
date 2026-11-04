@@ -23,6 +23,11 @@
  * con OXXO, SPEI y meses sin intereses. Se leen, se cancelan y avisan (`POST /webhook`) en Mercado Pago. Del 29 de
  * octubre al 4 de noviembre de 2026 solo se pudo pagar con PayPal; un año de Mercado Pago que se renovó entonces con
  * PayPal sigue renovándose con PayPal.
+ * Y con cripto (`pasarela: 'cripto'`), en NOWPayments y en `MONEDA`: no hay cobro automático, así que el mes, el año y
+ * el apoyo de una vez son cada uno una factura (`cripto`) que se paga con la moneda que se elija, desde Binance o
+ * cualquier wallet. El mensual vale un mes por pago y, como el año, el cron avisa antes de que se acabe con el enlace
+ * del siguiente. Cada aviso (`POST /webhook/cripto`) trae un pago, que se vuelve a leer de su API y se guarda en
+ * `cripto_pagos`.
  * Del 24 al 28 de octubre de 2026 también se pudo pagar con Stripe; nadie llegó a pagar y se quitó. De entonces queda
  * la columna `stripe`, vacía.
  *
@@ -72,6 +77,11 @@ export interface Env {
   MP_ACCESS_TOKEN: string
   MP_ACCESS_TOKEN_PRODUCCION?: string
   MP_WEBHOOK_SECRET?: string
+  /** El cobro con cripto: `prueba`, el sandbox de NOWPayments; `produccion`, de verdad. Sin su llave, no se ofrece. */
+  NOWPAYMENTS_MODO: 'prueba' | 'produccion'
+  NOWPAYMENTS_API_KEY?: string
+  /** La clave de sus avisos (IPN), con la que firman cada uno. */
+  NOWPAYMENTS_IPN_SECRET?: string
   /** La llave privada Ed25519 en PKCS8 y base64. */
   FIRMA: string
   /** La dirección de este Worker, para la página a la que vuelve el cliente tras pagar. */
@@ -142,6 +152,8 @@ export interface Fila {
   paypal: string | null
   /** Un año pagado de una vez con PayPal: la última orden que se abrió para ella. */
   orden: string | null
+  /** Pagada con cripto (el mes, el año o de una vez): la última factura de NOWPayments que se abrió para ella. */
+  cripto: string | null
 }
 
 /** Lo que el cobro guarda de una suscripción o de los pagos del año. `hasta`: su próximo cobro o su fin, si se sabe. */
@@ -150,12 +162,12 @@ export interface Lectura {
   hasta?: string
 }
 
-/** Un año (o un mes, el apoyo `unico`) pagado de una vez, con Mercado Pago o con PayPal: no se renueva solo. */
-const deUnaVez = (f: Pick<Fila, 'preferencia' | 'orden'>) => !!(f.preferencia || f.orden)
+/** Un año (o un mes, el apoyo `unico` y el mensual con cripto) pagado de una vez, con Mercado Pago, PayPal o cripto: no se renueva solo. */
+const deUnaVez = (f: Pick<Fila, 'preferencia' | 'orden' | 'cripto'>) => !!(f.preferencia || f.orden || f.cripto)
 /** Lo más que se apoya de una sola vez con el monto que elija cada quien, en cada moneda. */
 const APOYO_MAXIMO: Record<string, number> = { USD: 1000, MXN: 20000 }
 /** Quién cobra la suscripción de la fila, o quién cobró el primer año: para los correos y la página de gracias. */
-const pasarela = (f: Pick<Fila, 'preapproval' | 'preferencia'>) => (f.preapproval || f.preferencia ? 'Mercado Pago' : 'PayPal')
+const pasarela = (f: Pick<Fila, 'preapproval' | 'preferencia' | 'cripto'>) => (f.cripto ? 'NOWPayments' : f.preapproval || f.preferencia ? 'Mercado Pago' : 'PayPal')
 
 /** Cuántos se han unido: los lugares gratis tomados y las suscripciones pagadas alguna vez (de ellas, las de fundador). */
 export interface Cuenta {
@@ -187,8 +199,8 @@ export interface Precios {
   maximo: number
   moneda: string
 }
-/** Con qué se paga: PayPal (en `MONEDA`) o Mercado Pago (en pesos). */
-type Pasarela = 'paypal' | 'mercadopago'
+/** Con qué se paga: PayPal (en `MONEDA`), Mercado Pago (en pesos) o cripto (NOWPayments, en `MONEDA`). */
+type Pasarela = 'paypal' | 'mercadopago' | 'cripto'
 
 interface Preapproval {
   id: string
@@ -237,8 +249,36 @@ export interface PagoMp {
   external_reference?: string | null
 }
 
+/** Un pago de NOWPayments: el que hace el cliente con la moneda que eligió en la factura. `order_id` es su fila. */
+interface PagoCripto {
+  payment_id: number | string
+  payment_status: string
+  price_amount: number
+  price_currency: string
+  order_id?: string | null
+  updated_at?: string
+}
+
 const MP = 'https://api.mercadopago.com'
 const PAYPAL = { produccion: 'https://api-m.paypal.com', prueba: 'https://api-m.sandbox.paypal.com' }
+const NOWPAYMENTS = { produccion: 'https://api.nowpayments.io', prueba: 'https://api-sandbox.nowpayments.io' }
+/**
+ * El estado de un pago de NOWPayments, con el nombre de Mercado Pago que entiende `leerPagos`. Vale desde que la red lo
+ * confirmó (`confirmed`), aunque NOWPayments aún no lo mande a la wallet; el que pagó de menos (`partially_paid`) no
+ * vale: se arregla con soporte.
+ */
+const COBRO_CRIPTO: Record<string, string> = {
+  waiting: 'pending',
+  confirming: 'pending',
+  confirmed: 'approved',
+  sending: 'approved',
+  finished: 'approved',
+  partially_paid: 'rejected',
+  failed: 'rejected',
+  expired: 'rejected',
+  cancelled: 'rejected',
+  refunded: 'refunded'
+}
 /** Los pagos que valen: aprobados, o en reclamo mientras no se resuelva en contra (entonces pasan a `charged_back`). */
 const VALEN = new Set(['approved', 'in_mediation'])
 /** El estado de un cobro de PayPal, con el nombre de Mercado Pago que entiende `leerPagos`. */
@@ -390,6 +430,7 @@ async function atender(req: Request, env: Env, ctx: ExecutionContext, url: URL):
     if (req.method === 'GET' && url.pathname === '/gracias') return await gracias(env, url)
     if (req.method === 'GET' && url.pathname === '/renovar') return await renovacion(env, url)
     if (req.method === 'POST' && url.pathname === '/webhook/paypal') return await webhookPaypal(req, env, ctx)
+    if (req.method === 'POST' && url.pathname === '/webhook/cripto') return await webhookCripto(req, env, ctx)
     if (req.method === 'POST' && url.pathname === '/webhook') return await webhook(req, env, ctx, url)
     if (req.method === 'POST' && url.pathname === '/suscribir') return await suscribir(env, await cuerpo(req), await conexion(req))
     if (req.method === 'POST' && url.pathname === '/licencia') return await licencia(env, await cuerpo(req))
@@ -600,7 +641,9 @@ async function precios(env: Env) {
   ).first<Cuenta>()
   // Mercado Pago solo se ofrece con su token del modo de hoy.
   const conMp = !!(env.MP_MODO === 'produccion' ? env.MP_ACCESS_TOKEN_PRODUCCION : env.MP_ACCESS_TOKEN)
-  return tarifa(c ?? { fundadores: 0, apoyan: 0 }, env, conMp)
+  // Cripto, con la llave y la clave de los avisos de NOWPayments; cobra los mismos precios, en `MONEDA`.
+  const conCripto = !!(env.NOWPAYMENTS_API_KEY && env.NOWPAYMENTS_IPN_SECRET)
+  return { ...tarifa(c ?? { fundadores: 0, apoyan: 0 }, env, conMp), ...(conCripto ? { cripto: true } : {}) }
 }
 
 /**
@@ -654,23 +697,27 @@ async function suscribir(env: Env, c: Record<string, unknown>, desde: string): P
   if (!EMAIL.test(email) || email.length > 254) throw new Rechazo(400, 'Escribe un correo válido.')
   const plan: Plan = c.plan === 'gratis' ? 'gratis' : c.plan === 'anual' ? 'anual' : c.plan === 'unico' ? 'unico' : 'mensual'
   const equipo = c.equipo === undefined && plan !== 'gratis' ? undefined : equipoDe(c)
-  // El consentimiento expreso de los términos y, si se paga cada mes, del cobro automático (LFPC art. 76 Bis VIII), con la versión aceptada.
+  // Con Mercado Pago, en pesos; con PayPal o con cripto, en `MONEDA`. La app de antes no manda `pasarela`: PayPal.
+  const pasa: Pasarela = c.pasarela === 'mercadopago' ? 'mercadopago' : c.pasarela === 'cripto' ? 'cripto' : 'paypal'
+  // El consentimiento expreso de los términos y, si se paga cada mes, del cobro automático (LFPC art. 76 Bis VIII), con
+  // la versión aceptada. Con cripto no hay cobro automático: cada mes es un pago.
   const terminos = String(c.terminos ?? '')
   if (c.acepto !== true || !TERMINOS.test(terminos))
-    throw new Rechazo(400, plan === 'gratis' ? 'Para unirte, acepta los términos.' : plan === 'mensual' ? 'Para suscribirte, acepta el cobro automático y los términos.' : 'Para apoyar, acepta el pago y los términos.')
+    throw new Rechazo(
+      400,
+      plan === 'gratis' ? 'Para unirte, acepta los términos.' : plan === 'mensual' && pasa !== 'cripto' ? 'Para suscribirte, acepta el cobro automático y los términos.' : 'Para apoyar, acepta el pago y los términos.'
+    )
   const acepto = new Date().toISOString()
   if (plan === 'gratis') return unirse(env, email, equipo!, acepto, terminos, desde, c.porCorreo === true)
   const t = await precios(env)
-  // Con Mercado Pago, en pesos; con PayPal, en `MONEDA`. La app de antes no manda `pasarela`: PayPal.
-  const pasa: Pasarela = c.pasarela === 'mercadopago' ? 'mercadopago' : 'paypal'
-  if (pasa === 'mercadopago' && !t.mxn) throw new Rechazo(400, 'Por ahora solo se puede pagar con PayPal.')
+  if ((pasa === 'mercadopago' && !t.mxn) || (pasa === 'cripto' && !t.cripto)) throw new Rechazo(400, 'Por ahora solo se puede pagar con PayPal.')
   const p: Precios = pasa === 'mercadopago' ? t.mxn! : t
   const monto = montoDe(plan, c.monto, p)
   // Con una ya pagada, otra cobraría dos veces; con un lugar gratis de por vida, no hace falta. Con una cuenta, sí se apoya.
   await sinOtra(env, email, true)
   // Un doble clic, o volver a abrir el pago: la misma suscripción pendiente de la última hora, si sigue en el monto, la
   // moneda y la pasarela de hoy.
-  const columnas = pasa === 'mercadopago' ? '(preapproval IS NOT NULL OR preferencia IS NOT NULL)' : '(paypal IS NOT NULL OR orden IS NOT NULL)'
+  const columnas = { mercadopago: '(preapproval IS NOT NULL OR preferencia IS NOT NULL)', paypal: '(paypal IS NOT NULL OR orden IS NOT NULL)', cripto: 'cripto IS NOT NULL' }[pasa]
   const previa = await env.DB.prepare(
     `SELECT * FROM licencias WHERE email = ? AND plan = ? AND monto = ? AND moneda = ? AND estado = 'pending' AND enlace IS NOT NULL AND ${columnas} AND creada > ? ORDER BY creada DESC LIMIT 1`
   )
@@ -702,23 +749,25 @@ async function suscribir(env: Env, c: Record<string, unknown>, desde: string): P
     folio: null,
     cancelada: null,
     avisado_para: null,
-    modo: pasa === 'mercadopago' ? env.MP_MODO : env.PAYPAL_MODO,
+    modo: { mercadopago: env.MP_MODO, paypal: env.PAYPAL_MODO, cripto: env.NOWPAYMENTS_MODO }[pasa],
     preferencia: null,
     paypal: null,
-    orden: null
+    orden: null,
+    cripto: null
   }
   await env.DB.prepare('INSERT INTO licencias (id, clave, email, plan, monto, moneda, fundador, estado, creada, acepto, terminos, modo) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
     .bind(fila.id, fila.clave, email, plan, fila.monto, fila.moneda, fila.fundador, fila.estado, fila.creada, acepto, terminos, fila.modo)
     .run()
   // Dónde se paga y en qué columna queda: la suscripción mensual, o el pago del año o del apoyo de una vez.
-  let abierto: { columna: 'orden' | 'paypal' | 'preapproval' | 'preferencia'; id: string; enlace: string }
+  let abierto: { columna: 'orden' | 'paypal' | 'preapproval' | 'preferencia' | 'cripto'; id: string; enlace: string }
   try {
-    if (pasa === 'mercadopago')
+    if (pasa === 'cripto') abierto = { columna: 'cripto', ...(await facturaCripto(env, fila)) }
+    else if (pasa === 'mercadopago')
       abierto = plan === 'mensual' ? { columna: 'preapproval', ...(await suscripcionMp(env, fila)) } : { columna: 'preferencia', ...(await preferenciaMp(env, fila)) }
     else abierto = plan === 'mensual' ? { columna: 'paypal', ...(await suscripcionPaypal(env, fila)) } : { columna: 'orden', ...(await ordenPaypal(env, fila)) }
   } catch (error) {
     await env.DB.prepare('DELETE FROM licencias WHERE id = ?').bind(fila.id).run()
-    const quien = pasa === 'mercadopago' ? 'Mercado Pago' : 'PayPal'
+    const quien = { mercadopago: 'Mercado Pago', paypal: 'PayPal', cripto: 'NOWPayments' }[pasa]
     throw error instanceof Rechazo ? new Rechazo(502, `${quien} no pudo abrir el pago. Revisa tu correo e intenta otra vez.`) : error
   }
   await env.DB.prepare(`UPDATE licencias SET ${abierto.columna} = ?, enlace = ?, revisada = ? WHERE id = ?`)
@@ -799,6 +848,25 @@ async function preferenciaMp(env: Env, f: Fila): Promise<{ id: string; enlace: s
   return { id: p.id, enlace: p.init_point }
 }
 
+/**
+ * Un mes, un año o un apoyo de una vez, con cripto: una factura de NOWPayments en `MONEDA`, donde el cliente elige con
+ * qué moneda paga. Lleva la fila en `order_id`, y sus pagos avisan a `/webhook/cripto`.
+ */
+async function facturaCripto(env: Env, f: Fila): Promise<{ id: string; enlace: string }> {
+  const vuelta = `${env.ORIGEN}/gracias?s=${f.id}`
+  const i = await nowpayments<{ id: number | string; invoice_url?: string }>(env, 'POST', '/v1/invoice', {
+    price_amount: f.monto,
+    price_currency: f.moneda.toLowerCase(),
+    order_id: f.id,
+    order_description: { mensual: 'Sloth - un mes de apoyo', anual: 'Sloth - plan anual', unico: 'Sloth - apoyo de una vez' }[f.plan as 'mensual' | 'anual' | 'unico'],
+    ipn_callback_url: `${env.ORIGEN}/webhook/cripto`,
+    success_url: vuelta,
+    cancel_url: vuelta
+  })
+  if (!i.invoice_url) throw new Rechazo(502, 'NOWPayments no dio el enlace de pago')
+  return { id: String(i.id), enlace: i.invoice_url }
+}
+
 /** El plan mensual de PayPal de `monto` en `moneda`, que se crea la primera vez (y el producto «Sloth», también una vez). */
 async function planPaypal(env: Env, monto: number, moneda: string): Promise<string> {
   const llave = `${env.PAYPAL_MODO}:mensual:${moneda}:${monto}`
@@ -843,6 +911,12 @@ async function guardarIdPaypal(env: Env, llave: string, id: string): Promise<str
  * cobrado de la orden que deja de ser la última. Da adónde ir a pagar.
  */
 async function renovar(env: Env, f: Fila): Promise<string> {
+  // Con cripto, otra factura: el siguiente mes o año.
+  if (f.cripto) {
+    const i = await facturaCripto(env, f)
+    await env.DB.prepare('UPDATE licencias SET cripto = ?, enlace = ? WHERE id = ?').bind(i.id, i.enlace, f.id).run()
+    return i.enlace
+  }
   // Pagado con Mercado Pago, y nunca renovado con PayPal: otra vez con Mercado Pago, en pesos.
   if (f.preferencia && !f.orden) {
     const p = await preferenciaMp(env, f)
@@ -1047,10 +1121,41 @@ async function firmaDePaypal(h: Headers, texto: string, env: Env): Promise<boole
 }
 
 /**
+ * Un aviso de NOWPayments: llega con cada cambio de un pago. Se comprueba su firma, se contesta enseguida y luego se
+ * lee el pago de su API, que dice de qué fila es (`order_id`).
+ */
+async function webhookCripto(req: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+  const a = (await req.json().catch(() => null)) as { payment_id?: number | string } | null
+  if (!a || !(await firmaDeNowpayments(a, req.headers.get('x-nowpayments-sig'), env.NOWPAYMENTS_IPN_SECRET))) return new Response('Firma inválida', { status: 401 })
+  const id = String(a.payment_id ?? '')
+  if (/^\d+$/.test(id)) ctx.waitUntil(avisoCripto(env, id).catch((e) => console.error('Aviso de NOWPayments', e instanceof Error ? e.message : e)))
+  return new Response('ok')
+}
+
+async function avisoCripto(env: Env, id: string) {
+  const p = await nowpayments<PagoCripto>(env, 'GET', `/v1/payment/${id}`)
+  const fila = p.order_id ? await env.DB.prepare('SELECT * FROM licencias WHERE id = ?').bind(p.order_id).first<Fila>() : null
+  if (fila?.cripto) await refrescar(env, fila, { cripto: [p] })
+}
+
+/**
+ * La firma de un aviso de NOWPayments (`x-nowpayments-sig`): el HMAC-SHA512 en hex, con la clave de los avisos, del
+ * aviso en JSON con sus llaves en orden alfabético, también las de adentro.
+ */
+export async function firmaDeNowpayments(aviso: unknown, firma: string | null, secreto: string | undefined): Promise<boolean> {
+  if (!firma || !secreto?.trim()) return false
+  const ordenado = (v: unknown): unknown =>
+    Array.isArray(v) ? v.map(ordenado) : v && typeof v === 'object' ? Object.fromEntries(Object.keys(v).sort().map((k) => [k, ordenado((v as Record<string, unknown>)[k])])) : v
+  const llave = await crypto.subtle.importKey('raw', new TextEncoder().encode(secreto.trim()), { name: 'HMAC', hash: 'SHA-512' }, false, ['sign'])
+  const hex = [...new Uint8Array(await crypto.subtle.sign('HMAC', llave, new TextEncoder().encode(JSON.stringify(ordenado(aviso)))))].map((b) => b.toString(16).padStart(2, '0')).join('')
+  return iguales(hex, firma.trim().toLowerCase())
+}
+
+/**
  * Vuelve a leer la suscripción (de PayPal o de Mercado Pago) o los pagos del año pagado de una vez, y la guarda. `otros`:
  * lo que trajo un aviso, por si la búsqueda aún no lo ve (el pago de Mercado Pago) o no es la última orden (las de PayPal).
  */
-async function refrescar(env: Env, fila: Fila, otros: { mp?: PagoMp; ordenes?: string[] } = {}): Promise<Fila> {
+async function refrescar(env: Env, fila: Fila, otros: { mp?: PagoMp; ordenes?: string[]; cripto?: PagoCripto[] } = {}): Promise<Fila> {
   if (deUnaVez(fila)) return guardarEstado(env, fila, leerPagos(await pagosDelAño(env, fila, otros), fila))
   if (fila.paypal) return guardarEstado(env, fila, leerPaypal(await paypal<SuscripcionPaypal>(env, 'GET', `/v1/billing/subscriptions/${encodeURIComponent(fila.paypal)}`)))
   if (fila.preapproval) return guardarEstado(env, fila, leerMp(await mp<Preapproval>(env, 'GET', `/preapproval/${encodeURIComponent(fila.preapproval)}`)))
@@ -1069,14 +1174,41 @@ export function leerPaypal(s: Pick<SuscripcionPaypal, 'status' | 'billing_info'>
   return { estado, hasta: estado === 'authorized' ? s.billing_info?.next_billing_time : undefined }
 }
 
-/** Los pagos de un año pagado de una vez: los de Mercado Pago, si empezó ahí, y lo cobrado de sus órdenes de PayPal. */
-async function pagosDelAño(env: Env, f: Fila, otros: { mp?: PagoMp; ordenes?: string[] }): Promise<Pick<PagoMp, 'status' | 'transaction_amount' | 'currency_id' | 'date_approved'>[]> {
+/**
+ * Los pagos de un año pagado de una vez: los de Mercado Pago, si empezó ahí, lo cobrado de sus órdenes de PayPal y lo
+ * pagado con cripto. De cripto se vuelven a leer los que aún esperan; los demás cambian solo con su aviso.
+ */
+async function pagosDelAño(
+  env: Env,
+  f: Fila,
+  otros: { mp?: PagoMp; ordenes?: string[]; cripto?: PagoCripto[] }
+): Promise<Pick<PagoMp, 'status' | 'transaction_amount' | 'currency_id' | 'date_approved'>[]> {
   const deMp = f.preferencia ? await pagosMp(env, f, otros.mp) : []
   for (const orden of new Set([f.orden, ...(otros.ordenes ?? [])])) if (orden) await cobrarOrden(env, f, orden)
-  const { results } = await env.DB.prepare('SELECT estado AS status, monto AS transaction_amount, moneda AS currency_id, aprobado AS date_approved FROM paypal_pagos WHERE licencia = ?')
+  if (f.cripto) {
+    const avisados = otros.cripto ?? []
+    const { results: esperan } = await env.DB.prepare("SELECT pago FROM cripto_pagos WHERE licencia = ? AND estado = 'pending'").bind(f.id).all<{ pago: string }>()
+    const leidos = await Promise.all(
+      esperan.filter((e) => !avisados.some((p) => String(p.payment_id) === e.pago)).map((e) => nowpayments<PagoCripto>(env, 'GET', `/v1/payment/${encodeURIComponent(e.pago)}`))
+    )
+    for (const p of [...avisados, ...leidos]) await guardarPagoCripto(env, f, p)
+  }
+  const columnas = 'estado AS status, monto AS transaction_amount, moneda AS currency_id, aprobado AS date_approved'
+  const { results } = await env.DB.prepare(`SELECT ${columnas} FROM paypal_pagos WHERE licencia = ?1 UNION ALL SELECT ${columnas} FROM cripto_pagos WHERE licencia = ?1`)
     .bind(f.id)
     .all<Pick<PagoMp, 'status' | 'transaction_amount' | 'currency_id' | 'date_approved'>>()
   return [...deMp, ...results]
+}
+
+/** Guarda cómo va un pago de cripto de la fila, con cuándo valió por primera vez. Uno de otra fila no se toca. */
+async function guardarPagoCripto(env: Env, f: Fila, p: PagoCripto) {
+  if (p.order_id !== f.id) return
+  const estado = COBRO_CRIPTO[p.payment_status] ?? 'pending'
+  await env.DB.prepare(
+    'INSERT INTO cripto_pagos (pago, licencia, estado, monto, moneda, aprobado) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT (pago) DO UPDATE SET estado = excluded.estado, aprobado = COALESCE(cripto_pagos.aprobado, excluded.aprobado)'
+  )
+    .bind(String(p.payment_id), f.id, estado, Number(p.price_amount), p.price_currency.toUpperCase(), VALEN.has(estado) ? (p.updated_at ?? new Date().toISOString()) : null)
+    .run()
 }
 
 /**
@@ -1111,7 +1243,7 @@ async function pagosMp(env: Env, f: Fila, avisado?: PagoMp): Promise<PagoMp[]> {
 
 /**
  * Un año pagado de una vez, como lo guarda el cobro: cada pago que vale, en su moneda y de su monto, suma un año (un
- * mes, el apoyo de una vez) desde que se aprobó, o desde que acaba lo ya pagado si se renovó antes. Sin ninguno que
+ * mes, el apoyo de una vez y el mensual con cripto) desde que se aprobó, o desde que acaba lo ya pagado si se renovó antes. Sin ninguno que
  * valga: reembolsado o con contracargo, se acabó; si no, espera el pago.
  */
 export function leerPagos(pagos: Pick<PagoMp, 'status' | 'transaction_amount' | 'currency_id' | 'date_approved'>[], f: Pick<Fila, 'monto' | 'moneda' | 'plan'>): Lectura {
@@ -1122,7 +1254,7 @@ export function leerPagos(pagos: Pick<PagoMp, 'status' | 'transaction_amount' | 
   let fin = 0
   for (const aprobado of aprobados) {
     const d = new Date(Math.max(fin, aprobado))
-    fin = f.plan === 'unico' ? d.setUTCMonth(d.getUTCMonth() + 1) : d.setUTCFullYear(d.getUTCFullYear() + 1)
+    fin = f.plan === 'anual' ? d.setUTCFullYear(d.getUTCFullYear() + 1) : d.setUTCMonth(d.getUTCMonth() + 1)
   }
   if (fin) return { estado: 'pagado', hasta: new Date(fin).toISOString() }
   return { estado: pagos.some((p) => p.status === 'refunded' || p.status === 'charged_back') ? 'cancelled' : 'pending' }
@@ -1350,6 +1482,23 @@ async function paypal<T>(env: Env, metodo: string, ruta: string, cuerpo?: unknow
   return datos as T
 }
 
+/** Una llamada a NOWPayments, con su llave del modo de hoy. */
+async function nowpayments<T>(env: Env, metodo: string, ruta: string, cuerpo?: unknown): Promise<T> {
+  if (!env.NOWPAYMENTS_API_KEY) throw new Error(`Falta la llave de NOWPayments del modo ${env.NOWPAYMENTS_MODO}.`)
+  const r = await fetch(`${NOWPAYMENTS[env.NOWPAYMENTS_MODO]}${ruta}`, {
+    method: metodo,
+    headers: { 'x-api-key': env.NOWPAYMENTS_API_KEY, 'content-type': 'application/json' },
+    body: cuerpo === undefined ? undefined : JSON.stringify(cuerpo)
+  })
+  const datos = (await r.json().catch(() => ({}))) as { message?: string }
+  if (!r.ok) {
+    // Solo el estado y el mensaje: nada del cliente.
+    console.error('NOWPayments', metodo, ruta.replace(/\/\d+$/, '/…'), r.status, datos.message ?? '')
+    throw new Rechazo(r.status, datos.message ?? `NOWPayments respondió ${r.status}`)
+  }
+  return datos as T
+}
+
 export async function cuerpo(req: Request): Promise<Record<string, unknown>> {
   const c = await req.json().catch(() => null)
   if (!c || typeof c !== 'object') throw new Rechazo(400, 'Petición inválida.')
@@ -1379,11 +1528,14 @@ export async function avisarCobros(env: Env, ahora = Date.now()) {
     const f = await refrescar(env, vieja).catch(() => null)
     if (!f || !faltaAvisar(f, ahora)) continue
     const cada = f.plan === 'anual' ? 'anual' : 'mensual'
+    // Pagado de una vez: el año, o el mes con cripto.
+    const lapso = f.plan === 'anual' ? 'año' : 'mes'
+    const con = f.cripto ? 'cripto, con NOWPayments' : f.preferencia && !f.orden ? 'Mercado Pago' : 'PayPal'
     const enviado = await (f.estado === 'pagado'
-      ? correo(env, f.email, `Tu año de Sloth se acaba el ${fecha(f.pagado_hasta!)}`, [
+      ? correo(env, f.email, `Tu ${lapso} de Sloth se acaba el ${fecha(f.pagado_hasta!)}`, [
           'Hola:',
-          `Tu año de apoyo a Sloth se acaba el ${fecha(f.pagado_hasta!)}. No se renueva solo: no te vamos a cobrar nada.`,
-          `Si quieres seguir apoyando, paga el año siguiente (${f.monto.toLocaleString('es-MX')} ${f.moneda}, IVA incluido) con ${f.preferencia && !f.orden ? 'Mercado Pago' : 'PayPal'}: ${env.ORIGEN}/renovar?s=${f.id}. Tu clave es la misma y el año nuevo empieza cuando se acabe este.`,
+          `Tu ${lapso} de apoyo a Sloth se acaba el ${fecha(f.pagado_hasta!)}. No se renueva solo: no te vamos a cobrar nada.`,
+          `Si quieres seguir apoyando, paga el ${lapso} siguiente (${f.monto.toLocaleString('es-MX')} ${f.moneda}, IVA incluido) con ${con}: ${env.ORIGEN}/renovar?s=${f.id}. Tu clave es la misma y el ${lapso} nuevo empieza cuando se acabe este.`,
           'También lo renuevas desde Sloth: Opciones, Apoyo, «Renovar». Si tienes dudas, responde a este correo.'
         ])
       : correo(env, f.email, `Tu próximo cobro de Sloth: ${fecha(f.pagado_hasta!)}`, [
@@ -1463,7 +1615,7 @@ ${correoAviso(escapar(fila.email))}
   if (fila.estado === 'pending')
     return pagina(
       'Esperando tu pago…',
-      `<p>En cuanto ${pasarela(fila)} lo confirme, aquí aparecen tu clave y el instalador. Suele tardar unos segundos.</p>${correoAviso(escapar(fila.email))}${fila.enlace ? `<p class="otros">¿Saliste sin pagar? <a href="${escapar(fila.enlace)}">Volver al pago</a></p>` : ''}`,
+      `<p>En cuanto ${pasarela(fila)} lo confirme, aquí aparecen tu clave y el instalador. ${fila.cripto ? 'Con cripto tarda lo que la red en confirmar el pago: unos minutos.' : 'Suele tardar unos segundos.'}</p>${correoAviso(escapar(fila.email))}${fila.enlace ? `<p class="otros">¿Saliste sin pagar? <a href="${escapar(fila.enlace)}">Volver al pago</a></p>` : ''}`,
       5
     )
   return pagina(

@@ -3,7 +3,7 @@ import { createHmac } from 'node:crypto'
 import test from 'node:test'
 import { readFileSync } from 'node:fs'
 import { DatabaseSync } from 'node:sqlite'
-import { CUPO, VIGILAR, deTodos, esFundador, faltaAvisar, firmaDeMercadoPago, instaladorDe, leerPagos, leerPaypal, liberada, rangoDe, sistema, sistemaDelYml, sobran, tarifa, vigencia, montoDe } from './index.ts'
+import { CUPO, VIGILAR, deTodos, esFundador, faltaAvisar, firmaDeMercadoPago, instaladorDe, leerPagos, leerPaypal, liberada, rangoDe, sistema, sistemaDelYml, sobran, tarifa, vigencia, montoDe, firmaDeNowpayments } from './index.ts'
 import { DE_LA_APP } from './comunidad.ts'
 
 const SECRETO = 'secreto-de-prueba'
@@ -84,6 +84,24 @@ test('el apoyo de una vez vale un mes por pago, con el monto que se eligió', ()
   // Apoyar otra vez antes de que se acabe: el mes nuevo empieza cuando acaba el primero.
   assert.equal(leerPagos([pago('2026-11-04T16:00:00Z'), pago('2026-11-30T16:00:00Z')], f).hasta, '2027-01-04T16:00:00.000Z')
   assert.equal(leerPagos([pago('2026-11-04T16:00:00Z', 6)], f).estado, 'pending')
+})
+
+test('el mensual con cripto, pagado de una vez, vale un mes por pago', () => {
+  const f = { monto: 15, moneda: 'USD', plan: 'mensual' as const }
+  const pago = (date_approved: string) => ({ status: 'approved', date_approved, transaction_amount: 15, currency_id: 'USD' })
+  assert.deepEqual(leerPagos([pago('2026-11-04T16:00:00Z')], f), { estado: 'pagado', hasta: '2026-12-04T16:00:00.000Z' })
+  assert.equal(leerPagos([pago('2026-11-04T16:00:00Z'), pago('2026-11-28T16:00:00Z')], f).hasta, '2027-01-04T16:00:00.000Z')
+})
+
+test('acepta el aviso firmado por NOWPayments, con las llaves en orden, también las de adentro', async () => {
+  const aviso = { payment_status: 'finished', payment_id: 5077125051, order_id: 'fila', price_amount: 15, fee: { depositFee: 0, currency: 'usdttrc20' } }
+  const ordenado = '{"fee":{"currency":"usdttrc20","depositFee":0},"order_id":"fila","payment_id":5077125051,"payment_status":"finished","price_amount":15}'
+  const firma = createHmac('sha512', SECRETO).update(ordenado).digest('hex')
+  assert.equal(await firmaDeNowpayments(aviso, firma, SECRETO), true)
+  assert.equal(await firmaDeNowpayments(aviso, firma.toUpperCase(), ` ${SECRETO} `), true)
+  assert.equal(await firmaDeNowpayments({ ...aviso, price_amount: 150 }, firma, SECRETO), false)
+  assert.equal(await firmaDeNowpayments(aviso, null, SECRETO), false)
+  assert.equal(await firmaDeNowpayments(aviso, firma, undefined), false)
 })
 
 test('el mensual va con el sugerido o con el monto que se elija; el anual, siempre con su precio', () => {
