@@ -257,9 +257,14 @@ function RedFila(props: { red: Red; conectando: 'abriendo' | 'app' | 'edge' | nu
             <li>
               En ese caso de uso, abre «Configuración de la API con el inicio de sesión de Instagram» → «Generar tokens de acceso» → «Agregar cuenta», y entra
               con tu Instagram. Si te pide un rol: en Roles de la app, añade tu cuenta como evaluador de Instagram y acepta la invitación en Instagram
-              (Configuración → Apps y sitios web).
+              (Configuración → Apps y sitios web). En las apps nuevas, Meta solo deja la configuración con el inicio de sesión unificado: ahí el
+              token empieza con EAA, pide los permisos instagram_basic, instagram_content_publish, pages_show_list y pages_read_engagement, y tu
+              Instagram tiene que estar vinculado a una Página de Facebook.
             </li>
-            <li>Pulsa «Generar token», cópialo y pégalo aquí. Sloth lo prueba al momento y lo renueva solo cada día: no caduca.</li>
+            <li>
+              Pulsa «Generar token», cópialo y pégalo aquí. Sloth lo prueba al momento. El que empieza con IGAA lo renueva solo cada día; del EAA, te avisa
+              una semana antes si caduca.
+            </li>
           </ol>
           <div className="opcion-fila">
             <input type="password" autoFocus placeholder="Pega el token de Instagram" value={token} onChange={(e) => setToken(e.target.value)} autoComplete="off" />

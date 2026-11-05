@@ -29,7 +29,14 @@ interface Item {
   intentos?: number
 }
 
+/**
+ * Dos clases de token: los `IGAA…` del inicio de sesión de Instagram van a graph.instagram.com; los `EAA…`, que desde
+ * el 29-oct-2026 son los únicos que dan las apps nuevas de Meta («inicio de sesión unificado»), a graph.facebook.com.
+ * Publicar es igual en las dos; cambian cómo se encuentra la cuenta (`yo`) y que el `EAA` no se renueva (`vigente`).
+ */
 const API = 'https://graph.instagram.com/v25.0'
+const API_FB = 'https://graph.facebook.com/v25.0'
+const esFacebook = (t: string) => t.startsWith('EAA')
 /** Instagram tarda unos minutos en bajar y procesar el video: se le da con este margen antes de su hora. */
 const ANTES = 20 * 60000
 const DIA = 24 * 3600000
@@ -37,6 +44,7 @@ const INTENTOS = 5
 const REF = /^[0-9a-f-]{36}$/
 
 class Pasajero extends Error {}
+class SinPagina extends Error {}
 
 export default {
   async fetch(req, env): Promise<Response> {
@@ -57,13 +65,16 @@ export default {
       if (que === 'token' && req.method === 'PUT') {
         const { token } = await req.json<{ token: string }>()
         const cuenta = await yo(token).catch((e) => {
-          throw new Error(`Instagram no aceptó ese token (${mensaje(e)}). Cópialo entero, sin espacios.`)
+          throw e instanceof SinPagina ? e : new Error(`Instagram no aceptó ese token (${mensaje(e)}). Cópialo entero, sin espacios.`)
         })
         // Pedir el límite de publicaciones necesita el mismo permiso que publicar: así se sabe antes de la primera.
         await ig(`/${cuenta.user_id}/content_publishing_limit`, token).catch(() => {
-          throw new Error('Ese token no tiene permiso para publicar. Genéralo con instagram_business_content_publish marcado.')
+          throw new Error(`Ese token no tiene permiso para publicar. Genéralo con ${esFacebook(token) ? 'instagram_content_publish' : 'instagram_business_content_publish'} marcado.`)
         })
-        await env.VIDEOS.put('privado/token.json', JSON.stringify({ token, renovado: Date.now() } satisfies Token))
+        const caduca = esFacebook(token) ? await caducaFacebook(token) : undefined
+        if (caduca && caduca - Date.now() < DIA)
+          throw new Error('Ese token dura solo unas horas (es el del explorador de la API). Genera el de la configuración de la API de tu app, que dura meses.')
+        await env.VIDEOS.put('privado/token.json', JSON.stringify({ token, renovado: Date.now(), ...(caduca ? { caduca } : {}) } satisfies Token))
         return json({ cuenta: `@${cuenta.username}` })
       }
       if (que === 'token' && req.method === 'DELETE') {
@@ -214,12 +225,13 @@ interface Token {
 /**
  * El token, renovado una vez al día: cada renovación le da otros 60 días, así que no caduca mientras el cron corra. Solo
  * cuenta como renovado si Instagram dio un token nuevo. Si falla, el de antes sigue sirviendo hasta que caduque, y se
- * vuelve a intentar en 5 minutos, luego 10, 20… hasta cada 6 horas: ni un día perdido ni una llamada cada minuto.
+ * vuelve a intentar en 5 minutos, luego 10, 20… hasta cada 6 horas: ni un día perdido ni una llamada cada minuto. El
+ * `EAA` no se renueva sin el secreto de la app: dura lo que Meta dijo al guardarlo (`caduca`), o no caduca.
  */
 async function vigente(env: Env): Promise<Token | null> {
   const guardado = await (await env.VIDEOS.get('privado/token.json'))?.json<Token>()
   const ahora = Date.now()
-  if (!guardado || ahora - guardado.renovado < DIA || (guardado.reintento ?? 0) > ahora) return guardado ?? null
+  if (!guardado || esFacebook(guardado.token) || ahora - guardado.renovado < DIA || (guardado.reintento ?? 0) > ahora) return guardado ?? null
   type Respuesta = { access_token?: string; expires_in?: number; error?: { message?: string } }
   const r: Respuesta = await fetch(`https://graph.instagram.com/refresh_access_token?grant_type=ig_refresh_token&access_token=${encodeURIComponent(guardado.token)}`).then(
     (x) => x.json<Respuesta>().catch(() => ({ error: { message: `respondió ${x.status}` } })),
@@ -237,11 +249,32 @@ async function vigente(env: Env): Promise<Token | null> {
   return nuevo
 }
 
-const yo = (t: string) => ig<{ user_id: string; username: string }>('/me?fields=user_id,username', t)
+/**
+ * La cuenta de Instagram del token. Un `EAA` es de una persona (o de un usuario del sistema) y llega a Instagram por la
+ * Página de Facebook vinculada: la primera que tenga una. Si es el token de una Página, por ella misma.
+ */
+async function yo(t: string): Promise<{ user_id: string; username: string }> {
+  if (!esFacebook(t)) return ig('/me?fields=user_id,username', t)
+  type Pagina = { instagram_business_account?: { id: string; username: string } }
+  const campos = 'instagram_business_account{id,username}'
+  const paginas = await ig<{ data?: Pagina[] }>(`/me/accounts?fields=${campos}`, t).then(
+    (r) => r.data ?? [],
+    (e) => (e instanceof Pasajero ? Promise.reject(e) : null)
+  )
+  const cuenta = paginas ? paginas.find((p) => p.instagram_business_account)?.instagram_business_account : (await ig<Pagina>(`/me?fields=${campos}`, t)).instagram_business_account
+  if (!cuenta) throw new SinPagina('Ese token no ve ninguna Página de Facebook vinculada a tu cuenta profesional de Instagram: vincúlala y genera el token otra vez.')
+  return { user_id: cuenta.id, username: cuenta.username }
+}
+
+/** Cuándo caduca un `EAA` (ms), si caduca: lo dice Meta con `debug_token` (0 es que no). Si no contesta, no se sabe. */
+async function caducaFacebook(t: string): Promise<number | undefined> {
+  const r = await ig<{ data?: { expires_at?: number } }>(`/debug_token?input_token=${encodeURIComponent(t)}`, t).catch(() => null)
+  return r?.data?.expires_at ? r.data.expires_at * 1000 : undefined
+}
 
 async function ig<T = unknown>(ruta: string, token: string, datos?: Record<string, string>): Promise<T> {
   const headers = { authorization: `Bearer ${token}` }
-  const res = await fetch(`${API}${ruta}`, datos ? { method: 'POST', headers, body: new URLSearchParams(datos) } : { headers }).catch((e) => {
+  const res = await fetch(`${esFacebook(token) ? API_FB : API}${ruta}`, datos ? { method: 'POST', headers, body: new URLSearchParams(datos) } : { headers }).catch((e) => {
     throw new Pasajero(`No llegué a Instagram: ${mensaje(e)}`)
   })
   const json = await res.json<{ error?: { message?: string; error_user_msg?: string; is_transient?: boolean } }>().catch(() => ({ error: undefined }))

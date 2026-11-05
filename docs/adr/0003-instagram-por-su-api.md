@@ -70,3 +70,13 @@ app de Meta compartidas (pasar la revisión de Meta y guardar los tokens de todo
 - La nube del dueño no lleva token y se sigue desplegando con `npm run nube -- deploy`: esto no la toca.
 - Una dirección nueva de workers.dev tarda en responder (8 s en la prueba; en una cuenta nueva, a veces minutos):
   mientras, la nube responde 404 sin JSON, y Sloth dice que aún se está estrenando.
+
+## Cambio del 2026-11-05: también los tokens `EAA`
+
+Desde el 29-oct-2026, las apps nuevas de Meta ya no traen «Configuración de la API con el inicio de sesión de
+Instagram», solo la del inicio de sesión unificado, que da tokens `EAA…` de Facebook: graph.instagram.com los rechaza.
+La nube acepta los dos y elige por el prefijo. Con un `EAA`, todo va a graph.facebook.com (los mismos `media`,
+`media_publish`, `status_code` y `content_publishing_limit`), la cuenta se encuentra por la Página de Facebook vinculada
+(`/me/accounts`, o `/me` si es el token de la Página) y no se renueva, porque eso pide el secreto de la app: al
+guardarlo se pregunta a `debug_token` cuándo caduca, se rechaza el de unas horas del explorador de la API y Opciones
+avisa una semana antes. Los `IGAA` siguen como antes.
