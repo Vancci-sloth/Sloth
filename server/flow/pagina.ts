@@ -114,7 +114,10 @@ export async function ponerAportar(page: Page, quiere: boolean) {
 export async function leerSaldo(page: Page): Promise<Saldo | null> {
   await page.locator('.header-user-button').first().click({ timeout: 15_000 })
   const suyo = page.locator('mat-icon:text-is("movie_filter_auto")').first()
-  if (!(await suyo.waitFor({ timeout: 10_000 }).then(() => true, () => false))) return null
+  if (!(await suyo.waitFor({ timeout: 10_000 }).then(() => true, () => false))) {
+    await page.keyboard.press('Escape').catch(() => {})
+    return null
+  }
   const texto = await suyo.evaluate((d) => {
     let e = d as HTMLElement
     for (let i = 0; i < 4 && e.parentElement && !/\d.*\n.*\d/.test(e.innerText); i++) e = e.parentElement
@@ -299,8 +302,10 @@ export async function prepararEnFlow(page: Page, proyecto: string | undefined, p
  * sabe si se puede pedir de nuevo sin pagarlo dos veces.
  */
 export async function generarEnFlow(b: Browser, page: Page, proyecto: string | undefined, p: PedidoFlow, carpeta: string, alEntrar: (proyecto: string) => void) {
+  // El saldo, antes de entrar al proyecto: el menú de la cuenta no siempre se cierra con Escape, y abierto tapa el
+  // compositor (el clic en la caja del prompt fallaba). Entrar al proyecto recarga la página y lo cierra.
+  const saldoAntes = p.tipo === 'video' ? await saldoEnFlow(page).catch(() => null) : null
   const creditos = await prepararEnFlow(page, proyecto, p, alEntrar)
-  const saldoAntes = p.tipo === 'video' ? await leerSaldo(page).catch(() => null) : null
   // Después de preparar: cada imagen subida también es una tarjeta del proyecto.
   const tarjeta = page.locator('flow-tile-container').first()
   const antes = (await tarjeta.count()) ? await tarjeta.evaluate((d) => `${(d as HTMLElement).innerText} ${d.querySelector('img')?.src ?? ''}`) : ''
