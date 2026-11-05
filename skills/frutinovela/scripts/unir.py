@@ -1,10 +1,11 @@
 """
 Une los clips de una frutinovela en el video final. Se corre desde la raíz del proyecto:
 
-    python <skill>/scripts/unir.py <nombre> [--formato vertical|horizontal] [--sin-subtitulos] [--sin-recortar]
+    python <skill>/scripts/unir.py <nombre> [--formato vertical|horizontal] [--sin-subtitulos] [--sin-recortar] [--hasta NN=s ...]
 
 Toma `clips/esc-*.mp4` en orden y transcribe cada uno con el Whisper de Sloth. Corta el final muerto de cada clip, el
-segundo o dos en que nadie habla ni se mueve, a 0,35 s de su última palabra, salvo `--sin-recortar`. Los lleva al
+segundo o dos en que nadie habla ni se mueve, a 0,35 s de su última palabra, salvo `--sin-recortar`. `--hasta 03=7.6`
+acaba el clip `esc-03` en ese segundo: para lo que pasa tras la última palabra (los golpes en la puerta del cliffhanger). Los lleva al
 tamaño del formato (Veo da 720p) a 30 fps, une su audio y lo masteriza (`masterizar.mjs` de video-base, −14 LUFS y
 −1 dBTP). Deja lo que dicen en `revision/transcripcion.txt`, para compararlo con el guion, y salvo `--sin-subtitulos`
 lo pone encima en bloques de hasta tres palabras, con la más larga en amarillo. Deja `out/frutinovela-<nombre>.mp4`.
@@ -40,8 +41,11 @@ def con_audio(clip: Path) -> bool:
 
 
 def duracion(clip: Path) -> float:
-    r = subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", str(clip)], capture_output=True, text=True, check=True)
-    return float(r.stdout.strip())
+    """La de su imagen: el audio de Flow dura 8,04 s y la imagen 8,0, y cortar en la del archivo adelantaba el audio un
+    cuadro por clip (y el video salía con menos fotogramas de los que dice su duración)."""
+    r = subprocess.run(["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=duration:format=duration", "-of", "default=nw=1:nk=1", str(clip)], capture_output=True, text=True, check=True)
+    valores = [float(v) for v in r.stdout.split() if v.replace(".", "", 1).isdigit()]
+    return valores[0]
 
 
 def corte(clip: Path, segmentos: list[dict]) -> float:
@@ -117,7 +121,14 @@ def ass(bloques_: list[tuple[float, float, str]], ancho: int, alto: int) -> str:
 
 
 def main() -> None:
-    args = [a for a in sys.argv[1:] if not a.startswith("--")]
+    # `--hasta NN=s`: dónde acaba ese clip, en vez de su corte (lo que suena o pasa tras la última palabra).
+    hasta = {}
+    for i, a in enumerate(sys.argv):
+        if a == "--hasta" and i + 1 < len(sys.argv):
+            n, s = sys.argv[i + 1].split("=")
+            hasta[f"esc-{int(n):02d}"] = float(s)
+    valores = {sys.argv[i + 1] for i, a in enumerate(sys.argv) if a in ("--hasta", "--formato") and i + 1 < len(sys.argv)}
+    args = [a for a in sys.argv[1:] if not a.startswith("--") and a not in valores]
     if not args:
         sys.exit(__doc__)
     nombre = args[0]
@@ -139,6 +150,8 @@ def main() -> None:
     for c in clips:
         propios = transcribir(c).get("segmentos", []) if con_audio(c) else []
         fin = duracion(c) if "--sin-recortar" in sys.argv else corte(c, propios)
+        if c.stem in hasta:
+            fin = min(duracion(c), round(hasta[c.stem] * FPS) / FPS)
         cortes.append(fin)
         segmentos += [{**s, "start": s["start"] + inicio, "end": min(s["end"], fin) + inicio} for s in propios if s["start"] < fin]
         renglones.append(f"{c.stem} ({inicio:.1f}-{inicio + fin:.1f} s, de {duracion(c):.1f}): {' '.join(s['text'].strip() for s in propios) or '(sin voz)'}")

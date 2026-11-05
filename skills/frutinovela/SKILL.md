@@ -91,7 +91,9 @@ Antes de inventar a uno, mira si ya está.
 7. **Montaje.** `python <skill>/scripts/unir.py <nombre> --formato <formato>` se corre desde la carpeta del proyecto.
    Transcribe cada clip y le corta el final muerto: Veo deja de 1 a 2 s en que nadie habla ni se mueve, y se corta a
    0,35 s de su última palabra. Luego une los clips en orden, masteriza el audio y pone los subtítulos
-   (`--sin-subtitulos` si el usuario no los quiere). Mira `revision/transcripcion.txt` contra el guion y una hoja del video (`node <base>/scripts/hoja.mjs
+   (`--sin-subtitulos` si el usuario no los quiere). Si en un clip pasa algo tras la última palabra (un golpe, un grito,
+   la cara del remate), ese corte se lo come: mide dónde acaba (el volumen cada medio segundo y una hoja del final del
+   clip) y pasa `--hasta <NN>=<s>`. Mira `revision/transcripcion.txt` contra el guion y una hoja del video (`node <base>/scripts/hoja.mjs
    out/frutinovela-<nombre>.mp4 revision/hoja.png --cada 2`). Si un clip dice otra cosa, habla con la voz de otro, cambia a
    un personaje o trae texto, repítelo una vez con el prompt corregido. Repetirlo gasta otra vez: si sigue mal, déjalo y
    díselo al usuario. Al final, `node <base>/scripts/comprobar.mjs out/frutinovela-<nombre>.mp4 --duracion <s> --fps 30
