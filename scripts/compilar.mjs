@@ -1,6 +1,6 @@
 // Compila Sloth para venderla. `npm run compilar` arma en dist/Sloth la app que se instala en otra computadora y la
 // mete en su instalador, en dist/instalador: Sloth-Setup-<versión>.exe en Windows, Sloth-<versión>-mac-x64.dmg (y su
-// .zip, con el que se actualiza) en Mac y Sloth-<versión>-linux-x86_64.AppImage en Linux. Cada sistema se compila en el
+// .zip, con el que se actualiza; con SLOTH_MAC12=1, la de macOS 12, -mac12-x64) en Mac y Sloth-<versión>-linux-x86_64.AppImage en Linux. Cada sistema se compila en el
 // suyo: lleva su Node y los paquetes de ese sistema (en GitHub, .github/workflows/venta.yml). Es una app de Electron
 // (electron/main.ts) y la empaqueta electron-builder; junto al instalador deja lo que usan las actualizaciones, sus mapas
 // de bloques (.blockmap) y latest.yml (latest-mac.yml, latest-linux.yml), y `npm run publicar` lo sube. Con
@@ -33,6 +33,17 @@ const MAC = process.platform === 'darwin'
 for (const v of ['CSC_LINK', 'CSC_KEY_PASSWORD', 'APPLE_ID', 'APPLE_APP_SPECIFIC_PASSWORD', 'APPLE_TEAM_ID']) if (!process.env[v]) delete process.env[v]
 /** Con el certificado de Apple (CSC_LINK, ver docs/adr/0006), la de Mac va firmada y notarizada, y se actualiza sola. */
 const MAC_FIRMADA = MAC && !!process.env.CSC_LINK
+/**
+ * La de Mac con macOS 12 (Monterey), aparte, con SLOTH_MAC12=1 (docs/adr/0006): Electron dejó macOS 12 en su 44 y Node
+ * en su 24, así que esta lleva Electron 43 y el Node 22 con que se compila. Solo de Intel: todo Mac con Apple Silicon
+ * llega a macOS 13. Al abrirla avisa, en grande, que algunas cosas (Claude) pueden no andar ahí.
+ */
+const MAC12 = MAC && process.env.SLOTH_MAC12 === '1'
+/** El último Electron que abre en macOS 12. Sin parches de seguridad desde el 5 de enero de 2027. */
+const ELECTRON_MAC12 = '43.8.7'
+if (MAC12 && (process.arch !== 'x64' || process.versions.node.split('.')[0] !== '22')) throw new Error('La de macOS 12 se compila en un Mac con Intel y con Node 22 (su Node viaja dentro de la app).')
+/** El nombre de sus archivos, `-mac12-` en la de macOS 12: el cobro los tiene juntos. */
+const NOMBRE_MAC = MAC12 ? 'Sloth-${version}-mac12-${arch}.${ext}' : 'Sloth-${version}-mac-${arch}.${ext}'
 /** El cobro de Sloth (`licencias/`): de ahí bajan el instalador y las actualizaciones. */
 const COBRO = 'https://api.sloth.vancci.org'
 const VERSION = JSON.parse(readFileSync(join(REPO, 'package.json'), 'utf8')).version
@@ -105,7 +116,8 @@ const { metafile } = await esbuild({
   bundle: true,
   platform: 'node',
   format: 'esm',
-  target: 'node24',
+  // El Node que viaja en la app: el 22 en la de macOS 12.
+  target: MAC12 ? 'node22' : 'node24',
   packages: 'external',
   define: { __VENTA__: 'true', __NUBE__: JSON.stringify(nube.outputFiles[0].text) },
   minifySyntax: true,
@@ -187,7 +199,7 @@ if (WINDOWS) {
 
 paso('Armando la ventana')
 rmSync(VENTANA, { recursive: true, force: true })
-await armarVentana(VENTANA, { macFirmada: MAC_FIRMADA })
+await armarVentana(VENTANA, { macFirmada: MAC_FIRMADA, mac12: MAC12 })
 if (WINDOWS) {
   // ayudante.exe, que ancla Sloth a la barra de tareas en los Windows de antes y la desancla al desinstalarla
   // (electron/barra.ts): C# con el csc de .NET Framework 4, que trae Windows.
@@ -275,7 +287,7 @@ const hechos = await empaquetar({
   config: {
     // El mismo nombre ante Windows que la 0.2: lo ya anclado y los avisos siguen siendo de Sloth.
     appId: 'Sloth.App',
-    electronVersion: JSON.parse(readFileSync(join(REPO, 'node_modules', 'electron', 'package.json'), 'utf8')).version,
+    electronVersion: MAC12 ? ELECTRON_MAC12 : JSON.parse(readFileSync(join(REPO, 'node_modules', 'electron', 'package.json'), 'utf8')).version,
     productName: 'Sloth',
     copyright: 'Sloth',
     directories: { app: VENTANA, output: join(DIST, 'instalador') },
@@ -304,7 +316,8 @@ const hechos = await empaquetar({
     mac: {
       icon: ICONO_PNG,
       category: 'public.app-category.video',
-      artifactName: 'Sloth-${version}-mac-${arch}.${ext}',
+      artifactName: NOMBRE_MAC,
+      ...(MAC12 ? { minimumSystemVersion: '12.0' } : {}),
       // Sin certificado, firma ad hoc: sin ninguna, macOS dice que Sloth «está dañada». Con ella, se
       // abre una vez desde Configuración → Privacidad y seguridad → «Abrir de todos modos».
       identity: MAC_FIRMADA ? undefined : '-',
@@ -315,7 +328,7 @@ const hechos = await empaquetar({
       // La voz se graba en la interfaz: sin esto, macOS ni siquiera pregunta por el micrófono.
       extendInfo: { NSMicrophoneUsageDescription: 'Sloth graba tu voz para los videos.' }
     },
-    dmg: { artifactName: 'Sloth-${version}-mac-${arch}.${ext}' },
+    dmg: { artifactName: NOMBRE_MAC },
     linux: {
       icon: ICONO_PNG,
       category: 'AudioVideo',
@@ -327,9 +340,16 @@ const hechos = await empaquetar({
     electronLanguages: ['es', 'es-419', 'en-US'],
     afterPack: linuxSinAislamiento,
     // Las actualizaciones (electron-updater): el cobro sirve un pedazo por petición, no varios. La de Mac con Apple
-    // Silicon sale en otra máquina y lee su propio latest-arm64-mac.yml; el canal va aquí y no en electron/main.ts, que
-    // le dejaría instalar una versión más vieja.
-    publish: [{ provider: 'generic', url: `${COBRO}/actualizaciones`, useMultipleRangeRequest: false, ...(MAC && ARCH === Arch.arm64 ? { channel: 'latest-arm64' } : {}) }],
+    // Silicon sale en otra máquina y lee su propio latest-arm64-mac.yml, y la de macOS 12, latest-mac12-mac.yml (la de
+    // Intel no abriría ahí); el canal va aquí y no en electron/main.ts, que le dejaría instalar una versión más vieja.
+    publish: [
+      {
+        provider: 'generic',
+        url: `${COBRO}/actualizaciones`,
+        useMultipleRangeRequest: false,
+        ...(MAC12 ? { channel: 'latest-mac12' } : MAC && ARCH === Arch.arm64 ? { channel: 'latest-arm64' } : {})
+      }
+    ],
     releaseInfo: { releaseNotes: NOVEDAD },
     // Los de Linux, en linuxSinAislamiento.
     electronFuses: WINDOWS || MAC ? FUSIBLES : undefined,

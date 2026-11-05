@@ -13,10 +13,11 @@ de Windows, y la firma de Apple.
 
 ## Decisión
 
-Cada push a `venta` compila y publica cuatro instaladores (`.github/workflows/venta.yml`), cada uno en su máquina, con
-la misma versión: el `.exe` de siempre, un `.dmg` para Mac con Intel y otro para Mac con Apple Silicon (cada uno con
-su `.zip`, con el que se actualiza) y un AppImage para Linux x64. El cobro los da en `/descargar`,
-`/descargar?so=mac` (que deja elegir entre las dos de Mac), `/descargar?so=mac-arm64` y `/descargar?so=linux`.
+Cada push a `venta` compila y publica cinco instaladores (`.github/workflows/venta.yml`), cada uno en su máquina, con
+la misma versión: el `.exe` de siempre, un `.dmg` para Mac con Intel, otro para Mac con Apple Silicon y otro para Mac
+con macOS 12 (cada uno con su `.zip`, con el que se actualiza) y un AppImage para Linux x64. El cobro los da en
+`/descargar`, `/descargar?so=mac` (que deja elegir entre las de Mac), `/descargar?so=mac-arm64`,
+`/descargar?so=mac12` y `/descargar?so=linux`.
 
 - **Tus datos.** Un `.app` y un AppImage no se pueden escribir: el servidor viaja en `resources/sloth` y la app lo copia
   al estrenar cada versión a `~/Library/Application Support/Sloth` (Mac) o `~/.local/share/sloth` (Linux), donde viven
@@ -59,6 +60,15 @@ su `.zip`, con el que se actualiza) y un AppImage para Linux x64. El cobro los d
   en `app-update.yml`, al compilar; ponerlo en `autoUpdater.channel` le dejaría instalar versiones más viejas (lo hace
   la 0.3.43, que se armó a mano: su primera actualización ya lo quita). GitHub retira sus máquinas Intel en agosto de
   2027: entonces la de Intel saldrá de la de ARM o será universal.
+- La de macOS 12 (Monterey), desde el 5-nov-2026: Electron 44 y Node 24 ya no abren ahí («requiere macOS 13.0»), así
+  que sale aparte con Electron 43 (`ELECTRON_MAC12` en scripts/compilar.mjs) y Node 22, en `macos-15-intel` con
+  `SLOTH_MAC12=1`. Solo de Intel: todo Mac con Apple Silicon llega a macOS 13. Es otro sistema en el cobro (`mac12`,
+  `Sloth-<versión>-mac12-x64.dmg`, su canal `latest-mac12` y `latest-mac12-mac.yml`), para que nunca se actualice a la de
+  Intel, que ahí no abre. El servidor se arma para Node 22 y `comprobar.yml` corre las pruebas con él. Cada vez que se
+  abre, un aviso a pantalla completa (`web/src/AvisoMacViejo.tsx`) dice que es probable que algunas funciones no anden:
+  el programa de Claude pide macOS 13, y FFmpeg, Python y los demás agentes no se han probado ahí. Electron 43 deja de
+  recibir parches el 5-ene-2027: la de macOS 12 se queda en él mientras haya quien la use. Cuando Node 22 deje de tener
+  soporte (abril de 2027) o el servidor necesite algo de Node 24, se quita.
 - Linux ARM queda fuera: sería otra máquina en el flujo.
 - El Diff lee con OCR las capturas sin texto: en Windows usa el del sistema; en Mac y Linux, RapidOCR
   (`skills/video-el-diff/plantilla/ubicar.py`). Sloth instala RapidOCR con los paquetes de El Diff fuera de Windows

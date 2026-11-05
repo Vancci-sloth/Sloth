@@ -17,15 +17,18 @@ const PARTE = 64 * 1024 * 1024
 const REPO = join(dirname(fileURLToPath(import.meta.url)), '..')
 const VERSION = JSON.parse(readFileSync(join(REPO, 'package.json'), 'utf8')).version
 const ARCH = process.arch === 'arm64' ? 'arm64' : 'x64'
+/** La de macOS 12 (SLOTH_MAC12=1, scripts/compilar.mjs), con su propia última versión. */
+const MAC12 = process.platform === 'darwin' && process.env.SLOTH_MAC12 === '1'
+const MAC = MAC12 ? 'mac12' : 'mac'
 /** Por sistema: el instalador, lo demás que usa al actualizarse, lo que lee electron-updater y su enlace de descarga. */
 const { instalador, otros, ultimo, so } = {
   win32: { instalador: `Sloth-Setup-${VERSION}.exe`, otros: [], ultimo: 'latest.yml', so: '' },
-  // La de Apple Silicon, con su canal (scripts/compilar.mjs): cada Mac tiene su última versión.
+  // La de Apple Silicon y la de macOS 12, con su canal (scripts/compilar.mjs): cada Mac tiene su última versión.
   darwin: {
-    instalador: `Sloth-${VERSION}-mac-${ARCH}.dmg`,
-    otros: [`Sloth-${VERSION}-mac-${ARCH}.zip`],
-    ultimo: ARCH === 'arm64' ? 'latest-arm64-mac.yml' : 'latest-mac.yml',
-    so: ARCH === 'arm64' ? '?so=mac-arm64' : '?so=mac'
+    instalador: `Sloth-${VERSION}-${MAC}-${ARCH}.dmg`,
+    otros: [`Sloth-${VERSION}-${MAC}-${ARCH}.zip`],
+    ultimo: MAC12 ? 'latest-mac12-mac.yml' : ARCH === 'arm64' ? 'latest-arm64-mac.yml' : 'latest-mac.yml',
+    so: MAC12 ? '?so=mac12' : ARCH === 'arm64' ? '?so=mac-arm64' : '?so=mac'
   },
   // electron-builder llama x86_64 al AppImage de x64.
   linux: { instalador: `Sloth-${VERSION}-linux-${ARCH === 'x64' ? 'x86_64' : ARCH}.AppImage`, otros: [], ultimo: 'latest-linux.yml', so: '?so=linux' }

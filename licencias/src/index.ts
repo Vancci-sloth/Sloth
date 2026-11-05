@@ -31,8 +31,8 @@
  * fundadoras como las primeras que apoyan (`esFundador`), con lo nuevo `ANTICIPO` antes y sin el recordatorio. Ya no se
  * dan.
  *
- * También da el instalador: `GET /descargar` es la última versión, libre; la de Mac (Intel), la de Mac con Apple Silicon
- * y la de Linux, con `?so=mac`, `?so=mac-arm64` y `?so=linux` (también en `/version`). Está en R2
+ * También da el instalador: `GET /descargar` es la última versión, libre; la de Mac (Intel), la de Mac con Apple Silicon,
+ * la de Mac con macOS 12 y la de Linux, con `?so=mac`, `?so=mac-arm64`, `?so=mac12` y `?so=linux` (también en `/version`). Está en R2
  * (`DESCARGAS`) y lo sube `npm run publicar` por partes, con `PUBLICAR`: pesa más de lo que aceptan wrangler (300 MiB)
  * y una petición a un Worker (100 MB). `ultima.json` dice cuál es la última. Y las actualizaciones de la app instalada
  * (electron-updater): `GET /actualizaciones/latest.yml` dice cuál es la nueva (quien apoya la recibe `ANTICIPO` antes:
@@ -229,23 +229,24 @@ const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
  * el .zip con que se actualiza la de Mac, sus mapas de bloques y `latest.yml` (`latest-mac.yml`, `latest-linux.yml`), el
  * que lee electron-updater. `tipo` es lo que va tras la versión: el de cada archivo que se poda.
  */
-const BINARIO = /^Sloth-(?:Setup-)?\d+\.\d+\.\d+(?<tipo>\.exe|-mac-(?:arm64|x64)\.(?:dmg|zip)|-linux-(?:arm64|x86_64)\.AppImage)$/
-const AL_DIA = /^latest(-mac|-arm64-mac|-linux)?\.yml$/
+const BINARIO = /^Sloth-(?:Setup-)?\d+\.\d+\.\d+(?<tipo>\.exe|-mac-(?:arm64|x64)\.(?:dmg|zip)|-mac12-x64\.(?:dmg|zip)|-linux-(?:arm64|x86_64)\.AppImage)$/
+const AL_DIA = /^latest(-mac|-arm64-mac|-mac12-mac|-linux)?\.yml$/
 const publicable = (archivo: string) => AL_DIA.test(archivo) || BINARIO.test(archivo.replace(/\.blockmap$/, ''))
 /**
  * Cada sistema que se descarga (`?so=`) y dónde dice cuál es su última versión. Sin `so`, Windows. La de Mac con Apple
- * Silicon sale en su propia máquina y tiene su última aparte; `mac` es la de Intel.
+ * Silicon sale en su propia máquina y tiene su última aparte; `mac` es la de Intel, y `mac12`, la de Intel con Electron
+ * 43 que abre en macOS 12 (scripts/compilar.mjs).
  */
-const ULTIMAS = { windows: 'ultima.json', mac: 'ultima-mac.json', 'mac-arm64': 'ultima-mac-arm64.json', linux: 'ultima-linux.json' } as const
+const ULTIMAS = { windows: 'ultima.json', mac: 'ultima-mac.json', 'mac-arm64': 'ultima-mac-arm64.json', mac12: 'ultima-mac12.json', linux: 'ultima-linux.json' } as const
 /** Lo que lee electron-updater de cada sistema. */
-const YML = { windows: 'latest.yml', mac: 'latest-mac.yml', 'mac-arm64': 'latest-arm64-mac.yml', linux: 'latest-linux.yml' } as const
-const NOMBRES = { windows: 'Windows', mac: 'Mac con Intel', 'mac-arm64': 'Mac con Apple Silicon', linux: 'Linux' } as const
+const YML = { windows: 'latest.yml', mac: 'latest-mac.yml', 'mac-arm64': 'latest-arm64-mac.yml', mac12: 'latest-mac12-mac.yml', linux: 'latest-linux.yml' } as const
+const NOMBRES = { windows: 'Windows', mac: 'Mac con Intel', 'mac-arm64': 'Mac con Apple Silicon', mac12: 'Mac con macOS 12', linux: 'Linux' } as const
 type Sistema = keyof typeof ULTIMAS
 export const sistema = (so: string | null): Sistema => (so && so !== 'windows' && Object.hasOwn(ULTIMAS, so) ? (so as Sistema) : 'windows')
 /** El sistema del que `archivo` es el instalador; `undefined` si no es uno (el .zip de Mac, un mapa, latest.yml). */
 export function instaladorDe(archivo: string): Sistema | undefined {
   const tipo = BINARIO.exec(archivo)?.groups?.tipo
-  if (tipo?.endsWith('.dmg')) return tipo.includes('arm64') ? 'mac-arm64' : 'mac'
+  if (tipo?.endsWith('.dmg')) return tipo.includes('arm64') ? 'mac-arm64' : tipo.includes('mac12') ? 'mac12' : 'mac'
   return tipo === '.exe' ? 'windows' : tipo?.endsWith('.AppImage') ? 'linux' : undefined
 }
 /** El sistema de un `latest*.yml`. */
@@ -332,12 +333,12 @@ async function atender(req: Request, env: Env, ctx: ExecutionContext, url: URL):
     if ((req.method === 'GET' || req.method === 'HEAD') && url.pathname === '/descargar') {
       const so = sistema(url.searchParams.get('so'))
       const u = await ultimaPara(req, env, so)
-      // `?so=mac` (el enlace de la página y de los correos) deja elegir entre la de Apple Silicon y la de Intel; la que
-      // aún no va firmada por Apple dice antes cómo se abre la primera vez.
-      if ((so === 'mac' || so === 'mac-arm64') && !url.searchParams.has('visto')) {
-        const arm = so === 'mac-arm64' ? u : await ultimaPara(req, env, 'mac-arm64').catch(() => undefined)
-        const intel = so === 'mac' ? u : undefined
-        if ([intel, arm].some((m) => m && !m.firmada) || (intel && arm)) return avisoMac(intel, arm)
+      // `?so=mac` (el enlace de la página y de los correos) deja elegir entre la de Apple Silicon, la de Intel y la de
+      // macOS 12; la que aún no va firmada por Apple dice antes cómo se abre la primera vez.
+      if ((so === 'mac' || so === 'mac-arm64' || so === 'mac12') && !url.searchParams.has('visto')) {
+        const otra = (cual: Sistema) => (so === cual ? u : so === 'mac' ? ultimaPara(req, env, cual).catch(() => undefined) : undefined)
+        const [intel, arm, viejo] = await Promise.all([so === 'mac' ? u : undefined, otra('mac-arm64'), otra('mac12')])
+        if ([intel, arm, viejo].some((m) => m && !m.firmada) || (intel && (arm || viejo))) return avisoMac(intel, arm, viejo)
       }
       return servir(req, env, u.archivo, u.bytes, { 'content-disposition': `attachment; filename="${u.archivo}"` })
     }
@@ -1359,11 +1360,21 @@ async function renovacion(env: Env, url: URL): Promise<Response> {
  * (`intel`), y cómo se abre la primera vez la que aún no lleva la firma de Apple (docs/adr/0006-mac-y-linux.md): sin
  * ella, macOS no la deja abrir a la primera ni se actualiza sola.
  */
-function avisoMac(intel: Ultima | undefined, arm: Ultima | undefined): Response {
+function avisoMac(intel: Ultima | undefined, arm: Ultima | undefined, viejo?: Ultima): Response {
   const boton = (u: Ultima, so: Sistema, cual: string, principal: boolean) =>
     `<a class="${principal ? 'boton' : 'boton otro'}" href="/descargar?so=${so}&amp;visto">Descargar Sloth ${u.version} para ${cual}</a>`
   const elegir = intel && arm
-  const sinFirma = [intel, arm].some((u) => u && !u.firmada)
+  const sinFirma = [intel, arm, viejo].some((u) => u && !u.firmada)
+  // Las que se enseñan y no van firmadas; si son todas, se dice de «Sloth para Mac».
+  const macs: [string, Ultima | undefined][] = [['La de Apple Silicon', arm], ['La de Intel', intel], ['La de macOS 12', viejo]]
+  const vistas = macs.filter(([, u]) => u)
+  const sinFirmaDe = vistas.filter(([, u]) => !u?.firmada).map(([n]) => n)
+  const quien = sinFirmaDe.length === vistas.length ? 'Sloth para Mac' : sinFirmaDe.join(' y ').replace(' y La', ' y la')
+  const deMac12 = viejo
+    ? intel || arm
+      ? '<p>¿Tu Mac se quedó en <b>macOS 12 (Monterey)</b> y no se puede actualizar? Baja la de macOS 12: abre, pero es probable que <b>Claude</b> y otras funciones no anden ahí.</p>'
+      : '<p>Para Mac con <b>macOS 12 (Monterey)</b>. Abre, pero es probable que <b>Claude</b> y otras funciones no anden ahí: si tu Mac se puede actualizar a macOS 13 o más nuevo, mejor actualízala y baja la normal.</p>'
+    : ''
   const pasos = sinFirma
     ? `<ol><li>Abre el archivo que se baja y arrastra <b>Sloth</b> a <b>Aplicaciones</b>.</li>
 <li>Ábrela. macOS dirá que no puede comprobarla: cierra ese aviso, ve a <b>Configuración del Sistema → Privacidad y seguridad</b> y pulsa <b>«Abrir de todos modos»</b>. Solo la primera vez.</li>
@@ -1372,10 +1383,12 @@ function avisoMac(intel: Ultima | undefined, arm: Ultima | undefined): Response 
 <li>Ábrela. Las versiones nuevas se ponen solas: Sloth te avisa y basta con «Actualizar».</li></ol>`
   return pagina(
     'Sloth para Mac',
-    `${elegir ? '<p>Elige la de tu Mac: en el menú de Apple → <b>Acerca de esta Mac</b>, si dice <b>Chip Apple M1</b> o más nuevo, es Apple Silicon; si dice <b>Procesador Intel</b>, es Intel. Las dos piden macOS 13 o más nuevo.</p>' : '<p>Pide macOS 13 o más nuevo.</p>'}
-${sinFirma ? `<p>${elegir && intel?.firmada ? 'La de Apple Silicon' : elegir && arm?.firmada ? 'La de Intel' : 'Sloth para Mac'} todavía no lleva la firma de Apple: macOS pide un paso más la primera vez.</p>` : ''}
+    `${elegir ? '<p>Elige la de tu Mac: en el menú de Apple → <b>Acerca de esta Mac</b>, si dice <b>Chip Apple M1</b> o más nuevo, es Apple Silicon; si dice <b>Procesador Intel</b>, es Intel. Las dos piden macOS 13 o más nuevo.</p>' : intel || arm ? '<p>Pide macOS 13 o más nuevo.</p>' : ''}
+${deMac12}
+${sinFirma ? `<p>${quien} todavía no ${sinFirmaDe.length > 1 && quien !== 'Sloth para Mac' ? 'llevan' : 'lleva'} la firma de Apple: macOS pide un paso más la primera vez.</p>` : ''}
 ${arm ? boton(arm, 'mac-arm64', elegir ? 'Mac con Apple Silicon (M1 o más nuevo)' : 'Mac', true) : ''}
 ${intel ? boton(intel, 'mac', elegir ? 'Mac con Intel (i5, i7 o i9)' : 'Mac', !arm) : ''}
+${viejo ? boton(viejo, 'mac12', 'Mac con macOS 12', !arm && !intel) : ''}
 ${pasos}
 ${!elegir && intel ? '<p class="otros">Para Mac con Intel. En un Mac con M1 o más nuevo también abre: la primera vez, macOS pide instalar Rosetta.</p>' : ''}`
   )

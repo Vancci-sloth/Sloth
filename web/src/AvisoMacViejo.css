@@ -1,0 +1,17 @@
+/* Encima de todo y a pantalla completa: que no se pueda pasar por alto. */
+.mac-viejo {
+  position: fixed; inset: 0; z-index: 1000; display: grid; place-items: center; overflow-y: auto;
+  padding: 32px 16px; background: var(--bg);
+}
+.mac-viejo-caja { width: min(820px, 100%); text-align: center; }
+.mac-viejo-ico { width: 96px; height: 96px; color: var(--amber); }
+.mac-viejo h1 { margin: 18px 0 14px; font-size: clamp(36px, 6vw, 64px); line-height: 1.05; font-weight: 800; color: var(--amber); }
+.mac-viejo-sub { margin: 0 0 28px; font-size: clamp(20px, 2.6vw, 28px); line-height: 1.35; color: var(--text); }
+.mac-viejo ul {
+  margin: 0 auto 32px; padding: 20px 24px 20px 44px; max-width: 680px; text-align: left;
+  border: 1px solid var(--line); border-radius: 12px; background: var(--panel);
+  color: var(--muted); font-size: clamp(16px, 1.8vw, 19px); line-height: 1.5;
+}
+.mac-viejo li + li { margin-top: 10px; }
+.mac-viejo b { color: var(--text); }
+.mac-viejo .primary { padding: 16px 32px; font-size: 19px; border-radius: 12px; }

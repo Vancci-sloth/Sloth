@@ -132,6 +132,9 @@ test('reconoce el instalador de cada sistema, y nada más pasa por la última ve
   assert.equal(instaladorDe('Sloth-Setup-0.3.4.exe'), 'windows')
   assert.equal(instaladorDe('Sloth-0.3.4-mac-x64.dmg'), 'mac')
   assert.equal(instaladorDe('Sloth-0.3.4-mac-arm64.dmg'), 'mac-arm64')
+  assert.equal(instaladorDe('Sloth-0.3.4-mac12-x64.dmg'), 'mac12')
+  assert.equal(instaladorDe('Sloth-0.3.4-mac12-x64.zip'), undefined)
+  assert.equal(instaladorDe('Sloth-0.3.4-mac12-arm64.dmg'), undefined)
   assert.equal(instaladorDe('Sloth-0.3.4-linux-x86_64.AppImage'), 'linux')
   assert.equal(instaladorDe('Sloth-0.3.4-mac-arm64.zip'), undefined)
   assert.equal(instaladorDe('Sloth-0.3.4-mac-arm64.dmg.blockmap'), undefined)
@@ -139,15 +142,17 @@ test('reconoce el instalador de cada sistema, y nada más pasa por la última ve
   assert.equal(instaladorDe('Sloth-0.3.4-linux-x86_64.AppImage/../x'), undefined)
 })
 
-test('cada Mac tiene su sistema: la de Apple Silicon, su última y su latest.yml', () => {
+test('cada Mac tiene su sistema: la de Apple Silicon y la de macOS 12, su última y su latest.yml', () => {
   assert.equal(sistema('mac'), 'mac')
   assert.equal(sistema('mac-arm64'), 'mac-arm64')
+  assert.equal(sistema('mac12'), 'mac12')
   assert.equal(sistema('linux'), 'linux')
   assert.equal(sistema(null), 'windows')
   assert.equal(sistema('toString'), 'windows')
   assert.equal(sistemaDelYml('latest.yml'), 'windows')
   assert.equal(sistemaDelYml('latest-mac.yml'), 'mac')
   assert.equal(sistemaDelYml('latest-arm64-mac.yml'), 'mac-arm64')
+  assert.equal(sistemaDelYml('latest-mac12-mac.yml'), 'mac12')
   assert.equal(sistemaDelYml('latest-linux.yml'), 'linux')
 })
 

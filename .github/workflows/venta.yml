@@ -1,4 +1,5 @@
-# La app que se vende sale de la rama `venta`: cada push compila Sloth en Windows, Mac (Intel y Apple Silicon) y Linux,
+# La app que se vende sale de la rama `venta`: cada push compila Sloth en Windows, Mac (Intel, Apple Silicon y la de
+# macOS 12) y Linux,
 # y publica sus instaladores en el cobro (`npm run compilar` y `npm run publicar` en cada sistema), los que da sloth.vancci.org.
 # Cada push sale como versión nueva (scripts/version-venta.mjs, una sola vez para todos), y la app instalada ofrece
 # «Actualizar a Sloth X» y baja solo lo que cambió (electron/main.ts).
@@ -43,8 +44,15 @@ jobs:
       # Si uno falla, los otros publican igual: cada sistema tiene su propia última versión.
       fail-fast: false
       matrix:
-        # Dos de Mac, cada una en su procesador y con su última versión en el cobro (docs/adr/0006).
-        os: [windows-latest, macos-15-intel, macos-15, ubuntu-latest]
+        # Tres de Mac, cada una con su última versión en el cobro (docs/adr/0006): Intel, Apple Silicon y macOS 12.
+        # La de macOS 12 sale en un Mac con Intel, con Electron 43 y Node 22: Electron 44 y Node 24 ya no abren ahí
+        # (SLOTH_MAC12, scripts/compilar.mjs).
+        include:
+          - { os: windows-latest, node: 24.18.0 }
+          - { os: macos-15-intel, node: 24.18.0 }
+          - { os: macos-15, node: 24.18.0 }
+          - { os: macos-15-intel, node: 22.23.4, mac12: '1' }
+          - { os: ubuntu-latest, node: 24.18.0 }
     runs-on: ${{ matrix.os }}
     timeout-minutes: 60
     steps:
@@ -52,7 +60,7 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           # El Node que viaja dentro de la app: el mismo con que se prueba en la computadora del dueño.
-          node-version: 24.18.0
+          node-version: ${{ matrix.node }}
           cache: npm
       - run: npm ci --no-audit --no-fund
       - run: node scripts/version-venta.mjs
@@ -60,6 +68,7 @@ jobs:
           VERSION: ${{ needs.version.outputs.version }}
       - run: npm run compilar
         env:
+          SLOTH_MAC12: ${{ matrix.mac12 }}
           SLOTH_TUYO: ${{ secrets.SLOTH_TUYO }}
           CSC_LINK: ${{ secrets.CSC_LINK }}
           CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
@@ -68,6 +77,7 @@ jobs:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
       - run: npm run publicar
         env:
+          SLOTH_MAC12: ${{ matrix.mac12 }}
           PUBLICAR: ${{ secrets.PUBLICAR }}
           PARA_TODOS: ${{ (inputs.para_todos || contains(github.event.head_commit.message, '[para todos]')) && '1' || '' }}
           # Para que el cobro sepa si la de Mac se abre a la primera.

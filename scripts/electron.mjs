@@ -8,15 +8,18 @@ import { build } from 'esbuild'
 
 const REPO = join(dirname(fileURLToPath(import.meta.url)), '..')
 
-/** Deja en `salida` main.cjs y preload.cjs. `macFirmada`: la de Mac va firmada por Apple y se actualiza sola. */
-export async function armarVentana(salida, { macFirmada = false } = {}) {
+/**
+ * Deja en `salida` main.cjs y preload.cjs. `macFirmada`: la de Mac va firmada por Apple y se actualiza sola. `mac12`: es
+ * la de macOS 12, con su propia última versión y su aviso al abrirla.
+ */
+export async function armarVentana(salida, { macFirmada = false, mac12 = false } = {}) {
   const comun = {
     bundle: true,
     platform: 'node',
     format: 'cjs',
     target: 'node24',
     external: ['electron', 'koffi', 'bufferutil', 'utf-8-validate'],
-    define: { __MAC_FIRMADA__: String(macFirmada) },
+    define: { __MAC_FIRMADA__: String(macFirmada), __MAC12__: String(mac12) },
     logLevel: 'warning'
   }
   await build({ ...comun, entryPoints: [join(REPO, 'electron', 'main.ts')], outfile: join(salida, 'main.cjs') })

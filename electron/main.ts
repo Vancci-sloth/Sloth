@@ -33,8 +33,10 @@ const SOLO_VENTANA = process.env.SLOTH_VENTANA
 const URL_SLOTH = SOLO_VENTANA ?? `http://localhost:${process.env.PORT ?? '4848'}`
 const WINDOWS = process.platform === 'win32'
 const MAC = process.platform === 'darwin'
-/** El sistema ante el cobro (`?so=`): la de Mac con Apple Silicon tiene su propia última versión. */
-const SO = MAC ? (process.arch === 'arm64' ? 'mac-arm64' : 'mac') : WINDOWS ? 'windows' : 'linux'
+/** La de macOS 12, con Electron 43 y Node 22 (scripts/compilar.mjs). */
+declare const __MAC12__: boolean
+/** El sistema ante el cobro (`?so=`): la de Mac con Apple Silicon y la de macOS 12 tienen su propia última versión. */
+const SO = MAC ? (__MAC12__ ? 'mac12' : process.arch === 'arm64' ? 'mac-arm64' : 'mac') : WINDOWS ? 'windows' : 'linux'
 /** Fuera de Windows, dónde viven Sloth y lo tuyo: la app no se puede escribir. */
 const DATOS = MAC ? join(homedir(), 'Library', 'Application Support', 'Sloth') : join(process.env.XDG_DATA_HOME || join(homedir(), '.local', 'share'), 'sloth')
 /** La carpeta de Sloth.exe. */

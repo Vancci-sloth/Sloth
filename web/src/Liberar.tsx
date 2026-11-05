@@ -3,7 +3,7 @@ import type { VersionLiberable } from '../../shared/types'
 import { api } from './api'
 import { Confirm } from './Confirm'
 
-const SISTEMAS = { windows: 'Windows', mac: 'Mac (Intel)', 'mac-arm64': 'Mac (Apple Silicon)', linux: 'Linux' }
+const SISTEMAS = { windows: 'Windows', mac: 'Mac (Intel)', 'mac-arm64': 'Mac (Apple Silicon)', mac12: 'Mac (macOS 12)', linux: 'Linux' }
 
 /**
  * Solo el creador, arriba de la comunidad: la versión que aún es solo de quien apoya y el botón que la da a todos ya,

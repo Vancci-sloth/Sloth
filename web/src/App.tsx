@@ -30,6 +30,7 @@ import { abrirPublicacion, Comunidad } from './Comunidad' // comunidad
 import { PedirMejora } from './PedirMejora' // comunidad
 import { Icono } from './Iconos'
 import { Bienvenida } from './Bienvenida'
+import { AvisoMacViejo } from './AvisoMacViejo'
 import { MarcaAgente } from './Logos'
 import { YoutubeLote } from './YoutubeProgramar'
 import { CalendarioYoutube } from './YoutubeCalendario'
@@ -600,6 +601,7 @@ export function App() {
 
       <main className="main">
         <Bienvenida />
+        <AvisoMacViejo />
         <AvisoVideos />
         {view.kind === 'opciones' && (
           <Opciones onDone={() => go({ kind: 'new' })} />

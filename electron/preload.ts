@@ -5,7 +5,11 @@
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron'
 import type { EstadoNavegador, PuenteSloth } from '../shared/types.ts'
 
+/** La de macOS 12 (scripts/compilar.mjs). */
+declare const __MAC12__: boolean
+
 const puente: PuenteSloth = {
+  macViejo: __MAC12__,
   actualizacion: () => ipcRenderer.invoke('actualizacion'),
   actualizar: () => ipcRenderer.invoke('actualizar'),
   traer: () => ipcRenderer.send('traer'),

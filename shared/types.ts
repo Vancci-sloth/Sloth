@@ -1126,7 +1126,7 @@ export interface FeedComunidad {
 
 /** `/api/comunidad/liberar`, solo del creador: la última versión de un sistema y, mientras es solo de quien apoya, desde cuándo será de todos. */
 export interface VersionLiberable {
-  so: 'windows' | 'mac' | 'mac-arm64' | 'linux'
+  so: 'windows' | 'mac' | 'mac-arm64' | 'mac12' | 'linux'
   version: string
   todos?: string
 }
@@ -1223,6 +1223,8 @@ export interface ActualizacionSloth {
 
 /** Lo que la ventana de Sloth (electron/preload.ts) le da a la interfaz como `window.sloth`. En un navegador no está. */
 export interface PuenteSloth {
+  /** La de Mac con macOS 12 (Electron 43): al abrirla, el aviso de lo que puede no andar ahí (`AvisoMacViejo`). */
+  macViejo?: boolean
   actualizacion(): Promise<ActualizacionSloth>
   /** Baja la versión nueva y la pone: Sloth se cierra y se vuelve a abrir. */
   actualizar(): Promise<ActualizacionSloth>
