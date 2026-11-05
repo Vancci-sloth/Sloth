@@ -27,6 +27,7 @@ import { AvisoEquipo } from './Equipo' // tu equipo
 import { MisVideos, Rejilla, VideoDe } from './MisVideos'
 import { Modelos3D } from './Modelos3D' // modelos 3D
 import { abrirPublicacion, Comunidad } from './Comunidad' // comunidad
+import { CompartirEstilo, ImportarEstilo } from './Estilos' // estilos compartidos
 import { PedirMejora } from './PedirMejora' // comunidad
 import { Icono } from './Iconos'
 import { Bienvenida } from './Bienvenida'
@@ -295,6 +296,18 @@ export function App() {
     setFreshId(newId())
     go({ kind: 'new' })
   }
+
+  // Un borrador que pide otra parte de la app (adaptar o revisar un estilo, `abrirBorrador`): se revisa antes de mandarlo.
+  useEffect(() => {
+    const abrir = (e: Event) => {
+      const { cardId, texto } = (e as CustomEvent<{ cardId: string; texto: string }>).detail
+      const id = newId()
+      setDrafts((all) => ({ ...all, [id]: { text: texto, html: textoAHtml(texto), images: [], cardId, at: Date.now() } }))
+      go({ kind: 'draft', id })
+    }
+    addEventListener('sloth-borrador', abrir)
+    return () => removeEventListener('sloth-borrador', abrir)
+  }, []) // estilos compartidos
 
   function dropDraft(id: string) {
     setDrafts(({ [id]: _, ...rest }) => rest)
@@ -777,6 +790,7 @@ function NewSession(props: {
     if (a?.principal && avanzado && a.principal !== avanzado.principal) elegidoAMano(a.principal)
   }
   const [borrando, setBorrando] = useState<Card | null>(null)
+  const [compartiendo, setCompartiendo] = useState<Card | null>(null) // estilos compartidos
   // Duplicar no pregunta: la copia no rompe nada y se quita con ✕. Si falla, se dice junto a las skills.
   const [fallo, setFallo] = useState('')
   async function duplicar(c: Card) {
@@ -843,9 +857,13 @@ function NewSession(props: {
     // Sin videos terminados (sin previa) solo se elige: su galería saldría vacía.
     elegir: (c) => (props.onPick(c), setEnEstilo(!!c.etapas && !!previas[c.id])),
     duplicar: (c) => void duplicar(c),
-    borrar: setBorrando
+    borrar: setBorrando,
+    compartir: setCompartiendo
   }
-  const accionesCartel = useMemo<AccionesCartel>(() => ({ elegir: (c) => alCartel.current.elegir(c), duplicar: (c) => alCartel.current.duplicar(c), borrar: (c) => alCartel.current.borrar(c) }), [])
+  const accionesCartel = useMemo<AccionesCartel>(
+    () => ({ elegir: (c) => alCartel.current.elegir(c), duplicar: (c) => alCartel.current.duplicar(c), borrar: (c) => alCartel.current.borrar(c), compartir: (c) => alCartel.current.compartir(c) }),
+    []
+  )
 
   const composer = (
       <Composer
@@ -958,6 +976,7 @@ function NewSession(props: {
           <section className="estante">
             <header>
               <h2>Estilos</h2>
+              <ImportarEstilo /> {/* estilos compartidos */}
             </header>
             {fallo && <p className="bad small">{fallo}</p>}
             {/* Cada skill es un cartel: su último video si lo tiene y, si no, su icono y qué hace. Abajo, cuánto se usa. */}
@@ -979,6 +998,7 @@ function NewSession(props: {
         {composer}
         <TarjetasEnlaces enlaces={enlaces} />
       </div>
+      {compartiendo && <CompartirEstilo card={compartiendo} onCerrar={() => setCompartiendo(null)} />}
       {borrando && (
         <Confirm
           title={`¿Eliminar «${borrando.title}»?`}
@@ -1004,7 +1024,7 @@ function NewSession(props: {
   )
 }
 
-type AccionesCartel = { elegir(c: Card): void; duplicar(c: Card): void; borrar(c: Card): void }
+type AccionesCartel = { elegir(c: Card): void; duplicar(c: Card): void; borrar(c: Card): void; compartir(c: Card): void }
 
 /**
  * Las skills del inicio, cada una un cartel. Memorizadas: escribir en el compositor de abajo no las vuelve a dibujar (ni a
@@ -1044,6 +1064,11 @@ const Carteles = memo(function Carteles({ cards, activa, previas, sessions, acci
                   onClick={(e) => (e.stopPropagation(), acciones.duplicar(c))}
                 >
                   ⧉
+                </span>
+              )}
+              {c.tuya && (
+                <span role="button" title="Compartir: en la comunidad o como archivo" onClick={(e) => (e.stopPropagation(), acciones.compartir(c))}>
+                  <Icono de="compartir" className="icon-trazo" />
                 </span>
               )}
               <span role="button" className="danger" title="Eliminar" onClick={(e) => (e.stopPropagation(), acciones.borrar(c))}>

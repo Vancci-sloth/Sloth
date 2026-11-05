@@ -8,6 +8,7 @@ import { promisify } from 'node:util'
 import { NOMBRE_AGENTE, proveedorDe } from '../shared/providers.ts'
 import type { AdjuntoComunidad, AyudaMejora, OrigenMejora, PublicacionComunidad, ServerPush, VideoHecho } from '../shared/types.ts'
 import { bytes, cuerpo, json as enviar } from './http.ts'
+import { EstiloMalo, type Instalado, type Manifiesto, PESO as PESO_ESTILO, TIPO as TIPO_ESTILO } from './estilos.ts'
 import { COBRO } from './licencia.ts'
 import type { Sessions } from './sessions.ts'
 import { redactar as redactarConAgente } from './redactar.ts'
@@ -24,6 +25,10 @@ import { redactar as redactarConAgente } from './redactar.ts'
  *   de portada; quien quiera enseñarlo entero pega su enlace en el texto.
  * - `POST /api/comunidad/redactar` `{texto, origen?}`: «Ayúdame a decirlo». El agente del hilo lee lo que escribiste (y lo que pasaba
  *   en el hilo de donde sale) y propone el texto (`AyudaMejora`).
+ * - `POST /api/comunidad/estilo` `{cardId}`: empaqueta un estilo tuyo (`server/estilos.ts`) y lo sube. Da su adjunto.
+ * - `POST /api/comunidad/estilo/instalar` `{publicacion}`: baja el estilo de esa publicación de Estilos y lo instala.
+ * - `POST /api/comunidad/estilo/revisar` `{publicacion}`: solo el creador. Lo abre en una carpeta, sin instalarlo, para
+ *   leerlo (o que su agente lo lea) antes de aprobarlo.
  * - `POST /api/mejoras` `{texto, imagenes?, adjuntos?}`: publica una mejora. Lo usan «Pedir una mejora» de cada hilo y
  *   el agente; `imagenes` son rutas de `data/attachments`. El hilo de donde salió no se publica.
  */
@@ -54,6 +59,13 @@ interface Opciones {
   /** Su primer cuadro (`server/miniaturas.ts`). */
   cuadro(video: string): Promise<string>
   avisar(msg: ServerPush): void
+  /** Los estilos de esta computadora (`estilos()` de `server/estilos.ts`). */
+  estilos: {
+    empaquetarCard(id: string): { paquete: Buffer; manifiesto: Manifiesto }
+    instalarPaquete(paquete: Buffer, origen: { publicacion: string; llave: string; autor?: string }): Instalado
+  }
+  /** Abre el paquete de una publicación para revisarlo, sin instalarlo. Da su carpeta. */
+  revisar(paquete: Buffer, publicacion: string): { carpeta: string; manifiesto: Manifiesto }
 }
 
 export function comunidad(app: string, o: Opciones) {
@@ -85,6 +97,24 @@ export function comunidad(app: string, o: Opciones) {
   }
 
   const subir = (bytes: Buffer, tipo: string) => nubeJson<{ llave: string; url: string }>('/comunidad/archivo', { metodo: 'PUT', cuerpo: bytes, tipo })
+
+  /** El estilo de una publicación de Estilos, como lo ves tú (sin aprobar, solo si es tuyo o eres el creador), y su paquete. */
+  async function estiloDe(id: string): Promise<{ p: PublicacionComunidad; llave: string; paquete: Buffer }> {
+    if (!/^[a-z0-9]+$/.test(id)) throw new Rechazo(400, 'Esa publicación no existe.')
+    const { publicacion: p } = await nubeJson<{ publicacion: PublicacionComunidad }>(`/comunidad/p/${id}`)
+    const llave = p.adjuntos.find((a) => a.tipo === 'estilo')?.llave
+    if (!llave || !/^[a-z0-9]{20}\.estilo$/.test(llave)) throw new Rechazo(404, 'Esa publicación no trae un estilo.')
+    let r: Response
+    try {
+      r = await fetch(`${NUBE}/comunidad/archivo/${llave}`, { signal: AbortSignal.timeout(120_000) })
+    } catch {
+      throw new Rechazo(502, SIN_CONEXION)
+    }
+    if (!r.ok) throw new Rechazo(r.status === 404 ? 404 : 502, r.status === 404 ? 'El estilo ya no está en la comunidad.' : SIN_CONEXION)
+    const paquete = Buffer.from(await r.arrayBuffer())
+    if (paquete.length > PESO_ESTILO) throw new Rechazo(413, 'Ese estilo pesa de más.')
+    return { p, llave, paquete }
+  }
 
   /** Los primeros `SEGUNDOS` de un video, en un MP4 que cualquier navegador reproduce y empieza a ver antes de bajarlo. */
   async function recortar(ruta: string): Promise<Buffer> {
@@ -191,6 +221,21 @@ export function comunidad(app: string, o: Opciones) {
         if (!tipo.startsWith('image/')) throw new Rechazo(415, 'Aquí solo se suben imágenes; un video, elígelo de «Mis videos».')
         return enviar(res, 200, await subir(await bytes(req), tipo))
       }
+      if (ruta === '/api/comunidad/estilo' && metodo === 'POST') {
+        const { paquete, manifiesto } = o.estilos.empaquetarCard(String((await cuerpo<{ cardId?: string }>(req)).cardId ?? ''))
+        const a: AdjuntoComunidad = { tipo: 'estilo', nombre: manifiesto.titulo, ...(await subir(paquete, TIPO_ESTILO)) }
+        return enviar(res, 200, a)
+      }
+      if (ruta === '/api/comunidad/estilo/instalar' && metodo === 'POST') {
+        const { p, llave, paquete } = await estiloDe(String((await cuerpo<{ publicacion?: string }>(req)).publicacion ?? ''))
+        return enviar(res, 200, o.estilos.instalarPaquete(paquete, { publicacion: p.id, llave, ...(p.autor.nombre ? { autor: p.autor.nombre } : {}) }))
+      }
+      if (ruta === '/api/comunidad/estilo/revisar' && metodo === 'POST') {
+        const c = await o.credencial()
+        if (!c || !('llave' in c)) throw new Rechazo(403, 'Eso solo lo hace el creador de Sloth.')
+        const { p, paquete } = await estiloDe(String((await cuerpo<{ publicacion?: string }>(req)).publicacion ?? ''))
+        return enviar(res, 200, o.revisar(paquete, p.id))
+      }
       if (ruta === '/api/comunidad/video' && metodo === 'POST') return enviar(res, 200, await subirVideo(String((await cuerpo<{ ruta?: string }>(req)).ruta ?? '')))
       if (ruta === '/api/comunidad/redactar' && metodo === 'POST') {
         const { texto, origen } = await cuerpo<{ texto?: string; origen?: unknown }>(req)
@@ -215,7 +260,7 @@ export function comunidad(app: string, o: Opciones) {
       res.end(texto || '{}')
       return true
     } catch (e) {
-      return enviar(res, e instanceof Rechazo ? e.status : 500, { error: e instanceof Error ? e.message : String(e) })
+      return enviar(res, e instanceof Rechazo ? e.status : e instanceof EstiloMalo ? 400 : 500, { error: e instanceof Error ? e.message : String(e) })
     }
   }
 

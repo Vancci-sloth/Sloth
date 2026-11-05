@@ -30,6 +30,24 @@ export interface Card {
   voz?: false | { propia: string }
   /** Hace sus clips con `generar_video` en Google Flow: el compositor deja elegir el modelo (menú «Clips», `lineaClips`). */
   clips?: true
+  /**
+   * El estilo de Sloth del que partió uno tuyo (lo copió «Nuevo estilo»): pide los paquetes de Python de ese
+   * (`server/requisitos.ts`) y es con el que se compara al compartirlo (`server/estilos.ts`).
+   */
+  basadoEn?: string
+  /** Un estilo que instalaste de otro: de dónde vino. Al volver a instalarlo de ahí, se pone al día. */
+  origen?: OrigenEstilo
+}
+
+/** De dónde vino un estilo instalado: de un archivo (sin `publicacion`) o de la comunidad, y de qué versión de Sloth. */
+export interface OrigenEstilo {
+  /** La publicación de la sección Estilos y la llave de su paquete. */
+  publicacion?: string
+  llave?: string
+  /** Quién lo compartió, como se llama en la comunidad. */
+  autor?: string
+  /** La versión de Sloth donde se hizo. */
+  sloth: string
 }
 
 /** Un modelo con su esfuerzo. `medido` dice dónde se midió; sin él, es el de por defecto. */
@@ -1025,7 +1043,7 @@ export interface AyudaMejora {
 }
 
 /** Las secciones de la comunidad (`licencias/src/comunidad.ts`). En Anuncios solo publica el creador. */
-export type CategoriaComunidad = 'general' | 'hice' | 'ayuda' | 'mejoras' | 'anuncios'
+export type CategoriaComunidad = 'general' | 'hice' | 'ayuda' | 'mejoras' | 'estilos' | 'anuncios'
 
 /** Lo que los demás ven de un miembro de la comunidad. */
 export interface Autor {
@@ -1043,9 +1061,12 @@ export interface Autor {
 
 /** Una imagen o un video de una publicación. `llave` es su nombre en la comunidad y `url`, de donde se carga. */
 export interface AdjuntoComunidad {
-  tipo: 'imagen' | 'video'
+  /** `estilo`: un estilo tuyo empaquetado (`server/estilos.ts`), solo en la sección Estilos. */
+  tipo: 'imagen' | 'video' | 'estilo'
   llave: string
   url: string
+  /** El nombre del estilo. */
+  nombre?: string
   /** La portada de un video: su llave y su URL. */
   poster?: string
   posterUrl?: string
@@ -1076,6 +1097,8 @@ export interface PublicacionComunidad {
   comentaron: Autor[]
   /** Cuántos la reportaron. Solo lo ve el creador; con 3 o más, los demás ya no la ven hasta que la revise. */
   reportes?: number
+  /** Un estilo que el creador aún no aprueba: solo lo ven quien lo compartió y él. */
+  porAprobar?: true
 }
 
 export interface ComentarioComunidad {
@@ -1096,7 +1119,7 @@ export interface ComentarioComunidad {
 /** Lo que le pasó a lo tuyo en la comunidad: te comentaron, te respondieron, te dieron me gusta… */
 export interface AvisoComunidad {
   id: string
-  tipo: 'comento' | 'respondio' | 'gusta' | 'gustaComentario' | 'estado' | 'reporte' | 'anuncio'
+  tipo: 'comento' | 'respondio' | 'gusta' | 'gustaComentario' | 'estado' | 'reporte' | 'anuncio' | 'estilo' | 'aprobado'
   de: Autor
   publicacion: string
   /** El título de la publicación, o el principio de su texto. */

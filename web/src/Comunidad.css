@@ -165,6 +165,17 @@
 .com-boton.ok { color: var(--ok); }
 .com-boton.ok:hover { background: rgba(143, 193, 119, 0.13); color: var(--ok); }
 
+/* Un estilo de la sección Estilos: en el feed, una línea; abierto, su caja para instalarlo. */
+.com-estilo-linea { display: flex; align-items: center; gap: 6px; margin-top: 8px; color: var(--amber); font-size: 12.5px; font-weight: 600; }
+.com-estilo-linea .com-ico { width: 13px; height: 13px; }
+.com-instalar { display: flex; align-items: center; gap: 12px; margin: 14px 0 4px; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--line); background: var(--panel); }
+.com-instalar-icono { width: 36px; height: 36px; flex: none; display: grid; place-items: center; border-radius: 10px; background: var(--amber-tinte); color: var(--amber); }
+.com-instalar-icono .com-ico { width: 18px; height: 18px; }
+.com-instalar-texto { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.com-instalar-texto strong { font-size: 14px; overflow-wrap: anywhere; }
+.com-instalar-texto span { color: var(--muted); font-size: 12.5px; }
+.com-instalar-texto .com-instalar-error { color: var(--bad); }
+
 /* Una publicación abierta, sobre un velo. */
 .com-velo { position: fixed; inset: 0; z-index: 70; display: grid; place-items: start center; padding: 40px 24px; overflow-y: auto; background: rgba(15, 14, 12, 0.72); backdrop-filter: blur(3px); animation: com-velo 0.15s ease-out; }
 @keyframes com-velo { from { opacity: 0; } }

@@ -3,6 +3,7 @@ import type { AdjuntoComunidad, Autor, AvisoComunidad, CategoriaComunidad, Comen
 import { api, ErrorApi } from './api'
 import { Confirm } from './Confirm'
 import { Escribir, type Escrito, subirImagen } from './Escribir'
+import { abrirBorrador, COMPARTIR_ESTILO, type Instalado, TrasInstalar } from './Estilos'
 import { LINK } from './etiquetas'
 import { Unirse } from './Licencia'
 import { Icono as IconoBase, type NombreIcono } from './Iconos'
@@ -20,6 +21,10 @@ import './Comunidad.css'
  * él ve la versión que aún es de quien apoya y la libera para todos en un live (`Liberar.tsx`).
  * «Compartir» de un video de «Mis videos» abre el compositor en Lo que hice con ese video (`compartirVideo`).
  *
+ * En Estilos, cada publicación trae un estilo que se instala con un clic («Compartir» en la card de uno tuyo abre el
+ * compositor ahí con él, `compartirEstilo` en `Estilos.tsx`). Nadie más lo ve hasta que el creador lo aprueba; antes lo
+ * revisa: «Revisar» lo abre en una carpeta y le pide a «Nuevo estilo» que lo lea.
+ *
  * Los comentarios llevan imágenes, como el chat (se pegan, se sueltan o se eligen), se responden (un nivel) y se les da
  * me gusta. Lo de los demás se reporta, y lo reportado por 3 deja de
  * verse hasta que el creador lo revise. La campana junta tus avisos: te comentaron, te respondieron, te dieron me gusta,
@@ -32,6 +37,7 @@ export const SECCIONES: { id: CategoriaComunidad; nombre: string; icono: NombreI
   { id: 'hice', nombre: 'Lo que hice', icono: 'video', escribe: 'Cuenta cómo lo hiciste: el estilo, lo que le pediste a Sloth, lo que aprendiste.' },
   { id: 'ayuda', nombre: 'Ayuda', icono: 'pregunta', escribe: '¿Qué no te sale? Cuéntalo y, si puedes, pega una captura.' },
   { id: 'mejoras', nombre: 'Mejoras', icono: 'flechaArriba', escribe: '¿Qué le falta a Sloth o qué debería hacer mejor?' },
+  { id: 'estilos', nombre: 'Estilos', icono: 'claqueta', escribe: 'Qué hace tu estilo, qué pide cada vez y, si puedes, un video que hiciste con él.' },
   { id: 'anuncios', nombre: 'Anuncios', icono: 'megafono', escribe: '¿Qué hay de nuevo en Sloth?' },
 ]
 const seccionDe = (id: CategoriaComunidad) => SECCIONES.find((s) => s.id === id) ?? SECCIONES[0]
@@ -92,7 +98,13 @@ export function Comunidad() {
   const [sinCuenta, setSinCuenta] = useState(false)
   const [abierta, setAbierta] = useState<string | null>(null)
   // El compositor abierto: en qué sección y, si llega de «Mis videos», con qué. `clave` lo vuelve a armar.
-  const [escribiendo, setEscribiendo] = useState<{ seccion: CategoriaComunidad; titulo?: string; video?: { subida: Promise<AdjuntoComunidad>; poster?: string }; clave: number } | null>(null)
+  const [escribiendo, setEscribiendo] = useState<{
+    seccion: CategoriaComunidad
+    titulo?: string
+    video?: { subida: Promise<AdjuntoComunidad>; poster?: string }
+    estilo?: Promise<AdjuntoComunidad>
+    clave: number
+  } | null>(null)
   // Tu perfil: al tocarlo o, sin nombre, antes de publicar, comentar o dar me gusta (`luego`).
   const [perfil, setPerfil] = useState<{ luego?: () => void } | null>(null)
   const [nueva, setNueva] = useState<string | null>(null)
@@ -166,6 +178,14 @@ export function Comunidad() {
       const { ruta, titulo, src } = JSON.parse(v) as { ruta: string; titulo: string; src: string }
       setEscribiendo({ seccion: 'hice', titulo, video: { subida: api<AdjuntoComunidad>('/api/comunidad/video', { ruta }), poster: `${src}&cuadro` }, clave: Date.now() })
     }
+    const estilo = () => {
+      const e = sessionStorage.getItem(COMPARTIR_ESTILO)
+      if (!e) return
+      sessionStorage.removeItem(COMPARTIR_ESTILO)
+      const { cardId, titulo } = JSON.parse(e) as { cardId: string; titulo: string }
+      setSeccion('estilos')
+      setEscribiendo({ seccion: 'estilos', titulo, estilo: api<AdjuntoComunidad>('/api/comunidad/estilo', { cardId }), clave: Date.now() })
+    }
     const abrir = () => {
       const id = sessionStorage.getItem(ABRIR)
       if (!id) return
@@ -173,10 +193,12 @@ export function Comunidad() {
       setAbierta(id)
     }
     compartido()
+    estilo()
     abrir()
     addEventListener(COMPARTIR, compartido)
+    addEventListener(COMPARTIR_ESTILO, estilo)
     addEventListener(ABRIR, abrir)
-    return () => (removeEventListener(COMPARTIR, compartido), removeEventListener(ABRIR, abrir))
+    return () => (removeEventListener(COMPARTIR, compartido), removeEventListener(COMPARTIR_ESTILO, estilo), removeEventListener(ABRIR, abrir))
   }, [])
 
   /** Sin nombre no se publica ni se comenta: primero se pide. */
@@ -279,6 +301,8 @@ export function Comunidad() {
                 ayuda={escribiendo.seccion === 'mejoras' || escribiendo.seccion === 'ayuda'}
                 inicial={{ titulo: escribiendo.titulo }}
                 videoCompartido={escribiendo.video}
+                conEstilo={escribiendo.seccion === 'estilos'}
+                estiloCompartido={escribiendo.estilo}
                 placeholder={escribe.escribe}
                 accion="Publicar"
                 autoFocus
@@ -331,7 +355,13 @@ export function Comunidad() {
                 <img src="/icon.svg" alt="" />
               </div>
               <strong>{seccion ? `Aún no hay nada en ${seccionDe(seccion).nombre}` : 'Aún no hay nada aquí'}</strong>
-              <p>{seccion === 'anuncios' ? 'Lo nuevo de Sloth saldrá aquí.' : 'Sé el primero: preséntate o comparte un video que hiciste con Sloth.'}</p>
+              <p>
+                {seccion === 'anuncios'
+                  ? 'Lo nuevo de Sloth saldrá aquí.'
+                  : seccion === 'estilos'
+                    ? 'Comparte uno tuyo con «Compartir» en su card: sale aquí cuando el creador lo aprueba.'
+                    : 'Sé el primero: preséntate o comparte un video que hiciste con Sloth.'}
+              </p>
             </div>
           )}
 
@@ -514,8 +544,10 @@ function Bienvenida({ yo, onNombre, onPresentarse, onComentar }: { yo: Yo; onNom
 
 /** Una publicación en el feed: quién, cuándo y dónde; su título y el principio del texto; su portada; y lo que generó. */
 function Tarjeta({ p, yo, nueva, visto, onAbrir, onMegusta }: { p: PublicacionComunidad; yo?: Yo; nueva: boolean; visto?: string; onAbrir(): void; onMegusta(): void }) {
-  const portada = p.adjuntos.find((a) => a.tipo === 'video') ?? p.adjuntos[0]
+  const portada = p.adjuntos.find((a) => a.tipo === 'video') ?? p.adjuntos.find((a) => a.tipo === 'imagen')
   const imagen = portada && (portada.tipo === 'imagen' ? portada.url : portada.posterUrl)
+  const estilo = p.adjuntos.find((a) => a.tipo === 'estilo')
+  const fotos = p.adjuntos.filter((a) => a.tipo !== 'estilo').length
   // Nuevo: llegó después de la última vez que la abriste, y no lo escribiste tú.
   const nuevoComentario = !!p.ultimoComentario && (!visto || p.ultimoComentario > visto) && p.comentaron[0]?.id !== yo?.id
   return (
@@ -539,6 +571,7 @@ function Tarjeta({ p, yo, nueva, visto, onAbrir, onMegusta }: { p: PublicacionCo
           </span>
         </div>
         <EstadoMejora p={p} />
+        {p.porAprobar && <span className="com-estado">Por aprobar</span>}
         {!!p.reportes && <span className="com-reportada">Reportada · {p.reportes}</span>}
         {p.fijada && (
           <span className="com-fijada">
@@ -550,6 +583,11 @@ function Tarjeta({ p, yo, nueva, visto, onAbrir, onMegusta }: { p: PublicacionCo
         <div className="com-post-textos">
           {p.titulo && <h3>{p.titulo}</h3>}
           {p.texto && <p className={p.titulo ? '' : 'solo'}>{p.texto}</p>}
+          {estilo && (
+            <span className="com-estilo-linea">
+              <Icono de="claqueta" /> Estilo para instalar · {estilo.nombre}
+            </span>
+          )}
         </div>
         {portada && (
           <div className={`com-post-portada${portada.tipo === 'video' && portada.vertical ? ' vertical' : ''}`}>
@@ -559,7 +597,7 @@ function Tarjeta({ p, yo, nueva, visto, onAbrir, onMegusta }: { p: PublicacionCo
                 <Icono de="video" />
               </span>
             )}
-            {p.adjuntos.length > 1 && <span className="com-mas-fotos">+{p.adjuntos.length - 1}</span>}
+            {fotos > 1 && <span className="com-mas-fotos">+{fotos - 1}</span>}
           </div>
         )}
       </div>
@@ -656,7 +694,7 @@ function Abierta(props: {
 
   const cambiar = (nueva: PublicacionComunidad) => (setP(nueva), props.onCambio(nueva))
   /** Lo que solo hace el creador (fijar, cómo va una mejora). */
-  async function delCreador(c: { fijada?: boolean; estado?: 'haciendo' | 'hecha' | null }) {
+  async function delCreador(c: { fijada?: boolean; estado?: 'haciendo' | 'hecha' | null; aprobada?: boolean }) {
     if (!p) return
     setError('')
     try {
@@ -680,6 +718,29 @@ function Abierta(props: {
   const suya = !!p && p.autor.id === yo.id
   const video = p?.adjuntos.find((a) => a.tipo === 'video')
   const imagenes = p?.adjuntos.filter((a) => a.tipo === 'imagen') ?? []
+  const estilo = p?.adjuntos.find((a) => a.tipo === 'estilo')
+  const [revisando, setRevisando] = useState(false)
+
+  /** El creador lo abre en una carpeta (sin instalarlo) y le pide a «Nuevo estilo» que lo lea antes de aprobarlo. */
+  async function revisar() {
+    if (!p) return
+    setRevisando(true)
+    setError('')
+    try {
+      const { carpeta } = await api<{ carpeta: string }>('/api/comunidad/estilo/revisar', { publicacion: p.id })
+      abrirBorrador(
+        'nuevo-estilo',
+        [
+          `Revisa el estilo «${estilo?.nombre ?? p.titulo}» que compartió ${p.autor.nombre || 'alguien'} en la comunidad, antes de que yo lo apruebe. Está abierto en "${carpeta}" (no está instalado).`,
+          'Sigue «Revisar un estilo de la comunidad» de tu skill.'
+        ].join('\n\n')
+      )
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setRevisando(false)
+    }
+  }
 
   return (
     <div className="com-velo" onMouseDown={(e) => e.target === e.currentTarget && !editando && props.onCerrar()}>
@@ -705,6 +766,7 @@ function Abierta(props: {
                 </span>
               </div>
               <EstadoMejora p={p} />
+              {p.porAprobar && <span className="com-estado">Por aprobar</span>}
               {!!p.reportes && <span className="com-reportada">Reportada · {p.reportes}</span>}
               {!editando && (
                 <div className="com-acciones">
@@ -743,6 +805,7 @@ function Abierta(props: {
                 compacto
                 conTitulo
                 conVideo
+                conEstilo={seccion === 'estilos'}
                 inicial={p}
                 placeholder={seccionDe(seccion).escribe}
                 accion="Guardar"
@@ -761,6 +824,7 @@ function Abierta(props: {
                 {video && (
                   <video className={`com-video${video.vertical ? ' vertical' : ''}`} src={video.url} poster={video.posterUrl} controls loop playsInline preload="metadata" />
                 )}
+                {estilo && <ParaInstalar p={p} nombre={estilo.nombre ?? p.titulo} suya={suya} />}
                 {imagenes.length > 0 && (
                   <div className={`com-fotos n${Math.min(imagenes.length, 3)}`}>
                     {imagenes.map((a) => (
@@ -773,9 +837,24 @@ function Abierta(props: {
               </>
             )}
 
-            {/* Del creador, en Mejoras: cómo va. */}
-            {yo.creador && (p.categoria === 'mejoras' || !!p.reportes) && !editando && (
+            {/* Del creador, en Mejoras: cómo va. En Estilos: revisarlo y aprobarlo, que sin eso nadie más lo ve. */}
+            {yo.creador && (p.categoria === 'mejoras' || p.categoria === 'estilos' || !!p.reportes) && !editando && (
               <div className="com-creador-barra">
+                {estilo && (
+                  <button className="com-boton" disabled={revisando} title="Lo abre en una carpeta, sin instalarlo, y «Nuevo estilo» lo lee y te dice qué hace" onClick={() => void revisar()}>
+                    <Icono de="escudo" /> {revisando ? 'Abriendo…' : 'Revisar'}
+                  </button>
+                )}
+                {estilo &&
+                  (p.porAprobar ? (
+                    <button className="com-boton ok" title="Todos lo ven y lo pueden instalar" onClick={() => void delCreador({ aprobada: true })}>
+                      <Icono de="palomita" /> Aprobar
+                    </button>
+                  ) : (
+                    <button className="com-boton" title="Deja de verse hasta que lo vuelvas a aprobar" onClick={() => void delCreador({ aprobada: false })}>
+                      Quitar aprobación
+                    </button>
+                  ))}
                 {!!p.reportes && (
                   <button
                     className="com-boton ok"
@@ -1286,6 +1365,65 @@ function Avisos({ sinLeer, onAbrir, onLeidos }: { sinLeer: number; onAbrir(id: s
   )
 }
 
+/**
+ * El estilo de una publicación de Estilos: instalarlo, o ponerlo al día si ya lo tienes de aquí y su paquete cambió. Sin
+ * aprobar, solo lo ven quien lo compartió y el creador.
+ */
+function ParaInstalar({ p, nombre, suya }: { p: PublicacionComunidad; nombre: string; suya: boolean }) {
+  const llave = p.adjuntos.find((a) => a.tipo === 'estilo')?.llave
+  // Tu estilo de aquí, si ya lo instalaste: con qué paquete.
+  const [mio, setMio] = useState<{ llave?: string } | null | undefined>(undefined)
+  const [ocupado, setOcupado] = useState(false)
+  const [error, setError] = useState('')
+  const [instalado, setInstalado] = useState<Instalado | null>(null)
+  useEffect(() => {
+    api<{ origen?: { publicacion?: string; llave?: string } }[]>('/api/estilos').then(
+      (l) => setMio(l.find((e) => e.origen?.publicacion === p.id)?.origen ?? null),
+      () => setMio(null)
+    )
+  }, [p.id, instalado])
+  async function instalar() {
+    setOcupado(true)
+    setError('')
+    try {
+      setInstalado(await api<Instalado>('/api/comunidad/estilo/instalar', { publicacion: p.id }))
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setOcupado(false)
+    }
+  }
+  const alDia = !!mio && mio.llave === llave
+  return (
+    <div className="com-instalar">
+      <span className="com-instalar-icono">
+        <Icono de="claqueta" />
+      </span>
+      <div className="com-instalar-texto">
+        <strong>{nombre}</strong>
+        <span>
+          {p.porAprobar
+            ? suya
+              ? 'Solo lo ven tú y el creador de Sloth hasta que lo apruebe.'
+              : 'Aún no lo apruebas: nadie más lo ve.'
+            : alDia
+              ? 'Ya está en tus estilos.'
+              : mio
+                ? 'Hay una versión nueva.'
+                : 'Sale entre tus estilos, como uno tuyo.'}
+        </span>
+        {error && <span className="com-instalar-error">{error}</span>}
+      </div>
+      {mio !== undefined && !alDia && (
+        <button className="com-boton ok" disabled={ocupado} onClick={() => void instalar()}>
+          <Icono de="descargar" /> {ocupado ? 'Instalando…' : mio ? 'Actualizar' : 'Instalar'}
+        </button>
+      )}
+      {instalado && <TrasInstalar r={instalado} onCerrar={() => setInstalado(null)} />}
+    </div>
+  )
+}
+
 /** Lo que dice cada aviso. */
 function fraseDe(a: AvisoComunidad) {
   const quien = <strong>{a.de.nombre || 'Alguien'}</strong>
@@ -1296,6 +1434,8 @@ function fraseDe(a: AvisoComunidad) {
   if (a.tipo === 'gustaComentario') return <>A {quien} le gustó tu comentario en {sobre}</>
   if (a.tipo === 'estado') return a.texto === 'hecha' ? <>{quien} marcó hecha tu mejora {sobre}</> : <>{quien} está haciendo tu mejora {sobre}</>
   if (a.tipo === 'reporte') return <>{quien} reportó {a.comentario ? 'un comentario en ' : ''}{sobre}: {a.texto}</>
+  if (a.tipo === 'estilo') return <>{quien} compartió un estilo por aprobar: {sobre}</>
+  if (a.tipo === 'aprobado') return <>{quien} aprobó tu estilo {sobre}: ya todos lo pueden instalar</>
   return <>{quien} publicó un anuncio: {sobre}</>
 }
 

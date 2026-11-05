@@ -12,7 +12,8 @@ import './Escribir.css'
  * (`PedirMejora.tsx`). Crece con el texto; Enter lo manda y Mayús+Enter es otra línea (en el título, Enter baja al texto).
  * Las capturas se pegan, se sueltan o se eligen, y suben a la comunidad en cuanto llegan (`/api/comunidad/archivo`); un
  * video se elige de «Mis videos» y suben sus primeros 5 segundos con su portada (`/api/comunidad/video`): el entero se
- * enlaza en el texto. «Ayúdame a decirlo» (el símbolo del agente) le pide al agente del hilo (sin hilo, Claude) que
+ * enlaza en el texto. En Estilos se elige además uno de tus estilos, que se empaqueta y sube (`/api/comunidad/estilo`).
+ * «Ayúdame a decirlo» (el símbolo del agente) le pide al agente del hilo (sin hilo, Claude) que
  * entienda lo escrito y proponga cómo decirlo; desde un hilo, con lo que pasaba en él.
  */
 
@@ -22,10 +23,11 @@ export interface Escrito {
   adjuntos: AdjuntoComunidad[]
 }
 
-/** Lo que aún sube: una imagen sin nada que enseñar, o un video con su portada de aquí mientras tanto. */
+/** Lo que aún sube: una imagen sin nada que enseñar, un video con su portada de aquí mientras tanto, o un estilo. */
 interface Subiendo {
   id: number
   poster?: string
+  estilo?: true
 }
 
 const Icono = ({ de }: { de: NombreIcono }) => <IconoBase de={de} className="esc-ico" />
@@ -62,6 +64,10 @@ export function Escribir(props: {
   conVideo?: boolean
   /** Uno de «Mis videos» que ya está subiendo (lo compartiste desde ahí), con su portada de aquí. */
   videoCompartido?: { subida: Promise<AdjuntoComunidad>; poster?: string }
+  /** Deja elegir uno de tus estilos (en la sección Estilos). */
+  conEstilo?: boolean
+  /** Uno de tus estilos que ya está subiendo («Compartir» en su card). */
+  estiloCompartido?: Promise<AdjuntoComunidad>
   /** A la izquierda del botón: dónde se publica. */
   extra?: ReactNode
   /** Dentro de una tarjeta o de una caja: sin resplandor ni avatar. */
@@ -100,13 +106,13 @@ export function Escribir(props: {
   }, [props.autoFocus])
 
   /** Algo que sube: entra a la lista cuando llega, en el orden en que lo elegiste. */
-  async function conSubida(poster: string | undefined, subida: Promise<AdjuntoComunidad>) {
+  async function conSubida(poster: string | undefined, subida: Promise<AdjuntoComunidad>, estilo?: true) {
     const id = ++siguiente
-    setSubiendo((l) => [...l, { id, poster }])
+    setSubiendo((l) => [...l, { id, poster, estilo }])
     try {
       const a = await subida
-      // Un solo video: el nuevo reemplaza al de antes.
-      setAdjuntos((l) => [...(a.tipo === 'video' ? l.filter((x) => x.tipo !== 'video') : l), a])
+      // Un solo video y un solo estilo: el nuevo reemplaza al de antes.
+      setAdjuntos((l) => [...(a.tipo === 'imagen' ? l : l.filter((x) => x.tipo !== a.tipo)), a])
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
     } finally {
@@ -131,6 +137,9 @@ export function Escribir(props: {
   useEffect(() => {
     if (props.videoCompartido) void conSubida(props.videoCompartido.poster, props.videoCompartido.subida)
   }, [props.videoCompartido])
+  useEffect(() => {
+    if (props.estiloCompartido) void conSubida(undefined, props.estiloCompartido, true)
+  }, [props.estiloCompartido])
 
   function elegirVideo(v: VideoHecho) {
     setEligiendo(false)
@@ -243,8 +252,19 @@ export function Escribir(props: {
       {(adjuntos.length > 0 || subiendo.length > 0) && (
         <div className="esc-fotos">
           {adjuntos.map((a) => (
-            <div key={a.llave} className={`esc-miniatura${a.tipo === 'video' ? ' video' : ''}`}>
-              {a.tipo === 'imagen' ? <img src={a.url} alt="" /> : a.posterUrl ? <img src={a.posterUrl} alt="" /> : <video src={a.url} muted preload="metadata" />}
+            <div key={a.llave} className={`esc-miniatura${a.tipo === 'video' ? ' video' : a.tipo === 'estilo' ? ' estilo' : ''}`} title={a.tipo === 'estilo' ? 'El estilo que se instala' : undefined}>
+              {a.tipo === 'estilo' ? (
+                <span className="esc-estilo">
+                  <Icono de="claqueta" />
+                  {a.nombre}
+                </span>
+              ) : a.tipo === 'imagen' ? (
+                <img src={a.url} alt="" />
+              ) : a.posterUrl ? (
+                <img src={a.posterUrl} alt="" />
+              ) : (
+                <video src={a.url} muted preload="metadata" />
+              )}
               {a.tipo === 'video' && (
                 <span className="esc-play">
                   <Icono de="video" />
@@ -256,8 +276,13 @@ export function Escribir(props: {
             </div>
           ))}
           {subiendo.map((s) => (
-            <div key={s.id} className={`esc-miniatura subiendo${s.poster ? ' video' : ''}`} title={s.poster ? 'Subiendo sus primeros 5 segundos…' : 'Subiendo…'}>
+            <div
+              key={s.id}
+              className={`esc-miniatura subiendo${s.poster ? ' video' : s.estilo ? ' estilo' : ''}`}
+              title={s.poster ? 'Subiendo sus primeros 5 segundos…' : s.estilo ? 'Empaquetando el estilo…' : 'Subiendo…'}
+            >
               {s.poster && <img src={s.poster} alt="" />}
+              {s.estilo && <span className="esc-estilo">Empaquetando…</span>}
             </div>
           ))}
         </div>
@@ -322,6 +347,7 @@ export function Escribir(props: {
             {eligiendo && <MisVideosParaElegir onElegir={elegirVideo} onCerrar={() => setEligiendo(false)} />}
           </span>
         )}
+        {props.conEstilo && <ElegirEstilo onElegir={(cardId) => (setError(''), void conSubida(undefined, api<AdjuntoComunidad>('/api/comunidad/estilo', { cardId }), true))} />}
         {props.ayuda && (
           <button
             className={`esc-ayuda${pensando ? ' pensando' : ''}`}
@@ -345,6 +371,27 @@ export function Escribir(props: {
         </button>
       </div>
     </div>
+  )
+}
+
+/** Tus estilos, para elegir el que se comparte. */
+function ElegirEstilo({ onElegir }: { onElegir(cardId: string): void }) {
+  const [tuyos, setTuyos] = useState<{ id: string; title: string }[] | null>(null)
+  useEffect(() => {
+    api<{ id: string; title: string }[]>('/api/estilos').then(setTuyos, () => setTuyos([]))
+  }, [])
+  return (
+    <label className="esc-adjuntar esc-elegir-estilo" title={tuyos?.length === 0 ? 'Aún no haces ningún estilo: créalo con «Nuevo estilo»' : 'Uno de tus estilos, para que otros lo instalen'}>
+      <Icono de="claqueta" />
+      <select value="" disabled={!tuyos?.length} onChange={(e) => e.target.value && onElegir(e.target.value)}>
+        <option value="">{tuyos?.length === 0 ? 'Sin estilos tuyos' : 'Estilo'}</option>
+        {tuyos?.map((t) => (
+          <option key={t.id} value={t.id}>
+            {t.title}
+          </option>
+        ))}
+      </select>
+    </label>
   )
 }
 

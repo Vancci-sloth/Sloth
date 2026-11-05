@@ -15,11 +15,15 @@
  * (`DESCARGAS`, bajo `comunidad/`) con un nombre al azar, y `GET /comunidad/archivo/<llave>` los sirve sin preguntar quién
  * eres, para que `<img>` y `<video>` los carguen directo.
  *
+ * En Estilos, cada publicación lleva un estilo empaquetado (`server/estilos.ts`), que se instala desde ahí. Es código que
+ * corre en la computadora de quien lo instala: uno nuevo, o uno al que le cambian el paquete, queda `aprobada = 0` y solo
+ * lo ven quien lo compartió y el creador (le llega un aviso) hasta que lo aprueba (migración 0019).
+ *
  * - `GET /comunidad?categoria=&antes=`: quién eres, los números de la comunidad y una página del feed: las fijadas y luego
  *   lo que tuvo actividad más reciente. `antes` es la `actividad` de la última que ya tienes.
  * - `POST /comunidad/publicar` `{categoria, titulo, texto, adjuntos}`.
  * - `GET /comunidad/p/<id>`: una, con sus comentarios. `POST /comunidad/p/<id>` `{categoria?, titulo?, texto?,
- *   adjuntos?, fijada?, estado?}` la cambia; `/borrar`, `/megusta`, `/comentar` `{texto, responde?, adjuntos?}` (sus
+ *   adjuntos?, fijada?, estado?, aprobada?}` la cambia (`aprobada`, solo el creador); `/borrar`, `/megusta`, `/comentar` `{texto, responde?, adjuntos?}` (sus
  *   imágenes, migración 0009), `/reportar`
  *   `{motivo}` y `/revisada` (el creador quita sus reportes).
  * - `POST /comunidad/c/<id>/borrar`, `/megusta`, `/reportar` y `/revisada`: lo mismo para un comentario.
@@ -34,7 +38,7 @@
 import type { AdjuntoComunidad, Autor, AvisoComunidad, CategoriaComunidad, ComentarioComunidad, FeedComunidad, PublicacionComunidad, RoadmapComunidad } from '../../shared/types.ts'
 import { BLOQUEADA, CLAVE, EQUIPO, cupo, esFundador, type Env, type Fila, Rechazo, cuerpo, iguales, json, letras, liberar, servir, vigencia, vigilar } from './index.ts'
 
-export const CATEGORIAS: CategoriaComunidad[] = ['general', 'hice', 'ayuda', 'mejoras', 'anuncios']
+export const CATEGORIAS: CategoriaComunidad[] = ['general', 'hice', 'ayuda', 'mejoras', 'estilos', 'anuncios']
 
 /** Las metas del roadmap que se votan: las mismas de sloth.vancci.org («Lo que viene»). Si cambian allá, cambian aquí. */
 export const METAS = [
@@ -50,9 +54,10 @@ const PAGINA = 20
 const MAX_COMENTARIOS = 500
 /** Las imágenes de un comentario, como las de un chat: unas pocas. */
 const FOTOS_COMENTARIO = 4
-/** Lo más que pesa un archivo. Un video son sus primeros segundos: unos pocos MB. */
-const PESO = { imagen: 10 * 1024 * 1024, video: 50 * 1024 * 1024 }
-const TIPOS: Record<string, { tipo: 'imagen' | 'video'; ext: string }> = {
+/** Lo más que pesa un archivo. Un video son sus primeros segundos: unos pocos MB. Un estilo, lo que topa `server/estilos.ts`. */
+const PESO = { imagen: 10 * 1024 * 1024, video: 50 * 1024 * 1024, estilo: 15 * 1024 * 1024 }
+const TIPOS: Record<string, { tipo: AdjuntoComunidad['tipo']; ext: string }> = {
+  'application/x-sloth-estilo': { tipo: 'estilo', ext: 'estilo' },
   'image/png': { tipo: 'imagen', ext: 'png' },
   'image/jpeg': { tipo: 'imagen', ext: 'jpg' },
   'image/webp': { tipo: 'imagen', ext: 'webp' },
@@ -61,8 +66,9 @@ const TIPOS: Record<string, { tipo: 'imagen' | 'video'; ext: string }> = {
   'video/webm': { tipo: 'video', ext: 'webm' },
   'video/quicktime': { tipo: 'video', ext: 'mov' }
 }
-const LLAVE = /^[a-z0-9]{20}\.(png|jpg|webp|gif|mp4|webm|mov)$/
+const LLAVE = /^[a-z0-9]{20}\.(png|jpg|webp|gif|mp4|webm|mov|estilo)$/
 const IMAGEN = /\.(png|jpg|webp|gif)$/
+const ESTILO = /\.estilo$/
 const ID = /^[a-z0-9]+$/
 /** Lo más que publica, comenta o reporta cada miembro en un día (`cupo`): que un error o un abuso no llene la comunidad. */
 const AL_DIA = { publicaciones: 10, comentarios: 100, reportes: 20 }
@@ -113,6 +119,8 @@ interface Guardada {
   likes: number
   reportes: number
   ultimo_comentario: string | null
+  /** 0: un estilo que el creador aún no aprueba. */
+  aprobada: number
 }
 
 interface ComentarioGuardado {
@@ -128,7 +136,7 @@ interface ComentarioGuardado {
 }
 
 /** Un adjunto como se guarda: sin URLs, que dependen de `ORIGEN`. */
-type Adjunto = Pick<AdjuntoComunidad, 'tipo' | 'llave' | 'poster' | 'vertical'>
+type Adjunto = Pick<AdjuntoComunidad, 'tipo' | 'llave' | 'poster' | 'vertical' | 'nombre'>
 
 export async function comunidad(req: Request, env: Env, url: URL): Promise<Response> {
   const ruta = url.pathname
@@ -251,8 +259,8 @@ const autor = (env: Env, m: Pick<Miembro, 'id' | 'nombre' | 'foto' | 'clave' | '
   ...(m.clave === CREADOR ? { creador: true } : m.insignia ? { insignia: m.insignia } : {})
 })
 const esCreador = (m: Miembro) => m.clave === CREADOR
-/** Lo reportado por `OCULTAR` personas solo lo ven quien lo escribió y el creador. */
-const laVe = (x: { autor: string; reportes: number }, yo: Miembro) => x.reportes < OCULTAR || x.autor === yo.id || esCreador(yo)
+/** Lo reportado por `OCULTAR` personas, y un estilo sin aprobar, solo lo ven quien lo escribió y el creador. */
+const laVe = (x: { autor: string; reportes: number; aprobada?: number }, yo: Miembro) => (x.reportes < OCULTAR && x.aprobada !== 0) || x.autor === yo.id || esCreador(yo)
 
 /**
  * Un aviso para `para` de lo que hizo `de`. Nadie se avisa a sí mismo. Con `unaVez`, no se repite (quitar y volver a
@@ -280,7 +288,7 @@ async function feed(env: Env, yo: Miembro, url: URL): Promise<FeedComunidad> {
     donde.push('categoria = ?')
     valores.push(categoria)
   }
-  if (!esCreador(yo)) donde.push('(reportes < ? OR autor = ?)'), valores.push(OCULTAR, yo.id)
+  if (!esCreador(yo)) donde.push('((reportes < ? AND aprobada = 1) OR autor = ?)'), valores.push(OCULTAR, yo.id)
   // Las fijadas van solo en la primera página; las siguientes siguen por actividad.
   if (antes) donde.push('fijada = 0 AND actividad < ?'), valores.push(antes)
   const sql = `SELECT * FROM publicaciones${donde.length ? ` WHERE ${donde.join(' AND ')}` : ''} ORDER BY ${antes ? '' : 'fijada DESC, '}actividad DESC LIMIT ${PAGINA + 1}`
@@ -344,7 +352,8 @@ async function armar(env: Env, yo: Miembro, filas: Guardada[]): Promise<Publicac
     comentarios: f.comentarios,
     ...(f.ultimo_comentario ? { ultimoComentario: f.ultimo_comentario } : {}),
     comentaron: caras.filter((c) => c.publicacion === f.id).flatMap((c) => autores.get(c.autor) ?? []),
-    ...(esCreador(yo) && f.reportes ? { reportes: f.reportes } : {})
+    ...(esCreador(yo) && f.reportes ? { reportes: f.reportes } : {}),
+    ...(!f.aprobada ? { porAprobar: true as const } : {})
   }))
 }
 
@@ -407,14 +416,15 @@ function categoriaDe(valor: unknown, yo: Miembro): CategoriaComunidad {
   return c
 }
 
-/** Los adjuntos que se pueden guardar: archivos de la comunidad, a lo más 10 y un solo video. */
+/** Los adjuntos que se pueden guardar: archivos de la comunidad, a lo más 10, un solo video y un solo estilo. */
 export function adjuntosDe(valor: unknown): Adjunto[] {
   if (!Array.isArray(valor)) return []
   const lista = valor.flatMap((a): Adjunto[] => {
     if (!a || typeof a !== 'object') return []
-    const { tipo, llave, poster, vertical } = a as Record<string, unknown>
-    if ((tipo !== 'imagen' && tipo !== 'video') || typeof llave !== 'string' || !LLAVE.test(llave)) return []
-    if ((tipo === 'imagen') !== IMAGEN.test(llave)) return []
+    const { tipo, llave, poster, vertical, nombre } = a as Record<string, unknown>
+    if ((tipo !== 'imagen' && tipo !== 'video' && tipo !== 'estilo') || typeof llave !== 'string' || !LLAVE.test(llave)) return []
+    if ((tipo === 'imagen') !== IMAGEN.test(llave) || (tipo === 'estilo') !== ESTILO.test(llave)) return []
+    if (tipo === 'estilo') return [{ tipo, llave, nombre: texto(nombre, 80) || 'Estilo' }]
     return [
       {
         tipo,
@@ -425,8 +435,29 @@ export function adjuntosDe(valor: unknown): Adjunto[] {
     ]
   })
   const video = lista.findIndex((a) => a.tipo === 'video')
-  return lista.filter((a, i) => a.tipo === 'imagen' || i === video).slice(0, 10)
+  const estilo = lista.findIndex((a) => a.tipo === 'estilo')
+  return lista.filter((a, i) => a.tipo === 'imagen' || i === video || i === estilo).slice(0, 10)
 }
+
+/** Un estilo va en Estilos, y en Estilos va siempre uno. */
+export function estiloEnSuSitio(categoria: CategoriaComunidad, adjuntos: Adjunto[]) {
+  const lleva = adjuntos.some((a) => a.tipo === 'estilo')
+  if (categoria === 'estilos' && !lleva) throw new Rechazo(400, 'En Estilos se comparte un estilo: elígelo con «Estilo», o usa «Compartir» en su card.')
+  if (categoria !== 'estilos' && lleva) throw new Rechazo(400, 'Un estilo se comparte en la sección Estilos.')
+}
+
+const llaveDelEstilo = (adjuntos: string) => (JSON.parse(adjuntos) as Adjunto[]).find((a) => a.tipo === 'estilo')?.llave
+
+/** Un aviso al creador: hay un estilo que aprobar. */
+const porAprobar = (env: Env, de: Miembro, publicacion: string) =>
+  env.DB.prepare("INSERT INTO avisos (id, para, de, tipo, publicacion, creado) SELECT ?, id, ?, 'estilo', ?, ? FROM miembros WHERE clave = ? AND id != ?").bind(
+    nuevoId(),
+    de.id,
+    publicacion,
+    new Date().toISOString(),
+    CREADOR,
+    de.id
+  )
 
 /** Las imágenes de un comentario: archivos de la comunidad, sin video y a lo más `FOTOS_COMENTARIO`. */
 export const fotosDeComentario = (valor: unknown): Adjunto[] => adjuntosDe(valor).filter((a) => a.tipo === 'imagen').slice(0, FOTOS_COMENTARIO)
@@ -443,12 +474,15 @@ async function publicar(env: Env, yo: Miembro, c: Record<string, unknown>): Prom
   const cuerpoTexto = texto(c.texto, 20_000)
   const adjuntos = adjuntosDe(c.adjuntos)
   if (!titulo && !cuerpoTexto && !adjuntos.length) throw new Rechazo(400, 'Escribe algo o agrega una imagen.')
+  estiloEnSuSitio(categoria, adjuntos)
   if (!esCreador(yo) && !(await conCupo(env, yo, 'publicaciones')))
     throw new Rechazo(429, `Ya publicaste ${AL_DIA.publicaciones} veces hoy. Mañana sigues.`)
   const ahora = new Date().toISOString()
-  const f: Guardada = { id: nuevoId(), autor: yo.id, categoria, titulo, texto: cuerpoTexto, adjuntos: JSON.stringify(adjuntos), fijada: 0, estado: null, creada: ahora, editada: null, actividad: ahora, comentarios: 0, likes: 0, reportes: 0, ultimo_comentario: null }
+  // Un estilo de alguien más espera a que el creador lo apruebe.
+  const aprobada = categoria === 'estilos' && !esCreador(yo) ? 0 : 1
+  const f: Guardada = { id: nuevoId(), autor: yo.id, categoria, titulo, texto: cuerpoTexto, adjuntos: JSON.stringify(adjuntos), fijada: 0, estado: null, creada: ahora, editada: null, actividad: ahora, comentarios: 0, likes: 0, reportes: 0, ultimo_comentario: null, aprobada }
   await env.DB.batch([
-    env.DB.prepare('INSERT INTO publicaciones (id, autor, categoria, titulo, texto, adjuntos, creada, actividad) VALUES (?, ?, ?, ?, ?, ?, ?, ?)').bind(
+    env.DB.prepare('INSERT INTO publicaciones (id, autor, categoria, titulo, texto, adjuntos, creada, actividad, aprobada) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)').bind(
       f.id,
       f.autor,
       f.categoria,
@@ -456,8 +490,10 @@ async function publicar(env: Env, yo: Miembro, c: Record<string, unknown>): Prom
       f.texto,
       f.adjuntos,
       f.creada,
-      f.actividad
+      f.actividad,
+      f.aprobada
     ),
+    ...(aprobada ? [] : [porAprobar(env, yo, f.id)]),
     // Un anuncio les llega a todos.
     ...(categoria === 'anuncios'
       ? [
@@ -473,13 +509,16 @@ async function publicar(env: Env, yo: Miembro, c: Record<string, unknown>): Prom
   return (await armar(env, yo, [f]))[0]
 }
 
-/** Quien la escribió cambia lo suyo; el creador, además, la fija y dice cómo va una mejora (y se le avisa a quien la pidió). */
+/**
+ * Quien la escribió cambia lo suyo; el creador, además, la fija, dice cómo va una mejora (y se le avisa a quien la pidió) y
+ * aprueba un estilo. Un estilo al que le cambian el paquete vuelve a esperar su aprobación.
+ */
 async function cambiar(env: Env, yo: Miembro, f: Guardada, c: Record<string, unknown>): Promise<PublicacionComunidad> {
   const suya = f.autor === yo.id
   const creador = esCreador(yo)
   const contenido = c.titulo !== undefined || c.texto !== undefined || c.adjuntos !== undefined || c.categoria !== undefined
   if (contenido && !suya && !creador) throw new Rechazo(403, 'Solo quien la escribió puede cambiarla.')
-  if ((c.fijada !== undefined || c.estado !== undefined) && !creador) throw new Rechazo(403, 'Eso solo lo hace el creador de Sloth.')
+  if ((c.fijada !== undefined || c.estado !== undefined || c.aprobada !== undefined) && !creador) throw new Rechazo(403, 'Eso solo lo hace el creador de Sloth.')
   const nueva: Guardada = { ...f }
   if (c.categoria !== undefined) nueva.categoria = categoriaDe(c.categoria, yo)
   if (c.titulo !== undefined) nueva.titulo = texto(c.titulo, 140)
@@ -490,8 +529,14 @@ async function cambiar(env: Env, yo: Miembro, f: Guardada, c: Record<string, unk
   if (c.fijada !== undefined) nueva.fijada = c.fijada ? 1 : 0
   if (c.estado !== undefined) nueva.estado = c.estado === 'haciendo' || c.estado === 'hecha' ? c.estado : null
   if (nueva.categoria !== 'mejoras') nueva.estado = null
+  if (contenido) estiloEnSuSitio(nueva.categoria, JSON.parse(nueva.adjuntos) as Adjunto[])
+  // Lo que se aprobó es ese paquete: otro (o el mismo, al pasar a Estilos) vuelve a esperar.
+  const otroPaquete = nueva.categoria === 'estilos' && (f.categoria !== 'estilos' || llaveDelEstilo(nueva.adjuntos) !== llaveDelEstilo(f.adjuntos))
+  if (otroPaquete && !creador) nueva.aprobada = 0
+  if (c.aprobada !== undefined) nueva.aprobada = c.aprobada ? 1 : 0
+  if (nueva.categoria !== 'estilos') nueva.aprobada = 1
   await env.DB.batch([
-    env.DB.prepare('UPDATE publicaciones SET categoria = ?, titulo = ?, texto = ?, adjuntos = ?, fijada = ?, estado = ?, editada = ? WHERE id = ?').bind(
+    env.DB.prepare('UPDATE publicaciones SET categoria = ?, titulo = ?, texto = ?, adjuntos = ?, fijada = ?, estado = ?, editada = ?, aprobada = ? WHERE id = ?').bind(
       nueva.categoria,
       nueva.titulo,
       nueva.texto,
@@ -499,9 +544,12 @@ async function cambiar(env: Env, yo: Miembro, f: Guardada, c: Record<string, unk
       nueva.fijada,
       nueva.estado,
       nueva.editada,
+      nueva.aprobada,
       f.id
     ),
-    ...(nueva.estado && nueva.estado !== f.estado ? aviso(env, f.autor, yo, 'estado', f.id, { texto: nueva.estado }) : [])
+    ...(nueva.estado && nueva.estado !== f.estado ? aviso(env, f.autor, yo, 'estado', f.id, { texto: nueva.estado }) : []),
+    ...(nueva.aprobada && !f.aprobada ? aviso(env, f.autor, yo, 'aprobado', f.id) : []),
+    ...(!nueva.aprobada && f.aprobada ? [porAprobar(env, yo, f.id)] : [])
   ])
   // Lo que se quitó al editar ya no se usa.
   await quitarArchivos(env, llavesDe(f.adjuntos).filter((l) => !llavesDe(nueva.adjuntos).includes(l)))
@@ -681,18 +729,18 @@ export async function creditos(env: Env): Promise<string[]> {
 }
 
 /** El tipo de un archivo y su llave nueva, si se acepta y no pesa de más. */
-function aceptar(contentType: string, bytes: number): { tipo: 'imagen' | 'video'; llave: string; contentType: string } {
+function aceptar(contentType: string, bytes: number): { tipo: AdjuntoComunidad['tipo']; llave: string; contentType: string } {
   const ct = contentType.split(';')[0].trim().toLowerCase()
   const t = TIPOS[ct]
-  if (!t) throw new Rechazo(415, 'Solo se suben imágenes (PNG, JPG, WebP, GIF) y videos (MP4, WebM, MOV).')
+  if (!t) throw new Rechazo(415, 'Solo se suben imágenes (PNG, JPG, WebP, GIF), videos (MP4, WebM, MOV) y estilos de Sloth.')
   if (!bytes) throw new Rechazo(411, 'Falta el tamaño del archivo.')
-  if (bytes > PESO[t.tipo]) throw new Rechazo(413, `${t.tipo === 'video' ? 'El video' : 'La imagen'} pesa más de ${pesoLegible(PESO[t.tipo])}.`)
+  if (bytes > PESO[t.tipo]) throw new Rechazo(413, `${t.tipo === 'video' ? 'El video' : t.tipo === 'estilo' ? 'El estilo' : 'La imagen'} pesa más de ${pesoLegible(PESO[t.tipo])}.`)
   return { tipo: t.tipo, llave: `${letras(20).toLowerCase()}.${t.ext}`, contentType: ct }
 }
 const pesoLegible = (b: number) => `${b / 1024 ** 2} MB`
 const metadatos = (contentType: string) => ({ httpMetadata: { contentType, cacheControl: 'public, max-age=31536000, immutable' } })
 
-/** Una imagen o un video. */
+/** Una imagen, un video o un estilo. */
 async function subir(req: Request, env: Env): Promise<{ llave: string; url: string }> {
   const bytes = Number(req.headers.get('content-length'))
   const a = aceptar(req.headers.get('content-type') ?? '', bytes)

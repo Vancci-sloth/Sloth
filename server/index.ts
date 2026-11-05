@@ -31,6 +31,8 @@ import { guardarMeta, guardarYoutube, opciones } from './opciones.ts'
 import { previas } from './previas.ts' // previas de las cards
 import { radar } from './radar/index.ts' // radar
 import { comunidad, llaveDelCreador } from './comunidad.ts' // comunidad
+import { desempacar, estilos } from './estilos.ts' // estilos compartidos
+import { carpetaTrabajo } from './trabajo.ts'
 import { redes } from './redes/index.ts' // redes
 import { voz } from './voz/index.ts' // voz de AI Studio
 import { flow } from './flow/index.ts' // Google Flow
@@ -169,6 +171,8 @@ const idear = VENTA ? undefined : ideas(APP, sessions, broadcast, subirLargos?.l
 const biblioteca3d = modelos3d(carpetaSkill('modelos-3d') ?? join(APP, 'skills', 'modelos-3d')) // modelos 3D
 // El buscador propio de noticias de tecnología: lee sus fuentes en segundo plano y las skills buscan ahí.
 const noticias = radar(APP) // radar
+// Tus estilos en un archivo para compartirlos, y los de otros, instalados entre los tuyos.
+const estilosLocal = estilos(APP, cards) // estilos compartidos
 // La comunidad: lo que la gente hace con Sloth y cómo. Entra cada cliente con su licencia, y el creador con su llave,
 // también desde su copia instalada (publica en Anuncios); un cliente no la tiene.
 const comunidadApi = comunidad(APP, {
@@ -176,7 +180,13 @@ const comunidadApi = comunidad(APP, {
   sessions,
   video: (ruta) => cards().flatMap((c) => (c.etapas?.length ? videosDe(c, sessions) : [])).find((v) => v.ruta === ruta),
   cuadro,
-  avisar: broadcast
+  avisar: broadcast,
+  estilos: estilosLocal,
+  // Un estilo por aprobar se abre en el trabajo, fuera de las skills: ahí nadie lo usa.
+  revisar: (paquete, publicacion) => {
+    const carpeta = join(carpetaTrabajo(APP), 'estilos-por-revisar', publicacion)
+    return { carpeta, manifiesto: desempacar(paquete, carpeta) }
+  }
 }) // comunidad
 // En qué fase va cada video y cuántas etapas lleva, para la barra lateral.
 avance = avances(sessions, cards, broadcast)
@@ -435,15 +445,17 @@ async function api(req: IncomingMessage, res: ServerResponse, url: URL): Promise
     return true
   }
 
+  // Un estilo tuyo pide lo mismo que el de Sloth del que partió (`basadoEn`).
+  const pide = (skill?: string) => (skill && cards().find((c) => c.skill === skill)?.basadoEn) || skill
   if (path === '/api/requisitos' && method === 'GET') {
-    send(res, 200, await requisitos(APP, url.searchParams.has('fresco'), url.searchParams.get('skill') ?? undefined))
+    send(res, 200, await requisitos(APP, url.searchParams.has('fresco'), pide(url.searchParams.get('skill') ?? undefined)))
     return true
   }
 
   // Sin `ids`, todo lo que falta; con `skill`, de lo que pide esa skill.
   if (path === '/api/requisitos/instalar' && method === 'POST') {
     const { ids, skill } = await body<{ ids?: string[]; skill?: string }>(req)
-    send(res, 200, await instalar(APP, ids, skill))
+    send(res, 200, await instalar(APP, ids, pide(skill)))
     return true
   }
 
@@ -576,6 +588,7 @@ async function api(req: IncomingMessage, res: ServerResponse, url: URL): Promise
   if (await biblioteca3d.api(req, res, url)) return true // modelos 3D
   if (await noticias.api(req, res, url)) return true // radar
   if (await comunidadApi.api(req, res, url)) return true // comunidad
+  if (await estilosLocal.api(req, res, url)) return true // estilos compartidos
   if (await enlacesApi(req, res, url)) return true // tarjeta de los enlaces
 
   const m = /^\/api\/sessions\/([\w-]+)(?:\/(\w+))?$/.exec(path)

@@ -20,6 +20,13 @@
 .esc-fotos { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
 .esc-miniatura { position: relative; width: 72px; height: 72px; border-radius: 10px; border: 1px solid var(--line); overflow: hidden; background: var(--panel-2); }
 .esc-miniatura.video { width: 54px; height: 86px; }
+/* Un estilo que se comparte: su nombre con la claqueta, en vez de una imagen. */
+.esc-miniatura.estilo { width: auto; max-width: 220px; height: 44px; }
+.esc-estilo { height: 100%; display: flex; align-items: center; gap: 8px; padding: 0 30px 0 12px; color: var(--text); font-size: 12.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.esc-estilo .esc-ico { color: var(--amber); flex: none; }
+.esc-miniatura.subiendo .esc-estilo { color: var(--muted); }
+.esc-elegir-estilo select { appearance: none; border: 0; outline: none; background: none; color: inherit; font: inherit; cursor: pointer; }
+.esc-elegir-estilo select option { background: var(--panel); color: var(--text); }
 .esc-miniatura img, .esc-miniatura video { width: 100%; height: 100%; object-fit: cover; display: block; }
 .esc-miniatura button { position: absolute; top: 4px; right: 4px; width: 20px; height: 20px; display: grid; place-items: center; border-radius: 50%; background: rgba(15, 14, 12, 0.82); color: var(--text); font-size: 13px; line-height: 1; opacity: 0; transition: opacity 0.15s; }
 .esc-miniatura:hover button, .esc-miniatura button:focus-visible { opacity: 1; }

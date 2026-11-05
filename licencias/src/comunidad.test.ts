@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { adjuntosDe, fotosDeComentario } from './comunidad.ts'
+import { adjuntosDe, estiloEnSuSitio, fotosDeComentario } from './comunidad.ts'
 
 const imagen = (n: number) => ({ tipo: 'imagen', llave: `${String(n).padStart(20, 'a')}.png` })
 const video = { tipo: 'video', llave: 'bbbbbbbbbbbbbbbbbbbb.mp4', poster: 'cccccccccccccccccccc.webp', vertical: true }
@@ -19,6 +19,18 @@ test('un solo video, a lo más diez adjuntos, y la portada solo si es una imagen
   assert.deepEqual(adjuntosDe([video, otro]), [video])
   assert.equal(adjuntosDe(Array.from({ length: 14 }, (_, i) => imagen(i))).length, 10)
   assert.deepEqual(adjuntosDe([{ ...video, poster: 'eeeeeeeeeeeeeeeeeeee.mp4' }]), [{ tipo: 'video', llave: video.llave, vertical: true }])
+})
+
+test('un estilo es un paquete de la comunidad, uno solo, con su nombre, y va en Estilos', () => {
+  const estilo = { tipo: 'estilo', llave: 'ffffffffffffffffffff.estilo', nombre: 'Receta rápida' }
+  assert.deepEqual(adjuntosDe([estilo, { ...estilo, llave: 'gggggggggggggggggggg.estilo' }, imagen(1)]), [estilo, imagen(1)])
+  // Con otra extensión no es un estilo, ni un estilo es una imagen.
+  assert.deepEqual(adjuntosDe([{ ...estilo, llave: 'ffffffffffffffffffff.png' }, { tipo: 'imagen', llave: estilo.llave }]), [])
+  assert.deepEqual(adjuntosDe([{ tipo: 'estilo', llave: estilo.llave }]), [{ tipo: 'estilo', llave: estilo.llave, nombre: 'Estilo' }])
+  assert.doesNotThrow(() => estiloEnSuSitio('estilos', adjuntosDe([estilo])))
+  assert.throws(() => estiloEnSuSitio('estilos', adjuntosDe([imagen(1)])), /se comparte un estilo/)
+  assert.throws(() => estiloEnSuSitio('general', adjuntosDe([estilo])), /sección Estilos/)
+  assert.deepEqual(fotosDeComentario([estilo]), [])
 })
 
 test('un comentario lleva solo imágenes de la comunidad, a lo más cuatro', () => {

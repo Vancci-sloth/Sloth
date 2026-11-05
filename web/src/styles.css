@@ -104,6 +104,10 @@ input, textarea, select { font: inherit; color: inherit; }
 .estante { min-height: 0; display: flex; flex-direction: column; gap: 12px; }
 .estante header { display: flex; align-items: center; gap: 2px; }
 .estante h2 { flex: 1; margin: 0; font-size: 11px; font-weight: 650; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+/* «Importar» un estilo que te pasaron: texto con su icono, sin cápsula. */
+.estilo-importar { display: flex; align-items: center; gap: 6px; padding: 3px 6px; border-radius: 6px; color: var(--muted); font-size: 12px; transition: color 0.15s; }
+.estilo-importar:hover { color: var(--amber); }
+.importar-error { margin-right: 8px; }
 .cards { min-height: 0; overflow-y: auto; display: grid; grid-template-columns: repeat(auto-fill, minmax(168px, 1fr)); grid-auto-rows: max-content; gap: 14px; margin: 0 -6px; padding: 4px 6px 6px; }
 .card { position: relative; aspect-ratio: 3 / 4; overflow: hidden; isolation: isolate; border-radius: 14px; border: 1px solid var(--line); background: var(--panel-2); text-align: left; transition: border-color 0.15s, transform 0.15s; }
 .card:hover { border-color: #4a4236; transform: translateY(-2px); }
