@@ -99,6 +99,8 @@ export interface Env {
   PRECIO_ANUAL_MXN: number
   APOYO_MINIMO_MXN: number
   APOYO_GRANDE_MXN: number
+  /** Con cripto, lo menos que se apoya con el monto elegido: NOWPayments no acepta menos en las redes más usadas. */
+  APOYO_MINIMO_CRIPTO: number
   /** Los lugares gratis de por vida que se dieron cuando Sloth se vendía: ya no se dan. */
   GRATIS: number
   /** Las primeras personas que apoyan, fundadoras (hasta `FUNDADORES_HASTA` si se pone, una fecha ISO). */
@@ -641,9 +643,12 @@ async function precios(env: Env) {
   ).first<Cuenta>()
   // Mercado Pago solo se ofrece con su token del modo de hoy.
   const conMp = !!(env.MP_MODO === 'produccion' ? env.MP_ACCESS_TOKEN_PRODUCCION : env.MP_ACCESS_TOKEN)
-  // Cripto, con la llave y la clave de los avisos de NOWPayments; cobra los mismos precios, en `MONEDA`.
+  // Cripto, con la llave y la clave de los avisos de NOWPayments; cobra los mismos precios, en `MONEDA`, pero el monto
+  // elegido va desde `APOYO_MINIMO_CRIPTO`.
   const conCripto = !!(env.NOWPAYMENTS_API_KEY && env.NOWPAYMENTS_IPN_SECRET)
-  return { ...tarifa(c ?? { fundadores: 0, apoyan: 0 }, env, conMp), ...(conCripto ? { cripto: true } : {}) }
+  const t = tarifa(c ?? { fundadores: 0, apoyan: 0 }, env, conMp)
+  const cripto: Precios = { mensual: t.mensual, anual: t.anual, minimo: Number(env.APOYO_MINIMO_CRIPTO), grande: t.grande, maximo: t.maximo, moneda: t.moneda }
+  return { ...t, ...(conCripto ? { cripto } : {}) }
 }
 
 /**
@@ -711,7 +716,7 @@ async function suscribir(env: Env, c: Record<string, unknown>, desde: string): P
   if (plan === 'gratis') return unirse(env, email, equipo!, acepto, terminos, desde, c.porCorreo === true)
   const t = await precios(env)
   if ((pasa === 'mercadopago' && !t.mxn) || (pasa === 'cripto' && !t.cripto)) throw new Rechazo(400, 'Por ahora solo se puede pagar con PayPal.')
-  const p: Precios = pasa === 'mercadopago' ? t.mxn! : t
+  const p: Precios = pasa === 'mercadopago' ? t.mxn! : pasa === 'cripto' ? t.cripto! : t
   const monto = montoDe(plan, c.monto, p)
   // Con una ya pagada, otra cobraría dos veces; con un lugar gratis de por vida, no hace falta. Con una cuenta, sí se apoya.
   await sinOtra(env, email, true)

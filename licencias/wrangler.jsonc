@@ -49,6 +49,9 @@
     "PRECIO_ANUAL_MXN": 2990,
     "APOYO_MINIMO_MXN": 20,
     "APOYO_GRANDE_MXN": 599,
+    // Con cripto, el monto elegido va desde aquí: NOWPayments no acepta menos de unos $11 en USDT por TRON, la red más
+    // usada en Binance (BTC pide unos $21). El sugerido y el anual no cambian.
+    "APOYO_MINIMO_CRIPTO": 12,
     "MONEDA": "USD",
     // Los correos salen de un dominio verificado en Resend (con su RESEND_API_KEY como secreto) y se responden en soporte@vancci.org.
     "CORREO_DE": "Sloth <avisos@vancci.org>",
