@@ -971,7 +971,7 @@ function NewSession(props: {
           <TusCambios card={card} clave={hilos.map((s) => s.id + s.updatedAt).join()} />
         </div>
         {/* Hasta saber qué cuentas hay no sale: el aviso de Claude no se asoma a quien solo tiene ChatGPT u OpenCode. */}
-        {sinClaude !== undefined && <CuentaClaude model={choice?.model} onFalta={setSinCuenta} />}
+        {sinClaude !== undefined && <CuentaClaude model={choice?.model} onFalta={setSinCuenta} aAgentes />}
         {/* Las herramientas de video solo hacen falta en los estilos de video, y de los paquetes, los de su skill. */}
         {card.etapas && <Requisitos skill={card.skill} />}
         {composer}
