@@ -26,7 +26,15 @@ export function useVoz() {
     estado,
     error: error ?? estado?.error,
     conectar: () => void recibir(api('/api/voz/conectar', {})),
-    desconectar: () => void recibir(api('/api/voz/desconectar', {}))
+    // Devuelve la promesa, y falla si falla, para el aviso de Google Flow; el error queda también aquí.
+    desconectar: () =>
+      api<EstadoVoz>('/api/voz/desconectar', {}).then(
+        (e) => void (setEstado(e), setError(undefined)),
+        (x: Error) => {
+          setError(x.message)
+          throw x
+        }
+      )
   }
 }
 
@@ -117,9 +125,8 @@ export function GenerarVoz({ onGenerar }: { onGenerar(texto: string): Promise<vo
   )
 }
 
-/** Opciones → Voz: la cuenta de Google con que Sloth genera las voces en AI Studio. */
-export function VozOpciones() {
-  const voz = useVoz()
+/** Opciones → Voz: la cuenta de Google con que Sloth genera las voces en AI Studio. `voz` es el de Opciones, que comparte con Google Flow. */
+export function VozOpciones({ voz }: { voz: UsoVoz }) {
   const e = voz.estado
   return (
     <div className="item">
@@ -141,7 +148,7 @@ export function VozOpciones() {
             label={<span className="estado">{e.cuenta}</span>}
             value=""
             groups={[{ label: 'Cuenta', options: [{ value: 'conectar', label: 'Volver a conectar' }, { value: 'desconectar', label: 'Desconectar' }] }]}
-            onChange={(q) => (q === 'desconectar' ? voz.desconectar() : voz.conectar())}
+            onChange={(q) => (q === 'desconectar' ? void voz.desconectar().catch(() => {}) : voz.conectar())}
           />
         ) : (
           e && (

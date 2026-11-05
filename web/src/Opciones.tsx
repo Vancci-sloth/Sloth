@@ -16,7 +16,7 @@ import { RadarOpciones } from './RadarOpciones' // radar
 import { Segmento } from './Segmento'
 import { ConNavegadorRedes, RedesOpciones } from './Redes' // redes
 import { YoutubeOpciones } from './Youtube'
-import { VozOpciones } from './Voz' // voz de AI Studio
+import { useVoz, VozOpciones } from './Voz' // voz de AI Studio
 import { FlowOpciones } from './Flow' // Google Flow
 import { VENTA } from '../../shared/venta'
 import './Opciones.css'
@@ -43,6 +43,8 @@ const AGENTES = '/opciones/agentes'
 function Ajustes({ onDone, iniciando, onIniciando }: { onDone(): void; iniciando: boolean; onIniciando(si: boolean): void }) {
   const req = useRequisitos(true)
   const agentes = useRef<HTMLElement>(null)
+  // Uno para Voz y Google Flow: la cuenta de la voz también genera en Flow, y quitarla en uno la quita en el otro.
+  const voz = useVoz()
   // Lo de arriba (Redes) crece al cargar; el anclaje del scroll del navegador mantiene Agentes donde quedó.
   useEffect(() => {
     if (location.hash === `#${AGENTES}`) requestAnimationFrame(() => agentes.current?.scrollIntoView({ block: 'start' }))
@@ -92,13 +94,13 @@ function Ajustes({ onDone, iniciando, onIniciando }: { onDone(): void; iniciando
         ))}
       </Grupo>
       <Grupo titulo="Voz" nota="Al pedir un video eliges en «Voz» si la mandas tú o si el agente la genera aquí. La sesión de Google vive en un perfil aparte del navegador de Sloth: ningún agente la usa.">
-        <VozOpciones />
+        <VozOpciones voz={voz} />
       </Grupo>
       <Grupo
         titulo="Google Flow"
         nota="Los agentes generan imágenes y videos con tus cuentas de Google: la de la Voz y las que agregues aquí, hasta 50. Las imágenes son gratis; los videos gastan créditos de Flow, y si una cuenta se queda sin ellos, Sloth sigue con otra. Agrega solo cuentas tuyas: Google puede limitar o bloquear las que usa de más."
       >
-        <FlowOpciones />
+        <FlowOpciones voz={voz} />
       </Grupo>
       {/* Solo sirven a Ideas: sin la de YouTube, las recomendaciones van con el canal conectado. */}
       {!VENTA && (
