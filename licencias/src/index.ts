@@ -93,7 +93,8 @@ type Plan = 'mensual' | 'anual' | 'gratis' | 'cuenta'
  * Los de Mercado Pago, `gratis` para un lugar gratis de por vida o una cuenta (para quitárselos, `cancelled`) y
  * `pagado` para un año pagado de una vez, que vale hasta `pagado_hasta` sin renovarse.
  */
-export type Estado = 'pending' | 'authorized' | 'paused' | 'cancelled' | 'gratis' | 'pagado'
+/** `vetada`: la bloqueó el creador, a mano; su correo ya no entra a la comunidad ni abre otra cuenta. */
+export type Estado = 'pending' | 'authorized' | 'paused' | 'cancelled' | 'gratis' | 'pagado' | 'vetada'
 
 export interface Fila {
   id: string
@@ -736,6 +737,10 @@ async function unirse(env: Env, email: string, equipo: string, acepto: string, t
     .bind(equipo)
     .first<{ clave: string }>()
   if (suya) return json({ clave: suya.clave })
+  if (await env.DB.prepare("SELECT 1 FROM licencias WHERE email = ? AND estado = 'vetada'").bind(email).first()) {
+    await vigilar(env, email, 'pidió otra cuenta con su correo bloqueado', true)
+    throw new Rechazo(403, BLOQUEADA)
+  }
   if (!(await cupo(env, desde, 'cuenta', CUENTAS_AL_DIA))) throw new Rechazo(429, 'Desde esta conexión ya se pidieron muchas cuentas hoy. Prueba mañana.')
   let clave = (await env.DB.prepare("SELECT clave FROM licencias WHERE email = ? AND plan = 'cuenta' AND estado = 'gratis' LIMIT 1").bind(email).first<{ clave: string }>())?.clave
   if (!clave) {
@@ -1123,6 +1128,29 @@ export async function cupo(env: Env, quien: string, tipo: string, max: number): 
   const ahora = Date.now()
   const r = await env.DB.prepare(CUPO).bind(quien, tipo, new Date(ahora).toISOString(), new Date(ahora - DIA).toISOString(), max).run()
   return r.meta.changes > 0
+}
+
+/** Anota el aviso a `?1` de tipo `?2` si no se le dio en la última semana (`?5`); 0 cambios si ya se le dio. */
+export const VIGILAR =
+  'INSERT INTO vigilados (email, tipo, motivo, avisado) VALUES (?1, ?2, ?3, ?4) ON CONFLICT (email, tipo) DO UPDATE SET motivo = excluded.motivo, avisado = excluded.avisado WHERE vigilados.avisado < ?5'
+export const BLOQUEADA = 'Bloqueamos tu cuenta por actividad sospechosa.'
+
+/**
+ * Le avisa por correo a `email` que se vio actividad sospechosa en su cuenta (`motivo`) y que queda vigilada, o que se
+ * bloqueó, con copia a soporte. Una vez por semana de cada cosa. Un correo que falla no detiene lo demás.
+ */
+export async function vigilar(env: Env, email: string, motivo: string, bloqueada = false): Promise<void> {
+  const ahora = Date.now()
+  const tipo = bloqueada ? 'bloqueada' : 'vigilada'
+  const r = await env.DB.prepare(VIGILAR).bind(email, tipo, motivo, new Date(ahora).toISOString(), new Date(ahora - 7 * DIA).toISOString()).run()
+  if (!r.meta.changes) return
+  const suyo = bloqueada
+    ? [`${BLOQUEADA} Ya no entra a la comunidad, y con este correo no se abre otra.`]
+    : [`Detectamos actividad sospechosa en tu cuenta: ${motivo}.`, 'Desde ahora tu cuenta queda vigilada. Si sigue, la bloqueamos y ya no entras a la comunidad.']
+  await Promise.all([
+    correo(env, email, 'Actividad sospechosa en tu cuenta de Sloth', ['Hola:', ...suyo, 'Si crees que es un error, responde a este correo.']),
+    correo(env, env.CORREO_RESPUESTA, `Cuenta ${tipo}: ${email}`, [`${email}: ${motivo}.`, bloqueada ? 'Ya estaba bloqueada; se le avisó.' : 'Se le avisó que queda vigilada.'])
+  ]).catch((e) => console.error('Correo de vigilancia', e instanceof Error ? e.message : e))
 }
 
 /** La conexión de quien pide, resumida: para su cupo, sin guardar su IP. */

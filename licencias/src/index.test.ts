@@ -3,7 +3,8 @@ import { createHmac } from 'node:crypto'
 import test from 'node:test'
 import { readFileSync } from 'node:fs'
 import { DatabaseSync } from 'node:sqlite'
-import { CUPO, deTodos, esFundador, faltaAvisar, firmaDeMercadoPago, instaladorDe, leerPagos, leerPaypal, liberada, rangoDe, sistema, sistemaDelYml, sobran, tarifa, vigencia } from './index.ts'
+import { CUPO, VIGILAR, deTodos, esFundador, faltaAvisar, firmaDeMercadoPago, instaladorDe, leerPagos, leerPaypal, liberada, rangoDe, sistema, sistemaDelYml, sobran, tarifa, vigencia } from './index.ts'
+import { DE_LA_APP } from './comunidad.ts'
 
 const SECRETO = 'secreto-de-prueba'
 const firmar = (manifiesto: string) => createHmac('sha256', SECRETO).update(manifiesto).digest('hex')
@@ -187,4 +188,21 @@ test('el cupo del día no deja pasar de su máximo, y cada quien tiene el suyo',
   // Otro miembro tiene su propio cupo; lo de hace más de un día ya no cuenta.
   assert.equal(anotar('otro', 10), true)
   assert.equal(anotar('probe', 10, ahora + 25 * 3600_000), true)
+})
+
+test('lo sospechoso se avisa una vez por semana de cada cosa, y solo lo inventado no viene de la app', () => {
+  const db = new DatabaseSync(':memory:')
+  db.exec(readFileSync(new URL('../migrations/0014_vigilados.sql', import.meta.url), 'utf8'))
+  const ahora = Date.parse('2026-11-05T19:00:00Z')
+  const avisar = (tipo: string, dias: number) => {
+    const cuando = ahora + dias * 24 * 3600_000
+    return db.prepare(VIGILAR).run('probe@x.com', tipo, 'motivo', new Date(cuando).toISOString(), new Date(cuando - 7 * 24 * 3600_000).toISOString()).changes > 0
+  }
+  assert.equal(avisar('vigilada', 0), true)
+  assert.equal(avisar('vigilada', 3), false)
+  assert.equal(avisar('bloqueada', 3), true)
+  assert.equal(avisar('vigilada', 8), true)
+  assert.equal(DE_LA_APP.test('3f9a0c1e7b2d4a6f8e0c1b3d5f7a9c2e'), true)
+  assert.equal(DE_LA_APP.test('0f8fad5b-d9cb-469f-a165-70867728950e'), true)
+  assert.equal(DE_LA_APP.test('tu-probe-equipo-001'), false)
 })

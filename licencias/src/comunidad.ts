@@ -5,6 +5,9 @@
  * borra lo de cualquiera, publica en Anuncios, dice cómo va cada mejora y revisa lo reportado. De cada miembro se ve su
  * `id`, su nombre y su foto, nunca su clave.
  *
+ * Lo sospechoso se avisa por correo (`vigilar`, con copia a soporte): entrar sin la app (`DE_LA_APP`) o llegar al tope
+ * del día. Para bloquear a alguien, el creador pone su licencia en `estado = 'vetada'` en D1: su correo ya no entra.
+ *
  * En D1 (migración 0004): `miembros`, `publicaciones`, `comentarios` (con sus respuestas, de un solo nivel), los me gusta
  * de cada una (`likes`, `likes_comentarios`), los `reportes` y los `avisos` de cada miembro: te comentaron, te
  * respondieron, te dieron me gusta, cambió tu mejora, hay un anuncio. Lo que reportan `OCULTAR` personas deja de verse
@@ -29,7 +32,7 @@
  *   `POST` la da a todos ya (`liberar` en `index.ts`), cuando el chat de un live cumple su meta.
  */
 import type { AdjuntoComunidad, Autor, AvisoComunidad, CategoriaComunidad, ComentarioComunidad, FeedComunidad, PublicacionComunidad, RoadmapComunidad } from '../../shared/types.ts'
-import { CLAVE, EQUIPO, cupo, esFundador, type Env, type Fila, Rechazo, cuerpo, iguales, json, letras, liberar, servir, vigencia } from './index.ts'
+import { BLOQUEADA, CLAVE, EQUIPO, cupo, esFundador, type Env, type Fila, Rechazo, cuerpo, iguales, json, letras, liberar, servir, vigencia, vigilar } from './index.ts'
 
 export const CATEGORIAS: CategoriaComunidad[] = ['general', 'hice', 'ayuda', 'mejoras', 'anuncios']
 
@@ -63,6 +66,16 @@ const IMAGEN = /\.(png|jpg|webp|gif)$/
 const ID = /^[a-z0-9]+$/
 /** Lo más que publica, comenta o reporta cada miembro en un día (`cupo`): que un error o un abuso no llene la comunidad. */
 const AL_DIA = { publicaciones: 10, comentarios: 100, reportes: 20 }
+/** El identificador que manda la app (`server/licencia.ts`): el de la computadora resumido, o un UUID. Otro lo inventó alguien. */
+export const DE_LA_APP = /^(?:[0-9a-f]{32}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/
+
+/** El cupo del día de `yo`. Quien llega al tope queda vigilado: se le avisa por correo. */
+async function conCupo(env: Env, yo: Miembro, tipo: keyof typeof AL_DIA): Promise<boolean> {
+  if (await cupo(env, yo.id, tipo, AL_DIA[tipo])) return true
+  const email = (await env.DB.prepare('SELECT email FROM licencias WHERE clave = ?').bind(yo.clave).first<{ email: string }>())?.email
+  if (email) await vigilar(env, email, `llegó al tope del día de ${tipo} (${AL_DIA[tipo]})`)
+  return false
+}
 /** Con tantos reportes de personas distintas, una publicación o un comentario deja de verse hasta que el creador lo revise. */
 export const OCULTAR = 3
 /** Cada cuánto se anota que alguien entró. */
@@ -183,11 +196,21 @@ async function quien(req: Request, env: Env): Promise<Miembro> {
     const equipo = req.headers.get('x-sloth-equipo') ?? ''
     const fila =
       CLAVE.test(clave) && EQUIPO.test(equipo)
-        ? await env.DB.prepare('SELECT l.estado, l.pagado_hasta FROM licencias l JOIN equipos e ON e.clave = l.clave WHERE l.clave = ? AND e.equipo = ?')
+        ? await env.DB.prepare(
+            "SELECT l.estado, l.pagado_hasta, l.email, EXISTS (SELECT 1 FROM licencias v WHERE v.email = l.email AND v.estado = 'vetada') AS vetada FROM licencias l JOIN equipos e ON e.clave = l.clave WHERE l.clave = ? AND e.equipo = ?"
+          )
             .bind(clave, equipo)
-            .first<Pick<Fila, 'estado' | 'pagado_hasta'>>()
+            .first<Pick<Fila, 'estado' | 'pagado_hasta' | 'email'> & { vetada: number }>()
         : null
+    if (fila?.vetada) {
+      await vigilar(env, fila.email, 'intentó entrar a la comunidad con su cuenta bloqueada', true)
+      throw new Rechazo(403, BLOQUEADA)
+    }
     if (!fila || !vigencia(fila, ahora).activa) throw new Rechazo(401, 'Para entrar a la comunidad, crea tu cuenta gratis de Sloth.')
+    if (!DE_LA_APP.test(equipo)) {
+      await vigilar(env, fila.email, 'entró a la comunidad sin la app de Sloth, con un identificador de computadora inventado')
+      throw new Rechazo(403, 'Detectamos actividad sospechosa: esto no viene de la app de Sloth. Tu cuenta queda vigilada.')
+    }
   }
   const m =
     (await env.DB.prepare(`SELECT m.*, ${INSIGNIA} FROM miembros m JOIN licencias l ON l.clave = m.clave WHERE l.email = (SELECT email FROM licencias WHERE clave = ?) ORDER BY m.creado LIMIT 1`)
@@ -415,7 +438,7 @@ async function publicar(env: Env, yo: Miembro, c: Record<string, unknown>): Prom
   const cuerpoTexto = texto(c.texto, 20_000)
   const adjuntos = adjuntosDe(c.adjuntos)
   if (!titulo && !cuerpoTexto && !adjuntos.length) throw new Rechazo(400, 'Escribe algo o agrega una imagen.')
-  if (!esCreador(yo) && !(await cupo(env, yo.id, 'publicaciones', AL_DIA.publicaciones)))
+  if (!esCreador(yo) && !(await conCupo(env, yo, 'publicaciones')))
     throw new Rechazo(429, `Ya publicaste ${AL_DIA.publicaciones} veces hoy. Mañana sigues.`)
   const ahora = new Date().toISOString()
   const f: Guardada = { id: nuevoId(), autor: yo.id, categoria, titulo, texto: cuerpoTexto, adjuntos: JSON.stringify(adjuntos), fijada: 0, estado: null, creada: ahora, editada: null, actividad: ahora, comentarios: 0, likes: 0, reportes: 0, ultimo_comentario: null }
@@ -524,7 +547,7 @@ async function comentar(env: Env, yo: Miembro, f: Guardada, c: Record<string, un
   const t = texto(c.texto, 5000)
   const fotos = fotosDeComentario(c.adjuntos)
   if (!t && !fotos.length) throw new Rechazo(400, 'Escribe tu comentario o agrega una imagen.')
-  if (!esCreador(yo) && !(await cupo(env, yo.id, 'comentarios', AL_DIA.comentarios))) throw new Rechazo(429, 'Ya comentaste mucho hoy. Mañana sigues.')
+  if (!esCreador(yo) && !(await conCupo(env, yo, 'comentarios'))) throw new Rechazo(429, 'Ya comentaste mucho hoy. Mañana sigues.')
   let padre: ComentarioGuardado | null = null
   if (c.responde) {
     padre = ID.test(String(c.responde)) ? await env.DB.prepare('SELECT * FROM comentarios WHERE id = ? AND publicacion = ?').bind(String(c.responde), f.id).first<ComentarioGuardado>() : null
@@ -572,7 +595,7 @@ async function reportar(env: Env, yo: Miembro, tabla: 'publicaciones' | 'comenta
   if (x.autor === yo.id) throw new Rechazo(400, 'No puedes reportar lo tuyo: bórralo.')
   const motivo = texto(c.motivo, 300)
   if (!motivo) throw new Rechazo(400, 'Dinos por qué lo reportas.')
-  if (!(await cupo(env, yo.id, 'reportes', AL_DIA.reportes))) throw new Rechazo(429, 'Ya reportaste mucho hoy. Si algo es grave, escríbele al creador.')
+  if (!(await conCupo(env, yo, 'reportes'))) throw new Rechazo(429, 'Ya reportaste mucho hoy. Si algo es grave, escríbele al creador.')
   const puesto = await env.DB.prepare('INSERT INTO reportes (objeto, miembro, motivo, creado) VALUES (?, ?, ?, ?) ON CONFLICT DO NOTHING').bind(x.id, yo.id, motivo, new Date().toISOString()).run()
   if (!puesto.meta.changes) return { ok: true }
   const publicacion = x.publicacion ?? x.id
