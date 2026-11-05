@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { IMAGEN_CHATGPT, MODELOS_IMAGEN } from '../../shared/flow'
+import { IMAGEN_CHATGPT, MODELOS_IMAGEN, OPCIONES_CLIPS } from '../../shared/flow'
 import type { CuentaClaude, CuentaEnFlow, EstadoFlow, GastoFlow } from '../../shared/types'
 import { api } from './api'
 import { Picker } from './Composer'
@@ -11,7 +11,8 @@ import type { UsoVoz } from './Voz'
  * Google Flow en la interfaz (`server/flow/`). En Opciones: usa la cuenta de la voz y las que agregues, y la primera vez
  * con cada una hay que abrir Flow y aceptar su aviso, que es de cada quien. «Ayudar a mejorar Flow» sale apagado: cada quien decide si Google usa lo que
  * genera. Quien manda referencias confirma que tiene sus derechos (`AvisoDerechos`). En el compositor de un video, el menú
- * «Imágenes»: con ChatGPT o con un modelo de Flow (`lineaImagenes`, `shared/flow.ts`).
+ * «Imágenes»: con ChatGPT o con un modelo de Flow (`lineaImagenes`, `shared/flow.ts`), y en los estilos que hacen clips,
+ * «Clips»: el modelo de Veo u Omni (`lineaClips`).
  */
 
 const POLITICA = 'https://policies.google.com/terms/generative-ai/use-policy'
@@ -132,6 +133,24 @@ export function SelectorImagenes({ valor, hayChatGPT, voz, flow, onCambio }: { v
         />
       )}
     </>
+  )
+}
+
+/** El menú «Clips» del compositor de un estilo con `clips`: con qué modelo de Flow se hacen y cuánto cuesta cada uno. */
+export function SelectorClips({ valor, onCambio }: { valor: string; onCambio(modelo: string): void }) {
+  return (
+    <Picker
+      label={`Clips: ${valor}`}
+      value={valor}
+      menuWidth={300}
+      groups={[
+        {
+          label: 'Google Flow · créditos por clip de 8 s',
+          options: Object.entries(OPCIONES_CLIPS).map(([id, o]) => ({ value: id, label: `${id} · ${o.creditos}` }))
+        }
+      ]}
+      onChange={onCambio}
+    />
   )
 }
 

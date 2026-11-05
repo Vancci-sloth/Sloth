@@ -27,6 +27,8 @@ export interface Card {
    * hace el estilo si no eliges AI Studio, cuando no es mandándola tú.
    */
   voz?: false | { propia: string }
+  /** Hace sus clips con `generar_video` en Google Flow: el compositor deja elegir el modelo (menú «Clips», `lineaClips`). */
+  clips?: true
 }
 
 /** Un modelo con su esfuerzo. `medido` dice dónde se midió; sin él, es el de por defecto. */
@@ -1345,6 +1347,8 @@ export interface TrabajoFlow {
   estado: 'en-fila' | 'generando' | 'lista' | 'error'
   tipo: 'imagen' | 'video'
   modelo: string
+  /** La de Omni; Veo, siempre 720p. */
+  resolucion?: string
   /** La cuenta de Google con que se genera o se generó. */
   cuenta?: string
   archivo?: string

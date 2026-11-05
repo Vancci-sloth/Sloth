@@ -15,7 +15,8 @@ import { creditosDe, FORMATOS_IMAGEN, FORMATOS_VIDEO, gastoDeRechazo, PALABRA_CR
  *
  * Un video se hace en uno de dos modos del panel: «Ingredientes» (texto y, si hay, referencias: los personajes) o
  * «Fotogramas» (empieza en una imagen y, si se pide, acaba en otra). Los dos aceptan los cuatro modelos y cuestan igual
- * (comprobado el 3 de noviembre de 2026: Omni Flash 6, Lite 10, Fast 20, Quality 100). Los huecos de los fotogramas se
+ * (comprobado el 5 de noviembre de 2026: Lite 10, Fast 20, Quality 100, Omni Flash 12 en 720p y 6 en 360p; Veo sale
+ * siempre en 720p y Omni, si no se elige, en 360p). Los huecos de los fotogramas se
  * vacían al recargar el proyecto, y cada pedido lo recarga.
  */
 
@@ -59,6 +60,8 @@ export interface PedidoFlow {
   prompt: string
   formato: string
   modelo: string
+  /** Solo en Omni (`RESOLUCIONES_OMNI`): Veo no deja elegirla. */
+  resolucion?: string
   /** Lo más que puede costar: si cuesta más, no se genera. */
   tope: number
   /** Las imágenes de referencia, en rutas absolutas. Quien las pide ya confirmó sus derechos (ver `subir`). */
@@ -162,6 +165,11 @@ async function elegir(page: Page, p: PedidoFlow): Promise<number> {
   await page.getByRole('radio', { name: 'x1', exact: true }).click({ timeout: 10_000 })
   await page.locator('button:has(mat-icon:text-is("arrow_drop_down"))').first().click({ timeout: 10_000 })
   await page.getByRole('menuitem').filter({ hasText: p.modelo }).first().click({ timeout: 10_000 })
+  // Omni enseña además la resolución (sin elegirla, 360p) y la duración (4 a 10 s): se eligen siempre, y 8 s como Veo.
+  if (p.resolucion) {
+    await page.getByRole('radio', { name: p.resolucion, exact: true }).click({ timeout: 10_000 })
+    await page.getByRole('radio', { name: /^8\s*s$/ }).click({ timeout: 5000 })
+  }
   // El costo se rehace tras elegir: se lee cuando dos lecturas seguidas coinciden.
   const panel = () =>
     page.locator('[role=radio]').first().evaluate((d, palabra) => {

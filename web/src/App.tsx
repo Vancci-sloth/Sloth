@@ -38,8 +38,8 @@ import { NombreDelHilo, Renombrar } from './Renombrar'
 import { Segmento } from './Segmento'
 import { SelectorVoz, useVoz } from './Voz' // voz de AI Studio
 import { lineaVoz } from '../../shared/voz'
-import { SelectorImagenes, useChatGPT, useFlow } from './Flow' // Google Flow
-import { imagenPosible, lineaImagenes } from '../../shared/flow'
+import { SelectorClips, SelectorImagenes, useChatGPT, useFlow } from './Flow' // Google Flow
+import { imagenPosible, lineaClips, lineaImagenes, MODELOS_VIDEO, OPCIONES_CLIPS } from '../../shared/flow'
 import { Timeline } from './Timeline'
 import { compact, duration } from './items'
 import './Barra.css'
@@ -826,6 +826,9 @@ function NewSession(props: {
   const [imagenes, setImagenes] = useStored<string>('imagenes', '')
   const flow = useFlow()
   const imagenElegida = imagenPosible(imagenes, { chatgpt: hayChatGPT, google: !!voz.estado?.cuenta || !!flow.estado?.cuentas.length })
+  // Los clips de los estilos que los hacen en Flow: el último modelo elegido, o Veo 3.1 - Lite.
+  const [clips, setClips] = useStored<string>('clips', '')
+  const clipsElegidos = OPCIONES_CLIPS[clips] ? clips : MODELOS_VIDEO[0]
   // Un archivo o un enlace soltado en cualquier parte del inicio va al mensaje.
   const soltar = useSoltar()
 
@@ -878,6 +881,7 @@ function NewSession(props: {
             )}
             {conFormato && <SelectorVoz card={card} voz={voz} valor={vozElegida} onCambio={(v) => setVoces({ ...voces, [card.id]: v })} />}
             {conFormato && <SelectorImagenes valor={imagenElegida} hayChatGPT={hayChatGPT} voz={voz} flow={flow} onCambio={setImagenes} />}
+            {conFormato && card.clips && <SelectorClips valor={clipsElegidos} onCambio={setClips} />}
             {card.lote && enlaces.length > 1 && (
               <Segmento
                 label="Lote"
@@ -908,6 +912,7 @@ function NewSession(props: {
             conFormato && !formatoEscrito && `Formato: ${formato}`,
             conFormato && lineaVoz(card, vozElegida),
             conFormato && lineaImagenes(imagenElegida),
+            conFormato && card.clips && lineaClips(clipsElegidos),
             // El modelo de cada subagente: lo medido, o lo que elegiste en «Avanzado». La skill lo lee aquí.
             lineaSubagentes(tareas)
           ]

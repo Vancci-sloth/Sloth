@@ -5,7 +5,7 @@ import { dirname, isAbsolute, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type { McpStdioServerConfig } from '@anthropic-ai/claude-agent-sdk'
 import type { Browser } from 'playwright-core'
-import { A_LA_VEZ, AVISO_FRENADA, CALMA, type Descanso, descansoNuevo, elegirCuenta, espacioEntrePedidos, FORMATOS_IMAGEN, FORMATOS_VIDEO, type Motivo, MODELOS_IMAGEN, MODELOS_VIDEO, motivoDeAviso, PAUSA_CUENTA, puede, type Saldo, tipoDeArchivo, TOPE_CREDITOS, VIDEO_MAS_BARATO } from '../../shared/flow.ts'
+import { A_LA_VEZ, AVISO_FRENADA, CALMA, type Descanso, descansoNuevo, elegirCuenta, espacioEntrePedidos, FORMATOS_IMAGEN, FORMATOS_VIDEO, type Motivo, MODELOS_IMAGEN, MODELOS_VIDEO, motivoDeAviso, OMNI, PAUSA_CUENTA, puede, RESOLUCIONES_OMNI, type Saldo, tipoDeArchivo, TOPE_CREDITOS, VIDEO_MAS_BARATO } from '../../shared/flow.ts'
 import type { EstadoFlow, GastoFlow, SaldoFlow, TrabajoFlow } from '../../shared/types.ts'
 import { VENTA } from '../../shared/venta.ts'
 import { guardar } from '../disco.ts'
@@ -188,7 +188,7 @@ export function flow(app: string, google: Google) {
             await ponerAportar(page, aportar)
             aplicado.set(c.correo, aportar)
           }
-          const pedido = { tipo: t.tipo, prompt: t.prompt, formato: t.formato, modelo: t.modelo, tope: t.tope, referencias: t.referencias, cuadros: t.cuadros }
+          const pedido = { tipo: t.tipo, prompt: t.prompt, formato: t.formato, modelo: t.modelo, resolucion: t.resolucion, tope: t.tope, referencias: t.referencias, cuadros: t.cuadros }
           const hecho = await generarEnFlow(b, page, ajustes.proyectos?.[c.correo], pedido, bajada, (proyecto) => {
             if (ajustes.proyectos?.[c.correo] === proyecto) return
             ajustes.proyectos = { ...ajustes.proyectos, [c.correo]: proyecto }
@@ -318,8 +318,9 @@ export function flow(app: string, google: Google) {
     repartirEn(5000)
   }
 
-  function pedir(d: Pick<Trabajo, 'tipo' | 'prompt' | 'formato' | 'modelo' | 'salida' | 'tope' | 'referencias' | 'cuadros'>): Trabajo {
-    const suma = createHash('sha1').update(`${d.tipo}\n${d.modelo}\n${d.formato}\n${d.prompt}`)
+  function pedir(d: Pick<Trabajo, 'tipo' | 'prompt' | 'formato' | 'modelo' | 'resolucion' | 'salida' | 'tope' | 'referencias' | 'cuadros'>): Trabajo {
+    // Sin resolución (Veo), la huella de siempre: lo ya hecho no se repite.
+    const suma = createHash('sha1').update(`${d.tipo}\n${d.modelo}${d.resolucion ? ` ${d.resolucion}` : ''}\n${d.formato}\n${d.prompt}`)
     // Lo que importa de una imagen es lo que tiene, no dónde está. Los fotogramas, aparte: no son referencias.
     for (const r of d.referencias) suma.update(readFileSync(r))
     if (d.cuadros.length) suma.update('\nfotogramas\n')
@@ -416,7 +417,7 @@ export function flow(app: string, google: Google) {
       return json(res, 200, estado())
     }
     if (path === '/api/flow/generar' && metodo === 'POST') {
-      const d = await cuerpo<{ tipo?: string; prompt?: string; formato?: string; modelo?: string; salida?: string; tope?: number; referencias?: string[]; primerCuadro?: string; ultimoCuadro?: string }>(req)
+      const d = await cuerpo<{ tipo?: string; prompt?: string; formato?: string; modelo?: string; resolucion?: string; salida?: string; tope?: number; referencias?: string[]; primerCuadro?: string; ultimoCuadro?: string }>(req)
       if (d.tipo !== 'imagen' && d.tipo !== 'video') return json(res, 400, { error: 'El tipo es imagen o video.' })
       const video = d.tipo === 'video'
       const modelos = video ? MODELOS_VIDEO : MODELOS_IMAGEN
@@ -425,6 +426,9 @@ export function flow(app: string, google: Google) {
       const formato = d.formato?.trim() || '9:16'
       if (!modelos.includes(modelo)) return json(res, 400, { error: `Flow no tiene ese modelo. Hay: ${modelos.join(', ')}.` })
       if (!formatos[formato]) return json(res, 400, { error: `Esa proporción no está. Hay: ${Object.keys(formatos).join(', ')}.` })
+      const resolucion = modelo === OMNI ? d.resolucion?.trim() || RESOLUCIONES_OMNI[0] : undefined
+      if (resolucion && !RESOLUCIONES_OMNI.includes(resolucion)) return json(res, 400, { error: `Omni sale en ${RESOLUCIONES_OMNI.join(' o ')}.` })
+      if (!resolucion && d.resolucion && d.resolucion !== '720p') return json(res, 400, { error: 'Solo Omni deja elegir la resolución: Veo sale en 720p.' })
       if (!d.prompt?.trim() || !d.salida || !isAbsolute(d.salida) || !(video ? /\.mp4$/i : /\.jpe?g$/i).test(d.salida))
         return json(res, 400, { error: `Pide el prompt y la ruta absoluta del ${video ? '.mp4' : '.jpg'} donde va.` })
       if (!cuentas().length) return json(res, 409, { error: SIN_CUENTA })
@@ -437,7 +441,7 @@ export function flow(app: string, google: Google) {
       const mala = imagenMala([...referencias, ...cuadros])
       if (mala) return json(res, 400, { error: `No encuentro la imagen ${mala}: pasa la ruta absoluta de un .png, .jpg o .webp.` })
       if ((referencias.length || cuadros.length) && !ajustes.derechos) return json(res, 409, { error: SIN_DERECHOS })
-      return json(res, 200, publico(pedir({ tipo: d.tipo, prompt: d.prompt.trim(), formato, modelo, salida: resolve(d.salida), tope: d.tope ?? TOPE_CREDITOS, referencias, cuadros })))
+      return json(res, 200, publico(pedir({ tipo: d.tipo, prompt: d.prompt.trim(), formato, modelo, resolucion, salida: resolve(d.salida), tope: d.tope ?? TOPE_CREDITOS, referencias, cuadros })))
     }
     const t = /^\/api\/flow\/trabajos\/(\w+)$/.exec(path)
     if (t && metodo === 'GET') {

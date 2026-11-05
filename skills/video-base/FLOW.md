@@ -14,6 +14,9 @@ mensaje y manda sobre lo que diga tu skill:
 - `Imágenes: con ChatGPT …`: con Codex, como diga tu skill.
 - Sin la línea: lo que diga tu skill.
 
+En los estilos que hacen clips, la línea `Clips: genéralos en Google Flow con <modelo> …` dice el `modelo`, la
+`resolucion` (en Omni) y el `tope` de cada `generar_video`. La eligió el usuario: manda sobre tu skill, y ese tope ya lo autorizó.
+
 **Cada paso de tu skill sale igual que con Codex**, con estos cambios:
 
 - El pedido es el mismo `.txt`, en inglés, sin lo que habla de `image_gen`, de copiar el PNG o de responder con el nombre
@@ -30,15 +33,15 @@ mensaje y manda sobre lo que diga tu skill:
 Los clips, cuando el usuario los pida o tu skill lo diga.
 
 - `generar_imagen`: Nano Banana. `salida` es un `.jpg` en ruta absoluta.
-- `generar_video`: 8 s con audio, 720p (Omni Flash, 360p). **Gasta los créditos del usuario:** Omni Flash 6, Lite 10,
-  Fast 20, Quality 100. Una cuenta gratis tiene 50 al día. `salida` es un `.mp4` en ruta absoluta. Parte de una de estas:
+- `generar_video`: 8 s con audio, 720p. **Gasta los créditos del usuario:** Lite 10, Fast 20, Quality 100, Omni Flash 12
+  (o 6 con `resolucion` `360p`, que se ve borroso: solo si el usuario la pide). Una cuenta gratis tiene 50 al día. `salida` es un `.mp4` en ruta absoluta. Parte de una de estas:
   - **Solo texto.**
   - **`primerCuadro`** (y, si quieres, `ultimoCuadro`): el video empieza en esa imagen. Es lo más fiable para que los
     personajes y el lugar salgan iguales de un clip a otro: arma el cuadro con `generar_imagen` y las hojas de los
     personajes en `referencias` (gratis) y anímalo. El cuadro va en el mismo `formato` que el video.
   - **`referencias`** (hasta 3): sigue a esos personajes sin partir de una imagen. No va con `primerCuadro`.
 
-Usa Veo 3.1 - Lite salvo que el usuario o tu skill pidan otro. Cada pedido da un resultado. Antes de un lote de clips,
+Usa Veo 3.1 - Lite salvo que el usuario (en el chat o con la línea `Clips:`) o tu skill pidan otro. Cada pedido da un resultado. Antes de un lote de clips,
 llama a `estado_flow` sin `id`: dice cuántos créditos le quedan a cada cuenta y cuántos videos van hoy. Dile al usuario
 cuántos clips son, cuánto gastan y si alcanzan. Cada video hecho dice también cuánto queda. Si un pedido cuesta más que `tope` (20), no se genera: no subas el tope sin que el
 usuario lo pida.

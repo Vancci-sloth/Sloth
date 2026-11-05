@@ -1,6 +1,6 @@
 /**
  * Lo que comparten el servidor de Flow (`server/flow/`), el compositor y sus pruebas: los modelos que ofrece, lo más que
- * gasta un pedido sin permiso, cómo se leen el costo y lo que baja, la línea `Imágenes:` del primer mensaje y el reparto
+ * gasta un pedido sin permiso, cómo se leen el costo y lo que baja, las líneas `Imágenes:` y `Clips:` del primer mensaje y el reparto
  * de los pedidos entre las cuentas de Google.
  */
 
@@ -28,6 +28,35 @@ export function lineaImagenes(imagen: string): string {
   if (!imagen) return ''
   if (imagen === IMAGEN_CHATGPT) return 'Imágenes: con ChatGPT (Codex), no con Google Flow (video-base/FLOW.md).'
   return `Imágenes: genéralas en Google Flow con ${imagen}, no con ChatGPT (cómo, en video-base/FLOW.md).`
+}
+
+/** El único modelo de video en que Flow deja elegir la resolución: Veo sale siempre en 720p. */
+export const OMNI = 'Omni 1.1 Flash'
+/** Las de Omni, la primera por defecto. Flow pone 360p si no se elige, y se ve borroso al lado de Veo. */
+export const RESOLUCIONES_OMNI = ['720p', '360p']
+
+/**
+ * Lo que se elige en el menú «Clips» (los estilos con `clips`) y lo que cuesta un clip de 8 s, del panel de Flow
+ * (comprobado el 5 de noviembre de 2026, en una cuenta gratis).
+ */
+export const OPCIONES_CLIPS: Record<string, { modelo: string; resolucion?: string; creditos: number }> = {
+  'Veo 3.1 - Lite': { modelo: 'Veo 3.1 - Lite', creditos: 10 },
+  'Veo 3.1 - Fast': { modelo: 'Veo 3.1 - Fast', creditos: 20 },
+  'Veo 3.1 - Quality': { modelo: 'Veo 3.1 - Quality', creditos: 100 },
+  'Omni 1.1 Flash · 720p': { modelo: OMNI, resolucion: '720p', creditos: 12 },
+  'Omni 1.1 Flash · 360p': { modelo: OMNI, resolucion: '360p', creditos: 6 }
+}
+
+/**
+ * La línea del primer mensaje con lo elegido en el menú «Clips». Lo eligió el usuario, así que el tope es lo que cuesta.
+ * Sin elección, la skill usa el suyo.
+ */
+export function lineaClips(opcion: string): string {
+  const o = OPCIONES_CLIPS[opcion]
+  if (!o) return ''
+  const res = o.resolucion ? ` en ${o.resolucion}` : ''
+  const params = `modelo "${o.modelo}"${o.resolucion ? `, resolucion "${o.resolucion}"` : ''} y tope ${o.creditos}`
+  return `Clips: genéralos en Google Flow con ${o.modelo}${res}, ${o.creditos} créditos cada uno (en generar_video, ${params}; video-base/FLOW.md).`
 }
 
 /** Lo más que gasta un pedido si no se dice otro tope: alcanza para Lite y Fast, no para Quality (100). */
@@ -81,7 +110,7 @@ export function saldoDe(texto: string, ahora: number): Saldo | null {
   return falta < HOLGURA || falta > 24 * 60 * 60_000 - HOLGURA ? { creditos } : { creditos, renueva: d.getTime() }
 }
 
-/** Lo menos que cuesta un video (Omni Flash): con menos, la cuenta no hace ninguno hasta que se renueve. */
+/** Lo menos que cuesta un video (Omni Flash en 360p): con menos, la cuenta no hace ninguno hasta que se renueve. */
 export const VIDEO_MAS_BARATO = 6
 
 /**

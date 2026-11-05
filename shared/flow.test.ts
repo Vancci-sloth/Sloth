@@ -1,6 +1,27 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { AVISO_FRENADA, creditosDe, DESCANSO, descansoNuevo, elegirCuenta, ENTRE_PEDIDOS, espacioEntrePedidos, gastoDeRechazo, IMAGEN_CHATGPT, imagenPosible, lineaImagenes, motivoDeAviso, saldoDe, tipoDeArchivo, type UsoCuenta } from './flow.ts'
+import {
+  AVISO_FRENADA,
+  creditosDe,
+  DESCANSO,
+  descansoNuevo,
+  elegirCuenta,
+  ENTRE_PEDIDOS,
+  espacioEntrePedidos,
+  gastoDeRechazo,
+  IMAGEN_CHATGPT,
+  imagenPosible,
+  lineaClips,
+  lineaImagenes,
+  MODELOS_VIDEO,
+  motivoDeAviso,
+  OMNI,
+  OPCIONES_CLIPS,
+  RESOLUCIONES_OMNI,
+  saldoDe,
+  tipoDeArchivo,
+  type UsoCuenta
+} from './flow.ts'
 
 test('cada pedido va a la cuenta libre que lleva más sin generar', () => {
   const cuentas: UsoCuenta[] = [
@@ -96,6 +117,15 @@ test('la línea Imágenes dice con qué generar y sin elección no sale', () => 
   assert.match(lineaImagenes('Nano Banana Pro'), /^Imágenes: genéralas en Google Flow con Nano Banana Pro, no con ChatGPT/)
   assert.match(lineaImagenes(IMAGEN_CHATGPT), /^Imágenes: con ChatGPT/)
   assert.equal(lineaImagenes(''), '')
+})
+
+test('la línea Clips lleva el modelo, la resolución de Omni y su costo de tope; lo que no existe no sale', () => {
+  assert.match(lineaClips('Omni 1.1 Flash · 720p'), /^Clips: genéralos en Google Flow con Omni 1\.1 Flash en 720p, 12 créditos .*modelo "Omni 1\.1 Flash", resolucion "720p" y tope 12/)
+  assert.match(lineaClips('Veo 3.1 - Quality'), /con Veo 3\.1 - Quality, 100 créditos .*modelo "Veo 3\.1 - Quality" y tope 100/)
+  assert.equal(lineaClips('Veo 9'), '')
+  // Todo modelo que acepta el servidor sale en el menú, y la resolución solo en Omni.
+  assert.deepEqual([...new Set(Object.values(OPCIONES_CLIPS).map((o) => o.modelo))].sort(), [...MODELOS_VIDEO].sort())
+  for (const o of Object.values(OPCIONES_CLIPS)) assert.ok(o.resolucion === undefined || (o.modelo === OMNI && RESOLUCIONES_OMNI.includes(o.resolucion)))
 })
 
 test('lo que baja se reconoce por sus bytes, no por el nombre', () => {
