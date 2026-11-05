@@ -69,6 +69,8 @@ npm run licencias -- deploy
 Aplica las migraciones cuando el cambio incluya alguna, antes de desplegar código que necesite esas columnas.
 Comprueba la ruta afectada en `https://api.sloth.vancci.org`. Este despliegue es independiente de
 `main` y `venta`; subir la app no actualiza el Worker. Los nombres de sus secretos están en la cabecera de su configuración.
+Para guardar uno que el usuario copió, pásalo desde Git Bash: `tr -d ' \r\n' < /dev/clipboard | npm run licencias -- secret
+put NOMBRE`. Desde PowerShell, la tubería le pone un BOM delante y la pasarela rechaza la llave.
 
 ## Publicaciones de Instagram: nube/
 
