@@ -84,25 +84,75 @@ export function saldoDe(texto: string, ahora: number): Saldo | null {
 /** Lo menos que cuesta un video (Omni Flash): con menos, la cuenta no hace ninguno hasta que se renueve. */
 export const VIDEO_MAS_BARATO = 6
 
-/** Cuántas cuentas de Google puede tener Flow en Sloth, y cuántas generan a la vez (cada una abre su Edge). */
+/**
+ * Cuántas cuentas de Google puede tener Flow en Sloth, y cuántas generan a la vez (cada una abre su Edge). Eran tres, y el
+ * 4 de noviembre de 2026 Flow rechazó tres clips de un lote por «actividad inusual»: todas salen de la misma conexión.
+ */
 export const MAX_CUENTAS = 50
-export const A_LA_VEZ = 3
+export const A_LA_VEZ = 2
+
+/**
+ * El ritmo, para no pedir como una máquina: entre dos pedidos que empiezan, de `ENTRE_PEDIDOS` a su doble (al azar), y una
+ * cuenta que acaba descansa `PAUSA_CUENTA` antes del siguiente. Tras una frenada, durante `CALMA` va uno a la vez y con
+ * cuatro veces más espacio entre pedidos.
+ */
+export const ENTRE_PEDIDOS = 15_000
+export const PAUSA_CUENTA = 30_000
+export const CALMA = 60 * 60_000
+
+/** Lo que espera el siguiente pedido para empezar, en ms. `azar` va de 0 a 1. */
+export const espacioEntrePedidos = (calma: boolean, azar: number) => (calma ? 4 : 1) * ENTRE_PEDIDOS * (1 + azar)
 
 /**
  * Por qué descansa una cuenta: Flow no empezó su pedido porque no le quedan créditos (las imágenes siguen, no gastan),
- * porque la frenó por pedir mucho, o porque perdió la sesión.
+ * porque la frenó por pedir mucho (o vio «actividad inusual»), o porque perdió la sesión.
  */
 export type Motivo = 'creditos' | 'frenada' | 'sesion'
 
 /** Lo que descansa cada motivo. Volver a probar no gasta (Flow no empezó), solo tarda: por eso no se espera más. */
 export const DESCANSO: Record<Motivo, number> = { creditos: 3 * 60 * 60_000, frenada: 30 * 60_000, sesion: 10 * 60_000 }
 
+/** Lo más que descansa una cuenta frenada otra vez, y cuánto después de su descanso cuenta como «otra vez». */
+const FRENADA_MAXIMA = 8 * 60 * 60_000
+const RECUERDA_FRENADA = 6 * 60 * 60_000
+
+/** Un descanso: hasta cuándo (ms), por qué y, si la frenaron, cuántas veces seguidas. */
+export interface Descanso {
+  hasta: number
+  motivo: Motivo
+  veces?: number
+}
+
+/**
+ * El descanso que toca. Sin créditos, hasta que se renueven si se sabe cuándo. Frenada otra vez al poco de su descanso,
+ * descansa el doble cada vez, hasta 8 h: si Google la sigue viendo rara, probar seguido lo empeora.
+ */
+export function descansoNuevo(motivo: Motivo, ahora: number, previo?: Descanso, renueva?: number): Descanso {
+  const otraVez = motivo === 'frenada' && previo?.motivo === 'frenada' && ahora - previo.hasta < RECUERDA_FRENADA
+  const veces = motivo === 'frenada' ? (otraVez ? (previo.veces ?? 1) + 1 : 1) : undefined
+  const largo = motivo === 'frenada' ? Math.min(FRENADA_MAXIMA, DESCANSO.frenada * 2 ** (veces! - 1)) : DESCANSO[motivo]
+  const hasta = motivo === 'creditos' && renueva && renueva > ahora ? renueva : ahora + largo
+  return { hasta, motivo, ...(veces ? { veces } : {}) }
+}
+
+/** Lo que dice Flow cuando frena una cuenta: que pide mucho o que vio «actividad inusual» (en el idioma de la cuenta). */
+export const AVISO_FRENADA = /demasiad|too many|m[aá]s tarde|try again later|inusual|unusual|throttl/i
+
+/**
+ * Lo que gastó un video que Flow rechazó, comparando el saldo de antes de pedirlo con el de después. `null` si no se pudo
+ * leer alguno o si subió (se renovó en medio): entonces no se sabe.
+ */
+export function gastoDeRechazo(antes: Saldo | null, despues: Saldo | null): number | null {
+  if (!antes || !despues || despues.creditos > antes.creditos) return null
+  return antes.creditos - despues.creditos
+}
+
 /**
  * El motivo, de lo que dijo Flow al no empezar (su aviso, en el idioma de la cuenta). Sin aviso que se entienda, un video
  * es casi siempre que no quedan créditos; una imagen, que no gasta, que la frenó.
  */
 export function motivoDeAviso(aviso: string, tipo: 'imagen' | 'video'): Motivo {
-  if (/demasiad|too many|m[aá]s tarde|try again later|inusual|unusual|throttl/i.test(aviso)) return 'frenada'
+  if (AVISO_FRENADA.test(aviso)) return 'frenada'
   if (PALABRA_CREDITOS.test(aviso) || /cuota|quota|l[ií]mite|limit|agot|insuficient|insufficient|upgrade|mejora tu plan/i.test(aviso)) return 'creditos'
   return tipo === 'video' ? 'creditos' : 'frenada'
 }
@@ -112,7 +162,7 @@ export interface UsoCuenta {
   correo: string
   ocupada: boolean
   usada: number
-  descansa?: { hasta: number; motivo: Motivo }
+  descansa?: Descanso
 }
 
 /** Si la cuenta puede hacer ese tipo ahora: sin créditos, las imágenes sí, que no gastan. */

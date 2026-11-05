@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { creditosDe, elegirCuenta, IMAGEN_CHATGPT, imagenPosible, lineaImagenes, motivoDeAviso, saldoDe, tipoDeArchivo, type UsoCuenta } from './flow.ts'
+import { AVISO_FRENADA, creditosDe, DESCANSO, descansoNuevo, elegirCuenta, ENTRE_PEDIDOS, espacioEntrePedidos, gastoDeRechazo, IMAGEN_CHATGPT, imagenPosible, lineaImagenes, motivoDeAviso, saldoDe, tipoDeArchivo, type UsoCuenta } from './flow.ts'
 
 test('cada pedido va a la cuenta libre que lleva más sin generar', () => {
   const cuentas: UsoCuenta[] = [
@@ -31,6 +31,42 @@ test('el aviso de Flow dice si la cuenta se quedó sin créditos o la frenaron',
   assert.equal(motivoDeAviso('Demasiadas solicitudes. Inténtalo más tarde', 'video'), 'frenada')
   assert.equal(motivoDeAviso('', 'video'), 'creditos')
   assert.equal(motivoDeAviso('', 'imagen'), 'frenada')
+})
+
+test('el rechazo por «actividad inusual» en la tarjeta se ve como frenada, en cualquier idioma', () => {
+  assert.ok(AVISO_FRENADA.test('Failed: We noticed some unusual activity. Please visit the Help Centre for more information.'))
+  assert.ok(AVISO_FRENADA.test('Error: Notamos actividad inusual. Visita el Centro de ayuda'))
+  assert.ok(!AVISO_FRENADA.test('Failed: This prompt may violate our policies'))
+})
+
+test('una cuenta frenada otra vez descansa el doble cada vez, hasta 8 h, y lo olvida tras unas horas', () => {
+  const h = 60 * 60_000
+  const primera = descansoNuevo('frenada', 0, undefined)
+  assert.deepEqual(primera, { hasta: DESCANSO.frenada, motivo: 'frenada', veces: 1 })
+  const segunda = descansoNuevo('frenada', primera.hasta + 1000, primera)
+  assert.equal(segunda.veces, 2)
+  assert.equal(segunda.hasta - (primera.hasta + 1000), 2 * DESCANSO.frenada)
+  let d = segunda
+  for (let i = 0; i < 6; i++) d = descansoNuevo('frenada', d.hasta, d)
+  assert.equal(descansoNuevo('frenada', d.hasta, d).hasta - d.hasta, 8 * h)
+  // Mucho después de su último descanso, empieza de nuevo.
+  assert.equal(descansoNuevo('frenada', d.hasta + 7 * h, d).veces, 1)
+  // Sin créditos, hasta que se renueven.
+  assert.deepEqual(descansoNuevo('creditos', 0, undefined, 5 * h), { hasta: 5 * h, motivo: 'creditos' })
+})
+
+test('un video rechazado dice cuánto gastó comparando el saldo de antes y el de después', () => {
+  assert.equal(gastoDeRechazo({ creditos: 50 }, { creditos: 50 }), 0)
+  assert.equal(gastoDeRechazo({ creditos: 50 }, { creditos: 40 }), 10)
+  assert.equal(gastoDeRechazo(null, { creditos: 40 }), null)
+  // Subió: se renovó en medio, no se sabe.
+  assert.equal(gastoDeRechazo({ creditos: 2 }, { creditos: 50 }), null)
+})
+
+test('entre dos pedidos hay un espacio al azar, y cuatro veces más tras una frenada', () => {
+  assert.equal(espacioEntrePedidos(false, 0), ENTRE_PEDIDOS)
+  assert.equal(espacioEntrePedidos(false, 1), 2 * ENTRE_PEDIDOS)
+  assert.equal(espacioEntrePedidos(true, 0), 4 * ENTRE_PEDIDOS)
 })
 
 test('el costo se lee del panel de Flow en cualquier idioma', () => {

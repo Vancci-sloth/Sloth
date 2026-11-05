@@ -47,7 +47,8 @@ Lo que se dice en el clip va en el prompt, entre comillas y con quién lo dice: 
 la boca. Que quepa en 8 s: unas 20 palabras por clip.
 
 Tarda cerca de un minuto. Si no acabó en 40 s, la herramienta te da un id: sigue con lo que no lo necesita y espéralo con
-`estado_flow`. Lo que no depende de lo anterior pídelo seguido: con varias cuentas se generan hasta tres a la vez.
+`estado_flow`. Lo que no depende de lo anterior pídelo seguido: Sloth lo pone en fila y lo genera con calma (con
+varias cuentas, hasta dos a la vez, con unos segundos entre pedidos), para que Google no lo vea como actividad rara.
 
 ## Si falla
 
@@ -60,4 +61,8 @@ Tarda cerca de un minuto. Si no acabó en 40 s, la herramienta te da un id: sigu
   (referencias o fotogramas) sigue.
 - **Es su primera vez con una cuenta, o no dejó crear un proyecto:** que abra Flow con esa cuenta en Opciones → Google
   Flow y acepte su aviso.
-- **Otro error de Flow:** dile el error tal cual. No repitas un video que falló sin decírselo: puede gastar otra vez.
+- **Flow lo rechazó por «actividad inusual»:** si no gastó, Sloth ya lo pasó a otra cuenta, y solo te llega el error si
+  ninguna pudo. Si el error dice que cobró o que no se supo, no lo repitas: dile al usuario qué clips faltan y cuánto
+  se gastó. Con una sola cuenta, que espere a que se le quite (el error dice cuándo) o agregue otra.
+- **Otro error de Flow:** dile el error tal cual. Si dice «No gastó créditos», puedes pedirlo otra vez cambiando lo que
+  Flow no aceptó. Si no, no lo repitas sin decírselo al usuario: puede gastar otra vez.

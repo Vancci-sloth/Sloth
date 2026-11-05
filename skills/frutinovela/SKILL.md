@@ -81,7 +81,7 @@ Antes de inventar a uno, mira si ya está.
    o salió con texto, pídelo otra vez: no gasta. Listo cuando los personajes se ven iguales en todos.
 6. **Clips.** Mira con `estado_flow` sin `id` cuánto les queda a sus cuentas. Dile al usuario cuántos clips son, cuánto
    gastan y si alcanzan (paso «Lo que no se negocia»), y pídelos todos seguidos,
-   sin esperar uno para pedir el siguiente. Se reparten entre sus cuentas, tres a la vez. Usa `generar_video` con
+   sin esperar uno para pedir el siguiente. Sloth los reparte entre sus cuentas con calma, dos a la vez. Usa `generar_video` con
    `primerCuadro` `cuadros/esc-<NN>.jpg`, el formato del video, Veo 3.1 - Lite (salvo que el usuario pida otro) y
    `salida` `clips/esc-<NN>.mp4`. El prompt, en inglés, describe la acción. El diálogo va en español, entre comillas y
    con quién lo dice y cómo suena su voz (la de `ELENCO.md`). Al final, `static camera, no music, no subtitles, no text

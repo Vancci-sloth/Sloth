@@ -5,13 +5,13 @@ import { dirname, isAbsolute, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type { McpStdioServerConfig } from '@anthropic-ai/claude-agent-sdk'
 import type { Browser } from 'playwright-core'
-import { A_LA_VEZ, DESCANSO, elegirCuenta, FORMATOS_IMAGEN, FORMATOS_VIDEO, type Motivo, MODELOS_IMAGEN, MODELOS_VIDEO, motivoDeAviso, puede, type Saldo, tipoDeArchivo, TOPE_CREDITOS, VIDEO_MAS_BARATO } from '../../shared/flow.ts'
+import { A_LA_VEZ, AVISO_FRENADA, CALMA, type Descanso, descansoNuevo, elegirCuenta, espacioEntrePedidos, FORMATOS_IMAGEN, FORMATOS_VIDEO, type Motivo, MODELOS_IMAGEN, MODELOS_VIDEO, motivoDeAviso, PAUSA_CUENTA, puede, type Saldo, tipoDeArchivo, TOPE_CREDITOS, VIDEO_MAS_BARATO } from '../../shared/flow.ts'
 import type { EstadoFlow, GastoFlow, SaldoFlow, TrabajoFlow } from '../../shared/types.ts'
 import { VENTA } from '../../shared/venta.ts'
 import { guardar } from '../disco.ts'
 import { cuerpo, json } from '../http.ts'
 import { type CuentaFlow, cuentasFlow, nombreNavegador } from './cuentas.ts'
-import { generarEnFlow, leerSaldo, paginaFlow, ponerAportar, saldoEnFlow, SinEmpezar, URL_FLOW } from './pagina.ts'
+import { generarEnFlow, leerSaldo, paginaFlow, ponerAportar, Rechazado, saldoEnFlow, SinEmpezar, URL_FLOW } from './pagina.ts'
 
 /**
  * Las imágenes (Nano Banana) y los videos (Veo) de Google Flow, en las cuentas de Google del usuario, como los generaría
@@ -23,6 +23,11 @@ import { generarEnFlow, leerSaldo, paginaFlow, ponerAportar, saldoEnFlow, SinEmp
  * cuenta descansa (`descansos`) y el pedido pasa a otra que no lo haya probado. Si ninguna puede, falla diciendo cuándo
  * vuelven. La sesión de Google no la tiene ningún agente. Lo generado queda en un proyecto de Flow para Sloth
  * (`proyectos`, uno por cuenta), y lo que dura cada pedido está en `pagina.ts`.
+ *
+ * Si Flow lo empieza y lo rechaza en su tarjeta por «actividad inusual», la cuenta descansa igual. El pedido pasa a otra
+ * solo si se comprobó que no gastó (`Rechazado`); si gastó o no se supo, falla diciéndolo. Los pedidos van con ritmo
+ * (`espacioEntrePedidos`, `PAUSA_CUENTA`), y tras una frenada, de uno en uno durante `CALMA`: todas las cuentas salen de
+ * la misma conexión, y Google las ve juntas.
  *
  * Gasta los créditos del usuario, y por eso: cada pedido lee el costo antes de generar y no pasa de `tope`; si no cambió
  * nada desde el último archivo de esa ruta (`.huella`), no pide nada, y uno igual que ya está en fila no se repite.
@@ -56,7 +61,7 @@ interface Ajustes {
   aportar?: boolean
   derechos?: string
   proyectos?: Record<string, string>
-  descansos?: Record<string, { hasta: number; motivo: Motivo }>
+  descansos?: Record<string, Descanso>
   saldos?: Record<string, SaldoFlow>
   /** Por día (AAAA-MM-DD, del equipo) y por cuenta, los videos hechos y sus créditos. */
   uso?: Record<string, Record<string, GastoFlow>>
@@ -102,24 +107,30 @@ export function flow(app: string, google: Google) {
 
   const trabajos = new Map<string, Trabajo>()
   const fila: Trabajo[] = []
-  /** Las cuentas que están generando, y cuándo empezó cada una su último pedido. */
+  /** Las cuentas que están generando, cuándo empezó cada una su último pedido y cuándo acabó. */
   const ocupadas = new Set<string>()
   const usada = new Map<string, number>()
+  const acabo = new Map<string, number>()
   /** Las cuentas donde ya se puso `aportar` desde que arrancó el servidor, con su valor. */
   const aplicado = new Map<string, boolean>()
+  /** Cuándo puede empezar el siguiente pedido, y hasta cuándo se va con calma tras una frenada. */
+  let siguiente = 0
+  let calmaHasta = 0
+  let despertar: NodeJS.Timeout | undefined
 
+  // Una cuenta que acaba de generar cuenta como ocupada durante su pausa.
   const usos = (ahora: number) =>
     cuentas().map((c) => {
       const d = ajustes.descansos?.[c.correo]
-      return { correo: c.correo, ocupada: ocupadas.has(c.correo), usada: usada.get(c.correo) ?? 0, descansa: d && d.hasta > ahora ? d : undefined }
+      const ocupada = ocupadas.has(c.correo) || (acabo.get(c.correo) ?? 0) + PAUSA_CUENTA > ahora
+      return { correo: c.correo, ocupada, usada: usada.get(c.correo) ?? 0, descansa: d && d.hasta > ahora ? d : undefined }
     })
 
-  /** Sin créditos, descansa hasta que se renueven, si se sabe cuándo. */
+  /** Sin créditos, descansa hasta que se renueven, si se sabe cuándo. Una frenada calma a todas: Google las ve juntas. */
   function descansar(correo: string, motivo: Motivo) {
     const ahora = Date.now()
-    const renueva = ajustes.saldos?.[correo]?.renueva
-    const hasta = motivo === 'creditos' && renueva && renueva > ahora ? renueva : ahora + DESCANSO[motivo]
-    ajustes.descansos = { ...ajustes.descansos, [correo]: { hasta, motivo } }
+    ajustes.descansos = { ...ajustes.descansos, [correo]: descansoNuevo(motivo, ahora, ajustes.descansos?.[correo], ajustes.saldos?.[correo]?.renueva) }
+    if (motivo === 'frenada') calmaHasta = ahora + CALMA
     guardarAjustes()
   }
 
@@ -136,11 +147,12 @@ export function flow(app: string, google: Google) {
     guardarAjustes()
   }
 
-  function apuntarUso(correo: string, creditos: number) {
+  /** `videos`: 0 si Flow lo rechazó y aun así cobró. */
+  function apuntarUso(correo: string, creditos: number, videos = 1) {
     const hoy = dia(Date.now())
     const desde = dia(Date.now() - DIAS_DE_USO * 86_400_000)
     const uso = Object.fromEntries(Object.entries(ajustes.uso ?? {}).filter(([d]) => d >= desde))
-    uso[hoy] = { ...uso[hoy], [correo]: sumar(uso[hoy]?.[correo] ?? NADA, { videos: 1, creditos }) }
+    uso[hoy] = { ...uso[hoy], [correo]: sumar(uso[hoy]?.[correo] ?? NADA, { videos, creditos }) }
     ajustes.uso = uso
     guardarAjustes()
   }
@@ -203,21 +215,36 @@ export function flow(app: string, google: Google) {
         }
       })
     } catch (e) {
-      if (e instanceof SinEmpezar) {
-        // No gastó: la cuenta descansa y el pedido vuelve al frente de la fila, para otra.
-        descansar(c.correo, e.sesion ? 'sesion' : motivoDeAviso(e.aviso, t.tipo))
+      const frenada = e instanceof Rechazado && AVISO_FRENADA.test(e.aviso)
+      if (e instanceof Rechazado) {
+        if (e.saldo) apuntarSaldo(c.correo, e.saldo)
+        if (e.gasto) apuntarUso(c.correo, e.gasto, 0)
+        if (frenada) descansar(c.correo, 'frenada')
+      }
+      if (e instanceof SinEmpezar) descansar(c.correo, e.sesion ? 'sesion' : motivoDeAviso(e.aviso, t.tipo))
+      if (e instanceof SinEmpezar || (frenada && e.gasto === 0)) {
+        // No gastó: el pedido vuelve al frente de la fila, para otra cuenta.
         t.probadas.push(c.correo)
-        t.ultimo = `${c.correo}: ${e.message}`
+        t.ultimo = `${c.correo}: ${mensaje(e)}`
         t.estado = 'en-fila'
         t.cuenta = undefined
         fila.unshift(t)
       } else {
         t.estado = 'error'
-        t.error = mensaje(e)
+        t.error = e instanceof Rechazado ? `${mensaje(e)} ${cuantoGasto(e, frenada)}` : mensaje(e)
       }
     } finally {
+      acabo.set(c.correo, Date.now())
       rmSync(bajada, { recursive: true, force: true })
     }
+  }
+
+  /** Lo que se le dice al agente de un pedido rechazado: si gastó y si puede pedirlo otra vez. */
+  function cuantoGasto(e: Rechazado, frenada: boolean): string {
+    const descanso = frenada ? ' Flow frenó esa cuenta: descansa un rato y los pedidos siguientes van más despacio.' : ''
+    if (e.gasto === 0) return `No gastó créditos: se puede pedir otra vez cambiando lo que Flow no aceptó.${descanso}`
+    if (e.gasto) return `Flow cobró ${e.gasto} créditos aunque no lo hizo. No lo pidas otra vez sin decírselo al usuario.${descanso}`
+    return `No se pudo comprobar si gastó créditos. No lo pidas otra vez sin decírselo al usuario.${descanso}`
   }
 
   let leyendo = false
@@ -253,11 +280,22 @@ export function flow(app: string, google: Google) {
     }
   }
 
-  /** Reparte lo que hay en fila entre las cuentas libres, en orden. Lo que ninguna puede hacer, falla. */
+  /** Vuelve a repartir en `ms`, si hay algo en fila (una pausa o el espacio entre pedidos lo detuvo). */
+  function repartirEn(ms: number) {
+    clearTimeout(despertar)
+    if (fila.length) despertar = setTimeout(repartir, Math.max(1000, ms)).unref()
+  }
+
+  /**
+   * Reparte lo que hay en fila entre las cuentas libres, en orden y de uno en uno, con su espacio entre pedidos. Lo que
+   * ninguna puede hacer, falla.
+   */
   function repartir() {
+    const ahora = Date.now()
+    if (ahora < siguiente) return repartirEn(siguiente - ahora)
+    const calma = calmaHasta > ahora
     for (const t of [...fila]) {
-      if (ocupadas.size >= A_LA_VEZ) return
-      const ahora = Date.now()
+      if (ocupadas.size >= (calma ? 1 : A_LA_VEZ)) return
       const elegida = elegirCuenta(usos(ahora), t.tipo, ahora, t.probadas)
       if (elegida === 'esperar') continue
       fila.splice(fila.indexOf(t), 1)
@@ -269,11 +307,15 @@ export function flow(app: string, google: Google) {
       const c = cuentas().find((x) => x.correo === elegida)!
       ocupadas.add(c.correo)
       usada.set(c.correo, ahora)
+      siguiente = ahora + espacioEntrePedidos(calma, Math.random())
       void generar(t, c).finally(() => {
         ocupadas.delete(c.correo)
         repartir()
       })
+      return repartirEn(siguiente - ahora)
     }
+    // Lo que queda espera a que acabe la pausa de alguna cuenta.
+    repartirEn(5000)
   }
 
   function pedir(d: Pick<Trabajo, 'tipo' | 'prompt' | 'formato' | 'modelo' | 'salida' | 'tope' | 'referencias' | 'cuadros'>): Trabajo {
@@ -410,8 +452,8 @@ export function flow(app: string, google: Google) {
 
   return {
     api,
-    /** Por qué no se puede reiniciar el servidor: cortaría un pedido ya pagado, o la ventana donde entras con Google. */
-    ocupado: () => (ocupadas.size ? 'Sloth está generando en Google Flow. Espera a que termine.' : otras.agregando() ? 'Hay una ventana abierta para entrar con Google en Flow: termina o ciérrala.' : null)
+    /** Por qué no se puede reiniciar el servidor: cortaría un pedido ya pagado o en fila, o la ventana donde entras con Google. */
+    ocupado: () => (ocupadas.size || fila.length ? 'Sloth está generando en Google Flow. Espera a que termine.' : otras.agregando() ? 'Hay una ventana abierta para entrar con Google en Flow: termina o ciérrala.' : null)
   }
 }
 

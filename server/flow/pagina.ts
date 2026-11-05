@@ -2,7 +2,7 @@ import { randomBytes } from 'node:crypto'
 import { mkdirSync, readFileSync } from 'node:fs'
 import { extname, join } from 'node:path'
 import type { Browser, Locator, Page } from 'playwright-core'
-import { creditosDe, FORMATOS_IMAGEN, FORMATOS_VIDEO, PALABRA_CREDITOS, type Saldo, saldoDe } from '../../shared/flow.ts'
+import { creditosDe, FORMATOS_IMAGEN, FORMATOS_VIDEO, gastoDeRechazo, PALABRA_CREDITOS, type Saldo, saldoDe } from '../../shared/flow.ts'
 
 /**
  * Lo que se hace en la página de Google Flow. Se usan los iconos (el nombre de cada `mat-icon`), no los textos: Flow sale
@@ -24,6 +24,21 @@ export class SinEmpezar extends Error {
     mensaje: string,
     readonly aviso: string,
     readonly sesion = false
+  ) {
+    super(mensaje)
+  }
+}
+
+/**
+ * Flow empezó el pedido y lo rechazó en su tarjeta (por ejemplo, «Notamos actividad inusual»). `aviso` es lo que dice la
+ * tarjeta; `gasto`, lo que bajó el saldo de la cuenta (0 si nada), o `null` si no se supo; `saldo`, el de después.
+ */
+export class Rechazado extends Error {
+  constructor(
+    mensaje: string,
+    readonly aviso: string,
+    readonly gasto: number | null = null,
+    readonly saldo: Saldo | null = null
   ) {
     super(mensaje)
   }
@@ -237,7 +252,10 @@ async function esperar(page: Page, tarjeta: Locator, tipo: PedidoFlow['tipo'], a
     if (e.lista) return
     if (e.avanza) sinAvance = Date.now()
     // Sin % y sin resultado: Flow lo rechazó y deja la tarjeta con su motivo.
-    else if (Date.now() - sinAvance > 60_000) throw new Error(`Flow no lo generó: ${e.texto.replace(/\s+/g, ' ').slice(0, 200)}`)
+    else if (Date.now() - sinAvance > 60_000) {
+      const aviso = e.texto.replace(/\s+/g, ' ').trim().slice(0, 200)
+      throw new Rechazado(`Flow no lo generó: ${aviso}`, aviso)
+    }
     await page.waitForTimeout(2000)
   }
   throw new Error(`Flow no acabó en ${TERMINA / 60_000} minutos.`)
@@ -279,9 +297,13 @@ export async function prepararEnFlow(page: Page, proyecto: string | undefined, p
  * Genera lo pedido en el proyecto de Sloth y lo baja a `carpeta`. Si cuesta más que `tope`, no genera. Los pedidos van de
  * uno en uno: la tarjeta nueva es la primera del proyecto. `alEntrar` recibe el proyecto en cuanto se sabe, para no crear
  * otro si lo demás falla.
+ *
+ * Un video lee el saldo justo antes de pedirlo: si Flow lo rechaza, se lee otra vez y `Rechazado` dice si gastó. Así se
+ * sabe si se puede pedir de nuevo sin pagarlo dos veces.
  */
 export async function generarEnFlow(b: Browser, page: Page, proyecto: string | undefined, p: PedidoFlow, carpeta: string, alEntrar: (proyecto: string) => void) {
   const creditos = await prepararEnFlow(page, proyecto, p, alEntrar)
+  const saldoAntes = p.tipo === 'video' ? await leerSaldo(page).catch(() => null) : null
   // Después de preparar: cada imagen subida también es una tarjeta del proyecto.
   const tarjeta = page.locator('flow-tile-container').first()
   const antes = (await tarjeta.count()) ? await tarjeta.evaluate((d) => `${(d as HTMLElement).innerText} ${d.querySelector('img')?.src ?? ''}`) : ''
@@ -289,6 +311,17 @@ export async function generarEnFlow(b: Browser, page: Page, proyecto: string | u
   await page.keyboard.insertText(p.prompt.split(/\s+/).join(' '))
   await page.waitForTimeout(500)
   await icono(page, 'arrow_forward').last().click({ timeout: 10_000 })
-  await esperar(page, tarjeta, p.tipo, antes)
+  try {
+    await esperar(page, tarjeta, p.tipo, antes)
+  } catch (e) {
+    if (!(e instanceof Rechazado)) throw e
+    if (p.tipo === 'imagen') throw new Rechazado(e.message, e.aviso, 0)
+    // Si Flow devuelve los créditos, que alcance a verse: se espera un poco y se recarga.
+    await page.waitForTimeout(5000)
+    const despues = await ir(page, page.url())
+      .then(() => leerSaldo(page))
+      .catch(() => null)
+    throw new Rechazado(e.message, e.aviso, gastoDeRechazo(saldoAntes, despues), despues)
+  }
   return { creditos, archivo: await bajar(page, b, tarjeta, carpeta) }
 }
