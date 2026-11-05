@@ -5,7 +5,7 @@ import { join } from 'node:path'
 import type { Browser } from 'playwright-core'
 import { WebSocket } from 'ws'
 import { MAX_CUENTAS } from '../../shared/flow.ts'
-import { chromiumDelSistema, lanzarChromium, nombreDe, SIN_CHROMIUM } from '../chromium.ts'
+import { chromiumDelSistema, lanzarChromium, nombreDe, paginaNueva, SIN_CHROMIUM, SIN_VENTANA } from '../chromium.ts'
 import { guardar } from '../disco.ts'
 import { conectarCDP } from '../playwright.ts'
 import { URL_FLOW } from './pagina.ts'
@@ -100,7 +100,7 @@ function edgeDe(perfil: string) {
     const exe = navegador()
     if (!exe) throw new Error(SIN_CHROMIUM)
     mkdirSync(perfil, { recursive: true })
-    const extra = ventana ? [url] : ['--headless=new', '--mute-audio', 'about:blank']
+    const extra = ventana ? [url] : [...SIN_VENTANA, 'about:blank']
     // Un puerto libre ya elegido, nunca `0`: con `0`, Edge dice a las páginas que lo maneja un programa
     // (`navigator.webdriver`) y Google no deja entrar («Es posible que el navegador no sea seguro»).
     const nuevo = await puertoLibre()
@@ -140,7 +140,7 @@ function edgeDe(perfil: string) {
 
 /** El correo de la cuenta con que está Flow, de su botón de cuenta («Cuenta de Google: Nombre (correo)»). */
 async function correoEnFlow(b: Browser): Promise<string | null> {
-  const page = await b.contexts()[0].newPage()
+  const page = await paginaNueva(b)
   try {
     await page.goto(URL_FLOW, { waitUntil: 'domcontentloaded', timeout: 60_000 })
     await page.waitForLoadState('networkidle', { timeout: 20_000 }).catch(() => {})

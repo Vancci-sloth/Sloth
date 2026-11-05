@@ -1,4 +1,4 @@
-# Flow con calma: «actividad inusual» y lo que gasta un rechazo
+# Flow con calma y sin delatarse: «actividad inusual» y lo que gasta un rechazo
 
 Fecha: 2026-11-04
 
@@ -12,7 +12,16 @@ cuenta seguía recibiendo pedidos y el agente no sabía si se habían cobrado cr
 En el foro de Google hay quejas del mismo aviso, también de cuentas de pago, y Google no ha dicho la causa. Se habla de
 pedidos a la vez, de VPN y de lotes. Varios cuentan que Flow cobró créditos por clips que no hizo.
 
+Quien lo vio tenía una sola cuenta, gratis y sin VPN: Sloth ya le generaba de uno en uno, así que los pedidos a la vez no
+fueron la causa. Lo que sí se encontró, abriendo Edge como lo abre Sloth: sin ventana, cada pedido decía
+`HeadlessChrome`, y la pantalla medía 800×600 con la página a 800×1000. Las dos cosas delatan un navegador automático.
+
 ## Decisión
+
+- **El Edge sin ventana se presenta como uno con ventana** (`paginaNueva` y `SIN_VENTANA` en `server/chromium.ts`, para
+  Flow y para la voz). Se cambia el texto del navegador sin `Headless`, se le ponen sus mismas marcas (`userAgentData`)
+  y se abre con una pantalla de 1920×1080. Se comprobó el 4 de noviembre de 2026 con Edge 156: la página, sus workers y
+  las cabeceras dicen lo mismo que un Edge con ventana. La vista de Flow sigue en 800×1000.
 
 - **Un rechazo en la tarjeta es `Rechazado`.** Antes de pedir un video se lee el saldo de la cuenta. Si Flow lo rechaza,
   se espera un poco, se recarga y se vuelve a leer: así se sabe si cobró (`gastoDeRechazo`).
@@ -31,3 +40,5 @@ pedidos a la vez, de VPN y de lotes. Varios cuentan que Flow cobró créditos po
 - Si Flow devuelve los créditos más tarde de lo que se espera, el rechazo dirá que cobró: es lo que menos riesgo tiene,
   porque así no se repite solo.
 - Sigue sin comprobarse qué texto exacto pone Flow en español, y si devuelve los créditos de un rechazo.
+- No se sabe qué más mira Google. Si vuelve el aviso con todo esto, lo siguiente es generar en una ventana normal y
+  minimizada, que no tiene nada que ocultar.

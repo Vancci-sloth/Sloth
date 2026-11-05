@@ -2,6 +2,7 @@ import { randomBytes } from 'node:crypto'
 import { mkdirSync, readFileSync } from 'node:fs'
 import { extname, join } from 'node:path'
 import type { Browser, Locator, Page } from 'playwright-core'
+import { paginaNueva } from '../chromium.ts'
 import { creditosDe, FORMATOS_IMAGEN, FORMATOS_VIDEO, gastoDeRechazo, PALABRA_CREDITOS, type Saldo, saldoDe } from '../../shared/flow.ts'
 
 /**
@@ -66,11 +67,7 @@ export interface PedidoFlow {
   cuadros?: string[]
 }
 
-export const paginaFlow = async (b: Browser): Promise<Page> => {
-  const page = await b.contexts()[0].newPage()
-  await page.setViewportSize({ width: ANCHO, height: ALTO })
-  return page
-}
+export const paginaFlow = (b: Browser): Promise<Page> => paginaNueva(b, { ancho: ANCHO, alto: ALTO })
 
 async function ir(page: Page, url: string) {
   await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60_000 })
