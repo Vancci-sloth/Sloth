@@ -15,7 +15,7 @@ import {
   lineaImagenes,
   MODELOS_VIDEO,
   motivoDeAviso,
-  OMNI,
+  esOmni,
   OPCIONES_CLIPS,
   RESOLUCIONES_OMNI,
   saldoDe,
@@ -121,11 +121,12 @@ test('la línea Imágenes dice con qué generar y sin elección no sale', () => 
 
 test('la línea Clips lleva el modelo, la resolución de Omni y su costo de tope; lo que no existe no sale', () => {
   assert.match(lineaClips('Omni 1.1 Flash · 720p'), /^Clips: genéralos en Google Flow con Omni 1\.1 Flash en 720p, 12 créditos .*modelo "Omni 1\.1 Flash", resolucion "720p" y tope 12/)
+  assert.match(lineaClips('Omni 1.2 Flash · 360p'), /con Omni 1\.2 Flash en 360p, 8 créditos .*modelo "Omni 1\.2 Flash", resolucion "360p" y tope 8/)
   assert.match(lineaClips('Veo 3.1 - Quality'), /con Veo 3\.1 - Quality, 100 créditos .*modelo "Veo 3\.1 - Quality" y tope 100/)
   assert.equal(lineaClips('Veo 9'), '')
   // Todo modelo que acepta el servidor sale en el menú, y la resolución solo en Omni.
   assert.deepEqual([...new Set(Object.values(OPCIONES_CLIPS).map((o) => o.modelo))].sort(), [...MODELOS_VIDEO].sort())
-  for (const o of Object.values(OPCIONES_CLIPS)) assert.ok(o.resolucion === undefined || (o.modelo === OMNI && RESOLUCIONES_OMNI.includes(o.resolucion)))
+  for (const o of Object.values(OPCIONES_CLIPS)) assert.ok(o.resolucion === undefined || (esOmni(o.modelo) && RESOLUCIONES_OMNI.includes(o.resolucion)))
 })
 
 test('lo que baja se reconoce por sus bytes, no por el nombre', () => {

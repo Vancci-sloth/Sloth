@@ -14,9 +14,9 @@ import { creditosDe, FORMATOS_IMAGEN, FORMATOS_VIDEO, gastoDeRechazo, PALABRA_CR
  * un chat con un agente, que decide por su cuenta y no da el costo: por eso `ANCHO`.
  *
  * Un video se hace en uno de dos modos del panel: «Ingredientes» (texto y, si hay, referencias: los personajes) o
- * «Fotogramas» (empieza en una imagen y, si se pide, acaba en otra). Los dos aceptan los cuatro modelos y cuestan igual
- * (comprobado el 5 de noviembre de 2026: Lite 10, Fast 20, Quality 100, Omni Flash 12 en 720p y 6 en 360p; Veo sale
- * siempre en 720p y Omni, si no se elige, en 360p). Los huecos de los fotogramas se
+ * «Fotogramas» (empieza en una imagen y, si se pide, acaba en otra). Los dos aceptan todos los modelos y cuestan igual
+ * (comprobado el 6 de noviembre de 2026: Lite 10, Fast 20, Quality 100, Omni 1.2 Flash 24 en 720p y 8 en 360p, Omni 1.1
+ * Flash 12 y 6; Veo sale siempre en 720p y Omni, si no se elige, en 360p). Los huecos de los fotogramas se
  * vacían al recargar el proyecto, y cada pedido lo recarga.
  */
 
@@ -154,6 +154,29 @@ async function entrar(page: Page, proyecto: string | undefined): Promise<string>
   return page.url().split('?')[0]
 }
 
+/**
+ * Mueve la barra de la duración con las flechas hasta que diga `segundos`. Se lee lo que enseña («8 s»), no su valor: la
+ * barra va de 0 a 7 y no dice qué duración es cada paso.
+ */
+async function ponerSegundos(page: Page, segundos: number) {
+  const barra = page.getByRole('slider').first()
+  const dice = () =>
+    barra.evaluate((d) => {
+      let e = d as HTMLElement
+      while (e.parentElement && !/\d+\s*s\b/.test(e.innerText)) e = e.parentElement
+      return Number(e.innerText.match(/(\d+)\s*s\b/)?.[1] ?? NaN)
+    })
+  await barra.focus({ timeout: 5000 })
+  for (let i = 0; i < 12; i++) {
+    const ahora = await dice()
+    if (ahora === segundos) return
+    if (Number.isNaN(ahora)) break
+    await page.keyboard.press(ahora < segundos ? 'ArrowRight' : 'ArrowLeft')
+    await page.waitForTimeout(150)
+  }
+  throw new Error(`No pude poner el video en ${segundos} s en Flow. No se generó nada.`)
+}
+
 /** Elige en el panel del compositor lo pedido y devuelve lo que cuesta. Cierra el panel. */
 async function elegir(page: Page, p: PedidoFlow): Promise<number> {
   await page.locator('.base-prompt-box button:has(mat-icon:text-matches("^crop_"))').first().click({ timeout: 15_000 })
@@ -165,10 +188,13 @@ async function elegir(page: Page, p: PedidoFlow): Promise<number> {
   await page.getByRole('radio', { name: 'x1', exact: true }).click({ timeout: 10_000 })
   await page.locator('button:has(mat-icon:text-is("arrow_drop_down"))').first().click({ timeout: 10_000 })
   await page.getByRole('menuitem').filter({ hasText: p.modelo }).first().click({ timeout: 10_000 })
-  // Omni enseña además la resolución (sin elegirla, 360p) y la duración (4 a 10 s): se eligen siempre, y 8 s como Veo.
+  // Omni enseña además la resolución (sin elegirla, 360p) y la duración: se eligen siempre, y 8 s como Veo. En 1.1 la
+  // duración son botones (4 a 10 s); en 1.2, una barra (3 a 10 s).
   if (p.resolucion) {
     await page.getByRole('radio', { name: p.resolucion, exact: true }).click({ timeout: 10_000 })
-    await page.getByRole('radio', { name: /^8\s*s$/ }).click({ timeout: 5000 })
+    const boton = page.getByRole('radio', { name: /^8\s*s$/ })
+    if (await boton.count()) await boton.click({ timeout: 5000 })
+    else await ponerSegundos(page, 8)
   }
   // El costo se rehace tras elegir: se lee cuando dos lecturas seguidas coinciden.
   const panel = () =>

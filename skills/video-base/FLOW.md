@@ -33,8 +33,9 @@ En los estilos que hacen clips, la línea `Clips: genéralos en Google Flow con 
 Los clips, cuando el usuario los pida o tu skill lo diga.
 
 - `generar_imagen`: Nano Banana. `salida` es un `.jpg` en ruta absoluta.
-- `generar_video`: 8 s con audio, 720p. **Gasta los créditos del usuario:** Lite 10, Fast 20, Quality 100, Omni Flash 12
-  (o 6 con `resolucion` `360p`, que se ve borroso: solo si el usuario la pide). Una cuenta gratis tiene 50 al día. `salida` es un `.mp4` en ruta absoluta. Parte de una de estas:
+- `generar_video`: 8 s con audio, 720p. **Gasta los créditos del usuario:** Lite 10, Fast 20, Quality 100, Omni 1.2
+  Flash 24 y Omni 1.1 Flash 12 (8 y 6 con `resolucion` `360p`, que se ve borroso: solo si el usuario la pide). Fast,
+  Quality y Omni 1.1 se van de Flow el 5 de diciembre de 2026. Una cuenta gratis tiene 50 al día. `salida` es un `.mp4` en ruta absoluta. Parte de una de estas:
   - **Solo texto.**
   - **`primerCuadro`** (y, si quieres, `ultimoCuadro`): el video empieza en esa imagen. Es lo más fiable para que los
     personajes y el lugar salgan iguales de un clip a otro: arma el cuadro con `generar_imagen` y las hojas de los

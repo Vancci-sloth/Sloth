@@ -33,14 +33,14 @@ const HERRAMIENTAS = [
   {
     name: 'generar_video',
     description:
-      'Genera UN video de 8 s con audio (y las voces que diga el prompt) en Google Flow, con las cuentas de Google del usuario, y deja el MP4 en `salida` (720p; Omni, en la `resolucion` que pidas). GASTA los créditos del usuario: Lite 10, Fast 20, Quality 100, Omni Flash 12 en 720p o 6 en 360p. Lee el costo antes de generar y, si pasa de `tope`, no genera. Con `primerCuadro`, el video empieza en esa imagen (y acaba en `ultimoCuadro`, si lo pasas): así salen iguales los personajes y el lugar. Con `referencias`, sigue a esos personajes sin partir de una imagen. Las dos cosas a la vez, no. Tarda cerca de un minuto; si no acaba en 40 s, devuelve un id para esperarlo con estado_flow. Si una cuenta se quedó sin créditos, pasa sola a otra. Si nada cambió desde el último archivo de esa ruta, sale al momento y sin gastar.',
+      'Genera UN video de 8 s con audio (y las voces que diga el prompt) en Google Flow, con las cuentas de Google del usuario, y deja el MP4 en `salida` (720p; Omni, en la `resolucion` que pidas). GASTA los créditos del usuario: Lite 10, Fast 20, Quality 100, Omni 1.2 Flash 24 en 720p u 8 en 360p, Omni 1.1 Flash 12 en 720p o 6 en 360p (Fast, Quality y Omni 1.1 se van de Flow el 5 de diciembre). Lee el costo antes de generar y, si pasa de `tope`, no genera. Con `primerCuadro`, el video empieza en esa imagen (y acaba en `ultimoCuadro`, si lo pasas): así salen iguales los personajes y el lugar. Con `referencias`, sigue a esos personajes sin partir de una imagen. Las dos cosas a la vez, no. Tarda cerca de un minuto; si no acaba en 40 s, devuelve un id para esperarlo con estado_flow. Si una cuenta se quedó sin créditos, pasa sola a otra. Si nada cambió desde el último archivo de esa ruta, sale al momento y sin gastar.',
     inputSchema: {
       type: 'object',
       properties: {
         prompt: PROMPT,
         formato: { type: 'string', enum: ['9:16', '16:9'], description: 'La proporción; sin ella, 9:16. La del primer cuadro tiene que ser la misma' },
-        modelo: { type: 'string', enum: ['Veo 3.1 - Lite', 'Veo 3.1 - Fast', 'Veo 3.1 - Quality', 'Omni 1.1 Flash'], description: 'Sin él, Veo 3.1 - Lite' },
-        resolucion: { type: 'string', enum: ['720p', '360p'], description: 'Solo con Omni; sin ella, 720p. 360p cuesta la mitad y se ve borroso' },
+        modelo: { type: 'string', enum: ['Veo 3.1 - Lite', 'Veo 3.1 - Fast', 'Veo 3.1 - Quality', 'Omni 1.2 Flash', 'Omni 1.1 Flash'], description: 'Sin él, Veo 3.1 - Lite' },
+        resolucion: { type: 'string', enum: ['720p', '360p'], description: 'Solo con Omni; sin ella, 720p. 360p cuesta mucho menos y se ve borroso' },
         primerCuadro: { type: 'string', description: 'La ruta absoluta de la imagen (.png, .jpg o .webp) donde empieza el video' },
         ultimoCuadro: { type: 'string', description: 'La ruta absoluta de la imagen donde acaba; solo con primerCuadro' },
         referencias: { type: 'array', items: { type: 'string' }, description: 'Las rutas absolutas de hasta 3 imágenes de los personajes u objetos que salen; sin primerCuadro' },

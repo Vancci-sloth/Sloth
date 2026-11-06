@@ -5,7 +5,7 @@ import { dirname, isAbsolute, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type { McpStdioServerConfig } from '@anthropic-ai/claude-agent-sdk'
 import type { Browser } from 'playwright-core'
-import { A_LA_VEZ, AVISO_FRENADA, CALMA, type Descanso, descansoNuevo, elegirCuenta, espacioEntrePedidos, FORMATOS_IMAGEN, FORMATOS_VIDEO, type Motivo, MODELOS_IMAGEN, MODELOS_VIDEO, motivoDeAviso, OMNI, PAUSA_CUENTA, puede, RESOLUCIONES_OMNI, type Saldo, tipoDeArchivo, TOPE_CREDITOS, VIDEO_MAS_BARATO } from '../../shared/flow.ts'
+import { A_LA_VEZ, AVISO_FRENADA, CALMA, type Descanso, descansoNuevo, elegirCuenta, espacioEntrePedidos, FORMATOS_IMAGEN, FORMATOS_VIDEO, type Motivo, MODELOS_IMAGEN, MODELOS_VIDEO, motivoDeAviso, esOmni, PAUSA_CUENTA, puede, RESOLUCIONES_OMNI, type Saldo, tipoDeArchivo, TOPE_CREDITOS, VIDEO_MAS_BARATO } from '../../shared/flow.ts'
 import type { EstadoFlow, GastoFlow, SaldoFlow, TrabajoFlow } from '../../shared/types.ts'
 import { VENTA } from '../../shared/venta.ts'
 import { guardar } from '../disco.ts'
@@ -426,7 +426,7 @@ export function flow(app: string, google: Google) {
       const formato = d.formato?.trim() || '9:16'
       if (!modelos.includes(modelo)) return json(res, 400, { error: `Flow no tiene ese modelo. Hay: ${modelos.join(', ')}.` })
       if (!formatos[formato]) return json(res, 400, { error: `Esa proporción no está. Hay: ${Object.keys(formatos).join(', ')}.` })
-      const resolucion = modelo === OMNI ? d.resolucion?.trim() || RESOLUCIONES_OMNI[0] : undefined
+      const resolucion = esOmni(modelo) ? d.resolucion?.trim() || RESOLUCIONES_OMNI[0] : undefined
       if (resolucion && !RESOLUCIONES_OMNI.includes(resolucion)) return json(res, 400, { error: `Omni sale en ${RESOLUCIONES_OMNI.join(' o ')}.` })
       if (!resolucion && d.resolucion && d.resolucion !== '720p') return json(res, 400, { error: 'Solo Omni deja elegir la resolución: Veo sale en 720p.' })
       if (!d.prompt?.trim() || !d.salida || !isAbsolute(d.salida) || !(video ? /\.mp4$/i : /\.jpe?g$/i).test(d.salida))

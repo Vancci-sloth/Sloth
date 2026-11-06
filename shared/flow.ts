@@ -5,7 +5,8 @@
  */
 
 export const MODELOS_IMAGEN = ['Nano Banana 2.1', 'Nano Banana Pro', 'Nano Banana 2 Lite']
-export const MODELOS_VIDEO = ['Veo 3.1 - Lite', 'Veo 3.1 - Fast', 'Veo 3.1 - Quality', 'Omni 1.1 Flash']
+/** Flow avisa que Fast, Quality y Omni 1.1 dejan de estar el 5 de diciembre de 2026 (visto el 6 de noviembre). */
+export const MODELOS_VIDEO = ['Veo 3.1 - Lite', 'Veo 3.1 - Fast', 'Veo 3.1 - Quality', 'Omni 1.2 Flash', 'Omni 1.1 Flash']
 
 /** Las proporciones de cada tipo, con el icono de su botón en Flow (el texto cambia con el idioma; el icono, no). */
 export const FORMATOS_VIDEO: Record<string, string> = { '9:16': 'crop_9_16', '16:9': 'crop_16_9' }
@@ -30,21 +31,24 @@ export function lineaImagenes(imagen: string): string {
   return `Imágenes: genéralas en Google Flow con ${imagen}, no con ChatGPT (cómo, en video-base/FLOW.md).`
 }
 
-/** El único modelo de video en que Flow deja elegir la resolución: Veo sale siempre en 720p. */
-export const OMNI = 'Omni 1.1 Flash'
+/** Los modelos de video en que Flow deja elegir la resolución (y la duración): Veo sale siempre en 720p y 8 s. */
+export const MODELOS_OMNI = ['Omni 1.2 Flash', 'Omni 1.1 Flash']
+export const esOmni = (modelo: string) => MODELOS_OMNI.includes(modelo)
 /** Las de Omni, la primera por defecto. Flow pone 360p si no se elige, y se ve borroso al lado de Veo. */
 export const RESOLUCIONES_OMNI = ['720p', '360p']
 
 /**
  * Lo que se elige en el menú «Clips» (los estilos con `clips`) y lo que cuesta un clip de 8 s, del panel de Flow
- * (comprobado el 5 de noviembre de 2026, en una cuenta gratis).
+ * (comprobado el 6 de noviembre de 2026, en una cuenta gratis).
  */
 export const OPCIONES_CLIPS: Record<string, { modelo: string; resolucion?: string; creditos: number }> = {
   'Veo 3.1 - Lite': { modelo: 'Veo 3.1 - Lite', creditos: 10 },
   'Veo 3.1 - Fast': { modelo: 'Veo 3.1 - Fast', creditos: 20 },
   'Veo 3.1 - Quality': { modelo: 'Veo 3.1 - Quality', creditos: 100 },
-  'Omni 1.1 Flash · 720p': { modelo: OMNI, resolucion: '720p', creditos: 12 },
-  'Omni 1.1 Flash · 360p': { modelo: OMNI, resolucion: '360p', creditos: 6 }
+  'Omni 1.2 Flash · 720p': { modelo: 'Omni 1.2 Flash', resolucion: '720p', creditos: 24 },
+  'Omni 1.2 Flash · 360p': { modelo: 'Omni 1.2 Flash', resolucion: '360p', creditos: 8 },
+  'Omni 1.1 Flash · 720p': { modelo: 'Omni 1.1 Flash', resolucion: '720p', creditos: 12 },
+  'Omni 1.1 Flash · 360p': { modelo: 'Omni 1.1 Flash', resolucion: '360p', creditos: 6 }
 }
 
 /**
@@ -110,7 +114,7 @@ export function saldoDe(texto: string, ahora: number): Saldo | null {
   return falta < HOLGURA || falta > 24 * 60 * 60_000 - HOLGURA ? { creditos } : { creditos, renueva: d.getTime() }
 }
 
-/** Lo menos que cuesta un video (Omni Flash en 360p): con menos, la cuenta no hace ninguno hasta que se renueve. */
+/** Lo menos que cuesta un video (Omni 1.1 Flash en 360p): con menos, la cuenta no hace ninguno hasta que se renueve. */
 export const VIDEO_MAS_BARATO = 6
 
 /**
