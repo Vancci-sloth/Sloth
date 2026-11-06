@@ -25,6 +25,7 @@ import { anclada, anclar } from './barra.ts'
 import { opcionesClicDerecho } from './clic-derecho.ts'
 import { archivos, huella, huellas, nombreCopia, quitarViejos, respaldar } from '../server/originales.ts'
 import { MODELOS_VIEJOS } from './modelos-viejos.ts'
+import { destinoDe, donde, junto, libre, mudar, pesadas, porCopiar, porQueNo, recuperar } from './mudanza.ts'
 import { iniciarNavegador, ventanaDelNavegador } from './navegador.ts'
 import type { ActualizacionSloth } from '../shared/types.ts'
 
@@ -80,6 +81,8 @@ let registro: WriteStream | undefined
 /** El servidor ya dijo «Sloth en …»: la ventana puede cargar la interfaz. */
 let listo = !!SOLO_VENTANA
 let cerrando = false
+/** Llevando lo pesado a otro disco (`llevar`): el servidor está parado y Sloth no se deja cerrar. */
+let mudando = false
 let actualizacion: ActualizacionSloth = { actual: app.getVersion(), ...(A_MANO && { aMano: true }) }
 /** La descarga en curso: cancelarla la da por muerta. */
 let bajada: CancellationToken | undefined
@@ -103,7 +106,8 @@ else {
   app.on('activate', () => abrir())
   // Cerrar la ventana cierra Sloth entera, también en Mac: el servidor y lo que lanzó se detienen (`before-quit`).
   app.on('window-all-closed', () => app.quit())
-  app.on('before-quit', () => {
+  app.on('before-quit', (e) => {
+    if (mudando) return e.preventDefault()
     cerrando = true
     detener()
   })
@@ -123,6 +127,8 @@ else {
   })
   ipcMain.handle('anclada', () => anclada())
   ipcMain.handle('anclar', () => anclar())
+  ipcMain.handle('disco:donde', () => (SOLO_VENTANA ? null : donde(APP)))
+  ipcMain.handle('disco:llevar', () => llevar())
   void app.whenReady().then(iniciar)
 }
 
@@ -135,6 +141,13 @@ async function iniciar() {
   mkdirSync(join(APP, 'data'), { recursive: true })
   registro = createWriteStream(REGISTRO)
   process.on('uncaughtException', (e) => anotar(e.stack ?? e.message))
+  try {
+    recuperar(pesadas(APP))
+    // Instalada en otro disco que el de tu usuario: la IA local y lo demás pesado nacen allí, junto a la app.
+    if (WINDOWS) junto(APP, pesadas(APP))
+  } catch (e) {
+    anotar(`No se pudo poner lo pesado junto a Sloth: ${e instanceof Error ? e.message : e}`)
+  }
   try {
     if (!WINDOWS) await prepararApp()
     await prepararSkills()
@@ -179,6 +192,10 @@ function abrir() {
     else if (caidas.length === 4) dialog.showErrorBox('Sloth', 'La ventana se cerró varias veces seguidas. Recárgala con Ctrl+R: los agentes y tus archivos siguen trabajando.')
   })
   v.on('close', (e) => {
+    if (mudando) {
+      e.preventDefault()
+      return void dialog.showMessageBox(v, { type: 'info', title: 'Sloth', message: 'Espera a que Sloth acabe de mover tus cosas.', detail: 'Si se cierra a medias, tus videos quedarían partidos entre los dos discos.', noLink: true })
+    }
     // Solo si el servidor es de esta ventana: si no (el repo, o Sloth ya abierta de otra forma), cerrarla no detiene nada.
     if (servidor && !cerrando && !existsSync(SIN_AVISO)) {
       e.preventDefault()
@@ -410,7 +427,8 @@ function arrancar() {
     dialog.showErrorBox('Sloth', `No se pudo abrir Sloth: ${e.message}`)
     salir()
   })
-  s.on('exit', termino)
+  // Solo el que sigue siendo el de Sloth: el que se paró para mudarse ya no cuenta.
+  s.on('exit', (codigo) => s === servidor && termino(codigo))
 }
 
 function escribir(d: Buffer) {
@@ -508,6 +526,87 @@ function guardarInstalador(cache: string) {
   } catch (e) {
     anotar(`No se pudo guardar el instalador de esta versión: ${e instanceof Error ? e.message : e}`)
   }
+}
+
+const gb = (b: number) => `${(b / 1e9).toFixed(1).replace('.', ',')} GB`
+
+/**
+ * Opciones → Espacio en disco, «Cambiar de disco…»: eliges dónde, Sloth para el servidor, lleva lo pesado allí
+ * (electron/mudanza.ts) enseñando cuánto va, y vuelve a arrancar. Solo si nada trabaja. Devuelve por qué no, o nada.
+ */
+async function llevar(): Promise<{ error?: string }> {
+  const v = ventana
+  if (SOLO_VENTANA || !v || mudando) return { error: 'Solo se puede en la app instalada.' }
+  const ocupado = await net
+    .fetch(`${URL_SLOTH}/api/ocupado`)
+    .then((r) => r.json() as Promise<{ ocupado: string | null }>)
+    .then((r) => r.ocupado, () => null)
+  if (ocupado) return { error: ocupado }
+  const { canceled, filePaths } = await dialog.showOpenDialog(v, {
+    title: '¿En qué disco o carpeta pongo tus videos y la IA local?',
+    buttonLabel: 'Elegir',
+    properties: ['openDirectory', 'createDirectory']
+  })
+  if (canceled || !filePaths[0]) return {}
+  const lista = pesadas(APP)
+  const prohibidas = [RAIZ, APP, process.resourcesPath]
+  // Si la carpeta «Sloth» de ahí es la instalación (instalada en D:\Sloth y eliges D:\), va al lado.
+  const opciones = [destinoDe(filePaths[0]), join(filePaths[0], 'Sloth datos')]
+  const destino = opciones.find((d) => !porQueNo(d, lista, prohibidas))
+  if (!destino) return { error: porQueNo(opciones[0], lista, prohibidas) ?? undefined }
+  const total = await porCopiar(destino, lista)
+  if (total + 1e9 > libre(destino)) return { error: `En ese disco no cabe: hacen falta ${gb(total + 1e9)} y quedan ${gb(libre(destino))} libres.` }
+  const { response } = await dialog.showMessageBox(v, {
+    type: 'question',
+    title: 'Sloth',
+    message: total ? `¿Llevar ${gb(total)} a ${destino}?` : `¿Poner tus videos y la IA local en ${destino}?`,
+    detail:
+      'Van tus videos, la IA local (el Python de Sloth y sus modelos), los agentes y las dependencias de los videos; tus hilos se quedan. ' +
+      'Sloth se detiene mientras tanto y vuelve sola al acabar. No apagues la computadora ni desconectes el disco.',
+    buttons: ['Llevar', 'Cancelar'],
+    defaultId: 0,
+    cancelId: 1,
+    noLink: true
+  })
+  if (response !== 0) return {}
+  mudando = true
+  listo = false
+  detener()
+  let hechos = 0
+  let visto = 0
+  const decir = (texto: string) => void v.webContents.executeJavaScript(`document.getElementById('t').textContent = ${JSON.stringify(texto)}`).catch(() => {})
+  await v.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(paginaMudanza(destino))}`).catch(() => {})
+  let error: string | undefined
+  try {
+    await mudar(destino, lista, (bytes) => {
+      hechos += bytes
+      if (!total || Date.now() - visto < 500) return
+      visto = Date.now()
+      v.setProgressBar(Math.min(1, hechos / total))
+      decir(`${gb(hechos)} de ${gb(total)}`)
+    })
+    anotar(`Lo pesado pasó a ${destino}`)
+  } catch (e) {
+    error = e instanceof Error ? e.message : String(e)
+    anotar(`No se pudo llevar a ${destino}: ${error}`)
+  } finally {
+    mudando = false
+    v.setProgressBar(-1)
+  }
+  decir('Volviendo a abrir Sloth…')
+  arrancar()
+  if (error) void dialog.showMessageBox(v, { type: 'warning', title: 'Sloth', message: 'No se pudo mover todo.', detail: `${error}\n\nLo que ya se movió funciona igual y lo demás sigue donde estaba: puedes volver a intentarlo.`, noLink: true })
+  return {}
+}
+
+/** Lo que se ve mientras se mueve: el servidor está parado y la interfaz no carga. */
+function paginaMudanza(destino: string) {
+  const esc = (t: string) => t.replace(/[&<>"]/g, (c) => `&#${c.charCodeAt(0)};`)
+  return `<!doctype html><meta charset="utf-8"><title>Sloth</title><style>
+body{margin:0;height:100vh;display:grid;place-content:center;gap:8px;text-align:center;background:${FONDO};color:#ede6d6;font:15px system-ui,sans-serif}
+p{margin:0}.m{color:#9a907f;font-size:13px}</style>
+<p>Llevando tus videos y la IA local a ${esc(destino)}</p><p class="m" id="t">Empezando…</p>
+<p class="m">No cierres Sloth ni apagues la computadora.</p>`
 }
 
 function anotar(texto: unknown) {

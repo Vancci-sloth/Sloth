@@ -300,7 +300,9 @@ const hechos = await empaquetar({
     ],
     win: { icon: ICONO },
     nsis: {
-      oneClick: true,
+      // Con sus pasos, para elegir en qué disco va (scripts/instalador.nsh). Las actualizaciones siguen sin preguntar nada.
+      oneClick: false,
+      allowToChangeInstallationDirectory: true,
       perMachine: false,
       runAfterFinish: true,
       createDesktopShortcut: true,

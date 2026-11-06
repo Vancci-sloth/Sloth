@@ -7,7 +7,7 @@ import { dirname, isAbsolute, join, relative, resolve } from 'node:path'
 import type { Card, Espacio, GrupoEspacio, IdEspacio } from '../shared/types.ts'
 import { carpetasDe, folderOf, terminados } from './etapas.ts'
 import type { Sessions } from './sessions.ts'
-import { TRABAJO_DEV } from './trabajo.ts'
+import { carpetaTrabajo, TRABAJO_DEV } from './trabajo.ts'
 
 /**
  * Opciones → Espacio en disco: lo que Sloth y sus estilos de video dejan y ya no hace falta, y borrarlo. Lo seguro (los
@@ -148,7 +148,8 @@ export function espacio(o: OpcionesEspacio) {
       const suyos = lista.filter((c) => c.grupo === id)
       return { id, ...GRUPOS[id], bytes: suyos.reduce((n, c) => n + c.bytes, 0), cuantos: suyos.length }
     })
-    const { libre, total } = disco(o.app)
+    // El disco de tus videos, que puede ser otro (Cambiar de disco, electron/mudanza.ts).
+    const { libre, total } = disco(existsSync(carpetaTrabajo(o.app)) ? realpathSync(carpetaTrabajo(o.app)) : o.app)
     return { libre, total, grupos, ...(liberado !== undefined ? { liberado } : {}) }
   }
 

@@ -1268,6 +1268,13 @@ export interface PuenteSloth {
   anclar(): Promise<'anclada' | 'no' | 'windows'>
   /** El navegador integrado de cada hilo. No está en una ventana de antes de que existiera. */
   navegador?: PuenteNavegador
+  /** Dónde está lo pesado y llevarlo a otro disco (electron/mudanza.ts). No está en una ventana de antes. */
+  disco?: {
+    /** La carpeta de tus videos; `null` fuera de la app instalada. */
+    donde(): Promise<string | null>
+    /** Pregunta dónde, lo lleva y vuelve a abrir Sloth. Devuelve por qué no se pudo, si fue antes de empezar. */
+    llevar(): Promise<{ error?: string }>
+  }
 }
 
 /**
@@ -1496,7 +1503,7 @@ export interface GrupoEspacio {
 }
 
 export interface Espacio {
-  /** Bytes libres y totales del disco donde vive Sloth. */
+  /** Bytes libres y totales del disco de tus videos. */
   libre: number
   total: number
   grupos: GrupoEspacio[]

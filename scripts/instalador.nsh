@@ -1,6 +1,58 @@
 ; Lo propio del instalador de Sloth, que arma electron-builder (scripts/compilar.mjs) con NSIS. Instala para tu usuario,
-; sin permisos de administrador, en %LOCALAPPDATA%\Programs\Sloth, donde estaba la 0.2: tus videos (app\trabajo), tus
-; hilos (app\data) y tus skills (app\skills) viven ahí y ninguna versión nueva los toca.
+; sin permisos de administrador, en %LOCALAPPDATA%\Programs\Sloth, donde estaba la 0.2, o en la carpeta que elijas (otro
+; disco): tus videos (app\trabajo), tus hilos (app\data) y tus skills (app\skills) viven ahí y ninguna versión nueva los
+; toca. En otro disco, la IA local, los agentes y las dependencias de los videos nacen también ahí (app\ia, app\piezas y
+; app\modulos, `junto` en electron/mudanza.ts). Para mover lo de una Sloth ya instalada: Opciones → Espacio en disco.
+
+!ifndef BUILD_UNINSTALLER
+  !define MUI_DIRECTORYPAGE_TEXT_TOP "Tus videos y la IA local (unos 5 a 10 GB) van con Sloth: si tu disco está lleno, elige otro. Si ya la tienes, se queda en su carpeta; para moverla, usa Opciones → Espacio en disco."
+!endif
+
+; Siempre solo para tu usuario, sin preguntar: para todos iría a Archivos de programa, donde Sloth no puede guardar tus
+; videos ni tus hilos.
+!macro customInstallMode
+  StrCpy $isForceCurrentInstall "1"
+!macroend
+
+; Después de elegir la carpeta. Siempre una que se llame Sloth: al desinstalar se borra lo que hay en ella, y eligiendo
+; D:\ se borraría todo el disco. Si Sloth ya estaba instalada, no se deja cambiar: sus videos se quedarían allá.
+!macro customPageAfterChangeDir
+  Page custom carpetaSloth
+
+  Function carpetaSloth
+    Push $0
+    Push $1
+    ${GetFileName} $INSTDIR $0
+    ${If} $0 != "Sloth"
+      StrCpy $0 "Sloth"
+      StrCpy $1 $INSTDIR "" -1
+      ${If} $1 == "\"
+        StrCpy $INSTDIR "$INSTDIR$0"
+      ${Else}
+        StrCpy $INSTDIR "$INSTDIR\$0"
+      ${EndIf}
+    ${EndIf}
+    Pop $1
+    Pop $0
+    Abort
+  FunctionEnd
+
+  Function .onVerifyInstDir
+    ${If} $perUserInstallationFolder == ""
+    ${OrIf} $INSTDIR == $perUserInstallationFolder
+      Return
+    ${EndIf}
+    Push $R9
+    StrCpy $R9 "Sloth"
+    ${If} "$INSTDIR\$R9" == $perUserInstallationFolder
+    ${OrIf} "$INSTDIR$R9" == $perUserInstallationFolder
+      Pop $R9
+      Return
+    ${EndIf}
+    Pop $R9
+    Abort
+  FunctionEnd
+!macroend
 
 ; Después de poner los archivos: lo que dejaba el instalador de antes de Electron (hasta la 0.2), su desinstalador, su
 ; entrada en «Aplicaciones instaladas» y la ventana WebView2. Anclar Sloth a la barra de tareas no se ofrece aquí: Windows
@@ -21,7 +73,8 @@
   ${EndIf}
 !macroend
 
-; Quitar la versión instalada. Al actualizar (`--updated`) se va todo menos app\data, app\trabajo y app\skills; al
+; Quitar la versión instalada. Al actualizar (`--updated`) se va todo menos app\data, app\trabajo y app\skills (y app\ia,
+; app\piezas y app\modulos, lo pesado de una instalada en otro disco); al
 ; desinstalar también se van las skills y los node_modules que comparten los videos (se rehacen solos), tus videos y tus
 ; hilos solo si dices que sí, y la IA local que bajó Sloth (el Python con torch y Whisper, 5 a 10 GB) si dices que sí.
 !macro customRemoveFiles
@@ -44,6 +97,9 @@
     ${AndIf} $1 != "data"
     ${AndIf} $1 != "trabajo"
     ${AndIf} $1 != "skills"
+    ${AndIf} $1 != "ia"
+    ${AndIf} $1 != "piezas"
+    ${AndIf} $1 != "modulos"
       RMDir /r "$INSTDIR\app\$1"
       Delete "$INSTDIR\app\$1"
     ${EndIf}
@@ -52,6 +108,9 @@
   FindClose $0
   ${IfNot} ${isUpdated}
     RMDir /r "$INSTDIR\app\skills"
+    ; Lo que se rehace solo, si nació aquí (instalada en otro disco).
+    RMDir /r "$INSTDIR\app\modulos"
+    RMDir /r "$INSTDIR\app\piezas"
     ; Los node_modules compartidos de los videos (skills/video-base/scripts/espacio.py y comun.py de El Diff).
     RMDir /r "$LOCALAPPDATA\sloth-modulos"
     RMDir /r "$LOCALAPPDATA\video-el-diff\modulos"

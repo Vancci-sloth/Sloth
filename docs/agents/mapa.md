@@ -122,7 +122,9 @@ Este es el mapa:
   sin NVIDIA), el hilo nuevo lo ofrece arriba.
 - `server/espacio.ts` y `web/src/Espacio.tsx`: Opciones → Espacio en disco. Lo que dejan los videos y no hace falta
   (temporales de Remotion, pedazos de render, `node_modules` repetidos, cachés viejas); lo seguro lo borra solo cada
-  6 horas si nada trabaja. Las skills evitan dejarlo con `espacio.py` y `remotion.cjs` de video-base.
+  6 horas si nada trabaja. Las skills evitan dejarlo con `espacio.py` y `remotion.cjs` de video-base. «Cambiar de disco…»
+  (`electron/mudanza.ts`) lleva los videos, la IA local, los agentes y `sloth-modulos` a otra carpeta y deja enlaces en
+  su sitio, con las mismas rutas; el instalador de Windows deja elegir la carpeta (`scripts/instalador.nsh`).
 - `python/procesos/`: lo que las skills corren con el Python de Sloth (transcribir la voz o un video ajeno), lanzado por
   `proceso()` de `sloth.py` o `comun.py`. Con NVIDIA transcribe Whisper, ya cargado en `video-base/scripts/voz_viva.py`
   (ADR 0008); sin ella, Parakeet y `alineador.py` (`parakeet.py` dice cuál y por qué).

@@ -692,6 +692,9 @@ async function api(req: IncomingMessage, res: ServerResponse, url: URL): Promise
     return true
   }
 
+  // La ventana lo pregunta antes de parar el servidor para llevar lo pesado a otro disco (electron/mudanza.ts).
+  if (path === '/api/ocupado' && method === 'GET') return send(res, 200, { ocupado: ocupado() }), true
+
   if (path === '/api/restart' && method === 'POST') {
     if (ocupado()) return send(res, 409, { error: ocupado() }), true
     send(res, 200, { ok: true })
