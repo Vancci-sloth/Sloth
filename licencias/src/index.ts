@@ -34,8 +34,9 @@
  * El apoyo sugerido cuesta lo mismo para todos (`PRECIO_MENSUAL` o `PRECIO_ANUAL`). Desde el 4 de noviembre de 2026 el
  * mensual también va con el monto que elija cada quien (desde `APOYO_MINIMO`; con `APOYO_GRANDE` o más, la insignia
  * de apoyo grande), y hay un apoyo de una vez (`unico`): una orden como la del año, de cualquier monto, que vale un mes.
- * Las `FUNDADORES` primeras personas que apoyan con el precio sugerido o más son fundadoras (`fundador`) para siempre:
- * más beneficios que quien llega después. Cada suscripción conserva el monto y la moneda con que se creó: las de antes
+ * Las `FUNDADORES` primeras personas que apoyan cada mes con el precio sugerido o más son fundadoras (`fundador`) para
+ * siempre: más beneficios que quien llega después. Desde el 6 de noviembre de 2026 solo cuenta el mensual; las dos que lo
+ * fueron con un apoyo de una vez lo siguen siendo. Cada suscripción conserva el monto y la moneda con que se creó: las de antes
  * del 30 de octubre de 2026 siguen en pesos; las nuevas, en `MONEDA`.
  * Cuando Sloth se vendía, las primeras personas se unieron gratis de por vida (plan `gratis`, `GRATIS` como mucho): son
  * fundadoras como las primeras que apoyan (`esFundador`), con lo nuevo `ANTICIPO` antes y sin el recordatorio. Ya no se
@@ -176,7 +177,7 @@ const pasarela = (f: Pick<Fila, 'preapproval' | 'preferencia' | 'cripto'>) => (f
 /** Cuántos se han unido: los lugares gratis tomados y las suscripciones pagadas alguna vez (de ellas, las de fundador). */
 export interface Cuenta {
   fundadores: number
-  /** Las que apoyan hoy: pagadas y sin vencer, aunque ya cancelaran. */
+  /** Las que apoyan cada mes hoy: pagadas y sin vencer, aunque ya cancelaran. El apoyo de una vez y el anual no cuentan. */
   apoyan: number
 }
 
@@ -640,7 +641,7 @@ async function publicar(req: Request, env: Env, url: URL): Promise<Response> {
 async function precios(env: Env) {
   const c = await env.DB.prepare(
     `SELECT COUNT(CASE WHEN autorizada IS NOT NULL AND fundador = 1 THEN 1 END) AS fundadores,
-            COUNT(CASE WHEN julianday(pagado_hasta) > julianday('now') THEN 1 END) AS apoyan
+            COUNT(CASE WHEN plan = 'mensual' AND julianday(pagado_hasta) > julianday('now') THEN 1 END) AS apoyan
      FROM licencias WHERE plan IN ('mensual', 'anual', 'unico') AND modo = 'produccion'`
   ).first<Cuenta>()
   // Mercado Pago solo se ofrece con su token del modo de hoy.
@@ -743,8 +744,8 @@ async function suscribir(env: Env, c: Record<string, unknown>, desde: string): P
     plan,
     monto,
     moneda: p.moneda,
-    // Fundador, con el precio sugerido o más: el anual, o desde el mensual sugerido de su moneda, al mes o de una vez.
-    fundador: t.quedan > 0 && (plan === 'anual' || monto >= p.mensual) ? 1 : 0,
+    // Fundador, solo quien apoya cada mes con el precio sugerido de su moneda o más.
+    fundador: t.quedan > 0 && plan === 'mensual' && monto >= p.mensual ? 1 : 0,
     preapproval: null,
     enlace: null,
     estado: 'pending',
