@@ -3,7 +3,7 @@ import { createHmac } from 'node:crypto'
 import test from 'node:test'
 import { readFileSync } from 'node:fs'
 import { DatabaseSync } from 'node:sqlite'
-import { CUPO, VIGILAR, deTodos, esFundador, faltaAvisar, firmaDeMercadoPago, instaladorDe, leerPagos, leerPaypal, liberada, rangoDe, sistema, sistemaDelYml, sobran, tarifa, vigencia, montoDe, firmaDeNowpayments } from './index.ts'
+import { CUPO, VIGILAR, deTodos, esFundador, faltaAvisar, firmaDeMercadoPago, firmaDeNowpayments, instaladorDe, leerPagos, leerPaypal, liberada, montoDe, motivoDeRechazo, rangoDe, sistema, sistemaDelYml, sobran, tarifa, tarjetaDe, vigencia } from './index.ts'
 import { DE_LA_APP } from './comunidad.ts'
 
 const SECRETO = 'secreto-de-prueba'
@@ -269,4 +269,18 @@ test('lo sospechoso se avisa una vez por semana de cada cosa, y solo lo inventad
   assert.equal(DE_LA_APP.test('3f9a0c1e7b2d4a6f8e0c1b3d5f7a9c2e'), true)
   assert.equal(DE_LA_APP.test('0f8fad5b-d9cb-469f-a165-70867728950e'), true)
   assert.equal(DE_LA_APP.test('tu-probe-equipo-001'), false)
+})
+
+test('la tarjeta de la página: token, marca y banco; sin token o con algo raro, se rechaza', () => {
+  assert.deepEqual(tarjetaDe({ token: 'a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6', metodo: 'debvisa', emisor: '160' }), { token: 'a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6', metodo: 'debvisa', emisor: 160 })
+  assert.deepEqual(tarjetaDe({ token: 'a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6', metodo: 'master' }), { token: 'a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6', metodo: 'master' })
+  assert.throws(() => tarjetaDe(undefined), /tarjeta/)
+  assert.throws(() => tarjetaDe({ token: 'corto', metodo: 'visa' }), /tarjeta/)
+  assert.throws(() => tarjetaDe({ token: 'a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6', metodo: 'visa"; DROP' }), /tarjeta/)
+})
+
+test('el rechazo de la tarjeta se dice con su motivo, o uno general', () => {
+  assert.match(motivoDeRechazo('cc_rejected_insufficient_amount'), /saldo/)
+  assert.match(motivoDeRechazo('cc_rejected_algo_nuevo'), /no aceptó la tarjeta/)
+  assert.match(motivoDeRechazo(undefined), /no aceptó la tarjeta/)
 })

@@ -23,6 +23,9 @@
  * con OXXO, SPEI y meses sin intereses. Se leen, se cancelan y avisan (`POST /webhook`) en Mercado Pago. Del 29 de
  * octubre al 4 de noviembre de 2026 solo se pudo pagar con PayPal; un año de Mercado Pago que se renovó entonces con
  * PayPal sigue renovándose con PayPal.
+ * Con tarjeta (`pasarela: 'tarjeta'`) también cobra Mercado Pago, en pesos, pero sin salir de la página: ahí el script
+ * de Mercado Pago vuelve token la tarjeta (con `MP_LLAVE_PUBLICA`), y aquí el mensual es una suscripción ya autorizada
+ * con ese token y el año o el apoyo de una vez, un pago directo (`/v1/payments`). Quedan como los de Mercado Pago.
  * Y con cripto (`pasarela: 'cripto'`), en NOWPayments y en `MONEDA`: no hay cobro automático, así que el mes, el año y
  * el apoyo de una vez son cada uno una factura (`cripto`) que se paga con la moneda que se elija, desde Binance o
  * cualquier wallet. El mensual vale un mes por pago y, como el año, el cron avisa antes de que se acabe con el enlace
@@ -80,6 +83,11 @@ export interface Env {
   MP_ACCESS_TOKEN: string
   MP_ACCESS_TOKEN_PRODUCCION?: string
   MP_WEBHOOK_SECRET?: string
+  /**
+   * La llave pública de la app de Mercado Pago del `MP_MODO` de hoy (no es secreta): con ella, la página dibuja los
+   * campos de la tarjeta (`pasarela: 'tarjeta'`). Sin ella, no se ofrece.
+   */
+  MP_LLAVE_PUBLICA?: string
   /** El cobro con cripto: `prueba`, el sandbox de NOWPayments; `produccion`, de verdad. Sin su llave, no se ofrece. */
   NOWPAYMENTS_MODO: 'prueba' | 'produccion'
   NOWPAYMENTS_API_KEY?: string
@@ -208,8 +216,20 @@ export interface Precios {
   maximo: number
   moneda: string
 }
-/** Con qué se paga: PayPal (en `MONEDA`), Mercado Pago (en pesos) o cripto (NOWPayments, en `MONEDA`). */
-type Pasarela = 'paypal' | 'mercadopago' | 'cripto'
+/**
+ * Con qué se paga: PayPal (en `MONEDA`), Mercado Pago (en pesos), la tarjeta escrita en la página (la cobra Mercado
+ * Pago, en pesos) o cripto (NOWPayments, en `MONEDA`).
+ */
+type Pasarela = 'paypal' | 'mercadopago' | 'tarjeta' | 'cripto'
+
+/** La tarjeta que escribió el cliente en la página, ya vuelta token por el script de Mercado Pago: el número nunca llega aquí. */
+interface Tarjeta {
+  token: string
+  /** Su marca, como la nombra Mercado Pago (`visa`, `master`, `debvisa`…). */
+  metodo: string
+  /** El banco que la emitió, si Mercado Pago lo supo. */
+  emisor?: number
+}
 
 interface Preapproval {
   id: string
@@ -670,7 +690,15 @@ async function precios(env: Env, codigo?: unknown) {
   const t = tarifa(c ?? { fundadores: 0, apoyan: 0 }, env, conMp)
   const cripto: Precios = { mensual: t.mensual, anual: t.anual, minimo: Number(env.APOYO_MINIMO_CRIPTO), grande: t.grande, maximo: t.maximo, moneda: t.moneda }
   const fundador = codigo !== undefined && (await enlaceFundador(env, codigo))
-  return { ...t, ...(conCripto ? { cripto } : {}), ...(env.SIN_PAYPAL === '1' ? { sinPaypal: true } : {}), ...(fundador ? { fundador: true } : {}) }
+  // La tarjeta en la página: con Mercado Pago y su llave pública, a los precios en pesos (`mxn`).
+  const tarjeta = t.mxn && env.MP_LLAVE_PUBLICA ? { llave: env.MP_LLAVE_PUBLICA } : undefined
+  return {
+    ...t,
+    ...(conCripto ? { cripto } : {}),
+    ...(tarjeta ? { tarjeta } : {}),
+    ...(env.SIN_PAYPAL === '1' ? { sinPaypal: true } : {}),
+    ...(fundador ? { fundador: true } : {})
+  }
 }
 
 /**
@@ -725,7 +753,7 @@ async function suscribir(env: Env, c: Record<string, unknown>, desde: string): P
   const plan: Plan = c.plan === 'gratis' ? 'gratis' : c.plan === 'anual' ? 'anual' : c.plan === 'unico' ? 'unico' : 'mensual'
   const equipo = c.equipo === undefined && plan !== 'gratis' ? undefined : equipoDe(c)
   // Con Mercado Pago, en pesos; con PayPal o con cripto, en `MONEDA`. La app de antes no manda `pasarela`: PayPal.
-  const pasa: Pasarela = c.pasarela === 'mercadopago' ? 'mercadopago' : c.pasarela === 'cripto' ? 'cripto' : 'paypal'
+  const pasa: Pasarela = c.pasarela === 'mercadopago' || c.pasarela === 'tarjeta' || c.pasarela === 'cripto' ? c.pasarela : 'paypal'
   // El consentimiento expreso de los términos y, si se paga cada mes, del cobro automático (LFPC art. 76 Bis VIII), con
   // la versión aceptada. Con cripto no hay cobro automático: cada mes es un pago.
   const terminos = String(c.terminos ?? '')
@@ -737,20 +765,24 @@ async function suscribir(env: Env, c: Record<string, unknown>, desde: string): P
   const acepto = new Date().toISOString()
   if (plan === 'gratis') return unirse(env, email, equipo!, acepto, terminos, desde, c.porCorreo === true)
   const t = await precios(env, c.fundador)
-  if (pasa === 'paypal' && t.sinPaypal) throw new Rechazo(400, 'Por ahora no se puede pagar con PayPal: elige Mercado Pago o cripto.')
-  if ((pasa === 'mercadopago' && !t.mxn) || (pasa === 'cripto' && !t.cripto)) throw new Rechazo(400, 'Por ahora solo se puede pagar con PayPal.')
-  const p: Precios = pasa === 'mercadopago' ? t.mxn! : pasa === 'cripto' ? t.cripto! : t
+  if (pasa === 'paypal' && t.sinPaypal) throw new Rechazo(400, 'Por ahora no se puede pagar con PayPal: elige tarjeta, Mercado Pago o cripto.')
+  if ((pasa === 'mercadopago' && !t.mxn) || (pasa === 'tarjeta' && !t.tarjeta) || (pasa === 'cripto' && !t.cripto)) throw new Rechazo(400, 'Por ahora no se puede pagar así: elige otra forma de pago.')
+  const tarjeta = pasa === 'tarjeta' ? tarjetaDe(c.tarjeta) : undefined
+  const p: Precios = pasa === 'mercadopago' || pasa === 'tarjeta' ? t.mxn! : pasa === 'cripto' ? t.cripto! : t
   const monto = montoDe(plan, c.monto, p)
   // Con una ya pagada, otra cobraría dos veces; con un lugar gratis de por vida, no hace falta. Con una cuenta, sí se apoya.
   await sinOtra(env, email, true)
   // Un doble clic, o volver a abrir el pago: la misma suscripción pendiente de la última hora, si sigue en el monto, la
-  // moneda y la pasarela de hoy.
-  const columnas = { mercadopago: '(preapproval IS NOT NULL OR preferencia IS NOT NULL)', paypal: '(paypal IS NOT NULL OR orden IS NOT NULL)', cripto: 'cripto IS NOT NULL' }[pasa]
-  const previa = await env.DB.prepare(
-    `SELECT * FROM licencias WHERE email = ? AND plan = ? AND monto = ? AND moneda = ? AND estado = 'pending' AND enlace IS NOT NULL AND ${columnas} AND coalesce(enlace_fundador, '') = ? AND creada > ? ORDER BY creada DESC LIMIT 1`
-  )
-    .bind(email, plan, monto, p.moneda, t.fundador ? String(c.fundador) : '', new Date(Date.now() - 3600_000).toISOString())
-    .first<Fila>()
+  // moneda y la pasarela de hoy. Con tarjeta no hay a dónde volver: cada intento lleva su token y se cobra ya.
+  const columnas = { mercadopago: '(preapproval IS NOT NULL OR preferencia IS NOT NULL)', paypal: '(paypal IS NOT NULL OR orden IS NOT NULL)', cripto: 'cripto IS NOT NULL' }
+  const previa =
+    pasa === 'tarjeta'
+      ? null
+      : await env.DB.prepare(
+          `SELECT * FROM licencias WHERE email = ? AND plan = ? AND monto = ? AND moneda = ? AND estado = 'pending' AND enlace IS NOT NULL AND ${columnas[pasa]} AND coalesce(enlace_fundador, '') = ? AND creada > ? ORDER BY creada DESC LIMIT 1`
+        )
+          .bind(email, plan, monto, p.moneda, t.fundador ? String(c.fundador) : '', new Date(Date.now() - 3600_000).toISOString())
+          .first<Fila>()
   if (previa) {
     await env.DB.prepare('UPDATE licencias SET acepto = ?, terminos = ? WHERE id = ?').bind(acepto, terminos, previa.id).run()
     return json(equipo ? { clave: previa.clave, enlace: previa.enlace } : { enlace: previa.enlace })
@@ -781,7 +813,7 @@ async function suscribir(env: Env, c: Record<string, unknown>, desde: string): P
     folio: null,
     cancelada: null,
     avisado_para: null,
-    modo: { mercadopago: env.MP_MODO, paypal: env.PAYPAL_MODO, cripto: env.NOWPAYMENTS_MODO }[pasa],
+    modo: { mercadopago: env.MP_MODO, tarjeta: env.MP_MODO, paypal: env.PAYPAL_MODO, cripto: env.NOWPAYMENTS_MODO }[pasa],
     preferencia: null,
     paypal: null,
     orden: null,
@@ -791,26 +823,38 @@ async function suscribir(env: Env, c: Record<string, unknown>, desde: string): P
     .bind(fila.id, fila.clave, email, plan, fila.monto, fila.moneda, fila.fundador, fila.enlace_fundador, fila.estado, fila.creada, acepto, terminos, fila.modo)
     .run()
   // Dónde se paga y en qué columna queda: la suscripción mensual, o el pago del año o del apoyo de una vez.
-  let abierto: { columna: 'orden' | 'paypal' | 'preapproval' | 'preferencia' | 'cripto'; id: string; enlace: string }
+  // Con tarjeta ya se cobró: no queda enlace al que volver (`enlace` vacío), y se va directo a `/gracias`.
+  let abierto: { columna: 'orden' | 'paypal' | 'preapproval' | 'preferencia' | 'cripto'; id: string; enlace: string | null; pago?: PagoMp }
   try {
     if (pasa === 'cripto') abierto = { columna: 'cripto', ...(await facturaCripto(env, fila)) }
+    else if (tarjeta)
+      abierto =
+        plan === 'mensual'
+          ? { columna: 'preapproval', id: await suscripcionTarjeta(env, fila, tarjeta), enlace: null }
+          : { columna: 'preferencia', ...(await pagoTarjeta(env, fila, tarjeta)), enlace: null }
     else if (pasa === 'mercadopago')
       abierto = plan === 'mensual' ? { columna: 'preapproval', ...(await suscripcionMp(env, fila)) } : { columna: 'preferencia', ...(await preferenciaMp(env, fila)) }
     else abierto = plan === 'mensual' ? { columna: 'paypal', ...(await suscripcionPaypal(env, fila)) } : { columna: 'orden', ...(await ordenPaypal(env, fila)) }
   } catch (error) {
     await env.DB.prepare('DELETE FROM licencias WHERE id = ?').bind(fila.id).run()
-    const quien = { mercadopago: 'Mercado Pago', paypal: 'PayPal', cripto: 'NOWPayments' }[pasa]
+    // La tarjeta rechazada ya trae qué decirle al cliente.
+    if (error instanceof TarjetaRechazada) throw error
+    const quien = { mercadopago: 'Mercado Pago', tarjeta: 'Mercado Pago', paypal: 'PayPal', cripto: 'NOWPayments' }[pasa]
     // La suscripción de Mercado Pago rechaza (400) un correo que no es de una cuenta suya, o con «+»: se dice cuál poner.
     if (error instanceof Rechazo && pasa === 'mercadopago' && plan === 'mensual' && error.status === 400)
       throw new Rechazo(400, 'Mercado Pago no aceptó ese correo. Escribe el de tu cuenta de Mercado Pago (sin «+»), o paga una sola vez, que acepta cualquiera.')
     throw error instanceof Rechazo ? new Rechazo(502, `${quien} no pudo abrir el pago. Revisa tu correo e intenta otra vez.`) : error
   }
+  // `revisada` vacía: `/gracias` lee enseguida cómo quedó el cobro con tarjeta.
   await env.DB.prepare(`UPDATE licencias SET ${abierto.columna} = ?, enlace = ?, revisada = ? WHERE id = ?`)
-    .bind(abierto.id, abierto.enlace ?? null, new Date().toISOString(), fila.id)
+    .bind(abierto.id, abierto.enlace, tarjeta ? null : new Date().toISOString(), fila.id)
     .run()
-  if (!equipo) return json({ enlace: abierto.enlace })
+  // El pago con tarjeta ya cobrado cuenta desde ya: la búsqueda de Mercado Pago tarda unos segundos en verlo.
+  if (abierto.pago) await refrescar(env, { ...fila, preferencia: abierto.id }, { mp: abierto.pago }).catch(() => undefined)
+  const enlace = abierto.enlace ?? `${env.ORIGEN}/gracias?s=${fila.id}`
+  if (!equipo) return json({ enlace })
   await recordarEquipo(env, fila.clave, equipo, Date.now())
-  return json({ clave: fila.clave, enlace: abierto.enlace })
+  return json({ clave: fila.clave, enlace })
 }
 
 /** La página de PayPal en español, sin dirección de envío, y de vuelta a `/gracias` al pagar o al salir. */
@@ -861,6 +905,98 @@ async function suscripcionMp(env: Env, f: Fila): Promise<{ id: string; enlace: s
   })
   if (!p.init_point) throw new Rechazo(502, 'Mercado Pago no dio el enlace de pago')
   return { id: p.id, enlace: p.init_point }
+}
+
+/** Mercado Pago no cobró la tarjeta: `message` es lo que se le dice al cliente. */
+export class TarjetaRechazada extends Rechazo {
+  constructor(mensaje: string) {
+    super(402, mensaje)
+  }
+}
+
+/** Lo que manda la página de la tarjeta, revisado: el token, su marca y su banco. */
+export function tarjetaDe(t: unknown): Tarjeta {
+  const c = (t && typeof t === 'object' ? t : {}) as Record<string, unknown>
+  const token = String(c.token ?? '')
+  const metodo = String(c.metodo ?? '')
+  const emisor = Number(c.emisor)
+  if (!/^[\w-]{16,64}$/.test(token) || !/^[a-z_]{2,30}$/.test(metodo)) throw new Rechazo(400, 'Revisa los datos de tu tarjeta.')
+  return { token, metodo, ...(Number.isInteger(emisor) && emisor > 0 ? { emisor } : {}) }
+}
+
+/** Por qué Mercado Pago rechazó un pago con tarjeta (`status_detail`), dicho al cliente. */
+export function motivoDeRechazo(detalle: string | undefined): string {
+  const motivos: Record<string, string> = {
+    cc_rejected_insufficient_amount: 'Tu tarjeta no tiene saldo suficiente. Prueba con otra.',
+    cc_rejected_bad_filled_security_code: 'El código de seguridad no es correcto.',
+    cc_rejected_bad_filled_date: 'La fecha de vencimiento no es correcta.',
+    cc_rejected_bad_filled_card_number: 'Revisa el número de tu tarjeta.',
+    cc_rejected_bad_filled_other: 'Revisa los datos de tu tarjeta.',
+    cc_rejected_call_for_authorize: 'Tu banco pide que autorices este pago: llámale y vuelve a intentarlo.',
+    cc_rejected_card_disabled: 'Tu tarjeta no está activa: actívala con tu banco o prueba con otra.',
+    cc_rejected_duplicated_payment: 'Ya hiciste un pago igual hace un momento. Revisa tu correo antes de volver a intentarlo.',
+    cc_rejected_max_attempts: 'Llegaste al límite de intentos con esta tarjeta. Prueba con otra.'
+  }
+  return (detalle && motivos[detalle]) || 'Tu banco no aceptó la tarjeta. Revisa los datos o prueba con otra.'
+}
+
+/**
+ * La suscripción mensual con la tarjeta escrita en la página: autorizada desde ya, sin pasar por la página de Mercado
+ * Pago. Para comprobar la tarjeta, Mercado Pago hace un cargo chico y lo devuelve. Da el id de la suscripción.
+ */
+async function suscripcionTarjeta(env: Env, f: Fila, t: Tarjeta): Promise<string> {
+  const p = await mp<Preapproval>(env, 'POST', '/preapproval', {
+    reason: 'Sloth - plan mensual',
+    external_reference: f.id,
+    payer_email: f.email,
+    card_token_id: t.token,
+    auto_recurring: { frequency: 1, frequency_type: 'months', transaction_amount: f.monto, currency_id: f.moneda },
+    back_url: `${env.ORIGEN}/gracias?s=${f.id}`,
+    status: 'authorized'
+  }).catch((e) => {
+    if (!(e instanceof Rechazo) || e.status >= 500) throw e
+    // Un correo que Mercado Pago no acepta, la tarjeta que no pasó su comprobación (`CC_VAL_…`) u otra cosa.
+    throw new TarjetaRechazada(
+      /payer|email/i.test(e.message)
+        ? 'Mercado Pago no aceptó ese correo para el cobro de cada mes. Escribe otro (sin «+»), o apoya una sola vez.'
+        : /CC_VAL|card/i.test(e.message)
+          ? motivoDeRechazo(undefined)
+          : 'Mercado Pago no pudo abrir el cobro de cada mes con esta tarjeta. Elige «Mercado Pago», o apoya una sola vez.'
+    )
+  })
+  return p.id
+}
+
+/**
+ * Un año, o un apoyo de una vez, cobrado ya a la tarjeta escrita en la página, en una sola exhibición. Queda como un
+ * pago de Mercado Pago de la fila (`external_reference`), y se cuenta como los de Checkout Pro: por eso va en
+ * `preferencia`, con el id del pago (`tarjeta-…`). Rechazado, se dice por qué.
+ */
+async function pagoTarjeta(env: Env, f: Fila, t: Tarjeta): Promise<{ id: string; pago: PagoMp }> {
+  const unico = f.plan === 'unico'
+  const p = await mp<PagoMp & { status_detail?: string }>(
+    env,
+    'POST',
+    '/v1/payments',
+    {
+      transaction_amount: f.monto,
+      token: t.token,
+      description: unico ? 'Sloth - apoyo de una vez' : 'Sloth - plan anual',
+      installments: 1,
+      payment_method_id: t.metodo,
+      ...(t.emisor ? { issuer_id: t.emisor } : {}),
+      payer: { email: f.email },
+      external_reference: f.id,
+      statement_descriptor: 'SLOTH'
+    },
+    // El token sirve una sola vez: el mismo, otra vez, es el mismo pago.
+    { 'x-idempotency-key': t.token }
+  ).catch((e) => {
+    if (!(e instanceof Rechazo) || e.status >= 500) throw e
+    throw new TarjetaRechazada(motivoDeRechazo(undefined))
+  })
+  if (p.status === 'rejected' || p.status === 'cancelled') throw new TarjetaRechazada(motivoDeRechazo(p.status_detail))
+  return { id: `tarjeta-${p.id}`, pago: p }
 }
 
 /**
@@ -1471,10 +1607,10 @@ function tokenMp(env: Env): string {
   return token
 }
 
-async function mp<T>(env: Env, metodo: string, ruta: string, cuerpo?: unknown): Promise<T> {
+async function mp<T>(env: Env, metodo: string, ruta: string, cuerpo?: unknown, extra: Record<string, string> = {}): Promise<T> {
   const r = await fetch(`${MP}${ruta}`, {
     method: metodo,
-    headers: { authorization: `Bearer ${tokenMp(env)}`, 'content-type': 'application/json' },
+    headers: { authorization: `Bearer ${tokenMp(env)}`, 'content-type': 'application/json', ...extra },
     body: cuerpo === undefined ? undefined : JSON.stringify(cuerpo)
   })
   const datos = (await r.json().catch(() => ({}))) as { message?: string }

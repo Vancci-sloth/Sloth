@@ -29,6 +29,9 @@
     "PAYPAL_MODO": "produccion",
     // Con cuál de los dos tokens se leen y cancelan las suscripciones de Mercado Pago de antes.
     "MP_MODO": "produccion",
+    // La llave pública de la app «Sloth» de Mercado Pago de ese modo (no es secreta): con ella, la página dibuja los
+    // campos de la tarjeta. Al cambiar MP_MODO, cambia también.
+    "MP_LLAVE_PUBLICA": "APP_USR-3436d2c9-061c-42af-83e1-2384ed6a05d6",
     // `prueba` cobra en el sandbox de NOWPayments (account-sandbox.nowpayments.io, con sus propias llaves); `produccion`, de verdad.
     "NOWPAYMENTS_MODO": "produccion",
     "ORIGEN": "https://api.sloth.vancci.org",
