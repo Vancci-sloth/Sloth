@@ -1,7 +1,7 @@
 /**
  * El MCP `voz`: las herramientas con que un agente (Claude, Codex u OpenCode) pide la voz de un video a Sloth, que la
- * genera en Google AI Studio con la cuenta del usuario (`index.ts`). Solo habla con la API del servidor (`SLOTH_URL`):
- * la sesión de Google no pasa por aquí. Es JavaScript sin paquetes, para que el Node de Sloth lo corra igual en el repo
+ * genera en Google AI Studio con la cuenta del usuario, o con Fish Audio o ElevenLabs con su llave (`index.ts`). Solo
+ * habla con la API del servidor (`SLOTH_URL`): ni la sesión de Google ni las llaves pasan por aquí. Es JavaScript sin paquetes, para que el Node de Sloth lo corra igual en el repo
  * y en la app compilada (`scripts/compilar.mjs` lo copia tal cual). Habla MCP por stdio, un JSON por renglón.
  *
  * Cada herramienta espera como mucho 40 s a que acabe la voz: Codex corta una herramienta a los 60. Si no acabó, dice
@@ -16,7 +16,7 @@ const HERRAMIENTAS = [
   {
     name: 'voces',
     description:
-      'Las voces de Google AI Studio (Gemini 3.8 Flash TTS) con que Sloth puede generar la narración, cada una con cómo suena y su grupo (Podcast, Storyteller…). Son las que enseña la página; AI Studio tiene más de 2.000 y cualquier nombre de su buscador sirve. Dice también si hay una cuenta de Google conectada.',
+      'Las voces con que Sloth puede generar la narración: las de Google AI Studio (Gemini 3.8 Flash TTS, por grupos; cualquier nombre de su buscador sirve, tiene más de 2.000) y, si el usuario puso su llave, las de Fish Audio y ElevenLabs con el id que va en generar_voz (fish:… o elevenlabs:…); «tuya» es una que el usuario clonó de su voz. Cada una con cómo suena. Dice también qué está conectado.',
     inputSchema: {
       type: 'object',
       properties: { buscar: { type: 'string', description: 'Solo las que tengan esto en su nombre, cómo suenan o su grupo («deep», «Podcast»)' } }
@@ -25,11 +25,11 @@ const HERRAMIENTAS = [
   {
     name: 'generar_voz',
     description:
-      'Genera la narración en Google AI Studio con la voz pedida, en la cuenta de Google del usuario, y deja el WAV (24 kHz, mono) en `salida`. Pasa el texto tal como se narra, o `archivo`: un guion en Markdown se narra sin títulos ni encabezados. Las etiquetas de AI Studio, como <laugh> o <short pause>, van dentro del texto. Una frase tarda unos 5 s y 6 minutos de guion unos 100 s; si no acaba en 40 s, devuelve un id para esperarla con estado_voz. Si el texto y la voz no cambiaron desde el último WAV de esa ruta, sale al momento.',
+      'Genera la narración con la voz pedida y deja el WAV (mono) en `salida`: en Google AI Studio con la cuenta de Google del usuario, o en Fish Audio o ElevenLabs con su llave si la voz es fish:… o elevenlabs:…. Pasa el texto tal como se narra, o `archivo`: un guion en Markdown se narra sin títulos ni encabezados. Las etiquetas van dentro del texto: en AI Studio como <laugh> o <short pause>; en Fish Audio y ElevenLabs entre corchetes, como [laughs] o [whispers]. En AI Studio una frase tarda unos 5 s y 6 minutos de guion unos 100 s; si no acaba en 40 s, devuelve un id para esperarla con estado_voz. Si el texto y la voz no cambiaron desde el último WAV de esa ruta, sale al momento.',
     inputSchema: {
       type: 'object',
       properties: {
-        voz: { type: 'string', description: 'El nombre de la voz en AI Studio, como Fola o Kore' },
+        voz: { type: 'string', description: 'El nombre de la voz en AI Studio, como Fola o Kore, o el id de una de Fish Audio o ElevenLabs tal cual (fish:… o elevenlabs:…)' },
         texto: { type: 'string', description: 'Lo que se narra' },
         archivo: { type: 'string', description: 'O la ruta absoluta de un .md o .txt con lo que se narra' },
         salida: { type: 'string', description: 'La ruta absoluta del .wav que deja, como <carpeta del video>/fuentes/voz/ai-studio.wav' }
@@ -60,11 +60,25 @@ function contar(t) {
 const LLAMADAS = {
   async voces({ buscar } = {}) {
     const e = await pedir('/api/voz')
-    if (!e.cuenta) return 'No hay cuenta de Google conectada para AI Studio: que el usuario la conecte en Opciones → Voz. Mientras, pídele la voz.'
     const b = buscar?.toLowerCase()
-    const voces = e.voces.filter((v) => !b || `${v.nombre} ${v.descripcion} ${v.grupo}`.toLowerCase().includes(b))
-    const grupos = Map.groupBy(voces, (v) => v.grupo)
-    return [`Cuenta: ${e.cuenta}. ${voces.length} voces${b ? ` con «${buscar}»` : ''}:`, ...[...grupos].map(([g, vs]) => `${g}: ${vs.map((v) => `${v.nombre} (${v.descripcion})`).join('; ')}`)].join('\n')
+    const con = (...t) => !b || t.join(' ').toLowerCase().includes(b)
+    const renglones = []
+    if (e.cuenta) {
+      const voces = e.voces.filter((v) => con(v.nombre, v.descripcion, v.grupo))
+      const grupos = Map.groupBy(voces, (v) => v.grupo)
+      renglones.push(`AI Studio, cuenta ${e.cuenta}. ${voces.length} voces${b ? ` con «${buscar}»` : ''}:`, ...[...grupos].map(([g, vs]) => `${g}: ${vs.map((v) => `${v.nombre} (${v.descripcion})`).join('; ')}`))
+    } else renglones.push('AI Studio: sin cuenta de Google conectada.')
+    for (const [motor, nombre] of [['fish', 'Fish Audio'], ['elevenlabs', 'ElevenLabs']]) {
+      const m = e.motores?.[motor]
+      if (!m?.llave) {
+        renglones.push(`${nombre}: sin llave.`)
+        continue
+      }
+      const voces = m.voces.filter((v) => con(v.nombre, v.descripcion, v.propia ? 'tuya' : ''))
+      renglones.push(`${nombre}, ${voces.length} voces${b ? ` con «${buscar}»` : ''}: ${voces.map((v) => `${v.nombre}${v.propia ? ' (tuya)' : ''}${v.descripcion ? ` (${v.descripcion})` : ''} = ${motor}:${v.id}`).join('; ')}`)
+    }
+    if (!e.cuenta && !e.motores?.fish?.llave && !e.motores?.elevenlabs?.llave) renglones.push('Nada conectado: que el usuario conecte una en Opciones → Voz. Mientras, pídele la voz.')
+    return renglones.join('\n')
   },
   async generar_voz({ voz, texto, archivo, salida }) {
     const t = await pedir('/api/voz/generar', { voz, texto, archivo, salida })

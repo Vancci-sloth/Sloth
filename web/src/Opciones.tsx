@@ -93,7 +93,7 @@ function Ajustes({ onDone, iniciando, onIniciando }: { onDone(): void; iniciando
           <CuentaAgente key={p} p={p} />
         ))}
       </Grupo>
-      <Grupo titulo="Voz" nota="Al pedir un video eliges en «Voz» si la mandas tú o si el agente la genera aquí. La sesión de Google vive en un perfil aparte del navegador de Sloth: ningún agente la usa.">
+      <Grupo titulo="Voz" nota="Al pedir un video eliges en «Voz» si la mandas tú o si el agente la genera con una de estas. La sesión de Google vive en un perfil aparte del navegador de Sloth, que ningún agente usa; las llaves, en tu usuario de esta computadora.">
         <VozOpciones voz={voz} />
       </Grupo>
       <Grupo

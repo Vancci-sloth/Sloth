@@ -37,7 +37,7 @@ import { CalendarioYoutube } from './YoutubeCalendario'
 import { avisarTanda, AvisoRedes, ConNavegadorRedes, usePublicar } from './Redes' // redes
 import { NombreDelHilo, Renombrar } from './Renombrar'
 import { Segmento } from './Segmento'
-import { SelectorVoz, useVoz } from './Voz' // voz de AI Studio
+import { nombreDeVoz, SelectorVoz, useVoz, vozPosible } from './Voz' // voz de AI Studio, Fish Audio o ElevenLabs
 import { lineaVoz } from '../../shared/voz'
 import { SelectorClips, SelectorImagenes, useChatGPT, useFlow } from './Flow' // Google Flow
 import { imagenPosible, lineaClips, lineaImagenes, MODELOS_VIDEO, OPCIONES_CLIPS } from '../../shared/flow'
@@ -818,11 +818,11 @@ function NewSession(props: {
   const formatoEscrito = /^Formato: (vertical|horizontal)\s*$/m.exec(props.draft?.text ?? '')?.[1] as 'vertical' | 'horizontal' | undefined
   const formato = formatoEscrito ?? formatos[card.id] ?? 'vertical'
   const conFormato = !!card.etapas
-  // La voz: mandarla tú o que el agente la genere en AI Studio (`Voz.tsx`). La card recuerda la última; sin la cuenta
-  // de Google conectada, la mandas tú.
+  // La voz: mandarla tú o que el agente la genere en AI Studio, Fish Audio o ElevenLabs (`Voz.tsx`). La card recuerda
+  // la última; sin la cuenta o la llave de esa voz, la mandas tú.
   const voz = useVoz()
   const [voces, setVoces] = useStored<Record<string, string>>('voz', {})
-  const vozElegida = voz.estado?.cuenta ? (voces[card.id] ?? '') : ''
+  const vozElegida = vozPosible(voz.estado, voces[card.id] ?? '') ? voces[card.id] : ''
   // Las imágenes: con ChatGPT o con un modelo de Google Flow (`Flow.tsx`), según lo que tengas conectado.
   const hayChatGPT = useChatGPT()
   const [imagenes, setImagenes] = useStored<string>('imagenes', '')
@@ -912,7 +912,7 @@ function NewSession(props: {
           const pide = [
             laSerie && `Serie: ${laSerie.nombre} (${laSerie.archivo}; cómo se usa, en video-base/SERIES.md)${text ? '' : '. Elige tú el tema.'}`,
             conFormato && !formatoEscrito && `Formato: ${formato}`,
-            conFormato && lineaVoz(card, vozElegida),
+            conFormato && lineaVoz(card, vozElegida, nombreDeVoz(voz.estado, vozElegida)),
             conFormato && lineaImagenes(imagenElegida),
             conFormato && card.clips && lineaClips(clipsElegidos),
             // El modelo de cada subagente: lo medido, o lo que elegiste en «Avanzado». La skill lo lee aquí.

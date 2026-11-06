@@ -1278,6 +1278,29 @@ export interface EstadoVoz {
   voces: VozStudio[]
   enFila: number
   error?: string
+  /** Los proveedores que van con una llave de API (`server/voz/apis.ts`). */
+  motores: Record<ProveedorVoz, EstadoProveedorVoz>
+}
+
+/** Los proveedores de voz con llave de API, además de AI Studio. */
+export type ProveedorVoz = 'fish' | 'elevenlabs'
+
+/**
+ * Una voz de Fish Audio o ElevenLabs. `id`: el suyo allí (en Sloth va como `fish:<id>`, `shared/voz.ts`). `propia`: una
+ * que clonaste o creaste tú; las demás son de su biblioteca.
+ */
+export interface VozApi {
+  id: string
+  nombre: string
+  descripcion: string
+  propia: boolean
+}
+
+/** Un proveedor con llave: los cuatro últimos de la llave (`null`: sin poner) y sus voces. `error`: lo último que falló. */
+export interface EstadoProveedorVoz {
+  llave: string | null
+  voces: VozApi[]
+  error?: string
 }
 
 /**

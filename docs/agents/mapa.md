@@ -75,7 +75,8 @@ Este es el mapa:
 - `server/voz/` y `web/src/Voz.tsx`: la voz de los videos con Google AI Studio (Gemini 3.8 Flash TTS), en la cuenta de
   Google de cada quien (Opciones → Voz). La genera el servidor en la página `voz` del navegador integrado, con su propio
   perfil; los agentes la piden con el MCP `voz` (`mcp.mjs`), y el menú «Voz» del compositor manda la línea `Voz:` que
-  siguen las skills (`skills/video-base/VOZ.md`). ADR 0011.
+  siguen las skills (`skills/video-base/VOZ.md`). ADR 0011. Fish Audio y ElevenLabs van por su API con la llave de cada
+  quien (`server/voz/apis.ts`, voces `fish:<id>` y `elevenlabs:<id>`), también clonando la voz del usuario.
 - `server/flow/` y `web/src/Flow.tsx`: imágenes (Nano Banana) y videos (Veo) de Google Flow, con la cuenta de la voz (en
   su Edge y su turno, `voz().google`) y las que se agregan en Opciones (`cuentas.ts`, cada una en su Edge), hasta dos a la
   vez y con ritmo. `elegirCuenta`, el ritmo y los descansos están en `shared/flow.ts`. `pagina.ts` maneja la página, por sus iconos: texto,

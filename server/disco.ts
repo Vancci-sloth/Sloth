@@ -7,7 +7,7 @@ import { promisify } from 'node:util'
  * Escribe un archivo entero de una vez: primero en un temporal y después lo cambia por el bueno. Si se corta a la mitad
  * (se apaga la computadora, se llena el disco), queda el archivo de antes, no uno a medias que ya no se puede leer.
  */
-export function guardar(archivo: string, texto: string) {
+export function guardar(archivo: string, texto: string | Uint8Array) {
   const tmp = `${archivo}.tmp`
   writeFileSync(tmp, texto)
   try {

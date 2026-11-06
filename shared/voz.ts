@@ -1,22 +1,101 @@
-import type { Card, VozStudio } from './types.ts'
+import type { Card, ProveedorVoz, VozStudio } from './types.ts'
 
 /**
  * Lo que comparten el servidor de la voz (`server/voz/`), su MCP y el compositor: la línea `Voz:` que lleva el primer
- * mensaje de un video, cómo se leen las voces del panel de AI Studio y cuándo un WAV bajado está entero.
+ * mensaje de un video, cómo se leen las voces del panel de AI Studio, cuándo un WAV bajado está entero y cómo se juntan
+ * los trozos que dan Fish Audio y ElevenLabs.
  */
 
 /** La guía que siguen las skills con la línea `Voz:` (en `SLOTH_SKILLS`). */
 const GUIA = 'video-base/VOZ.md'
 
+/** El nombre de cada motor con llave, como se ve en Sloth. */
+export const MOTORES: Record<ProveedorVoz, string> = { fish: 'Fish Audio', elevenlabs: 'ElevenLabs' }
+
 /**
- * La línea del primer mensaje con la voz elegida en el compositor. `voz`: el nombre de una voz de AI Studio, que genera
- * el agente; vacía, la manda el usuario. Un estilo que hace la suya (`propia`, el reel con edge-tts) no lleva línea si no
- * eliges AI Studio. Sin elección posible (`voz: false`, el documental), tampoco.
+ * De qué motor es una voz: las de Fish Audio y ElevenLabs van con su prefijo (`fish:<id>`, `elevenlabs:<id>`); lo demás
+ * es el nombre de una voz de AI Studio (`Fola`).
  */
-export function lineaVoz(card: Pick<Card, 'voz'>, voz: string): string {
+export function motorDe(voz: string): { motor: ProveedorVoz | 'ai-studio'; id: string } {
+  const m = /^(fish|elevenlabs):(.+)$/.exec(voz.trim())
+  return m ? { motor: m[1] as ProveedorVoz, id: m[2] } : { motor: 'ai-studio', id: voz.trim() }
+}
+
+/**
+ * La línea del primer mensaje con la voz elegida en el compositor. `voz`: una voz de AI Studio (su nombre) o de Fish
+ * Audio o ElevenLabs (`fish:<id>`, y `nombre` el que se ve), que genera el agente; vacía, la manda el usuario. Un estilo
+ * que hace la suya (`propia`, el reel con edge-tts) no lleva línea si no eliges otra. Sin elección posible (`voz: false`,
+ * el documental), tampoco.
+ */
+export function lineaVoz(card: Pick<Card, 'voz'>, voz: string, nombre?: string): string {
   if (card.voz === false) return ''
-  if (voz) return `Voz: genérala tú en AI Studio con la voz ${voz} (cómo, en ${GUIA}).`
-  return card.voz?.propia ? '' : `Voz: la manda el usuario; no la generes (${GUIA}).`
+  if (!voz) return card.voz?.propia ? '' : `Voz: la manda el usuario; no la generes (${GUIA}).`
+  const { motor } = motorDe(voz)
+  if (motor === 'ai-studio') return `Voz: genérala tú en AI Studio con la voz ${voz} (cómo, en ${GUIA}).`
+  return `Voz: genérala tú con ${MOTORES[motor]}, voz «${nombre || voz}»: en generar_voz pon la voz ${voz} (cómo, en ${GUIA}).`
+}
+
+/**
+ * Parte lo que se narra en trozos de hasta `max` letras, por párrafos (y, si uno no cabe, por frases), para las API
+ * que no aceptan un guion entero en un pedido.
+ */
+export function trozosParaVoz(texto: string, max: number): string[] {
+  const piezas = texto
+    .split(/\n\s*\n/)
+    .map((p) => p.trim())
+    .filter(Boolean)
+    .flatMap((p) => (p.length <= max ? [p] : (p.match(/[^.!?…]+(?:[.!?…]+["»”)]*\s*|$)/g) ?? [p]).map((f) => f.trim()).filter(Boolean)))
+  const trozos: string[] = []
+  for (const p of piezas) {
+    const ultimo = trozos.at(-1)
+    if (ultimo && ultimo.length + 2 + p.length <= max) trozos[trozos.length - 1] = `${ultimo}\n\n${p}`
+    else for (let i = 0; i < p.length; i += max) trozos.push(p.slice(i, i + max))
+  }
+  return trozos
+}
+
+/** El audio de un WAV PCM: su formato y sus muestras. Un WAV de una API que se manda a trozos no dice su tamaño: se toma hasta el final. */
+export function pcmDeWav(b: Uint8Array): { frecuencia: number; canales: number; bits: number; datos: Uint8Array } | null {
+  if (b.length < 44) return null
+  const v = new DataView(b.buffer, b.byteOffset, b.byteLength)
+  const txt = (o: number) => String.fromCharCode(b[o], b[o + 1], b[o + 2], b[o + 3])
+  if (txt(0) !== 'RIFF' || txt(8) !== 'WAVE') return null
+  let formato: { frecuencia: number; canales: number; bits: number } | null = null
+  for (let o = 12; o + 8 <= b.length; ) {
+    const tam = v.getUint32(o + 4, true)
+    if (txt(o) === 'fmt ') formato = { canales: v.getUint16(o + 10, true), frecuencia: v.getUint32(o + 12, true), bits: v.getUint16(o + 22, true) }
+    // Uno que se manda a trozos dice 0 o el máximo: se toma hasta el final.
+    if (txt(o) === 'data') return formato && { ...formato, datos: b.subarray(o + 8, tam && o + 8 + tam <= b.length ? o + 8 + tam : b.length) }
+    o += 8 + tam + (tam % 2)
+  }
+  return null
+}
+
+/** Un WAV PCM con estas muestras seguidas, y `silencio` segundos callados entre una y otra. */
+export function wavDePcm(trozos: Uint8Array[], frecuencia: number, canales = 1, bits = 16, silencio = 0): Uint8Array<ArrayBuffer> {
+  const porMuestra = canales * (bits / 8)
+  const callado = new Uint8Array(Math.round(silencio * frecuencia) * porMuestra)
+  const partes = trozos.flatMap((t, i) => (i ? [callado, t] : [t]))
+  const tam = partes.reduce((s, p) => s + p.length, 0)
+  const wav = new Uint8Array(44 + tam)
+  const v = new DataView(wav.buffer)
+  const poner = (o: number, s: string) => [...s].forEach((c, i) => (wav[o + i] = c.charCodeAt(0)))
+  poner(0, 'RIFF')
+  v.setUint32(4, 36 + tam, true)
+  poner(8, 'WAVE')
+  poner(12, 'fmt ')
+  v.setUint32(16, 16, true)
+  v.setUint16(20, 1, true)
+  v.setUint16(22, canales, true)
+  v.setUint32(24, frecuencia, true)
+  v.setUint32(28, frecuencia * porMuestra, true)
+  v.setUint16(32, porMuestra, true)
+  v.setUint16(34, bits, true)
+  poner(36, 'data')
+  v.setUint32(40, tam, true)
+  let o = 44
+  for (const p of partes) wav.set(p, o), (o += p.length)
+  return wav
 }
 
 /**

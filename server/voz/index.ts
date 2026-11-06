@@ -8,13 +8,14 @@ import type { McpStdioServerConfig } from '@anthropic-ai/claude-agent-sdk'
 import type { Browser, Page } from 'playwright-core'
 import { WebSocket } from 'ws'
 import { conectarCDP } from '../playwright.ts'
-import { type EstadoVoz, NAVEGADOR_VOZ, type TrabajoVoz, type VozStudio } from '../../shared/types.ts'
+import { type EstadoVoz, type ProveedorVoz, NAVEGADOR_VOZ, type TrabajoVoz, type VozStudio } from '../../shared/types.ts'
 import { VENTA } from '../../shared/venta.ts'
-import { segundosWav, textoParaVoz, vocesDelPanel } from '../../shared/voz.ts'
+import { MOTORES, motorDe, segundosWav, textoParaVoz, vocesDelPanel } from '../../shared/voz.ts'
 import { chromiumDelSistema, lanzarChromium, nombreDe, paginaNueva, SIN_CHROMIUM, SIN_VENTANA } from '../chromium.ts'
 import { guardar } from '../disco.ts'
-import { cuerpo } from '../http.ts'
+import { bytes, cuerpo } from '../http.ts'
 import { integrado } from '../navegador-agente.ts'
+import { vozPorApi } from './apis.ts'
 
 /**
  * La voz de los videos, generada en Google AI Studio («Generate speech», Gemini 3.8 Flash TTS) con la cuenta de Google
@@ -35,6 +36,9 @@ import { integrado } from '../navegador-agente.ts'
  *
  * Los botones se buscan por su texto en inglés, que es como sale AI Studio en cualquier idioma de la cuenta (solo
  * cambian los de la cuenta y el de cerrar el panel). Si la página cambia, falla con una captura en `data/voz/error.png`.
+ *
+ * Las voces de Fish Audio y ElevenLabs (`fish:<id>`, `elevenlabs:<id>`) van por su API, con la llave de cada quien
+ * (`apis.ts`): no pasan por la página ni esperan su fila, y dejan el WAV en el mismo sitio, con la misma huella.
  */
 
 const URL_VOZ = 'https://aistudio.google.com/generate-speech'
@@ -82,6 +86,10 @@ export function voz(app: string) {
   let conectando = false
   let error: string | undefined
   const guardarCuenta = () => (mkdirSync(carpeta, { recursive: true }), guardar(archivoCuenta, JSON.stringify({ correo: cuenta, voces }, null, 1)))
+
+  const apis = vozPorApi(carpeta)
+  /** Las que se están generando por API, que no hacen fila. */
+  let porApi = 0
 
   const trabajos = new Map<string, Trabajo>()
   const fila: Trabajo[] = []
@@ -453,6 +461,26 @@ export function voz(app: string) {
     }
   }
 
+  /** Una voz de Fish Audio o ElevenLabs: por su API, sin la página. */
+  async function generarPorApi(t: Trabajo) {
+    t.estado = 'generando'
+    porApi++
+    try {
+      const { wav, segundos } = await apis.generar(t.voz, t.texto)
+      mkdirSync(dirname(t.salida), { recursive: true })
+      guardar(t.salida, wav)
+      guardar(`${t.salida}.huella`, t.huella)
+      t.segundos = Math.round(segundos * 10) / 10
+      t.archivo = t.salida
+      t.estado = 'lista'
+    } catch (e) {
+      t.estado = 'error'
+      t.error = mensaje(e)
+    } finally {
+      porApi--
+    }
+  }
+
   function pedir(texto: string, nombre: string, salida: string): Trabajo {
     const huella = createHash('sha1').update(`${nombre.toLowerCase()}\n${texto}`).digest('hex')
     const t: Trabajo = { id: randomBytes(6).toString('hex'), estado: 'en-fila', voz: nombre, palabras: texto.split(/\s+/).length, texto, salida, huella }
@@ -462,13 +490,13 @@ export function voz(app: string) {
     const igual = existsSync(salida) && existsSync(`${salida}.huella`) && readFileSync(`${salida}.huella`, 'utf8') === huella
     const segundos = igual ? segundosWav(readFileSync(salida)) : null
     if (segundos) return Object.assign(t, { estado: 'lista', archivo: salida, segundos: Math.round(segundos * 10) / 10 })
-    fila.push(t)
-    void seguir()
+    if (motorDe(nombre).motor !== 'ai-studio') void generarPorApi(t)
+    else fila.push(t), void seguir()
     return t
   }
 
   const publico = ({ texto: _t, salida: _s, huella: _h, ...t }: Trabajo): TrabajoVoz => t
-  const estado = (): EstadoVoz => ({ cuenta, conectando, navegador: nombreEdge(), voces, enFila: fila.length + (trabajando ? 1 : 0), ...(error ? { error } : {}) })
+  const estado = (): EstadoVoz => ({ cuenta, conectando, navegador: nombreEdge(), voces, enFila: fila.length + (trabajando ? 1 : 0) + porApi, ...(error ? { error } : {}), motores: apis.estado() })
 
   // ── La API ─────────────────────────────────────────────────────────────────────────────────────────────────────
 
@@ -508,8 +536,31 @@ export function voz(app: string) {
       }
       if (!texto || !d.voz?.trim() || !d.salida || !isAbsolute(d.salida) || !/\.wav$/i.test(d.salida))
         return enviar(400, { error: 'Pide el texto (o el archivo con él), la voz y la ruta absoluta del .wav donde va.' }), true
-      if (!cuenta) return enviar(409, { error: 'No hay cuenta de Google conectada para AI Studio: que el usuario la conecte en Opciones → Voz (o en el selector Voz del compositor). Mientras, pídele la voz.' }), true
+      const { motor } = motorDe(d.voz)
+      if (motor !== 'ai-studio' && !apis.tieneLlave(motor))
+        return enviar(409, { error: `No hay llave de ${MOTORES[motor]}: que el usuario la ponga en Opciones → Voz. Mientras, pídele la voz.` }), true
+      if (motor === 'ai-studio' && !cuenta)
+        return enviar(409, { error: 'No hay cuenta de Google conectada para AI Studio: que el usuario la conecte en Opciones → Voz (o en el selector Voz del compositor). Mientras, pídele la voz.' }), true
       return enviar(200, publico(pedir(texto, d.voz.trim(), resolve(d.salida)))), true
+    }
+    // Fish Audio y ElevenLabs: poner o quitar la llave, volver a leer sus voces y clonar la tuya.
+    const m = /^\/api\/voz\/(fish|elevenlabs)\/(llave|voces|clonar)$/.exec(path)
+    if (m && metodo === 'POST') {
+      const motor = m[1] as ProveedorVoz
+      try {
+        if (m[2] === 'llave') await apis.guardarLlave(motor, (await cuerpo<{ llave?: string | null }>(req)).llave || null)
+        if (m[2] === 'voces') await apis.actualizar(motor)
+        if (m[2] === 'clonar') {
+          const q = new URL(req.url ?? '', 'http://x').searchParams
+          const audio = await bytes(req)
+          if (audio.length < 1000) return enviar(400, { error: 'Elige una grabación de tu voz.' }), true
+          if (audio.length > 25e6) return enviar(400, { error: 'La grabación pesa más de 25 MB: con un minuto basta.' }), true
+          await apis.clonar(motor, q.get('nombre')?.trim() || 'Mi voz', audio, String(req.headers['content-type'] ?? ''), q.get('archivo') || 'voz.wav')
+        }
+        return enviar(200, estado()), true
+      } catch (e) {
+        return enviar(400, { error: mensaje(e) }), true
+      }
     }
     const t = /^\/api\/voz\/trabajos\/(\w+)$/.exec(path)
     if (t && metodo === 'GET') {
@@ -525,7 +576,7 @@ export function voz(app: string) {
   return {
     api,
     /** Por qué no se puede reiniciar el servidor: cortaría una voz a medias. */
-    ocupado: () => (trabajando ? 'Sloth está generando una voz en AI Studio. Espera a que termine.' : null),
+    ocupado: () => (trabajando || porApi ? 'Sloth está generando una voz. Espera a que termine.' : null),
     /** Lo que Flow (`server/flow/`) toma de aquí: la cuenta y el Edge con la sesión, en el turno de la voz (ver `enTurno`). */
     google: {
       cuenta: () => cuenta,
