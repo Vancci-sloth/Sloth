@@ -20,10 +20,11 @@
 ---
 
 **Sloth** es una app de escritorio que hace videos verticales para TikTok, Reels y Shorts. Eliges un estilo, le das
-un tema o un enlace, y un agente de Claude investiga, escribe el guion, te pide tu voz y edita el video en tu
+un tema o un enlace, y un agente de IA investiga, escribe el guion, te pide tu voz y edita el video en tu
 computadora. No es una caja negra: lo ves trabajar paso a paso y le pides cambios con tus palabras.
 
-Es gratis, sin tarjeta y sin límite de videos. Trabaja con tu propia cuenta de Claude.
+Es gratis, sin tarjeta y sin límite de videos. Trabaja con la IA que ya tengas: Claude, ChatGPT, OpenCode (que tiene
+modelos gratis) u otra.
 
 ## Ejemplos
 

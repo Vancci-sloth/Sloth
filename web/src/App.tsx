@@ -613,7 +613,7 @@ export function App() {
       </aside>
 
       <main className="main">
-        <Bienvenida />
+        <Bienvenida models={models} />
         <AvisoMacViejo />
         <AvisoVideos />
         {view.kind === 'opciones' && (

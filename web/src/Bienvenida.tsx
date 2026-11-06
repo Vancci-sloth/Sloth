@@ -1,7 +1,8 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { Icono } from './Iconos'
 import { Logo } from './Logos'
-import { CuentaChatGPT, CuentaClaude, CuentaOpenCode, Requisitos } from './Opciones'
+import { AvisoPrimerAgente, Requisitos, useConAgente } from './Opciones'
+import type { Model } from '../../shared/types'
 import './Bienvenida.css'
 
 const VISTA = 'bienvenida'
@@ -39,11 +40,9 @@ export const abrirBienvenida = () => dispatchEvent(new Event(EVENTO))
  * La bienvenida: sale la primera vez que se abre Sloth y luego desde Opciones. Dice qué hace, qué hace falta (con lo
  * que falta a la vista, para hacerlo ahí mismo), cómo va un video, cuánto tarda y qué cuesta.
  */
-export function Bienvenida() {
+export function Bienvenida({ models }: { models: Model[] }) {
   const [abierta, setAbierta] = useState(() => !localStorage.getItem(VISTA))
-  const [claude, setClaude] = useState<boolean>()
-  const [chatgpt, setChatgpt] = useState<boolean>()
-  const [opencode, setOpencode] = useState<boolean>()
+  const conAgente = useConAgente(models)
   const [listo, setListo] = useState<boolean>()
   // En la app instalada en Windows: si Sloth está anclada a la barra de tareas. `null`, aquí no se ofrece.
   const [anclada, setAnclada] = useState<boolean | null>(null)
@@ -94,8 +93,8 @@ export function Bienvenida() {
           </div>
         </header>
 
-        {/* Con uno basta. Con ChatGPT, además, hace las imágenes de los videos. */}
-        <Paso n={1} titulo="Elige con qué trabaja" hecho={claude || chatgpt || opencode}>
+        {/* Con uno basta. Sin ninguno, el aviso lleva a Opciones → Agentes, como el del compositor. */}
+        <Paso n={1} titulo="Elige con qué trabaja" hecho={conAgente}>
           Con uno basta, y Sloth no te cobra aparte. Todos se conectan en Opciones → Agentes; Pi usa el plan o la llave que le
           conectes.
           {OPCIONES.map(({ titulo, nota, agentes }) => (
@@ -114,9 +113,7 @@ export function Bienvenida() {
               </div>
             </div>
           ))}
-          <CuentaClaude onFalta={(falta) => setClaude(falta === undefined ? undefined : !falta)} />
-          <CuentaChatGPT onFalta={(falta) => setChatgpt(falta === undefined ? undefined : !falta)} />
-          <CuentaOpenCode aviso onFalta={(falta) => setOpencode(falta === undefined ? undefined : !falta)} />
+          {conAgente === false && <AvisoPrimerAgente onIr={cerrar} />}
         </Paso>
         <Paso n={2} titulo="Prepara tu computadora" hecho={listo}>
           Los estilos usan unas herramientas (FFmpeg, Python…). Si falta alguna, aquí sale el botón para descargarla; tarda unos

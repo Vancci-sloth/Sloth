@@ -1783,7 +1783,7 @@ ${correoAviso(escapar(fila.email))}
 <p class="otros">También para <a href="/descargar?so=mac">Mac</a> y <a href="/descargar?so=linux">Linux</a>.</p>
 <ol><li>Instálala. Si Windows dice «Windows protegió tu PC», da clic en <b>Más información</b> y luego en <b>Ejecutar de todas formas</b>.</li>
 <li>Ábrela y pega tu clave en Opciones: deja de salirte el recordatorio. Sirve en dos computadoras a la vez.</li>
-<li>Conecta tu cuenta de Claude, elige un estilo y escribe el tema.</li></ol>`
+<li>Conecta tu IA en Opciones, en Agentes (Claude, ChatGPT, OpenCode, que tiene modelos gratis, u otra), elige un estilo y escribe el tema.</li></ol>`
     )
   // Quien sale de PayPal sin pagar también vuelve aquí: puede volver al pago.
   if (fila.estado === 'pending')

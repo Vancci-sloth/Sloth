@@ -452,15 +452,27 @@ const CUENTA_CONECTADA = 'sloth-cuenta-conectada'
  * al conectar una cuenta.
  */
 export function useSinClaude(models: Model[] = []) {
-  const [cuentas, setCuentas] = useState<'codex' | 'opencode' | 'ninguna' | false>()
+  const { cuentas, otro } = useCuentas(models)
+  const sin: Proveedor | false | undefined = cuentas === 'ninguna' ? (otro ?? false) : cuentas === 'claude' ? false : cuentas
+  return sin
+}
+
+/** Si hay alguna IA conectada, la que sea (`undefined` mientras no se sabe): la bienvenida pide la primera si no. */
+export function useConAgente(models: Model[] = []) {
+  const { cuentas, otro } = useCuentas(models)
+  return cuentas && (cuentas !== 'ninguna' || !!otro)
+}
+
+/** Qué cuenta hay de Claude, ChatGPT u OpenCode, por ese orden, y el primero de los demás agentes que tenga modelos. */
+function useCuentas(models: Model[]) {
+  const [cuentas, setCuentas] = useState<'claude' | 'codex' | 'opencode' | 'ninguna'>()
   const otro = OTROS_AGENTES.find((p) => models.some((m) => proveedorDe(m.id) === p))
-  const sin: Proveedor | false | undefined = cuentas === 'ninguna' ? (otro ?? false) : cuentas
   useEffect(() => {
     let vivo = true
     const leer = () =>
       Promise.all([api<Cuenta>('/api/claude/cuenta'), api<Cuenta>('/api/codex/cuenta'), api<Cuenta>('/api/opencode/cuenta')]).then(
-        ([claude, codex, opencode]) => vivo && setCuentas(claude.conectada ? false : codex.conectada ? 'codex' : opencode.conectada ? 'opencode' : 'ninguna'),
-        () => vivo && setCuentas(false)
+        ([claude, codex, opencode]) => vivo && setCuentas(claude.conectada ? 'claude' : codex.conectada ? 'codex' : opencode.conectada ? 'opencode' : 'ninguna'),
+        () => vivo && setCuentas('claude')
       )
     void leer()
     addEventListener(CUENTA_CONECTADA, leer)
@@ -469,7 +481,7 @@ export function useSinClaude(models: Model[] = []) {
       removeEventListener(CUENTA_CONECTADA, leer)
     }
   }, [])
-  return sin
+  return { cuentas, otro }
 }
 
 /**
@@ -837,7 +849,28 @@ export function CuentaAgente({ p, aviso = false, onFalta }: { p: OtroAgente; avi
 }
 
 /** La cuenta de ChatGPT, solo si falta, como la de Claude: en la bienvenida. */
-export const CuentaChatGPT = ({ onFalta }: { onFalta?(falta?: boolean): void }) => <CuentaCodex aviso onFalta={onFalta} />
+/**
+ * A quien empieza no se le habla de Claude ni de llaves: se le manda a elegir su IA, en Opciones → Agentes. Lo ven el
+ * compositor y la bienvenida, que se cierra al ir (`onIr`).
+ */
+export function AvisoPrimerAgente({ onIr }: { onIr?(): void }) {
+  return (
+    <section className="panel cuenta-aviso">
+      <div className="item">
+        <div className="fila">
+          <Logo de="python-sloth" />
+          <div className="fila-nombre">
+            <strong>Conecta tu primer agente</strong>
+            <span>Sloth hace los videos con una IA: Claude, ChatGPT, OpenCode (gratis) u otra. Elige una en Opciones y conéctala una sola vez.</span>
+          </div>
+          <button className="primary" onClick={() => (onIr?.(), (location.hash = AGENTES))}>
+            Conectar la IA
+          </button>
+        </div>
+      </div>
+    </section>
+  )
+}
 
 function AvisoClaude({ onFalta, aAgentes }: { onFalta?(falta?: boolean): void; aAgentes?: boolean }) {
   const c = useCuenta()
@@ -846,24 +879,7 @@ function AvisoClaude({ onFalta, aAgentes }: { onFalta?(falta?: boolean): void; a
   const falta = c.cuenta ? !c.cuenta.conectada : undefined
   useEffect(() => onFalta?.(falta), [falta])
   if (!c.cuenta || !falta) return null
-  // A quien empieza no se le habla de Claude ni de llaves: se le manda a elegir su IA.
-  if (aAgentes)
-    return (
-      <section className="panel cuenta-aviso">
-        <div className="item">
-          <div className="fila">
-            <Logo de="python-sloth" />
-            <div className="fila-nombre">
-              <strong>Conecta tu primer agente</strong>
-              <span>Sloth hace los videos con una IA: Claude, ChatGPT, OpenCode (gratis) u otra. Elige una en Opciones y conéctala una sola vez.</span>
-            </div>
-            <button className="primary" onClick={() => (location.hash = AGENTES)}>
-              Conectar la IA
-            </button>
-          </div>
-        </div>
-      </section>
-    )
+  if (aAgentes) return <AvisoPrimerAgente />
   return (
     <section className="panel cuenta-aviso">
       <div className="item">
