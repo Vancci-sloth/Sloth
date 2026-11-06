@@ -1,1 +1,1 @@
-Si tu IA llega a su límite a media tarea, el hilo sigue con otra que tengas conectada, sin perder lo hablado ni el estilo.
+Comparte tus estilos en la comunidad (o instala los de otros) y genera la voz también con Fish Audio o ElevenLabs, con tu llave.
