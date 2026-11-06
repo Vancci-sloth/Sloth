@@ -74,8 +74,8 @@ put NOMBRE`. Desde PowerShell, la tubería le pone un BOM delante y la pasarela 
 
 Cuando el usuario pida un link de Fundador, dale uno nuevo con `npm run fundador -- nuevo <para quién>`. Es de una sola
 persona: la página ofrece los $15 (cada mes o una vez) hasta que alguien paga con él, aunque los 25 lugares públicos
-estén ocupados. Sin link, la página solo enseña «Lo que gustes» y $30, y quien paga $15 o más ahí toma un lugar público
-si queda. Con `lista` ves los que se han dado y quién usó cada uno, y con `revocar <código>` uno deja de servir.
+estén ocupados. Sin link, la página enseña el de Fundador mientras quede alguno de los 25, y llenos, solo «Lo que
+gustes» y $30. Con `lista` ves los que se han dado y quién usó cada uno, y con `revocar <código>` uno deja de servir.
 
 ## Publicaciones de Instagram: nube/
 

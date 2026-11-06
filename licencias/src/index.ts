@@ -36,7 +36,7 @@
  * de apoyo grande), y hay un apoyo de una vez (`unico`): una orden como la del año, de cualquier monto, que vale un mes.
  * Ser Fundador (`fundador`) da más beneficios que a quien llega después. Lo es quien paga el precio de Fundador
  * (`PRECIO_MENSUAL`) o más, cada mes o una vez, mientras lo pagado no vence (`esFundador`): al vencer, el lugar se libera.
- * Por la página son `FUNDADORES` lugares como mucho (la página solo enseña el grande y «Lo que gustes»); con un enlace
+ * Por la página son `FUNDADORES` lugares como mucho (llenos, la página solo enseña el grande y «Lo que gustes»); con un enlace
  * de invitación del creador (`enlaces_fundador`, que da `npm run fundador`), que es de una sola persona y deja de servir
  * con su primer pago, la página ofrece el precio de Fundador aunque los lugares estén ocupados. Cada suscripción conserva el monto y la moneda con que se creó: las de antes
  * del 30 de octubre de 2026 siguen en pesos; las nuevas, en `MONEDA`.
