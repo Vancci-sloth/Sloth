@@ -227,7 +227,7 @@ async function quien(req: Request, env: Env): Promise<Miembro> {
 
 /**
  * La insignia del miembro `m`, por el correo de su clave: `fundador` si un apoyo suyo entró entre los primeros y se
- * pagó, o si tiene un lugar gratis de por vida (para siempre, `esFundador`); mientras tenga uno pagado y sin vencer,
+ * pagó, o si tiene un lugar gratis de por vida (`esFundador`); mientras tenga uno pagado y sin vencer,
  * `grande` si es de `APOYO_GRANDE` o más al mes (o de una vez) en `MONEDA`, o de `APOYO_GRANDE_MXN` en pesos, y si no,
  * `apoya`.
  */

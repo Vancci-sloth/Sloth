@@ -34,9 +34,10 @@
  * El apoyo sugerido cuesta lo mismo para todos (`PRECIO_MENSUAL` o `PRECIO_ANUAL`). Desde el 4 de noviembre de 2026 el
  * mensual también va con el monto que elija cada quien (desde `APOYO_MINIMO`; con `APOYO_GRANDE` o más, la insignia
  * de apoyo grande), y hay un apoyo de una vez (`unico`): una orden como la del año, de cualquier monto, que vale un mes.
- * Las `FUNDADORES` primeras personas que apoyan cada mes con el precio sugerido o más son fundadoras (`fundador`) para
- * siempre: más beneficios que quien llega después. Desde el 6 de noviembre de 2026 solo cuenta el mensual; las dos que lo
- * fueron con un apoyo de una vez lo siguen siendo. Cada suscripción conserva el monto y la moneda con que se creó: las de antes
+ * Hay `FUNDADORES` lugares de Fundador (`fundador`): más beneficios que quien llega después. Desde el 6 de noviembre de
+ * 2026 (`FUNDADOR_MIENTRAS`) solo se ofrecen con un enlace de invitación del creador (`enlaces_fundador`, que da
+ * `npm run fundador`), con el mensual del precio sugerido o más, y duran mientras se apoya: al vencer, el lugar se libera.
+ * Quien lo fue antes, también con un apoyo de una vez, lo es para siempre, como decían sus términos. Cada suscripción conserva el monto y la moneda con que se creó: las de antes
  * del 30 de octubre de 2026 siguen en pesos; las nuevas, en `MONEDA`.
  * Cuando Sloth se vendía, las primeras personas se unieron gratis de por vida (plan `gratis`, `GRATIS` como mucho): son
  * fundadoras como las primeras que apoyan (`esFundador`), con lo nuevo `ANTICIPO` antes y sin el recordatorio. Ya no se
@@ -358,11 +359,23 @@ const TERMINOS = /^\d{4}-\d{2}-\d{2}$/
 /** Cuánto antes que los demás recibe lo nuevo quien apoya. */
 const ANTICIPO = 7 * DIA
 /**
- * Si una fila de `licencias` hace fundadora a su correo, para siempre: un apoyo de los primeros que se llegó a pagar, o
- * un lugar gratis de por vida que sigue en pie. `t` es el nombre de la tabla en la consulta.
+ * Desde estos términos, el lugar de Fundador dura mientras se apoya: al acabarse lo pagado se pierde y se libera. Quien lo
+ * fue con los de antes lo es para siempre, como se le prometió.
+ */
+export const FUNDADOR_MIENTRAS = '2026-11-06'
+/**
+ * Si una fila de `licencias` hace fundadora a su correo: un apoyo de los primeros que se llegó a pagar (con los términos
+ * de antes de `FUNDADOR_MIENTRAS`, para siempre; con los nuevos, mientras no venza), o un lugar gratis de por vida que
+ * sigue en pie. `t` es el nombre de la tabla en la consulta.
  */
 export function esFundador(t: string) {
-  return `((${t}.fundador = 1 AND ${t}.autorizada IS NOT NULL) OR (${t}.plan = 'gratis' AND ${t}.estado = 'gratis'))`
+  return `((${t}.fundador = 1 AND ${t}.autorizada IS NOT NULL AND (coalesce(${t}.terminos, '') < '${FUNDADOR_MIENTRAS}' OR julianday(${t}.pagado_hasta) > julianday('now'))) OR (${t}.plan = 'gratis' AND ${t}.estado = 'gratis'))`
+}
+
+/** Un enlace de invitación de Fundador que sigue en pie (`enlaces_fundador`). */
+async function enlaceFundador(env: Env, codigo: unknown): Promise<boolean> {
+  if (typeof codigo !== 'string' || !/^[A-Za-z0-9]{8,32}$/.test(codigo)) return false
+  return !!(await env.DB.prepare('SELECT 1 FROM enlaces_fundador WHERE codigo = ? AND revocado IS NULL').bind(codigo).first())
 }
 /** Se avisa del cobro cuando faltan esto o menos días: el cron corre cada mañana, así que el aviso llega con 6 o 7. */
 const AVISO = 7 * DIA
@@ -413,7 +426,7 @@ export default {
 
 async function atender(req: Request, env: Env, ctx: ExecutionContext, url: URL): Promise<Response> {
   try {
-    if (req.method === 'GET' && url.pathname === '/precio') return json(await precios(env))
+    if (req.method === 'GET' && url.pathname === '/precio') return json(await precios(env, url.searchParams.get('fundador') ?? undefined))
     // Los Fundadores que pidieron salir en los créditos de la página.
     if (req.method === 'GET' && url.pathname === '/creditos') return json({ fundadores: await creditos(env) })
     if (req.method === 'GET' && url.pathname === '/version') return json(await ultimaPara(req, env, sistema(url.searchParams.get('so'))))
@@ -637,10 +650,14 @@ async function publicar(req: Request, env: Env, url: URL): Promise<Response> {
   throw new Rechazo(404, 'No existe')
 }
 
-/** El precio de hoy. Las suscripciones de prueba y las cuentas gratis no cuentan: solo las pagadas de verdad y los lugares gratis de por vida. */
-async function precios(env: Env) {
+/**
+ * El precio de hoy. Las suscripciones de prueba y las cuentas gratis no cuentan: solo las pagadas de verdad y los lugares
+ * gratis de por vida. Los lugares de Fundador los ocupan los que siguen siéndolo (`esFundador`). Con un enlace de
+ * Fundador en pie (`codigo`), `fundador`: la página ofrece ese apoyo.
+ */
+async function precios(env: Env, codigo?: unknown) {
   const c = await env.DB.prepare(
-    `SELECT COUNT(CASE WHEN autorizada IS NOT NULL AND fundador = 1 THEN 1 END) AS fundadores,
+    `SELECT COUNT(CASE WHEN ${esFundador('licencias')} THEN 1 END) AS fundadores,
             COUNT(CASE WHEN plan = 'mensual' AND julianday(pagado_hasta) > julianday('now') THEN 1 END) AS apoyan
      FROM licencias WHERE plan IN ('mensual', 'anual', 'unico') AND modo = 'produccion'`
   ).first<Cuenta>()
@@ -651,7 +668,8 @@ async function precios(env: Env) {
   const conCripto = !!(env.NOWPAYMENTS_API_KEY && env.NOWPAYMENTS_IPN_SECRET)
   const t = tarifa(c ?? { fundadores: 0, apoyan: 0 }, env, conMp)
   const cripto: Precios = { mensual: t.mensual, anual: t.anual, minimo: Number(env.APOYO_MINIMO_CRIPTO), grande: t.grande, maximo: t.maximo, moneda: t.moneda }
-  return { ...t, ...(conCripto ? { cripto } : {}), ...(env.SIN_PAYPAL === '1' ? { sinPaypal: true } : {}) }
+  const fundador = codigo !== undefined && t.quedan > 0 && (await enlaceFundador(env, codigo))
+  return { ...t, ...(conCripto ? { cripto } : {}), ...(env.SIN_PAYPAL === '1' ? { sinPaypal: true } : {}), ...(fundador ? { fundador: true } : {}) }
 }
 
 /**
@@ -717,7 +735,7 @@ async function suscribir(env: Env, c: Record<string, unknown>, desde: string): P
     )
   const acepto = new Date().toISOString()
   if (plan === 'gratis') return unirse(env, email, equipo!, acepto, terminos, desde, c.porCorreo === true)
-  const t = await precios(env)
+  const t = await precios(env, c.fundador)
   if (pasa === 'paypal' && t.sinPaypal) throw new Rechazo(400, 'Por ahora no se puede pagar con PayPal: elige Mercado Pago o cripto.')
   if ((pasa === 'mercadopago' && !t.mxn) || (pasa === 'cripto' && !t.cripto)) throw new Rechazo(400, 'Por ahora solo se puede pagar con PayPal.')
   const p: Precios = pasa === 'mercadopago' ? t.mxn! : pasa === 'cripto' ? t.cripto! : t
@@ -744,8 +762,8 @@ async function suscribir(env: Env, c: Record<string, unknown>, desde: string): P
     plan,
     monto,
     moneda: p.moneda,
-    // Fundador, solo quien apoya cada mes con el precio sugerido de su moneda o más.
-    fundador: t.quedan > 0 && plan === 'mensual' && monto >= p.mensual ? 1 : 0,
+    // Fundador, solo con un enlace de Fundador, mientras queden lugares, y apoyando cada mes con el precio sugerido de su moneda o más.
+    fundador: t.fundador && plan === 'mensual' && monto >= p.mensual && terminos >= FUNDADOR_MIENTRAS ? 1 : 0,
     preapproval: null,
     enlace: null,
     estado: 'pending',
@@ -1320,7 +1338,7 @@ export function vigencia(f: Pick<Fila, 'estado' | 'pagado_hasta'>, ahora: number
 /** Lo que guarda Sloth: `datos` tal cual se firmó (un JSON en texto) y su firma. */
 async function firmada(env: Env, f: Fila, equipo: string, ahora: number): Promise<Response> {
   const { activa, hasta } = vigencia(f, ahora)
-  // Fundador para siempre: un apoyo de su correo que entró entre los primeros y se llegó a pagar, o su lugar gratis de por vida.
+  // Fundador: un apoyo de su correo que entró entre los primeros y se llegó a pagar (`esFundador`), o su lugar gratis de por vida.
   const fundador = !!(await env.DB.prepare(`SELECT 1 FROM licencias l WHERE l.email = ? AND ${esFundador('l')} LIMIT 1`).bind(f.email).first())
   const datos = JSON.stringify({
     clave: f.clave,

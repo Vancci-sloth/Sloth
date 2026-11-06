@@ -3,7 +3,7 @@ import { createHmac } from 'node:crypto'
 import test from 'node:test'
 import { readFileSync } from 'node:fs'
 import { DatabaseSync } from 'node:sqlite'
-import { CUPO, VIGILAR, deTodos, esFundador, faltaAvisar, firmaDeMercadoPago, instaladorDe, leerPagos, leerPaypal, liberada, rangoDe, sistema, sistemaDelYml, sobran, tarifa, vigencia, montoDe, firmaDeNowpayments } from './index.ts'
+import { CUPO, VIGILAR, FUNDADOR_MIENTRAS, deTodos, esFundador, faltaAvisar, firmaDeMercadoPago, instaladorDe, leerPagos, leerPaypal, liberada, rangoDe, sistema, sistemaDelYml, sobran, tarifa, vigencia, montoDe, firmaDeNowpayments } from './index.ts'
 import { DE_LA_APP } from './comunidad.ts'
 
 const SECRETO = 'secreto-de-prueba'
@@ -169,20 +169,22 @@ test('un lugar gratis abre siempre; quitado (cancelled, sin nada pagado), ya no'
   assert.deepEqual(vigencia({ estado: 'cancelled', pagado_hasta: null }, ahora), { activa: false, hasta: ahora })
 })
 
-test('son fundadoras para siempre los primeros apoyos pagados y los lugares gratis de por vida que siguen en pie', () => {
+test('son fundadoras los primeros apoyos pagados (los de antes, para siempre; los nuevos, mientras no venzan) y los lugares gratis de por vida que siguen en pie', () => {
   const db = new DatabaseSync(':memory:')
-  db.exec('CREATE TABLE licencias (id TEXT, plan TEXT, estado TEXT, fundador INTEGER, autorizada TEXT)')
+  db.exec('CREATE TABLE licencias (id TEXT, plan TEXT, estado TEXT, fundador INTEGER, autorizada TEXT, terminos TEXT, pagado_hasta TEXT)')
   const filas = [
-    ['primer-apoyo', 'mensual', 'cancelled', 1, '2026-09-01'],
-    ['apoyo-sin-pagar', 'mensual', 'pending', 1, null],
-    ['apoyo-de-despues', 'anual', 'authorized', 0, '2026-10-01'],
-    ['gratis-de-por-vida', 'gratis', 'gratis', 0, '2026-08-01'],
-    ['gratis-quitado', 'gratis', 'cancelled', 0, '2026-08-01'],
-    ['cuenta-gratis', 'cuenta', 'gratis', 0, '2026-10-01']
+    ['primer-apoyo', 'mensual', 'cancelled', 1, '2026-09-01', '2026-10-21', '2026-10-01'],
+    ['apoyo-sin-pagar', 'mensual', 'pending', 1, null, '2026-10-21', null],
+    ['apoyo-de-despues', 'anual', 'authorized', 0, '2026-10-01', '2026-10-21', '2099-01-01'],
+    ['fundador-nuevo-al-dia', 'mensual', 'authorized', 1, '2026-11-07', FUNDADOR_MIENTRAS, '2099-01-01'],
+    ['fundador-nuevo-que-se-fue', 'mensual', 'cancelled', 1, '2026-11-07', FUNDADOR_MIENTRAS, '2000-01-01'],
+    ['gratis-de-por-vida', 'gratis', 'gratis', 0, '2026-08-01', null, null],
+    ['gratis-quitado', 'gratis', 'cancelled', 0, '2026-08-01', null, null],
+    ['cuenta-gratis', 'cuenta', 'gratis', 0, '2026-10-01', null, null]
   ]
-  for (const f of filas) db.prepare('INSERT INTO licencias VALUES (?, ?, ?, ?, ?)').run(...f)
+  for (const f of filas) db.prepare('INSERT INTO licencias VALUES (?, ?, ?, ?, ?, ?, ?)').run(...f)
   const fundadoras = db.prepare(`SELECT l.id FROM licencias l WHERE ${esFundador('l')} ORDER BY l.id`).all().map((f) => f.id)
-  assert.deepEqual(fundadoras, ['gratis-de-por-vida', 'primer-apoyo'])
+  assert.deepEqual(fundadoras, ['fundador-nuevo-al-dia', 'gratis-de-por-vida', 'primer-apoyo'])
 })
 
 test('reconoce el instalador de cada sistema, y nada más pasa por la última versión', () => {

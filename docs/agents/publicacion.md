@@ -72,6 +72,10 @@ Comprueba la ruta afectada en `https://api.sloth.vancci.org`. Este despliegue es
 Para guardar uno que el usuario copió, pásalo desde Git Bash: `tr -d ' \r\n' < /dev/clipboard | npm run licencias -- secret
 put NOMBRE`. Desde PowerShell, la tubería le pone un BOM delante y la pasarela rechaza la llave.
 
+Cuando el usuario pida un link de Fundador, dale uno con `npm run fundador -- nuevo <para quién>`. Sirve para todos los
+que lo abran: la página ofrece los $15 al mes mientras queden lugares, y sin link solo «Lo que gustes» y $30. Con
+`lista` ves los que se han dado y con `revocar <código>` uno deja de servir.
+
 ## Publicaciones de Instagram: nube/
 
 El Worker `sloth-redes`, con R2 y su cron, se configura en `nube/wrangler.jsonc`. Desde la raíz:
