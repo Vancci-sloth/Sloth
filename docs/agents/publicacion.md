@@ -66,6 +66,9 @@ npm run licencias -- d1 migrations apply sloth-licencias --remote
 npm run licencias -- deploy
 ```
 
+Despliega desde `origin/main` al día (un worktree aparte si tu checkout va atrás o tiene cambios sin guardar), con tu
+cambio encima y subido a `main`: lo publicado suele llevar commits de otros hilos, y desplegar una copia atrasada los
+borra. Si pasa, `npm run licencias -- deployments list` y `npm run licencias -- rollback <versión> -y` vuelven a la de antes.
 Aplica las migraciones cuando el cambio incluya alguna, antes de desplegar código que necesite esas columnas.
 Comprueba la ruta afectada en `https://api.sloth.vancci.org`. Este despliegue es independiente de
 `main` y `venta`; subir la app no actualiza el Worker. Los nombres de sus secretos están en la cabecera de su configuración.
