@@ -101,6 +101,8 @@ export interface Env {
   APOYO_GRANDE_MXN: number
   /** Con cripto, lo menos que se apoya con el monto elegido: NOWPayments no acepta menos en las redes más usadas. */
   APOYO_MINIMO_CRIPTO: number
+  /** Con `"1"`, no se abren apoyos nuevos con PayPal (la página lo esconde): mientras PayPal revisa la cuenta. Los de antes siguen. */
+  SIN_PAYPAL?: string
   /** Los lugares gratis de por vida que se dieron cuando Sloth se vendía: ya no se dan. */
   GRATIS: number
   /** Las primeras personas que apoyan, fundadoras (hasta `FUNDADORES_HASTA` si se pone, una fecha ISO). */
@@ -648,7 +650,7 @@ async function precios(env: Env) {
   const conCripto = !!(env.NOWPAYMENTS_API_KEY && env.NOWPAYMENTS_IPN_SECRET)
   const t = tarifa(c ?? { fundadores: 0, apoyan: 0 }, env, conMp)
   const cripto: Precios = { mensual: t.mensual, anual: t.anual, minimo: Number(env.APOYO_MINIMO_CRIPTO), grande: t.grande, maximo: t.maximo, moneda: t.moneda }
-  return { ...t, ...(conCripto ? { cripto } : {}) }
+  return { ...t, ...(conCripto ? { cripto } : {}), ...(env.SIN_PAYPAL === '1' ? { sinPaypal: true } : {}) }
 }
 
 /**
@@ -715,6 +717,7 @@ async function suscribir(env: Env, c: Record<string, unknown>, desde: string): P
   const acepto = new Date().toISOString()
   if (plan === 'gratis') return unirse(env, email, equipo!, acepto, terminos, desde, c.porCorreo === true)
   const t = await precios(env)
+  if (pasa === 'paypal' && t.sinPaypal) throw new Rechazo(400, 'Por ahora no se puede pagar con PayPal: elige Mercado Pago o cripto.')
   if ((pasa === 'mercadopago' && !t.mxn) || (pasa === 'cripto' && !t.cripto)) throw new Rechazo(400, 'Por ahora solo se puede pagar con PayPal.')
   const p: Precios = pasa === 'mercadopago' ? t.mxn! : pasa === 'cripto' ? t.cripto! : t
   const monto = montoDe(plan, c.monto, p)

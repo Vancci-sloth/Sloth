@@ -52,6 +52,9 @@
     // Con cripto, el monto elegido va desde aquí: NOWPayments no acepta menos de unos $11 en USDT por TRON, la red más
     // usada en Binance (BTC pide unos $21). El sugerido y el anual no cambian.
     "APOYO_MINIMO_CRIPTO": 12,
+    // "1": no se abren apoyos nuevos con PayPal y la página no lo ofrece (desde el 5 de noviembre de 2026, mientras PayPal
+    // revisa la cuenta). Las suscripciones de antes siguen. Para volver a ofrecerlo, quítalo y despliega.
+    "SIN_PAYPAL": "1",
     "MONEDA": "USD",
     // Los correos salen de un dominio verificado en Resend (con su RESEND_API_KEY como secreto) y se responden en soporte@vancci.org.
     "CORREO_DE": "Sloth <avisos@vancci.org>",
