@@ -5,7 +5,8 @@
 // de antes: MP_ACCESS_TOKEN (producción de «Sloth pruebas», la app de la vendedora de prueba), MP_ACCESS_TOKEN_PRODUCCION
 // (producción de la aplicación «Sloth» real), MP_WEBHOOK_SECRET (la clave secreta de los webhooks de la real),
 // NOWPAYMENTS_API_KEY y NOWPAYMENTS_IPN_SECRET (la llave de la API y la clave de los avisos IPN, en Settings del panel de
-// NOWPayments, del modo `NOWPAYMENTS_MODO`; sin ellas no se ofrece pagar con cripto),
+// NOWPayments, del modo `NOWPAYMENTS_MODO`; sin ellas no se ofrece pagar con cripto), STRIPE_SECRET_KEY y
+// STRIPE_WEBHOOK_SECRET (la tarjeta, con Stripe: `npm run stripe` pone las dos con la llave secreta; sin ellas no se ofrece),
 // VOICES_PK_LIVE (la llave de socio `pk_live_…` de Voices Cloning, para las voces de src/voz.ts; sin ella, la app no las ofrece),
 // FIRMA (la llave privada Ed25519 en PKCS8 y base64; la pública va en server/licencia.ts) y PUBLICAR (la llave de
 // `npm run publicar`, que también está en %APPDATA%\sloth\licencias\publicar.txt). La base de datos se crea con
@@ -30,9 +31,6 @@
     "PAYPAL_MODO": "produccion",
     // Con cuál de los dos tokens se leen y cancelan las suscripciones de Mercado Pago de antes.
     "MP_MODO": "produccion",
-    // La llave pública de la app «Sloth» de Mercado Pago de ese modo (no es secreta): con ella, la página dibuja los
-    // campos de la tarjeta. Al cambiar MP_MODO, cambia también.
-    "MP_LLAVE_PUBLICA": "APP_USR-3436d2c9-061c-42af-83e1-2384ed6a05d6",
     // `prueba` cobra en el sandbox de NOWPayments (account-sandbox.nowpayments.io, con sus propias llaves); `produccion`, de verdad.
     "NOWPAYMENTS_MODO": "produccion",
     "ORIGEN": "https://api.sloth.vancci.org",

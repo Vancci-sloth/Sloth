@@ -3,7 +3,7 @@ import { createHmac } from 'node:crypto'
 import test from 'node:test'
 import { readFileSync } from 'node:fs'
 import { DatabaseSync } from 'node:sqlite'
-import { CUPO, VIGILAR, deTodos, esFundador, faltaAvisar, firmaDeMercadoPago, firmaDeNowpayments, instaladorDe, leerPagos, leerPaypal, liberada, mensualRechazado, montoDe, motivoDeRechazo, rangoDe, sistema, sistemaDelYml, sobran, tarifa, tarjetaDe, vigencia } from './index.ts'
+import { CUPO, VIGILAR, deTodos, esFundador, faltaAvisar, firmaDeMercadoPago, firmaDeNowpayments, instaladorDe, leerPagos, leerPaypal, liberada, mensualRechazado, montoDe, rangoDe, sistema, sistemaDelYml, sobran, tarifa, vigencia } from './index.ts'
 import { DE_LA_APP } from './comunidad.ts'
 
 const SECRETO = 'secreto-de-prueba'
@@ -271,25 +271,10 @@ test('lo sospechoso se avisa una vez por semana de cada cosa, y solo lo inventad
   assert.equal(DE_LA_APP.test('tu-probe-equipo-001'), false)
 })
 
-test('la tarjeta de la página: token, marca y banco; sin token o con algo raro, se rechaza', () => {
-  assert.deepEqual(tarjetaDe({ token: 'a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6', metodo: 'debvisa', emisor: '160' }), { token: 'a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6', metodo: 'debvisa', emisor: 160 })
-  assert.deepEqual(tarjetaDe({ token: 'a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6', metodo: 'master' }), { token: 'a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6', metodo: 'master' })
-  assert.throws(() => tarjetaDe(undefined), /tarjeta/)
-  assert.throws(() => tarjetaDe({ token: 'corto', metodo: 'visa' }), /tarjeta/)
-  assert.throws(() => tarjetaDe({ token: 'a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6', metodo: 'visa"; DROP' }), /tarjeta/)
-})
-
-test('el rechazo de la tarjeta se dice con su motivo, o uno general', () => {
-  assert.match(motivoDeRechazo('cc_rejected_insufficient_amount'), /saldo/)
-  assert.match(motivoDeRechazo('cc_rejected_algo_nuevo'), /no aceptó la tarjeta/)
-  assert.match(motivoDeRechazo(undefined), /no aceptó la tarjeta/)
-})
-
 test('el cobro de cada mes rechazado dice por qué, sin hablar del «+»', () => {
   // Lo que contesta Mercado Pago a un correo con cuenta suya de otro país.
-  assert.match(mensualRechazado('Payer is associated with a different site', false), /otro país.*Elige «Tarjeta»/)
-  assert.match(mensualRechazado('Payer is associated with a different site', true), /otro país.*Vuelve y escribe otro correo/)
-  assert.match(mensualRechazado('Invalid payer_email', false), /no aceptó ese correo/)
-  assert.match(mensualRechazado('Algo nuevo', true), /con esta tarjeta/)
-  for (const m of ['Payer is associated with a different site', 'Invalid payer_email', 'Algo nuevo']) for (const t of [false, true]) assert.doesNotMatch(mensualRechazado(m, t), /\+/)
+  assert.match(mensualRechazado('Payer is associated with a different site'), /otro país.*Elige «Tarjeta»/)
+  assert.match(mensualRechazado('Invalid payer_email'), /no aceptó ese correo/)
+  assert.match(mensualRechazado('Algo nuevo'), /no pudo abrir el cobro de cada mes/)
+  for (const m of ['Payer is associated with a different site', 'Invalid payer_email', 'Algo nuevo']) assert.doesNotMatch(mensualRechazado(m), /\+/)
 })
