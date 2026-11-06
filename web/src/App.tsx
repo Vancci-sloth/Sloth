@@ -1,7 +1,7 @@
 import { memo, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { CANAL_CARD, IDEAS_CARD } from '../../shared/ideas' // ideas
 import type { AvanceCorto, AvisoComunidad, Card, Model, Previa, Serie, ServerPush, SessionMeta, VideoHecho } from '../../shared/types'
-import { NOMBRE_AGENTE, proveedorDe } from '../../shared/providers'
+import { NOMBRE_AGENTE, PROVEEDORES, proveedorDe } from '../../shared/providers'
 import { AvisoVideos } from './AvisoVideos'
 import { VENTA } from '../../shared/venta'
 import { Ideas } from './Ideas' // ideas
@@ -1155,6 +1155,9 @@ const SessionView = memo(function SessionView({ id, session, card, models }: { i
   // Un video del lote que espera su turno arranca con su propio mensaje: un clic no le manda otro.
   const pendiente = !!session?.pendiente
   const onResponder = useMemo(() => (pendiente ? undefined : (text: string) => api(`/api/sessions/${id}/send`, { text })), [id, pendiente])
+  // Con quién puede seguir el hilo si su agente llega al límite: el primer modelo de cada otro agente conectado.
+  const actual = proveedorDe(session?.model ?? '')
+  const relevos = useMemo(() => PROVEEDORES.filter((p) => p !== actual).flatMap((p) => (p === 'opencode' ? conOpenCode(models) : conPrimero(models, p))?.principal ?? []), [models, actual])
   const navegador = useNavegadorAbierto(id)
   if (!session) return <div className="empty">{fallo ? `No se pudo abrir este hilo: ${fallo}` : 'Cargando…'}</div>
   const subagente = abierto?.sesion === session.id ? abierto.id : undefined
@@ -1196,6 +1199,7 @@ const SessionView = memo(function SessionView({ id, session, card, models }: { i
         subagente={subagente}
         onSubagente={onSubagente}
         onResponder={onResponder}
+        relevos={relevos}
       />
       {/* Oculto y no quitado: guarda lo que escribías, y una cita del subagente le llega. */}
       <div className="session-composer" hidden={!!subagente}>
@@ -1221,7 +1225,7 @@ const SessionView = memo(function SessionView({ id, session, card, models }: { i
         {esDeEstudio(card) && <ReferenciaVideo sessionId={session.id} />}
         <Composer
           key={`composer:${session.id}`}
-          models={models.filter((m) => proveedorDe(m.id) === proveedorDe(session.model))}
+          models={models}
           initial={{ model: session.model, effort: session.effort }}
           running={session.running}
           background={!!session.background?.length}

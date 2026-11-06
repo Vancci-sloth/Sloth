@@ -38,22 +38,66 @@ test('un hilo enorme cabe: se queda con el encargo y lo más reciente', () => {
   assert.match(r, /mensajes omitidos/)
 })
 
-function preparar(t: test.TestContext) {
+function preparar(t: test.TestContext, model = 'antigravity:x') {
   const dir = mkdtempSync(join(tmpdir(), 'sloth-relevo-'))
   const eventos: AgentEvent[] = []
   const enviados: string[] = []
+  const skills: (string | undefined)[] = []
   const reanudar: (string | undefined)[] = []
   let opciones!: AgentOptions
   let cierres = 0
   const sessions = new Sessions(dir, (_, __, events) => eventos.push(...events), () => {}, () => {}, () => {}, (opts) => {
     opciones = opts
     reanudar.push(opts.resume)
-    return { send(text) { enviados.push(text) }, steer() {}, async interrupt() {}, close() { cierres++ } }
+    return { send(text, skill) { enviados.push(text); skills.push(skill?.name) }, steer() {}, async interrupt() {}, close() { cierres++ } }
   })
-  const meta = sessions.create({ cardId: 'sloth', cwd: dir, title: 'Prueba', model: 'antigravity:x' })
+  const meta = sessions.create({ cardId: 'sloth', cwd: dir, title: 'Prueba', model })
   t.after(() => { sessions.closeAll(); rmSync(dir, { recursive: true, force: true }) })
-  return { sessions, meta, eventos, enviados, reanudar, cierres: () => cierres, emitir: (e: AgentEvent) => opciones.onEvent(e), sesion: (id: string) => opciones.onProviderSession(id) }
+  return { sessions, meta, eventos, enviados, skills, reanudar, cierres: () => cierres, emitir: (e: AgentEvent) => opciones.onEvent(e), sesion: (id: string) => opciones.onProviderSession(id) }
 }
+
+test('Claude llega al límite a media tarea y el hilo pasa a ChatGPT con lo hablado, sus tareas y la skill', async (t) => {
+  const h = preparar(t, 'claude-opus-5-5')
+  h.sessions.send(h.meta.id, 'Haz el video de 45 escenas', { name: 'video-explicativo' })
+  h.sesion('de-claude')
+  h.emitir({ t: 'text', id: 'a', delta: 'Escena 23 lista, sigo con la 24.' })
+  h.emitir({ t: 'tool', id: 'p', name: 'TodoWrite', input: { todos: [{ content: 'Escenas 1-23', status: 'completed' }, { content: 'Escena 24', status: 'in_progress' }] } })
+  h.emitir({ t: 'text', id: 'b', delta: "You've hit your 5-hour limit · resets 6:50pm" })
+  h.emitir({ t: 'turn_end', at, ok: false, error: "You've hit your 5-hour limit · resets 6:50pm" })
+  // El error recuerda de quién era, aunque el hilo pase a otro.
+  const fin = h.eventos.findLast((e) => e.t === 'turn_end')
+  assert.equal(fin?.t === 'turn_end' && fin.agente, 'claude')
+
+  h.sessions.setModel(h.meta.id, 'codex:gpt-5.6', 'high')
+  assert.equal(h.cierres(), 1)
+  assert.equal(h.meta.providerSessionId, undefined)
+  assert.equal(h.meta.vieneDe, 'claude')
+  assert.ok(h.eventos.some((e) => e.t === 'info' && /de Claude a ChatGPT/.test(e.text)))
+
+  h.sessions.send(h.meta.id, 'Sigue donde te quedaste.')
+  const pasado = h.enviados[1]
+  assert.match(pasado, /lo llevaba Claude/)
+  assert.match(pasado, /Claude: Escena 23 lista/)
+  assert.match(pasado, /\[x\] Escenas 1-23\n- \[en curso\] Escena 24/)
+  assert.match(pasado, /\.jsonl/)
+  assert.doesNotMatch(pasado, /hit your/)
+  assert.match(pasado, /<\/historial>\n\nSigue donde te quedaste\.$/)
+  // Sesión nueva, y vuelve a pedir la skill del hilo.
+  assert.deepEqual(h.reanudar, [undefined, undefined])
+  assert.equal(h.skills[1], 'video-explicativo')
+  h.sesion('de-codex')
+  assert.equal(h.meta.vieneDe, undefined)
+})
+
+test('cambiar de modelo sin cambiar de agente no abre otra sesión', (t) => {
+  const h = preparar(t, 'claude-opus-5-5')
+  h.sessions.send(h.meta.id, 'Hola')
+  h.sesion('de-claude')
+  h.emitir({ t: 'turn_end', at, ok: true })
+  h.sessions.setModel(h.meta.id, 'claude-sonnet-5-5')
+  assert.equal(h.meta.providerSessionId, 'de-claude')
+  assert.equal(h.meta.resumir, undefined)
+})
 
 test('una sesión agotada se cambia por otra, con el resumen, y el hilo sigue solo', async (t) => {
   const h = preparar(t)

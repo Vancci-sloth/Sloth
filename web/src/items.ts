@@ -7,7 +7,7 @@ export type Item =
   | { kind: 'text'; key: string; text: string; parent?: string; opciones?: string[] }
   | { kind: 'thinking'; key: string; text: string; parent?: string; at?: number }
   | { kind: 'tool'; key: string; id: string; name: string; input: any; output: string; largo?: number; done: boolean; error: boolean; parent?: string; subagente?: Subagente }
-  | { kind: 'turn_end'; key: string; ok: boolean; error?: string; caida?: boolean; costUsd?: number; ms: number }
+  | { kind: 'turn_end'; key: string; ok: boolean; error?: string; caida?: boolean; costUsd?: number; agente?: Proveedor; ms: number }
   | { kind: 'info'; key: string; text: string }
   | { kind: 'arranque'; key: string; nombre: string; desde: number; dura: number; acabado?: boolean }
 
@@ -155,7 +155,7 @@ function leer(a: Armado, e: AgentEvent, i: number) {
     }
     case 'turn_end':
       acabarArranque(a)
-      poner({ kind: 'turn_end', key: `end${i}`, ok: e.ok, error: e.error, caida: e.caida, costUsd: e.costUsd, ms: a.turnStart ? e.at - a.turnStart : 0 })
+      poner({ kind: 'turn_end', key: `end${i}`, ok: e.ok, error: e.error, caida: e.caida, costUsd: e.costUsd, agente: e.agente, ms: a.turnStart ? e.at - a.turnStart : 0 })
       // Lo que quedó a medias cuando el turno acabó (cortado o con error) ya no va a terminar. Lo de un subagente sí
       // puede: trabaja aparte, y lo suyo se cierra con él.
       for (const k of a.abiertas) {
@@ -354,8 +354,9 @@ export const REINTENTAR = 'Sigue donde te quedaste.'
  * Un turno que acabó mal, en palabras de todos los días: qué pasó y qué hacer. `reintentar`: pedirle que siga puede
  * bastar. `tuyo`: lo detuviste tú, no es un fallo. El error tal cual se ve al pasar el ratón. `agente`: el del hilo, que
  * nombra el plan y la cuenta (con Codex, los de ChatGPT). Con OpenCode, sus modelos gratis se saturan o se acaba el uso gratis.
+ * `limite`: se acabó el uso de ese agente, y el hilo puede seguir ya con otro (`Fallo` en Timeline.tsx).
  */
-export function errorLlano(error = '', caida = false, agente: Proveedor = 'claude'): { titulo: string; ayuda: string; reintentar: boolean; tuyo?: boolean } {
+export function errorLlano(error = '', caida = false, agente: Proveedor = 'claude'): { titulo: string; ayuda: string; reintentar: boolean; tuyo?: boolean; limite?: boolean } {
   const nombre = NOMBRE_AGENTE[agente]
   // La caída la marca el servidor. Los hilos de antes de la marca traen la frase con que sessions.ts cierra el turno.
   if (caida || /^el servidor se cerró a mitad del turno/.test(error)) {
@@ -367,15 +368,15 @@ export function errorLlano(error = '', caida = false, agente: Proveedor = 'claud
   }
   // El uso gratis se acaba en todos los modelos gratis a la vez: cambiar a otro gratis no sirve.
   if (agente === 'opencode' && /uso gratis|free usage/i.test(error)) {
-    return { titulo: 'Se acabó tu uso gratis de OpenCode', ayuda: 'Vuelve solo, en unas horas o al día siguiente: OpenCode no dice cuándo. Es de tu computadora: cambiar de cuenta no lo repone. Mientras, elige abajo un modelo de pago de OpenCode, Claude o ChatGPT, y pulsa «Reintentar».', reintentar: true }
+    return { titulo: 'Se acabó tu uso gratis de OpenCode', ayuda: 'Vuelve solo, en unas horas o al día siguiente: OpenCode no dice cuándo. Es de tu computadora: cambiar de cuenta no lo repone. Mientras, elige abajo un modelo de pago de OpenCode, Claude o ChatGPT, y pulsa «Reintentar».', reintentar: true, limite: true }
   }
   if (agente === 'opencode' && /modelo gratis|rate.?limit|too many requests|\b429\b/i.test(error)) {
     return { titulo: 'El modelo gratis está saturado', ayuda: 'Espera unos minutos y pulsa «Reintentar», o elige otro modelo gratis.', reintentar: true }
   }
-  if (agente === 'antigravity' && /^Se acabó tu cuota/.test(error)) return { titulo: 'Se acabó tu cuota de Antigravity', ayuda: error, reintentar: true }
+  if (agente === 'antigravity' && /^Se acabó tu cuota/.test(error)) return { titulo: 'Se acabó tu cuota de Antigravity', ayuda: error, reintentar: true, limite: true }
   if (/hit your .*limit|usage limit|rate.?limit|out of usage|spend limit|credit balance|\b429\b/i.test(error)) {
     const cuando = reinicio(error)
-    return { titulo: `Llegaste al límite de tu plan de ${nombre}`, ayuda: `${cuando ? `Se reinicia: ${cuando}.` : 'En Opciones ves cuándo se reinicia.'} Entonces pulsa «Reintentar».`, reintentar: true }
+    return { titulo: `Llegaste al límite de tu plan de ${nombre}`, ayuda: `${cuando ? `Se reinicia: ${cuando}.` : 'En Opciones ves cuándo se reinicia.'} Entonces pulsa «Reintentar», o sigue ya con otra IA: le pasa lo hablado.`, reintentar: true, limite: true }
   }
   if (/\/login|not logged in|authenticat|oauth|\b401\b|invalid api key|credential/i.test(error)) {
     return { titulo: `Tu cuenta de ${nombre} se desconectó`, ayuda: 'Vuelve a conectarla en Opciones y pulsa «Reintentar».', reintentar: true }

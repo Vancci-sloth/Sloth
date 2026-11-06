@@ -1,4 +1,5 @@
 /** Lo que comparten el servidor y la interfaz. */
+import type { Proveedor } from './providers.ts'
 
 /** Una card de la pantalla de inicio. Si trae `skill`, el primer mensaje de cada sesión la invoca. */
 export interface Card {
@@ -246,8 +247,11 @@ export type AgentEvent =
    * turno según el SDK, con los subagentes (con Codex, a precio de la API: server/precios.ts); faltan si no se
    * sabe (se cortó antes de que el SDK lo diera, es el primer turno tras retomar la sesión o el modelo no tiene precio).
    */
-  /** `relevo`: la sesión del agente ya no sirve; el hilo sigue en otra con un resumen, sola (`sigue`) o con el siguiente mensaje. */
-  | { t: 'turn_end'; at: number; ok: boolean; error?: string; costUsd?: number; tokens?: Tokens; caida?: boolean; relevo?: 'sigue' | 'espera' }
+  /**
+   * `relevo`: la sesión del agente ya no sirve; el hilo sigue en otra con un resumen, sola (`sigue`) o con el siguiente
+   * mensaje. `agente`: de un turno que falló, quién lo llevaba (el hilo puede pasar luego a otro).
+   */
+  | { t: 'turn_end'; at: number; ok: boolean; error?: string; costUsd?: number; tokens?: Tokens; caida?: boolean; relevo?: 'sigue' | 'espera'; agente?: Proveedor }
   | { t: 'info'; text: string }
   /** El agente tarda en arrancar: `dura`, lo que se espera en ms, desde `desde`. `listo`: ya arrancó. El fin del turno también lo acaba. */
   | { t: 'arranque'; nombre: string; desde: number; dura: number; listo?: boolean }
@@ -303,6 +307,8 @@ export interface SessionMeta {
   acaboBien?: boolean
   /** La sesión del agente se cambió por otra: la siguiente que se abra empieza con el resumen del hilo (`relevar` en sessions.ts). */
   resumir?: boolean
+  /** Con `resumir`: el hilo pasó de este agente a otro (`setModel`), y el resumen se lo dice al nuevo. */
+  vieneDe?: Proveedor
   /**
    * La skill que invoca el primer mensaje. Mientras el agente no haya respondido (sin `providerSessionId`), cada turno la
    * vuelve a pedir: un hilo que se cayó antes de la primera respuesta no la olvida al retomarse.

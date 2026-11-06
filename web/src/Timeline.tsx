@@ -5,7 +5,7 @@ import type { AgentEvent } from '../../shared/types'
 import { api } from './api'
 import { Arranque } from './Arranque'
 import { useEventos } from './eventos'
-import { Icon } from './Composer'
+import { Icon, type Choice } from './Composer'
 import { LINK, LINK_ICON, linkParts, pedirMejora, QUOTE, QUOTE_EVENT, QUOTE_ICON, quoteText, THREAD, THREAD_ICON, threadIconOf } from './etiquetas'
 import { MarcaAgente } from './Logos'
 import { imageUrl, Thumbs } from './Images'
@@ -150,9 +150,10 @@ function plegarTrabajo(lista: Item[], acabado: boolean): (Item | Trabajo)[] {
  * `onResponder` le escribe al agente, como el compositor. Sin él (un video del lote que espera su turno), nada de la
  * conversación se contesta con un clic. `subagente` es el que está abierto: el chat enseña solo lo suyo y su barra. Los
  * eventos los lee él mismo (`eventos.ts`): con cada trozo del agente se vuelve a dibujar el chat y nada más, y de él solo
- * la fila que cambió (`Row` va memorizada y `buildTimeline` deja igual lo que no cambió).
+ * la fila que cambió (`Row` va memorizada y `buildTimeline` deja igual lo que no cambió). `relevos`: un modelo de cada
+ * otro agente conectado, con los que el hilo sigue si el suyo llega al límite.
  */
-export function Timeline({ running, background, sessionId, proveedor = 'claude', subagente, onSubagente, onResponder }: { running: boolean; background: string[]; sessionId: string; proveedor?: string; subagente?: string; onSubagente?(id: string | null): void; onResponder?(text: string): Promise<unknown> }) {
+export function Timeline({ running, background, sessionId, proveedor = 'claude', subagente, onSubagente, onResponder, relevos }: { running: boolean; background: string[]; sessionId: string; proveedor?: string; subagente?: string; onSubagente?(id: string | null): void; onResponder?(text: string): Promise<unknown>; relevos?: Choice[] }) {
   const events = useEventos(sessionId) ?? SIN_EVENTOS
   const items = buildTimeline(events)
   const lanzador = subagente ? items.find((i): i is Extract<Item, { kind: 'tool' }> => i.kind === 'tool' && i.id === subagente && !!i.subagente) : undefined
@@ -240,7 +241,7 @@ export function Timeline({ running, background, sessionId, proveedor = 'claude',
   function pintar(fila: Fila): React.ReactNode {
     if ('trabajo' in fila) return <PlegadoTrabajo key={fila.key} t={fila.trabajo} abierto={desplegados.has(fila.key)} onPlegar={plegar(fila.key)} pintar={pintar} />
     if ('grupo' in fila) return <GrupoSubagentes key={fila.key} subs={fila.grupo} proveedor={proveedor} abierto={desplegados.has(fila.key)} onPlegar={plegar(fila.key)} onAbrir={onAbrir} />
-    return <Row key={fila.key} item={fila.item} sessionId={sessionId} anidado={!sub && 'parent' in fila.item && !!fila.item.parent} proveedor={proveedor} onAbrir={onAbrir} onResponder={contestables.has(fila.key) ? responder : undefined} />
+    return <Row key={fila.key} item={fila.item} sessionId={sessionId} anidado={!sub && 'parent' in fila.item && !!fila.item.parent} proveedor={proveedor} onAbrir={onAbrir} onResponder={contestables.has(fila.key) ? responder : undefined} relevos={relevos} />
   }
 
   return (
@@ -482,7 +483,7 @@ function WithLinks({ text }: { text: string }) {
  * `anidado`: lo de un subagente que no se sabe cuál es, suelto en el hilo, va sangrado. Memorizada: mientras el agente
  * escribe, solo se vuelve a dibujar la fila que crece.
  */
-const Row = memo(function Row({ item, sessionId, anidado, proveedor, onAbrir, onResponder }: { item: Item; sessionId?: string; anidado: boolean; proveedor: string; onAbrir(id: string): void; onResponder?(text: string): Promise<unknown> }) {
+const Row = memo(function Row({ item, sessionId, anidado, proveedor, onAbrir, onResponder, relevos }: { item: Item; sessionId?: string; anidado: boolean; proveedor: string; onAbrir(id: string): void; onResponder?(text: string): Promise<unknown>; relevos?: Choice[] }) {
   const nested = anidado ? 'nested' : ''
   switch (item.kind) {
     case 'user':
@@ -510,7 +511,7 @@ const Row = memo(function Row({ item, sessionId, anidado, proveedor, onAbrir, on
       const datos = `${item.ms > 0 ? ` · ${duration(item.ms)}` : ''}${item.costUsd ? ` · $${item.costUsd.toFixed(2)}` : ''}`
       // Es lo que se sabe: el agente acabó su turno. El trabajo puede seguir esperando tu voz, una revisión o la exportación.
       if (item.ok) return <div className="turn-end">Turno terminado{datos}</div>
-      return <Fallo item={item} datos={datos} proveedor={proveedor} sessionId={sessionId} onResponder={onResponder} />
+      return <Fallo item={item} datos={datos} proveedor={proveedor} sessionId={sessionId} onResponder={onResponder} relevos={relevos} />
     }
     case 'info':
       return <div className="info">{item.text}</div>
@@ -551,13 +552,23 @@ function Respuestas({ opciones, onElegir }: { opciones: string[]; onElegir?(text
  * Un turno que acabó mal, dicho en llano; el error tal cual, al pasar el ratón. El último, con el hilo quieto
  * (`onResponder`), dice además qué hacer y deja «Reintentar», que le pide que siga donde se quedó. Todos llevan el símbolo
  * del agente del hilo, que pide una mejora con el error para que no vuelva a pasar. El error habla de ese agente: con
- * Codex, el plan y la cuenta son los de ChatGPT.
+ * Codex, el plan y la cuenta son los de ChatGPT; si el hilo pasó luego a otro, el de quien falló (`item.agente`).
+ *
+ * Si se acabó el uso de ese agente, «Seguir con…» pasa el hilo a otro conectado, como el traspaso de T3 Code: el
+ * servidor le da lo hablado, la carpeta y la skill (`setModel` en sessions.ts), y sigue donde se quedó.
  */
-function Fallo({ item, datos, proveedor, sessionId, onResponder }: { item: Extract<Item, { kind: 'turn_end' }>; datos: string; proveedor: string; sessionId?: string; onResponder?(text: string): Promise<unknown> }) {
-  const agente = proveedorDe(proveedor === 'claude' ? '' : `${proveedor}:`)
+function Fallo({ item, datos, proveedor, sessionId, onResponder, relevos = [] }: { item: Extract<Item, { kind: 'turn_end' }>; datos: string; proveedor: string; sessionId?: string; onResponder?(text: string): Promise<unknown>; relevos?: Choice[] }) {
+  const actual = proveedorDe(proveedor === 'claude' ? '' : `${proveedor}:`)
+  const agente = item.agente ?? actual
   const e = errorLlano(item.error, item.caida, agente)
   const [enviando, setEnviando] = useState(false)
   const [fallo, setFallo] = useState('')
+  const intentar = (paso: () => Promise<unknown>) => {
+    setEnviando(true)
+    setFallo('')
+    paso().catch((err) => (setEnviando(false), setFallo(err instanceof Error ? err.message : String(err))))
+  }
+  const otros = e.limite && sessionId && onResponder ? relevos.filter((c) => proveedorDe(c.model) !== agente) : []
   return (
     <>
       <div className={`turn-end ${e.tuyo ? '' : 'bad'}`} title={item.error}>
@@ -573,16 +584,20 @@ function Fallo({ item, datos, proveedor, sessionId, onResponder }: { item: Extra
       {onResponder && (
         <div className="turn-ayuda">
           <span className={fallo ? 'bad' : ''}>{fallo || e.ayuda}</span>
-          {e.reintentar && (
+          {otros.map((c) => (
             <button
-              className="primary"
+              key={c.model}
+              className="seguir-con"
               disabled={enviando}
-              onClick={() => {
-                setEnviando(true)
-                setFallo('')
-                onResponder(REINTENTAR).catch((err) => (setEnviando(false), setFallo(err instanceof Error ? err.message : String(err))))
-              }}
+              title={`Le pasa a ${NOMBRE_AGENTE[proveedorDe(c.model)]} lo hablado, la carpeta y la skill, y sigue donde se quedó`}
+              onClick={() => intentar(() => api(`/api/sessions/${sessionId}/model`, c).then(() => onResponder(REINTENTAR)))}
             >
+              <MarcaAgente de={proveedorDe(c.model)} />
+              Seguir con {NOMBRE_AGENTE[proveedorDe(c.model)]}
+            </button>
+          ))}
+          {e.reintentar && (
+            <button className="primary" disabled={enviando} onClick={() => intentar(() => onResponder(REINTENTAR))}>
               Reintentar
             </button>
           )}
