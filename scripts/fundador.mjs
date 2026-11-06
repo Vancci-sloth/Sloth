@@ -1,8 +1,8 @@
 // Los enlaces de invitación de Fundador (`enlaces_fundador` del cobro, `licencias/`): con uno, sloth.vancci.org ofrece el
-// apoyo de Fundador mientras queden lugares; sin él, solo «Lo que gustes» y el grande. Un enlace sirve para todos los que
-// lo abran. Usa la sesión de Cloudflare de Sloth, como `npm run licencias`.
-//   npm run fundador -- nuevo [nota]     da un enlace nuevo (la nota dice para quién o dónde se dio)
-//   npm run fundador -- lista            los enlaces que se han dado
+// apoyo de Fundador; sin él, solo «Lo que gustes» y el grande. Cada enlace es de una sola persona: con su primer pago deja
+// de servir. Usa la sesión de Cloudflare de Sloth, como `npm run licencias`.
+//   npm run fundador -- nuevo [nota]     da un enlace nuevo (la nota dice para quién es)
+//   npm run fundador -- lista            los enlaces que se han dado, y quién usó cada uno
 //   npm run fundador -- revocar <codigo> ese enlace deja de servir
 import { spawnSync } from 'node:child_process'
 import { randomBytes } from 'node:crypto'
@@ -38,10 +38,13 @@ if (orden === 'nuevo') {
   console.log(enlace(codigo))
 } else if (orden === 'lista') {
   const filas = d1(
-    "SELECT codigo, nota, substr(creado, 1, 10) AS creado, revocado IS NOT NULL AS revocado FROM enlaces_fundador ORDER BY creado"
+    'SELECT e.codigo, e.nota, substr(e.creado, 1, 10) AS creado, e.revocado IS NOT NULL AS revocado, l.email FROM enlaces_fundador e LEFT JOIN licencias l ON l.id = e.usado ORDER BY e.creado'
   )
   if (!filas.length) console.log('Aún no hay enlaces.')
-  for (const f of filas) console.log(`${f.revocado ? '(revocado) ' : ''}${f.creado}  ${f.nota || 'sin nota'}\n  ${enlace(f.codigo)}`)
+  for (const f of filas) {
+    const estado = f.email ? `usado por ${f.email}` : f.revocado ? 'revocado' : 'sin usar'
+    console.log(`${f.creado}  ${f.nota || 'sin nota'}  (${estado})\n  ${enlace(f.codigo)}`)
+  }
 } else if (orden === 'revocar' && /^[A-Za-z0-9]{8,32}$/.test(resto[0] ?? '')) {
   d1(`UPDATE enlaces_fundador SET revocado = '${new Date().toISOString()}' WHERE codigo = '${resto[0]}'`)
   console.log(`Revocado: ${resto[0]}`)

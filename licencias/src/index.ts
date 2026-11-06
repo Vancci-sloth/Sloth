@@ -34,10 +34,10 @@
  * El apoyo sugerido cuesta lo mismo para todos (`PRECIO_MENSUAL` o `PRECIO_ANUAL`). Desde el 4 de noviembre de 2026 el
  * mensual también va con el monto que elija cada quien (desde `APOYO_MINIMO`; con `APOYO_GRANDE` o más, la insignia
  * de apoyo grande), y hay un apoyo de una vez (`unico`): una orden como la del año, de cualquier monto, que vale un mes.
- * Hay `FUNDADORES` lugares de Fundador (`fundador`): más beneficios que quien llega después. Desde el 6 de noviembre de
- * 2026 solo se ofrecen con un enlace de invitación del creador (`enlaces_fundador`, que da `npm run fundador`), con el
- * precio de Fundador (`PRECIO_MENSUAL`) o más, cada mes o una vez, y duran mientras lo pagado no vence: después, el lugar
- * se libera (`esFundador`). Cada suscripción conserva el monto y la moneda con que se creó: las de antes
+ * Ser Fundador (`fundador`) da más beneficios que a quien llega después. Desde el 6 de noviembre de 2026 solo se ofrece
+ * con un enlace de invitación del creador (`enlaces_fundador`, que da `npm run fundador`): cada enlace es de una sola
+ * persona y deja de servir con su primer pago. No hay tope (ya no cuenta `FUNDADORES`). Se paga el precio de Fundador
+ * (`PRECIO_MENSUAL`) o más, cada mes o una vez, y dura mientras lo pagado no vence (`esFundador`). Cada suscripción conserva el monto y la moneda con que se creó: las de antes
  * del 30 de octubre de 2026 siguen en pesos; las nuevas, en `MONEDA`.
  * Cuando Sloth se vendía, las primeras personas se unieron gratis de por vida (plan `gratis`, `GRATIS` como mucho): son
  * fundadoras como las primeras que apoyan (`esFundador`), con lo nuevo `ANTICIPO` antes y sin el recordatorio. Ya no se
@@ -160,6 +160,8 @@ export interface Fila {
   orden: string | null
   /** Pagada con cripto (el mes, el año o de una vez): la última factura de NOWPayments que se abrió para ella. */
   cripto: string | null
+  /** El enlace de Fundador con que se abrió (`enlaces_fundador`): al confirmarse el primer pago, ya no sirve a nadie más. */
+  enlace_fundador?: string | null
 }
 
 /** Lo que el cobro guarda de una suscripción o de los pagos del año. `hasta`: su próximo cobro o su fin, si se sabe. */
@@ -367,10 +369,10 @@ export function esFundador(t: string) {
   return `((${t}.fundador = 1 AND ${t}.autorizada IS NOT NULL AND julianday(${t}.pagado_hasta) > julianday('now')) OR (${t}.plan = 'gratis' AND ${t}.estado = 'gratis'))`
 }
 
-/** Un enlace de invitación de Fundador que sigue en pie (`enlaces_fundador`). */
+/** Un enlace de invitación de Fundador que sigue en pie (`enlaces_fundador`): sin revocar y sin que nadie haya pagado con él. */
 async function enlaceFundador(env: Env, codigo: unknown): Promise<boolean> {
   if (typeof codigo !== 'string' || !/^[A-Za-z0-9]{8,32}$/.test(codigo)) return false
-  return !!(await env.DB.prepare('SELECT 1 FROM enlaces_fundador WHERE codigo = ? AND revocado IS NULL').bind(codigo).first())
+  return !!(await env.DB.prepare('SELECT 1 FROM enlaces_fundador WHERE codigo = ? AND revocado IS NULL AND usado IS NULL').bind(codigo).first())
 }
 /** Se avisa del cobro cuando faltan esto o menos días: el cron corre cada mañana, así que el aviso llega con 6 o 7. */
 const AVISO = 7 * DIA
@@ -647,8 +649,7 @@ async function publicar(req: Request, env: Env, url: URL): Promise<Response> {
 
 /**
  * El precio de hoy. Las suscripciones de prueba y las cuentas gratis no cuentan: solo las pagadas de verdad y los lugares
- * gratis de por vida. Los lugares de Fundador los ocupan los que siguen siéndolo (`esFundador`). Con un enlace de
- * Fundador en pie (`codigo`), `fundador`: la página ofrece ese apoyo.
+ * gratis de por vida. Con un enlace de Fundador en pie (`codigo`), `fundador`: la página ofrece ese apoyo.
  */
 async function precios(env: Env, codigo?: unknown) {
   const c = await env.DB.prepare(
@@ -663,7 +664,7 @@ async function precios(env: Env, codigo?: unknown) {
   const conCripto = !!(env.NOWPAYMENTS_API_KEY && env.NOWPAYMENTS_IPN_SECRET)
   const t = tarifa(c ?? { fundadores: 0, apoyan: 0 }, env, conMp)
   const cripto: Precios = { mensual: t.mensual, anual: t.anual, minimo: Number(env.APOYO_MINIMO_CRIPTO), grande: t.grande, maximo: t.maximo, moneda: t.moneda }
-  const fundador = codigo !== undefined && t.quedan > 0 && (await enlaceFundador(env, codigo))
+  const fundador = codigo !== undefined && (await enlaceFundador(env, codigo))
   return { ...t, ...(conCripto ? { cripto } : {}), ...(env.SIN_PAYPAL === '1' ? { sinPaypal: true } : {}), ...(fundador ? { fundador: true } : {}) }
 }
 
@@ -741,15 +742,17 @@ async function suscribir(env: Env, c: Record<string, unknown>, desde: string): P
   // moneda y la pasarela de hoy.
   const columnas = { mercadopago: '(preapproval IS NOT NULL OR preferencia IS NOT NULL)', paypal: '(paypal IS NOT NULL OR orden IS NOT NULL)', cripto: 'cripto IS NOT NULL' }[pasa]
   const previa = await env.DB.prepare(
-    `SELECT * FROM licencias WHERE email = ? AND plan = ? AND monto = ? AND moneda = ? AND estado = 'pending' AND enlace IS NOT NULL AND ${columnas} AND creada > ? ORDER BY creada DESC LIMIT 1`
+    `SELECT * FROM licencias WHERE email = ? AND plan = ? AND monto = ? AND moneda = ? AND estado = 'pending' AND enlace IS NOT NULL AND ${columnas} AND coalesce(enlace_fundador, '') = ? AND creada > ? ORDER BY creada DESC LIMIT 1`
   )
-    .bind(email, plan, monto, p.moneda, new Date(Date.now() - 3600_000).toISOString())
+    .bind(email, plan, monto, p.moneda, t.fundador ? String(c.fundador) : '', new Date(Date.now() - 3600_000).toISOString())
     .first<Fila>()
   if (previa) {
     await env.DB.prepare('UPDATE licencias SET acepto = ?, terminos = ? WHERE id = ?').bind(acepto, terminos, previa.id).run()
     return json(equipo ? { clave: previa.clave, enlace: previa.enlace } : { enlace: previa.enlace })
   }
 
+  // Fundador, solo con un enlace de Fundador que nadie ha usado: cada mes o una vez, con el precio de Fundador de su moneda o más.
+  const deFundador = !!t.fundador && plan !== 'anual' && monto >= p.mensual
   const fila: Fila = {
     id: crypto.randomUUID(),
     clave: nuevaClave(),
@@ -757,8 +760,8 @@ async function suscribir(env: Env, c: Record<string, unknown>, desde: string): P
     plan,
     monto,
     moneda: p.moneda,
-    // Fundador, solo con un enlace de Fundador y mientras queden lugares: cada mes o una vez, con el precio de Fundador de su moneda o más.
-    fundador: t.fundador && plan !== 'anual' && monto >= p.mensual ? 1 : 0,
+    fundador: deFundador ? 1 : 0,
+    enlace_fundador: deFundador ? String(c.fundador) : null,
     preapproval: null,
     enlace: null,
     estado: 'pending',
@@ -777,8 +780,8 @@ async function suscribir(env: Env, c: Record<string, unknown>, desde: string): P
     orden: null,
     cripto: null
   }
-  await env.DB.prepare('INSERT INTO licencias (id, clave, email, plan, monto, moneda, fundador, estado, creada, acepto, terminos, modo) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
-    .bind(fila.id, fila.clave, email, plan, fila.monto, fila.moneda, fila.fundador, fila.estado, fila.creada, acepto, terminos, fila.modo)
+  await env.DB.prepare('INSERT INTO licencias (id, clave, email, plan, monto, moneda, fundador, enlace_fundador, estado, creada, acepto, terminos, modo) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+    .bind(fila.id, fila.clave, email, plan, fila.monto, fila.moneda, fila.fundador, fila.enlace_fundador, fila.estado, fila.creada, acepto, terminos, fila.modo)
     .run()
   // Dónde se paga y en qué columna queda: la suscripción mensual, o el pago del año o del apoyo de una vez.
   let abierto: { columna: 'orden' | 'paypal' | 'preapproval' | 'preferencia' | 'cripto'; id: string; enlace: string }
@@ -1299,6 +1302,9 @@ async function guardarEstado(env: Env, fila: Fila, l: Lectura): Promise<Fila> {
   // El primer pago: la clave por correo, una sola vez aunque el aviso y `/gracias` lleguen a la vez.
   if (!fila.autorizada && nueva.autorizada) {
     const r = await env.DB.prepare('UPDATE licencias SET autorizada = ? WHERE id = ? AND autorizada IS NULL').bind(ahora, fila.id).run()
+    // Su enlace de Fundador ya se usó: es de una sola persona.
+    if (r.meta.changes && fila.enlace_fundador)
+      await env.DB.prepare('UPDATE enlaces_fundador SET usado = ? WHERE codigo = ? AND usado IS NULL').bind(fila.id, fila.enlace_fundador).run()
     if (r.meta.changes) await bienvenida(env, nueva).catch((e) => console.error('Correo con la clave', e instanceof Error ? e.message : e))
   }
   await env.DB.prepare('UPDATE licencias SET estado = ?, pagado_hasta = ?, autorizada = COALESCE(autorizada, ?), revisada = ? WHERE id = ?')
