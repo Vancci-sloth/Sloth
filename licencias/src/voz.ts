@@ -28,6 +28,9 @@
  *
  * Cada llamada queda en `voz_registro` (migración 0020): quién, qué, cuántas letras y créditos, y si falló, por qué. El
  * cron borra lo de más de `GUARDAR_DIAS`.
+ *
+ * Con `VOZ_SOLO_CREADOR` en `"1"`, nadie más que el creador la usa, aunque tenga créditos: a los demás `GET /voz` les
+ * dice que no está, lo demás responde 403 y Administrador no da de alta a nadie.
  */
 import { BLOQUEADA, CLAVE, EQUIPO, type Env, Rechazo, cuerpo, iguales, json, vigencia, vigilar } from './index.ts'
 import { DE_LA_APP } from './comunidad.ts'
@@ -40,6 +43,8 @@ export const MAX_LETRAS = 5000
 /** Lo que se guarda del registro. */
 export const GUARDAR_DIAS = 180
 const SIN_LLAVE = 'Las voces de Voices Cloning aún no están listas en Sloth.'
+const CERRADA = 'Las voces de Voices Cloning aún no están abiertas en Sloth.'
+const soloCreador = (env: Env) => env.VOZ_SOLO_CREADOR === '1'
 const EXTERNO = /^[\w-]{1,100}$/
 const TAREA = /^[\w-]{1,100}$/
 
@@ -73,6 +78,10 @@ export async function voz(req: Request, env: Env, ctx: ExecutionContext, url: UR
   if (ruta.startsWith('/voz/admin')) {
     if (!q.creador) throw new Rechazo(403, 'Esto solo lo ve el creador de Sloth.')
     return admin(req, env, ctx, url)
+  }
+  if (!q.creador && soloCreador(env)) {
+    if (req.method === 'GET' && ruta === '/voz') return json({ disponible: false, creador: false })
+    throw new Rechazo(403, CERRADA)
   }
   if (req.method === 'GET' && ruta === '/voz') {
     if (!env.VOICES_PK_LIVE) return json({ disponible: false, creador: q.creador })
@@ -140,6 +149,7 @@ async function admin(req: Request, env: Env, ctx: ExecutionContext, url: URL): P
     ])
     return json({
       configurado,
+      soloCreador: soloCreador(env),
       creditosIniciales: creditosIniciales(env),
       pagina,
       consumo,
@@ -182,6 +192,7 @@ async function admin(req: Request, env: Env, ctx: ExecutionContext, url: URL): P
     return responder(r)
   }
   if (ruta === '/voz/admin/alta') {
+    if (soloCreador(env)) throw new Rechazo(409, 'Voices Cloning aún es solo para ti (VOZ_SOLO_CREADOR en el cobro): quítalo para darlo a alguien más.')
     const email = String(c.email ?? '').trim().toLowerCase()
     const creditos = Math.max(0, Math.floor(Number(c.creditos) || 0))
     const fila = await env.DB.prepare('SELECT id FROM licencias WHERE email = ? ORDER BY creada LIMIT 1').bind(email).first<{ id: string }>()

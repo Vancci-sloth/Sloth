@@ -64,6 +64,9 @@
     // Los créditos de voz de Voices Cloning con que se da de alta a cada quien la primera vez que abre sus voces. En 0, solo
     // las ve quien recibió créditos del creador (Administrador, en su Sloth).
     "VOZ_CREDITOS": 0,
+    // "1": Voices Cloning es solo del creador, aunque alguien más tenga créditos (desde el 6 de noviembre de 2026, mientras
+    // se prueba). Para abrirlo a los demás, quítalo y despliega.
+    "VOZ_SOLO_CREADOR": "1",
     "CORREO_DE": "Sloth <avisos@vancci.org>",
     "CORREO_RESPUESTA": "soporte@vancci.org"
   }

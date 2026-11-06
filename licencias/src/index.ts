@@ -130,6 +130,8 @@ export interface Env {
   VOICES_PK_LIVE?: string
   /** Los créditos de voz con que se da de alta a cada quien la primera vez que abre las voces de Voices Cloning. */
   VOZ_CREDITOS?: number
+  /** Con `"1"`, las voces de Voices Cloning son solo del creador, aunque alguien más tenga créditos. */
+  VOZ_SOLO_CREADOR?: string
 }
 
 /**

@@ -44,6 +44,8 @@ interface Registro {
 
 interface Panel {
   configurado: boolean
+  /** `VOZ_SOLO_CREADOR` en el cobro: nadie más la usa. */
+  soloCreador: boolean
   creditosIniciales: number
   pagina: number
   consumo: number
@@ -116,6 +118,12 @@ export function Admin() {
         </p>
       )}
 
+      {panel?.soloCreador && (
+        <p className="admin-aviso">
+          Por ahora Voices Cloning es <strong>solo para ti</strong>: nadie más lo ve en su Sloth, aunque tenga créditos. Para abrirlo, quita <span className="mono">VOZ_SOLO_CREADOR</span> de <span className="mono">licencias/wrangler.jsonc</span> y despliega el cobro.
+        </p>
+      )}
+
       {panel && (
         <>
           <Seccion titulo="Tu cuenta general" fallo={panel.saldo}>
@@ -130,7 +138,7 @@ export function Admin() {
           {detalle && <Detalle externo={detalle} quien={quien(detalle)} onCerrar={() => setDetalle(undefined)} onCambio={cargar} />}
 
           <Seccion titulo="Dar créditos a una cuenta de Sloth" nota="Por el correo de su cuenta o su apoyo. Si aún no usaba las voces, la da de alta con esos créditos; si ya las usaba, se le suman. Con créditos, el menú Voz de su Sloth le enseña Voices Cloning.">
-            <Alta onHecho={cargar} />
+            {panel.soloCreador ? <p className="muted small">Mientras sea solo para ti, no se da de alta a nadie más.</p> : <Alta onHecho={cargar} />}
           </Seccion>
 
           <Seccion titulo="Últimos 30 días" nota="Lo que pasó por el cobro, por tipo de llamada.">

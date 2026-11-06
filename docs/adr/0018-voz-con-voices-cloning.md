@@ -19,7 +19,8 @@ la sacaría del instalador, y con ella el encabezado `X-Partner-User` dejaría g
   creador, `creador`. Ni el correo ni la clave salen hacia Voices Cloning.
 - **Los créditos los da el creador.** `VOZ_CREDITOS` (0 de entrada) son los de cada alta; con 0, la app solo ofrece
   Voices Cloning a quien tiene o tuvo créditos, que el creador da por correo desde Administrador. Así el saldo general
-  no se gasta antes de decidir cuánto da cada plan.
+  no se gasta antes de decidir cuánto da cada plan. Mientras se prueba, `VOZ_SOLO_CREADOR` («1» desde el 6 de noviembre de
+  2026) la deja solo para el creador, aunque alguien más tenga créditos: el cobro se lo niega a los demás.
 - **Las voces se eligen en su ventana** (`embed.js`, un iframe suyo con `frame-ancestors *`), con un pase de una hora
   que pide el servidor de Sloth al cobro. La elegida o clonada queda en el menú «Voz» como `vc:<voice_id>`
   (`data/voz/voices-cloning.json`). Generar es el mismo `generar_voz` de siempre: el guion va por trozos, cada MP3 pasa a
