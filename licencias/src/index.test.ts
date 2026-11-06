@@ -3,7 +3,7 @@ import { createHmac } from 'node:crypto'
 import test from 'node:test'
 import { readFileSync } from 'node:fs'
 import { DatabaseSync } from 'node:sqlite'
-import { CUPO, VIGILAR, deTodos, esFundador, faltaAvisar, firmaDeMercadoPago, firmaDeNowpayments, instaladorDe, leerPagos, leerPaypal, liberada, montoDe, motivoDeRechazo, rangoDe, sistema, sistemaDelYml, sobran, tarifa, tarjetaDe, vigencia } from './index.ts'
+import { CUPO, VIGILAR, deTodos, esFundador, faltaAvisar, firmaDeMercadoPago, firmaDeNowpayments, instaladorDe, leerPagos, leerPaypal, liberada, mensualRechazado, montoDe, motivoDeRechazo, rangoDe, sistema, sistemaDelYml, sobran, tarifa, tarjetaDe, vigencia } from './index.ts'
 import { DE_LA_APP } from './comunidad.ts'
 
 const SECRETO = 'secreto-de-prueba'
@@ -283,4 +283,13 @@ test('el rechazo de la tarjeta se dice con su motivo, o uno general', () => {
   assert.match(motivoDeRechazo('cc_rejected_insufficient_amount'), /saldo/)
   assert.match(motivoDeRechazo('cc_rejected_algo_nuevo'), /no aceptó la tarjeta/)
   assert.match(motivoDeRechazo(undefined), /no aceptó la tarjeta/)
+})
+
+test('el cobro de cada mes rechazado dice por qué, sin hablar del «+»', () => {
+  // Lo que contesta Mercado Pago a un correo con cuenta suya de otro país.
+  assert.match(mensualRechazado('Payer is associated with a different site', false), /otro país.*Elige «Tarjeta»/)
+  assert.match(mensualRechazado('Payer is associated with a different site', true), /otro país.*Vuelve y escribe otro correo/)
+  assert.match(mensualRechazado('Invalid payer_email', false), /no aceptó ese correo/)
+  assert.match(mensualRechazado('Algo nuevo', true), /con esta tarjeta/)
+  for (const m of ['Payer is associated with a different site', 'Invalid payer_email', 'Algo nuevo']) for (const t of [false, true]) assert.doesNotMatch(mensualRechazado(m, t), /\+/)
 })

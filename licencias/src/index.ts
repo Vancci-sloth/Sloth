@@ -850,9 +850,8 @@ async function suscribir(env: Env, c: Record<string, unknown>, desde: string): P
     // La tarjeta rechazada ya trae qué decirle al cliente.
     if (error instanceof TarjetaRechazada) throw error
     const quien = { mercadopago: 'Mercado Pago', tarjeta: 'Mercado Pago', paypal: 'PayPal', cripto: 'NOWPayments' }[pasa]
-    // La suscripción de Mercado Pago rechaza (400) un correo que no es de una cuenta suya, o con «+»: se dice cuál poner.
-    if (error instanceof Rechazo && pasa === 'mercadopago' && plan === 'mensual' && error.status === 400)
-      throw new Rechazo(400, 'Mercado Pago no aceptó ese correo. Escribe el de tu cuenta de Mercado Pago (sin «+»), o paga una sola vez, que acepta cualquiera.')
+    // La suscripción de Mercado Pago rechaza (400) ciertos correos: se dice por qué y qué hacer.
+    if (error instanceof Rechazo && pasa === 'mercadopago' && plan === 'mensual' && error.status === 400) throw new Rechazo(400, mensualRechazado(error.message, false))
     throw error instanceof Rechazo ? new Rechazo(502, `${quien} no pudo abrir el pago. Revisa tu correo e intenta otra vez.`) : error
   }
   // `revisada` vacía: `/gracias` lee enseguida cómo quedó el cobro con tarjeta.
@@ -965,16 +964,22 @@ async function suscripcionTarjeta(env: Env, f: Fila, t: Tarjeta): Promise<string
     status: 'authorized'
   }).catch((e) => {
     if (!(e instanceof Rechazo) || e.status >= 500) throw e
-    // Un correo que Mercado Pago no acepta, la tarjeta que no pasó su comprobación (`CC_VAL_…`) u otra cosa.
-    throw new TarjetaRechazada(
-      /payer|email/i.test(e.message)
-        ? 'Mercado Pago no aceptó ese correo para el cobro de cada mes. Escribe otro (sin «+»), o apoya una sola vez.'
-        : /CC_VAL|card/i.test(e.message)
-          ? motivoDeRechazo(undefined)
-          : 'Mercado Pago no pudo abrir el cobro de cada mes con esta tarjeta. Elige «Mercado Pago», o apoya una sola vez.'
-    )
+    // La tarjeta que no pasó su comprobación (`CC_VAL_…`), un correo que Mercado Pago no acepta u otra cosa.
+    throw new TarjetaRechazada(/CC_VAL|card/i.test(e.message) ? motivoDeRechazo(undefined) : mensualRechazado(e.message, true))
   })
   return p.id
+}
+
+/**
+ * Por qué Mercado Pago no abrió el cobro de cada mes (`/preapproval`, 400), dicho al cliente. El más común: el correo es
+ * de una cuenta de Mercado Pago o Mercado Libre de otro país («Payer is associated with a different site»), y Mercado
+ * Pago México no le cobra cada mes; con otro correo, la tarjeta sí pasa. Con `conTarjeta`, ya está en «Tarjeta».
+ */
+export function mensualRechazado(mensaje: string, conTarjeta: boolean): string {
+  const otro = conTarjeta ? 'Vuelve y escribe otro correo' : 'Elige «Tarjeta» y escribe otro correo'
+  if (/different site/i.test(mensaje)) return `Ese correo es de una cuenta de Mercado Pago de otro país, y Mercado Pago México no le cobra cada mes. ${otro} (ahí te llega tu clave), o apoya una sola vez.`
+  if (/payer|email/i.test(mensaje)) return `Mercado Pago no aceptó ese correo para el cobro de cada mes. ${otro} (ahí te llega tu clave), o apoya una sola vez.`
+  return conTarjeta ? 'Mercado Pago no pudo abrir el cobro de cada mes con esta tarjeta. Elige «Mercado Pago», o apoya una sola vez.' : 'Mercado Pago no pudo abrir el cobro de cada mes. Elige «Tarjeta», o apoya una sola vez.'
 }
 
 /**
