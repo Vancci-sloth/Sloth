@@ -6,7 +6,8 @@ import { type Proveedor, proveedorDe } from '../../shared/providers'
 import { encender, encendido, notificar, sonar, usePermiso } from './avisos'
 import { abrirBienvenida } from './Bienvenida'
 import { Picker } from './Composer'
-import { EspacioDisco } from './Espacio' // espacio en disco
+import { ESPACIO_DISCO, EspacioDisco } from './Espacio' // espacio en disco
+import { discoLleno } from './items'
 import { TuEquipo } from './Equipo' // tu equipo
 import { Icono } from './Iconos'
 import { SuscripcionOpciones } from './Licencia' // apoyo
@@ -132,6 +133,30 @@ function Grupo({ ref, titulo, extra, nota, children }: { ref?: Ref<HTMLElement>;
       <div className="panel">{children}</div>
       {nota && <p className="grupo-nota">{nota}</p>}
     </section>
+  )
+}
+
+/**
+ * El error de una fila. Con el disco lleno, lo que dicen npm o Node no se entiende: se cambia por qué pasó y un botón a
+ * Espacio en disco, y el texto de antes queda al pasar el ratón.
+ */
+function Fallo({ error, className = '' }: { error?: string; className?: string }) {
+  if (!error) return null
+  if (!discoLleno(error)) return <p className={`bad small fila-extra ${className}`}>{error}</p>
+  return (
+    <p className={`bad small fila-extra ${className}`} title={error}>
+      Tu disco está lleno y no cupo lo que había que descargar. Libera espacio y vuelve a intentarlo.{' '}
+      {/* Sin cambiar el hash, que es la ruta de la app. */}
+      <a
+        href={`#${ESPACIO_DISCO}`}
+        onClick={(e) => {
+          e.preventDefault()
+          document.getElementById(ESPACIO_DISCO)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+        }}
+      >
+        Ir a Espacio en disco
+      </a>
+    </p>
   )
 }
 
@@ -625,7 +650,7 @@ export function CuentaOpenCode({ aviso = false, onFalta }: { aviso?: boolean; on
           </a>
         </p>
       </div>
-      {(c.error || error || a?.error) && <p className="bad small fila-extra">{c.error || error || a?.error}</p>}
+      <Fallo error={c.error || error || a?.error} />
       {version.aviso}
     </div>
   )
@@ -841,7 +866,7 @@ export function CuentaAgente({ p, aviso = false, onFalta }: { p: OtroAgente; avi
           <Interruptor on={cuenta.llavesSloth.usar} disabled={c.ocupado} onCambiar={(usar) => void c.pedir(`/api/${p}/llaves`, { usar })} etiqueta="Usarlas en Pi" />
         </div>
       )}
-      {(c.error || error || a?.error) && <p className="bad small fila-extra">{c.error || error || a?.error}</p>}
+      <Fallo error={c.error || error || a?.error} />
       {version.aviso}
     </div>
   )
@@ -904,7 +929,7 @@ function AvisoClaude({ onFalta, aAgentes }: { onFalta?(falta?: boolean): void; a
         </div>
         {llave.formulario}
         <Autorizando c={c} />
-        {c.error && <p className="bad small fila-extra">{c.error}</p>}
+        <Fallo error={c.error} />
       </div>
     </section>
   )
@@ -984,7 +1009,7 @@ function CuentaCodex({ aviso = false, onFalta }: { aviso?: boolean; onFalta?(fal
       {llave.formulario}
       {url && <p className="fila-extra small"><a href={url} target="_blank" rel="noreferrer">Abrir inicio de sesión de ChatGPT ↗</a>. Vuelve aquí después de autorizar.</p>}
       {!aviso && cuenta?.conectada && <Limites proveedor="codex" />}
-      {c.error && <p className="bad small fila-extra">{c.error}</p>}
+      <Fallo error={c.error} />
       {version.aviso}
     </div>
   )
@@ -1054,7 +1079,7 @@ export function Requisitos({ skill, onListo }: { skill?: string; onListo?(listo?
             </button>
           )}
         </div>
-        {error && <p className="bad small fila-extra">{error}</p>}
+        <Fallo error={error} />
       </div>
       {lista
         ?.filter((r) => (!r.listo && !r.opcional) || r.estado || r.error)
@@ -1113,7 +1138,7 @@ function Herramientas({ req }: { req: UsoRequisitos }) {
       ) : (
         lista.map((r) => <RequisitoFila key={r.id} r={r} onBajar={() => req.bajar([r.id])} />)
       )}
-      {req.lista && req.error && <p className="bad small fila-extra">{req.error}</p>}
+      {req.lista && <Fallo error={req.error} />}
     </Grupo>
   )
 }
@@ -1136,7 +1161,7 @@ function RequisitoFila({ r, onBajar }: { r: Requisito; onBajar?(): void }) {
           </button>
         )}
       </div>
-      {r.error && <p className="bad small fila-extra requisito-error">{r.error}</p>}
+      <Fallo error={r.error} className="requisito-error" />
     </div>
   )
 }
@@ -1226,7 +1251,7 @@ function Agentes() {
         <Autorizando c={c} />
         {/* Con una llave de API no hay plan ni límites: se paga por uso. */}
         {cuenta?.conectada && cuenta.plan && <Limites proveedor="claude" />}
-        {c.error && <p className="bad small fila-extra">{c.error}</p>}
+        <Fallo error={c.error} />
         {version.aviso}
       </div>
     </>

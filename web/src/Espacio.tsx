@@ -4,6 +4,8 @@ import { api } from './api'
 import { Icono } from './Iconos'
 
 const gb = (b: number) => (b >= 1e9 ? `${(b / 1e9).toFixed(1)} GB` : b >= 1e6 ? `${Math.round(b / 1e6)} MB` : '0 MB')
+/** El id de la sección, para que el aviso de «disco lleno» de Opciones lleve a ella. */
+export const ESPACIO_DISCO = 'espacio-disco'
 /** Lo que no vale un botón: menos de esto no se enseña. */
 const MINIMO = 20e6
 
@@ -37,7 +39,7 @@ export function EspacioDisco() {
   const ocupado = liberando !== null
 
   return (
-    <section className="grupo">
+    <section className="grupo" id={ESPACIO_DISCO}>
       <div className="grupo-titulo">
         <h2>Espacio en disco</h2>
         {totalSeguro > 0 && (

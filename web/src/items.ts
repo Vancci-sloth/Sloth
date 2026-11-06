@@ -356,6 +356,9 @@ export const REINTENTAR = 'Sigue donde te quedaste.'
  * nombra el plan y la cuenta (con Codex, los de ChatGPT). Con OpenCode, sus modelos gratis se saturan o se acaba el uso gratis.
  * `limite`: se acabó el uso de ese agente, y el hilo puede seguir ya con otro (`Fallo` en Timeline.tsx).
  */
+/** Que no cupo en el disco: Node dice ENOSPC; npm, «insufficient space»; Windows, «not enough space». */
+export const discoLleno = (error = '') => /ENOSPC|no space left|insufficient space|not enough space|disk (is )?full/i.test(error)
+
 export function errorLlano(error = '', caida = false, agente: Proveedor = 'claude'): { titulo: string; ayuda: string; reintentar: boolean; tuyo?: boolean; limite?: boolean } {
   const nombre = NOMBRE_AGENTE[agente]
   // La caída la marca el servidor. Los hilos de antes de la marca traen la frase con que sessions.ts cierra el turno.
@@ -390,7 +393,7 @@ export function errorLlano(error = '', caida = false, agente: Proveedor = 'claud
   if (/prompt is too long|too many tokens|context (window|length)/i.test(error)) {
     return { titulo: 'La conversación ya es demasiado larga', ayuda: 'Abre un hilo nuevo y cuéntale dónde se quedó este.', reintentar: false }
   }
-  if (/ENOSPC|no space left/i.test(error)) return { titulo: 'El disco está lleno', ayuda: 'Libera espacio y pulsa «Reintentar».', reintentar: true }
+  if (discoLleno(error)) return { titulo: 'El disco está lleno', ayuda: 'Libera espacio y pulsa «Reintentar».', reintentar: true }
   // Casi siempre es que lo detuviste, en los hilos de antes de que el servidor lo dijera.
   if (error === 'error_during_execution') return { titulo: 'Se detuvo antes de terminar', ayuda: 'Si lo detuviste tú, dile qué cambiar. Si no, pulsa «Reintentar».', reintentar: true }
   return { titulo: 'Se detuvo por un error', ayuda: `${error ? `El error dice: «${error.slice(0, 160)}». ` : ''}Pulsa «Reintentar» o cuéntale qué pasó.`, reintentar: true }
