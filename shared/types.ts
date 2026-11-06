@@ -1029,7 +1029,7 @@ export interface Autor {
   foto?: string
   /** El creador de Sloth. */
   creador?: boolean
-  /** Fundador (de las primeras personas que apoyaron, para siempre), Apoyo grande o Apoya (mientras apoya). */
+  /** Fundador (mientras tenga pagado el precio de Fundador), Donador PRO (`grande`) o Apoya, mientras apoya. */
   insignia?: 'fundador' | 'grande' | 'apoya'
   /** Solo en tu perfil: si sales en los créditos de sloth.vancci.org (los Fundadores que lo piden). */
   creditos?: boolean
