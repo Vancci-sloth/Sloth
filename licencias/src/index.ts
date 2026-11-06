@@ -767,6 +767,9 @@ async function suscribir(env: Env, c: Record<string, unknown>, desde: string): P
   const t = await precios(env, c.fundador)
   if (pasa === 'paypal' && t.sinPaypal) throw new Rechazo(400, 'Por ahora no se puede pagar con PayPal: elige tarjeta, Mercado Pago o cripto.')
   if ((pasa === 'mercadopago' && !t.mxn) || (pasa === 'tarjeta' && !t.tarjeta) || (pasa === 'cripto' && !t.cripto)) throw new Rechazo(400, 'Por ahora no se puede pagar así: elige otra forma de pago.')
+  // La página de la tarjeta de Mercado Pago (`/pagar`, hasta el 6 de noviembre de 2026) mandaba el monto en pesos y su
+  // token: abierta desde antes, cobraría esos pesos como dólares.
+  if (pasa === 'tarjeta' && c.tarjeta !== undefined) throw new Rechazo(400, 'La página de pago cambió: vuelve a sloth.vancci.org, elige tu apoyo y «Tarjeta» otra vez.')
   // En pesos con Mercado Pago; con cripto, su propio mínimo; con PayPal o tarjeta, los de `MONEDA`.
   const p: Precios = pasa === 'mercadopago' ? t.mxn! : pasa === 'cripto' ? t.cripto! : t
   const monto = montoDe(plan, c.monto, p)
