@@ -968,7 +968,7 @@ async function unirse(env: Env, email: string, equipo: string, acepto: string, t
     'Hola:',
     'Ya tienes tu cuenta de Sloth: con ella entras a la comunidad. Sloth es gratis y lo seguirá siendo.',
     `Tu clave es ${clave}. Escríbela en Sloth para entrar, y guárdala: con ella entras desde otra computadora (dos a la vez). También queda en Opciones de Sloth.`,
-    'Sloth trabaja con tu propia cuenta de Claude Pro o Max, que pagas aparte a Anthropic. Si tienes dudas, responde a este correo.'
+    'Sloth trabaja con la IA que ya tengas: Claude, ChatGPT, OpenCode (que tiene modelos gratis) y otros agentes. Con uno basta, y Sloth no te cobra aparte: lo conectas en Opciones, en Agentes. Si tienes dudas, responde a este correo.'
   ]).catch((e) => (console.error('Correo de la cuenta', e instanceof Error ? e.message : e), false))
   if (!enviada) throw new Rechazo(502, 'No pudimos mandarte el correo con tu clave. Prueba en un rato.')
   if (!porCorreo) throw new Rechazo(409, `Te mandamos tu clave a ${email}. Escríbela en Opciones de Sloth, en «Ya apoyo».`)
@@ -1297,7 +1297,7 @@ function bienvenida(env: Env, f: Fila) {
     `${pasarela(f)} confirmó tu pago: gracias por apoyar a Sloth. Guarda este correo, es donde queda tu clave.`,
     `Tu clave: ${f.clave}`,
     `Pégala en Sloth, en Opciones, y deja de salirte el recordatorio. Si aún no la tienes, descárgala en ${env.ORIGEN}/descargar (Mac: ${env.ORIGEN}/descargar?so=mac; Linux: ${env.ORIGEN}/descargar?so=linux). La clave sirve en dos computadoras a la vez.`,
-    'Sloth trabaja con tu propia cuenta de Claude Pro o Max, que pagas aparte a Anthropic. Si tienes dudas, responde a este correo.'
+    'Sloth trabaja con la IA que ya tengas: Claude, ChatGPT, OpenCode (que tiene modelos gratis) y otros agentes. Con uno basta, y Sloth no te cobra aparte: lo conectas en Opciones, en Agentes. Si tienes dudas, responde a este correo.'
   ])
 }
 

@@ -70,8 +70,8 @@ Descarga la última versión para tu sistema y ábrela:
 | **Mac** con Apple Silicon (M1 o más nueva) o con Intel | [Sloth para Mac](https://api.sloth.vancci.org/descargar?so=mac) | La página deja elegir la de tu Mac. |
 | **Linux** | [Sloth para Linux](https://api.sloth.vancci.org/descargar?so=linux) | Es un AppImage: dale permiso de ejecutar y ábrelo. |
 
-Necesitas tu propia cuenta de **Claude Pro o Max** (con Max alcanza para varios videos). Opcional: tu cuenta de
-ChatGPT, para que Sloth haga las imágenes. FFmpeg, Python y lo que pide cada estilo los instala la propia app. Las
+Necesitas una IA conectada, con una basta: **Claude**, **ChatGPT**, **OpenCode** (tiene modelos gratis) u otro agente.
+Con ChatGPT, Sloth además hace las imágenes. FFmpeg, Python y lo que pide cada estilo los instala la propia app. Las
 versiones nuevas se instalan desde la misma app.
 
 ## Correrla desde el código
