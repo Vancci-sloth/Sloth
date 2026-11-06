@@ -195,7 +195,8 @@ const disco = espacio({ app: APP, sessions, cards, ocupado, python: () => python
 // Opciones → Tu equipo: con qué transcribe la voz y cuánto tarda cada cosa en esta computadora.
 const maquina = equipo({ app: APP, ocupado }) // tu equipo
 // La voz de los videos, que los agentes piden a Sloth y Sloth genera en AI Studio con la cuenta de Google del usuario.
-const narrar = voz(APP) // voz de AI Studio
+// Voices Cloning va por el cobro: con tu cuenta o tu apoyo, o con la llave del creador en su computadora.
+const narrar = voz(APP, { credencial: () => llaveDelCreador() ?? suscripcion?.credencial(), creador: () => llaveDelCreador() as { llave: string } | undefined }) // voz de AI Studio
 // Las imágenes y videos de Google Flow, con esa misma cuenta y en ese mismo Edge.
 const generarFlow = flow(APP, narrar.google) // Google Flow
 
@@ -588,6 +589,7 @@ async function api(req: IncomingMessage, res: ServerResponse, url: URL): Promise
   if (await biblioteca3d.api(req, res, url)) return true // modelos 3D
   if (await noticias.api(req, res, url)) return true // radar
   if (await comunidadApi.api(req, res, url)) return true // comunidad
+  if (await narrar.admin(req, res, url)) return true // Administrador, solo en la computadora del creador
   if (await estilosLocal.api(req, res, url)) return true // estilos compartidos
   if (await enlacesApi(req, res, url)) return true // tarjeta de los enlaces
 

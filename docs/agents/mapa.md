@@ -78,7 +78,11 @@ Este es el mapa:
   Google de cada quien (Opciones → Voz). La genera el servidor en la página `voz` del navegador integrado, con su propio
   perfil; los agentes la piden con el MCP `voz` (`mcp.mjs`), y el menú «Voz» del compositor manda la línea `Voz:` que
   siguen las skills (`skills/video-base/VOZ.md`). ADR 0011. Fish Audio y ElevenLabs van por su API con la llave de cada
-  quien (`server/voz/apis.ts`, voces `fish:<id>` y `elevenlabs:<id>`), también clonando la voz del usuario.
+  quien (`server/voz/apis.ts`, voces `fish:<id>` y `elevenlabs:<id>`), también clonando la voz del usuario. Voices
+  Cloning, el proveedor de Sloth (voces `vc:<id>`, `server/voz/voices-cloning.ts`, ADR 0018), va por el cobro
+  (`licencias/src/voz.ts`), que guarda la llave del socio y los créditos de cada quien; se elige en su ventana.
+- Administrador (`web/src/Admin.tsx`, `/api/admin*`): solo en la computadora del creador, la que tiene su `publicar.txt`.
+  Saldo, usuarios, consumo y registro de Voices Cloning; dar, quitar y suspender.
 - `server/flow/` y `web/src/Flow.tsx`: imágenes (Nano Banana) y videos (Veo) de Google Flow, con la cuenta de la voz (en
   su Edge y su turno, `voz().google`) y las que se agregan en Opciones (`cuentas.ts`, cada una en su Edge), hasta dos a la
   vez y con ritmo. `elegirCuenta`, el ritmo y los descansos están en `shared/flow.ts`. `pagina.ts` maneja la página, por sus iconos: texto,

@@ -16,7 +16,7 @@ const HERRAMIENTAS = [
   {
     name: 'voces',
     description:
-      'Las voces con que Sloth puede generar la narración: las de Google AI Studio (Gemini 3.8 Flash TTS, por grupos; cualquier nombre de su buscador sirve, tiene más de 2.000) y, si el usuario puso su llave, las de Fish Audio y ElevenLabs con el id que va en generar_voz (fish:… o elevenlabs:…); «tuya» es una que el usuario clonó de su voz. Cada una con cómo suena. Dice también qué está conectado.',
+      'Las voces con que Sloth puede generar la narración: las de Google AI Studio (Gemini 3.8 Flash TTS, por grupos; cualquier nombre de su buscador sirve, tiene más de 2.000) y, si el usuario puso su llave, las de Fish Audio y ElevenLabs con el id que va en generar_voz (fish:… o elevenlabs:…), y las de Voices Cloning, el proveedor de Sloth, que el usuario eligió en su ventana (vc:…); «tuya» es una que el usuario clonó de su voz. Cada una con cómo suena. Dice también qué está conectado.',
     inputSchema: {
       type: 'object',
       properties: { buscar: { type: 'string', description: 'Solo las que tengan esto en su nombre, cómo suenan o su grupo («deep», «Podcast»)' } }
@@ -25,11 +25,11 @@ const HERRAMIENTAS = [
   {
     name: 'generar_voz',
     description:
-      'Genera la narración con la voz pedida y deja el WAV (mono) en `salida`: en Google AI Studio con la cuenta de Google del usuario, o en Fish Audio o ElevenLabs con su llave si la voz es fish:… o elevenlabs:…. Pasa el texto tal como se narra, o `archivo`: un guion en Markdown se narra sin títulos ni encabezados. Las etiquetas van dentro del texto: en AI Studio como <laugh> o <short pause>; en Fish Audio y ElevenLabs entre corchetes, como [laughs] o [whispers]. En AI Studio una frase tarda unos 5 s y 6 minutos de guion unos 100 s; si no acaba en 40 s, devuelve un id para esperarla con estado_voz. Si el texto y la voz no cambiaron desde el último WAV de esa ruta, sale al momento.',
+      'Genera la narración con la voz pedida y deja el WAV (mono) en `salida`: en Google AI Studio con la cuenta de Google del usuario, o en Fish Audio o ElevenLabs con su llave si la voz es fish:… o elevenlabs:…, o en Voices Cloning con los créditos que da Sloth si es vc:…. Pasa el texto tal como se narra, o `archivo`: un guion en Markdown se narra sin títulos ni encabezados. Las etiquetas van dentro del texto: en AI Studio como <laugh> o <short pause>; en Fish Audio y ElevenLabs entre corchetes, como [laughs] o [whispers]. En AI Studio una frase tarda unos 5 s y 6 minutos de guion unos 100 s; si no acaba en 40 s, devuelve un id para esperarla con estado_voz. Si el texto y la voz no cambiaron desde el último WAV de esa ruta, sale al momento.',
     inputSchema: {
       type: 'object',
       properties: {
-        voz: { type: 'string', description: 'El nombre de la voz en AI Studio, como Fola o Kore, o el id de una de Fish Audio o ElevenLabs tal cual (fish:… o elevenlabs:…)' },
+        voz: { type: 'string', description: 'El nombre de la voz en AI Studio, como Fola o Kore, o el id de una de Fish Audio, ElevenLabs o Voices Cloning tal cual (fish:…, elevenlabs:… o vc:…)' },
         texto: { type: 'string', description: 'Lo que se narra' },
         archivo: { type: 'string', description: 'O la ruta absoluta de un .md o .txt con lo que se narra' },
         salida: { type: 'string', description: 'La ruta absoluta del .wav que deja, como <carpeta del video>/fuentes/voz/ai-studio.wav' }
@@ -77,7 +77,17 @@ const LLAMADAS = {
       const voces = m.voces.filter((v) => con(v.nombre, v.descripcion, v.propia ? 'tuya' : ''))
       renglones.push(`${nombre}, ${voces.length} voces${b ? ` con «${buscar}»` : ''}: ${voces.map((v) => `${v.nombre}${v.propia ? ' (tuya)' : ''}${v.descripcion ? ` (${v.descripcion})` : ''} = ${motor}:${v.id}`).join('; ')}`)
     }
-    if (!e.cuenta && !e.motores?.fish?.llave && !e.motores?.elevenlabs?.llave) renglones.push('Nada conectado: que el usuario conecte una en Opciones → Voz. Mientras, pídele la voz.')
+    // Voices Cloning, el proveedor de Sloth: las que el usuario eligió o clonó en su ventana (el agente no la abre).
+    if (e.vc?.disponible) {
+      const voces = e.vc.voces.filter((v) => con(v.nombre, v.descripcion, v.propia ? 'tuya' : ''))
+      const creditos = typeof e.vc.creditos === 'number' ? `, ${e.vc.creditos} créditos` : ''
+      renglones.push(
+        voces.length
+          ? `Voices Cloning${creditos}, ${voces.length} voces${b ? ` con «${buscar}»` : ''}: ${voces.map((v) => `${v.nombre}${v.propia ? ' (tuya)' : ''}${v.descripcion ? ` (${v.descripcion})` : ''} = vc:${v.id}`).join('; ')}`
+          : `Voices Cloning${creditos}: sin voces elegidas. El usuario las elige en el menú Voz («Abrir voces y funciones…»).`
+      )
+    }
+    if (!e.cuenta && !e.motores?.fish?.llave && !e.motores?.elevenlabs?.llave && !e.vc?.disponible) renglones.push('Nada conectado: que el usuario conecte una en Opciones → Voz. Mientras, pídele la voz.')
     return renglones.join('\n')
   },
   async generar_voz({ voz, texto, archivo, salida }) {

@@ -1303,10 +1303,33 @@ export interface EstadoVoz {
   error?: string
   /** Los proveedores que van con una llave de API (`server/voz/apis.ts`). */
   motores: Record<ProveedorVoz, EstadoProveedorVoz>
+  /** Voices Cloning, el proveedor de Sloth (`server/voz/voices-cloning.ts`). */
+  vc: EstadoVoicesCloning
 }
 
 /** Los proveedores de voz con llave de API, además de AI Studio. */
 export type ProveedorVoz = 'fish' | 'elevenlabs'
+
+/** Los motores de voz que no son AI Studio: los de llave y Voices Cloning (`vc:<id>`). */
+export type FuenteVoz = ProveedorVoz | 'vc'
+
+/**
+ * Voices Cloning, el proveedor de voz de Sloth: sin llave propia, con los créditos que da Sloth (su cobro guarda la del
+ * socio, `licencias/src/voz.ts`). `disponible`: si se puede usar aquí (con cuenta de Sloth, la llave puesta y créditos, o
+ * siendo el creador). `voces`: las que elegiste o clonaste en su ventana, para el menú. `error`: lo último que falló.
+ */
+export interface EstadoVoicesCloning {
+  disponible: boolean
+  creador: boolean
+  creditos?: number
+  usados?: number
+  hoy?: number
+  generaciones?: number
+  /** `active` o `suspended`, como lo dice Voices Cloning. */
+  estado?: string
+  voces: VozApi[]
+  error?: string
+}
 
 /**
  * Una voz de Fish Audio o ElevenLabs. `id`: el suyo allí (en Sloth va como `fish:<id>`, `shared/voz.ts`). `propia`: una

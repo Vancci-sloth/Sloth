@@ -6,6 +6,7 @@
 // (producción de la aplicación «Sloth» real), MP_WEBHOOK_SECRET (la clave secreta de los webhooks de la real),
 // NOWPAYMENTS_API_KEY y NOWPAYMENTS_IPN_SECRET (la llave de la API y la clave de los avisos IPN, en Settings del panel de
 // NOWPayments, del modo `NOWPAYMENTS_MODO`; sin ellas no se ofrece pagar con cripto),
+// VOICES_PK_LIVE (la llave de socio `pk_live_…` de Voices Cloning, para las voces de src/voz.ts; sin ella, la app no las ofrece),
 // FIRMA (la llave privada Ed25519 en PKCS8 y base64; la pública va en server/licencia.ts) y PUBLICAR (la llave de
 // `npm run publicar`, que también está en %APPDATA%\sloth\licencias\publicar.txt). La base de datos se crea con
 // `npm run licencias -- d1 migrations apply sloth-licencias --remote`. El instalador vive en el bucket DESCARGAS.
@@ -60,6 +61,9 @@
     "SIN_PAYPAL": "1",
     "MONEDA": "USD",
     // Los correos salen de un dominio verificado en Resend (con su RESEND_API_KEY como secreto) y se responden en soporte@vancci.org.
+    // Los créditos de voz de Voices Cloning con que se da de alta a cada quien la primera vez que abre sus voces. En 0, solo
+    // las ve quien recibió créditos del creador (Administrador, en su Sloth).
+    "VOZ_CREDITOS": 0,
     "CORREO_DE": "Sloth <avisos@vancci.org>",
     "CORREO_RESPUESTA": "soporte@vancci.org"
   }

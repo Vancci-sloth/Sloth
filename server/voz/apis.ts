@@ -182,13 +182,13 @@ export function vozPorApi(carpeta: string) {
     /** El nombre de una voz (`fish:<id>`) como se ve en el menú, si la conoce. */
     nombre(voz: string): string | undefined {
       const { motor, id } = motorDe(voz)
-      return motor === 'ai-studio' ? undefined : guardadas[motor]?.find((v) => v.id === id)?.nombre
+      return motor === 'ai-studio' || motor === 'vc' ? undefined : guardadas[motor]?.find((v) => v.id === id)?.nombre
     },
 
     /** La voz de un guion entero (`voz` con su prefijo), como WAV, y cuánto dura. */
     async generar(voz: string, texto: string): Promise<{ wav: Uint8Array; segundos: number }> {
       const { motor, id } = motorDe(voz)
-      if (motor === 'ai-studio') throw new Error(`${voz} no es una voz de Fish Audio ni de ElevenLabs.`)
+      if (motor === 'ai-studio' || motor === 'vc') throw new Error(`${voz} no es una voz de Fish Audio ni de ElevenLabs.`)
       if (!llave(motor)) throw new Error(`No hay llave de ${MOTORES[motor]}: que el usuario la ponga en Opciones → Voz. Mientras, pídele la voz.`)
       const pedir = pedidor(motor)
       const partes: Awaited<ReturnType<Motor['hablar']>>[] = []

@@ -43,6 +43,7 @@ import { lineaVoz } from '../../shared/voz'
 import { SelectorClips, SelectorImagenes, useChatGPT, useFlow } from './Flow' // Google Flow
 import { imagenPosible, lineaClips, lineaImagenes, MODELOS_VIDEO, OPCIONES_CLIPS } from '../../shared/flow'
 import { Timeline } from './Timeline'
+import { Admin, useEsCreador } from './Admin' // Administrador, solo en la computadora del creador
 import { compact, duration } from './items'
 import './Barra.css'
 
@@ -56,6 +57,7 @@ type View =
   | { kind: 'videos'; estilo?: string }
   | { kind: 'modelos3d' } // modelos 3D
   | { kind: 'comunidad' } // comunidad
+  | { kind: 'admin' } // Administrador, solo en la computadora del creador
 
 /** Lo que se escribió en un hilo nuevo sin mandarlo. Vive en localStorage hasta que se manda o se borra. */
 type Saved = Draft & { cardId: string; at: number }
@@ -75,6 +77,7 @@ function readHash(): View {
   if (kind === 'mis-videos') return { kind: 'videos', estilo: id || undefined }
   if (kind === 'modelos-3d') return { kind: 'modelos3d' } // modelos 3D
   if (kind === 'comunidad' || kind === 'mejoras') return { kind: 'comunidad' } // comunidad (antes, Mejoras)
+  if (kind === 'admin') return { kind: 'admin' }
   return { kind: 'new', cardId: kind === 'new' ? id : undefined }
 }
 
@@ -94,6 +97,8 @@ function go(view: View) {
                 ? '/modelos-3d'
                 : view.kind === 'comunidad' // comunidad
                 ? '/comunidad'
+                : view.kind === 'admin'
+                ? '/admin'
                 : view.cardId
                 ? `/new/${view.cardId}`
                 : '/'
@@ -358,6 +363,7 @@ export function App() {
   // comunidad: tus avisos sin leer, junto a «Comunidad». Se piden cada 2 minutos mientras se ve Sloth, cada 10 con la
   // ventana oculta (un anuncio avisa aunque no la estés mirando), y al leerlos. Si subieron, se mira si hay un anuncio.
   const [avisosComunidad, setAvisosComunidad] = useState(0)
+  const esCreador = useEsCreador()
   useEffect(() => {
     let sabidos = 0
     let pedida = 0
@@ -517,6 +523,15 @@ export function App() {
             </span>
           )}
         </button>
+        {/* Administrador: solo en la computadora del creador (la que tiene su llave de publicar.txt). */}
+        {esCreador && (
+          <button className={`new-chat${view.kind === 'admin' ? ' active' : ''}`} onClick={() => go({ kind: 'admin' })} title={plegada ? 'Administrador' : undefined}>
+            <span className="new-chat-icon">
+              <Icono de="escudo" />
+            </span>{' '}
+            Administrador
+          </button>
+        )}
         <label className="buscar" title={plegada ? 'Buscar (Ctrl K)' : undefined} onClick={() => plegada && buscar()}>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
             <circle cx="11" cy="11" r="7" />
@@ -638,6 +653,7 @@ export function App() {
         )}
         {view.kind === 'modelos3d' && <Modelos3D />} {/* modelos 3D */}
         {view.kind === 'comunidad' && <Comunidad />}
+        {view.kind === 'admin' && esCreador && <Admin />}
         {/* comunidad: «Pedir una mejora», que abre el símbolo del agente de cualquier hilo y la publica en Mejoras. */}
         <PedirMejora sessions={sessions} />
         {view.kind === 'videos' && (

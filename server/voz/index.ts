@@ -16,6 +16,7 @@ import { guardar } from '../disco.ts'
 import { bytes, cuerpo } from '../http.ts'
 import { integrado } from '../navegador-agente.ts'
 import { vozPorApi } from './apis.ts'
+import { voicesCloning } from './voices-cloning.ts'
 
 /**
  * La voz de los videos, generada en Google AI Studio («Generate speech», Gemini 3.8 Flash TTS) con la cuenta de Google
@@ -38,7 +39,9 @@ import { vozPorApi } from './apis.ts'
  * cambian los de la cuenta y el de cerrar el panel). Si la página cambia, falla con una captura en `data/voz/error.png`.
  *
  * Las voces de Fish Audio y ElevenLabs (`fish:<id>`, `elevenlabs:<id>`) van por su API, con la llave de cada quien
- * (`apis.ts`): no pasan por la página ni esperan su fila, y dejan el WAV en el mismo sitio, con la misma huella.
+ * (`apis.ts`): no pasan por la página ni esperan su fila, y dejan el WAV en el mismo sitio, con la misma huella. Igual
+ * las de Voices Cloning (`vc:<id>`, `voices-cloning.ts`), el proveedor de Sloth, que van por el cobro con los créditos
+ * que da Sloth.
  */
 
 const URL_VOZ = 'https://aistudio.google.com/generate-speech'
@@ -64,8 +67,11 @@ const ESPERA_MAXIMA = 50_000
 type Trabajo = TrabajoVoz & { texto: string; salida: string; huella: string }
 type Cookie = { name: string; value: string; domain: string; path: string; expires: number; httpOnly: boolean; secure: boolean; sameSite?: string; partitionKey?: unknown }
 
-/** Lo que el servidor monta: su API, si está generando y la configuración del MCP para los agentes. */
-export function voz(app: string) {
+/**
+ * Lo que el servidor monta: su API, si está generando y la configuración del MCP para los agentes. `socio`: con qué se
+ * habla al cobro para Voices Cloning (tu cuenta o tu apoyo, o la llave del creador) y si esta es la computadora del creador.
+ */
+export function voz(app: string, socio: Parameters<typeof voicesCloning>[1]) {
   const carpeta = join(app, 'data', 'voz')
   const descargas = join(carpeta, 'descargas')
   // El perfil del Edge donde se entra con Google. El del script viejo de El Diff ya tiene la sesión: se usa mientras no
@@ -88,6 +94,7 @@ export function voz(app: string) {
   const guardarCuenta = () => (mkdirSync(carpeta, { recursive: true }), guardar(archivoCuenta, JSON.stringify({ correo: cuenta, voces }, null, 1)))
 
   const apis = vozPorApi(carpeta)
+  const vc = voicesCloning(carpeta, socio)
   /** Las que se están generando por API, que no hacen fila. */
   let porApi = 0
 
@@ -466,7 +473,8 @@ export function voz(app: string) {
     t.estado = 'generando'
     porApi++
     try {
-      const { wav, segundos } = await apis.generar(t.voz, t.texto)
+      const { motor, id } = motorDe(t.voz)
+      const { wav, segundos } = motor === 'vc' ? await vc.generar(id, t.texto) : await apis.generar(t.voz, t.texto)
       mkdirSync(dirname(t.salida), { recursive: true })
       guardar(t.salida, wav)
       guardar(`${t.salida}.huella`, t.huella)
@@ -496,7 +504,7 @@ export function voz(app: string) {
   }
 
   const publico = ({ texto: _t, salida: _s, huella: _h, ...t }: Trabajo): TrabajoVoz => t
-  const estado = (): EstadoVoz => ({ cuenta, conectando, navegador: nombreEdge(), voces, enFila: fila.length + (trabajando ? 1 : 0) + porApi, ...(error ? { error } : {}), motores: apis.estado() })
+  const estado = (): EstadoVoz => ({ cuenta, conectando, navegador: nombreEdge(), voces, enFila: fila.length + (trabajando ? 1 : 0) + porApi, ...(error ? { error } : {}), motores: apis.estado(), vc: vc.estado() })
 
   // ── La API ─────────────────────────────────────────────────────────────────────────────────────────────────────
 
@@ -537,12 +545,16 @@ export function voz(app: string) {
       if (!texto || !d.voz?.trim() || !d.salida || !isAbsolute(d.salida) || !/\.wav$/i.test(d.salida))
         return enviar(400, { error: 'Pide el texto (o el archivo con él), la voz y la ruta absoluta del .wav donde va.' }), true
       const { motor } = motorDe(d.voz)
-      if (motor !== 'ai-studio' && !apis.tieneLlave(motor))
+      if (motor === 'vc' && !vc.puede()) await vc.refrescar()
+      if (motor === 'vc' && !vc.puede())
+        return enviar(409, { error: 'Las voces de Voices Cloning no están disponibles en esta computadora (hace falta la cuenta de Sloth y créditos de voz). Mientras, pídele la voz al usuario.' }), true
+      if (motor !== 'ai-studio' && motor !== 'vc' && !apis.tieneLlave(motor))
         return enviar(409, { error: `No hay llave de ${MOTORES[motor]}: que el usuario la ponga en Opciones → Voz. Mientras, pídele la voz.` }), true
       if (motor === 'ai-studio' && !cuenta)
         return enviar(409, { error: 'No hay cuenta de Google conectada para AI Studio: que el usuario la conecte en Opciones → Voz (o en el selector Voz del compositor). Mientras, pídele la voz.' }), true
       return enviar(200, publico(pedir(texto, d.voz.trim(), resolve(d.salida)))), true
     }
+    if (await vc.api(req, res, path, estado)) return true
     // Fish Audio y ElevenLabs: poner o quitar la llave, volver a leer sus voces y clonar la tuya.
     const m = /^\/api\/voz\/(fish|elevenlabs)\/(llave|voces|clonar)$/.exec(path)
     if (m && metodo === 'POST') {
@@ -575,6 +587,8 @@ export function voz(app: string) {
 
   return {
     api,
+    /** La sección Administrador del creador (`/api/admin*`, `voices-cloning.ts`). */
+    admin: vc.apiAdmin,
     /** Por qué no se puede reiniciar el servidor: cortaría una voz a medias. */
     ocupado: () => (trabajando || porApi ? 'Sloth está generando una voz. Espera a que termine.' : null),
     /** Lo que Flow (`server/flow/`) toma de aquí: la cuenta y el Edge con la sesión, en el turno de la voz (ver `enTurno`). */

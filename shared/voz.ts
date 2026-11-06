@@ -1,4 +1,4 @@
-import type { Card, ProveedorVoz, VozStudio } from './types.ts'
+import type { Card, FuenteVoz, VozStudio } from './types.ts'
 
 /**
  * Lo que comparten el servidor de la voz (`server/voz/`), su MCP y el compositor: la línea `Voz:` que lleva el primer
@@ -9,16 +9,16 @@ import type { Card, ProveedorVoz, VozStudio } from './types.ts'
 /** La guía que siguen las skills con la línea `Voz:` (en `SLOTH_SKILLS`). */
 const GUIA = 'video-base/VOZ.md'
 
-/** El nombre de cada motor con llave, como se ve en Sloth. */
-export const MOTORES: Record<ProveedorVoz, string> = { fish: 'Fish Audio', elevenlabs: 'ElevenLabs' }
+/** El nombre de cada motor que no es AI Studio, como se ve en Sloth. */
+export const MOTORES: Record<FuenteVoz, string> = { fish: 'Fish Audio', elevenlabs: 'ElevenLabs', vc: 'Voices Cloning' }
 
 /**
- * De qué motor es una voz: las de Fish Audio y ElevenLabs van con su prefijo (`fish:<id>`, `elevenlabs:<id>`); lo demás
- * es el nombre de una voz de AI Studio (`Fola`).
+ * De qué motor es una voz: las de Fish Audio, ElevenLabs y Voices Cloning van con su prefijo (`fish:<id>`,
+ * `elevenlabs:<id>`, `vc:<id>`); lo demás es el nombre de una voz de AI Studio (`Fola`).
  */
-export function motorDe(voz: string): { motor: ProveedorVoz | 'ai-studio'; id: string } {
-  const m = /^(fish|elevenlabs):(.+)$/.exec(voz.trim())
-  return m ? { motor: m[1] as ProveedorVoz, id: m[2] } : { motor: 'ai-studio', id: voz.trim() }
+export function motorDe(voz: string): { motor: FuenteVoz | 'ai-studio'; id: string } {
+  const m = /^(fish|elevenlabs|vc):(.+)$/.exec(voz.trim())
+  return m ? { motor: m[1] as FuenteVoz, id: m[2] } : { motor: 'ai-studio', id: voz.trim() }
 }
 
 /**

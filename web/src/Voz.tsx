@@ -9,7 +9,54 @@ import { Logo } from './Logos'
  * La voz en la interfaz (`server/voz/`): conectar la cuenta de Google para AI Studio y poner las llaves de Fish Audio y
  * ElevenLabs (Opciones → Voz) y, en el compositor de un video, elegir entre mandar tu voz o que el agente la genere con
  * una de ellas. Lo elegido va en la línea `Voz:` del primer mensaje (`lineaVoz`, `shared/voz.ts`).
+ *
+ * Voices Cloning, el proveedor de Sloth, no lleva llave: «Abrir voces y funciones…» abre su ventana (`embed.js`, un iframe
+ * suyo encima de Sloth) con el pase que pide el servidor, y la voz que eliges o clonas ahí queda en el menú (`vc:<id>`).
  */
+
+/** El script de su ventana. Solo se carga al abrirla. */
+const EMBED = 'https://www.voicescloning.art/embed.js'
+
+/** Lo que devuelve su ventana (`embed.js`): la voz elegida, o lo que hizo una de «Otras funciones». */
+interface VozElegida {
+  voice_id: string
+  name?: string
+  provider?: string
+}
+interface ResultadoVc {
+  kind: 'clone' | 'dialogue' | 'studio' | 'transcribe'
+  voice_id?: string
+  name?: string
+}
+interface VoiceWidget {
+  open(o: { token: string; view?: 'menu' | 'voices' | 'functions'; language?: string; title?: string; onSelectVoice?(v: VozElegida): void; onResult?(r: ResultadoVc): void; onClose?(): void }): void
+}
+declare global {
+  interface Window {
+    VoiceWidget?: VoiceWidget
+  }
+}
+
+let cargandoWidget: Promise<VoiceWidget> | undefined
+function widget(): Promise<VoiceWidget> {
+  if (window.VoiceWidget) return Promise.resolve(window.VoiceWidget)
+  cargandoWidget ??= new Promise<VoiceWidget>((ok, mal) => {
+    const s = document.createElement('script')
+    s.src = EMBED
+    s.async = true
+    s.onload = () => (window.VoiceWidget ? ok(window.VoiceWidget) : mal(new Error('La ventana de Voices Cloning no cargó.')))
+    s.onerror = () => {
+      cargandoWidget = undefined
+      s.remove()
+      mal(new Error('No se pudo abrir Voices Cloning: revisa tu internet.'))
+    }
+    document.head.append(s)
+  })
+  return cargandoWidget
+}
+
+/** La opción del menú que abre la ventana de Voices Cloning, que no es ninguna voz. */
+const ABRIR_VC = ' voices-cloning'
 
 /** El estado de la voz. Mientras esperas en Edge (o Chrome), se vuelve a preguntar cada 2 s. */
 export function useVoz() {
@@ -24,9 +71,43 @@ export function useVoz() {
   }, [estado?.conectando])
   /** Lo de Fish Audio y ElevenLabs: devuelve la promesa y falla si falla, para que su fila diga por qué. */
   const aProveedor = (p: Promise<EstadoVoz>) => p.then((e) => void setEstado(e))
+  const [errorVc, setErrorVc] = useState('')
+  /**
+   * Abre la ventana de Voices Cloning y da la voz que eliges en ella (`vc:<id>`), o la que clonas; nada si la cierras sin
+   * elegir. La guarda antes para el menú, así ya sale con su nombre.
+   */
+  const abrirVc = async (view: 'voices' | 'menu' = 'voices'): Promise<string | undefined> => {
+    setErrorVc('')
+    try {
+      const [{ token }, w] = await Promise.all([api<{ token: string }>('/api/voz/vc/sesion', {}), widget()])
+      return await new Promise<string | undefined>((ok) => {
+        const guardarla = (voz: VozElegida, clonada: boolean) =>
+          api<EstadoVoz>('/api/voz/vc/elegida', { voz, clonada }).then(
+            (e) => (setEstado(e), ok(`vc:${voz.voice_id}`)),
+            (x: Error) => (setErrorVc(x.message), ok(undefined))
+          )
+        w.open({
+          token,
+          view,
+          language: 'es',
+          title: 'Voices Cloning',
+          onSelectVoice: (v) => void guardarla(v, false),
+          onResult: (r) => void (r.kind === 'clone' && r.voice_id ? guardarla({ voice_id: r.voice_id, name: r.name }, true) : undefined),
+          onClose: () => ok(undefined)
+        })
+      })
+    } catch (x) {
+      setErrorVc(x instanceof Error ? x.message : String(x))
+      return undefined
+    }
+  }
   return {
     estado,
     error: error ?? estado?.error,
+    abrirVc,
+    errorVc,
+    quitarVc: (id: string) => aProveedor(api('/api/voz/vc/quitar', { id })),
+    releerVc: () => aProveedor(api('/api/voz/vc', {})),
     conectar: () => void recibir(api('/api/voz/conectar', {})),
     // Devuelve la promesa, y falla si falla, para el aviso de Google Flow; el error queda también aquí.
     desconectar: () =>
@@ -51,21 +132,27 @@ export function useVoz() {
 
 export type UsoVoz = ReturnType<typeof useVoz>
 
-const PROVEEDORES = Object.keys(MOTORES) as ProveedorVoz[]
+const PROVEEDORES: ProveedorVoz[] = ['fish', 'elevenlabs']
 
-/** ¿Se puede generar con esta voz? La de AI Studio, con la cuenta; la de Fish Audio o ElevenLabs, con su llave. */
+/**
+ * ¿Se puede generar con esta voz? La de AI Studio, con la cuenta; la de Fish Audio o ElevenLabs, con su llave; la de
+ * Voices Cloning, si Sloth la ofrece aquí.
+ */
 export function vozPosible(e: EstadoVoz | undefined, voz: string): boolean {
-  if (!voz || !e) return false
+  if (!voz || !e || voz === ABRIR_VC) return false
   const { motor } = motorDe(voz)
-  return motor === 'ai-studio' ? !!e.cuenta : !!e.motores?.[motor]?.llave
+  return motor === 'ai-studio' ? !!e.cuenta : motor === 'vc' ? !!e.vc?.disponible : !!e.motores?.[motor]?.llave
 }
 
-/** El nombre con que se ve una voz: el de AI Studio tal cual; el de Fish Audio o ElevenLabs, el de su biblioteca. */
+/** El nombre con que se ve una voz: el de AI Studio tal cual; el de los demás, el de su biblioteca (o el que elegiste). */
 export function nombreDeVoz(e: EstadoVoz | undefined, voz: string): string {
   const { motor, id } = motorDe(voz)
   if (motor === 'ai-studio') return voz
-  return e?.motores?.[motor]?.voces.find((v) => v.id === id)?.nombre ?? id
+  return (motor === 'vc' ? e?.vc?.voces : e?.motores?.[motor]?.voces)?.find((v) => v.id === id)?.nombre ?? id
 }
+
+/** «9,878 créditos», los que te quedan de Voices Cloning. */
+const creditosVc = (e: EstadoVoz | undefined) => (typeof e?.vc?.creditos === 'number' ? `${e.vc.creditos.toLocaleString('es-MX')} créditos` : '')
 
 /** «Fola · AI Studio», «Mi voz · Fish Audio». */
 const etiqueta = (e: EstadoVoz | undefined, voz: string) => {
@@ -85,7 +172,7 @@ export function SelectorVoz({ card, voz, valor, onCambio }: { card: Card; voz: U
   const e = voz.estado
   const propia = card.voz?.propia ?? 'La mando yo'
   const posible = vozPosible(e, valor)
-  const label = e?.conectando ? `Voz: entra con Google en ${e.navegador}…` : posible ? `Voz: ${etiqueta(e, valor)}` : `Voz: ${propia.toLowerCase()}`
+  const label = e?.conectando ? `Voz: entra con Google en ${e.navegador}…` : voz.errorVc ? `Voz: ${voz.errorVc}` : posible ? `Voz: ${etiqueta(e, valor)}` : `Voz: ${propia.toLowerCase()}`
   return (
     <Picker
       label={label}
@@ -93,7 +180,7 @@ export function SelectorVoz({ card, voz, valor, onCambio }: { card: Card; voz: U
       menuWidth={340}
       disabled={!e || e.conectando}
       groups={[{ label: 'Voz', options: [{ value: '', label: propia }] }, ...gruposDeVoces(e, valor)]}
-      onChange={(v) => (v === CONECTAR ? voz.conectar() : onCambio(v))}
+      onChange={(v) => (v === CONECTAR ? voz.conectar() : v === ABRIR_VC ? void voz.abrirVc().then((x) => x && onCambio(x)) : onCambio(v))}
     />
   )
 }
@@ -101,9 +188,10 @@ export function SelectorVoz({ card, voz, valor, onCambio }: { card: Card; voz: U
 type Grupo = { label: string; options: { value: string; label: string }[] }
 
 /**
- * Las voces para un menú: primero las tuyas (clonadas en Fish Audio o ElevenLabs), luego las de AI Studio por grupos
- * como los pone la página (sin cuenta, la opción de conectarla) y al final las bibliotecas de Fish Audio y ElevenLabs.
- * Una elegida antes que ya no sale (`valor`) sigue a la vista.
+ * Las voces para un menú: primero las tuyas (clonadas en Fish Audio o ElevenLabs), luego las de Voices Cloning (las que
+ * elegiste en su ventana y la opción de abrirla), las de AI Studio por grupos como los pone la página (sin cuenta, la
+ * opción de conectarla) y al final las bibliotecas de Fish Audio y ElevenLabs. Una elegida antes que ya no sale
+ * (`valor`) sigue a la vista.
  */
 function gruposDeVoces(e: EstadoVoz | undefined, valor = ''): Grupo[] {
   const tuyas: Grupo[] = []
@@ -118,7 +206,15 @@ function gruposDeVoces(e: EstadoVoz | undefined, valor = ''): Grupo[] {
   const studio = new Map<string, Grupo['options']>()
   if (!e?.cuenta) studio.set('AI Studio · Gemini 3.8 Flash TTS, gratis', [{ value: CONECTAR, label: 'Conectar tu cuenta de Google…' }])
   else for (const v of e.voces) studio.set(`AI Studio · ${v.grupo}`, [...(studio.get(`AI Studio · ${v.grupo}`) ?? []), { value: v.nombre, label: `${v.nombre} · ${v.descripcion}` }])
-  const todos = [...tuyas, ...[...studio].map(([label, options]) => ({ label, options })), ...bibliotecas].filter((g) => g.options.length)
+  const vc: Grupo[] = e?.vc?.disponible
+    ? [
+        {
+          label: ['Voices Cloning', creditosVc(e)].filter(Boolean).join(' · '),
+          options: [...e.vc.voces.map((v) => ({ value: `vc:${v.id}`, label: v.descripcion ? `${v.nombre} · ${v.descripcion}` : v.nombre })), { value: ABRIR_VC, label: 'Abrir voces y funciones…' }]
+        }
+      ]
+    : []
+  const todos = [...tuyas, ...vc, ...[...studio].map(([label, options]) => ({ label, options })), ...bibliotecas].filter((g) => g.options.length)
   if (valor && vozPosible(e, valor) && !todos.some((g) => g.options.some((o) => o.value === valor))) todos.unshift({ label: 'Elegida', options: [{ value: valor, label: etiqueta(e, valor) }] })
   return todos
 }
@@ -137,9 +233,9 @@ export function GenerarVoz({ onGenerar }: { onGenerar(texto: string): Promise<vo
   const [elegida, setElegida] = useState(() => localStorage.getItem(ULTIMA) ?? '')
   const [mandando, setMandando] = useState(false)
   if (!e) return null
-  const conApi = PROVEEDORES.some((p) => e.motores?.[p]?.llave && e.motores[p].voces.length)
+  const conApi = PROVEEDORES.some((p) => e.motores?.[p]?.llave && e.motores[p].voces.length) || !!e.vc?.disponible
   // La guardada solo vale si se puede usar; si no, la primera que haya.
-  const primera = gruposDeVoces(e).flatMap((g) => g.options).find((o) => o.value !== CONECTAR)?.value ?? ''
+  const primera = gruposDeVoces(e).flatMap((g) => g.options).find((o) => o.value !== CONECTAR && o.value !== ABRIR_VC)?.value ?? ''
   const valor = vozPosible(e, elegida) ? elegida : primera
   if (!e.cuenta && !conApi)
     return (
@@ -159,8 +255,14 @@ export function GenerarVoz({ onGenerar }: { onGenerar(texto: string): Promise<vo
         value={valor}
         menuWidth={340}
         groups={gruposDeVoces(e, valor)}
-        onChange={(v) => (v === CONECTAR ? voz.conectar() : (localStorage.setItem(ULTIMA, v), setElegida(v)))}
+        onChange={(v) => {
+          const elegir = (x: string) => (localStorage.setItem(ULTIMA, x), setElegida(x))
+          if (v === CONECTAR) voz.conectar()
+          else if (v === ABRIR_VC) void voz.abrirVc().then((x) => x && elegir(x))
+          else elegir(v)
+        }}
       />
+      {voz.errorVc && <span className="bad small">{voz.errorVc}</span>}
       <button
         className="primary small"
         disabled={!valor || mandando}
@@ -215,10 +317,59 @@ export function VozOpciones({ voz }: { voz: UsoVoz }) {
         {e?.conectando && <p className="muted small fila-extra">Google no deja entrar desde una app. Al entrar en {e.navegador} (la primera vez, AI Studio te pide aceptar sus términos), la ventana se cierra y la sesión pasa sola a Sloth.</p>}
         {voz.error && !e?.conectando && <p className="bad small fila-extra">{voz.error}</p>}
       </div>
+      <VoicesCloningOpciones voz={voz} />
       {PROVEEDORES.map((p) => (
         <ProveedorOpciones key={p} p={p} voz={voz} />
       ))}
     </>
+  )
+}
+
+/**
+ * Voices Cloning en Opciones → Voz, si Sloth te la ofrece: tus créditos, abrir su ventana entera (voces, clonar tu voz,
+ * diálogo, texto largo, transcribir) y quitar del menú una voz que ya no usas.
+ */
+function VoicesCloningOpciones({ voz }: { voz: UsoVoz }) {
+  const vc = voz.estado?.vc
+  const [ocupado, setOcupado] = useState('')
+  const [error, setError] = useState('')
+  if (!vc?.disponible) return null
+  const hacer = (que: string, p: Promise<unknown>) => {
+    setOcupado(que)
+    setError('')
+    void p.catch((x: Error) => setError(x.message)).finally(() => setOcupado(''))
+  }
+  const datos = [creditosVc(voz.estado), typeof vc.usados === 'number' && `${vc.usados.toLocaleString('es-MX')} usados`, typeof vc.hoy === 'number' && vc.hoy > 0 && `${vc.hoy.toLocaleString('es-MX')} hoy`]
+  return (
+    <div className="item">
+      <div className="fila">
+        <Logo de="voicescloning" nombre="Voices Cloning" />
+        <div className="fila-nombre">
+          <strong>Voices Cloning</strong>
+          <span>
+            {vc.estado === 'suspended' ? 'Tu usuario está suspendido. ' : ''}
+            {[...datos.filter(Boolean), `${vc.voces.length} ${vc.voces.length === 1 ? 'voz' : 'voces'} en el menú Voz`].join(' · ')}
+          </span>
+        </div>
+        <Picker
+          className="acciones"
+          label={<span className="estado">{ocupado || 'Sloth'}</span>}
+          value=""
+          disabled={!!ocupado}
+          groups={[
+            { label: 'Voices Cloning', options: [{ value: 'abrir', label: 'Abrir voces y funciones…' }, { value: 'releer', label: 'Volver a leer tus créditos' }] },
+            ...(vc.voces.length ? [{ label: 'Quitar del menú', options: vc.voces.map((v) => ({ value: `quitar:${v.id}`, label: v.nombre })) }] : [])
+          ]}
+          onChange={(q) => {
+            if (q === 'abrir') void voz.abrirVc('menu')
+            if (q === 'releer') hacer('Leyendo…', voz.releerVc())
+            if (q.startsWith('quitar:')) hacer('Quitando…', voz.quitarVc(q.slice(7)))
+          }}
+        />
+      </div>
+      <p className="muted small fila-extra">Las voces de Sloth: eliges una en su ventana, o clonas la tuya subiendo una grabación, y sale en el menú Voz. Gasta los créditos de voz que te da Sloth, sin llave ni cuenta aparte.</p>
+      {(error || voz.errorVc || vc.error) && <p className="bad small fila-extra">{error || voz.errorVc || vc.error}</p>}
+    </div>
   )
 }
 

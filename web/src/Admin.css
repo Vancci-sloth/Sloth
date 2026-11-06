@@ -1,0 +1,68 @@
+/*
+ * Administrador (solo en la computadora del creador): una columna ancha de secciones. Arriba las cifras de la cuenta en
+ * cuadros; luego tablas que se desplazan de lado si no caben, con sus acciones en la última columna.
+ */
+.admin { height: 100%; width: 100%; overflow-y: auto; background: var(--bg); padding: 36px 48px 72px; display: flex; flex-direction: column; gap: 28px; }
+.admin > * { width: 100%; max-width: 1200px; margin-left: auto; margin-right: auto; }
+.admin .ok { color: var(--ok); }
+
+.admin-cabeza { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; }
+.admin-cabeza h1 { margin: 2px 0 6px; font-size: 28px; font-weight: 700; letter-spacing: -0.02em; }
+.admin-cabeza p { margin: 0; max-width: 620px; color: var(--muted); font-size: 13.5px; line-height: 1.5; }
+.admin-antetitulo { font-size: 11px; font-weight: 650; letter-spacing: 0.08em; text-transform: uppercase; color: var(--amber); }
+.admin-recargar { display: inline-flex; align-items: center; gap: 6px; flex-shrink: 0; }
+.admin-recargar .ico { width: 14px; height: 14px; }
+.admin-aviso { margin: 0; padding: 10px 14px; border: 1px solid var(--line); border-radius: var(--radio); background: var(--panel); font-size: 13px; }
+
+.admin-seccion { display: flex; flex-direction: column; gap: 10px; }
+.admin-seccion h2 { margin: 0; color: var(--muted); font-size: 11.5px; font-weight: 650; letter-spacing: 0.07em; text-transform: uppercase; }
+.admin-seccion > p { margin: 0; }
+.admin-vacio { padding: 4px 0; }
+
+.admin-cifras { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 10px; }
+.admin-cifra { display: flex; flex-direction: column; gap: 4px; padding: 12px 14px; border: 1px solid var(--line); border-radius: var(--radio); background: var(--panel-2); }
+.admin-cifra strong { font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: -0.01em; }
+.admin-cifra-titulo { color: var(--muted); font-size: 11.5px; font-weight: 600; }
+
+.admin-tabla-caja { overflow-x: auto; border: 1px solid var(--line); border-radius: var(--radio); background: var(--panel); }
+.admin-tabla { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.admin-tabla th { position: sticky; top: 0; text-align: left; white-space: nowrap; font-size: 11px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); padding: 8px 10px; border-bottom: 1px solid var(--line); background: var(--panel); }
+.admin-tabla td { padding: 7px 10px; border-bottom: 1px solid var(--line); vertical-align: middle; font-variant-numeric: tabular-nums; }
+.admin-tabla tr:last-child td { border-bottom: 0; }
+.admin-tabla tr:hover td { background: var(--panel-2); }
+.admin-quien { color: var(--text); text-align: left; text-decoration: underline; text-decoration-color: var(--line); text-underline-offset: 3px; }
+.admin-quien:hover { color: var(--amber-2); text-decoration-color: currentColor; }
+.admin-planes { white-space: pre-line; color: var(--muted); font-size: 11.5px; }
+.admin-planes-detalle { margin: 0; white-space: pre-line; color: var(--muted); font: inherit; font-size: 12px; }
+.admin-id { font-size: 11px; color: var(--muted); overflow-wrap: anywhere; }
+.admin-error { display: inline-block; max-width: 420px; overflow-wrap: anywhere; }
+
+.admin-acciones { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
+.admin-acciones input, .admin-alta input { padding: 5px 9px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); font-size: 12.5px; }
+.admin-acciones input { width: 92px; }
+.admin-acciones input:focus, .admin-alta input:focus { outline: 1px solid var(--amber); outline-offset: -1px; }
+.admin-boton { padding: 5px 10px; border: 1px solid var(--line); border-radius: 8px; color: var(--text); font-size: 12px; font-weight: 600; }
+.admin-boton:hover:not(:disabled) { border-color: var(--amber); color: var(--amber-2); }
+.admin-boton.peligro:hover:not(:disabled) { border-color: var(--bad); color: var(--bad); }
+
+.admin-alta { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.admin-alta input[type='email'] { width: 280px; }
+.admin-alta input[type='number'] { width: 120px; }
+.admin-alta .primary { padding: 6px 14px; }
+
+.admin-paginas { display: flex; align-items: center; justify-content: flex-end; gap: 14px; }
+.admin-filtro { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); align-self: flex-start; cursor: pointer; }
+
+.admin-detalle { padding: 16px; border: 1px solid var(--amber); border-radius: var(--radio); background: var(--panel); }
+.admin-detalle-cabeza { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.admin-detalle-cabeza h2 { color: var(--text); font-size: 14px; letter-spacing: 0; text-transform: none; }
+
+.admin-crudo { border: 1px solid var(--line); border-radius: var(--radio); background: var(--panel); }
+.admin-crudo summary { padding: 8px 12px; cursor: pointer; color: var(--muted); font-size: 12.5px; }
+.admin-crudo summary:hover { color: var(--text); }
+.admin-crudo pre { margin: 0; padding: 0 12px 12px; max-height: 420px; overflow: auto; font-family: var(--mono); font-size: 11.5px; color: var(--text); }
+
+@media (max-width: 720px) {
+  .admin { padding: 24px 16px 56px; }
+  .admin-cabeza { flex-direction: column; align-items: flex-start; }
+}

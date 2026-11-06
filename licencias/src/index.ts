@@ -62,10 +62,12 @@
  * cada mañana avisa por correo (Resend) al menos 5 días antes de cada cobro. El año pagado de una vez no tiene cobro
  * automático: se aceptan sus términos y el pago único.
  *
- * Y la comunidad (`/comunidad/*`, en `comunidad.ts`), de quien tiene una licencia activa.
+ * Y la comunidad (`/comunidad/*`, en `comunidad.ts`), de quien tiene una licencia activa, y la voz de Voices Cloning
+ * (`/voz/*`, en `voz.ts`), que guarda aquí la llave del socio.
  */
 import type { VersionLiberable } from '../../shared/types.ts'
 import { comunidad, creditos } from './comunidad.ts'
+import { olvidarRegistroVoz, voz } from './voz.ts'
 
 export interface Env {
   DB: D1Database
@@ -124,6 +126,10 @@ export interface Env {
   /** De quién salen (`Sloth <avisos@vancci.org>`, dominio verificado en Resend) y adónde se responden. */
   CORREO_DE: string
   CORREO_RESPUESTA: string
+  /** La llave de socio de Voices Cloning (`pk_live_…`). Sin ella, la app no ofrece sus voces (`voz.ts`). */
+  VOICES_PK_LIVE?: string
+  /** Los créditos de voz con que se da de alta a cada quien la primera vez que abre las voces de Voices Cloning. */
+  VOZ_CREDITOS?: number
 }
 
 /**
@@ -439,6 +445,7 @@ export default {
   async scheduled(_evento: ScheduledController, env: Env, ctx: ExecutionContext) {
     ctx.waitUntil(avisarCobros(env).catch((e) => console.error('Avisos de cobro', e instanceof Error ? e.message : e)))
     ctx.waitUntil(env.DB.prepare('DELETE FROM cupos WHERE creado < ?').bind(new Date(Date.now() - 2 * DIA).toISOString()).run())
+    ctx.waitUntil(olvidarRegistroVoz(env).catch((e) => console.error('Registro de la voz', e instanceof Error ? e.message : e)))
   }
 } satisfies ExportedHandler<Env>
 
@@ -473,6 +480,7 @@ async function atender(req: Request, env: Env, ctx: ExecutionContext, url: URL):
     if (req.method === 'POST' && url.pathname === '/cancelar') return await cancelar(env, await cuerpo(req))
     if (req.method === 'POST' && url.pathname === '/pago') return await pago(env, await cuerpo(req))
     if (url.pathname === '/comunidad' || url.pathname.startsWith('/comunidad/')) return await comunidad(req, env, url)
+    if (url.pathname === '/voz' || url.pathname.startsWith('/voz/')) return await voz(req, env, ctx, url)
     return json({ error: 'No existe' }, 404)
   } catch (error) {
     if (error instanceof Rechazo) return json({ error: error.message }, error.status)
