@@ -35,9 +35,9 @@
  * mensual también va con el monto que elija cada quien (desde `APOYO_MINIMO`; con `APOYO_GRANDE` o más, la insignia
  * de apoyo grande), y hay un apoyo de una vez (`unico`): una orden como la del año, de cualquier monto, que vale un mes.
  * Hay `FUNDADORES` lugares de Fundador (`fundador`): más beneficios que quien llega después. Desde el 6 de noviembre de
- * 2026 (`FUNDADOR_MIENTRAS`) solo se ofrecen con un enlace de invitación del creador (`enlaces_fundador`, que da
- * `npm run fundador`), con el mensual del precio sugerido o más, y duran mientras se apoya: al vencer, el lugar se libera.
- * Quien lo fue antes, también con un apoyo de una vez, lo es para siempre, como decían sus términos. Cada suscripción conserva el monto y la moneda con que se creó: las de antes
+ * 2026 solo se ofrecen con un enlace de invitación del creador (`enlaces_fundador`, que da `npm run fundador`), con el
+ * precio de Fundador (`PRECIO_MENSUAL`) o más, cada mes o una vez, y duran mientras lo pagado no vence: después, el lugar
+ * se libera (`esFundador`). Cada suscripción conserva el monto y la moneda con que se creó: las de antes
  * del 30 de octubre de 2026 siguen en pesos; las nuevas, en `MONEDA`.
  * Cuando Sloth se vendía, las primeras personas se unieron gratis de por vida (plan `gratis`, `GRATIS` como mucho): son
  * fundadoras como las primeras que apoyan (`esFundador`), con lo nuevo `ANTICIPO` antes y sin el recordatorio. Ya no se
@@ -359,17 +359,12 @@ const TERMINOS = /^\d{4}-\d{2}-\d{2}$/
 /** Cuánto antes que los demás recibe lo nuevo quien apoya. */
 const ANTICIPO = 7 * DIA
 /**
- * Desde estos términos, el lugar de Fundador dura mientras se apoya: al acabarse lo pagado se pierde y se libera. Quien lo
- * fue con los de antes lo es para siempre, como se le prometió.
- */
-export const FUNDADOR_MIENTRAS = '2026-11-06'
-/**
- * Si una fila de `licencias` hace fundadora a su correo: un apoyo de los primeros que se llegó a pagar (con los términos
- * de antes de `FUNDADOR_MIENTRAS`, para siempre; con los nuevos, mientras no venza), o un lugar gratis de por vida que
- * sigue en pie. `t` es el nombre de la tabla en la consulta.
+ * Si una fila de `licencias` hace fundadora a su correo: un apoyo de Fundador pagado y sin vencer (al acabarse lo pagado,
+ * el lugar se libera; desde el 6 de noviembre de 2026, para todos), o un lugar gratis de por vida que sigue en pie. `t` es
+ * el nombre de la tabla en la consulta.
  */
 export function esFundador(t: string) {
-  return `((${t}.fundador = 1 AND ${t}.autorizada IS NOT NULL AND (coalesce(${t}.terminos, '') < '${FUNDADOR_MIENTRAS}' OR julianday(${t}.pagado_hasta) > julianday('now'))) OR (${t}.plan = 'gratis' AND ${t}.estado = 'gratis'))`
+  return `((${t}.fundador = 1 AND ${t}.autorizada IS NOT NULL AND julianday(${t}.pagado_hasta) > julianday('now')) OR (${t}.plan = 'gratis' AND ${t}.estado = 'gratis'))`
 }
 
 /** Un enlace de invitación de Fundador que sigue en pie (`enlaces_fundador`). */
@@ -762,8 +757,8 @@ async function suscribir(env: Env, c: Record<string, unknown>, desde: string): P
     plan,
     monto,
     moneda: p.moneda,
-    // Fundador, solo con un enlace de Fundador, mientras queden lugares, y apoyando cada mes con el precio sugerido de su moneda o más.
-    fundador: t.fundador && plan === 'mensual' && monto >= p.mensual && terminos >= FUNDADOR_MIENTRAS ? 1 : 0,
+    // Fundador, solo con un enlace de Fundador y mientras queden lugares: cada mes o una vez, con el precio de Fundador de su moneda o más.
+    fundador: t.fundador && plan !== 'anual' && monto >= p.mensual ? 1 : 0,
     preapproval: null,
     enlace: null,
     estado: 'pending',
