@@ -4,8 +4,12 @@
 //   npm run fundador -- nuevo [nota]     da un enlace nuevo (la nota dice para quién es)
 //   npm run fundador -- lista            los enlaces que se han dado, y quién usó cada uno
 //   npm run fundador -- revocar <codigo> ese enlace deja de servir
+//   npm run fundador -- dar <correo> [meses]  Fundador por esos meses (1 si no se dice) a quien apoyó por transferencia,
+//                                        con su clave por correo. Si ya tiene uno así, se le suman y conserva la clave;
+//                                        con 0 meses, solo se le vuelve a mandar. Usa la llave de `npm run publicar`.
 import { spawnSync } from 'node:child_process'
 import { randomBytes } from 'node:crypto'
+import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
 const [orden, ...resto] = process.argv.slice(2)
@@ -48,6 +52,19 @@ if (orden === 'nuevo') {
 } else if (orden === 'revocar' && /^[A-Za-z0-9]{8,32}$/.test(resto[0] ?? '')) {
   d1(`UPDATE enlaces_fundador SET revocado = '${new Date().toISOString()}' WHERE codigo = '${resto[0]}'`)
   console.log(`Revocado: ${resto[0]}`)
+} else if (orden === 'dar' && resto[0]) {
+  const llave = (process.env.PUBLICAR || readFileSync(join(process.env.APPDATA ?? '', 'sloth', 'licencias', 'publicar.txt'), 'utf8')).trim()
+  const r = await fetch('https://api.sloth.vancci.org/a-mano', {
+    method: 'POST',
+    headers: { authorization: `Bearer ${llave}`, 'content-type': 'application/json' },
+    body: JSON.stringify({ email: resto[0], meses: resto[1] === undefined ? 1 : Number(resto[1]) })
+  })
+  const d = await r.json()
+  if (!r.ok) {
+    console.error(d.error ?? r.status)
+    process.exit(1)
+  }
+  console.log(`${resto[0]}: Fundador hasta el ${d.hasta.slice(0, 10)}, clave ${d.clave}${d.enviado ? ', mandada por correo' : ' (el correo no salió)'}`)
 } else {
-  console.log('Uso: npm run fundador -- nuevo [nota] | lista | revocar <codigo>')
+  console.log('Uso: npm run fundador -- nuevo [nota] | lista | revocar <codigo> | dar <correo> [meses]')
 }

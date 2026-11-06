@@ -471,6 +471,7 @@ async function atender(req: Request, env: Env, ctx: ExecutionContext, url: URL):
     if (req.method === 'POST' && url.pathname === '/licencia') return await licencia(env, await cuerpo(req))
     if (req.method === 'POST' && url.pathname === '/cancelar') return await cancelar(env, await cuerpo(req))
     if (req.method === 'POST' && url.pathname === '/pago') return await pago(env, await cuerpo(req))
+    if (req.method === 'POST' && url.pathname === '/a-mano') return await aMano(req, env)
     if (url.pathname === '/comunidad' || url.pathname.startsWith('/comunidad/')) return await comunidad(req, env, url)
     if (url.pathname === '/voz' || url.pathname.startsWith('/voz/')) return await voz(req, env, ctx, url)
     return json({ error: 'No existe' }, 404)
@@ -1483,11 +1484,56 @@ async function guardarEstado(env: Env, fila: Fila, l: Lectura): Promise<Fila> {
 function bienvenida(env: Env, f: Fila) {
   return correo(env, f.email, `Tu clave de Sloth: ${f.clave}`, [
     'Hola:',
-    `${pasarela(f)} confirmó tu pago: gracias por apoyar a Sloth. Guarda este correo, es donde queda tu clave.`,
+    deAMano(f)
+      ? `Recibimos tu apoyo: gracias por apoyar a Sloth. Eres Fundador hasta el ${fecha(f.pagado_hasta!)}. Guarda este correo, es donde queda tu clave.`
+      : `${pasarela(f)} confirmó tu pago: gracias por apoyar a Sloth. Guarda este correo, es donde queda tu clave.`,
     `Tu clave: ${f.clave}`,
     `Pégala en Sloth, en Opciones, y deja de salirte el recordatorio. Si aún no la tienes, descárgala en ${env.ORIGEN}/descargar (Mac: ${env.ORIGEN}/descargar?so=mac; Linux: ${env.ORIGEN}/descargar?so=linux). La clave sirve en dos computadoras a la vez.`,
     'Sloth trabaja con la IA que ya tengas: Claude, ChatGPT, OpenCode (que tiene modelos gratis) y otros agentes. Con uno basta, y Sloth no te cobra aparte: lo conectas en Opciones, en Agentes. Si tienes dudas, responde a este correo.'
   ])
+}
+
+/** Un apoyo de Fundador que el creador dio a mano (una transferencia): ninguna pasarela lo lee ni lo cancela. */
+const deAMano = (f: Pick<Fila, 'plan' | 'paypal' | 'orden' | 'preapproval' | 'preferencia' | 'cripto' | 'stripe'>) =>
+  f.plan === 'unico' && !(f.paypal || f.orden || f.preapproval || f.preferencia || f.cripto || f.stripe)
+
+/** Hasta cuándo vale un apoyo a mano al sumarle `meses`: desde lo ya pagado, si aún no se acaba. */
+export function hastaAMano(pagadoHasta: string | null, meses: number, ahora: number): string {
+  const d = new Date(Math.max(ahora, pagadoHasta ? Date.parse(pagadoHasta) : 0))
+  d.setUTCMonth(d.getUTCMonth() + meses)
+  return d.toISOString()
+}
+
+/**
+ * `POST /a-mano` (`npm run fundador -- dar`), solo del creador, con la llave de `PUBLICAR`: Fundador por `meses` a quien
+ * apoyó sin pasarela (una transferencia). Si ese correo ya tiene uno a mano, se le suman a lo pagado y conserva su clave;
+ * con `meses: 0`, solo se le vuelve a mandar. La clave le llega por correo.
+ */
+async function aMano(req: Request, env: Env): Promise<Response> {
+  if (!env.PUBLICAR || !iguales(req.headers.get('authorization') ?? '', `Bearer ${env.PUBLICAR}`)) throw new Rechazo(401, 'No autorizado.')
+  const c = await cuerpo(req)
+  const email = String(c.email ?? '').trim().toLowerCase()
+  const meses = Number(c.meses ?? 1)
+  if (!EMAIL.test(email)) throw new Rechazo(400, 'Escribe un correo válido.')
+  if (!Number.isInteger(meses) || meses < 0 || meses > 24) throw new Rechazo(400, 'Los meses van de 0 a 24.')
+  const ahora = new Date().toISOString()
+  const { results } = await env.DB.prepare("SELECT * FROM licencias WHERE email = ? AND plan = 'unico' ORDER BY creada DESC").bind(email).all<Fila>()
+  let fila = results.find(deAMano)
+  if (!fila && !meses) throw new Rechazo(404, 'Ese correo no tiene un apoyo a mano.')
+  if (fila) {
+    fila = { ...fila, estado: 'pagado', pagado_hasta: hastaAMano(fila.pagado_hasta, meses, Date.now()) }
+    await env.DB.prepare("UPDATE licencias SET estado = 'pagado', pagado_hasta = ?, revisada = ? WHERE id = ?").bind(fila.pagado_hasta, ahora, fila.id).run()
+  } else {
+    const nueva = { id: crypto.randomUUID(), clave: nuevaClave(), pagado_hasta: hastaAMano(null, meses, Date.now()) }
+    await env.DB.prepare(
+      "INSERT INTO licencias (id, clave, email, plan, monto, moneda, fundador, estado, pagado_hasta, autorizada, creada, revisada, acepto, modo) VALUES (?, ?, ?, 'unico', ?, ?, 1, 'pagado', ?, ?, ?, ?, ?, ?)"
+    )
+      .bind(nueva.id, nueva.clave, email, Number(env.PRECIO_MENSUAL), env.MONEDA, nueva.pagado_hasta, ahora, ahora, ahora, ahora, env.PAYPAL_MODO)
+      .run()
+    fila = (await env.DB.prepare('SELECT * FROM licencias WHERE id = ?').bind(nueva.id).first<Fila>())!
+  }
+  const enviado = await bienvenida(env, fila)
+  return json({ clave: fila.clave, hasta: fila.pagado_hasta, enviado })
 }
 
 /**

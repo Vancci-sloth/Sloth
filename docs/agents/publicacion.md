@@ -79,6 +79,8 @@ Cuando el usuario pida un link de Fundador, dale uno nuevo con `npm run fundador
 persona: la página ofrece los $15 (cada mes o una vez) hasta que alguien paga con él, aunque los 25 lugares públicos
 estén ocupados. Sin link, la página enseña el de Fundador mientras quede alguno de los 25, y llenos, solo «Lo que
 gustes» y $30. Con `lista` ves los que se han dado y quién usó cada uno, y con `revocar <código>` uno deja de servir.
+Si alguien apoyó por transferencia, `npm run fundador -- dar <correo> [meses]` lo hace Fundador esos meses (1 si no se
+dice) y le manda su clave por correo; si ya tenía uno así, se le suman. Con 0 meses, solo se le vuelve a mandar.
 
 ## Publicaciones de Instagram: nube/
 

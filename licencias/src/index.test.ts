@@ -3,8 +3,16 @@ import { createHmac } from 'node:crypto'
 import test from 'node:test'
 import { readFileSync } from 'node:fs'
 import { DatabaseSync } from 'node:sqlite'
-import { CUPO, VIGILAR, deTodos, esFundador, faltaAvisar, firmaDeMercadoPago, firmaDeNowpayments, instaladorDe, leerPagos, leerPaypal, liberada, mensualRechazado, montoDe, rangoDe, sistema, sistemaDelYml, sobran, tarifa, vigencia } from './index.ts'
+import { CUPO, VIGILAR, deTodos, esFundador, faltaAvisar, firmaDeMercadoPago, firmaDeNowpayments, hastaAMano, instaladorDe, leerPagos, leerPaypal, liberada, mensualRechazado, montoDe, rangoDe, sistema, sistemaDelYml, sobran, tarifa, vigencia } from './index.ts'
 import { DE_LA_APP } from './comunidad.ts'
+
+test('un apoyo a mano suma sus meses desde lo ya pagado, o desde hoy si ya se acabó', () => {
+  const hoy = Date.parse('2026-11-06T12:00:00Z')
+  assert.equal(hastaAMano(null, 1, hoy), '2026-12-06T12:00:00.000Z')
+  assert.equal(hastaAMano('2026-12-06T12:00:00.000Z', 2, hoy), '2027-02-06T12:00:00.000Z')
+  assert.equal(hastaAMano('2026-10-01T00:00:00.000Z', 1, hoy), '2026-12-06T12:00:00.000Z')
+  assert.equal(hastaAMano('2026-12-06T12:00:00.000Z', 0, hoy), '2026-12-06T12:00:00.000Z')
+})
 
 const SECRETO = 'secreto-de-prueba'
 const firmar = (manifiesto: string) => createHmac('sha256', SECRETO).update(manifiesto).digest('hex')
