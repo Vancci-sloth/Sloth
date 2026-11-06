@@ -20,7 +20,7 @@ import { conectandoOtro, OTROS, sinLimites } from './proveedores.ts'
 import { PROVEEDORES, type Proveedor, proveedorDe } from '../shared/providers.ts'
 import { paraMandar, salidaDe, sinSalidasLargas } from '../shared/historial.ts'
 import { conectandoCodex, conectarCodex, cuentaCodex, limitesCodex } from './cuenta-codex.ts'
-import { conectando, conectarClaude, cuentaClaude, limitesClaude } from './cuenta.ts'
+import { alEntrarClaude, conectando, conectarClaude, cuentaClaude, limitesClaude } from './cuenta.ts'
 import { cancelarOpenCode, conectandoOpenCode, conectarOpenCode, cuentaOpenCode, limitesOpenCode, quitarCuentaOpenCode, usarCuentaOpenCode } from './cuenta-opencode.ts'
 import { enlacesApi } from './enlaces.ts' // tarjeta de los enlaces
 import { cerrarVigilantesOciosos, etapasApi, folderOf, mismaCwd, queFalta, videosApi, videosDe } from './etapas.ts' // panel de etapas
@@ -115,6 +115,8 @@ const sessions = new Sessions(
 /** Si el hilo es de un estilo de video: solo su estudio enseña lo que va escribiendo. */
 const conEtapas = (id: string) => !!cards().find((c) => c.id === sessions.meta(id)?.cardId)?.etapas?.length
 sessions.esVideo = (meta) => !!cards().find((c) => c.id === meta.cardId)?.etapas?.some((e) => e.fase)
+// Con otra cuenta de Claude, los hilos quietos sueltan su Claude Code: el siguiente mensaje ya va con ella.
+alEntrarClaude(() => sessions.soltarQuietos('claude'))
 // Mientras un video trabaja, Whisper se queda cargado: el primero que empieza lo carga, antes de que sus agentes llenen la memoria.
 setInterval(() => {
   if (sessions.videosTrabajando()) void mantenerVoz(SKILLS)

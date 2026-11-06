@@ -101,10 +101,22 @@ export function conectarClaude(app: string): Promise<CuentaClaude> {
   return cuentaClaude(app)
 }
 
+/** Quienes deben saber que se entró con una cuenta (`alEntrarClaude`). */
+const alEntrar: (() => void)[] = []
+/**
+ * Al terminar de entrar, con la misma cuenta o con otra: los hilos quietos sueltan su Claude Code, que pudo quedarse con
+ * la sesión de antes, y el siguiente mensaje lo abre ya con la nueva (`soltarQuietos` en sessions.ts).
+ */
+export const alEntrarClaude = (f: () => void) => void alEntrar.push(f)
+
 function cerrar(app: string, error?: Error) {
   void estado(app).then((s) => {
     if (!s.loggedIn) fallo = error?.message ?? 'No se terminó de autorizar la cuenta. Vuelve a intentarlo.'
     login = false
+    if (!s.loggedIn) return
+    // Los límites guardados eran de la cuenta de antes.
+    limites = null
+    for (const f of alEntrar) f()
   })
 }
 

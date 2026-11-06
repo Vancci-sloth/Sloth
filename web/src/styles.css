@@ -403,6 +403,10 @@ span.sub-avatar > .logo.chico svg { width: 13px; height: 13px; }
 /* «Seguir con…»: el hilo pasa a otro agente conectado (`Fallo` en Timeline.tsx). */
 .turn-ayuda .seguir-con { display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px; border: 1px solid var(--line); border-radius: 12px; color: var(--text); font-size: 12.5px; font-weight: 600; }
 .turn-ayuda .seguir-con:hover:not(:disabled) { background: var(--panel-2); }
+/* Una fila entera del aviso: cuánto queda del límite de Claude, o qué hacer al cambiar de cuenta (`LimiteClaude.tsx`). */
+.turn-ayuda-linea { flex-basis: 100%; }
+.turn-ayuda-linea b { color: var(--text); font-weight: 600; font-variant-numeric: tabular-nums; }
+.turn-ayuda-linea b.bad, .turn-ayuda-linea.bad { color: var(--bad); }
 .info { color: var(--muted); font-size: 12.5px; font-style: italic; }
 /* El agente que tarda en arrancar (`Arranque.tsx`): la barra crece a saltos, una vez por segundo. */
 .arranque { display: flex; flex-direction: column; gap: 6px; max-width: 420px; }

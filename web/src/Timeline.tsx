@@ -6,6 +6,7 @@ import { api } from './api'
 import { Arranque } from './Arranque'
 import { useEventos } from './eventos'
 import { Icon, type Choice } from './Composer'
+import { LimiteClaude } from './LimiteClaude'
 import { LINK, LINK_ICON, linkParts, pedirMejora, QUOTE, QUOTE_EVENT, QUOTE_ICON, quoteText, THREAD, THREAD_ICON, threadIconOf } from './etiquetas'
 import { MarcaAgente } from './Logos'
 import { imageUrl, Thumbs } from './Images'
@@ -555,7 +556,8 @@ function Respuestas({ opciones, onElegir }: { opciones: string[]; onElegir?(text
  * Codex, el plan y la cuenta son los de ChatGPT; si el hilo pasó luego a otro, el de quien falló (`item.agente`).
  *
  * Si se acabó el uso de ese agente, «Seguir con…» pasa el hilo a otro conectado, como el traspaso de T3 Code: el
- * servidor le da lo hablado, la carpeta y la skill (`setModel` en sessions.ts), y sigue donde se quedó.
+ * servidor le da lo hablado, la carpeta y la skill (`setModel` en sessions.ts), y sigue donde se quedó. Con Claude, además,
+ * cuánto queda del límite y entrar con otra cuenta (`LimiteClaude.tsx`).
  */
 function Fallo({ item, datos, proveedor, sessionId, onResponder, relevos = [] }: { item: Extract<Item, { kind: 'turn_end' }>; datos: string; proveedor: string; sessionId?: string; onResponder?(text: string): Promise<unknown>; relevos?: Choice[] }) {
   const actual = proveedorDe(proveedor === 'claude' ? '' : `${proveedor}:`)
@@ -584,6 +586,15 @@ function Fallo({ item, datos, proveedor, sessionId, onResponder, relevos = [] }:
       {onResponder && (
         <div className="turn-ayuda">
           <span className={fallo ? 'bad' : ''}>{fallo || e.ayuda}</span>
+          {e.limite && agente === 'claude' && actual === 'claude' && (
+            <LimiteClaude
+              ocupado={enviando}
+              onSeguir={() => {
+                setEnviando(true)
+                return onResponder(REINTENTAR).catch((err) => (setEnviando(false), Promise.reject(err)))
+              }}
+            />
+          )}
           {otros.map((c) => (
             <button
               key={c.model}

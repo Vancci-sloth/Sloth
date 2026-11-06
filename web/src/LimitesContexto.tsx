@@ -3,8 +3,8 @@ import { NOMBRE_AGENTE, type Proveedor } from '../../shared/providers'
 import type { CuentaEnFlow, EstadoFlow, GastoFlow, LimitesClaude } from '../../shared/types'
 import { api } from './api'
 
-/** Cuánto falta para el reinicio. No supone que una ventana vencida tenga ya el 100% disponible. */
-function reinicio(fecha: string, ahora: number): string {
+/** Cuánto falta para el reinicio. No supone que una ventana vencida tenga ya el 100% disponible. También en `LimiteClaude.tsx`. */
+export function reinicio(fecha: string, ahora: number): string {
   const minutos = Math.ceil((Date.parse(fecha) - ahora) / 60_000)
   if (!Number.isFinite(minutos)) return 'Sin fecha de reinicio'
   if (minutos <= 0) return 'Pendiente de actualizar'

@@ -447,6 +447,11 @@ export class Sessions {
     this.save(meta)
   }
 
+  /** Cierra los procesos quietos de un agente: tras cambiar de cuenta, el siguiente mensaje abre uno con la nueva. */
+  soltarQuietos(proveedor: string) {
+    for (const [id] of this.runs) if (proveedorDe(this.metas.get(id)?.model ?? '') === proveedor) this.cerrarQuieto(id)
+  }
+
   /** Le pone otro nombre. Sin tocar `updatedAt`: renombrarlo no lo sube en la lista ni lo marca como terminado. */
   rename(id: string, title: string) {
     const meta = this.metas.get(id)

@@ -379,7 +379,9 @@ export function errorLlano(error = '', caida = false, agente: Proveedor = 'claud
   if (agente === 'antigravity' && /^Se acabó tu cuota/.test(error)) return { titulo: 'Se acabó tu cuota de Antigravity', ayuda: error, reintentar: true, limite: true }
   if (/hit your .*limit|usage limit|rate.?limit|out of usage|spend limit|credit balance|\b429\b/i.test(error)) {
     const cuando = reinicio(error)
-    return { titulo: `Llegaste al límite de tu plan de ${nombre}`, ayuda: `${cuando ? `Se reinicia: ${cuando}.` : 'En Opciones ves cuándo se reinicia.'} Entonces pulsa «Reintentar», o sigue ya con otra IA: le pasa lo hablado.`, reintentar: true, limite: true }
+    // Con Claude, el aviso deja entrar con otra cuenta (`LimiteClaude.tsx`).
+    const otra = agente === 'claude' ? 'otra cuenta o con otra IA' : 'otra IA'
+    return { titulo: `Llegaste al límite de tu plan de ${nombre}`, ayuda: `${cuando ? `Se reinicia: ${cuando}.` : 'En «Uso» ves cuándo se reinicia.'} Entonces pulsa «Reintentar», o sigue ya con ${otra}: le pasa lo hablado.`, reintentar: true, limite: true }
   }
   if (/\/login|not logged in|authenticat|oauth|\b401\b|invalid api key|credential/i.test(error)) {
     return { titulo: `Tu cuenta de ${nombre} se desconectó`, ayuda: 'Vuelve a conectarla en Opciones y pulsa «Reintentar».', reintentar: true }
