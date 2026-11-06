@@ -15,7 +15,6 @@
     "nube": "node scripts/nube.mjs",
     "licencias": "node scripts/nube.mjs --licencias",
     "paypal": "node scripts/paypal.mjs",
-    "fundador": "node scripts/fundador.mjs",
     "compilar": "node scripts/compilar.mjs",
     "publicar": "node scripts/publicar.mjs"
   },
