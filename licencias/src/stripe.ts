@@ -104,6 +104,8 @@ export function sesionStripe(env: Env, f: Pick<Fila, 'id' | 'email' | 'plan' | '
     'line_items[0][price_data][unit_amount]': String(Math.round(f.monto * 100)),
     ...(mensual ? { 'line_items[0][price_data][recurring][interval]': 'month' } : {}),
     'line_items[0][price_data][product_data][name]': nombre,
+    // El precio ya trae el IVA, como dice la página: con Stripe Tax (encendido en la cuenta) se desglosa, no se suma.
+    'line_items[0][price_data][tax_behavior]': 'inclusive',
     // Quien paga desde otro país lo ve y lo paga en su moneda.
     'adaptive_pricing[enabled]': 'true',
     // Que se vea Sloth y no el nombre de la cuenta: su nombre y su paleta.
