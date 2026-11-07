@@ -66,6 +66,9 @@ test('quien instala de cero no tiene estilo de antes', () => {
   try {
     rmSync(join(s.skills, 'video-explicativo'), { recursive: true })
     assert.deepEqual(guardarAnteriores({ cards: [s.card], ...s }), [])
+    // Pero el aviso le sale igual, solo para leerlo, hasta que lo lee.
+    assert.equal(anteriorDe(s.card, s.datos)?.guardado, false)
+    olvidarAnterior(s.card, s.datos)
     assert.equal(anteriorDe(s.card, s.datos), null)
     // Y al volver a crear la carpeta (la versión ya puesta), tampoco: ese cambio ya lo tenía.
     escribir(join(s.skills, 'video-explicativo', 'SKILL.md'), 'el nuevo')
@@ -79,7 +82,7 @@ test('guardar el de antes lo pone entre tus estilos con otro nombre, y el aviso 
   const s = sloth()
   try {
     guardarAnteriores({ cards: [s.card], ...s })
-    assert.deepEqual(anteriorDe(s.card, s.datos), { fecha: '2026-11-07', texto: 'Sale en 5 min.', compara: 'https://ejemplo.org/compara', titulo: 'Video explicativo (hasta el 7 nov 2026)' })
+    assert.deepEqual(anteriorDe(s.card, s.datos), { fecha: '2026-11-07', texto: 'Sale en 5 min.', compara: 'https://ejemplo.org/compara', titulo: 'Video explicativo (hasta el 7 nov 2026)', guardado: true })
     const tusCards = join(s.datos, 'tus-cards.json')
     const r = conservarAnterior({ card: s.card, datos: s.datos, skills: s.skills, tusCards })
     assert.deepEqual(r, { id: 'video-explicativo-2026-11-07', titulo: 'Video explicativo (hasta el 7 nov 2026)', adaptar: ['VOZ.md'] })

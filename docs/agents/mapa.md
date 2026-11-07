@@ -114,8 +114,12 @@ Este es el mapa:
   Lo que se pisa, también al actualizar (`prepararSkills`), se copia antes a `data/skills-tuyas`.
 - `server/anteriores.ts` y `web/src/EstiloCambio.tsx`: cuando una versión cambia a fondo un estilo de Sloth, su card en
   `cards.json` lleva `cambio` (la fecha, qué cambió para quien hace videos, el enlace a los dos lado a lado y lo de la
-  card de antes que ya no es igual). Al actualizar se guarda el de antes y la card ofrece «Guardar también el de antes»,
-  que lo pone entre tus estilos como `<skill>-<fecha>`. El de Sloth se actualiza siempre. Al rehacer un estilo, pon el
+  card de antes que ya no es igual). Al actualizar se guarda el de antes. Al abrir Sloth, todos ven un aviso a pantalla
+  completa hasta pulsar «Leí toda la especificación»; quien tenía el de antes elige luego «Guardar también el de antes»,
+  que lo pone entre sus estilos como `<skill>-<fecha>`, o «Usar solo el nuevo». El de Sloth se actualiza siempre.
+  Cada estilo lleva su `version`, a la vista en su card: el segundo número sube con un cambio que se nota, el primero
+  con uno a fondo (el del `cambio`, que dice en `antes.version` la de antes; lo comprueba `reglas-repo.test.ts`).
+  El aviso enseña el mismo video con los dos (`cambio.comparacion`), con los archivos en `web/public/cambios/<card>/`. Al rehacer un estilo, pon el
   `cambio` y deja la comparación lista antes de publicar.
 - `server/requisitos.ts`: lo que las skills necesitan fuera de Sloth. Cada card pide solo los paquetes de su skill
   (`PAQUETES` dice cuáles), siempre ya compilados; si tu Python de Windows no los tiene (uno recién salido), baja el suyo. Instala automáticamente el Python de Sloth en `%APPDATA%\youtube\piezas\python`,

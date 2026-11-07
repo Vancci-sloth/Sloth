@@ -86,6 +86,7 @@ input, textarea, select { font: inherit; color: inherit; }
 .new-head { text-align: center; }
 .new-head h1 { margin: 2px 0; font-size: 26px; font-weight: 700; letter-spacing: -0.02em; }
 .new-head p { margin: 0; color: var(--muted); }
+.new-head .estilo-version { margin-top: 6px; font-size: 12.5px; }
 /* «Con tus cambios (N)» (TusCambios.tsx): ámbar, que avisa sin alarmar. */
 .tus-cambios { margin-top: 8px; padding: 3px 11px; border-radius: 999px; border: 1px solid var(--amber); color: var(--amber); font-size: 12.5px; font-weight: 600; transition: background 0.15s; }
 .tus-cambios:hover { background: var(--amber-tinte); }
@@ -98,14 +99,6 @@ input, textarea, select { font: inherit; color: inherit; }
 .tus-cambios-lista button { flex: none; padding: 2px 9px; border-radius: 999px; color: var(--muted); font-size: 12px; transition: background 0.15s, color 0.15s; }
 .tus-cambios-lista button:hover { background: var(--panel-2); color: var(--text); }
 .new-bottom .cuenta-aviso, .new-bottom .requisitos-aviso { border-color: var(--amber); }
-/* «Este estilo cambió» (EstiloCambio.tsx): qué cambió y quedarse también con el de antes. */
-.estilo-cambio .fila { align-items: flex-start; }
-.estilo-cambio-acciones { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 14px; margin-top: 10px; }
-.estilo-cambio-acciones a, .estilo-cambio-acciones button:not(.primary) { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: 13px; }
-.estilo-cambio-acciones a:hover, .estilo-cambio-acciones button:not(.primary):hover { color: var(--text); }
-.estilo-cambio-listo { margin: 0; text-align: center; font-size: 13px; color: var(--muted); }
-.estilo-cambio-listo button { color: var(--amber); font-size: inherit; }
-.estilo-cambio-listo button:hover { text-decoration: underline; }
 
 /* El estante: cada skill es un cartel. Con previa, su último video (quieto hasta pasar el ratón); sin ella, su icono y
    qué hace. Abajo, sobre una sombra, el nombre y cuánto se usa. */
@@ -131,6 +124,9 @@ input, textarea, select { font: inherit; color: inherit; }
 .card.active .card-title { color: var(--amber-2); }
 .card-uso { font-size: 11.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .card-uso.vivo { color: var(--amber); }
+/* La versión del estilo (Card.version), arriba a la izquierda; con fondo, que encima de una previa se lea. */
+.card-version { position: absolute; top: 8px; left: 8px; z-index: 1; padding: 2px 7px; border-radius: 6px; background: rgba(15, 14, 12, 0.72); color: var(--text); font-size: 11px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.card:has(.card-version) .card-fondo { padding-top: 38px; }
 .card-actions { position: absolute; top: 8px; right: 8px; display: flex; gap: 2px; opacity: 0; transition: opacity 0.15s; }
 .card:hover .card-actions, .card:focus-visible .card-actions { opacity: 1; }
 .card-actions span { width: 24px; height: 24px; display: grid; place-items: center; border-radius: 6px; background: rgba(15, 14, 12, 0.8); color: var(--text); font-size: 12px; }

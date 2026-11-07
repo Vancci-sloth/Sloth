@@ -4,6 +4,7 @@
     "title": "El Diff",
     "description": "Tu noticiero para TikTok o YouTube, con tu nombre, tu sello y tu despedida: le das un enlace o un tema, te escribe el guion, grabas tu voz y arma el episodio, o un short.",
     "skill": "video-el-diff",
+    "version": "1.0",
     "icon": "noticiero",
     "etapas": [
       {
@@ -189,6 +190,7 @@
     "title": "Video explicativo",
     "description": "Un video que explica cualquier tema en el tiempo que necesite: un solo mundo 3D que la cámara recorre sin cortes, el texto palabra por palabra y tu personaje (el perro salchicha, uno tuyo o ninguno). Tú grabas la voz y el cierre lleva a donde quieras.",
     "skill": "video-explicativo",
+    "version": "2.0",
     "icon": "pizarra",
     "modelos": {
       "principal": {
@@ -238,8 +240,56 @@
     ],
     "cambio": {
       "fecha": "2026-11-07",
-      "texto": "Ahora sale en unos 5 minutos en vez de más de media hora, y gasta mucho menos de tu plan (con el mismo guion y la misma voz, 46 veces menos): el agente ya no programa cada video, llena la lista de lo que pasa en cada frase y Sloth arma la cámara, las fotos, las cifras y las animaciones. El guion lo escribe Opus, con un gancho que te contradice y una situación concreta. Si preferías cómo salían antes, guarda también el de antes: queda entre tus estilos tal cual.",
+      "texto": "El agente ya no programa cada video: llena la lista de lo que pasa en cada frase y Sloth arma la cámara, las fotos, las cifras y las animaciones. El guion lo escribe Opus, con un gancho que te contradice y una situación concreta.",
+      "titulo": "Sale en 5 minutos y gasta 46 veces menos",
+      "comparacion": {
+        "resumen": [
+          { "valor": "10,7×", "texto": "más rápido" },
+          { "valor": "46×", "texto": "más barato" },
+          { "valor": "17×", "texto": "menos pasos" }
+        ],
+        "nota": "Mismo pedido, mismo guion palabra por palabra y misma grabación de voz, en la misma computadora. El costo es a precio de la API: con tu plan no lo pagas aparte, pero gasta de él en la misma proporción.",
+        "antes": {
+          "video": "/cambios/video-explicativo/antes.mp4",
+          "portada": "/cambios/video-explicativo/antes.jpg",
+          "detalle": "Opus, esfuerzo alto",
+          "cifras": [
+            {
+              "nombre": "Tardó",
+              "valor": "53,6 min"
+            },
+            {
+              "nombre": "Costó",
+              "valor": "$21,68"
+            },
+            {
+              "nombre": "Pasos",
+              "valor": "262"
+            }
+          ]
+        },
+        "ahora": {
+          "video": "/cambios/video-explicativo/ahora.mp4",
+          "portada": "/cambios/video-explicativo/ahora.jpg",
+          "detalle": "Sonnet medio, Opus en el guion",
+          "cifras": [
+            {
+              "nombre": "Tardó",
+              "valor": "5,0 min"
+            },
+            {
+              "nombre": "Costó",
+              "valor": "$0,47"
+            },
+            {
+              "nombre": "Pasos",
+              "valor": "15"
+            }
+          ]
+        }
+      },
       "antes": {
+        "version": "1.0",
         "etapas": [
           {
             "nombre": "Investigación",
@@ -287,6 +337,7 @@
     "title": "Reel de comedia",
     "description": "Un sketch de comedia sobre cualquier tema o tu propio guion: un experto muy serio enseña a resolver una situación con pasos físicos absurdos, con tus poses recortadas sobre fotos reales y la voz que elijas.",
     "skill": "reel-collage",
+    "version": "1.0",
     "icon": "risa",
     "voz": {
       "propia": "Voz de edge-tts"
@@ -339,6 +390,7 @@
     "title": "Documental",
     "description": "Tu grabación hablando a cámara, convertida en un documental para YouTube, TikTok o Reels: cada frase con material real encontrado en internet, recoloreado y animado a golpe de corte, tú recortado delante de un mundo que cambia y un clic en cada imagen.",
     "skill": "video-documental",
+    "version": "1.0",
     "icon": "claqueta",
     "voz": false,
     "etapas": [
@@ -383,6 +435,7 @@
     "title": "Frutinovela",
     "description": "Una telenovela de frutas en 3D que hablan con sus propias voces: los mismos personajes en cada escena, drama de traición o familia y un final que pide la siguiente parte. Se hace en Google Flow con tus cuentas de Google.",
     "skill": "frutinovela",
+    "version": "1.0",
     "icon": "personas",
     "voz": false,
     "clips": true,

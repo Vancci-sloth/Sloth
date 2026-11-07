@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { readdirSync, readFileSync } from 'node:fs'
+import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { join, matchesGlob } from 'node:path'
 import test from 'node:test'
 import type { Card } from '../shared/types.ts'
@@ -25,6 +25,21 @@ test('la interfaz no suma emojis', () => {
       .map((m) => m[0])
       .filter((c) => !(c.codePointAt(0)! >= 0x2190 && c.codePointAt(0)! <= 0x21ff) && !(DEUDA[f] ?? '').includes(c))
     assert.deepEqual([...new Set(nuevos)], [], `web/src/${f} usa emojis: un icono de Iconos.tsx en su lugar`)
+  }
+})
+
+test('cada estilo dice su versión, y el que cambió a fondo, también la de antes', () => {
+  const cards: Card[] = JSON.parse(readFileSync(join(REPO, 'cards.json'), 'utf8'))
+  for (const card of cards.filter((c) => c.etapas)) {
+    assert.match(card.version ?? '', /^\d+\.\d+$/, `${card.id}: sin \`version\` (como "1.0"; ver Card.version)`)
+    if (card.cambio) {
+      const antes = String(card.cambio.antes?.version ?? '')
+      assert.match(antes, /^\d+\.\d+$/, `${card.id}: su \`cambio.antes\` no dice la versión de antes`)
+      assert.ok(Number(antes.split('.')[0]) < Number(card.version!.split('.')[0]), `${card.id}: un cambio a fondo sube el primer número de la versión`)
+      const c = card.cambio.comparacion
+      for (const ruta of c ? [c.antes.video, c.ahora.video, c.antes.portada, c.ahora.portada] : [])
+        if (ruta) assert.ok(existsSync(join(REPO, 'web', 'public', ...ruta.split('/').filter(Boolean))), `${card.id}: falta ${ruta} en web/public`)
+    }
   }
 })
 

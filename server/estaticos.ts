@@ -22,16 +22,28 @@ const TIPOS: Record<string, string> = {
 /**
  * La interfaz ya armada (`scripts/compilar.mjs`), en la app que se vende: sirve los archivos de `raiz` y, a cualquier
  * otra ruta, `index.html`, que la interfaz enruta con el hash. Lo de `assets/` lleva su huella en el nombre: no cambia.
+ * Responde a un trozo (`Range`), que un video necesita para volver al principio (los del aviso de un estilo que cambió).
  */
 export function estaticos(raiz: string) {
   return (req: IncomingMessage, res: ServerResponse) => {
     const ruta = decodeURIComponent(new URL(req.url ?? '/', 'http://x').pathname)
     let archivo = normalize(join(raiz, ruta))
     if (!archivo.startsWith(raiz + sep) || !existsSync(archivo) || !statSync(archivo).isFile()) archivo = join(raiz, 'index.html')
-    res.writeHead(200, {
+    const cabeza = {
       'content-type': TIPOS[extname(archivo).toLowerCase()] ?? 'application/octet-stream',
-      'cache-control': archivo.includes(`${sep}assets${sep}`) ? 'max-age=31536000, immutable' : 'no-cache'
-    })
+      'cache-control': archivo.includes(`${sep}assets${sep}`) ? 'max-age=31536000, immutable' : 'no-cache',
+      'accept-ranges': 'bytes'
+    }
+    const largo = statSync(archivo).size
+    const trozo = /^bytes=(\d*)-(\d*)$/.exec(req.headers.range ?? '')
+    if (trozo && (trozo[1] || trozo[2])) {
+      const inicio = trozo[1] ? Number(trozo[1]) : Math.max(0, largo - Number(trozo[2]))
+      const fin = trozo[1] && trozo[2] ? Math.min(Number(trozo[2]), largo - 1) : largo - 1
+      if (inicio > fin || inicio >= largo) return res.writeHead(416, { 'content-range': `bytes */${largo}` }).end()
+      res.writeHead(206, { ...cabeza, 'content-range': `bytes ${inicio}-${fin}/${largo}`, 'content-length': fin - inicio + 1 })
+      return createReadStream(archivo, { start: inicio, end: fin }).pipe(res)
+    }
+    res.writeHead(200, { ...cabeza, 'content-length': largo })
     createReadStream(archivo).pipe(res)
   }
 }

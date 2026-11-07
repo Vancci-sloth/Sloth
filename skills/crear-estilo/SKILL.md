@@ -51,6 +51,7 @@ Sloth la enseña en el inicio en cuanto ese archivo cambia, y enlaza la skill do
      "title": "Receta rápida",
      "description": "Una receta en 30 segundos: los ingredientes vuelan a la olla y tu voz cuenta los pasos.",
      "skill": "<id>",
+     "version": "1.0",
      "basadoEn": "video-explicativo",
      "icon": "claqueta",
      "etapas": [
@@ -65,6 +66,7 @@ Sloth la enseña en el inicio en cuanto ese archivo cambia, y enlaza la skill do
    - `etapas`: los pasos que el estudio enseña; `listo` es un glob dentro de la carpeta del video que existe cuando el
      paso está hecho. `fase` es una de `idea`, `guion`, `sonido`, `video`, `entrega`, en ese orden. `espera` es lo que
      le toca hacer al usuario; `copiar`, que el texto se lee en voz alta; `muestra`, qué se enseña si no es lo de `listo`.
+   - `version`: la que se ve en su card. Un estilo nuevo es la `1.0`.
    - `basadoEn`: el estilo de Sloth que copiaste en el paso 2. Con él, Sloth instala los paquetes de Python que ese
      usa y sabe de dónde viene al compartirlo.
    - `icon`: uno de trazo, nunca un emoji: `noticiero`, `pizarra`, `claqueta`, `risa`, `video`, `imagen`, `megafono`,
@@ -86,7 +88,8 @@ Sloth la enseña en el inicio en cuanto ese archivo cambia, y enlaza la skill do
 ## Cambiar un estilo tuyo
 
 Si pide cambiar uno que ya hizo (está en `tus-cards.json`), cambia su carpeta y su card; los de Sloth, nunca (cópialo
-con otro `id` si quiere uno parecido). Para borrarlo, que use la ✕ de su card: quita la card y guarda la skill en
+con otro `id` si quiere uno parecido). Sube su `version`: el segundo número si el cambio se nota en los videos
+(`1.0` → `1.1`), y el primero si lo rehiciste a fondo (`1.4` → `2.0`). Si no tenía, era la `1.0`. Para borrarlo, que use la ✕ de su card: quita la card y guarda la skill en
 `<skills>/../data/skills-tuyas/<fecha> estilo borrado <id>/`, de donde se recupera si se arrepiente.
 
 ## Compartir un estilo

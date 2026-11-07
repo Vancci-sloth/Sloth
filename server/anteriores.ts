@@ -12,8 +12,9 @@ import { huella } from './originales.ts'
  *   cambio), qué cambió en palabras del usuario, el enlace de la comparación y lo de la card de antes que ya no es igual.
  * - Al estrenar la versión, antes de poner sus skills (`prepararSkills`, electron/main.ts), `guardarAnteriores` copia la
  *   carpeta de cada estilo con un `cambio` que el usuario aún no tenía a `data/estilos-anteriores/<skill>/`.
- * - La card enseña el aviso (`web/src/EstiloCambio.tsx`): «Guardar también el de antes» lo pone entre tus estilos
- *   (`conservarAnterior`) y «Usar solo el nuevo» borra la copia (`olvidarAnterior`). Sin copia no hay aviso.
+ * - Sloth enseña el aviso a todos, hasta que lo leen (`web/src/EstiloCambio.tsx`). Quien tenía el de antes elige:
+ *   «Guardar también el de antes» lo pone entre sus estilos (`conservarAnterior`) y «Usar solo el nuevo» borra la copia
+ *   (`olvidarAnterior`). Quien no lo tenía (instaló de cero) solo lo lee. Lo leído va a `estilos-leidos.json`.
  * Lo que cada quien junta al usarlo (huellas, banco, modelos 3D) se queda en el de Sloth: la copia no lo lleva.
  */
 
@@ -23,6 +24,8 @@ const FUERA = new Set(['node_modules', 'out', '__pycache__', '.cache', '.git', '
 const FUERA_RUTA = ['series/banco']
 /** El último cambio de cada estilo que este usuario ya tiene. */
 const VISTOS = 'estilos-vistos.json'
+/** El último aviso de cada estilo que este usuario ya leyó y contestó. */
+const LEIDOS = 'estilos-leidos.json'
 
 interface Guardado {
   /** El `cambio.fecha` de la versión nueva: el de antes es el de hasta ese día. */
@@ -36,7 +39,7 @@ interface Guardado {
 }
 
 /** Lo que va de la card de Sloth a la del de antes. `modelos` no: el de antes iba con lo que eligiera el usuario. */
-const CAMPOS = ['title', 'description', 'icon', 'etapas', 'lote', 'editor', 'voz', 'clips'] as const
+const CAMPOS = ['title', 'description', 'icon', 'version', 'etapas', 'lote', 'editor', 'voz', 'clips'] as const
 
 /** «7 nov 2026», de `2026-11-07`. */
 export function fechaCorta(fecha: string): string {
@@ -116,12 +119,26 @@ function aAdaptar(carpeta: string, originales: Record<string, string>, nuevas: s
     .sort()
 }
 
-/** El aviso de una card de Sloth cuyo estilo de antes está guardado; `null` si no hay. */
+/**
+ * El aviso de una card de Sloth que cambió: con su copia del de antes si la hay, y si no, el de su `cambio` mientras este
+ * usuario no lo haya leído. `null` si no hay nada que avisar.
+ */
 export function anteriorDe(card: Card, datos: string): EstiloAnterior | null {
   if (!card.skill || card.tuya) return null
   const g = leer<Guardado>(join(datos, CARPETA, `${card.skill}.json`))
-  if (!g || !existsSync(join(datos, CARPETA, card.skill, 'SKILL.md'))) return null
-  return { fecha: g.fecha, texto: g.texto, ...(g.compara ? { compara: g.compara } : {}), titulo: tituloDe(card, g.fecha) }
+  if (g && existsSync(join(datos, CARPETA, card.skill, 'SKILL.md')))
+    return { fecha: g.fecha, texto: g.texto, ...(g.compara ? { compara: g.compara } : {}), titulo: tituloDe(card, g.fecha), guardado: true }
+  const c = card.cambio
+  if (!c || leer<Record<string, string>>(join(datos, LEIDOS))?.[card.skill] === c.fecha) return null
+  return { fecha: c.fecha, texto: c.texto, ...(c.compara ? { compara: c.compara } : {}), titulo: tituloDe(card, c.fecha), guardado: false }
+}
+
+/** Anota que este usuario ya leyó y contestó el aviso del cambio de `fecha`: ya no vuelve a salir. */
+function marcarLeido(skill: string, fecha: string, datos: string) {
+  const leidos = leer<Record<string, string>>(join(datos, LEIDOS)) ?? {}
+  leidos[skill] = fecha
+  mkdirSync(datos, { recursive: true })
+  guardar(join(datos, LEIDOS), JSON.stringify(leidos, null, 2))
 }
 
 const tituloDe = (card: Pick<Card, 'title'>, fecha: string) => `${card.title} (hasta el ${fechaCorta(fecha)})`
@@ -152,14 +169,18 @@ export function conservarAnterior(o: { card: Card; datos: string; skills: string
   mkdirSync(dirname(o.tusCards), { recursive: true })
   guardar(o.tusCards, JSON.stringify(lista, null, 2) + '\n')
   olvidarAnterior(card, o.datos)
+  marcarLeido(card.skill, g.fecha, o.datos)
   return { id, titulo, adaptar: g.adaptar }
 }
 
-/** «Usar solo el nuevo»: se borra la copia y su aviso. */
+/** «Usar solo el nuevo», o «Leí toda la especificación» sin copia: se borra la copia, si la hay, y el aviso ya no sale. */
 export function olvidarAnterior(card: Card, datos: string) {
   if (!card.skill) return
+  const g = leer<Guardado>(join(datos, CARPETA, `${card.skill}.json`))
   rmSync(join(datos, CARPETA, card.skill), { recursive: true, force: true })
   rmSync(join(datos, CARPETA, `${card.skill}.json`), { force: true })
+  const fecha = card.cambio?.fecha ?? g?.fecha
+  if (fecha) marcarLeido(card.skill, fecha, datos)
 }
 
 /** El `name` del frontmatter de un SKILL.md, y su descripción con `prefijo` delante. */

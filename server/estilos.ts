@@ -43,7 +43,7 @@ const TIPOS = new Set(['md', 'txt', 'json', 'py', 'mjs', 'cjs', 'js', 'ts', 'tsx
 const SIN_TIPO = new Set(['LICENSE', 'README', 'NOTICE', '.gitkeep', '.gitignore'])
 const TEXTO = new Set(['md', 'txt', 'json', 'py', 'mjs', 'cjs', 'js', 'ts', 'tsx', 'jsx', 'css', 'html', 'svg', 'ps1', 'sh', 'yml', 'yaml', 'csv'])
 /** Lo de la card que viaja; `cwd` no: el estilo trabaja donde todos los tuyos. */
-const CAMPOS = ['title', 'description', 'icon', 'etapas', 'lote', 'editor', 'modelos', 'voz', 'clips'] as const
+const CAMPOS = ['title', 'description', 'icon', 'version', 'etapas', 'lote', 'editor', 'modelos', 'voz', 'clips'] as const
 const ID = /^[a-z0-9]+(-[a-z0-9]+)*$/
 
 export interface Manifiesto {

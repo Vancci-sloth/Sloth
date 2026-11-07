@@ -705,6 +705,7 @@ export function App() {
           />
         )}
       </main>
+      <EstiloCambio cards={cards} activa={newCard?.id} />
     </div>
   )
 }
@@ -1006,9 +1007,9 @@ function NewSession(props: {
           <span className="card-icon big"><Icon icon={card.icon ?? '✦'} /></span>
           <h1>{card.title}</h1>
           <p>{card.description}</p>
+          {card.version && <p className="estilo-version">Versión {card.version}</p>}
           <TusCambios card={card} clave={hilos.map((s) => s.id + s.updatedAt).join()} />
         </div>
-        <EstiloCambio card={card} />
         {/* Hasta saber qué cuentas hay no sale: el aviso de Claude no se asoma a quien solo tiene ChatGPT u OpenCode. */}
         {sinClaude !== undefined && <CuentaClaude model={choice?.model} onFalta={setSinCuenta} aAgentes />}
         {/* Las herramientas de video solo hacen falta en los estilos de video, y de los paquetes, los de su skill. */}
@@ -1072,6 +1073,7 @@ const Carteles = memo(function Carteles({ cards, activa, previas, sessions, acci
               <span className="card-desc">{c.description}</span>
             </span>
           )}
+          {c.version && <span className="card-version" title={`Versión ${c.version} de este estilo`}>v{c.version}</span>}
           {/* En la app que se vende, las cards de Sloth ni se duplican ni se borran; las de tus estilos se borran. */}
           {(!VENTA || c.tuya) && (
             <span className="card-actions">

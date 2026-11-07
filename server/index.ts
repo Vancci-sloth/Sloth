@@ -132,6 +132,7 @@ setInterval(() => {
 
 /**
  * Las cards de cards.json, más las tuyas (`CARDS_TUYAS`) si hay; una tuya sin `id` o con el de una de Sloth no cuenta.
+ * Un estilo tuyo sin `version` (de antes de que la hubiera) es la 1.0.
  * Se releen solo si alguno cambió. Si quedó a medio escribir o con un error, siguen las últimas buenas: una coma de más no
  * puede dejarte sin «Detener» ni «Reiniciar backend», que pasan por aquí. Un error en las tuyas no se lleva las de Sloth.
  */
@@ -147,7 +148,7 @@ function cards(): Card[] {
       const ids = new Set(deSloth.map((c) => c.id))
       let suyas: Card[] = []
       try {
-        if (tuyas) suyas = readCards(CARDS_TUYAS, APP).filter((c) => !ids.has(c.id)).map((c) => ({ ...c, tuya: true }))
+        if (tuyas) suyas = readCards(CARDS_TUYAS, APP).filter((c) => !ids.has(c.id)).map((c) => ({ ...c, tuya: true, ...(c.etapas && !c.version ? { version: '1.0' } : {}) }))
       } catch (error) {
         console.error(`${CARDS_TUYAS} tiene un error; van solo las cards de Sloth. ${error instanceof Error ? error.message : error}`)
       }

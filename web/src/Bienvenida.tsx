@@ -35,6 +35,15 @@ const OPCIONES = [
 
 /** Opciones la vuelve a abrir. */
 export const abrirBienvenida = () => dispatchEvent(new Event(EVENTO))
+/** Si la primera bienvenida aún no se cerró: lo que quiera salir al abrir Sloth (`EstiloCambio.tsx`) espera a `BIENVENIDA_CERRADA`. */
+export const bienvenidaPendiente = () => {
+  try {
+    return !localStorage.getItem(VISTA)
+  } catch {
+    return false
+  }
+}
+export const BIENVENIDA_CERRADA = 'sloth-bienvenida-cerrada'
 
 /**
  * La bienvenida: sale la primera vez que se abre Sloth y luego desde Opciones. Dice qué hace, qué hace falta (con lo
@@ -76,6 +85,7 @@ export function Bienvenida({ models }: { models: Model[] }) {
   function cerrar() {
     localStorage.setItem(VISTA, '1')
     setAbierta(false)
+    dispatchEvent(new Event(BIENVENIDA_CERRADA))
   }
 
   if (!abierta) return null
