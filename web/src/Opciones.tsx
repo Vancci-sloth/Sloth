@@ -13,6 +13,7 @@ import { Icono } from './Iconos'
 import { SuscripcionOpciones } from './Licencia' // apoyo
 import { Logo } from './Logos'
 import { BotonNavegador } from './Navegador'
+import { PilotoOpciones } from './Piloto' // piloto
 import { RadarOpciones } from './RadarOpciones' // radar
 import { Segmento } from './Segmento'
 import { ConNavegadorRedes, RedesOpciones } from './Redes' // redes
@@ -110,6 +111,9 @@ function Ajustes({ onDone, iniciando, onIniciando }: { onDone(): void; iniciando
           <Llave id="meta" />
         </Grupo>
       )}
+      <Grupo titulo="Piloto automático" nota="Apagado por defecto. Con el brief de tu marca, Sloth hace un video por hilo en los horarios que pongas y lo mete a la cola de redes de arriba (o lo deja aquí por revisar). Trabaja mientras Sloth esté abierto.">
+        <PilotoOpciones />
+      </Grupo>
       <Grupo titulo="Radar" nota="El Diff investiga aquí primero: el radar lee estas fuentes cada 5 minutos y guarda sus noticias, así cada noticiero sale con lo último.">
         <RadarOpciones />
       </Grupo>

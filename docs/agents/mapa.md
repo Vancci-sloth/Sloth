@@ -75,6 +75,7 @@ Este es el mapa:
   apagada. La nube se despliega con `npm run nube -- deploy`, no con «Reiniciar backend». Cuando todo un video quedó
   programado, se borra lo regenerable de su carpeta (`out/partes`, `_bundle_rev`). Para mirar o mover la cola:
   `docs/agents/redes.md`.
+- `server/piloto.ts`, `shared/piloto.ts` y `web/src/Piloto.tsx`: Opciones → Piloto automático, apagado por defecto. Cada 10 min crea un hilo por horario libre del día (un lote, un video por hilo) con el brief de la marca, y al terminar mete el video a la cola de redes (`programarVideo` en `server/redes/`) o lo deja por revisar. Todo en `data/piloto/piloto.json`.
 - `server/voz/` y `web/src/Voz.tsx`: la voz de los videos con Google AI Studio (Gemini 3.8 Flash TTS), en la cuenta de
   Google de cada quien (Opciones → Voz). La genera el servidor en la página `voz` del navegador integrado, con su propio
   perfil; los agentes la piden con el MCP `voz` (`mcp.mjs`), y el menú «Voz» del compositor manda la línea `Voz:` que
