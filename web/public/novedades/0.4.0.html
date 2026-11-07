@@ -2,7 +2,7 @@
 <!--
   La guía de lo nuevo de la 0.4.0: sale una vez al abrir Sloth después de actualizar (web/src/Novedades.tsx, en un
   iframe), y también se abre sola en un navegador. Una página suelta, sin dependencias: el logo (web/public/icon.svg) va
-  adentro, en #cara. Siete escenas; cada una tiene su guion en `guiones`, y «Siguiente», las flechas o deslizar pasan
+  adentro, en #cara. Ocho escenas (la fiesta, seis novedades y el final); cada una tiene su guion en `guiones`, y «Siguiente», las flechas o deslizar pasan
   de una a otra. Con ?escena=N abre directo en una.
 -->
 <html lang="es">
@@ -62,7 +62,30 @@
   @keyframes menear { 0%, 100% { transform: rotate(-8deg); } 50% { transform: rotate(10deg); } }
   @keyframes soplar { 0%, 100% { transform: scaleX(.1); } 28%, 60% { transform: scaleX(1); } 76% { transform: scaleX(.1); } }
   @keyframes mecer { from { transform: rotate(-7deg); } to { transform: rotate(7deg); } }
-  @media (prefers-reduced-motion: reduce) { .gira, .brinca, .sombra, .menea, .sopla, .mece { animation: none; } }
+  @media (prefers-reduced-motion: reduce) { .gira, .brinca, .sombra, .menea, .sopla, .mece, .eq i { animation: none; } }
+
+  /* La canción de la fiesta: el reproductor de YouTube en una tarjeta, arriba a la derecha (escenas 0 y 6). */
+  .sonando { position: absolute; top: 3.2%; right: 3.2%; width: 31%; padding: 1.1%; background: var(--panel); border: 2px solid var(--line); border-radius: 12px; box-shadow: 0 14px 40px rgba(0, 0, 0, .5); font-size: clamp(10px, 1.55vmin, 17px); transition: opacity .45s, transform .45s cubic-bezier(.3,1.4,.5,1); }
+  .sonando.fuera { opacity: 0; transform: translateY(-18px) scale(.96); pointer-events: none; }
+  /* En las novedades se hace chiquita y se acomoda junto a la cabecera, sin tapar las barritas. */
+  .sonando { transition: opacity .45s, transform .45s cubic-bezier(.3,1.4,.5,1), width .5s cubic-bezier(.2,.8,.2,1), top .5s cubic-bezier(.2,.8,.2,1), right .5s cubic-bezier(.2,.8,.2,1), padding .5s; }
+  .sonando.mini { top: 1.4%; right: 8.33%; width: 19%; padding: .45%; }
+  .sonando.mini .sonando-cab { display: none; }
+  /* Tú bailando, recortado, a la izquierda (baile.webm, con transparencia y en bucle). En las novedades, chiquito
+     junto a la tarjeta de la canción. Es material propio: no entra al repo (.gitignore). */
+  .baile { position: absolute; left: 3.2%; top: 8.5%; height: 48%; pointer-events: none; transition: opacity .45s, left .5s cubic-bezier(.2,.8,.2,1), top .5s cubic-bezier(.2,.8,.2,1), height .5s cubic-bezier(.2,.8,.2,1); }
+  .baile.mini { left: 65.4%; top: .8%; height: 11%; }
+  .baile.fuera { opacity: 0; }
+  .sonando-cab { display: flex; align-items: center; gap: .75em; margin: .1em .2em .75em; line-height: 1.2; }
+  .sonando-cab span { display: block; color: var(--amber); font-size: .78em; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+  .sonando-cab b { display: block; color: var(--text); font-weight: 800; }
+  .sonando-cab small { color: var(--muted); font-size: 1em; font-weight: 600; }
+  .eq { display: flex; align-items: flex-end; gap: 3px; width: 1.7em; height: 1.7em; flex: none; }
+  .eq i { flex: 1; height: 100%; background: var(--amber); border-radius: 2px; transform-origin: bottom; animation: eq 1.1s steps(6) infinite; }
+  .eq i:nth-child(2) { animation-delay: -.4s; } .eq i:nth-child(3) { animation-delay: -.75s; } .eq i:nth-child(4) { animation-delay: -.2s; }
+  @keyframes eq { 0%, 100% { transform: scaleY(.25); } 30% { transform: scaleY(1); } 55% { transform: scaleY(.5); } 80% { transform: scaleY(.85); } }
+  .sonando-video { aspect-ratio: 16 / 9; border-radius: 8px; overflow: hidden; background: #000; }
+  .sonando-video iframe { display: block; width: 100%; height: 100%; border: 0; }
 </style>
 </head>
 <body>
@@ -114,7 +137,10 @@
     <symbol id="i-alerta" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></symbol>
     <symbol id="i-personas" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><path d="M9 3a4 4 0 1 0 0 8 4 4 0 0 0 0-8z"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></symbol>
     <symbol id="i-claqueta" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.2 6 3 11l-.9-2.4c-.3-1.1.3-2.2 1.3-2.5l13.5-4c1.1-.3 2.2.3 2.5 1.3Z"/><path d="m6.2 5.3 3.1 3.9"/><path d="m12.4 3.4 3.1 4"/><path d="M3 11h18v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/></symbol>
-    <symbol id="i-columnas" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"/><path d="M12 3v18"/></symbol>
+    <symbol id="i-microfono" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><path d="M12 19v3"/></symbol>
+    <symbol id="i-corazon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/></symbol>
+    <symbol id="i-buscar" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></symbol>
+    <symbol id="i-columnas"viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"/><path d="M12 3v18"/></symbol>
 
     <!-- El logo de Sloth (web/public/icon.svg), en sus coordenadas de 512 -->
     <g id="cara">
@@ -434,8 +460,49 @@
     <g class="linea"><text x="150" y="895" font-size="32" font-weight="500" fill="#9a907f">para gastar solo 8 créditos por clip.</text></g>
   </g></g>
 
-  <!-- 6 · A crear -->
+  <!-- 6 · Voz: el menú nuevo y los créditos de cada mes -->
   <g class="escena" id="e6"><g class="cuerpo">
+    <use href="#panel"/>
+    <g clip-path="url(#clipPanel)">
+      <g class="menu-voz">
+        <rect x="120" y="214" width="450" height="412" rx="18" fill="#12110f" stroke="#2e2a24" stroke-width="2"/>
+        <rect x="140" y="232" width="410" height="44" rx="10" fill="#221f1b"/>
+        <use href="#i-buscar" x="154" y="244" width="20" height="20" style="color:#9a907f"/>
+        <text x="184" y="261" font-size="16" fill="#9a907f">Busca: grave, cálida, narración…</text>
+        <rect x="140" y="290" width="88" height="36" rx="9" fill="#e8a33d"/>
+        <g transform="translate(150 298) scale(.04)"><use href="#cara"/></g>
+        <text x="176" y="314" font-size="15" font-weight="800" fill="#1b1408">Sloth</text>
+        <rect x="234" y="290" width="110" height="36" rx="9" fill="#221f1b"/>
+        <text x="289" y="314" text-anchor="middle" font-size="15" font-weight="700" fill="#9a907f">ElevenLabs</text>
+        <rect x="350" y="290" width="100" height="36" rx="9" fill="#221f1b"/>
+        <text x="400" y="314" text-anchor="middle" font-size="15" font-weight="700" fill="#9a907f">Fish Audio</text>
+        <rect x="456" y="290" width="94" height="36" rx="9" fill="#221f1b"/>
+        <text x="503" y="314" text-anchor="middle" font-size="15" font-weight="700" fill="#9a907f">AI Studio</text>
+        <text x="140" y="356" font-size="15" fill="#9a907f">Te quedan <tspan class="num queda" font-weight="800" fill="#ede6d6">100,000</tspan> créditos de voz</text>
+        <g class="filas"></g>
+      </g>
+      <g class="tarjeta-cred">
+        <rect x="600" y="214" width="360" height="412" rx="18" fill="#12110f" stroke="#2e2a24" stroke-width="2"/>
+        <g transform="translate(630 240) scale(.07)"><use href="#cara"/></g>
+        <text x="676" y="268" font-size="21" font-weight="800" fill="#ede6d6">Voces de Sloth</text>
+        <g class="cred-w a"><text class="num cred-v" x="780" y="402" text-anchor="middle" font-size="76" font-weight="900" fill="#e8a33d">100,000</text></g>
+        <text x="780" y="442" text-anchor="middle" font-size="21" fill="#9a907f">créditos cada mes</text>
+        <rect x="630" y="474" width="300" height="14" rx="7" fill="#2e2a24"/>
+        <rect class="izq barra-v" x="630" y="474" width="300" height="14" rx="7" fill="#e8a33d"/>
+        <use href="#i-corazon" x="630" y="530" width="24" height="24" style="color:#8fc177"/>
+        <text x="664" y="549" font-size="19" font-weight="800" fill="#8fc177">Si apoyas a Sloth</text>
+        <text x="630" y="590" font-size="16" fill="#9a907f">Se te refrescan cada mes.</text>
+      </g>
+      <g class="cursor"><g class="punta" style="transform-box: fill-box; transform-origin: 0 0"><use href="#puntero"/></g></g>
+    </g>
+    <g class="kicker"><use href="#i-microfono" x="150" y="693" width="32" height="32" style="color:#e8a33d"/><text x="194" y="720" font-size="30" font-weight="800" fill="#e8a33d" letter-spacing="4">VOZ</text></g>
+    <text class="partir-palabras" x="150" y="795" font-size="60" font-weight="800" fill="#ede6d6">Elige tu voz oyéndola</text>
+    <g class="linea"><text x="150" y="850" font-size="32" font-weight="500" fill="#9a907f">Oyes cada voz antes de elegir y clonas la tuya.</text></g>
+    <g class="linea"><text x="150" y="895" font-size="32" font-weight="500" fill="#9a907f">Y si apoyas a Sloth, 100,000 créditos cada mes.</text></g>
+  </g></g>
+
+  <!-- 7 · A crear -->
+  <g class="escena" id="e7"><g class="cuerpo">
     <g class="globos"></g>
     <g class="sombra-w a"><ellipse class="sombra a" cx="540" cy="575" rx="112" ry="14" fill="#000"/></g>
     <g transform="translate(540 450) scale(.54) translate(-256 -270)"><g class="entra-sloth a"><use href="#sloth-fiesta"/></g></g>
@@ -445,6 +512,14 @@
   </g></g>
 </svg>
 <canvas id="chispas"></canvas>
+<video class="baile fuera" id="baile" src="baile.webm" muted loop playsinline preload="auto" aria-hidden="true"></video>
+<aside class="sonando fuera" id="sonando">
+  <div class="sonando-cab">
+    <div class="eq" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+    <div><span>Sonando</span><b>Gasolina</b><small>Daddy Yankee</small></div>
+  </div>
+  <div class="sonando-video"><iframe id="yt" title="Daddy Yankee - Gasolina (Video Oficial)" allow="autoplay; encrypted-media; picture-in-picture" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe></div>
+</aside>
 <nav class="controles">
   <button id="anterior" class="oculto" type="button"><svg><use href="#i-izq"/></svg>Anterior</button>
   <span id="cuenta"></span>
@@ -625,8 +700,8 @@ function construir() {
   const rg = document.getElementById('rayosG');
   for (let k = 0; k < 18; k++) el('path', { d: 'M0 0 L-36 -680 L36 -680 Z', transform: `rotate(${(k / 18) * 360})` }, rg);
   // Barritas de la cabecera
-  const bg = document.getElementById('barras'), w = (900 - 4 * 14) / 5;
-  for (let k = 0; k < 5; k++) {
+  const bg = document.getElementById('barras'), w = (900 - 5 * 14) / 6;
+  for (let k = 0; k < 6; k++) {
     const x = 90 + k * (w + 14);
     el('rect', { x, y: 150, width: w, height: 8, rx: 4, fill: C.line }, bg);
     el('rect', { x, y: 150, width: w, height: 8, rx: 4, fill: C.amber, class: 'izq barra-llena', style: 'transform: scaleX(0)' }, bg);
@@ -647,7 +722,18 @@ function construir() {
     });
   }
   // Globos (se pueden reventar)
-  for (const e of [escenas[0], escenas[6]]) {
+  // Las voces del menú de la escena 6, cada una con su botón y su onda
+  const filas = en(escenas[6], '.filas');
+  [['Valeria', 'Mujer · cálida'], ['Mateo', 'Hombre · grave'], ['Lucía', 'Mujer · narración']].forEach(([nombre, tipo], k) => {
+    const y = 372 + k * 84, f = el('g', { class: 'fila' }, filas);
+    el('rect', { class: 'fila-borde', x: 140, y, width: 410, height: 72, rx: 12, fill: '#171512', stroke: C.line, 'stroke-width': 2 }, f);
+    el('circle', { class: 'boton', cx: 176, cy: y + 36, r: 20, fill: C.p2, stroke: C.line, 'stroke-width': 2 }, f);
+    el('use', { class: 'boton-i', href: '#i-video', x: 169, y: y + 28, width: 16, height: 16, style: `color:${C.text}` }, f);
+    el('text', { x: 212, y: y + 31, 'font-size': 18, 'font-weight': 700, fill: C.text }, f).textContent = nombre;
+    el('text', { x: 212, y: y + 54, 'font-size': 14, fill: C.muted }, f).textContent = tipo;
+    [10, 18, 26, 14, 30, 20, 12, 24, 16, 28, 12, 20].forEach((h, j) => el('rect', { class: 'onda a', x: 432 + j * 9, y: y + 36 - h / 2, width: 5, height: h, rx: 2.5, fill: C.line }, f));
+  });
+  for (const e of [escenas[0], escenas[7]]) {
     const cont = en(e, '.globos');
     [{ x: 150, c: C.amber, d: 11000 }, { x: 300, c: C.ok, d: 13500 }, { x: 800, c: C.bad, d: 12000 }, { x: 945, c: C.amber2, d: 10500 }, { x: 560, c: C.ok, d: 14500 }].forEach((b, k) => {
       const pos = el('g', { transform: `translate(${b.x} 1220)` }, cont);
@@ -958,7 +1044,44 @@ const guiones = [
     await espera(650); if (!vivo()) return;
     const [x, y] = aLienzo(cred); confeti(x, y, 40, -100, 120, [5, 11]);
   },
-  // 6 · A crear
+  // 6 · Voz: llegan los créditos del mes y una voz suena
+  async (e, vivo) => {
+    textos(e);
+    const cifra = (n) => Math.round(n).toLocaleString('es-MX');
+    const num = en(e, '.cred-v'), queda = en(e, '.queda'), filas = todos(e, '.fila');
+    num.textContent = queda.textContent = '0';
+    filas.forEach((f) => {
+      en(f, '.fila-borde').setAttribute('stroke', C.line); en(f, '.boton').setAttribute('fill', C.p2);
+      en(f, '.boton-i').style.color = C.text; todos(f, '.onda').forEach((o) => o.setAttribute('fill', C.line));
+    });
+    oculto(en(e, '.cursor'));
+    A(en(e, '.menu-voz'), [{ opacity: 0, transform: 'translateX(-60px)' }, { opacity: 1, transform: 'none' }], { duration: 650, delay: 80 });
+    A(en(e, '.tarjeta-cred'), [{ opacity: 0, transform: 'translateX(60px)' }, { opacity: 1, transform: 'none' }], { duration: 650, delay: 200 });
+    filas.forEach((f, k) => aparece(f, { duration: 500, delay: 380 + k * 110 }));
+    const barra = en(e, '.barra-v');
+    A(barra, [{ transform: 'scaleX(0)' }, { transform: 'scaleX(1)' }], { duration: 1600, delay: 600, easing: 'cubic-bezier(.2,.8,.2,1)' });
+    await espera(600); if (!vivo()) return;
+    await tween(1600, (t) => (num.textContent = queda.textContent = cifra(t * 100000)), vivo);
+    if (!vivo()) return;
+    en(e, '.cred-w').animate([{ transform: 'scale(1)' }, { transform: 'scale(1.12)' }, { transform: 'scale(1)' }], { duration: 450, easing: 'ease-out' });
+    const [x, y] = aLienzo(num); confeti(x, y, 60, -90, 150, [6, 13]); estallido(x, y, C.amber, 40, 6);
+    await espera(800); if (!vivo()) return;
+    // Oír la voz de Mateo
+    const cur = en(e, '.cursor'), f = filas[1];
+    await mover(cur, [560, 640], [176, 492], 800); if (!vivo()) return;
+    clic(e, cur, 176, 492);
+    A(cur, [{ opacity: 1 }, { opacity: 0 }], { duration: 300, delay: 400 });
+    en(f, '.fila-borde').setAttribute('stroke', C.amber); en(f, '.boton').setAttribute('fill', C.amber);
+    en(f, '.boton-i').style.color = '#1b1408';
+    todos(f, '.onda').forEach((o) => {
+      o.setAttribute('fill', C.amber);
+      A(o, [{ transform: 'scaleY(.35)' }, { transform: 'scaleY(1.15)' }], { duration: azar(260, 520), delay: azar(0, 200), iterations: Infinity, direction: 'alternate', easing: 'steps(3)' });
+    });
+    await espera(1300); if (!vivo()) return;
+    // Tu frase con su voz gasta unos pocos créditos
+    tween(600, (t) => (num.textContent = queda.textContent = cifra(100000 - t * 60)), vivo);
+  },
+  // 7 · A crear
   async (e, vivo) => {
     sloth(e); globos(e);
     const letras = todos(e, '.letra');
@@ -978,7 +1101,7 @@ const cab = document.getElementById('cabecera');
 const sigBtn = document.getElementById('siguiente'), antBtn = document.getElementById('anterior');
 const sigTxt = document.getElementById('sig-texto'), sigIco = document.getElementById('sig-icono'), cuenta = document.getElementById('cuenta');
 const brilloStops = [...document.querySelectorAll('#brillo stop')];
-const TONO = [C.amber, C.amber, C.ok, C.amber2, C.bad, C.ok, C.amber];
+const TONO = [C.amber, C.amber, C.ok, C.amber2, C.bad, C.ok, C.amber2, C.amber];
 
 function limpiar(e) {
   e.getAnimations({ subtree: true }).forEach((a) => { if (!(a instanceof CSSAnimation)) a.cancel(); });
@@ -988,14 +1111,33 @@ function pulsar() {
   if (quieto) return;
   pulso = sigBtn.animate([{ boxShadow: '0 0 0 0 rgba(232, 163, 61, .6)' }, { boxShadow: '0 0 0 16px rgba(232, 163, 61, 0)' }], { duration: 1400, iterations: Infinity });
 }
+// La canción: arranca con la fiesta (el reproductor oficial de YouTube, que se carga hasta entonces), sigue en las
+// novedades en chiquito y se quita con «Terminar» (el final).
+const YT_ID = 'CCF1_jI8Prk'; // Daddy Yankee - Gasolina (Video Oficial)
+const sonando = document.getElementById('sonando'), yt = document.getElementById('yt'), baile = document.getElementById('baile');
+function musica(i) {
+  const suena = i < 7;
+  for (const el of [sonando, baile]) {
+    el.classList.toggle('fuera', !suena);
+    el.classList.toggle('mini', i >= 1 && i <= 6);
+  }
+  if (suena) baile.play().catch(() => {}); else baile.pause();
+  if (suena && !yt.src) {
+    const origen = location.origin !== 'null' ? `&origin=${encodeURIComponent(location.origin)}` : '';
+    yt.src = `https://www.youtube-nocookie.com/embed/${YT_ID}?autoplay=1&enablejsapi=1&playsinline=1&rel=0${origen}`;
+  } else if (yt.src) {
+    yt.contentWindow.postMessage(JSON.stringify({ event: 'command', func: suena ? 'playVideo' : 'pauseVideo', args: [] }), '*');
+  }
+}
 function interfaz(i, antes) {
+  musica(i);
   antBtn.classList.toggle('oculto', i === 0);
-  sigTxt.textContent = i === 0 ? 'Ver lo nuevo' : i === 5 ? 'Terminar' : i === 6 ? (enSloth ? 'Empezar a crear' : 'Ver otra vez') : 'Siguiente';
-  sigIco.setAttribute('href', i === 6 && !enSloth ? '#i-reabrir' : '#i-flecha');
-  cuenta.textContent = i >= 1 && i <= 5 ? `${i} de 5` : '';
+  sigTxt.textContent = i === 0 ? 'Ver lo nuevo' : i === 6 ? 'Terminar' : i === 7 ? (enSloth ? 'Empezar a crear' : 'Ver otra vez') : 'Siguiente';
+  sigIco.setAttribute('href', i === 7 && !enSloth ? '#i-reabrir' : '#i-flecha');
+  cuenta.textContent = i >= 1 && i <= 6 ? `${i} de 6` : '';
   brilloStops.forEach((s) => (s.style.stopColor = TONO[i]));
-  document.getElementById('rayos').style.opacity = i === 0 || i === 6 ? 1 : 0.3;
-  const dentro = (k) => k >= 1 && k <= 5;
+  document.getElementById('rayos').style.opacity = i === 0 || i === 7 ? 1 : 0.3;
+  const dentro = (k) => k >= 1 && k <= 6;
   if (dentro(i) && !dentro(antes)) A(cab, [{ opacity: 0, transform: 'translateY(-40px)' }, { opacity: 1, transform: 'none' }], { duration: 600, delay: 150 });
   if (!dentro(i) && dentro(antes)) A(cab, [{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'translateY(-40px)' }], { duration: 350 });
   todos(cab, '.barra-llena').forEach((b, k) => {

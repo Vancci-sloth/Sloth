@@ -76,7 +76,7 @@ export function Novedades() {
   if (!abierta) return null
   return createPortal(
     <div className="novedades" onClick={(e) => e.target === e.currentTarget && cerrar()}>
-      <iframe ref={marco} className="nov-marco" src={`/novedades/${VERSION}.html`} title={`Lo nuevo de la ${VERSION}`} onLoad={() => marco.current?.focus()} />
+      <iframe ref={marco} className="nov-marco" src={`/novedades/${VERSION}.html`} title={`Lo nuevo de la ${VERSION}`} allow="autoplay; encrypted-media" onLoad={() => marco.current?.focus()} />
       <button className="nov-cerrar" onClick={cerrar} aria-label="Cerrar" title="Cerrar">
         <Icono de="cerrar" />
       </button>
