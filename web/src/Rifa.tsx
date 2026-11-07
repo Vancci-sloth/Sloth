@@ -7,7 +7,7 @@ import './Rifa.css'
 /**
  * «Participa en la rifa», hasta arriba de la comunidad mientras el creador tiene una abierta (`licencias/src/rifa.ts`):
  * qué se rifa, cuántos participan y un solo botón. Al pulsarlo queda claro que ya estás dentro y adónde llega el aviso
- * si ganas. Quien apoya o es Fundador la ve, con por qué no participa. Sin rifa abierta, durante unos días, quién ganó
+ * si ganas. Quien ya tiene los créditos de cada mes (paga $15 USD o más) o es Fundador la ve, con por qué no participa. Sin rifa abierta, durante unos días, quién ganó
  * la última. Al creador le lleva a Administrador, donde se sortea (`RifaAdmin.tsx`).
  */
 export const RIFA_CAMBIO = 'sloth-rifa'

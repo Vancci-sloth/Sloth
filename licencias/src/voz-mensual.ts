@@ -1,7 +1,7 @@
 /**
  * Los 100.000 créditos mensuales de Sloth salen de las cuentas del socio (`voz.ts`). Se refrescan (se llena hasta 100.000, sin acumular) una vez por mes natural
- * de Ciudad de México, sin recuperar meses anteriores. Solo apoyos pagados y vigentes (no los lugares gratis de por vida);
- * una persona es el id de la primera licencia de su correo, aunque tenga más de una clave o computadora.
+ * de Ciudad de México, sin recuperar meses anteriores. SOLO para quien paga activamente $15 USD o más (`daCreditos`) y
+ * nadie más; una persona es el id de la primera licencia de su correo, aunque tenga más de una clave o computadora.
  *
  * Empieza cuando `scripts/publicar.mjs` termina de subir una actualización que trae esta función. Desplegar el Worker
  * no la abre antes. El cron entrega y avisa por correo aunque la persona no abra Sloth; `/voz` adelanta su entrega.
@@ -39,23 +39,45 @@ export async function vocesPublicadas(env: Env): Promise<boolean> {
   return !!(await env.DESCARGAS.head(APERTURA_VOZ))
 }
 
+/** Desde cuánto se reciben los créditos: el apoyo sugerido (`PRECIO_MENSUAL` en `MONEDA`; en pesos, `PRECIO_MENSUAL_MXN`). */
+export const desdeCuanto = (env: Env) => ({
+  moneda: String(env.MONEDA ?? 'USD').replace(/[^A-Z]/g, '') || 'USD',
+  monto: Number(env.PRECIO_MENSUAL) || 15,
+  pesos: Number(env.PRECIO_MENSUAL_MXN) || 299
+})
+/** «$15 USD (299 MXN en los apoyos en pesos)», para Administrador. */
+export const desdeTexto = (env: Env) => {
+  const d = desdeCuanto(env)
+  return `$${d.monto} ${d.moneda} (${d.pesos} MXN en los apoyos en pesos)`
+}
+
 /**
- * Solo quien paga: un apoyo de producción con pago confirmado y vigente (mensual, anual o de una vez; el Fundador de
- * transferencia es `unico` pagado). Los lugares gratis de Fundador de por vida (`plan = 'gratis'`) no entran, por
- * decisión del creador (7 de noviembre de 2026). Se excluye todo el correo si hay un bloqueo; autorizar sin pago
- * confirmado no da créditos.
+ * La licencia `t` da los créditos del mes (una expresión SQL; `ahora`, la fecha con que se compara): SOLO quien paga
+ * activamente $15 USD o más, por decisión del creador (7 de noviembre de 2026), y nadie más. Es un apoyo de producción,
+ * con pago confirmado (`autorizada`) y sin vencer: el mensual o el de una vez (que vale ese mes) de al menos
+ * `PRECIO_MENSUAL` en `MONEDA` o `PRECIO_MENSUAL_MXN` en los de pesos, o el anual. NO reciben: las cuentas gratis, los
+ * apoyos de menos (el monto que cada quien elige, desde $1), los vencidos, los de prueba, los que aún no pagan y los
+ * lugares gratis de Fundador de por vida. El Fundador que pagó por transferencia es un `unico` de `PRECIO_MENSUAL`: sí.
+ * La rifa (`rifa.ts`) usa esta misma regla para saber quién ya los tiene.
  */
-export const BENEFICIARIOS_VOZ = `SELECT
+export function daCreditos(env: Env, t: string, ahora: string): string {
+  const d = desdeCuanto(env)
+  return `(${t}.plan IN ('mensual', 'anual', 'unico') AND ${t}.modo = 'produccion' AND ${t}.autorizada IS NOT NULL
+    AND julianday(${t}.pagado_hasta) > julianday(${ahora})
+    AND (${t}.plan = 'anual' OR (${t}.moneda = '${d.moneda}' AND ${t}.monto >= ${d.monto}) OR (${t}.moneda = 'MXN' AND ${t}.monto >= ${d.pesos})))`
+}
+
+/** Quiénes reciben los créditos (`?1`, ahora; `?2`, un solo correo o NULL). Se excluye todo el correo si hay un bloqueo. */
+export const beneficiariosVoz = (env: Env) => `SELECT
   (SELECT v.id FROM licencias v WHERE v.email = l.email ORDER BY v.creada, v.id LIMIT 1) AS externo,
   l.email, l.clave FROM licencias l
   WHERE NOT EXISTS (SELECT 1 FROM licencias v WHERE v.email = l.email AND v.estado = 'vetada')
-  AND l.plan IN ('mensual', 'anual', 'unico') AND l.modo = 'produccion' AND l.autorizada IS NOT NULL
-  AND julianday(l.pagado_hasta) > julianday(?1)
+  AND ${daCreditos(env, 'l', '?1')}
   AND (?2 IS NULL OR l.email = ?2)
   GROUP BY l.email`
 
 export async function beneficiarioVoz(env: Env, email: string): Promise<BeneficiarioVoz | null> {
-  return env.DB.prepare(BENEFICIARIOS_VOZ).bind(new Date().toISOString(), email).first<BeneficiarioVoz>()
+  return env.DB.prepare(beneficiariosVoz(env)).bind(new Date().toISOString(), email).first<BeneficiarioVoz>()
 }
 
 /**
@@ -131,10 +153,11 @@ async function avisarEntrega(env: Env, b: Entrega): Promise<void> {
   // En el tono de Vancci (docs/agents/anuncios.md): sin acentos, como en un chat. Lo mismo dice el aviso de la app
   // (web/src/CreditosVoz.tsx).
   const mes = mesDe(periodo)
+  const d = desdeCuanto(env)
   const enviada = await correo(env, b.email, `YA TIENES TUS 100,000 CREDITOS DE VOZ :))) · ${mes}`, [
     'Holaaaaa como estas, aqui Vancci.',
-    `Oye estoy bien emocionado de contarte esto: por apoyar a Sloth ya tienes 100,000 CREDITOS DE VOZ para ${mes}. Neta muchisimas gracias, gracias a ti esto sigue creciendo :)))`,
-    'Y lo mejor: se te refrescan CADA MES mientras sigas apoyando, cada mes vuelves a tener 100,000. Ojo, no se acumulan, los que no uses en el mes no pasan al siguiente, asi que usalos sin miedo.',
+    `Oye estoy bien emocionado de contarte esto: por apoyar a Sloth con $${d.monto} ${d.moneda} o mas ya tienes 100,000 CREDITOS DE VOZ para ${mes}. Neta muchisimas gracias, gracias a ti esto sigue creciendo :)))`,
+    `Y lo mejor: se te refrescan CADA MES mientras sigas apoyando con $${d.monto} ${d.moneda} o mas, cada mes vuelves a tener 100,000. Si tu apoyo se vence o baja de $${d.monto} ya no se refrescan. Ojo, no se acumulan, los que no uses en el mes no pasan al siguiente, asi que usalos sin miedo.`,
     `Tu clave de Sloth: ${b.clave}`,
     'Para usarlos actualiza Sloth y entra a Opciones > Voz > Voces de Sloth. Ahi le das a "Añadir clave de Sloth" y pegas tu clave. Si ya la tenias puesta en Apoyo nada mas dale a "Volver a leer tus creditos" y yap.',
     'Ya con eso escoges una voz o clonas LA TUYA con una grabacion, y el agente la usa solita para tus videos. Esta bien perron, ya veras. Ojo, los creditos son SOLO para la voz, los agentes de IA siguen con su propia cuenta.',
@@ -148,7 +171,7 @@ async function avisarEntrega(env: Env, b: Entrega): Promise<void> {
 export async function repartirVozMensual(env: Env, repartidor: RepartidorVoz): Promise<void> {
   if (!(await vocesPublicadas(env))) return
   const periodo = periodoVoz()
-  const filas = await env.DB.prepare(`SELECT b.* FROM (${BENEFICIARIOS_VOZ}) b LEFT JOIN voz_mensual m ON m.externo = b.externo AND m.periodo = ?3
+  const filas = await env.DB.prepare(`SELECT b.* FROM (${beneficiariosVoz(env)}) b LEFT JOIN voz_mensual m ON m.externo = b.externo AND m.periodo = ?3
     WHERE m.externo IS NULL OR m.estado = 'pendiente' OR (m.estado = 'preparando' AND m.intento < ?4) OR (m.entregado IS NOT NULL AND m.correo IS NULL)
     ORDER BY COALESCE(m.intento, ''), b.externo LIMIT 10`)
     .bind(new Date().toISOString(), null, periodo, new Date(Date.now() - 5 * 60_000).toISOString()).all<BeneficiarioVoz>()

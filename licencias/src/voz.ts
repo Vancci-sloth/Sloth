@@ -42,12 +42,12 @@
  *
  * Con `VOZ_SOLO_CREADOR` en `"1"`, nadie más que el creador la usa, aunque tenga créditos: a los demás `GET /voz` les
  * dice que no está, lo demás responde 403 y Administrador no da de alta a nadie, hasta publicar la actualización con
- * `vozMensual` (marca `voz-mensual.json` en R2). Desde ahí `voz-mensual.ts` refresca a 100.000 (sin acumular) por correo y mes a apoyos
- * pagados y vigentes (no a los lugares gratis de Fundador). El cron también los entrega y manda la clave personal de Sloth por correo.
+ * `vozMensual` (marca `voz-mensual.json` en R2). Desde ahí `voz-mensual.ts` refresca a 100.000 (sin acumular) por correo y mes, SOLO
+ * a quien paga activamente $15 USD o más (`daCreditos`): ni cuentas gratis, ni apoyos de menos, ni lugares gratis de Fundador. El cron también los entrega y manda la clave personal de Sloth por correo.
  */
 import { BLOQUEADA, CLAVE, EQUIPO, type Env, Rechazo, cuerpo, delCreador, json, vigencia, vigilar } from './index.ts'
 import { DE_LA_APP } from './comunidad.ts'
-import { beneficiarioVoz, CREDITOS_MENSUALES, entregarVozMensual, repartirVozMensual, vocesPublicadas, type RepartidorVoz } from './voz-mensual.ts'
+import { beneficiarioVoz, CREDITOS_MENSUALES, desdeTexto, entregarVozMensual, repartirVozMensual, vocesPublicadas, type RepartidorVoz } from './voz-mensual.ts'
 
 const BASE = 'https://www.voicescloning.art'
 /** El usuario del creador en Voices Cloning. */
@@ -289,6 +289,7 @@ async function admin(req: Request, env: Env, ctx: ExecutionContext, url: URL, ll
       configurado: llaves.length > 0,
       soloCreador: await soloCreador(env),
       mensuales: CREDITOS_MENSUALES,
+      mensualesDesde: desdeTexto(env),
       repartos: (await env.DB.prepare('SELECT externo, periodo, creditos, estado, entregado, correo, error FROM voz_mensual ORDER BY periodo DESC, externo LIMIT 300').all()).results,
       creditosIniciales: creditosIniciales(env),
       pagina,

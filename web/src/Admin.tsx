@@ -49,6 +49,8 @@ interface Panel {
   soloCreador: boolean
   creditosIniciales: number
   mensuales?: number
+  /** Desde cuánto se reciben: «$15 USD (299 MXN en los apoyos en pesos)». */
+  mensualesDesde?: string
   repartos?: { externo: string; periodo: string; creditos: number; estado: string; entregado: string | null; correo: string | null; error: string | null }[]
   pagina: number
   consumo: number
@@ -176,7 +178,7 @@ export function Admin() {
           </Seccion>
 
           {panel.repartos && (
-            <Seccion titulo="Créditos mensuales de Sloth" nota={`${num(panel.mensuales)} créditos al mes para cada correo con apoyo vigente o lugar de Fundador de por vida. Salen de tus llaves de socio; los que no se gasten se conservan.`}>
+            <Seccion titulo="Créditos mensuales de Sloth" nota={`${num(panel.mensuales)} créditos al mes SOLO para cada correo que paga activamente ${panel.mensualesDesde ?? '$15 USD'} o más (o el anual). Nadie más: ni cuentas gratis, ni apoyos de menos, ni lugares gratis de Fundador. Cada mes se llenan hasta ${num(panel.mensuales)}: no se acumulan. Salen de tus llaves de socio.`}>
               {panel.repartos.length ? <Tabla
                 cabeza={['Usuario', 'Mes', 'Créditos', 'Entrega', 'Correo', 'Detalle']}
                 filas={panel.repartos.map((r) => [quien(r.externo), r.periodo, num(r.creditos),

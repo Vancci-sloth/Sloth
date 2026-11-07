@@ -4,7 +4,7 @@ import { DatabaseSync } from 'node:sqlite'
 import test from 'node:test'
 import worker, { type Env } from './index.ts'
 import { idDe } from './voz.ts'
-import { APERTURA_VOZ, BENEFICIARIOS_VOZ, entregarVozMensual, periodoVoz, repartirVozMensual, type RepartidorVoz } from './voz-mensual.ts'
+import { APERTURA_VOZ, beneficiariosVoz, entregarVozMensual, periodoVoz, repartirVozMensual, type RepartidorVoz } from './voz-mensual.ts'
 
 const NOVIEMBRE = new Date('2026-11-07T12:00:00Z')
 const beneficiario = { externo: 'cuenta-original', email: 'persona@example.com', clave: 'SLOTH-AAAA-BBBB-CCCC-DDDD' }
@@ -41,9 +41,9 @@ function preparar(t: { after(fn: () => void): void }) {
     quedan: async () => saldo,
     sumar: async (externo, llave, cantidad) => { sumas.push({ externo, llave, cantidad }); saldo += cantidad }
   }
-  const licencia = (id: string, email: string, plan: string, estado: string, modo = 'produccion', hasta: string | null = '2099-01-01', autorizada: string | null = '2026-11-01') =>
-    db.prepare('INSERT INTO licencias (id, clave, email, plan, monto, estado, modo, pagado_hasta, autorizada, creada) VALUES (?, ?, ?, ?, 15, ?, ?, ?, ?, ?)')
-      .run(id, `SLOTH-${id}`, email, plan, estado, modo, hasta, autorizada, id === 'cuenta-original' ? '2026-10-01' : '2026-11-01')
+  const licencia = (id: string, email: string, plan: string, estado: string, modo = 'produccion', hasta: string | null = '2099-01-01', autorizada: string | null = '2026-11-01', monto = 15, moneda = 'USD') =>
+    db.prepare('INSERT INTO licencias (id, clave, email, plan, monto, moneda, estado, modo, pagado_hasta, autorizada, creada) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+      .run(id, `SLOTH-${id}`, email, plan, monto, moneda, estado, modo, hasta, autorizada, id === 'cuenta-original' ? '2026-10-01' : '2026-11-01')
   return { db, env, objetos, correos, repartidor, sumas, saldo: () => saldo, gastar: (n: number) => void (saldo -= n), licencia }
 }
 
@@ -54,8 +54,8 @@ test('el mes cambia a medianoche de Ciudad de México, también al cambiar de a�
   assert.equal(periodoVoz(new Date('2027-01-01T06:00:00Z')), '2027-01')
 })
 
-test('solo apoyos pagados de producción vigentes, no los Fundadores gratis de por vida, una persona por correo', (t) => {
-  const { db, licencia } = preparar(t)
+test('SOLO quien paga activamente $15 USD o más (o 299 MXN, o el anual): nadie más, una persona por correo', (t) => {
+  const { db, env, licencia } = preparar(t)
   licencia('cuenta-original', 'persona@example.com', 'cuenta', 'gratis', 'produccion', null, null)
   licencia('apoyo1', 'persona@example.com', 'mensual', 'authorized')
   licencia('apoyo2', 'persona@example.com', 'anual', 'pagado')
@@ -70,8 +70,15 @@ test('solo apoyos pagados de producción vigentes, no los Fundadores gratis de p
   licencia('gratis', 'gratis@example.com', 'cuenta', 'gratis', 'produccion', null, null)
   licencia('vetada', 'vetada@example.com', 'cuenta', 'vetada')
   licencia('apoyovetado', 'vetada@example.com', 'mensual', 'authorized')
-  const filas = db.prepare(BENEFICIARIOS_VOZ).all(NOVIEMBRE.toISOString(), null) as { externo: string }[]
-  assert.deepEqual(filas.map((f) => f.externo).sort(), ['cuenta-original', 'transferencia', 'unico'])
+  // Con el monto que elige cada quien: menos de $15 no da créditos, aunque pague.
+  licencia('cinco', 'cinco@example.com', 'mensual', 'authorized', 'produccion', '2099-01-01', '2026-11-01', 5)
+  licencia('catorce', 'catorce@example.com', 'unico', 'pagado', 'produccion', '2099-01-01', '2026-11-01', 14)
+  licencia('treinta', 'treinta@example.com', 'mensual', 'authorized', 'produccion', '2099-01-01', '2026-11-01', 30)
+  // Los de antes, en pesos: desde 299 MXN.
+  licencia('pesos', 'pesos@example.com', 'mensual', 'authorized', 'produccion', '2099-01-01', '2026-11-01', 299, 'MXN')
+  licencia('pocospesos', 'pocospesos@example.com', 'mensual', 'authorized', 'produccion', '2099-01-01', '2026-11-01', 100, 'MXN')
+  const filas = db.prepare(beneficiariosVoz(env)).all(NOVIEMBRE.toISOString(), null) as { externo: string }[]
+  assert.deepEqual(filas.map((f) => f.externo).sort(), ['cuenta-original', 'pesos', 'transferencia', 'treinta', 'unico'])
 })
 
 test('dos computadoras y el cron entregan una sola vez; cada mes se refresca a 100.000, sin acumular', async (t) => {

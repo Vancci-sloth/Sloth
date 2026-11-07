@@ -105,9 +105,11 @@ Comprueba la ruta afectada en `https://api.sloth.vancci.org`. Este despliegue es
 Los créditos mensuales de voz necesitan la migración `0024_voz_mensual.sql` y el Worker actualizado **antes** de publicar
 la app. El script de publicación manda `vozMensual` y, al terminar de subir el `latest*.yml`, el Worker guarda la marca
 `voz-mensual.json` en R2: ahí abre las voces aunque siga `VOZ_SOLO_CREADOR=1`. Hasta entonces siguen solo para el creador.
-Cada diez minutos refresca a 100.000 los créditos de cada correo, una vez por mes natural de Ciudad de México, a los
-apoyos de producción pagados y vigentes, y solo a ellos: los lugares gratis de Fundador de por vida no reciben, por
-decisión del creador. También lo hace al consultar `/voz`. Refrescar es sumar lo que falta para llegar a 100.000: lo
+Cada diez minutos refresca a 100.000 los créditos de cada correo, una vez por mes natural de Ciudad de México, **SOLO a
+quien paga activamente $15 USD o más** (`PRECIO_MENSUAL`; 299 MXN en los apoyos en pesos, o el anual) y a nadie más: ni
+cuentas gratis, ni apoyos de menos (el monto que cada quien elige), ni lugares gratis de Fundador de por vida. Lo decidió
+el creador el 7 de noviembre de 2026 y la regla es una sola, `daCreditos` en `licencias/src/voz-mensual.ts`, que usa
+también la rifa. También lo hace al consultar `/voz`. Refrescar es sumar lo que falta para llegar a 100.000: lo
 no usado no se acumula, nunca se quita lo que el creador dio de más, y no se recuperan meses anteriores. El correo lleva
 la **clave de Sloth existente**, que se pega en Opciones → Voz → Voces de Sloth, y se reintenta sin repetir la entrega. Todo sale de las mismas llaves de socio y aparece en Administrador.
 La rifa necesita la migración `0025_rifas.sql` y el Worker desplegado; con créditos, además, las voces ya abiertas.

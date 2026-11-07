@@ -8,8 +8,9 @@ import { novedadesPendiente, NOVEDADES_CERRADAS } from './Novedades'
 import './CreditosVoz.css'
 
 /**
- * «Ya tienes 100,000 creditos de voz»: a toda la pantalla, una sola vez, a quien apoya pagando (no a los lugares gratis de Fundador), en cuanto el cobro
- * dice que le tocan los créditos de cada mes (`vc.mensuales`, `licencias/src/voz-mensual.ts`). A los demás no les sale.
+ * «Ya tienes 100,000 creditos de voz»: a toda la pantalla, una sola vez, SOLO a quien paga activamente $15 USD o más, en
+ * cuanto el cobro dice que le tocan los créditos de cada mes (`vc.mensuales`, `daCreditos` en `licencias/src/voz-mensual.ts`).
+ * A nadie más le sale: ni cuentas gratis, ni apoyos de menos, ni lugares gratis de Fundador. El monto es `PRECIO_MENSUAL`.
  * Espera a la bienvenida, a la guía de lo nuevo y al aviso de un estilo que cambió. «Elegir mi voz» lleva a Opciones → Voz → Voces de Sloth. Va escrito
  * en el tono de Vancci (`docs/agents/anuncios.md`), como el correo que llega con los créditos.
  * En el repo, «Ver aviso de créditos» de Opciones lo abre (`abrirCreditosVoz`).
@@ -103,7 +104,7 @@ export function CreditosVoz() {
         <h2 id="cv-titulo">
           Siiiii, ya tienes <b>{cuantos}</b> creditos de voz :)))
         </h2>
-        <p className="cv-texto">Neta muchisimas gracias por apoyar a Sloth, estoy bien emocionado con esto. Son para que el agente le ponga voz a tus videos, y se te refrescan CADA MES: cada mes vuelves a tener {cuantos}.</p>
+        <p className="cv-texto">Neta muchisimas gracias por apoyar a Sloth, estoy bien emocionado con esto. Son para que el agente le ponga voz a tus videos, y se te refrescan CADA MES mientras sigas apoyando con $15 dolares o mas: cada mes vuelves a tener {cuantos}.</p>
         <ul className="cv-lista">
           <li>Escoge una de las voces de Sloth o clona LA TUYA con una grabacion</li>
           <li>El agente la usa solita cuando le genera la voz a tu video</li>

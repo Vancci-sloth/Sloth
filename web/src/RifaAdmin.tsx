@@ -51,7 +51,7 @@ export function RifaAdmin() {
     <section className="admin-seccion admin-rifa">
       <h2>Rifa</h2>
       <p className="muted small">
-        Entre quienes usan Sloth gratis: quien apoya o es Fundador no participa. Mientras está abierta sale hasta arriba de la comunidad con su botón para participar. Al rifar, cada ganador recibe sus créditos en su cuenta de voz, el aviso en su Sloth y un correo.
+        Entre quienes no tienen los créditos de cada mes: cuentas gratis y apoyos de menos de $15 USD. Quien paga $15 o más y los Fundadores no participan. Mientras está abierta sale hasta arriba de la comunidad con su botón para participar. Al rifar, cada ganador recibe sus créditos en su cuenta de voz, el aviso en su Sloth y un correo.
       </p>
       {error && <p className="bad small">{error}</p>}
       {panel && !a && <Nueva vozAbierta={panel.vozAbierta} onHecho={cambio} />}

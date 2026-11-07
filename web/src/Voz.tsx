@@ -319,7 +319,7 @@ function VoicesCloningOpciones({ voz }: { voz: UsoVoz }) {
           <strong>Voces de Sloth</strong>
           <span>
             {vc?.estado === 'suspended' ? 'Tu usuario está suspendido. ' : ''}
-            {vc?.disponible ? `${vc.voces.length} ${vc.voces.length === 1 ? 'voz' : 'voces'} en el menú Voz` : '100.000 créditos de voz al mes para quienes apoyan a Sloth.'}
+            {vc?.disponible ? `${vc.voces.length} ${vc.voces.length === 1 ? 'voz' : 'voces'} en el menú Voz` : '100.000 créditos de voz al mes, solo para quienes apoyan a Sloth con $15 USD o más al mes.'}
           </span>
         </div>
         {vc?.disponible ? (
@@ -359,10 +359,10 @@ function VoicesCloningOpciones({ voz }: { voz: UsoVoz }) {
             </>
           )}
           {typeof vc?.hoy === 'number' && vc.hoy > 0 && <span className="muted">{vc.hoy.toLocaleString('es-MX')} usados hoy</span>}
-          {!!vc?.mensuales && <span className="muted">Se refrescan a {vc.mensuales.toLocaleString('es-MX')} cada mes · no se acumulan</span>}
+          {!!vc?.mensuales && <span className="muted">Se refrescan a {vc.mensuales.toLocaleString('es-MX')} cada mes mientras pagues $15 USD o más · no se acumulan</span>}
         </div>
       )}
-      <p className="muted small fila-extra">Las eliges en el menú Voz, en su pestaña, o clonas la tuya grabándola ahí. Usa tu clave personal de Sloth, la que recibes por correo al apoyar. Si ya la pusiste en Apoyo, se conecta sola. Los créditos salen del saldo general del proveedor de Sloth.</p>
+      <p className="muted small fila-extra">Las eliges en el menú Voz, en su pestaña, o clonas la tuya grabándola ahí. Usa tu clave personal de Sloth, la que recibes por correo al apoyar. Los 100.000 al mes son solo para quien paga activamente $15 USD o más; con menos, con la cuenta gratis o como Fundador sin pago no se reciben. Si ya la pusiste en Apoyo, se conecta sola. Los créditos salen del saldo general del proveedor de Sloth.</p>
       {pegando && (
         <form className="fila-extra" onSubmit={(ev) => {
           ev.preventDefault()

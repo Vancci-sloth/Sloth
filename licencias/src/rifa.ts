@@ -4,8 +4,8 @@
  * con su ruleta (`web/src/RifaAdmin.tsx`).
  *
  * - Participa una persona por correo (`externo`, el id de la primera licencia de su correo, el mismo usuario que en las
- *   voces), con un botón. Quien apoya con el precio sugerido o más (Apoya, Donador PRO) o es Fundador queda fuera
- *   (`fuera`): ya tiene sus créditos cada mes. Quien apoya con menos sí entra. Se vuelve a mirar al sortear: quien empezó a apoyar después ya no entra.
+ *   voces), con un botón. Quien ya recibe los créditos de cada mes (paga activamente $15 USD o más, `daCreditos`) o es
+ *   Fundador queda fuera (`fuera`). Las cuentas gratis y quien apoya con menos sí entran. Se vuelve a mirar al sortear: quien empezó a apoyar después ya no entra.
  * - Solo una abierta a la vez (migración 0025). Sortear elige al azar (`crypto.getRandomValues`, sin sesgo) y deja la
  *   rifa sorteada y sus ganadores en una sola transacción: dos sorteos a la vez no dan dos resultados.
  * - A cada ganador se le suman sus créditos en su cuenta de voz de Sloth (el repartidor de `voz.ts`, como los mensuales),
@@ -22,7 +22,7 @@
 import type { GanadorRifa, RifaAdmin, RifaComunidad, RifaGanada, SorteoRifa } from '../../shared/types.ts'
 import { correo, cuerpo, esFundador, type Env, letras, Rechazo } from './index.ts'
 import { repartidorVoz, vozAbierta } from './voz.ts'
-import type { RepartidorVoz } from './voz-mensual.ts'
+import { daCreditos, desdeCuanto, type RepartidorVoz } from './voz-mensual.ts'
 
 /** Quién pide, de `comunidad.ts`. */
 export interface QuienRifa {
@@ -40,26 +40,23 @@ const ID = /^[a-z0-9]{12}$/
 const SIN_NOMBRE = 'Alguien de la comunidad'
 
 type Fuera = 'vetada' | 'fundador' | 'apoya'
-const POR_QUE: Record<Fuera, string> = {
-  vetada: 'Tu cuenta está bloqueada.',
-  fundador: 'Como Fundador ya tienes tus créditos: la rifa es para quien usa Sloth gratis.',
-  apoya: 'Tú ya apoyas a Sloth y tienes tus créditos cada mes: la rifa es para quien usa Sloth gratis.'
+function porQue(env: Env, f: Fuera): string {
+  const d = desdeCuanto(env)
+  if (f === 'vetada') return 'Tu cuenta está bloqueada.'
+  if (f === 'fundador') return `Los Fundadores no participan en la rifa: es para quien no tiene los créditos de cada mes (cuentas gratis y apoyos de menos de $${d.monto} ${d.moneda}).`
+  return `Tú ya apoyas a Sloth con $${d.monto} ${d.moneda} o más y tienes tus 100,000 créditos cada mes: la rifa es para quien no los tiene.`
 }
 
 /**
  * Lo que deja fuera de la rifa al correo `email` (una expresión SQL), o NULL si puede entrar: bloqueado, Fundador (el
- * que pagó su lugar o el gratis de por vida) o un apoyo pagado y vigente de al menos el precio sugerido (`PRECIO_MENSUAL`
- * en `MONEDA`, `PRECIO_MENSUAL_MXN` en pesos, o el anual). Quien apoya con menos (el monto que elige, desde $1) sí
- * participa, por decisión del creador (7 de noviembre de 2026): lo que trae el apoyo empieza en el sugerido.
+ * que pagó su lugar o el gratis de por vida, por decisión del creador) o quien ya recibe los créditos de cada mes
+ * (`daCreditos`: paga activamente $15 USD o más). Quien apoya con menos (el monto que elige, desde $1) sí participa.
  * Su alias (`rf`) no es el de ninguna consulta que la use: con el mismo, compararía cada correo consigo mismo.
  */
 export const fuera = (env: Env, email: string) => `(SELECT CASE
   WHEN MAX(rf.estado = 'vetada') THEN 'vetada'
   WHEN MAX(${esFundador('rf')}) THEN 'fundador'
-  WHEN MAX(rf.modo = 'produccion' AND rf.plan IN ('mensual', 'anual', 'unico') AND julianday(rf.pagado_hasta) > julianday('now')
-    AND (rf.plan = 'anual'
-      OR (rf.moneda = '${String(env.MONEDA ?? 'USD').replace(/[^A-Z]/g, '')}' AND rf.monto >= ${Number(env.PRECIO_MENSUAL) || 15})
-      OR (rf.moneda = 'MXN' AND rf.monto >= ${Number(env.PRECIO_MENSUAL_MXN) || 299}))) THEN 'apoya'
+  WHEN MAX(${daCreditos(env, 'rf', "'now'")}) THEN 'apoya'
   END FROM licencias rf WHERE rf.email = ${email})`
 
 interface Guardada {
@@ -156,7 +153,7 @@ async function vista(env: Env, yo: QuienRifa): Promise<RifaComunidad> {
   return {
     ...(abierta ? { abierta: publica(abierta) } : {}),
     participo,
-    ...(yo.creador ? { fuera: 'El creador no participa en su propia rifa.' } : p?.fuera ? { fuera: POR_QUE[p.fuera] } : {}),
+    ...(yo.creador ? { fuera: 'El creador no participa en su propia rifa.' } : p?.fuera ? { fuera: porQue(env, p.fuera) } : {}),
     ...(p ? { correo: p.email } : {}),
     ...(deLaUltima ? { ultima: deLaUltima } : {}),
     ...(gane ? { gane } : {})
@@ -177,7 +174,7 @@ async function participar(env: Env, yo: QuienRifa): Promise<RifaComunidad> {
   if (!abierta) throw new Rechazo(409, 'Ahora no hay ninguna rifa abierta.')
   const p = await persona(env, yo.clave)
   if (!p) throw new Rechazo(401, 'Para participar, crea tu cuenta gratis de Sloth.')
-  if (p.fuera) throw new Rechazo(403, POR_QUE[p.fuera])
+  if (p.fuera) throw new Rechazo(403, porQue(env, p.fuera))
   await env.DB.prepare('INSERT OR IGNORE INTO rifa_participantes (rifa, externo, miembro, desde) VALUES (?, ?, ?, ?)').bind(abierta.id, p.externo, yo.id, new Date().toISOString()).run()
   return vista(env, yo)
 }
@@ -314,7 +311,7 @@ async function panel(env: Env): Promise<RifaAdmin> {
       ? {
           abierta: {
             ...publica(abierta),
-            lista: (await participantes(env, abierta.id)).map((p) => ({ externo: p.externo, nombre: p.nombre, email: p.email, desde: p.desde, ...(p.fuera ? { fuera: POR_QUE[p.fuera] } : {}) }))
+            lista: (await participantes(env, abierta.id)).map((p) => ({ externo: p.externo, nombre: p.nombre, email: p.email, desde: p.desde, ...(p.fuera ? { fuera: porQue(env, p.fuera) } : {}) }))
           }
         }
       : {}),
