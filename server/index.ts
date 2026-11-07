@@ -43,6 +43,7 @@ import { espacio } from './espacio.ts' // espacio en disco
 import { equipo } from './equipo.ts' // tu equipo
 import { licencia } from './licencia.ts' // suscripción
 import { Sessions } from './sessions.ts'
+import { Proyectos } from './proyectos.ts' // proyectos
 import { mantenerVoz } from './voz-viva.ts'
 import { avisoDeVideos } from '../shared/limites.ts'
 import { eventosEnVivo } from './eventos-en-vivo.ts'
@@ -115,6 +116,9 @@ const sessions = new Sessions(
 
 /** Si el hilo es de un estilo de video: solo su estudio enseña lo que va escribiendo. */
 const conEtapas = (id: string) => !!cards().find((c) => c.id === sessions.meta(id)?.cardId)?.etapas?.length
+// Proyectos y series: su memoria entra al principio del primer turno de cada hilo del proyecto.
+const proyectos = new Proyectos(join(APP, 'data', 'proyectos'))
+sessions.contexto = (meta) => proyectos.contexto(meta.proyecto, meta.serie)
 sessions.esVideo = (meta) => !!cards().find((c) => c.id === meta.cardId)?.etapas?.some((e) => e.fase)
 // Con otra cuenta de Claude, los hilos quietos sueltan su Claude Code: el siguiente mensaje ya va con ella.
 alEntrarClaude(() => sessions.soltarQuietos('claude'))
@@ -349,6 +353,7 @@ async function api(req: IncomingMessage, res: ServerResponse, url: URL): Promise
   }
 
   if (await disco.api(req, res, path)) return true // espacio en disco
+  if (await proyectos.api(req, res, path)) return true // proyectos
   if (await maquina.api(req, res, path)) return true // tu equipo
   if (await narrar.api(req, res, path)) return true // voz de AI Studio
   if (await generarFlow.api(req, res, path)) return true // Google Flow
@@ -557,9 +562,13 @@ async function api(req: IncomingMessage, res: ServerResponse, url: URL): Promise
   }
 
   if (path === '/api/sessions' && method === 'POST') {
-    const input = await body<{ cardId: string; model: string; effort?: string; text: string; images?: string[]; masDeDos?: boolean }>(req)
+    const input = await body<{ cardId: string; model: string; effort?: string; text: string; images?: string[]; masDeDos?: boolean; proyecto?: string; serie?: string }>(req)
     const card = cards().find((c) => c.id === input.cardId)
     if (!card) return send(res, 404, { error: 'No existe esa card' }), true
+    // proyectos: solo uno que existe, y una serie suya.
+    const lineasProyecto = proyectos.lineasDe(input.proyecto, input.serie)
+    const proyecto = lineasProyecto.length ? input.proyecto : undefined
+    const serie = proyecto && lineasProyecto.some((l) => l.startsWith('MemoriaSerie:')) ? input.serie : undefined
     if (card.etapas?.some((e) => e.fase) && pideConfirmar(res, input.masDeDos)) return true
     mkdirSync(card.cwd, { recursive: true })
     // Uno que sale de Ideas se llama como la idea (su línea `Título:`); los demás, como su primer mensaje, hasta que llegue
@@ -568,8 +577,8 @@ async function api(req: IncomingMessage, res: ServerResponse, url: URL): Promise
     const title = (titulo ?? input.text.split('\n')[0]).slice(0, 80) || (input.images?.length ? 'Imagen' : card.title)
     // Un video nuevo también nace con su carpeta, como los de un lote: la skill la crea con el nombre de la línea `Carpeta:`.
     const nueva = card.etapas?.length ? carpetaDeVideo(card, title) : undefined // panel de etapas
-    const meta = sessions.create({ cardId: card.id, title, model: input.model, effort: input.effort, cwd: card.cwd, carpeta: nueva })
-    const text = [input.text, nueva && `Carpeta: ${nueva}`].filter(Boolean).join('\n\n')
+    const meta = sessions.create({ cardId: card.id, title, model: input.model, effort: input.effort, cwd: card.cwd, carpeta: nueva, proyecto, serie })
+    const text = [input.text, nueva && `Carpeta: ${nueva}`, lineasProyecto.join('\n')].filter(Boolean).join('\n\n')
     sessions.send(meta.id, text, card.skill ? skillRef(card.skill) : undefined, input.images)
     // El primer mensaje recortado se cambia por un título corto cuando llega, como un renombrado. Nadie lo espera; si
     // falla, o mientras alguien le puso otro nombre, se queda el que tiene. Sin las líneas que añade la app.
@@ -584,7 +593,7 @@ async function api(req: IncomingMessage, res: ServerResponse, url: URL): Promise
 
   // Un lote: un hilo por enlace, cada uno con su carpeta ya nombrada. Esperan su turno en `sessions`.
   if (path === '/api/lotes' && method === 'POST') {
-    const input = await body<{ cardId: string; model: string; effort?: string; text: string; enlaces: string[]; images?: string[]; masDeDos?: boolean }>(req)
+    const input = await body<{ cardId: string; model: string; effort?: string; text: string; enlaces: string[]; images?: string[]; masDeDos?: boolean; proyecto?: string; serie?: string }>(req)
     const card = cards().find((c) => c.id === input.cardId)
     if (!card?.lote) return send(res, 404, { error: 'Esa card no hace lotes' }), true
     const n = input.enlaces.length
@@ -592,13 +601,16 @@ async function api(req: IncomingMessage, res: ServerResponse, url: URL): Promise
     // Todos los videos del lote copian a la misma carpeta, cada uno con el nombre de la suya.
     if (pideConfirmar(res, input.masDeDos, n)) return true
     mkdirSync(card.cwd, { recursive: true })
+    const lineasProyecto = proyectos.lineasDe(input.proyecto, input.serie) // proyectos
+    const proyecto = lineasProyecto.length ? input.proyecto : undefined
+    const serie = proyecto && lineasProyecto.some((l) => l.startsWith('MemoriaSerie:')) ? input.serie : undefined
     const videos = carpetasDeLote(card, n).map((carpeta, i) => ({
       carpeta,
       title: `${i + 1}/${n} · ${input.enlaces[i].replace(/^https?:\/\/(www\.)?/, '')}`.slice(0, 80),
-      text: [input.text, `Enlace: ${input.enlaces[i]}`, `Lote: video ${i + 1} de ${n}. Carpeta: ${carpeta}`].filter(Boolean).join('\n\n')
+      text: [input.text, `Enlace: ${input.enlaces[i]}`, `Lote: video ${i + 1} de ${n}. Carpeta: ${carpeta}`, lineasProyecto.join('\n')].filter(Boolean).join('\n\n')
     }))
     const { cardId, model, effort } = input
-    const metas = sessions.crearLote({ cardId, model, effort, cwd: card.cwd }, videos, card.skill ? skillRef(card.skill) : undefined, input.images)
+    const metas = sessions.crearLote({ cardId, model, effort, cwd: card.cwd, proyecto, serie }, videos, card.skill ? skillRef(card.skill) : undefined, input.images)
     send(res, 200, metas)
     return true
   }
@@ -647,6 +659,18 @@ async function api(req: IncomingMessage, res: ServerResponse, url: URL): Promise
       const { archived } = await body<{ archived: boolean }>(req)
       sessions.archive(id, archived)
       send(res, 200, { ok: true })
+    } else if (action === 'mover' && method === 'POST') {
+      // proyectos: a otro proyecto o serie, o a «Sin proyecto». Solo a uno que existe.
+      const { proyecto, serie } = await body<{ proyecto?: string | null; serie?: string | null }>(req)
+      const p = proyecto ? proyectos.get(proyecto) : null
+      if (proyecto && !p) return send(res, 404, { error: 'No existe ese proyecto.' }), true
+      if (serie && !p?.series.some((s) => s.id === serie)) return send(res, 404, { error: 'No existe esa serie.' }), true
+      try {
+        sessions.mover(id, p?.id, serie ?? undefined)
+        send(res, 200, { ok: true })
+      } catch (error) {
+        send(res, 404, { error: error instanceof Error ? error.message : String(error) })
+      }
     } else if (action === 'rename') {
       // Una línea, del largo de los títulos que salen del primer mensaje.
       const { title } = await body<{ title?: string }>(req)

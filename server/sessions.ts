@@ -112,6 +112,11 @@ export class Sessions {
   esVideo: (meta: SessionMeta) => boolean = () => false
   /** Lo que su card no le ofrece al agente (`Card.sinHerramientas`). */
   sinHerramientas: (meta: SessionMeta) => string[] | undefined = () => undefined
+  /**
+   * La memoria del proyecto y de la serie del hilo (`Proyectos.contexto`), que se antepone al primer turno del agente,
+   * sea cual sea su proveedor. No se ve en el hilo: lo que se ve son las líneas `Proyecto:` y `MemoriaProyecto:`.
+   */
+  contexto: (meta: SessionMeta) => string = () => ''
 
   constructor(
     private dir: string,
@@ -210,9 +215,10 @@ export class Sessions {
   }
 
   /** Con `carpeta`, el hilo nace sabiendo dónde trabaja: la de su video, nuevo o que ya existe. */
-  create(input: { cardId: string; title: string; model: string; effort?: string; cwd: string; carpeta?: string }): SessionMeta {
+  create(input: { cardId: string; title: string; model: string; effort?: string; cwd: string; carpeta?: string; proyecto?: string; serie?: string }): SessionMeta {
     const now = Date.now()
-    const meta: SessionMeta = { id: now.toString(36) + Math.random().toString(36).slice(2, 6), ...input, createdAt: now, updatedAt: now, running: false }
+    const { proyecto, serie, ...resto } = input
+    const meta: SessionMeta = { id: now.toString(36) + Math.random().toString(36).slice(2, 6), ...resto, ...(proyecto ? { proyecto, ...(serie ? { serie } : {}) } : {}), createdAt: now, updatedAt: now, running: false }
     this.metas.set(meta.id, meta)
     this.events.set(meta.id, [])
     this.save(meta)
@@ -252,15 +258,35 @@ export class Sessions {
     const pide = skill ?? (!meta.providerSessionId && meta.skill ? { name: meta.skill } : undefined)
     const traspaso = meta.vieneDe ? { de: NOMBRE_AGENTE[meta.vieneDe], historial: join(this.dir, `${meta.id}.jsonl`) } : undefined
     const antes = meta.resumir ? `${resumenDelHilo(this.load(meta.id), meta.carpeta ?? meta.lote?.carpeta, traspaso)}\n\n` : ''
+    // La memoria del proyecto, al principio del primer turno de cada proceso que aún no tiene sesión que retomar.
+    let contexto = ''
+    if (meta.proyecto && !meta.providerSessionId && !this.runs.has(meta.id)) {
+      try {
+        contexto = this.contexto(meta)
+      } catch (error) {
+        console.error(`No se pudo leer la memoria del proyecto de ${meta.id}: ${error instanceof Error ? error.message : error}`)
+      }
+    }
     this.emit(meta.id, { t: 'turn_start', at: Date.now() })
-    this.runFor(meta).send(antes + conRutas(text, images), pide, images)
+    this.runFor(meta).send(antes + contexto + conRutas(text, images), pide, images)
+  }
+
+  /** Mover el hilo a otro proyecto o serie (o a ninguno). Sin tocar `updatedAt`: no lo sube en la lista. */
+  mover(id: string, proyecto?: string, serie?: string) {
+    const meta = this.metas.get(id)
+    if (!meta) throw new Error('No existe esa sesión')
+    if (proyecto) meta.proyecto = proyecto
+    else delete meta.proyecto
+    if (proyecto && serie) meta.serie = serie
+    else delete meta.serie
+    this.save(meta)
   }
 
   /**
    * Un lote: un hilo por video, todos esperando, con su primer mensaje ya a la vista. `repartir` los arranca en orden
    * mientras quepan en la máquina.
    */
-  crearLote(input: { cardId: string; model: string; effort?: string; cwd: string }, videos: { title: string; text: string; carpeta: string }[], skill?: SkillRef, images: string[] = []): SessionMeta[] {
+  crearLote(input: { cardId: string; model: string; effort?: string; cwd: string; proyecto?: string; serie?: string }, videos: { title: string; text: string; carpeta: string }[], skill?: SkillRef, images: string[] = []): SessionMeta[] {
     const lote = Date.now().toString(36)
     const metas = videos.map((v, i) => {
       const meta = this.create({ ...input, title: v.title })

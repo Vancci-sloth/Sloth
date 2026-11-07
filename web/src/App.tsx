@@ -47,6 +47,8 @@ import { Timeline } from './Timeline'
 import { Admin, useEsCreador } from './Admin' // Administrador, solo en la computadora del creador
 import { compact, duration } from './items'
 import './Barra.css'
+import { alArrastrarHilo, guardarProyectoActivo, MoverA, SeccionProyectos, SelectorProyecto, useElegido, useProyectos, vivos } from './Proyectos' // proyectos
+import { serieDelBanco, type Proyecto } from '../../shared/proyectos' // proyectos
 
 /** El inicio es siempre un hilo nuevo; sin card en el hash, toma la última que se usó. Un borrador es un inicio a medias. */
 type View =
@@ -124,6 +126,7 @@ export function App() {
   const [cards, setCards] = useState<Card[]>([])
   const [models, setModels] = useState<Model[]>([])
   const [sessions, setSessions] = useState<SessionMeta[]>([])
+  const proyectos = useProyectos() // proyectos
   // Los eventos de cada hilo no viven aquí sino en `eventos.ts`: llegan muchas veces por segundo y solo los pinta el abierto.
   // En qué fase va cada video, para la barra lateral. Lo manda el servidor cuando cambia (`server/avances.ts`).
   const [avances, setAvances] = useState<Record<string, AvanceCorto>>({}) // avance
@@ -234,6 +237,11 @@ export function App() {
 
   const openId = view.kind === 'session' ? view.id : null
   abierto.current = openId
+  // proyectos: el hilo que abres decide el proyecto del siguiente hilo nuevo.
+  const proyectoAbierto = sessions.find((s) => s.id === openId)
+  useEffect(() => {
+    if (proyectoAbierto) guardarProyectoActivo(proyectoAbierto.proyecto ? { proyecto: proyectoAbierto.proyecto, serie: proyectoAbierto.serie } : null)
+  }, [openId, proyectoAbierto?.proyecto, proyectoAbierto?.serie])
   // El servidor manda los eventos del hilo abierto. El que se deja se guarda para volver, si no trabaja (`eventos.ts`).
   const deSesiones = useRef(sessions)
   deSesiones.current = sessions
@@ -329,10 +337,14 @@ export function App() {
     if (icon) threadIcons.set(s.id, icon)
   }
   const archived = sessions.filter((s) => s.archived)
+  // proyectos: los hilos de un proyecto vivo van en su grupo; los demás, en «Sin proyecto», por fechas como siempre.
+  const vivosIds = new Set(vivos(proyectos).map((p) => p.id))
+  const enProyecto = (s: SessionMeta) => !!s.proyecto && vivosIds.has(s.proyecto)
+  const deProyectos = sessions.filter((s) => !s.archived && enProyecto(s))
   // Los videos de un lote van juntos, donde cae el más reciente.
   const lista: (SessionMeta | SessionMeta[])[] = []
   const lotes = new Map<string, SessionMeta[]>()
-  for (const s of sessions.filter((s) => !s.archived)) {
+  for (const s of sessions.filter((s) => !s.archived && !enProyecto(s))) {
     if (!s.lote) {
       lista.push(s)
       continue
@@ -406,6 +418,7 @@ export function App() {
       q
         ? encontrados
         : [
+            ...deProyectos, // proyectos
             ...secciones.flatMap((sec) =>
               sec.items.flatMap((x) => {
                 if (!Array.isArray(x)) return [x]
@@ -577,7 +590,15 @@ export function App() {
               </button>
             </div>
           ))}
-          {secciones.flatMap((sec) => [
+          {/* proyectos: arriba los proyectos con sus series y sus hilos; abajo «Sin proyecto», por fechas. */}
+          <SeccionProyectos
+            proyectos={proyectos}
+            hilos={deProyectos}
+            openId={openId}
+            plegada={plegada}
+            fila={row}
+            hayHilosSinProyecto={lista.length > 0}
+            sinProyecto={secciones.flatMap((sec) => [
             <div key={`seccion-${sec.nombre}`} className="barra-seccion">
               {sec.nombre}
             </div>,
@@ -587,6 +608,7 @@ export function App() {
               return <LoteFila key={id} videos={videos} card={cardOf(videos[0].cardId)} abierto={abierto} onToggle={() => setAbiertos({ ...abiertos, [id]: !abierto })} fila={row} vista={vistaDeLote(videos, avances)} />
             }),
           ])}
+          />
           {/* Los archivados, al final y plegados: casi siempre se llega a ellos buscando. */}
           {archived.length > 0 && (
             <button
@@ -615,6 +637,7 @@ export function App() {
           <SessionMenu
             {...menu}
             app={app}
+            proyectos={proyectos}
             onClose={() => setMenu(null)}
             onSelect={() => {
               if (!selected) setPickY(menu.y)
@@ -659,7 +682,7 @@ export function App() {
         <PedirMejora sessions={sessions} />
         {view.kind === 'videos' && (
           <ConNavegadorRedes>
-            <MisVideos cards={cards} sessions={sessions} estilo={view.estilo} onEstilo={(estilo) => go({ kind: 'videos', estilo })} />
+            <MisVideos cards={cards} sessions={sessions} proyectos={proyectos} estilo={view.estilo} onEstilo={(estilo) => go({ kind: 'videos', estilo })} />
           </ConNavegadorRedes>
         )}
         {newCard && draftId && (
@@ -673,6 +696,7 @@ export function App() {
             key={draftId}
             card={newCard}
             cards={cards}
+            proyectos={proyectos}
             sessions={sessions}
             models={models}
             draft={drafts[draftId]}
@@ -734,6 +758,8 @@ const FilaHilo = memo(function FilaHilo({ s, icono, activa, marcada, plegada, av
     <button
       className={`session-row ${activa ? 'active' : ''} ${s.archived ? 'archived' : ''} ${marcada ? 'selected' : ''}`}
       title={plegada ? [s.title, vista?.title].filter(Boolean).join('\n') : undefined}
+      draggable={marcada === undefined}
+      onDragStart={(e) => alArrastrarHilo(s, e)}
       onClick={(e) => acciones.clic(s, e)}
       onDoubleClick={(e) => acciones.doble(s, e)}
       onContextMenu={(e) => {
@@ -785,6 +811,7 @@ const enlacesDe = (text: string) => [...new Set(text.match(new RegExp(LINK, 'g')
 function NewSession(props: {
   card: Card
   cards: Card[]
+  proyectos: Proyecto[]
   sessions: SessionMeta[]
   models: Model[]
   draft?: Draft
@@ -843,6 +870,12 @@ function NewSession(props: {
   const [serie, setSerie] = useState('')
   useEffect(() => setSerie(''), [card.id])
   const laSerie = series.find((s) => s.id === serie)
+  // proyectos: el del hilo o la selección actual. Si su serie es también una del banco de la skill, se elige esa.
+  const elegido = useElegido(props.proyectos)
+  useEffect(() => {
+    const igual = elegido?.serie && serieDelBanco(elegido.serie, series)
+    if (igual) setSerie(igual.id)
+  }, [elegido?.serie?.id, series])
   const lote = !!card.lote && enlaces.length > 1 && !!porEnlace[card.id]
   // Todo estilo de video hace los dos formatos (skills/video-base/FORMATO.md): la skill hace solo el elegido. La card
   // recuerda el último; una idea de YouTube ya lo trae escrito en el mensaje (`Formato: horizontal`), y ese manda.
@@ -895,6 +928,7 @@ function NewSession(props: {
         modelos={<Modelos conf={card.modelos} models={models} avanzado={avanzado} choice={choice} tareas={tareas} sinClaude={sinClaude} onAvanzado={cambiarModelos} />}
         extra={
           <>
+            <SelectorProyecto proyectos={props.proyectos} /> {/* proyectos */}
             {series.length > 0 && (
               <Picker
                 label={laSerie ? laSerie.nombre : 'Sin serie'}
@@ -956,10 +990,10 @@ function NewSession(props: {
           ]
           text = [text, ...pide].filter(Boolean).join('\n\n')
           if (porEnlace) {
-            const metas = await api<SessionMeta[]>('/api/lotes', { cardId: card.id, text, enlaces, images, ...choice })
+            const metas = await api<SessionMeta[]>('/api/lotes', { cardId: card.id, text, enlaces, images, ...choice, proyecto: elegido?.proyecto.id, serie: elegido?.serie?.id })
             return props.onCreated(metas[0].id)
           }
-          const meta = await api<SessionMeta>('/api/sessions', { cardId: card.id, text, images, ...choice })
+          const meta = await api<SessionMeta>('/api/sessions', { cardId: card.id, text, images, ...choice, proyecto: elegido?.proyecto.id, serie: elegido?.serie?.id })
           props.onCreated(meta.id)
         }}
       />
@@ -1316,8 +1350,9 @@ const SIN_TAREAS: string[] = []
  * El clic derecho sobre un hilo. «Copiar referencia» copia la ruta de su historial: pegada en otro hilo, el agente la
  * lee y tiene el contexto, trabaje donde trabaje. «Renombrar» lo renombra en su fila, como el doble clic.
  */
-function SessionMenu({ session, x, y, app, onClose, onSelect, onDeleted, onRename }: { session: SessionMeta; x: number; y: number; app: string; onClose(): void; onSelect(): void; onDeleted(id: string): void; onRename(): void }) {
+function SessionMenu({ session, x, y, app, proyectos, onClose, onSelect, onDeleted, onRename }: { session: SessionMeta; x: number; y: number; app: string; proyectos: Proyecto[]; onClose(): void; onSelect(): void; onDeleted(id: string): void; onRename(): void }) {
   const [error, setError] = useState('')
+  const [moviendo, setMoviendo] = useState(false) // proyectos
   const [borrar, setBorrar] = useState(false)
   const busy = session.running || !!session.background?.length
 
@@ -1360,7 +1395,7 @@ function SessionMenu({ session, x, y, app, onClose, onSelect, onDeleted, onRenam
 
   return (
     <div className="menu-backdrop" onClick={onClose} onContextMenu={(e) => (e.preventDefault(), onClose())}>
-      <div className="menu" style={{ left: Math.min(x, innerWidth - 230), top: Math.min(y, innerHeight - 180) }} onClick={(e) => e.stopPropagation()}>
+      <div className="menu" style={{ left: Math.min(x, innerWidth - 230), top: Math.min(y, innerHeight - (moviendo ? 460 : 220)) }} onClick={(e) => e.stopPropagation()}>
         <button
           title="Para dárselo como contexto a otro hilo"
           onClick={() => run(() => navigator.clipboard.writeText(threadRef(session.title, session.id, app)))}
@@ -1373,6 +1408,11 @@ function SessionMenu({ session, x, y, app, onClose, onSelect, onDeleted, onRenam
         <button title="Para archivar o eliminar varios a la vez (también con Ctrl+clic)" onClick={() => run(async () => onSelect())}>
           Seleccionar
         </button>
+        {/* proyectos: también se mueve arrastrando la fila sobre un proyecto o una serie. */}
+        <button aria-expanded={moviendo} title="A un proyecto o una serie; también arrastrando el hilo" onClick={() => setMoviendo(!moviendo)}>
+          Mover a…
+        </button>
+        {moviendo && <MoverA session={session} proyectos={proyectos} onListo={onClose} />}
         <button onClick={() => run(() => api(`/api/sessions/${session.id}/archive`, { archived: !session.archived }))}>{session.archived ? 'Desarchivar' : 'Archivar'}</button>
         <button className="danger" disabled={busy} title={busy ? 'El agente sigue trabajando en este hilo' : undefined} onClick={() => setBorrar(true)}>
           Eliminar

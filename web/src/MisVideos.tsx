@@ -13,6 +13,7 @@ import { YoutubeLote } from './YoutubeProgramar'
 import { CalendarioYoutube } from './YoutubeCalendario'
 import { CalendarioRedes, type EstadoRedes, estadoEnRedes, Marcas, ResumenRedes } from './Redes' // redes
 import './MisVideos.css'
+import { cssDeColor, type Proyecto } from '../../shared/proyectos' // proyectos
 
 /**
  * «Mis videos»: los videos terminados de todos los estilos, del más nuevo al más viejo, con un filtro por estilo (el
@@ -24,7 +25,9 @@ import './MisVideos.css'
 /** Cuántas tarjetas se dibujan de una vez. Al acercarse al final, otras tantas. */
 const TANDA = 30
 
-export function MisVideos({ cards, sessions, estilo, onEstilo }: { cards: Card[]; sessions: SessionMeta[]; estilo?: string; onEstilo(id?: string): void }) {
+export function MisVideos({ cards, sessions, proyectos = [], estilo, onEstilo }: { cards: Card[]; sessions: SessionMeta[]; proyectos?: Proyecto[]; estilo?: string; onEstilo(id?: string): void }) {
+  // proyectos: filtro por proyecto y serie, además del estilo. Un video es del proyecto de su hilo.
+  const [porProyecto, setPorProyecto] = useState<{ proyecto: string; serie?: string } | null>(null)
   const [todos, setTodos] = useState<VideosDeTodos | null>(null)
   const [error, setError] = useState('')
   // Lo que falló al tocar una marca de redes (reintentar, descartar).
@@ -66,7 +69,15 @@ export function MisVideos({ cards, sessions, estilo, onEstilo }: { cards: Card[]
   const conVideos = cards.filter((c) => cuantos.has(c.id))
   // Un estilo que ya no tiene videos es como «Todos».
   const filtro = estilo && cuantos.has(estilo) ? estilo : undefined
-  const vistos = filtro ? videos.filter((v) => v.cardId === filtro) : videos
+  const hiloDe = new Map(sessions.map((s) => [s.id, s]))
+  const deProyecto = (v: VideoHecho) => (v.sessionId ? hiloDe.get(v.sessionId) : undefined)
+  const proyectosCon = proyectos.filter((p) => !p.archivado && videos.some((v) => deProyecto(v)?.proyecto === p.id))
+  const elProyecto = proyectosCon.find((p) => p.id === porProyecto?.proyecto)
+  const seriesCon = elProyecto ? elProyecto.series.filter((x) => videos.some((v) => deProyecto(v)?.proyecto === elProyecto.id && deProyecto(v)?.serie === x.id)) : []
+  const laSerie = seriesCon.find((x) => x.id === porProyecto?.serie)
+  const vistos = videos.filter(
+    (v) => (!filtro || v.cardId === filtro) && (!elProyecto || deProyecto(v)?.proyecto === elProyecto.id) && (!laSerie || deProyecto(v)?.serie === laSerie.id)
+  )
   // Un estado que ya no tiene videos (los arreglaste) es como ninguno.
   const enEstado = porEstado && todos?.redes ? vistos.filter((v) => estadoEnRedes(todos.redes!, v.ruta) === porEstado) : []
   const enRejilla = enEstado.length ? enEstado : vistos
@@ -121,6 +132,23 @@ export function MisVideos({ cards, sessions, estilo, onEstilo }: { cards: Card[]
           ))}
         </div>
       )}
+      {proyectosCon.length > 0 && (
+        <div className="mis-filtros">
+          <button className={elProyecto ? '' : 'on'} onClick={() => setPorProyecto(null)}>
+            Todos los proyectos
+          </button>
+          {proyectosCon.map((p) => (
+            <button key={p.id} className={elProyecto?.id === p.id && !laSerie ? 'on' : ''} onClick={() => setPorProyecto({ proyecto: p.id })}>
+              <span className="proyecto-punto" style={{ background: cssDeColor(p.color) }} /> {p.nombre}
+            </button>
+          ))}
+          {seriesCon.map((x) => (
+            <button key={x.id} className={laSerie?.id === x.id ? 'on' : ''} onClick={() => setPorProyecto({ proyecto: elProyecto!.id, serie: x.id })}>
+              Serie {x.nombre}
+            </button>
+          ))}
+        </div>
+      )}
       <ResumenRedes marcas={todos?.redes} videos={vistos} estado={enEstado.length ? porEstado : null} onEstado={setPorEstado} onCambio={otraVuelta} /> {/* redes */}
       {/* La app que se vende aún no publica: sin marcas de redes, lo de redes no se dibuja; lo de YouTube se quita aquí. */}
       {ritmo && <Ritmos />}
@@ -131,7 +159,7 @@ export function MisVideos({ cards, sessions, estilo, onEstilo }: { cards: Card[]
       {fallo && <p className="bad small">{fallo}</p>}
       {!todos ? null : vistos.length ? (
         // Por estilo y por estado, una rejilla nueva: empieza arriba y con la primera tanda.
-        <Rejilla key={`${filtro ?? ''}|${enEstado.length ? porEstado : ''}`} videos={enRejilla}>
+        <Rejilla key={`${filtro ?? ''}|${elProyecto?.id ?? ''}|${laSerie?.id ?? ''}|${enEstado.length ? porEstado : ''}`} videos={enRejilla}>
           {(v) => (
             <VideoDe
               key={v.src}

@@ -400,6 +400,10 @@ export interface SessionMeta {
   skill?: string
   /** El primer mensaje de un video del lote que aún no empieza: espera a que haya sitio en la máquina. */
   pendiente?: { text: string; images?: string[] }
+  /** El proyecto del hilo (`data/proyectos/<id>`, `server/proyectos.ts`). Sin él, va en «Sin proyecto». */
+  proyecto?: string
+  /** La serie del proyecto, si tiene. */
+  serie?: string
 }
 
 export interface Lote {

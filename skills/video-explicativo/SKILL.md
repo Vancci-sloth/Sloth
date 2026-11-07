@@ -12,6 +12,9 @@ código ni abras la plantilla**: todo lo que el video necesita se dice en `momen
 
 `<skill>` es esta carpeta y `<base>` es `video-base`, junto a ella. Los scripts van con el `python` del sistema.
 
+Si trae `Proyecto:` y `MemoriaProyecto:` (y quizá `MemoriaSerie:`), sigue [`PROYECTOS.md`](../video-base/PROYECTOS.md): lee
+esa memoria, respétala en marca, tono, reglas y cierre, y al terminar propón (sin escribirlo) qué agregarle.
+
 ## Lo que el usuario pidió y no se negocia
 
 - **Cada dato es verdadero**, de su fuente primaria, con fecha de corte. Al video solo van cifras primarias o de medios

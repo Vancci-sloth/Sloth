@@ -19,6 +19,7 @@ Lo que comparten los estilos de vídeo: el lote, los errores ya vistos y los scr
 | [VOZ.md](VOZ.md) | La voz que el usuario elige al pedir el vídeo (`Voz:` del mensaje): mandarla él o generarla tú en AI Studio con el MCP `voz` |
 | [FLOW.md](FLOW.md) | La línea `Imágenes:` (con ChatGPT o con Google Flow) y los clips de Flow, con lo que gastan |
 | [SERIES.md](SERIES.md) | Las series (`series/`), formatos fijos del canal para todo estilo: Sloth las ofrece al crear un vídeo; solo se lee si el mensaje trae `Serie:` |
+| [PROYECTOS.md](PROYECTOS.md) | El proyecto y la serie del hilo (`Proyecto:`, `MemoriaProyecto:`, `MemoriaSerie:` del mensaje): leer su memoria, respetarla y proponer al final qué agregar |
 | `scripts/` | Las herramientas (abajo) |
 
 `<base>` es esta carpeta, `video-base`, junto a las skills de cada estilo.

@@ -36,6 +36,9 @@ Este es el mapa:
   sigue en otra, con el resumen que Sloth saca de su historial (`relevar`, `server/relevo.ts`). `/compact` hace lo mismo.
   Elegir un modelo de otro agente en un hilo (`setModel`) lo pasa a ese agente con el mismo resumen, la skill y la ruta
   del historial, como el traspaso de T3 Code (`vieneDe`); el aviso de un límite de uso lo ofrece con «Seguir con…»; el de Claude dice además cuánto queda y deja entrar con otra cuenta (`LimiteClaude.tsx`).
+- Proyectos y series (`server/proyectos.ts`, `shared/proyectos.ts`, `web/src/Proyectos.tsx`): agrupan hilos en la barra y guardan una
+  memoria (`data/proyectos/<id>/MEMORIA.md`, y la de cada serie) que `Sessions.turno` antepone al primer turno del agente; la skill
+  la lee por `video-base/PROYECTOS.md`. Para quitarlos: no montar `Proyectos` en `server/index.ts` ni `SeccionProyectos` en `App.tsx`.
 - Lo que aguanta la máquina (ADR 0011): el aviso antes de pasar de dos videos a la vez (`shared/limites.ts`,
   `web/src/AvisoVideos.tsx`), el tope de subagentes de Claude (`server/tope-agentes.ts`), el de navegadores (`turnoNavegador` en `video-base/scripts/chrome.mjs`),
   Whisper cargado mientras trabaja un video (`server/voz-viva.ts`) y la fila de la GPU, con la voz primero (`sloth.py`).
