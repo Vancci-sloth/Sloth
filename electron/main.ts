@@ -27,12 +27,14 @@ import { archivos, huella, huellas, nombreCopia, quitarViejos, respaldar } from 
 import { guardarAnteriores } from '../server/anteriores.ts'
 import { MODELOS_VIEJOS } from './modelos-viejos.ts'
 import { destinoDe, donde, junto, libre, mudar, pesadas, porCopiar, porQueNo, recuperar } from './mudanza.ts'
+import { consultarPuerto, elegirPuerto, puertoLibre } from './puerto.ts'
 import { iniciarNavegador, ventanaDelNavegador } from './navegador.ts'
 import type { ActualizacionSloth } from '../shared/types.ts'
 
 /** En el repo: la dirección del servidor que ya levantó `npm start`. */
 const SOLO_VENTANA = process.env.SLOTH_VENTANA
-const URL_SLOTH = SOLO_VENTANA ?? `http://localhost:${process.env.PORT ?? '4848'}`
+/** La dirección de la interfaz. En la instalada, el puerto puede cambiar al arrancar (`ponerPuerto`, electron/puerto.ts). */
+let URL_SLOTH = SOLO_VENTANA ?? `http://localhost:${process.env.PORT ?? '4848'}`
 const WINDOWS = process.platform === 'win32'
 const MAC = process.platform === 'darwin'
 /** La de macOS 12, con Electron 43 y Node 22 (scripts/compilar.mjs). */
@@ -155,8 +157,26 @@ async function iniciar() {
   } catch (e) {
     anotar(`No se pudo poner esta versión de Sloth: ${e instanceof Error ? e.message : e}`)
   }
+  await ponerPuerto()
   arrancar()
   actualizaciones()
+}
+
+/**
+ * Si en el puerto de Sloth ya contesta otra Sloth (de otra carpeta: el repo en desarrollo), esta usa el siguiente libre y
+ * levanta ahí su servidor; si contesta la suya, se engancha (electron/puerto.ts). El servidor y start.mjs lo leen de PORT.
+ */
+async function ponerPuerto() {
+  try {
+    const inicial = Number(process.env.PORT ?? 4848)
+    const { puerto, propio } = await elegirPuerto({ inicial, app: APP, consultar: (p) => consultarPuerto(p), libre: puertoLibre })
+    if (puerto !== inicial) anotar(`En el puerto ${inicial} ya hay otra Sloth (de otra carpeta): esta usa el ${puerto}.`)
+    else if (propio) anotar(`Sloth ya corría en el puerto ${puerto}: me engancho a ella.`)
+    process.env.PORT = String(puerto)
+    URL_SLOTH = `http://localhost:${puerto}`
+  } catch (e) {
+    anotar(`No pude elegir puerto; sigo con el ${process.env.PORT ?? 4848}: ${e instanceof Error ? e.message : e}`)
+  }
 }
 
 /** La ventana, o al frente si ya está. Se enseña en cuanto se pide y carga la interfaz cuando el servidor contesta. */
