@@ -1,7 +1,21 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import type { Env } from './index.ts'
-import { MAX_LETRAS, idDe, laDeMasSaldo, llavesDe, mensajeDe, pedidoTts } from './voz.ts'
+import { MAX_LETRAS, idDe, juntas, laDeMasSaldo, llavesDe, mensajeDe, pedidoTts } from './voz.ts'
+
+test('la Administrador de antes ve todas las llaves como una sola cuenta', () => {
+  const r = (datos: Record<string, unknown>, status = 200) => ({ status, datos })
+  const j = juntas([
+    { saldo: r({ balance: 3_000_000, users: 0, daily_limit: null }), usuarios: r({ users: [], total: 0, per_page: 100 }), uso: r({ items: [{ credits: 1 }] }) },
+    { saldo: r({ balance: 499_954, users: 1 }), usuarios: r({ users: [{ external_id: 'creador' }], total: 1 }), uso: r({ items: [{ credits: 2 }] }) },
+    { saldo: r({ error: 'x' }, 401), usuarios: r({}, 401), uso: r({}, 401) }
+  ])
+  assert.deepEqual(j.saldo, { status: 200, datos: { balance: 3_499_954, users: 1, daily_limit: null } })
+  assert.deepEqual(j.usuarios?.datos, { users: [{ external_id: 'creador' }], total: 1, per_page: 100 })
+  assert.deepEqual(j.uso?.datos.items, [{ credits: 1 }, { credits: 2 }])
+  assert.equal(juntas([{ saldo: r({ error: 'no' }, 401), usuarios: r({}, 401), uso: r({}, 401) }]).saldo?.status, 401)
+  assert.deepEqual(juntas([]), {})
+})
 
 test('las llaves del socio se leen de cada VOICES_PK_LIVE_n, en orden, sin vacías ni repetidas', async () => {
   const env = { VOICES_PK_LIVE_10: 'pk_live_diez', VOICES_PK_LIVE_2: 'pk_live_dos', VOICES_PK_LIVE: ' pk_live_uno ', VOICES_PK_LIVE_3: '', VOICES_PK_LIVE_4: 'pk_live_dos', OTRA: 'pk_live_x', VOICES_PK_LIVE_X: 'pk_live_y' } as unknown as Env

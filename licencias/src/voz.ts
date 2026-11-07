@@ -283,6 +283,8 @@ async function admin(req: Request, env: Env, ctx: ExecutionContext, url: URL, ll
       pagina,
       consumo,
       llaves: deCadaLlave,
+      // La Administrador de antes de las varias llaves lee una sola cuenta: le van las de todas juntas.
+      ...juntas(deCadaLlave),
       nuevos: laDeMasSaldo(deCadaLlave.map((l) => ({ llave: llaves.find((o) => o.id === l.id)!, r: l.saldo })))?.id ?? llaves[0]?.id ?? null,
       cuentas,
       registro: registro.results,
@@ -341,6 +343,26 @@ async function admin(req: Request, env: Env, ctx: ExecutionContext, url: URL, ll
     return json({ externo: fila.id, creado: donde.creado, llave: donde.llave.fin })
   }
   return json({ error: 'No existe' }, 404)
+}
+
+/**
+ * Las cuentas de todas las llaves como si fueran una (`saldo`, `usuarios`, `uso`), para la Administrador de antes: el
+ * saldo y sus cifras sumados, y las listas una tras otra. Una que no se pudo leer no suma; si ninguna se leyó, va su error.
+ */
+export function juntas(cuentas: { saldo: Respuesta; usuarios: Respuesta; uso: Respuesta }[]): { saldo?: Respuesta; usuarios?: Respuesta; uso?: Respuesta } {
+  const junta = (campo: 'saldo' | 'usuarios' | 'uso', lista?: string): Respuesta | undefined => {
+    const rs = cuentas.map((c) => c[campo])
+    const bien = rs.filter((r) => r.status < 400)
+    if (!bien.length) return rs[0]
+    const datos: Record<string, unknown> = { ...bien[0].datos }
+    for (const k of ['balance', 'used_today', 'used_total', 'generations', 'users', 'total']) {
+      const n = bien.map((r) => numero(r.datos[k]))
+      if (n.some((v) => v !== undefined)) datos[k] = n.reduce<number>((s, v) => s + (v ?? 0), 0)
+    }
+    if (lista) datos[lista] = bien.flatMap((r) => (Array.isArray(r.datos[lista]) ? r.datos[lista] : []))
+    return { status: 200, datos }
+  }
+  return cuentas.length ? { saldo: junta('saldo'), usuarios: junta('usuarios', 'users'), uso: junta('uso', 'items') } : {}
 }
 
 /** Los usuarios que el registro conoce, aunque Voices Cloning no los liste en esta página. */
