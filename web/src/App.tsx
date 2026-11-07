@@ -18,6 +18,7 @@ import { Confirm } from './Confirm'
 import { TusCambios } from './TusCambios'
 import { EstiloCambio } from './EstiloCambio'
 import { Novedades } from './Novedades'
+import { CreditosVoz } from './CreditosVoz'
 import { ActualizarSloth, AvisoAgentes } from './Actualizar' // versiones nuevas
 import { TarjetasEnlaces } from './Enlaces' // tarjeta de los enlaces
 import { esDeEstudio, Estudio } from './Estudio' // panel de etapas
@@ -707,6 +708,7 @@ export function App() {
         )}
       </main>
       <Novedades />
+      <CreditosVoz />
       <EstiloCambio cards={cards} activa={newCard?.id} />
     </div>
   )

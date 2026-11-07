@@ -1398,6 +1398,8 @@ export type FuenteVoz = ProveedorVoz | 'vc'
 export interface EstadoVoicesCloning {
   disponible: boolean
   creador: boolean
+  /** Créditos que se suman cada mes natural por el apoyo o el lugar de Fundador. */
+  mensuales?: number
   creditos?: number
   usados?: number
   hoy?: number

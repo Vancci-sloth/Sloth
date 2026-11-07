@@ -102,6 +102,16 @@ borra. Si pasa, `npm run licencias -- deployments list` y `npm run licencias -- 
 Aplica las migraciones cuando el cambio incluya alguna, antes de desplegar código que necesite esas columnas.
 Comprueba la ruta afectada en `https://api.sloth.vancci.org`. Este despliegue es independiente de
 `main` y `venta`; subir la app no actualiza el Worker. Los nombres de sus secretos están en la cabecera de su configuración.
+Los créditos mensuales de voz necesitan la migración `0024_voz_mensual.sql` y el Worker actualizado **antes** de publicar
+la app. El script de publicación manda `vozMensual` y, al terminar de subir el `latest*.yml`, el Worker guarda la marca
+`voz-mensual.json` en R2: ahí abre las voces aunque siga `VOZ_SOLO_CREADOR=1`. Hasta entonces siguen solo para el creador.
+Cada diez minutos refresca a 100.000 los créditos de cada correo, una vez por mes natural de Ciudad de México, a los
+apoyos de producción pagados y vigentes, y solo a ellos: los lugares gratis de Fundador de por vida no reciben, por
+decisión del creador. También lo hace al consultar `/voz`. Refrescar es sumar lo que falta para llegar a 100.000: lo
+no usado no se acumula, nunca se quita lo que el creador dio de más, y no se recuperan meses anteriores. El correo lleva
+la **clave de Sloth existente**, que se pega en Opciones → Voz → Voces de Sloth, y se reintenta sin repetir la entrega. Todo sale de las mismas llaves de socio y aparece en Administrador.
+Un reparto en `enviando` o `revisar` requiere comprobar el movimiento en el proveedor antes de volver a sumarlo: su API
+no documenta idempotencia para créditos. No se reintenta esa suma automáticamente.
 Para guardar uno que el usuario copió, pásalo desde Git Bash: `tr -d ' \r\n' < /dev/clipboard | npm run licencias -- secret
 put NOMBRE`. Desde PowerShell, la tubería le pone un BOM delante y la pasarela rechaza la llave. Una llave de Voices
 Cloning (`pk_live_…`) va en el siguiente `VOICES_PK_LIVE_<n>` libre (mira `secret list`), nunca encima de una que ya

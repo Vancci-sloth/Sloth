@@ -82,7 +82,7 @@ if (VENTA) {
   process.env.CLAUDE_CONFIG_DIR ??= configClaudeDev(APP)
 }
 // Y su clave: la cuenta gratis de la comunidad o el apoyo, que quita el recordatorio. Sloth abre sin ella.
-const suscripcion = VENTA ? licencia(APP) : undefined // suscripción
+const suscripcion = licencia(APP) // La clave de Sloth también conecta las voces en la copia de desarrollo.
 
 const clients = new Set<WebSocket>()
 const suscripciones = new Map<WebSocket, string | null>()

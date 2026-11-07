@@ -158,8 +158,8 @@ export function voicesCloning(carpeta: string, o: { credencial(): Credencial | u
   /** Vuelve a preguntar si se puede usar y cuántos créditos quedan. */
   async function refrescar() {
     try {
-      const d = await pedirBien<{ disponible: boolean; creador: boolean; creditos?: number; usados?: number; hoy?: number; generaciones?: number; estado?: string }>('/voz')
-      info = { configurado: d.disponible, creador: d.creador, creditos: d.creditos, usados: d.usados, hoy: d.hoy, generaciones: d.generaciones, estado: d.estado }
+      const d = await pedirBien<{ disponible: boolean; creador: boolean; mensuales?: number; creditos?: number; usados?: number; hoy?: number; generaciones?: number; estado?: string }>('/voz')
+      info = { configurado: d.disponible, creador: d.creador, mensuales: d.mensuales, creditos: d.creditos, usados: d.usados, hoy: d.hoy, generaciones: d.generaciones, estado: d.estado }
       error = ''
     } catch (e) {
       // Sin cuenta de Sloth no es un error: solo no se ofrece.

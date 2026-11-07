@@ -110,3 +110,8 @@
 .limite-barra span { display: block; height: 100%; border-radius: inherit; background: var(--ok); }
 .limite-barra.alto span { background: var(--amber); }
 .limite-barra.lleno span { background: var(--bad); }
+
+/* El saldo de voz de Sloth, con la misma barra de consumo que los planes de los agentes. */
+.creditos-sloth { font-size: 12px; }
+.creditos-sloth > .limite-nombre:first-child { align-items: baseline; color: var(--text); }
+.creditos-sloth > .limite-nombre > strong { font-size: 24px; line-height: 1.2; font-weight: 600; }

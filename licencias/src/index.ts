@@ -67,7 +67,8 @@
 import type { VersionLiberable } from '../../shared/types.ts'
 import { comunidad, creditos, olvidarSueltos } from './comunidad.ts'
 import { cancelarStripe, firmaDeStripe, leerStripe, modoStripe, pagoDeSesion, sesion, sesionStripe, suscripcionStripe, type PagoStripe, type SesionStripe } from './stripe.ts'
-import { olvidarRegistroVoz, voz } from './voz.ts'
+import { olvidarRegistroVoz, renovarVoces, voz } from './voz.ts'
+import { APERTURA_VOZ } from './voz-mensual.ts'
 
 export interface Env {
   DB: D1Database
@@ -459,7 +460,11 @@ export default {
 
   /** Cada 10 minutos, las claves que no salieron; cada mañana, el aviso de los cobros que vienen. */
   async scheduled(evento: ScheduledController, env: Env, ctx: ExecutionContext) {
-    if (evento.cron === '*/10 * * * *') return ctx.waitUntil(reenviarClaves(env).catch((e) => console.error('Claves sin mandar', e instanceof Error ? e.message : e)))
+    if (evento.cron === '*/10 * * * *') {
+      ctx.waitUntil(reenviarClaves(env).catch((e) => console.error('Claves sin mandar', e instanceof Error ? e.message : e)))
+      ctx.waitUntil(renovarVoces(env, ctx).catch((e) => console.error('Créditos mensuales de voz', e instanceof Error ? e.message : e)))
+      return
+    }
     ctx.waitUntil(avisarCobros(env).catch((e) => console.error('Avisos de cobro', e instanceof Error ? e.message : e)))
     ctx.waitUntil(env.DB.prepare('DELETE FROM cupos WHERE creado < ?').bind(new Date(Date.now() - 2 * DIA).toISOString()).run())
     ctx.waitUntil(olvidarRegistroVoz(env).catch((e) => console.error('Registro de la voz', e instanceof Error ? e.message : e)))
@@ -663,7 +668,7 @@ async function publicar(req: Request, env: Env, url: URL): Promise<Response> {
     return json(await subida.uploadPart(n, req.body))
   }
   if (req.method === 'POST' && url.pathname === '/publicar/fin') {
-    const { partes, version, paraTodos, firmada } = (await cuerpo(req)) as { partes: R2UploadedPart[]; version: string; paraTodos?: boolean; firmada?: boolean }
+    const { partes, version, paraTodos, firmada, vozMensual } = (await cuerpo(req)) as { partes: R2UploadedPart[]; version: string; paraTodos?: boolean; firmada?: boolean; vozMensual?: boolean }
     // Una versión nueva: la que había pasa a `anterior/` (su ultima.json y su latest.yml, que aún no se reemplaza: va al
     // final), salvo que aún fuera solo de quien apoya; entonces la anterior sigue siendo la de antes. Si esa ya no tiene
     // instalador, a quien no apoya se le estaba dando la que había: pasa a ser la anterior, o la nueva le llegaría ya.
@@ -687,7 +692,12 @@ async function publicar(req: Request, env: Env, url: URL): Promise<Response> {
       const viejos = sobran(iguales, anteriores.filter((v) => v !== undefined))
       if (viejos.length) await env.DESCARGAS.delete(viejos)
     }
-    if (!so) return json({ archivo, bytes: obj.size })
+    if (!so) {
+      // El actualizador se sube al final: la app ya está disponible para quienes recibirán los créditos.
+      if (vozMensual && Object.values(YML).some((nombre) => nombre === archivo) && !(await env.DESCARGAS.head(APERTURA_VOZ)))
+        await env.DESCARGAS.put(APERTURA_VOZ, JSON.stringify({ version, desde: new Date().toISOString() }), { httpMetadata: { contentType: 'application/json' } })
+      return json({ archivo, bytes: obj.size })
+    }
     // La misma versión otra vez (se volvió a publicar) conserva cuándo salió; una nueva es de quien apoya `ANTICIPO`.
     const misma = previa?.version === String(version)
     const publicado = misma ? previa.publicado : new Date().toISOString()
@@ -1911,7 +1921,7 @@ export function faltaAvisar(f: Pick<Fila, 'estado' | 'pagado_hasta' | 'avisado_p
 }
 
 /** Manda un correo con Resend. `false` si no hay llave todavía: se anota y no se marca como enviado. */
-async function correo(env: Env, para: string, asunto: string, parrafos: string[]): Promise<boolean> {
+export async function correo(env: Env, para: string, asunto: string, parrafos: string[], idempotencia?: string): Promise<boolean> {
   if (!env.RESEND_API_KEY) {
     console.log('Correo sin mandar (falta RESEND_API_KEY):', asunto)
     return false
@@ -1919,7 +1929,7 @@ async function correo(env: Env, para: string, asunto: string, parrafos: string[]
   const pie = `${PROVEEDOR} · ${env.CORREO_RESPUESTA}`
   const html = `<div style="font:15px/1.6 system-ui,sans-serif;color:#1b1408;max-width:560px">${parrafos.map((p) => `<p>${escapar(p)}</p>`).join('')}<p style="color:#9a907f;font-size:12px">${escapar(pie)}</p></div>`
   const cuerpo = JSON.stringify({ from: env.CORREO_DE, to: [para], reply_to: env.CORREO_RESPUESTA, subject: asunto, text: [...parrafos, '', pie].join('\n\n'), html })
-  const llave = crypto.randomUUID()
+  const llave = idempotencia ?? crypto.randomUUID()
   // Con demasiados a la vez (429) o una falla suya (5xx), Resend pide volver a intentar: dos veces más, con pausa.
   for (let intento = 0; ; intento++) {
     const r = await fetch('https://api.resend.com/emails', {

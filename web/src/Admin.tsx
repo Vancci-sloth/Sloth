@@ -47,6 +47,8 @@ interface Panel {
   /** `VOZ_SOLO_CREADOR` en el cobro: nadie más la usa. */
   soloCreador: boolean
   creditosIniciales: number
+  mensuales?: number
+  repartos?: { externo: string; periodo: string; creditos: number; estado: string; entregado: string | null; correo: string | null; error: string | null }[]
   pagina: number
   consumo: number
   /** Cada llave de socio, con lo que respondió su cuenta. */
@@ -137,7 +139,7 @@ export function Admin() {
 
       {panel?.soloCreador && (
         <p className="admin-aviso">
-          Por ahora Voices Cloning es <strong>solo para ti</strong>: nadie más lo ve en su Sloth, aunque tenga créditos. Para abrirlo, quita <span className="mono">VOZ_SOLO_CREADOR</span> de <span className="mono">licencias/wrangler.jsonc</span> y despliega el cobro.
+          Por ahora las voces de Sloth son <strong>solo para ti</strong>. Los créditos mensuales se abren automáticamente cuando se termine de publicar la actualización que los incluye.
         </p>
       )}
 
@@ -169,6 +171,17 @@ export function Admin() {
             <Usuarios usuarios={usuarios} cuentas={panel.cuentas} onCambio={cargar} onVer={setDetalle} />
             <Paginas r={mayor('usuarios')} pagina={panel.pagina} cargando={cargando} onPagina={setPagina} />
           </Seccion>
+
+          {panel.repartos && (
+            <Seccion titulo="Créditos mensuales de Sloth" nota={`${num(panel.mensuales)} créditos al mes para cada correo con apoyo vigente o lugar de Fundador de por vida. Salen de tus llaves de socio; los que no se gasten se conservan.`}>
+              {panel.repartos.length ? <Tabla
+                cabeza={['Usuario', 'Mes', 'Créditos', 'Entrega', 'Correo', 'Detalle']}
+                filas={panel.repartos.map((r) => [quien(r.externo), r.periodo, num(r.creditos),
+                  <span className={r.estado === 'revisar' || r.estado === 'enviando' ? 'bad' : ''}>{r.estado === 'entregado' ? 'Entregados' : r.estado === 'revisar' || r.estado === 'enviando' ? 'Revisar en el proveedor antes de repetir' : 'Pendientes'}</span>,
+                  r.correo ? fecha(r.correo) : 'Por enviar', r.error ?? '—'])}
+              /> : <p className="muted small admin-vacio">El primer reparto empieza al publicar la actualización.</p>}
+            </Seccion>
+          )}
 
           {detalle && <Detalle externo={detalle} quien={quien(detalle)} onCerrar={() => setDetalle(undefined)} onCambio={cargar} />}
 

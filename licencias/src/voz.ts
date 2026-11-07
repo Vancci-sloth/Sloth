@@ -41,10 +41,13 @@
  * falló, por qué. El cron borra lo de más de `GUARDAR_DIAS`.
  *
  * Con `VOZ_SOLO_CREADOR` en `"1"`, nadie más que el creador la usa, aunque tenga créditos: a los demás `GET /voz` les
- * dice que no está, lo demás responde 403 y Administrador no da de alta a nadie.
+ * dice que no está, lo demás responde 403 y Administrador no da de alta a nadie, hasta publicar la actualización con
+ * `vozMensual` (marca `voz-mensual.json` en R2). Desde ahí `voz-mensual.ts` refresca a 100.000 (sin acumular) por correo y mes a apoyos
+ * pagados y vigentes (no a los lugares gratis de Fundador). El cron también los entrega y manda la clave personal de Sloth por correo.
  */
 import { BLOQUEADA, CLAVE, EQUIPO, type Env, Rechazo, cuerpo, delCreador, json, vigencia, vigilar } from './index.ts'
 import { DE_LA_APP } from './comunidad.ts'
+import { beneficiarioVoz, CREDITOS_MENSUALES, entregarVozMensual, repartirVozMensual, vocesPublicadas, type RepartidorVoz } from './voz-mensual.ts'
 
 const BASE = 'https://www.voicescloning.art'
 /** El usuario del creador en Voices Cloning. */
@@ -58,13 +61,14 @@ export const NOMBRE_LLAVE = /^VOICES_PK_LIVE(?:_(\d+))?$/
 const SIN_LLAVE = 'Las voces de Sloth aún no están listas.'
 const CERRADA = 'Las voces de Sloth aún no están abiertas.'
 const SIN_CUENTA = 'Ese usuario no está en ninguna cuenta de Voices Cloning.'
-const soloCreador = (env: Env) => env.VOZ_SOLO_CREADOR === '1'
+const soloCreador = async (env: Env) => env.VOZ_SOLO_CREADOR === '1' && !(await vocesPublicadas(env))
 const EXTERNO = /^[\w-]{1,100}$/
 const TAREA = /^[\w-]{1,100}$/
 
 interface Quien {
   externo: string
   creador: boolean
+  email?: string
 }
 
 /** Una llave de socio: el secreto donde está, su id (lo que se anota) y sus últimas cuatro letras, para reconocerla. */
@@ -103,10 +107,12 @@ export async function voz(req: Request, env: Env, ctx: ExecutionContext, url: UR
     if (!q.creador) throw new Rechazo(403, 'Esto solo lo ve el creador de Sloth.')
     return admin(req, env, ctx, url, llaves)
   }
-  if (!q.creador && soloCreador(env)) {
+  if (!q.creador && await soloCreador(env)) {
     if (req.method === 'GET' && ruta === '/voz') return json({ disponible: false, creador: false })
     throw new Rechazo(403, CERRADA)
   }
+  const beneficiario = q.email && llaves.length && await vocesPublicadas(env) ? await beneficiarioVoz(env, q.email) : null
+  if (beneficiario) await entregarVozMensual(env, beneficiario, repartidor(env, ctx, llaves))
   if (req.method === 'GET' && ruta === '/voz') {
     if (!llaves.length) return json({ disponible: false, creador: q.creador })
     const c = await cuentaDe(env, ctx, llaves, q.externo, false)
@@ -114,7 +120,7 @@ export async function voz(req: Request, env: Env, ctx: ExecutionContext, url: UR
     const r = await vc(c.llave, 'GET', `/api/partner/v1/users/${encodeURIComponent(q.externo)}`)
     if (r.status >= 400) return responder(r)
     const u = r.datos
-    return json({ disponible: true, creador: q.creador, alta: true, creditos: u.credits, usados: u.used_total, hoy: u.used_today, generaciones: u.generations, estado: u.status })
+    return json({ disponible: true, creador: q.creador, alta: true, creditos: u.credits, usados: u.used_total, hoy: u.used_today, generaciones: u.generations, estado: u.status, ...(beneficiario ? { mensuales: CREDITOS_MENSUALES } : {}) })
   }
   if (!llaves.length) throw new Rechazo(503, SIN_LLAVE)
   if (req.method === 'POST' && ruta === '/voz/sesion') {
@@ -209,6 +215,9 @@ async function cuentaDe(env: Env, ctx: ExecutionContext, llaves: Llave[], extern
     await anotarCuenta(env, externo, hallada)
     return { llave: hallada, creado: false }
   }
+  // Un fallo de conexión no demuestra que el usuario no exista: darlo de alta en otra cuenta duplicaría sus créditos.
+  const fallo = buscadas.find((r) => r.status !== 404)
+  if (fallo) throw new Rechazo(502, mensajeDe(fallo))
   if (crear === false) return undefined
   const llave = (await conMasSaldo(llaves)) ?? llaves[0]
   const r = await alta(env, ctx, llave, externo, crear)
@@ -278,7 +287,9 @@ async function admin(req: Request, env: Env, ctx: ExecutionContext, url: URL, ll
     ])
     return json({
       configurado: llaves.length > 0,
-      soloCreador: soloCreador(env),
+      soloCreador: await soloCreador(env),
+      mensuales: CREDITOS_MENSUALES,
+      repartos: (await env.DB.prepare('SELECT externo, periodo, creditos, estado, entregado, correo, error FROM voz_mensual ORDER BY periodo DESC, externo LIMIT 300').all()).results,
       creditosIniciales: creditosIniciales(env),
       pagina,
       consumo,
@@ -327,7 +338,7 @@ async function admin(req: Request, env: Env, ctx: ExecutionContext, url: URL, ll
     return responder(r)
   }
   if (ruta === '/voz/admin/alta') {
-    if (soloCreador(env)) throw new Rechazo(409, 'Voices Cloning aún es solo para ti (VOZ_SOLO_CREADOR en el cobro): quítalo para darlo a alguien más.')
+    if (await soloCreador(env)) throw new Rechazo(409, 'Las voces de Sloth se abrirán cuando se publique la actualización con los créditos mensuales.')
     const email = String(c.email ?? '').trim().toLowerCase()
     const creditos = Math.max(0, Math.floor(Number(c.creditos) || 0))
     const fila = await env.DB.prepare('SELECT id FROM licencias WHERE email = ? ORDER BY creada LIMIT 1').bind(email).first<{ id: string }>()
@@ -396,7 +407,7 @@ async function quien(req: Request, env: Env): Promise<Quien> {
   const fila =
     CLAVE.test(clave) && EQUIPO.test(equipo)
       ? await env.DB.prepare(
-          "SELECT l.estado, l.pagado_hasta, l.email, (SELECT v.id FROM licencias v WHERE v.email = l.email ORDER BY v.creada LIMIT 1) AS externo, EXISTS (SELECT 1 FROM licencias v WHERE v.email = l.email AND v.estado = 'vetada') AS vetada FROM licencias l JOIN equipos e ON e.clave = l.clave WHERE l.clave = ? AND e.equipo = ?"
+          "SELECT l.estado, l.pagado_hasta, l.email, (SELECT v.id FROM licencias v WHERE v.email = l.email ORDER BY v.creada, v.id LIMIT 1) AS externo, EXISTS (SELECT 1 FROM licencias v WHERE v.email = l.email AND v.estado = 'vetada') AS vetada FROM licencias l JOIN equipos e ON e.clave = l.clave WHERE l.clave = ? AND e.equipo = ?"
         )
           .bind(clave, equipo)
           .first<{ estado: string; pagado_hasta: string | null; email: string; externo: string; vetada: number }>()
@@ -407,7 +418,34 @@ async function quien(req: Request, env: Env): Promise<Quien> {
     await vigilar(env, fila.email, 'pidió voces de Voices Cloning sin la app de Sloth, con un identificador de computadora inventado')
     throw new Rechazo(403, 'Detectamos actividad sospechosa: esto no viene de la app de Sloth. Tu cuenta queda vigilada.')
   }
-  return { externo: fila.externo, creador: false }
+  return { externo: fila.externo, creador: false, email: fila.email }
+}
+
+/** Mismo lote de socio que los demás pedidos de voz; nunca una cuenta personal del proveedor. */
+function repartidor(env: Env, ctx: ExecutionContext, llaves: Llave[]): RepartidorVoz {
+  return {
+    async preparar(externo) {
+      return (await cuentaDe(env, ctx, llaves, externo, 0)).llave.id
+    },
+    async quedan(externo, id) {
+      const r = await vc(llaves.find((l) => l.id === id)!, 'GET', `/api/partner/v1/users/${encodeURIComponent(externo)}`)
+      if (r.status >= 400) throw new Error(mensajeDe(r))
+      return numero(r.datos.credits) ?? 0
+    },
+    async sumar(externo, id, creditos) {
+      const llave = llaves.find((l) => l.id === id)!
+      const t = Date.now()
+      const r = await vc(llave, 'POST', `/api/partner/v1/users/${encodeURIComponent(externo)}/credits`, { cuerpo: { amount: creditos } })
+      anotar(env, ctx, { externo, accion: 'creditos', llave, creditos, ms: Date.now() - t, r })
+      if (r.status >= 400) throw new Error(mensajeDe(r))
+    }
+  }
+}
+
+/** Cada diez minutos: créditos y correo de quienes apoyan, sin que necesiten abrir la app. */
+export async function renovarVoces(env: Env, ctx: ExecutionContext): Promise<void> {
+  const llaves = await llavesDe(env)
+  if (llaves.length) await repartirVozMensual(env, repartidor(env, ctx, llaves))
 }
 
 const nombreDe = (externo: string) => (externo === CREADOR_VOZ ? 'Vancci (creador de Sloth)' : 'Usuario de Sloth')
@@ -450,7 +488,8 @@ async function vc(llave: Llave, metodo: string, ruta: string, o: { usuario?: str
     r = await fetch(`${BASE}${ruta}`, {
       method: metodo,
       headers: { authorization: `Bearer ${llave.valor}`, 'content-type': 'application/json', ...(o.usuario ? { 'x-partner-user': o.usuario } : {}) },
-      body: o.cuerpo === undefined ? undefined : JSON.stringify(o.cuerpo)
+      body: o.cuerpo === undefined ? undefined : JSON.stringify(o.cuerpo),
+      signal: AbortSignal.timeout(ruta === '/api/v1/tts' ? 6 * 60_000 : 30_000)
     })
   } catch {
     return { status: 502, datos: { error: 'No hubo conexión con las voces de Sloth.', code: 'sin_conexion' } }

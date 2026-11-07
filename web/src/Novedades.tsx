@@ -9,11 +9,14 @@ import './Novedades.css'
  * una sola vez, a toda la pantalla, al abrir la app instalada (`window.sloth`) después de actualizar. Quien instala de
  * cero tiene la bienvenida y no la ve. La guía avisa que terminó con `postMessage`; también se cierra con la X, Escape o
  * un clic fuera. Lo que sale al abrir Sloth después (`EstiloCambio.tsx`) espera a `NOVEDADES_CERRADAS`.
+ * «Ver novedades» en Opciones la abre de nuevo, también en el navegador de desarrollo.
  * Para la guía de otra versión: su página en `web/public/novedades/` y su número aquí.
  */
 const VERSION = '0.4.0'
 const VISTA = 'sloth-novedades-vistas'
+const ABRIR = 'sloth-novedades-abrir'
 export const NOVEDADES_CERRADAS = 'sloth-novedades-cerradas'
+export const abrirNovedades = () => dispatchEvent(new Event(ABRIR))
 
 const vista = () => {
   try {
@@ -41,6 +44,12 @@ export function Novedades() {
     return true
   })
   const marco = useRef<HTMLIFrameElement>(null)
+
+  useEffect(() => {
+    const abrir = () => setAbierta(true)
+    addEventListener(ABRIR, abrir)
+    return () => removeEventListener(ABRIR, abrir)
+  }, [])
 
   useEffect(() => {
     if (!abierta) return

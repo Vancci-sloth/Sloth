@@ -11,9 +11,10 @@ import { Logo } from './Logos'
  * ElevenLabs (Opciones → Voz) y, en el compositor de un video, elegir entre mandar tu voz o que el agente la genere con
  * una de ellas. Lo elegido va en la línea `Voz:` del primer mensaje (`lineaVoz`, `shared/voz.ts`).
  *
- * Voices Cloning, el proveedor de Sloth, no lleva llave: sus voces se eligen en el menú «Voz» (`ElegirVoz.tsx`), y en
- * Opciones «Abrir sus funciones…» abre su ventana para lo demás (`embed.js`, un iframe
- * suyo encima de Sloth) con el pase que pide el servidor, y la voz que eliges o clonas ahí queda en el menú (`vc:<id>`).
+ * Las voces de Sloth (Voices Cloning, el proveedor socio) usan la clave personal de la cuenta de Sloth: sus voces se
+ * eligen en el menú «Voz» (`ElegirVoz.tsx`), y en Opciones «Abrir sus funciones…» abre su ventana para lo demás
+ * (`embed.js`, un iframe suyo encima de Sloth) con el pase que pide el servidor; la voz que eliges o clonas ahí queda
+ * en el menú (`vc:<id>`).
  */
 
 /** El script de su ventana. Solo se carga al abrirla. */
@@ -110,6 +111,10 @@ export function useVoz() {
     errorVc,
     quitarVc: (id: string) => aProveedor(api('/api/voz/vc/quitar', { id })),
     releerVc: () => aProveedor(api('/api/voz/vc', {})),
+    claveSloth: async (clave: string) => {
+      await api('/api/licencia/clave', { clave })
+      await aProveedor(api('/api/voz/vc', {}))
+    },
     conectar: () => void recibir(api('/api/voz/conectar', {})),
     // Devuelve la promesa, y falla si falla, para el aviso de Google Flow; el error queda también aquí.
     desconectar: () =>
@@ -295,42 +300,84 @@ function VoicesCloningOpciones({ voz }: { voz: UsoVoz }) {
   const vc = voz.estado?.vc
   const [ocupado, setOcupado] = useState('')
   const [error, setError] = useState('')
-  if (!vc?.disponible) return null
+  const [pegando, setPegando] = useState(false)
+  const [clave, setClave] = useState('')
   const hacer = (que: string, p: Promise<unknown>) => {
     setOcupado(que)
     setError('')
-    void p.catch((x: Error) => setError(x.message)).finally(() => setOcupado(''))
+    return p.then(() => true, (x: Error) => (setError(x.message), false)).finally(() => setOcupado(''))
   }
-  const datos = [creditosVc(voz.estado), typeof vc.usados === 'number' && `${vc.usados.toLocaleString('es-MX')} usados`, typeof vc.hoy === 'number' && vc.hoy > 0 && `${vc.hoy.toLocaleString('es-MX')} hoy`]
+  const disponibles = typeof vc?.creditos === 'number' ? Math.max(0, vc.creditos) : undefined
+  const usados = typeof vc?.usados === 'number' ? Math.max(0, vc.usados) : undefined
+  const total = disponibles !== undefined && usados !== undefined ? disponibles + usados : undefined
+  const consumo = total ? (usados! / total) * 100 : 0
   return (
-    <div className="item">
+    <div className="item" id="voces-de-sloth">
       <div className="fila">
         <Logo de="sloth" nombre="Sloth" />
         <div className="fila-nombre">
           <strong>Voces de Sloth</strong>
           <span>
-            {vc.estado === 'suspended' ? 'Tu usuario está suspendido. ' : ''}
-            {[...datos.filter(Boolean), `${vc.voces.length} ${vc.voces.length === 1 ? 'voz' : 'voces'} en el menú Voz`].join(' · ')}
+            {vc?.estado === 'suspended' ? 'Tu usuario está suspendido. ' : ''}
+            {vc?.disponible ? `${vc.voces.length} ${vc.voces.length === 1 ? 'voz' : 'voces'} en el menú Voz` : '100.000 créditos de voz al mes para quienes apoyan a Sloth.'}
           </span>
         </div>
-        <Picker
-          className="acciones"
-          label={<span className="estado">{ocupado || 'Sloth'}</span>}
-          value=""
-          disabled={!!ocupado}
-          groups={[
-            { label: 'Voces de Sloth', options: [{ value: 'abrir', label: 'Abrir sus funciones (diálogo, texto largo, transcribir)…' }, { value: 'releer', label: 'Volver a leer tus créditos' }] },
-            ...(vc.voces.length ? [{ label: 'Quitar del menú', options: vc.voces.map((v) => ({ value: `quitar:${v.id}`, label: v.nombre })) }] : [])
-          ]}
-          onChange={(q) => {
-            if (q === 'abrir') void voz.abrirVc('menu')
-            if (q === 'releer') hacer('Leyendo…', voz.releerVc())
-            if (q.startsWith('quitar:')) hacer('Quitando…', voz.quitarVc(q.slice(7)))
-          }}
-        />
+        {vc?.disponible ? (
+          <Picker
+            className="acciones"
+            label={<span className="estado">{ocupado || 'Sloth'}</span>}
+            value=""
+            disabled={!!ocupado}
+            groups={[
+              { label: 'Voces de Sloth', options: [{ value: 'abrir', label: 'Abrir sus funciones (diálogo, texto largo, transcribir)…' }, { value: 'releer', label: 'Volver a leer tus créditos' }, { value: 'clave', label: 'Cambiar clave de Sloth' }] },
+              ...(vc.voces.length ? [{ label: 'Quitar del menú', options: vc.voces.map((v) => ({ value: `quitar:${v.id}`, label: v.nombre })) }] : [])
+            ]}
+            onChange={(q) => {
+              if (q === 'abrir') void voz.abrirVc('menu')
+              if (q === 'releer') hacer('Leyendo…', voz.releerVc())
+              if (q === 'clave') setPegando(true)
+              if (q.startsWith('quitar:')) hacer('Quitando…', voz.quitarVc(q.slice(7)))
+            }}
+          />
+        ) : <button className="primary" disabled={!voz.estado || !!ocupado} onClick={() => setPegando(true)}>Añadir clave de Sloth</button>}
       </div>
-      <p className="muted small fila-extra">Las voces de Sloth: las eliges en el menú Voz, en su pestaña, o clonas la tuya grabándola ahí. Gasta los créditos de voz que te da Sloth, sin llave ni cuenta aparte.</p>
-      {(error || voz.errorVc || vc.error) && <p className="bad small fila-extra">{error || voz.errorVc || vc.error}</p>}
+      {disponibles !== undefined && (
+        <div className="fila-extra creditos-sloth">
+          <div className="limite-nombre">
+            <span>Créditos disponibles</span>
+            <strong>{disponibles.toLocaleString('es-MX')}</strong>
+          </div>
+          {total !== undefined && (
+            <>
+              <div className={`limite-barra${consumo >= 90 || total === 0 ? ' lleno' : consumo >= 70 ? ' alto' : ''}`} role="meter" aria-label="Créditos de Sloth usados" aria-valuenow={usados} aria-valuemin={0} aria-valuemax={total || 1} aria-valuetext={`${usados!.toLocaleString('es-MX')} usados; ${disponibles.toLocaleString('es-MX')} disponibles`}>
+                <span style={{ width: `${consumo}%` }} />
+              </div>
+              <div className="limite-nombre muted">
+                <span>{usados!.toLocaleString('es-MX')} créditos usados</span>
+                {total > 0 && <span>{Math.round(consumo)} % usado</span>}
+              </div>
+            </>
+          )}
+          {typeof vc?.hoy === 'number' && vc.hoy > 0 && <span className="muted">{vc.hoy.toLocaleString('es-MX')} usados hoy</span>}
+          {!!vc?.mensuales && <span className="muted">Se refrescan a {vc.mensuales.toLocaleString('es-MX')} cada mes · no se acumulan</span>}
+        </div>
+      )}
+      <p className="muted small fila-extra">Las eliges en el menú Voz, en su pestaña, o clonas la tuya grabándola ahí. Usa tu clave personal de Sloth, la que recibes por correo al apoyar. Si ya la pusiste en Apoyo, se conecta sola. Los créditos salen del saldo general del proveedor de Sloth.</p>
+      {pegando && (
+        <form className="fila-extra" onSubmit={(ev) => {
+          ev.preventDefault()
+          if (clave.trim()) void hacer('Conectando…', voz.claveSloth(clave)).then((ok) => ok && (setPegando(false), setClave('')))
+        }}>
+          <div className="opcion-fila">
+            <input type="password" autoFocus aria-label="Clave personal de Sloth" placeholder="SLOTH-…" value={clave} onChange={(ev) => setClave(ev.target.value)} autoComplete="off" />
+            <button className="primary" disabled={!!ocupado || !clave.trim()}>{ocupado || 'Conectar Sloth'}</button>
+            <button type="button" className="ghost" disabled={!!ocupado} onClick={() => (setPegando(false), setClave(''))}>Cancelar</button>
+          </div>
+          <p className="muted small">Es la misma clave de tu cuenta y apoyo en Sloth. Al conectarla, también se usará en Apoyo y Comunidad.</p>
+        </form>
+      )}
+      {!vc?.disponible && !pegando && <button className="ghost small fila-extra" disabled={!!ocupado} onClick={() => void hacer('Leyendo…', voz.releerVc())}>{ocupado || 'Volver a leer tus créditos'}</button>}
+      {(error || voz.errorVc || vc?.error) && <p className="bad small fila-extra">{error || voz.errorVc || vc?.error}</p>}
     </div>
   )
 }

@@ -5,6 +5,8 @@ import { Arranque } from './Arranque'
 import { type Proveedor, proveedorDe } from '../../shared/providers'
 import { encender, encendido, notificar, sonar, usePermiso } from './avisos'
 import { abrirBienvenida } from './Bienvenida'
+import { abrirNovedades } from './Novedades'
+import { abrirCreditosVoz } from './CreditosVoz'
 import { Picker } from './Composer'
 import { ESPACIO_DISCO, EspacioDisco } from './Espacio' // espacio en disco
 import { discoLleno } from './items'
@@ -61,6 +63,15 @@ function Ajustes({ onDone, iniciando, onIniciando }: { onDone(): void; iniciando
           <button className="ghost small" onClick={abrirBienvenida}>
             Ver la bienvenida
           </button>
+          <button className="ghost small" onClick={abrirNovedades}>
+            Ver novedades
+          </button>
+          {/* Solo en el repo: el aviso de los créditos sale solo a quien apoya, y así se revisa. */}
+          {!VENTA && (
+            <button className="ghost small" onClick={abrirCreditosVoz}>
+              Ver aviso de créditos
+            </button>
+          )}
           {iniciando && <BotonNavegador hilo={NAVEGADOR_REDES} trabajando={false} />}
         </div>
       </div>

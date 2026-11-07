@@ -63,7 +63,7 @@ async function subir(archivo) {
   } finally {
     closeSync(fd)
   }
-  return cobro(`fin?${q(`&upload=${encodeURIComponent(upload)}`)}`, 'POST', JSON.stringify({ partes, version: VERSION, paraTodos: process.env.PARA_TODOS === '1', firmada: process.platform === 'darwin' && process.env.FIRMADA === '1' }))
+  return cobro(`fin?${q(`&upload=${encodeURIComponent(upload)}`)}`, 'POST', JSON.stringify({ partes, version: VERSION, paraTodos: process.env.PARA_TODOS === '1', firmada: process.platform === 'darwin' && process.env.FIRMADA === '1', vozMensual: true }))
 }
 
 const u = await subir(instalador)
