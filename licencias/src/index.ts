@@ -166,6 +166,8 @@ export interface Fila {
   folio: string | null
   cancelada: string | null
   avisado_para: string | null
+  /** Cuándo aceptó Resend el correo con la clave. Vacía con el pago ya confirmado: el cron lo reintenta (`reenviarClaves`). */
+  clave_enviada?: string | null
   /** El `PAYPAL_MODO` (antes, el `MP_MODO`) con que se creó. */
   modo: string
   /** Un año pagado de una vez con Mercado Pago: el último pago de Checkout Pro que se abrió para ella. */
@@ -432,8 +434,9 @@ export default {
     return r
   },
 
-  /** Cada mañana: el aviso de los cobros que vienen. */
-  async scheduled(_evento: ScheduledController, env: Env, ctx: ExecutionContext) {
+  /** Cada 10 minutos, las claves que no salieron; cada mañana, el aviso de los cobros que vienen. */
+  async scheduled(evento: ScheduledController, env: Env, ctx: ExecutionContext) {
+    if (evento.cron === '*/10 * * * *') return ctx.waitUntil(reenviarClaves(env).catch((e) => console.error('Claves sin mandar', e instanceof Error ? e.message : e)))
     ctx.waitUntil(avisarCobros(env).catch((e) => console.error('Avisos de cobro', e instanceof Error ? e.message : e)))
     ctx.waitUntil(env.DB.prepare('DELETE FROM cupos WHERE creado < ?').bind(new Date(Date.now() - 2 * DIA).toISOString()).run())
     ctx.waitUntil(olvidarRegistroVoz(env).catch((e) => console.error('Registro de la voz', e instanceof Error ? e.message : e)))
@@ -1472,12 +1475,46 @@ async function guardarEstado(env: Env, fila: Fila, l: Lectura): Promise<Fila> {
     // Su enlace de Fundador ya se usó: es de una sola persona.
     if (r.meta.changes && fila.enlace_fundador)
       await env.DB.prepare('UPDATE enlaces_fundador SET usado = ? WHERE codigo = ? AND usado IS NULL').bind(fila.id, fila.enlace_fundador).run()
-    if (r.meta.changes) await bienvenida(env, nueva).catch((e) => console.error('Correo con la clave', e instanceof Error ? e.message : e))
+    // Si no sale, `clave_enviada` queda vacía y el cron lo reintenta.
+    if (r.meta.changes) await mandarClave(env, nueva)
   }
   await env.DB.prepare('UPDATE licencias SET estado = ?, pagado_hasta = ?, autorizada = COALESCE(autorizada, ?), revisada = ? WHERE id = ?')
     .bind(estado, nueva.pagado_hasta, nueva.autorizada, ahora, fila.id)
     .run()
   return nueva
+}
+
+/** Manda la clave y, si Resend la aceptó, lo anota en `clave_enviada`. `false` si no salió: no lanza. */
+async function mandarClave(env: Env, f: Fila): Promise<boolean> {
+  const enviada = await bienvenida(env, f).catch((e) => (console.error('Correo con la clave', f.email, e instanceof Error ? e.message : e), false))
+  if (enviada) await env.DB.prepare('UPDATE licencias SET clave_enviada = ? WHERE id = ?').bind(new Date().toISOString(), f.id).run()
+  return enviada
+}
+
+/** Hasta cuándo se reintenta mandar una clave que no salió, desde que se confirmó el pago. */
+const REINTENTAR_CLAVE = 3 * DIA
+const MINUTO = 60_000
+const HORA = 60 * MINUTO
+
+/**
+ * Cada 10 minutos: los apoyos ya confirmados cuya clave no salió (Resend falló o no respondió), otra vez, hasta
+ * `REINTENTAR_CLAVE`. Si sigue sin salir pasada una hora, se avisa a soporte una vez para mandarla a mano.
+ */
+export async function reenviarClaves(env: Env, ahora = Date.now()) {
+  // Las de los últimos 2 minutos no: su primer intento puede estar saliendo ahora mismo.
+  const { results } = await env.DB.prepare("SELECT * FROM licencias WHERE clave_enviada IS NULL AND autorizada > ? AND autorizada < ? AND plan != 'cuenta'")
+    .bind(new Date(ahora - REINTENTAR_CLAVE).toISOString(), new Date(ahora - 2 * MINUTO).toISOString())
+    .all<Fila>()
+  for (const f of results) {
+    if (await mandarClave(env, f)) continue
+    const hace = ahora - Date.parse(f.autorizada!)
+    // Una sola vez: en la vuelta del cron que cae entre la hora y la hora y 10 minutos.
+    if (hace >= HORA && hace < HORA + 10 * MINUTO)
+      await correo(env, env.CORREO_RESPUESTA, `No salió la clave de ${f.email}`, [
+        `Su pago se confirmó (${pasarela(f)}, ${f.monto} ${f.moneda}) y su correo con la clave lleva una hora sin salir. Se sigue intentando hasta 3 días.`,
+        `Su clave: ${f.clave}. Mándasela a mano si te escribe.`
+      ]).catch(() => false)
+  }
 }
 
 /** La clave y cómo empezar, al confirmarse el primer pago. */
@@ -1532,7 +1569,7 @@ async function aMano(req: Request, env: Env): Promise<Response> {
       .run()
     fila = (await env.DB.prepare('SELECT * FROM licencias WHERE id = ?').bind(nueva.id).first<Fila>())!
   }
-  const enviado = await bienvenida(env, fila)
+  const enviado = await mandarClave(env, fila)
   return json({ clave: fila.clave, hasta: fila.pagado_hasta, enviado })
 }
 
@@ -1806,14 +1843,24 @@ async function correo(env: Env, para: string, asunto: string, parrafos: string[]
   }
   const pie = `${PROVEEDOR} · ${env.CORREO_RESPUESTA}`
   const html = `<div style="font:15px/1.6 system-ui,sans-serif;color:#1b1408;max-width:560px">${parrafos.map((p) => `<p>${escapar(p)}</p>`).join('')}<p style="color:#9a907f;font-size:12px">${escapar(pie)}</p></div>`
-  const r = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    // Resend pide un User-Agent, y el fetch de un Worker no manda ninguno.
-    headers: { authorization: `Bearer ${env.RESEND_API_KEY}`, 'content-type': 'application/json', 'user-agent': 'sloth-licencias' },
-    body: JSON.stringify({ from: env.CORREO_DE, to: [para], reply_to: env.CORREO_RESPUESTA, subject: asunto, text: [...parrafos, '', pie].join('\n\n'), html })
-  })
-  if (!r.ok) throw new Error(`Resend respondió ${r.status}: ${(await r.text()).slice(0, 200)}`)
-  return true
+  const cuerpo = JSON.stringify({ from: env.CORREO_DE, to: [para], reply_to: env.CORREO_RESPUESTA, subject: asunto, text: [...parrafos, '', pie].join('\n\n'), html })
+  const llave = crypto.randomUUID()
+  // Con demasiados a la vez (429) o una falla suya (5xx), Resend pide volver a intentar: dos veces más, con pausa.
+  for (let intento = 0; ; intento++) {
+    const r = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      // Resend pide un User-Agent, y el fetch de un Worker no manda ninguno. La llave de idempotencia, la misma en cada
+      // intento de este correo, evita mandarlo dos veces si un intento sí llegó pero su respuesta no.
+      headers: { authorization: `Bearer ${env.RESEND_API_KEY}`, 'content-type': 'application/json', 'user-agent': 'sloth-licencias', 'idempotency-key': llave },
+      body: cuerpo
+    })
+    if (r.ok) return true
+    if (intento < 2 && (r.status === 429 || r.status >= 500)) {
+      await new Promise((listo) => setTimeout(listo, 1500 * (intento + 1)))
+      continue
+    }
+    throw new Error(`Resend respondió ${r.status}: ${(await r.text()).slice(0, 200)}`)
+  }
 }
 
 function escapar(texto: string): string {

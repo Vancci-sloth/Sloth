@@ -19,8 +19,9 @@
   "workers_dev": true,
   "routes": [{ "pattern": "api.sloth.vancci.org", "custom_domain": true }],
   "observability": { "enabled": true },
-  // Cada mañana (9:00 de la Ciudad de México): el aviso de los cobros que vienen.
-  "triggers": { "crons": ["0 15 * * *"] },
+  // Cada mañana (9:00 de la Ciudad de México): el aviso de los cobros que vienen. Cada 10 minutos: las claves que no
+  // salieron por correo al confirmarse el pago (`reenviarClaves`).
+  "triggers": { "crons": ["0 15 * * *", "*/10 * * * *"] },
   "d1_databases": [{ "binding": "DB", "database_name": "sloth-licencias", "database_id": "0de2b337-32cc-474e-bcb4-14cac3181a5e" }],
   "r2_buckets": [{ "binding": "DESCARGAS", "bucket_name": "sloth-descargas" }],
   "vars": {

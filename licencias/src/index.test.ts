@@ -3,7 +3,7 @@ import { createHmac } from 'node:crypto'
 import test from 'node:test'
 import { readFileSync } from 'node:fs'
 import { DatabaseSync } from 'node:sqlite'
-import { CUPO, VIGILAR, deTodos, esFundador, faltaAvisar, firmaDeMercadoPago, firmaDeNowpayments, hastaAMano, instaladorDe, leerPagos, leerPaypal, liberada, mensualRechazado, montoDe, rangoDe, sistema, sistemaDelYml, sobran, tarifa, vigencia } from './index.ts'
+import { CUPO, VIGILAR, deTodos, esFundador, faltaAvisar, firmaDeMercadoPago, firmaDeNowpayments, hastaAMano, instaladorDe, leerPagos, leerPaypal, liberada, mensualRechazado, montoDe, rangoDe, reenviarClaves, sistema, sistemaDelYml, sobran, tarifa, vigencia } from './index.ts'
 import { DE_LA_APP } from './comunidad.ts'
 
 test('un apoyo a mano suma sus meses desde lo ya pagado, o desde hoy si ya se acabó', () => {
@@ -285,4 +285,57 @@ test('el cobro de cada mes rechazado dice por qué, sin hablar del «+»', () =>
   assert.match(mensualRechazado('Invalid payer_email'), /no aceptó ese correo/)
   assert.match(mensualRechazado('Algo nuevo'), /no pudo abrir el cobro de cada mes/)
   for (const m of ['Payer is associated with a different site', 'Invalid payer_email', 'Algo nuevo']) assert.doesNotMatch(mensualRechazado(m), /\+/)
+})
+
+test('la clave que no salió se reintenta hasta que Resend la acepta, y a la hora se avisa a soporte una vez', async () => {
+  const db = new DatabaseSync(':memory:')
+  db.exec('CREATE TABLE licencias (id TEXT, clave TEXT, email TEXT, plan TEXT, monto REAL, moneda TEXT, estado TEXT, pagado_hasta TEXT, autorizada TEXT, preapproval TEXT, clave_enviada TEXT)')
+  const ahora = Date.parse('2026-11-06T05:05:00Z')
+  const hace = (min: number) => new Date(ahora - min * 60_000).toISOString()
+  const filas = [
+    ['sin-mandar', 'mensual', hace(30), null],
+    ['sin-mandar-hace-una-hora', 'mensual', hace(65), null],
+    ['recien-pagada', 'mensual', hace(1), null],
+    ['ya-mandada', 'mensual', hace(30), hace(30)],
+    ['de-hace-una-semana', 'mensual', hace(7 * 24 * 60), null],
+    ['cuenta-gratis', 'cuenta', hace(30), null]
+  ]
+  for (const [id, plan, autorizada, enviada] of filas)
+    db.prepare("INSERT INTO licencias VALUES (?, 'SLOTH-X', ?, ?, 20, 'MXN', 'authorized', '2026-12-06', ?, 'pre', ?)").run(id, `${id}@x.com`, plan, autorizada, enviada)
+  // D1 con la misma forma que usa el Worker: prepare(sql).bind(...).all/first/run.
+  const DB = {
+    prepare: (sql: string) => {
+      const consulta = (args: unknown[]) => ({
+        bind: (...mas: unknown[]) => consulta([...args, ...mas]),
+        all: async () => ({ results: db.prepare(sql).all(...(args as never[])) }),
+        first: async () => db.prepare(sql).get(...(args as never[])) ?? null,
+        run: async () => ({ meta: { changes: Number(db.prepare(sql).run(...(args as never[])).changes) } })
+      })
+      return consulta([])
+    }
+  }
+  const mandados: { to: string[]; subject: string }[] = []
+  const antes = globalThis.fetch
+  let resendCaido = true
+  globalThis.fetch = (async (_url: string, init: RequestInit) => {
+    const c = JSON.parse(String(init.body))
+    if (resendCaido && c.to[0] !== 'soporte@x.com') return new Response('{"message":"no"}', { status: 422 })
+    mandados.push(c)
+    return new Response('{"id":"1"}')
+  }) as typeof fetch
+  try {
+    const env = { DB, RESEND_API_KEY: 're_x', CORREO_DE: 'Sloth <a@x.com>', CORREO_RESPUESTA: 'soporte@x.com', ORIGEN: 'https://x' } as never
+    await reenviarClaves(env, ahora)
+    // Resend rechaza: solo sale el aviso a soporte, de la que ya lleva una hora.
+    assert.deepEqual(mandados.map((m) => m.subject), ['No salió la clave de sin-mandar-hace-una-hora@x.com'])
+    resendCaido = false
+    mandados.length = 0
+    await reenviarClaves(env, ahora + 10 * 60_000)
+    assert.deepEqual(mandados.map((m) => m.to[0]).sort(), ['recien-pagada@x.com', 'sin-mandar-hace-una-hora@x.com', 'sin-mandar@x.com'])
+    mandados.length = 0
+    await reenviarClaves(env, ahora + 20 * 60_000)
+    assert.deepEqual(mandados, [])
+  } finally {
+    globalThis.fetch = antes
+  }
 })
