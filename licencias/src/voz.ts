@@ -15,7 +15,7 @@
  * - Si su llave se quita del cobro, se busca o se da de alta otra vez.
  *
  * Aquí se sabe quién pide, como en la comunidad (`x-sloth-clave` y `x-sloth-equipo` de una cuenta o un apoyo activos,
- * o el creador con `PUBLICAR`), y se le pone su `X-Partner-User`, que nadie más puede elegir. Ese `external_id` es el
+ * o el creador con su llave, `ADMIN` o `PUBLICAR`), y se le pone su `X-Partner-User`, que nadie más puede elegir. Ese `external_id` es el
  * `id` de la primera licencia de su correo, así que su cuenta gratis y su apoyo son el mismo usuario y el correo no sale
  * de aquí; el del creador es `creador`.
  *
@@ -43,7 +43,7 @@
  * Con `VOZ_SOLO_CREADOR` en `"1"`, nadie más que el creador la usa, aunque tenga créditos: a los demás `GET /voz` les
  * dice que no está, lo demás responde 403 y Administrador no da de alta a nadie.
  */
-import { BLOQUEADA, CLAVE, EQUIPO, type Env, Rechazo, cuerpo, iguales, json, vigencia, vigilar } from './index.ts'
+import { BLOQUEADA, CLAVE, EQUIPO, type Env, Rechazo, cuerpo, delCreador, json, vigencia, vigilar } from './index.ts'
 import { DE_LA_APP } from './comunidad.ts'
 
 const BASE = 'https://www.voicescloning.art'
@@ -366,9 +366,9 @@ async function cuentasDe(env: Env, externos: string[]): Promise<Record<string, {
 
 // ── Lo de todos ─────────────────────────────────────────────────────────────────────────────────────────────────
 
-/** Quién pide: el creador, con la llave `PUBLICAR`, o una cuenta o un apoyo activos en una computadora que lo usa. */
+/** Quién pide: el creador, con su llave (`delCreador`), o una cuenta o un apoyo activos en una computadora que lo usa. */
 async function quien(req: Request, env: Env): Promise<Quien> {
-  if (env.PUBLICAR && iguales(req.headers.get('authorization') ?? '', `Bearer ${env.PUBLICAR}`)) return { externo: CREADOR_VOZ, creador: true }
+  if (delCreador(req, env)) return { externo: CREADOR_VOZ, creador: true }
   const clave = (req.headers.get('x-sloth-clave') ?? '').replace(/\s+/g, '').toUpperCase()
   const equipo = req.headers.get('x-sloth-equipo') ?? ''
   const fila =
