@@ -14,13 +14,16 @@ import { startOpenCode } from './opencode.ts'
 import { OTROS } from './proveedores.ts'
 import { guardar } from './disco.ts'
 import { resumenDelHilo } from './relevo.ts'
+import { cabenALaVez, vramNvidia } from './tope-agentes.ts'
 
 /**
  * Cuántos agentes trabajan a la vez mientras un lote espera: uno por cada 3 hilos de CPU (un render ya abre un Chrome por
- * cada 3) y por cada 4 GB de memoria. Y uno más no arranca con menos de 2 GB libres, que piden los renders; pero si no
- * trabaja ninguno, arranca igual: si no, un lote se quedaría esperando para siempre en una máquina con poca memoria.
+ * cada 3), por cada 4 GB de memoria y, con NVIDIA, por cada 4 GB de su memoria de video (`cabenALaVez`): con 8 GB de
+ * VRAM, 2, que el 3D de cada render y la voz se la reparten (antes salían 8 y se estorbaban). Y uno más no arranca con
+ * menos de 2 GB libres, que piden los renders; pero si no trabaja ninguno, arranca igual: si no, un lote se quedaría
+ * esperando para siempre en una máquina con poca memoria.
  */
-export const CABEN = Math.max(1, Math.min(Math.floor(cpus().length / 3), Math.floor(totalmem() / 4e9)))
+export const CABEN = cabenALaVez({ hilos: cpus().length, memoria: totalmem(), vram: vramNvidia() })
 const LIBRE = 2e9
 /** Cuánto espera el hilo, con el segundo plano recién vacío, antes de decir que ya no queda nada (`avisarFondo`). */
 const CALMA = 4000

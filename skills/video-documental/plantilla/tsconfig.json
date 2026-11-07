@@ -9,7 +9,9 @@
     "resolveJsonModule": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
-    "noEmit": true
+    "noEmit": true,
+    "incremental": true,
+    "tsBuildInfoFile": "out/tsc.tsbuildinfo"
   },
   "include": ["src"]
 }

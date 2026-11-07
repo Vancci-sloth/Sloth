@@ -231,8 +231,9 @@ objeto), y nada de etiquetas de cambio sueltas («−94 %»): el número ya lo d
    que su primera versión compila. Termina tu mensaje: te avisa al terminar (~3 min). Mientras, no esperes con
    `sleep` ni lo vigiles.
 4. **Si dice ✗**, arregla lo que dice y vuelve a correrlo de fondo, sin `--studio` si el guion no cambió (la voz se
-   guarda). Si dice ✓, mira `revision/hoja.png` (un cuadro cada 1.5 s) y `portada.png`: que cada momento enseñe lo que
-   se dice, que nada se tape ni se corte y que se entienda sin sonido. Otro render cuesta minuto y medio: solo si algo
+   guarda). Si dice ✓, que un subagente mire `revision/hoja.png` (un cuadro cada 1.5 s) y `portada.png` y te conteste en texto,
+   celda por celda y solo lo que falla (una imagen que abres tú se relee en cada llamada que sigue): que cada momento
+   enseñe lo que se dice, que nada se tape ni se corte y que se entienda sin sonido. Otro render cuesta minuto y medio: solo si algo
    se tapa, se corta o queda vacío, y todo en una vuelta (lo que solo podría verse un poco mejor, no). Un
    ✘ de movimiento o de parpadeo es del director: no lo busques, entrega y díselo al usuario.
 5. **Entrega**: la ruta de `out/<carpeta>.mp4`, el enfoque en una línea, cuánto dura y que el audio no lo oíste. Si

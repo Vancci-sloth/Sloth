@@ -1,4 +1,4 @@
-import { existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, realpathSync, renameSync, rmdirSync, statSync, symlinkSync, unlinkSync } from 'node:fs'
+import { copyFileSync, existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, realpathSync, renameSync, rmdirSync, statSync, symlinkSync, unlinkSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -11,7 +11,7 @@ import { cambiosDe, nombreCopia, respaldar, restaurar } from './originales.ts'
 
 /**
  * Donde los agentes buscan las skills. En la app que se vende, ~/.claude/skills, donde las enlaza `enlazarSkills`. Desde
- * el repo, las del repo: su Claude tiene su propia configuración (`configClaudeDev`) y no toca ~/.claude, que es de la
+ * el repo, las del repo: su Claude tiene su propia configuración (`configClaude`) y no toca ~/.claude, que es de la
  * Sloth instalada en esta computadora; así esa funciona igual que en la de cualquier cliente. `SLOTH_SKILLS`, si ya viene
  * puesta, manda (las pruebas imitan así la app que se vende).
  */
@@ -20,19 +20,69 @@ const CASA = join(homedir(), '.claude', 'skills')
 export const SKILLS = process.env.SLOTH_SKILLS || (VENTA ? CASA : resolve(dirname(fileURLToPath(import.meta.url)), '..', 'skills'))
 
 /**
- * La configuración de Claude de la copia del repo, en su `data/claude` (`CLAUDE_CONFIG_DIR`), con sus `skills` enlazadas
- * a las del repo. Su cuenta se conecta aparte, una vez, desde Sloth.
+ * ¿Claude trabaja con la configuración propia de Sloth (`configClaude`) o con la `~/.claude` del usuario? Desde el repo,
+ * siempre con la propia. En la app que se vende, por omisión con la del usuario, como siempre; `SLOTH_CLAUDE_PROPIO=1`
+ * la cambia a la propia, y es la que menos gasta: medido en un lote de 12 videos, el contexto de arranque pasó de 63 959 a
+ * 18 130 tokens, porque cada hilo dejó de cargar los plugins, hooks, CLAUDE.md global y MCP del Claude Code del usuario
+ * (unas 400 llamadas por video). Para que sea el modo de siempre, cambia el `=== '1'` por `!== '0'`.
  */
-export function configClaudeDev(app: string): string {
+export const CLAUDE_PROPIO = VENTA ? process.env.SLOTH_CLAUDE_PROPIO === '1' : true
+
+/**
+ * La configuración de Claude propia de Sloth (`CLAUDE_CONFIG_DIR`), en `<app>/data/claude`. Solo trae las skills,
+ * enlazadas: en el repo, a las del repo; en la que se vende, a ~/.claude/skills (`CASA`), donde `enlazarSkills` deja las
+ * suyas y `guardarSkillTuya` las de cada quien. Su cuenta se conecta aparte, una vez, desde Sloth.
+ *
+ * En la que se vende, la sesión no se pierde: la primera vez se copian de ~/.claude solo las credenciales y la cuenta
+ * (`heredarSesion`), nunca settings, plugins ni hooks; y `projects` apunta a ~/.claude/projects, para que los hilos de
+ * antes se puedan seguir (`resume`).
+ */
+export function configClaude(app: string, venta = VENTA, casa = join(homedir(), '.claude')): string {
   const dir = join(app, 'data', 'claude')
   mkdirSync(dir, { recursive: true })
-  const enlace = join(dir, 'skills')
-  try {
-    if (!existsSync(enlace)) symlinkSync(join(app, 'skills'), enlace, 'junction')
-  } catch (error) {
-    console.error(`No se pudieron enlazar las skills del repo en ${enlace}: ${error instanceof Error ? error.message : error}`)
+  enlazar(venta ? join(casa, 'skills') : join(app, 'skills'), join(dir, 'skills'))
+  if (venta) {
+    if (existsSync(join(casa, 'projects'))) enlazar(join(casa, 'projects'), join(dir, 'projects'))
+    heredarSesion(dir, casa)
   }
   return dir
+}
+
+/** Una unión de `destino` a `origen`, si `destino` no existe aún. */
+function enlazar(origen: string, destino: string) {
+  try {
+    if (existsSync(destino)) return
+    mkdirSync(origen, { recursive: true })
+    symlinkSync(origen, destino, 'junction')
+  } catch (error) {
+    console.error(`No se pudo enlazar ${origen} en ${destino}: ${error instanceof Error ? error.message : error}`)
+  }
+}
+
+/**
+ * Si la configuración de Sloth (`dir`) aún no tiene sesión, copia la del Claude Code del usuario (`casa`, ~/.claude): el
+ * archivo de credenciales (`.credentials.json`, en Windows y Linux; en Mac viven en el llavero y se conecta una vez desde
+ * Opciones) y, de `~/.claude.json` (al lado de `casa`), solo la cuenta (`oauthAccount`, `userID`) y que ya pasó la
+ * bienvenida. Nada de settings, plugins, hooks ni MCP. Una sola vez: si ya hay credenciales, no se tocan. Devuelve si
+ * copió algo.
+ */
+export function heredarSesion(dir: string, casa = join(homedir(), '.claude')): boolean {
+  const credenciales = join(dir, '.credentials.json')
+  if (existsSync(credenciales) || !existsSync(join(casa, '.credentials.json'))) return false
+  try {
+    copyFileSync(join(casa, '.credentials.json'), credenciales)
+    const estado = join(dir, '.claude.json')
+    const suyo = join(dirname(casa), '.claude.json')
+    if (!existsSync(estado) && existsSync(suyo)) {
+      const d = JSON.parse(readFileSync(suyo, 'utf8'))
+      const cuenta = Object.fromEntries(['oauthAccount', 'userID', 'hasCompletedOnboarding', 'lastOnboardingVersion'].filter((k) => k in d).map((k) => [k, d[k]]))
+      writeFileSync(estado, JSON.stringify(cuenta, null, 2))
+    }
+    return true
+  } catch (error) {
+    console.error(`No se pudo copiar la sesión de Claude a ${dir}: ${error instanceof Error ? error.message : error}`)
+    return false
+  }
 }
 
 /**

@@ -118,6 +118,18 @@ async function apagarServidores(run: Query, quitar: string[] | undefined) {
 }
 
 /**
+ * Compactar antes (apagado salvo que se pida): con `SLOTH_AUTOCOMPACTAR=<tokens>` (de 100000 a 1000000; p. ej. 200000)
+ * el hilo resume su conversación al llegar a esa cifra, en vez de cerca del límite del modelo. Un video llegaba a
+ * 450–565 mil tokens de contexto y los releía en cada una de unas 400 llamadas. El riesgo: el resumen pierde detalle
+ * (rutas, decisiones, lo que dijo el usuario) y el agente puede repetir trabajo o equivocarse; por eso no va encendido
+ * hasta medirlo en un lote de prueba. Va como ajuste de Claude Code (`autoCompactWindow`, `--settings`).
+ */
+export function compactarAntes(env: NodeJS.ProcessEnv = process.env): { autoCompactWindow: number } | undefined {
+  const n = Number(env.SLOTH_AUTOCOMPACTAR)
+  return env.SLOTH_AUTOCOMPACTAR && Number.isFinite(n) && n >= 100_000 && n <= 1_000_000 ? { autoCompactWindow: Math.round(n) } : undefined
+}
+
+/**
  * Claude con el Agent SDK, como lo usa T3 Code: el mismo Claude Code, con tus skills, tu CLAUDE.md y sin pedir
  * permisos. Los mensajes del usuario entran por una cola, así la sesión sigue viva entre turnos.
  */
@@ -141,6 +153,7 @@ export function startClaude(opts: AgentOptions): AgentRun {
       permissionMode: 'bypassPermissions',
       allowDangerouslySkipPermissions: true,
       settingSources: ['user', 'project', 'local'],
+      ...(compactarAntes() ? { settings: compactarAntes() } : {}),
       // Lo que su card nunca usó, fuera del contexto: un servidor entero (`mcp__openseo`) o una herramienta.
       disallowedTools: opts.sinHerramientas,
       systemPrompt: { type: 'preset', preset: 'claude_code', append: `${OPCIONES}\n\n${UN_VIDEO_POR_HILO}` },

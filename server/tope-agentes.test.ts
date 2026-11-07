@@ -5,7 +5,7 @@ import { join } from 'node:path'
 import test from 'node:test'
 // @ts-expect-error: un script de la skill, sin tipos
 import { turnoNavegador } from '../skills/video-base/scripts/chrome.mjs'
-import { crearTope, sitiosDeAgente } from './tope-agentes.ts'
+import { cabenALaVez, crearTope, sitiosDeAgente, topeAgentes } from './tope-agentes.ts'
 
 const pronto = () => new Promise((r) => setTimeout(r, 5))
 
@@ -107,4 +107,18 @@ test('tras la paciencia abre igual: un navegador de más es mejor que un agente 
   const opciones = { carpeta, tope: 1, memoria: () => 8e9, pausa: 2, paciencia: 20 }
   await turnoNavegador(opciones)
   assert.equal(typeof (await turnoNavegador(opciones)), 'function')
+})
+
+test('los videos a la vez: con 8 GB de VRAM, 2, aunque sobren hilos y memoria; sin NVIDIA, como antes', () => {
+  assert.equal(cabenALaVez({ hilos: 24, memoria: 32e9, vram: 8 }), 2)
+  assert.equal(cabenALaVez({ hilos: 24, memoria: 32e9, vram: 24 }), 6)
+  assert.equal(cabenALaVez({ hilos: 24, memoria: 32e9 }), 8)
+  assert.equal(cabenALaVez({ hilos: 4, memoria: 8e9, vram: 2 }), 1)
+})
+
+test('los subagentes a la vez: uno por cada 2 GB, entre 3 y 6', () => {
+  assert.equal(topeAgentes(32e9), 6)
+  assert.equal(topeAgentes(64e9), 6)
+  assert.equal(topeAgentes(8e9), 4)
+  assert.equal(topeAgentes(4e9), 3)
 })

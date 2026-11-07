@@ -35,6 +35,8 @@ for (const par of pares) {
     overwrite: true,
     chromiumOptions,
   });
-  console.log(carpeta);
+  // Sin la ruta de la imagen: quien la tiene que ver es el agente que hace el modelo, y lo sabe (modelos-3d, «Guardar»).
+  // Con la ruta impresa, el hilo principal la abría en cada vuelta y se quedaba en su contexto.
+  console.log(`${id}: vista lista`);
 }
 soltar();

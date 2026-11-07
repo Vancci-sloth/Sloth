@@ -1,12 +1,42 @@
+import { execFileSync } from 'node:child_process'
 import { freemem, totalmem } from 'node:os'
 
 /**
- * Cuántos subagentes de Claude trabajan a la vez en toda la máquina, sumando los hilos (ADR 0011): uno por cada 2 GB, y uno
- * más no empieza con menos de `LIBRE` libres, salvo que no haya ninguno: si no, se esperaría para siempre. Sin esto, cada
- * hilo lanzaba los suyos en un mismo mensaje: 36 a la vez en 16 GB. No le dicen al agente que espere: su herramienta tarda
+ * Cuántos subagentes de Claude trabajan a la vez en toda la máquina, sumando los hilos (ADR 0011): uno por cada 2 GB,
+ * hasta 6 (`MAS_AGENTES`), y uno más no empieza con menos de `LIBRE` libres, salvo que no haya ninguno: si no, se
+ * esperaría para siempre. Sin esto, cada hilo lanzaba los suyos en un mismo mensaje: 36 a la vez en 16 GB. Sin el techo
+ * eran 16 en 32 GB, y cada uno relee su contexto y abre su Chrome o su render de vistas: 6 dan el mismo avance con
+ * menos tokens y sin pelearse la tarjeta de video. No le dicen al agente que espere: su herramienta tarda
  * más en arrancar (`startClaude`). Codex ya trae su tope y OpenCode no tiene por dónde frenarlo.
  */
-export const TOPE_AGENTES = Math.max(3, Math.floor(totalmem() / 2e9))
+export const MAS_AGENTES = 6
+export const TOPE_AGENTES = topeAgentes(totalmem())
+export function topeAgentes(memoria: number) {
+  return Math.max(3, Math.min(MAS_AGENTES, Math.floor(memoria / 2e9)))
+}
+
+/** GB de memoria de video que pide cada video que trabaja a la vez: el 3D de su render (ANGLE) y, a ratos, la voz. */
+const VRAM_POR_VIDEO = 4
+
+/**
+ * Cuántos videos de un lote van a la vez (`CABEN` de sessions.ts): uno por cada 3 hilos de CPU, por cada 4 GB de
+ * memoria y, si se sabe la memoria de la NVIDIA (`vram`, en GB), por cada `VRAM_POR_VIDEO` de ella. Al menos uno.
+ */
+export function cabenALaVez({ hilos, memoria, vram }: { hilos: number; memoria: number; vram?: number }) {
+  const porVram = vram && vram > 0 ? Math.floor(vram / VRAM_POR_VIDEO) : Infinity
+  return Math.max(1, Math.min(Math.floor(hilos / 3), Math.floor(memoria / 4e9), porVram))
+}
+
+/** La memoria de la NVIDIA, en GB (la mayor si hay varias), o undefined sin `nvidia-smi`. Se pregunta una vez, al arrancar. */
+export function vramNvidia(): number | undefined {
+  try {
+    const salida = execFileSync('nvidia-smi', ['--query-gpu=memory.total', '--format=csv,noheader,nounits'], { encoding: 'utf8', timeout: 5000, windowsHide: true, stdio: ['ignore', 'pipe', 'ignore'] })
+    const mib = Math.max(...salida.split(/\r?\n/).map(Number).filter((n) => n > 0))
+    return Number.isFinite(mib) ? Math.round(mib / 1024) : undefined
+  } catch {
+    return undefined
+  }
+}
 const LIBRE = 1.5e9
 /** Cada cuánto se vuelve a mirar la memoria con alguien esperando: se libera sin que nada lo avise. */
 const MIRAR = 5000

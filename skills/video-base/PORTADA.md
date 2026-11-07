@@ -35,7 +35,7 @@ al usuario una vez, en llano, que con su cuenta de ChatGPT conectada (Opciones �
     node <base>/scripts/portada_sin_ia.mjs out/<video>.mp4 portada.png --titulo "<EL TÍTULO>" --t <s> [--fuente <la letra del estilo>] [--color <el de su título>]
 
 `--t`, el segundo de su mejor momento: el protagonista grande y a la vista, sin texto del vídeo encima del centro.
-Mírala (paso 4) y sigue en el paso 5. **Con ella:**
+Que la mire un subagente (paso 4) y sigue en el paso 5. **Con ella:**
 
 1. Tres cuadros del vídeo terminado de referencia, de su mejor momento:
    `ffmpeg -nostdin -v error -ss <s> -i out/<video>.mp4 -frames:v 1 -vf scale=540:-2 portada/ref-1.jpg` (y 2 y 3).
@@ -53,7 +53,8 @@ Mírala (paso 4) y sigue en el paso 5. **Con ella:**
    (tarda 30–85 s; varias se piden a la vez). Si no copió el archivo, no la pidas otra vez: en Windows el sandbox de
    Codex suele fallar al copiar («setup refresh had errors»), pero la imagen ya está en
    `~/.codex/generated_images/<id>/` (la más nueva): cópiala de ahí (25 de octubre). Muévela a `portada.png`.
-4. **Mírala** entera y en chico (`-vf scale=120:-2`): que el título diga exactamente lo pedido, con sus acentos, que
+4. **Que la mire un subagente**, entera y en chico (`-vf scale=120:-2`), y te conteste en texto (abierta en tu hilo, se
+   relee en cada llamada que sigue): que el título diga exactamente lo pedido, con sus acentos, que
    se lea en chico y que nada importante quede en los bordes. Si falla, pídela otra vez diciendo qué corregir: lo que
    más falla es el título o el protagonista demasiado grandes (se salen por arriba o bajan a la zona del texto).
    Con Flow, pedirla otra vez corrige el título y los lados, pero el piso se queda donde lo trae la referencia (1 de
@@ -85,4 +86,4 @@ estilo no la pega. Sloth la ofrece al programar el vídeo en YouTube. Se hace co
   ```
 
   Y se recorta a 16:9: `ffmpeg -nostdin -v error -i <la generada>.png -vf "scale=1280:-2,crop=1280:720" portada.png`.
-- **Mírala** entera y en chico (`-vf scale=240:-2`), como en el paso 4.
+- **Que la mire un subagente** entera y en chico (`-vf scale=240:-2`), como en el paso 4.

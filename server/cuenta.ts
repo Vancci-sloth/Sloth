@@ -9,7 +9,8 @@ import { Inbox } from './agent.ts'
 import { asegurarAgente, descartarRoto, programaClaude, rutaAgente } from './agentes.ts'
 
 /**
- * La cuenta de Claude con la que trabaja Sloth. Es la del Claude Code que trae el SDK, que la guarda en `~/.claude`: si ya
+ * La cuenta de Claude con la que trabaja Sloth. Es la del Claude Code que trae el SDK, que la guarda en `~/.claude` (o, con la configuración propia de Sloth, `CLAUDE_CONFIG_DIR`,
+ * adonde se copia una vez la sesión de ahí): si ya
  * usas Claude Code en esta computadora, ya está conectada. Si no, «Conectar con Claude» abre `claude auth login` en su
  * propia ventana, que abre el navegador para autorizarla, como `/login` en la terminal. Si el navegador no se abre, esa
  * ventana da el enlace y pide ahí el código. Sloth no toca ni el código ni la sesión: Anthropic pide que el inicio de

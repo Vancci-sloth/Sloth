@@ -22,8 +22,10 @@ python -B -X utf8 <esta skill>/scripts/modelos.py guardar caja-fuerte --nombre "
 
 Al diseñar el mundo del video, por cada objeto que vayas a necesitar, `buscar` con varias palabras: la cosa, sus
 sinónimos y lo que representa («caja regalo premio airdrop»). Sin palabras, lista todo. De cada uno dice qué exporta,
-qué es y dónde está su vista: **mírala** (Read) antes de decidir. Si sirve, se usa; si casi sirve, se mejora (3); solo
-si nada se le parece, se hace uno nuevo (4).
+qué es, qué hace y sus etiquetas: **decide por su ficha**. Si dudas entre varios, `buscar --rutas` da la ruta de cada
+vista y un subagente las mira y te contesta en texto: una imagen que abres tú se queda en tu contexto y se relee en cada
+llamada que sigue (en un video, una vista se leyó 224 veces). Si sirve, se usa; si casi sirve, se mejora (3); solo si
+nada se le parece, se hace uno nuevo (4).
 
 ## 2. Usar
 
@@ -105,8 +107,9 @@ Su ficha es lo que el usuario lee en Sloth para decidir si le sirve, así que ca
 
 Revisa que solo importe lo permitido, lo copia aquí con sus archivos, escribe su `modelo.json` (además: lo que
 exporta, qué modelos usa, sus íconos, de qué video salió) y saca su vista con la tarjeta de video (necesita el
-`node_modules` del proyecto). **Mira la vista**: si no se entiende qué es, cambia la `Muestra` o el `--cuadro` y
-vuelve a guardar. Al mejorar uno, solo se pasa lo que cambió; `--hace` y `--etiquetas` se pasan enteros, con lo nuevo.
+`node_modules` del proyecto). **Mira la vista** (`modelos/<id>/vista.webp` de esta skill; la salida ya no da su
+ruta): si no se entiende qué es, cambia la `Muestra` o el `--cuadro` y vuelve a guardar. Esto lo hace quien escribe
+el modelo, que en un video es un subagente; el hilo del video no abre la vista. Al mejorar uno, solo se pasa lo que cambió; `--hace` y `--etiquetas` se pasan enteros, con lo nuevo.
 
 La biblioteca es de cada quien y empieza vacía: la moneda y el ícono 3D que trae la plantilla del explicativo están
 en `plantilla/`, que `usar` encuentra y `buscar` no enseña (si mejoras uno y lo guardas, pasa a la biblioteca). Lo

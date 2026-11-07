@@ -1,7 +1,7 @@
 """
 La biblioteca de modelos 3D: buscar uno antes de hacerlo, traerlo al proyecto y guardar los nuevos.
 
-    python -B -X utf8 modelos.py buscar [palabra…]        qué hay que sirva (sin palabras, todo)
+    python -B -X utf8 modelos.py buscar [palabra…]        qué hay que sirva (sin palabras, todo) [--rutas]
     python -B -X utf8 modelos.py lista                     una línea por modelo: id, qué es y sus props
     python -B -X utf8 modelos.py usar <id> [<id>…]         lo copia al proyecto, con lo que necesita [--pisa]
     python -B -X utf8 modelos.py iconos <nombre> […]       íconos de Phosphor a public/iconos (para Icono3D)
@@ -73,7 +73,10 @@ def raiz(palabra: str) -> str:
     return p if len(p) <= 5 else p[: max(5, len(p) - 2)]
 
 
-def buscar(palabras: list[str]) -> None:
+def buscar(palabras: list[str], rutas: bool = False) -> None:
+    """Las fichas que sirven. Sin `rutas`, no da la de cada vista: el hilo elige por la ficha, y si duda le pasa las
+    rutas (`--rutas`) a un subagente que las mire. Una imagen leída en el hilo se relee en cada llamada que sigue (en un
+    video, una vista se leyó 224 veces y el contexto llegó a medio millón de tokens)."""
     raices = [raiz(p) for p in palabras]
     filas = []
     for id_ in todos():
@@ -94,7 +97,8 @@ def buscar(palabras: list[str]) -> None:
             print(f"  hace: {'; '.join(m['hace'])}")
         print(f"  etiquetas: {', '.join(m['etiquetas'])}")
         vista = MODELOS / id_ / "vista.webp"
-        print(f"  vista: {vista if vista.exists() else '(sin vista)'}  · de {m.get('origen', '?')}")
+        hay = (vista if rutas else "sí") if vista.exists() else "(sin vista)"
+        print(f"  vista: {hay}  · de {m.get('origen', '?')}")
     print(f"\n{len(filas)} de {len(todos())}. Para traerlo: python -B -X utf8 {Path(__file__).name} usar <id>")
 
 
@@ -307,7 +311,9 @@ def guardar(id_: str, dados: dict[str, str | None], cuadro: int | None, sin_vist
 def main() -> None:
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = p.add_subparsers(dest="orden", required=True)
-    sub.add_parser("buscar").add_argument("palabras", nargs="*")
+    b = sub.add_parser("buscar")
+    b.add_argument("palabras", nargs="*")
+    b.add_argument("--rutas", action="store_true", help="la ruta de cada vista, para pasársela a un subagente que la mire")
     sub.add_parser("lista")
     u = sub.add_parser("usar")
     u.add_argument("ids", nargs="+")
@@ -325,7 +331,7 @@ def main() -> None:
     sub.add_parser("vista").add_argument("ids", nargs="+")
     a = p.parse_args()
     if a.orden == "buscar":
-        buscar(a.palabras)
+        buscar(a.palabras, a.rutas)
     elif a.orden == "lista":
         lista()
     elif a.orden == "usar":

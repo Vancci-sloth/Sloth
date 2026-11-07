@@ -12,7 +12,39 @@ process.env.USERPROFILE = casa
 const originales = mkdtempSync(join(tmpdir(), 'sloth-originales-'))
 mkdirSync(join(originales, 'video-base'))
 process.env.SLOTH_SKILLS_ORIGINALES = originales
-const { enlazarSkills, enlazarSkillsCodex, guardarSkillTuya } = await import('./skills.ts')
+const { configClaude, enlazarSkills, enlazarSkillsCodex, guardarSkillTuya, heredarSesion } = await import('./skills.ts')
+
+test('la configuración propia de Claude: en la que se vende, sus skills y la sesión de ~/.claude, sin settings, plugins ni hooks', (t) => {
+  const raiz = mkdtempSync(join(tmpdir(), 'sloth-config-'))
+  t.after(() => rmSync(raiz, { recursive: true, force: true }))
+  const usuario = join(raiz, 'usuario')
+  const suya = join(usuario, '.claude')
+  for (const d of ['skills/video-el-diff', 'projects/hilo-viejo', 'plugins/otro']) mkdirSync(join(suya, d), { recursive: true })
+  writeFileSync(join(suya, '.credentials.json'), '{"claudeAiOauth":{"accessToken":"a"}}')
+  writeFileSync(join(suya, 'settings.json'), '{"hooks":{"PreToolUse":[]},"enabledPlugins":{"otro":true}}')
+  writeFileSync(join(suya, 'CLAUDE.md'), 'reglas globales')
+  writeFileSync(join(usuario, '.claude.json'), JSON.stringify({ oauthAccount: { emailAddress: 'a@b.c' }, userID: 'u', hasCompletedOnboarding: true, mcpServers: { x: {} }, projects: {} }))
+  const app = join(raiz, 'app')
+  mkdirSync(join(app, 'skills'), { recursive: true })
+
+  const dir = configClaude(app, true, suya)
+  assert.equal(dir, join(app, 'data', 'claude'))
+  assert.deepEqual(readdirSync(dir).sort(), ['.claude.json', '.credentials.json', 'projects', 'skills'])
+  assert.equal(realpathSync(join(dir, 'skills')), realpathSync(join(suya, 'skills')))
+  assert.ok(existsSync(join(dir, 'projects', 'hilo-viejo')), 'los hilos de antes se pueden seguir')
+  assert.deepEqual(JSON.parse(readFileSync(join(dir, '.claude.json'), 'utf8')), { oauthAccount: { emailAddress: 'a@b.c' }, userID: 'u', hasCompletedOnboarding: true })
+  // Una vez: si ya hay sesión (otra cuenta, o el token ya se renovó aquí), no se pisa.
+  writeFileSync(join(dir, '.credentials.json'), '{"propia":true}')
+  assert.equal(heredarSesion(dir, suya), false)
+  assert.equal(readFileSync(join(dir, '.credentials.json'), 'utf8'), '{"propia":true}')
+
+  // En el repo, las skills son las del repo y no se copia ninguna sesión.
+  const repo = join(raiz, 'repo')
+  mkdirSync(join(repo, 'skills'), { recursive: true })
+  const dev = configClaude(repo, false, suya)
+  assert.deepEqual(readdirSync(dev), ['skills'])
+  assert.equal(realpathSync(join(dev, 'skills')), realpathSync(join(repo, 'skills')))
+})
 
 test('Codex lee las mismas skills que Claude, y una copia vieja sale de sus carpetas', (t) => {
   t.after(() => rmSync(casa, { recursive: true, force: true }))

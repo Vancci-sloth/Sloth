@@ -48,7 +48,7 @@ import { avisoDeVideos } from '../shared/limites.ts'
 import { eventosEnVivo } from './eventos-en-vivo.ts'
 import { enviarCliente } from './enviar-cliente.ts'
 import { anteriorDe, conservarAnterior, olvidarAnterior } from './anteriores.ts'
-import { cambiosDeCard, carpetaSkill, configClaudeDev, duplicateCard, enlazarSkills, enlazarSkillsCodex, guardarSkillTuya, readCards, removeCard, seriesDe, SKILLS, skillRef, volverAOriginal } from './skills.ts'
+import { cambiosDeCard, carpetaSkill, CLAUDE_PROPIO, configClaude, duplicateCard, enlazarSkills, enlazarSkillsCodex, guardarSkillTuya, readCards, removeCard, seriesDe, SKILLS, skillRef, volverAOriginal } from './skills.ts'
 import { estaticos } from './estaticos.ts'
 import { type Agente, version } from './version.ts'
 import { cargarPreciosCodex } from './precios.ts'
@@ -76,11 +76,12 @@ if (VENTA) {
   // mismas carpetas, no de copias suyas.
   enlazarSkills(APP)
   enlazarSkillsCodex(APP)
-} else {
-  // Desde el repo, Claude usa su propia configuración con las skills del repo (`SKILLS`), y ~/.claude queda para la
-  // Sloth instalada en esta computadora. A Codex se le pasa siempre la ruta de la skill.
-  process.env.CLAUDE_CONFIG_DIR ??= configClaudeDev(APP)
 }
+// Desde el repo, Claude usa siempre su propia configuración con las skills del repo (`SKILLS`), y ~/.claude queda para la
+// Sloth instalada en esta computadora. La instalada la usa solo con `SLOTH_CLAUDE_PROPIO=1` (`CLAUDE_PROPIO`): solo las
+// skills y la sesión, sin los plugins, hooks, CLAUDE.md ni MCP del Claude Code del usuario. Un `CLAUDE_CONFIG_DIR` ya
+// puesto manda. A Codex se le pasa siempre la ruta de la skill.
+if (CLAUDE_PROPIO) process.env.CLAUDE_CONFIG_DIR ??= configClaude(APP)
 // Y su clave: la cuenta gratis de la comunidad o el apoyo, que quita el recordatorio. Sloth abre sin ella.
 const suscripcion = VENTA ? licencia(APP) : undefined // suscripción
 

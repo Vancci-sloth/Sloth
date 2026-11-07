@@ -37,7 +37,7 @@ Este es el mapa:
   Elegir un modelo de otro agente en un hilo (`setModel`) lo pasa a ese agente con el mismo resumen, la skill y la ruta
   del historial, como el traspaso de T3 Code (`vieneDe`); el aviso de un límite de uso lo ofrece con «Seguir con…»; el de Claude dice además cuánto queda y deja entrar con otra cuenta (`LimiteClaude.tsx`).
 - Lo que aguanta la máquina (ADR 0011): el aviso antes de pasar de dos videos a la vez (`shared/limites.ts`,
-  `web/src/AvisoVideos.tsx`), el tope de subagentes de Claude (`server/tope-agentes.ts`), el de navegadores (`turnoNavegador` en `video-base/scripts/chrome.mjs`),
+  `web/src/AvisoVideos.tsx`), el tope de subagentes de Claude (`server/tope-agentes.ts`, hasta 6) y cuántos videos de un lote van a la vez (`cabenALaVez`: con 8 GB de VRAM, 2), el de navegadores (`turnoNavegador` en `video-base/scripts/chrome.mjs`),
   Whisper cargado mientras trabaja un video (`server/voz-viva.ts`) y la fila de la GPU, con la voz primero (`sloth.py`).
 - `cards.json`: las cards. `skill` es la carpeta en `SKILLS` (`server/skills.ts`): en la app que se vende,
   `~/.claude/skills`, enlazada también en `~/.codex/skills` y `~/.agents/skills` (`enlazarSkillsCodex`), para que Claude y
