@@ -96,6 +96,7 @@ Este es el mapa:
   pestañas (el agente solo usa la primera), tamaños fijos (`navegador-medidas.ts`) y bordes que se arrastran. T3 usa
   `<webview>` y Sloth una vista nativa: el tamaño fijo es `enableDeviceEmulation`, y por eso el relevo reescala los clics.
   Google no deja iniciar sesión dentro de la app: ese paso se da en Edge (Chrome en Mac) y la sesión pasa a sus páginas (`electron/google.ts`).
+  Qué sitios abre cada perfil, qué descargas se cancelan y cuándo el agente espera tu Permitir/Bloquear: `docs/agents/navegador-seguridad.md`.
 - `server/ideas/` y `web/src/Ideas.tsx`: Ideas, qué video hacer: largo en YouTube o vertical en TikTok e Instagram
   (`formato: 'vertical'`), en `trabajo/ideas/<id>/`. Investigar mide cada video contra su canal (outlier: 3× o más),
   transcribe lo dicho (`transcribir.ts`) y agrupa temas con vectores locales (`vectores.ts`); en vertical busca con

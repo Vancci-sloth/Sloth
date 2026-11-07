@@ -87,3 +87,27 @@ test('las cookies del navegador van a las del perfil de la página: así funcion
   assert.deepEqual(enviados, [{ metodo: 'Network.getAllCookies', sesion: undefined }, { metodo: 'Network.setCookies', sesion: undefined }, { metodo: 'Network.clearBrowserCookies', sesion: undefined }])
   assert.deepEqual(salida[0], { id: 1, result: { ok: 'Network.getAllCookies' } })
 })
+
+test('la entrada del agente pasa por la revisión: si la bloquean, la página no la recibe y el agente ve el motivo', async () => {
+  const enviados: string[] = []
+  const salida: Record<string, unknown>[] = []
+  const relevo = crearRelevo(
+    {
+      enviar: async (metodo) => (enviados.push(metodo), {}),
+      id: async () => 'PAGINA',
+      url: () => 'https://example.com/',
+      titulo: () => '',
+      agente: () => '',
+      descargas: () => {},
+      revisar: async (metodo) => (metodo === 'Input.dispatchMouseEvent' ? 'bloqueado por la persona' : null)
+    },
+    (t) => salida.push(JSON.parse(t))
+  )
+  relevo.recibir(JSON.stringify({ id: 1, method: 'Target.setAutoAttach' }))
+  relevo.recibir(JSON.stringify({ id: 2, method: 'Input.dispatchMouseEvent', params: { type: 'mousePressed' }, sessionId: 'sloth-pagina' }))
+  relevo.recibir(JSON.stringify({ id: 3, method: 'Input.dispatchKeyEvent', params: { type: 'keyDown', key: 'a' }, sessionId: 'sloth-pagina' }))
+  await new Promise((r) => setTimeout(r, 5))
+  assert.deepEqual(enviados, ['Input.dispatchKeyEvent'])
+  const error = salida.find((s) => s.id === 2) as { error: { message: string } }
+  assert.equal(error.error.message, 'bloqueado por la persona')
+})

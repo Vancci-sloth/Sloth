@@ -38,16 +38,16 @@ class Vista {
 }
 const ipcMain = Object.assign(new EventEmitter(), { handle() {} })
 const perfil = Object.assign(new EventEmitter(), {
-  getUserAgent: () => 'Prueba', setUserAgent() {}, setPermissionRequestHandler() {}, setPermissionCheckHandler() {}
+  getUserAgent: () => 'Prueba', setUserAgent() {}, setPermissionRequestHandler() {}, setPermissionCheckHandler() {}, webRequest: { onBeforeRequest() {} }
 })
 const servidores: Server[] = []
 ;(globalThis as any).__slothNavegadorPrueba = {
-  app: { getName: () => 'Sloth' }, ipcMain, Menu: {}, shell: {}, session: { fromPartition: () => perfil }, WebContentsView: Vista,
+  app: { getName: () => 'Sloth' }, ipcMain, dialog: {}, Menu: {}, shell: {}, session: { fromPartition: () => perfil }, WebContentsView: Vista,
   createServer: (...args: Parameters<typeof createServer>) => { const s = createServer(...args); servidores.push(s); return s }
 }
 registerHooks({ resolve(specifier, context, next) {
   if (/\/navegador\.ts$/.test(context.parentURL ?? '')) {
-    if (specifier === 'electron') return { url: 'data:text/javascript,export const {app,ipcMain,Menu,session,shell,WebContentsView}=globalThis.__slothNavegadorPrueba', shortCircuit: true }
+    if (specifier === 'electron') return { url: 'data:text/javascript,export const {app,dialog,ipcMain,Menu,session,shell,WebContentsView}=globalThis.__slothNavegadorPrueba', shortCircuit: true }
     if (specifier === 'node:http') return { url: 'data:text/javascript,export const createServer=(...args)=>globalThis.__slothNavegadorPrueba.createServer(...args)', shortCircuit: true }
   }
   return next(specifier, context)

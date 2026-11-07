@@ -16,6 +16,11 @@ export interface PaginaDelRelevo {
   agente(): string
   /** Dónde guardar lo que baje el agente (`null`: que no baje nada). */
   descargas(carpeta: string | null): void
+  /**
+   * Antes de pasarle un comando de entrada (clic, tecla) o una navegación a la página: `null` si sigue, o por qué no (el usuario lo
+   * bloqueó). Es la confirmación humana de `navegador.ts`; sin ella, todo pasa.
+   */
+  revisar?(metodo: string, params: Record<string, unknown>): Promise<string | null>
 }
 
 export interface Relevo {
@@ -112,7 +117,13 @@ export function crearRelevo(pagina: PaginaDelRelevo, escribir: (texto: string) =
     // La página ya corre; sus marcos hijos no: Playwright se une a ellos con `waitForDebuggerOnStart`, y Chromium los
     // detiene hasta que esto les llega. Tragárselo dejaba congelados los captchas y los inicios de sesión de otro sitio.
     if (c.method === 'Runtime.runIfWaitingForDebugger' && hija === undefined) return Promise.resolve({})
-    return pagina.enviar(c.method, c.params ?? {}, hija)
+    const params = c.params ?? {}
+    if (pagina.revisar && hija === undefined && (c.method === 'Input.dispatchMouseEvent' || c.method === 'Input.dispatchKeyEvent' || c.method === 'Page.navigate'))
+      return pagina.revisar(c.method, params).then((bloqueo) => {
+        if (bloqueo) throw new Error(bloqueo)
+        return pagina.enviar(c.method, params, hija)
+      })
+    return pagina.enviar(c.method, params, hija)
   }
 
   return {
