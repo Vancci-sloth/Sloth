@@ -290,6 +290,8 @@ export async function modelosMuse(): Promise<Model[]> {
 /** La cuenta: Muse no dice si hay sesión, pero sin ella no da modelos. Conectar abre `muse login` en su ventana. */
 export const cuentaMuse = cuentaConVentana('muse', {
   comando: (exe) => ({ command: [exe, 'login'], env: { MUSE_NO_AUTO_UPDATE: '1' } }),
+  // Borra la credencial de Meta que guardó al entrar; un META_API_KEY de tus variables sigue valiendo.
+  salir: (exe) => ({ command: [exe, 'logout'], env: { MUSE_NO_AUTO_UPDATE: '1' } }),
   async estado() {
     return { conectada: (await modelosMuse()).length > 0 }
   }

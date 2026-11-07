@@ -72,6 +72,20 @@ export async function conectarCodex(): Promise<CuentaClaude> {
   return cuentaCodex()
 }
 
+/** Cierra la sesión de ChatGPT en Codex (`account/logout`, que borra sus credenciales). La llave de API de Sloth se queda. */
+export async function salirCodex(): Promise<CuentaClaude> {
+  if (rutaAgente('codex') && !login) {
+    const c = cliente()
+    try {
+      await c.ready
+      await c.request('account/logout')
+    } finally { descansar() }
+  }
+  fallo = undefined
+  limites = undefined
+  return cuentaCodex()
+}
+
 /** Lee las cuotas del plan sin abrir un turno ni gastar tokens. Las lecturas simultáneas comparten un minuto de caché. */
 export function limitesCodex(): Promise<LimitesClaude> {
   // Con la llave no hay plan: se paga por uso.

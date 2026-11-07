@@ -1,12 +1,14 @@
 import { entornoAgente, llavesPrestables, llavesPrestadas, prestarLlaves } from './acceso.ts'
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process'
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { homedir } from 'node:os'
 import { dirname, extname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type { AgentEvent, Model, Tokens } from '../shared/types.ts'
 import { conRutas, IMAGE_TYPES, type AgentOptions, type AgentRun, type SkillRef } from './agent.ts'
 import { comandoAgente } from './agentes.ts'
 import { cuentaConVentana } from './cuenta-ventana.ts'
+import { guardar } from './disco.ts'
 import { conSkill, INSTRUCCIONES, mcpSloth } from './instrucciones.ts'
 import { matarArbol } from './rpc-lineas.ts'
 
@@ -409,5 +411,16 @@ export const cuentaPi = cuentaConVentana('pi', {
 /** Darle a Pi las llaves de Sloth, o dejar de dárselas: cambia los modelos que tiene. Los hilos abiertos siguen como estaban. */
 export function llavesPi(usar: boolean) {
   prestarLlaves('pi', usar)
+  return cuentaPi.cuenta(true)
+}
+
+/**
+ * Cierra todas las cuentas de Pi, como su `/logout` con cada proveedor: vacía `auth.json`, donde las guarda, y deja de
+ * darle las llaves de Sloth. Las llaves de API de tus variables las sigue usando: con ellas, sigue conectado.
+ */
+export function salirPi() {
+  const cuentas = join(process.env.PI_CODING_AGENT_DIR || join(homedir(), '.pi', 'agent'), 'auth.json')
+  if (existsSync(cuentas)) guardar(cuentas, '{}\n')
+  prestarLlaves('pi', false)
   return cuentaPi.cuenta(true)
 }

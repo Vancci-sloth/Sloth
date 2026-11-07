@@ -325,11 +325,11 @@ function useCuenta(fresco = false, proveedor = 'claude') {
     const id = setInterval(() => leer(), 2000)
     return () => clearInterval(id)
   }, [conectando])
-  // Al entrar, el inicio vuelve a mirar qué cuentas hay (`useSoloChatGPT`).
+  // Al entrar o al cerrar sesión, el inicio vuelve a mirar qué cuentas hay (`useCuentas`).
   const antes = useRef<boolean>(undefined)
   useEffect(() => {
     if (!cuenta) return
-    if (antes.current === false && cuenta.conectada) dispatchEvent(new Event(CUENTA_CONECTADA))
+    if (antes.current !== undefined && antes.current !== cuenta.conectada) dispatchEvent(new Event(CUENTA_CONECTADA))
     antes.current = cuenta.conectada
   }, [cuenta?.conectada])
 
@@ -665,8 +665,7 @@ type OtroAgente = (typeof OTROS_AGENTES)[number]
  * Cómo se conecta cada uno y qué hay que saber antes, a la vista. `ventana`: el agente abre su propia ventana para
  * iniciar sesión; `navegador`: da un enlace que se autoriza en el navegador; `llave`: se pega una llave de API.
  */
-/** `salir`: el de ventana que sabe cerrar su sesión (los de navegador y llave siempre pueden). */
-const OTROS: Record<OtroAgente, { titulo: string; logo: string; como: 'ventana' | 'navegador' | 'llave'; texto: ReactNode; ayuda?: ReactNode; uso?: string; abreSolo?: string; beta?: boolean; salir?: true }> = {
+const OTROS: Record<OtroAgente, { titulo: string; logo: string; como: 'ventana' | 'navegador' | 'llave'; texto: ReactNode; ayuda?: ReactNode; uso?: string; abreSolo?: string; beta?: boolean }> = {
   deepseek: {
     titulo: 'DeepSeek · con tu llave de API',
     logo: 'deepseek',
@@ -689,8 +688,7 @@ const OTROS: Record<OtroAgente, { titulo: string; logo: string; como: 'ventana' 
     como: 'ventana',
     beta: true,
     texto: 'Sloth trabaja con tu cuenta de Grok. Al conectar se abre una ventana de Grok que te lleva a autorizarla en el navegador.',
-    uso: 'https://grok.com',
-    salir: true
+    uso: 'https://grok.com'
   },
   antigravity: {
     titulo: 'Antigravity · Google',
@@ -801,7 +799,7 @@ export function CuentaAgente({ p, aviso = false, onFalta }: { p: OtroAgente; avi
                   options: [
                     ...(cuenta.uso || o.uso ? [{ value: 'uso', label: o.como === 'llave' ? 'Ver tu saldo ↗' : 'Ver tu uso ↗' }] : []),
                     { value: 'cambiar', label: o.como === 'llave' ? 'Cambiar de llave' : 'Cambiar de cuenta' },
-                    ...(o.como !== 'ventana' || o.salir ? [{ value: 'quitar', label: o.como === 'llave' ? 'Quitar la llave' : 'Cerrar sesión' }] : []),
+                    { value: 'quitar', label: o.como === 'llave' ? 'Quitar la llave' : 'Cerrar sesión' },
                   ],
                 },
               ]}
@@ -979,12 +977,16 @@ function CuentaCodex({ aviso = false, onFalta }: { aviso?: boolean; onFalta?(fal
                         options: [
                           { value: 'uso', label: 'Ver tu uso ↗' },
                           { value: 'cambiar', label: 'Cambiar de cuenta' },
+                          { value: 'salir', label: 'Cerrar sesión' },
                         ],
                       },
                     ]),
                 ...llave.menu,
               ]}
-              onChange={(que) => llave.elegir(que) || (que === 'uso' ? window.open('https://chatgpt.com/codex/settings/usage', '_blank', 'noreferrer') : conectar())}
+              onChange={(que) =>
+                llave.elegir(que) ||
+                (que === 'uso' ? window.open('https://chatgpt.com/codex/settings/usage', '_blank', 'noreferrer') : que === 'salir' ? void c.pedir('/api/codex/salir', {}) : conectar())
+              }
             />
           ) : (
             <span>Sloth trabaja con tu plan de pago de ChatGPT (Plus o Pro), o con una llave de API, y con ella hace las imágenes de los videos: portadas y personajes. La cuenta se autoriza en el navegador.</span>
@@ -1226,12 +1228,16 @@ function Agentes() {
                           options: [
                             { value: 'uso', label: 'Ver tu uso ↗' },
                             { value: 'cambiar', label: 'Cambiar de cuenta' },
+                            { value: 'salir', label: 'Cerrar sesión' },
                           ],
                         },
                       ]),
                   ...llave.menu,
                 ]}
-                onChange={(que) => llave.elegir(que) || (que === 'uso' ? window.open('https://claude.ai/settings/usage', '_blank', 'noreferrer') : c.conectar())}
+                onChange={(que) =>
+                  llave.elegir(que) ||
+                  (que === 'uso' ? window.open('https://claude.ai/settings/usage', '_blank', 'noreferrer') : que === 'salir' ? void c.pedir('/api/claude/salir', {}) : c.conectar())
+                }
               />
             ) : cuenta.conectando ? (
               <span className="falta">Esperando al navegador…</span>

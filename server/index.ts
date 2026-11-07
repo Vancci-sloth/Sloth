@@ -19,8 +19,8 @@ import { opencodeModels } from './opencode.ts'
 import { conectandoOtro, OTROS, sinLimites } from './proveedores.ts'
 import { PROVEEDORES, type Proveedor, proveedorDe } from '../shared/providers.ts'
 import { paraMandar, salidaDe, sinSalidasLargas } from '../shared/historial.ts'
-import { conectandoCodex, conectarCodex, cuentaCodex, limitesCodex } from './cuenta-codex.ts'
-import { alEntrarClaude, conectando, conectarClaude, cuentaClaude, limitesClaude } from './cuenta.ts'
+import { conectandoCodex, conectarCodex, cuentaCodex, limitesCodex, salirCodex } from './cuenta-codex.ts'
+import { alEntrarClaude, conectando, conectarClaude, cuentaClaude, limitesClaude, salirClaude } from './cuenta.ts'
 import { cancelarOpenCode, conectandoOpenCode, conectarOpenCode, cuentaOpenCode, limitesOpenCode, quitarCuentaOpenCode, usarCuentaOpenCode } from './cuenta-opencode.ts'
 import { enlacesApi } from './enlaces.ts' // tarjeta de los enlaces
 import { cerrarVigilantesOciosos, etapasApi, folderOf, mismaCwd, queFalta, videosApi, videosDe } from './etapas.ts' // panel de etapas
@@ -367,6 +367,15 @@ async function api(req: IncomingMessage, res: ServerResponse, url: URL): Promise
     pedirModelos()
     return true
   }
+  if (path === '/api/codex/salir' && method === 'POST') {
+    try {
+      send(res, 200, await salirCodex())
+      pedirModelos()
+    } catch (error) {
+      send(res, 400, { error: error instanceof Error ? error.message : String(error) })
+    }
+    return true
+  }
 
   // La cuenta de OpenCode (`server/cuenta-opencode.ts`): mirarla, conectar otra, dejar de esperar al navegador, usar otra
   // de las conectadas o quitarla. Sus modelos dependen de la cuenta: cada cambio los vuelve a pedir.
@@ -421,6 +430,10 @@ async function api(req: IncomingMessage, res: ServerResponse, url: URL): Promise
 
   if (path === '/api/claude/conectar' && method === 'POST') {
     send(res, 200, await conectarClaude(APP))
+    return true
+  }
+  if (path === '/api/claude/salir' && method === 'POST') {
+    send(res, 200, await salirClaude(APP))
     return true
   }
 

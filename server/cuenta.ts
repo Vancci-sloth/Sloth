@@ -101,6 +101,20 @@ export function conectarClaude(app: string): Promise<CuentaClaude> {
   return cuentaClaude(app)
 }
 
+/**
+ * Cierra la sesión de Claude Code en esta computadora (`claude auth logout`, que borra lo que guardó al entrar). La llave
+ * de API guardada en Sloth no se toca: se quita aparte. Los hilos quietos sueltan su Claude Code, como al entrar.
+ */
+export async function salirClaude(app: string): Promise<CuentaClaude> {
+  const exe = rutaAgente('claude')
+  if (exe && !login) await new Promise<void>((ok) => execFile(exe, ['auth', 'logout'], { timeout: 30_000, windowsHide: true }, () => ok()))
+  conectada = null
+  limites = null
+  fallo = ''
+  for (const f of alEntrar) f()
+  return cuentaClaude(app, true)
+}
+
 /** Quienes deben saber que se entró con una cuenta (`alEntrarClaude`). */
 const alEntrar: (() => void)[] = []
 /**

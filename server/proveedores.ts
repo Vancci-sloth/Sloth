@@ -8,7 +8,7 @@ import { cuentaDeepSeek, deepseekModels } from './deepseek.ts'
 import { cuentaGemini, modelosGemini, startGemini } from './gemini.ts'
 import { cuentaGrok, modelosGrok, startGrok } from './grok.ts'
 import { cuentaMuse, modelosMuse, startMuse } from './muse.ts'
-import { cuentaPi, llavesPi, modelosPi, startPi } from './pi.ts'
+import { cuentaPi, llavesPi, modelosPi, salirPi, startPi } from './pi.ts'
 
 /**
  * Los agentes que llegaron después de Claude, Codex y OpenCode, con lo mismo para cada uno: cómo se arranca (`start`, el
@@ -39,7 +39,7 @@ export const OTROS: Partial<Record<Proveedor, Otro>> = {
   gemini: { como: 'llave', start: startGemini, cuenta: cuentaGemini, modelos: modelosGemini },
   cursor: { como: 'navegador', start: startCursor, cuenta: cuentaCursor, conectar: conectarCursor, cancelar: cancelarCursor, salir: salirCursor, conectando: conectandoCursor, modelos: modelosCursor },
   muse: { como: 'ventana', start: startMuse, ...cuentaMuse, modelos: modelosMuse },
-  pi: { como: 'ventana', start: startPi, ...cuentaPi, llaves: llavesPi, modelos: modelosPi }
+  pi: { como: 'ventana', start: startPi, ...cuentaPi, salir: salirPi, llaves: llavesPi, modelos: modelosPi }
 }
 
 /** Ninguno de estos informa los límites de un plan a Sloth: se paga por uso o se ve en su página. */
