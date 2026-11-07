@@ -126,7 +126,8 @@ RapidOCR).
   - `*marca_texto(img, "frase citada", en=..., es="la traducción")` además traduce: medio segundo después de
     pintarse el resaltador, el inglés se desenfoca y en su lugar aparece el español, con la letra, el tamaño y el
     color del original y el resaltador encima. Ver [Traducción](#traducción-de-lo-resaltado).
-  - `caja_texto(img, "frase", en=..., pad=2)` pone una caja alrededor de la frase. `pad` va en píxeles de la imagen,
+  - `caja_texto(img, "frase", en=..., pad=2)` pone una caja alrededor de la frase (no traduce: en una oración en
+    inglés va `marca_texto` con `es=`). `pad` va en píxeles de la imagen,
     y el componente le suma 8 px de pantalla.
   - `zona(img, "frase")` da un rectángulo para `vista` o `toma` centrado en la frase, con la forma de la pantalla (la
     zona en vertical, 16:9 en horizontal; `aspecto=` la cambia). Encuadra con ella y no con rectángulos en píxeles:
@@ -184,16 +185,21 @@ millones", es `en="dos"`, no `en="2"`. Una palabra que no está en el `say` cae,
 
 ### Traducción de lo resaltado
 
-El público habla español: toda marca de resaltador sobre texto en inglés lleva `es=` (no hace falta en nombres
-propios, cifras o código). Traduce corto y con tono natural de México, de un largo parecido al inglés. El español va
+El público habla español: toda marca de resaltador sobre texto en inglés lleva `es=`. Una sin `es=` sobre inglés
+la avisa `guion.py`, y `final.py` no renderiza mientras quede una (en un episodio de Haiku del 3 de noviembre, las
+seis marcas salieron en inglés). Un nombre propio, una cifra o código se quedan como están con `es=False`; un nombre
+en mayúsculas iniciales ("Grid Protectors Program") no hace falta marcarlo. Traduce con tono natural de México y del largo del inglés: entra de un 80 % a un 125 % de sus caracteres (el último
+renglón se estira y la letra crece o se achica), y si no, el aviso dice cuántos. El español va
 en el mismo lugar, con la letra (Segoe UI, o Georgia con `serif=True`), el tamaño y el color del original; si no
 cabe, se achica. `peso=700` e `italica=True` imitan un titular en negritas o cursiva.
 
 **Se traduce la oración entera, nunca un pedazo.** Un pedazo deja el resto de la oración en inglés pegado al español
 ("heels of DeepSeek lanzó su modelo"), y un español más corto deja un hueco antes del inglés que sigue en el renglón:
 el 19 de octubre, 30 de 89 traducciones salieron así. Por eso `marca_texto` no pone una traducción que no queda
-limpia (inglés suelto en la misma oración, un hueco o un renglón de más) y avisa `no se traduce`: márcala hasta el
-punto y tradúcela entera, o déjala en inglés con su resaltador (la voz ya la dice en español). Lo que mejor se
+limpia (inglés suelto en la misma oración, un hueco o un renglón de más) y avisa `no se traduce` con lo que hay que
+hacer: la oración entera que marcar y cuántos caracteres debe medir su traducción. Una oración citada **siempre** se
+traduce: `es=False` en una oración cuenta como sin traducir (en un episodio de Haiku, el 3 de noviembre, dejó en
+inglés todo lo citado). Lo que mejor se
 traduce: un tuit corto, un titular, una oración suelta.
 
 ```python
@@ -204,8 +210,8 @@ traduce: un tuit corto, un titular, una oración suelta.
 Sirve en fondo oscuro y claro y en frases de varios renglones: el español llena los mismos renglones (si la frase
 empieza al final de un renglón, arranca en el siguiente) y no pasa de donde acaba la frase cuando el renglón sigue
 con otro texto; si la frase cierra su renglón, puede seguir hasta el margen. `guion.py` avisa cuando una traducción
-quedó a menos del 90 % del tamaño del inglés: acórtala. Ningún `no se traduce` se queda sin decidir: cada uno se
-arregla (la oración entera) o se quita su `es=`. El cambio termina unos 1.2 s después de que empieza la
+quedó a menos del 90 % del tamaño del inglés: acórtala. Ningún `no se traduce` se queda: cada uno se arregla
+como dice su aviso, y `guion.py` cuenta los que quedan en `FALTA TRADUCIR`. El cambio termina unos 1.2 s después de que empieza la
 marca: ponla en una palabra que deje ese tiempo antes de que la cámara se vaya. Si el beat termina antes, el cambio
 sigue en el beat siguiente cuando este lleva `sigue`.
 
@@ -229,7 +235,8 @@ sigue en el beat siguiente cuando este lleva `sigue`.
   `{"tipo": "logo", "invitacion": True}` para la invitación. El logo, su lema y los rótulos salen de `src/marca.json`.
 - Primer beat de cada sección: `seccion=True` dentro de `v`.
 - Las secciones que escribe otro agente (paso 3 del SKILL) entran con `*bloque("<n>")`: `fuentes/escenas/<n>.py` es una
-  sola lista de párrafos, sin import ni asignaciones.
+  sola lista de párrafos, sin import ni asignaciones. Se cambia con Edit: un parche con `python -c`, un heredoc o `sed`
+  convierte el `\n` de un rótulo en un salto de línea, deja la cadena abierta y `guion.py` ya no la lee.
 - **Gags propios del episodio**: el chiste que no se arma con metraje encontrado, un recorte y un rótulo (el artefacto
   fabricado del ejemplo absurdo: la app inventada, la terminal que cobra) lleva un componente nuevo en `src/escenas/`.
   Regístralo en `ESCENAS` de `src/Video.tsx`, y en `VERTICALES` si lee `useFormato()` ([Cómo se compone](#cómo-se-compone)).

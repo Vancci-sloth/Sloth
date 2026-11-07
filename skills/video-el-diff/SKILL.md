@@ -60,14 +60,11 @@ imágenes son lo que más entra. Por eso:
   escribir todo su contexto.
 - **Texto antes que imagen.** Lee las capturas con `python ubicar.py <imagen>` y los videos con su transcripción. Abre
   una imagen solo para decidir algo visual.
-- **Subagentes con `model: "sonnet"`** para lo mecánico y para lo visual en volumen: el agente de captura
-  ([`MATERIAL.md`](MATERIAL.md)) y la primera revisión de las hojas (fase 2). Te devuelven texto, y sus imágenes no
-  se quedan en tu contexto. Si el mensaje trae una línea `Subagentes:` (la pone Sloth: lo medido, o lo que eligió el
-  usuario), lanza cada uno con el `model` y el `effort` que dice: `captura` es el agente de captura, `pantalla` el de
-  pantalla, `revisión` el revisor de las hojas y `escenas` los que escriben las escenas (paso 3). Sin esa línea, los
-  de esta skill (para `escenas`, Opus con `effort: "medium"`: con Sonnet, en el-diff-8 y el-diff-9, la revisión
-  encontró el doble de clips en el segundo equivocado y hubo que arreglar y renderizar otra vez).
-- **Opus para lo creativo**: el guion, los chistes, qué material va en cada frase y los gags.
+- **Subagentes para lo mecánico y para lo visual en volumen**: el agente de captura ([`MATERIAL.md`](MATERIAL.md)),
+  el de pantalla, los que escriben las escenas y los revisores de las hojas (fase 2). Te devuelven texto, y sus
+  imágenes no se quedan en tu contexto. **Todos van en tu mismo modelo y esfuerzo**, el que eligió el usuario: con el
+  `model` y el `effort` de la línea `Subagentes:` (la pone Sloth: `todos = haiku high`), o, sin ella, sin `model` (así
+  heredan el tuyo) y con tu esfuerzo. Nunca otro modelo, ni para ahorrar ni para que salga mejor.
 - **El usuario está esperando el video.** Lo que no depende de otra cosa va a la vez: las herramientas independientes
   en un mismo mensaje, y los renders y las transcripciones en segundo plano mientras sigues con lo demás. El 19 de
   octubre, la mitad de la fase 2 fue trabajo que podía haberse hecho antes de que llegara la voz.
@@ -226,11 +223,12 @@ escenas y los revisores) y lo demás son scripts. Así salió el-diff-10 (25 de 
 con lo que no depende de otra cosa a la vez:
 
 - **En cuanto copias `guion.md`** (paso 6 de la fase 1), en un mismo mensaje: la voz (`generar_voz`, o la que mande
-  el usuario), `material.py` y `repartir.py` (pasos 2 y 3), los agentes de cada bloque, de fondo, y la portada (paso 6).
+  el usuario), `material.py` y `repartir.py` (pasos 2 y 3), los agentes de cada bloque, de fondo, y la portada (paso 6;
+  la de `portada_sin_ia.mjs`, en cuanto haya cuadros de la revisión).
   Las capturas y los clips que aún no llegan salen como `FALTA` o en blanco: cuando lleguen, otra vez `material.py`.
 - **Cuando llega el WAV:** `voz.py` (paso 1), de fondo, mientras escriben las escenas.
 - **Con los bloques y la voz listos:** la línea del paso 4, la revisión del paso 5 con sus arreglos (los hace el agente
-  de cada bloque) y `final.py` (paso 6), que ya pone la portada.
+  de cada bloque) y, con la portada ya hecha, `final.py` (paso 6), una sola vez.
 
 Espera lo que corre en segundo plano en tramos de 4 minutos como mucho
 (`timeout 230 bash -c 'until <ya terminó>; do sleep 10; done'`): tu caché dura 5 minutos, y cada espera más larga
@@ -277,7 +275,7 @@ vuelve a pagar todo tu contexto.
      marca) y escribe `fuentes/escenas/encargo.md`: lo que todos leen y quién escribe qué. No hace falta el encabezado
      de constantes: los bloques usan las rutas.
    - Lanza en un mismo mensaje un agente por bloque (`subagent_type: "general-purpose"`, con el `model` y el `effort`
-     de `escenas`, `run_in_background: true`: mientras escriben haces la voz y la portada, y te avisan al terminar), cada
+     de la línea `Subagentes:`, `run_in_background: true`: mientras escriben haces la voz y la portada, y te avisan al terminar), cada
      uno con una sola línea: «Lee `<ruta>/fuentes/escenas/encargo.md`
      y escribe el bloque `<n>`». Si el cierre cobra algo del arranque, añade esa línea solo al del cierre.
    - Una sección larga queda en dos bloques con el mismo id de párrafo, y `guion.py` los junta.
@@ -303,8 +301,8 @@ vuelve a pagar todo tu contexto.
    al 70 % muchas siguen a medio pintar y parecen errores. Esta revisión es antes de renderizar: el 19 de octubre, lo
    que no se leía en el celular se vio después del render y costó dos renders más.
 
-   Lanza **un revisor por hoja**, todos a la vez en un mismo mensaje (con `model: "sonnet"`, `effort: "high"` o lo que
-   diga `revisión` en la línea `Subagentes:`, y `run_in_background: false`: en segundo plano terminas tu turno
+   Lanza **un revisor por hoja**, todos a la vez en un mismo mensaje (con el `model` y el `effort` de la línea
+   `Subagentes:`, y `run_in_background: false`: en segundo plano terminas tu turno
    esperándolos y no siempre vuelves). Uno solo tardó 5 minutos con diez hojas; uno por hoja, 30 s. A cada uno, una
    sola línea: «Lee `<skill>/REVISAR.md` y revisa la hoja `<n>` del proyecto `<ruta>`» ([`REVISAR.md`](REVISAR.md)
    tiene qué abrir y qué buscar). Un encargo largo por revisor tardaba un minuto en salir antes de que empezara el
@@ -317,23 +315,27 @@ vuelve a pagar todo tu contexto.
    arreglas tú mientras tanto. Una sola ronda: después, la línea del paso 4 y `final.py`, sin volver a revisar. Al
    terminar, dile al usuario en dos listas qué se arregló y qué conviene que mire él en la vista en vivo, con el beat y
    el segundo.
-6. **Final.** `python <skill>/scripts/final.py` en segundo plano. Renderiza el episodio en su formato por tramos en
-   `out/partes/` con el renderizador web de Remotion, en varios Edge sin ventana (`render_web.mjs`), los une, lo deja a
-   -14 LUFS con el pico por debajo de -1.5 dBTP (medidos en el archivo, lo imprime), deja `revision/final_hoja.png` y
-   abre el Explorador. Cada tramo que no cambió se reutiliza: corregir una escena después del final es volver a correr
-   `final.py`, que rehace solo sus tramos. Si otro episodio está renderizando, espera su turno (lo dice al empezar): no
-   lo mates ni lo lances otra vez. Si avisa de la plantilla de antes, haz lo que dice. No entregues un defecto conocido
-   por no renderizar.
+6. **Final.** Se renderiza **una sola vez**, al final: el usuario ve cada render terminado, y a un episodio de Haiku
+   (3 de noviembre) le salió cuatro veces, por la portada que llegó después y por arreglos vistos en la hoja del final.
+   Antes van la portada y todo lo de la revisión; `final.py` no arranca si falta `portada.png` (en vertical) o si queda
+   inglés resaltado sin traducir, y lo dice.
    Solo en vertical, su portada es el primer cuadro, según [`PORTADA.md`](../video-base/PORTADA.md) de video-base, en
-   `portada.png`. Hazla mientras renderiza, no después: en el episodio de des-to, la portada esperó al final y sumó
-   casi 5 minutos. Con ChatGPT, lo que pide El Diff en el pedido: el `GANCHO` de título, en letra
+   `portada.png`. Hazla mientras escriben las escenas (paso 3), no al final: en el episodio de des-to, la portada esperó
+   al final y sumó casi 5 minutos. Con ChatGPT, lo que pide El Diff en el pedido: el `GANCHO` de título, en letra
    condensada gruesa, la primera línea blanca y la segunda roja, la placa chica con el `sello` de la marca arriba, sobre
    fondo oscuro, y lo que el episodio enseña (la captura o la cara de la noticia). Sin ChatGPT, `portada_sin_ia.mjs`
-   pone un cuadro del video de fondo y el título encima en un solo color: el `GANCHO` en un renglón, y `--t` en un
-   cuadro sin texto citado al centro. `final.py` la renderiza como un tramo de un cuadro y la pega sin recodificar (no
-   uses `portada.mjs`): si ya existía al empezar, sale con ella; si no, vuelve a correr `final.py` cuando esté, que
-   tarda unos 20 s (y lo mismo si cambias `portada.png`). Mira la hoja y entrega la ruta de `out\el-diff-final.mp4`,
-   qué es material original y qué son gráficos propios. Si no viste el video completo, dilo.
+   pone de fondo un cuadro de la revisión (`revision/bNN_95.jpg`, de un beat sin texto citado al centro, en vez del
+   video) y el título encima en un solo color: el `GANCHO` en un renglón. `final.py` la renderiza como un tramo de un
+   cuadro y la pega sin recodificar (no uses `portada.mjs`).
+   Luego `python <skill>/scripts/final.py` en segundo plano. Renderiza el episodio en su formato por tramos en
+   `out/partes/` con el renderizador web de Remotion, en varios Edge sin ventana (`render_web.mjs`), los une, lo deja a
+   -14 LUFS con el pico por debajo de -1.5 dBTP (medidos en el archivo, lo imprime), deja `revision/final_hoja.png` y
+   abre el Explorador. Si otro episodio está renderizando, espera su turno (lo dice al empezar): no lo mates ni lo
+   lances otra vez. Si avisa de la plantilla de antes, haz lo que dice.
+   Mira la hoja y entrega la ruta de `out\el-diff-final.mp4`, qué es material original y qué son gráficos propios. Si
+   no viste el video completo, dilo. Lo que veas mal en la hoja no se arregla con otro render: va en la lista de lo
+   que conviene que mire el usuario, con el beat y el segundo. Solo si él pide un cambio, lo arreglas y corres
+   `final.py --otra-vez`, que rehace solo los tramos que cambiaron.
 
 ## Al terminar
 

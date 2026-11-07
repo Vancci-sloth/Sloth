@@ -5,10 +5,10 @@ import { gruposModelos, Picker, type Choice } from './Composer'
 import { Segmento } from './Segmento'
 
 /**
- * El modelo de un hilo nuevo. «Optimizado» (lo normal) usa lo que medimos como mejor para la skill en cada tarea: el hilo
- * y cada subagente (`modelos` de la card); en una skill sin medir, el hilo va en lo último que elegiste a mano.
- * «Avanzado» deja elegir el modelo y el esfuerzo de cada uno. Sloth le pasa los de los subagentes al agente en la línea
- * `Subagentes:`, que la skill respeta.
+ * El modelo de un hilo nuevo. «Optimizado» (lo normal) usa lo que medimos como mejor para el hilo (`modelos` de la
+ * card); en una skill sin medir, lo último que elegiste a mano. «Avanzado» deja elegirlo, con su esfuerzo. Los
+ * subagentes van siempre en ese mismo modelo y esfuerzo: Sloth se lo pasa al agente en la línea `Subagentes:`, que la
+ * skill respeta (antes iban en lo medido por tarea, y en un hilo de Haiku los de las escenas salían en Opus).
  */
 
 /** Sin medir y sin nada elegido a mano, el hilo va en Opus con esfuerzo alto: lo mejor en las dos skills que se midieron. */
@@ -30,9 +30,6 @@ export function conPrimero(models: Model[], p: Proveedor): Avanzado | undefined 
   const m = models.find((x) => proveedorDe(x.id) === p)
   return m && { principal: { model: m.id, effort: m.defaultEffort }, tareas: {} }
 }
-const SUBAGENTES = ['opus', 'sonnet', 'haiku']
-const ESFUERZOS = ['low', 'medium', 'high', 'xhigh']
-const NOMBRE: Record<string, string> = { opus: 'Opus', sonnet: 'Sonnet', haiku: 'Haiku' }
 
 /** Lo que el usuario cambió en «Avanzado». Sin esto, la card va en «Optimizado». */
 export type Avanzado = { principal?: Choice; tareas: Record<string, { model: string; effort: string }> }
@@ -49,13 +46,20 @@ export function elegirModelos(conf: ModelosConf | undefined, models: Model[], av
     valido(models, POR_DEFECTO) ||
     (models[0] && valido(models, { model: models[0].id }))
   const choice = (avanzado?.principal && valido(models, avanzado.principal)) || optimo
-  // Las mediciones actuales piden alias de Claude: Codex y OpenCode eligen sus propios subagentes.
-  const tareas: Tarea[] = proveedorDe(choice?.model ?? '') !== 'claude' ? [] : (conf?.tareas ?? []).map((t) => ({ ...t, ...(avanzado?.tareas[t.nombre] ?? {}) }))
-  return { choice, tareas }
+  return { choice, tareas: subagentes(choice) }
 }
 
-/** La línea que la skill lee para elegir el modelo de cada subagente. */
-export const lineaSubagentes = (tareas: Tarea[]) => (tareas.length ? `Subagentes: ${tareas.map((t) => `${t.nombre} = ${t.model} ${t.effort}`).join('; ')}.` : '')
+/**
+ * Los subagentes, en el modelo y el esfuerzo del hilo, con el alias que pide la herramienta Agent de Claude (`opus`,
+ * `sonnet`, `haiku`, `fable`). Codex y OpenCode no lo leen: sus subagentes ya van en su modelo.
+ */
+export function subagentes(choice: Choice | undefined): Tarea[] {
+  const alias = proveedorDe(choice?.model ?? '') === 'claude' && choice?.model.match(/claude-(opus|sonnet|haiku|fable)/)?.[1]
+  return alias ? [{ nombre: 'todos', para: 'Captura, escenas, revisión y los demás', model: alias, effort: choice?.effort ?? '' }] : []
+}
+
+/** La línea que la skill lee para elegir el modelo de cada subagente: `Subagentes: todos = haiku high.` */
+export const lineaSubagentes = (tareas: Tarea[]) => (tareas.length ? `Subagentes: ${tareas.map((t) => `${t.nombre} = ${t.model}${t.effort ? ` ${t.effort}` : ''}`).join('; ')}.` : '')
 
 /** Un modelo del catálogo con un esfuerzo que admite. Una elección vieja guardada puede decir `claude-opus-5-5[1m]`: es el mismo. */
 function valido(models: Model[], c: { model: string; effort?: string }): Choice | undefined {
@@ -93,8 +97,6 @@ export function Modelos(props: {
   }, [open])
 
   const cambiarPrincipal = (c: Partial<Choice>) => props.onAvanzado({ ...avanzado!, principal: { ...choice!, ...c } })
-  const cambiarTarea = (t: Tarea, c: Partial<{ model: string; effort: string }>) =>
-    props.onAvanzado({ ...avanzado!, tareas: { ...avanzado!.tareas, [t.nombre]: { model: t.model, effort: t.effort, ...c } } })
 
   return (
     <div ref={root} className={`picker modelos ${open ? 'open' : ''}`}>
@@ -146,35 +148,9 @@ export function Modelos(props: {
                 </span>
               )}
             </Fila>
-            {tareas.map((t) => (
-              <Fila key={t.nombre} nombre={t.nombre[0].toUpperCase() + t.nombre.slice(1)} para={t.para} medido={!avanzado ? t.medido : undefined}>
-                {avanzado ? (
-                  <>
-                    <select value={t.model} onChange={(e) => cambiarTarea(t, { model: e.target.value })}>
-                      {SUBAGENTES.map((m) => (
-                        <option key={m} value={m}>
-                          {NOMBRE[m]}
-                        </option>
-                      ))}
-                    </select>
-                    <Picker
-                      className="modelos-selector"
-                      menuClassName="modelos-lista"
-                      menuWidth={160}
-                      flotante
-                      label={t.effort}
-                      value={t.effort}
-                      groups={[{ label: 'Esfuerzo', options: ESFUERZOS.map((x) => ({ value: x, label: x })) }]}
-                      onChange={(effort) => cambiarTarea(t, { effort })}
-                    />
-                  </>
-                ) : (
-                  <span>
-                    {NOMBRE[t.model] ?? t.model} · {t.effort}
-                  </span>
-                )}
-              </Fila>
-            ))}
+            <Fila nombre="Subagentes" para="Captura, escenas, revisión y los demás">
+              <span>{tareas.length ? 'El mismo modelo y esfuerzo' : 'Los del agente'}</span>
+            </Fila>
           </div>
           <p className="modelos-nota muted small">
             {props.sinClaude === 'codex'
@@ -185,9 +161,9 @@ export function Modelos(props: {
               ? `Sin Claude, el hilo va con ${NOMBRE_AGENTE[props.sinClaude]}, en el modelo que elijas. «Optimizado» va con Claude: se puede elegir al conectar tu cuenta de Claude en Opciones.`
               : avanzado
                 ? 'Tus elecciones se quedan para esta card. «Optimizado» vuelve a lo medido o, si la skill no se ha medido, a lo último que elegiste.'
-                : tareas.length || principalMedido
-                  ? 'Lo que medimos como mejor en cada tarea: misma calidad por menos tiempo y dinero. Pasa el ratón por «medido» para ver la prueba.'
-                  : 'Esta skill aún no se ha medido: el hilo va en lo último que elegiste a mano (o en Opus high, si nunca elegiste), y sus subagentes, en lo que diga la skill.'}
+                : principalMedido
+                  ? 'Lo que medimos como mejor para el hilo; sus subagentes van en ese mismo modelo y esfuerzo. Pasa el ratón por «medido» para ver la prueba.'
+                  : 'Esta skill aún no se ha medido: el hilo va en lo último que elegiste a mano (o en Opus high, si nunca elegiste), y sus subagentes, en ese mismo modelo y esfuerzo.'}
           </p>
         </div>
       )}

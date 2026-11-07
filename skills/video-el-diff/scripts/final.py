@@ -4,7 +4,10 @@ corre en la raíz del proyecto, en segundo plano. Si otro episodio está renderi
 comun.py).
 
     python <skill>/scripts/final.py
+    python <skill>/scripts/final.py --otra-vez     un segundo render, solo si el usuario pidió un cambio
 
+Se renderiza una sola vez, al final: no arranca si falta la portada (en vertical) o si queda inglés resaltado sin
+traducir, y no rehace un final ya hecho sin --otra-vez.
 1. Lo renderiza por tramos en out/partes/, con el renderizador web de Remotion en Edge sin ventana (render_web.mjs): el
    propio Edge pinta cada cuadro y la tarjeta lo codifica, con varios Edge a la vez. Un tramo es un párrafo de
    guion.json, partido en pedazos de hasta PEDAZO cuadros para que los Edge se repartan parejo. Cada tramo lleva en el
@@ -12,7 +15,7 @@ comun.py).
    marcas de sus capturas en el episodio, sus archivos de public/, el código de src/): uno que no cambió no se vuelve a
    renderizar. Los 6.5 minutos del episodio de Photon tardaron 72 s (el render de siempre, con fotos de Chrome y FFmpeg,
    6.8 min); corregir una escena es renderizar sus pedazos.
-   En vertical, si existe portada.png, va delante como un tramo más de un cuadro (PORTADA.md de video-base): cambiarla es
+   En vertical, portada.png va delante como un tramo más de un cuadro (PORTADA.md de video-base): cambiarla es
    renderizar ese cuadro y volver a unir.
 2. Une los tramos sin recodificar: el video H.264 y el audio en PCM, que pegado sale idéntico, muestra por muestra.
 3. out/el-diff-final.mp4: el audio a -14 LUFS con el pico real por debajo de -1.5 dBTP medidos en el AAC 256k
@@ -155,6 +158,22 @@ def tramo_portada(raiz: Path, linea: dict) -> tuple[str, int, int, str]:
     return ("00-portada", 0, 0, h.hexdigest()[:10])
 
 
+def antes_de_renderizar(raiz: Path, vertical: bool) -> None:
+    """Lo que obligaba a un segundo render, antes del primero: la portada (vertical) y el inglés resaltado sin traducir."""
+    faltan = []
+    if vertical and not (raiz / "portada.png").exists():
+        faltan.append("la portada: portada.png, el primer cuadro del vertical (paso 6 de SKILL.md, PORTADA.md de video-base)")
+    guion = raiz / "guion.json"
+    beats = [b for p in json.loads(guion.read_text(encoding="utf8"))["parrafos"] for b in p["beats"]] if guion.exists() else []
+    for b in beats:
+        for m in b["v"].get("marcas") or []:
+            if m.get("ingles"):
+                faltan.append(f'{b["id"]} «{b["say"][:40]}»: "{m["ingles"]}" está resaltado en inglés. Tradúcelo con '
+                              'es="…" (la oración entera) o ponle es=False si es un nombre o código, y corre guion.py')
+    if faltan:
+        raise SystemExit("Antes del final falta:\n- " + "\n- ".join(faltan))
+
+
 def main() -> None:
     raiz = Path.cwd()
     out, rev = raiz / "out", raiz / "revision"
@@ -167,11 +186,19 @@ def main() -> None:
     plantilla_vieja(raiz)
     linea = json.loads((raiz / "src" / "timeline.json").read_text(encoding="utf8"))
     vertical = linea.get("formato") == "vertical"
+    antes_de_renderizar(raiz, vertical)
     plan = tramos(raiz)
-    if vertical and (raiz / "portada.png").exists():
+    if vertical:
         plan.insert(0, tramo_portada(raiz, linea))
     videos = [dir_partes / f"{nombre}-{huella}.mov" for nombre, a, b, huella in plan]
     faltan = [(nombre, a, b, v) for (nombre, a, b, _), v in zip(plan, videos) if not v.exists()]
+    final = out / "el-diff-final.mp4"
+    if faltan and final.exists() and "--otra-vez" not in sys.argv:
+        # El usuario ve cada render terminado: en un episodio de Haiku (3 nov 2026) le salió cuatro veces, por la portada
+        # que llegó después y por arreglos vistos en la hoja del final.
+        raise SystemExit(f"{final} ya está renderizado, y el final se renderiza una sola vez. Lo que viste después en la "
+                         "hoja díselo al usuario (beat y segundo) en lo que conviene que mire; vuelve a correr final.py "
+                         "con --otra-vez solo si el usuario pide un cambio.")
     if faltan:
         with turno_render():
             comprobar_disco(raiz)
@@ -189,7 +216,6 @@ def main() -> None:
     for viejo in set(dir_partes.iterdir()) - set(videos):
         viejo.unlink()  # tramos de versiones anteriores
     print(f"tramos: {len(faltan)} renderizados, {len(plan) - len(faltan)} ya estaban")
-    final = out / "el-diff-final.mp4"
     al_dia = final.exists() and all(v.stat().st_mtime < final.stat().st_mtime for v in videos)
     if al_dia:
         print(f"{final} ya estaba al día: no cambió ningún tramo.")
@@ -220,8 +246,6 @@ def main() -> None:
             lista.unlink(missing_ok=True)
         print(f"final: {f['lufs']:.1f} LUFS, pico {f['pico']:.1f} dBTP, medidos en el AAC")
         hoja(final, rev, vertical)
-    if vertical and not (raiz / "portada.png").exists():
-        print("Falta la portada: hazla según PORTADA.md de video-base y vuelve a correr final.py, que la pone.")
     print(f"{final} (en {(time.time() - t0) / 60:.1f} min)  ·  revisa revision/final_hoja.png")
     if os.name == "nt":
         subprocess.run(f'explorer.exe /select,"{final}"', shell=True)

@@ -149,7 +149,11 @@ def bloque(nombre):
     try:
         codigo = compile(f.read_text(encoding="utf8"), str(f), "eval")
     except SyntaxError as e:
-        raise SystemExit(f"{f} tiene que ser una sola lista de párrafos, sin import ni asignaciones: {e}")
+        # Casi siempre la rompe un parche con `python -c` o un heredoc: el `\n` de un rótulo de dos líneas llega como
+        # salto de línea de verdad y deja la cadena abierta (unas 100 veces en 15 episodios, de octubre de 2026).
+        raise SystemExit(f"{f} tiene que ser una sola lista de párrafos, sin import ni asignaciones: {e}\n"
+                         "Arréglala con Edit, no con python -c, un heredoc ni sed: convierten el \\n de los textos en un "
+                         "salto de línea y dejan las comillas abiertas.")
     return eval(codigo, globals())
 
 
@@ -192,6 +196,10 @@ for pid, lista in parrafos:
         salida["parrafos"].append({"id": pid, "beats": []})
     for say, v in lista:
         n += 1
+        # `marcas=[marca_texto(...)]` sin el `*` deja una lista dentro de la lista (un intento de Haiku, 3 nov 2026):
+        # el video no la dibuja. Se aplana.
+        if isinstance(v, dict) and any(isinstance(m, list) for m in v.get("marcas") or []):
+            v["marcas"] = [x for m in v["marcas"] for x in (m if isinstance(m, list) else [m])]
         salida["parrafos"][-1]["beats"].append({"id": f"b{n:02d}", "say": say, "v": v})
 
 def avisos(beats):
@@ -232,3 +240,8 @@ guardar(RAIZ / "src" / "lineas.json", json.dumps({img: renglones(img) for img in
 print(n, "beats")
 if FALTAN:
     print("FALTA (aún no está en public/):", ", ".join(sorted(FALTAN)))
+# Lo resaltado que sigue en inglés (arriba, su `aviso:` dice cómo traducirlo): final.py no renderiza con uno.
+sin_traducir = [f'{b["id"]} "{m["ingles"]}"' for p in salida["parrafos"] for b in p["beats"]
+                for m in b["v"].get("marcas") or [] if isinstance(m, dict) and m.get("ingles")]
+if sin_traducir:
+    print(f"FALTA TRADUCIR ({len(sin_traducir)}):", "; ".join(sin_traducir))

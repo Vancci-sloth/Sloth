@@ -296,8 +296,31 @@ def _mas(r: list[int], mas: int) -> list[int]:
     return [r[0] - mas, r[1], r[2] + 2 * mas, r[3]]
 
 
+# Palabras que solo salen en inglés: con una, la frase (o su oración) está en inglés. Sin ellas y con todo en
+# mayúscula inicial o cifras, es un nombre ("Grid Protectors Program", "1,000"), que no se traduce.
+_INGLES = set("the of and to is are was were be been being it its that this these those for on with as by at from has "
+              "have had not will would can could should may might must just but or we you they he she our their his her "
+              "than into about more most which who what when how why if so do does did an all also only over after said "
+              "says new there here out up no yes".split())
+_ESPANOL = set("el la los las de del que y en un una por para con es se su sus lo al más pero como este esta".split())
+
+
+def en_ingles(frase: str, oracion_: str | None = None) -> bool:
+    """Si lo marcado está en inglés y hay que traducirlo: por sus palabras o, si no las trae, por las de su oración."""
+    def cuenta(texto):
+        ps = re.findall(r"[a-záéíóúñü']+", texto.lower())
+        return sum(p in _INGLES for p in ps), sum(p in _ESPANOL for p in ps) + 3 * bool(re.search(r"[áéíóúñ¿¡]", texto.lower()))
+    ing, esp = cuenta(frase)
+    if ing or esp:
+        return ing > esp
+    if all(p[:1].isupper() or not p[:1].isalpha() for p in frase.split()):
+        return False
+    ing, esp = cuenta(oracion_ or "")
+    return ing > esp
+
+
 def marca_texto(fuente: str, frase: str, en: str | None = None, t: float | None = None, ocurrencia: int = 1,
-                mas: int = 0, es: str | None = None, peso: int = 400, italica: bool = False, serif: bool = False,
+                mas: int = 0, es: str | bool | None = None, peso: int = 400, italica: bool = False, serif: bool = False,
                 **kw) -> list[dict]:
     """Resaltador sobre la frase (una marca por renglón). `mas` alarga cada marca esos píxeles por lado (texto chico).
 
@@ -305,25 +328,36 @@ def marca_texto(fuente: str, frase: str, en: str | None = None, t: float | None 
     mismo tamaño. `peso` (400, 600, 700), `italica` y `serif` imitan la letra del original (un titular en negritas).
     Solo si queda limpia: si en la oración quedaría inglés suelto junto al español, si deja un hueco antes de lo que sigue
     en el renglón o si no cabe en sus renglones, la frase se queda en inglés con su resaltador y lo avisa.
+    Inglés sin traducir (sin `es=`, con `es=False` o con una traducción que no quedó limpia) se apunta en la marca como
+    `ingles`, guion.py lo cuenta en FALTA TRADUCIR y final.py no renderiza mientras quede uno. `es=False` solo vale en un
+    nombre, una cifra o código, no en una oración: en un episodio de Haiku (3 nov 2026) dejó en inglés todo lo citado.
     """
     cuando = {"en": en} if en else {"t": t or 0}
     renglones = _renglones(fuente, frase, ocurrencia)
     marcas = [{"r": _mas(_union(l["rs"], 4), mas), "tipo": "marcador", **cuando, **kw} for l in renglones]
+    if not marcas:
+        return marcas
+    o = oracion(fuente, frase, ocurrencia)
     if not es:
+        if en_ingles(frase, o and o["oracion"]):
+            porque = "es=False solo vale en un nombre, una cifra o código" if es is False else "no lleva es="
+            print(f'aviso: "{frase}" ({fuente}) está en inglés y {porque}: {_como_traducir(frase, o)}', file=sys.stderr)
+            marcas[0]["ingles"] = frase
         return marcas
     # Una traducción a medias se lee como un error: el 19 de octubre, 30 de 89 salieron con inglés pegado al español
-    # ("heels of DeepSeek lanzó su modelo"), huecos en blanco o encima de otro renglón. Mejor el inglés resaltado, que la
-    # voz ya dice en español. El resto del párrafo alrededor de lo citado (otras oraciones) no cuenta.
-    o = oracion(fuente, frase, ocurrencia)
-    sueltos = [(x, donde) for x, donde in ((o["antes"], "antes"), (o["despues"], "después")) if x] if o else []
+    # ("heels of DeepSeek lanzó su modelo"), huecos en blanco o encima de otro renglón. Por eso la traducción es de la
+    # oración entera, del largo del inglés. El resto del párrafo alrededor de lo citado (otras oraciones) no cuenta.
+    sueltos = [x for x in (o["antes"], o["despues"]) if x] if o else []
     tr = traduccion(fuente, renglones, es, peso, italica, serif)
     hueco, cabe = tr.pop("hueco"), tr.pop("cabe")
-    motivo = ("en la misma oración quedaría en inglés " + " y ".join(f"«{x}» {donde}" for x, donde in sueltos)
-              if sueltos else "no cabe en sus renglones" if not cabe
-              else f"deja un hueco de {hueco} px junto al inglés que sigue" if hueco else "")
+    largo = f"la tuya mide {len(es)} caracteres y el inglés {len(frase)}"
+    motivo = ("en la misma oración quedaría inglés suelto. " + _como_traducir(frase, o) if sueltos
+              else f"no cabe en sus renglones ({largo}): acórtala a {_rango(frase)}" if not cabe
+              else f"deja un hueco de {hueco} px junto al inglés que sigue ({largo}): alárgala a {_rango(frase)}"
+              if hueco else "")
     if motivo:
-        print(f'aviso: no se traduce "{frase}" ({fuente}): {motivo}. Márcala hasta el punto (la oración entera) y'
-              ' tradúcela entera, o déjala en inglés.', file=sys.stderr)
+        print(f'aviso: no se traduce "{frase}" ({fuente}): {motivo}', file=sys.stderr)
+        marcas[0]["ingles"] = frase
         return marcas
     marcas[0]["es"] = tr
     for m in marcas[1:]:
@@ -331,7 +365,23 @@ def marca_texto(fuente: str, frase: str, en: str | None = None, t: float | None 
     return marcas
 
 
+def _como_traducir(frase: str, o: dict | None) -> str:
+    """Lo que hay que escribir para que la traducción quede limpia: la oración entera, de su largo."""
+    if o and (o["antes"] or o["despues"]):
+        return (f'márcala entera, hasta el punto, y tradúcela entera en {_rango(o["oracion"])}: '
+                f'marca_texto(..., "{o["oracion"]}", es="…")')
+    return f'tradúcela con es="…" en {_rango(frase)}'
+
+
+def _rango(ingles: str) -> str:
+    """El largo que entra sin hueco ni renglón de más: el último renglón se estira y la letra crece o se achica."""
+    return f"unos {len(ingles)} caracteres (entra de {round(ESTIRA * len(ingles))} a {round(1.25 * len(ingles))})"
+
+
 # ---------- traducción de lo marcado ----------
+
+# Lo más que se estira el último renglón del español para no dejar hueco: desde el 80 % de lo que medía el inglés.
+ESTIRA = 0.8
 
 _LETRAS = {(400, False, False): "segoeui.ttf", (400, True, False): "segoeuii.ttf", (600, False, False): "seguisb.ttf",
            (600, True, False): "seguisbi.ttf", (700, False, False): "segoeuib.ttf", (700, True, False): "segoeuiz.ttf",
@@ -452,13 +502,15 @@ def traduccion(fuente: str, renglones: list[dict], texto: str, peso: int = 400, 
     if renglones[-1]["al_final"]:
         der = max(der, img.width - max(30, min(crudos[0][0], 60)))
 
-    def acomodar(tam: float, n: int, salta: bool = False):
-        """`salta`: deja vacío el primer renglón (la frase empieza en las últimas palabras de un renglón)."""
+    def acomodar(tam: float, n: int, salta: bool = False, q: float = 1.0):
+        """`salta`: deja vacío el primer renglón (la frase empieza en las últimas palabras de un renglón). `q` angosta
+        los renglones, para que un español más corto llene tantos como el inglés (y luego se estiran)."""
         f = _letra(peso, italica, tam, serif)
         xs = [crudos[i][0] if i < len(crudos) else izq for i in range(n)]
         lim = [der - x for x in xs]
         if not renglones[-1]["al_final"] and n == len(crudos):
             lim[-1] = crudos[-1][0] + crudos[-1][2] - xs[-1]
+        lim = [w * q for w in lim]
         lineas, actual = ([""] if salta else []), ""
         for p in texto.split():
             prueba = (actual + " " + p).strip()
@@ -495,28 +547,61 @@ def traduccion(fuente: str, renglones: list[dict], texto: str, peso: int = 400, 
     elif tam < tam0 * 0.9:
         print(f'aviso: "{texto}" quedó al {tam / tam0:.0%} del tamaño del inglés en {fuente}; una traducción más corta'
               ' se ve mejor', file=sys.stderr)
-    salida, cubre, anchos = [], [[m[0] - 2, m[1], m[2] + 4, m[3]] for m in marcas], {}
-    for i, t in enumerate(lineas):
-        if not t:
-            continue
-        j = min(i, len(bases) - 1)
-        base = round(bases[j] + paso * (i - j))
-        m = marcas[min(i, len(marcas) - 1)]
-        w = round(f.getlength(t))
-        x = xs[i] if i < len(xs) else izq
-        r = [x - 4, m[1] + base - bases[j], w + 8, m[3]]
-        salida.append({"t": t, "x": x, "base": base, "w": w, "r": r})
-        anchos[i] = w
-        cubre.append(r)
-    # El hueco: lo que el parche deja vacío en el último renglón cuando sigue otro texto en inglés, o un renglón entero
-    # sin español dentro del párrafo. El primero, vacío a propósito (la frase empezaba al final), no cuenta.
-    hueco = 0
-    for i in range(n):
-        if i == 0 and lineas[0] == "":
-            continue
-        if not anchos.get(i) or (i == n - 1 and not renglones[-1]["al_final"]):
-            hueco = max(hueco, crudos[i][2] - anchos.get(i, 0))
-    hueco = round(hueco) if hueco > 0.6 * tam else 0
+    # Lo que tapa el inglés: cada renglón de la frase y, en los que la frase sigue abajo, hasta la orilla del párrafo
+    # (una raya «—» entre palabras no es palabra, y se asomaba junto al español).
+    tapa = [[m[0] - 2, m[1], (der + 2 if i < len(marcas) - 1 else m[0] + m[2] + 2) - (m[0] - 2), m[3]]
+            for i, m in enumerate(marcas)]
+
+    def armar(lineas, f, xs, tam, estira=False):
+        """Los renglones en su sitio y el hueco que dejan. Con `estira`, el último renglón se estira hasta donde
+        acababa el inglés (el componente lo dibuja con `textLength`): así un español algo más corto no deja hueco."""
+        salida, cubre, anchos = [], [list(r) for r in tapa], {}
+        for i, t in enumerate(lineas):
+            if not t:
+                continue
+            j = min(i, len(bases) - 1)
+            base = round(bases[j] + paso * (i - j))
+            m = marcas[min(i, len(marcas) - 1)]
+            w = round(f.getlength(t))
+            x = xs[i] if i < len(xs) else izq
+            if estira and i == n - 1 and not renglones[-1]["al_final"]:
+                hasta = crudos[i][0] + crudos[i][2]
+                if w >= ESTIRA * (hasta - x):
+                    w = max(w, round(hasta - x))
+            r = [x - 4, m[1] + base - bases[j], w + 8, m[3]]
+            salida.append({"t": t, "x": x, "base": base, "w": w, "r": r})
+            anchos[i] = w
+            cubre.append(r)
+        # El hueco: lo que el parche deja vacío en el último renglón cuando sigue otro texto en inglés, o un renglón
+        # entero sin español dentro del párrafo. El primero, vacío a propósito (la frase empezaba al final), no cuenta.
+        hueco = 0
+        for i in range(n):
+            if i == 0 and lineas[0] == "":
+                continue
+            if not anchos.get(i) or (i == n - 1 and not renglones[-1]["al_final"]):
+                hueco = max(hueco, crudos[i][2] - anchos.get(i, 0))
+        return salida, cubre, round(hueco) if hueco > 0.6 * tam else 0
+
+    salida, cubre, hueco = armar(lineas, f, xs, tam, estira=True)
+    # Un español algo más corto: la letra un poco más grande (hasta un 12 %) lo lleva hasta el final del inglés. Antes
+    # había que atinarle al largo exacto, y nadie le atinaba (a 7 caracteres del inglés, «hueco de 140 px»).
+    k = 1.0
+    while cabe and hueco and k < 1.12:
+        k += 0.02
+        c2, l2, f2, x2 = acomodar(tam0 * k, n)
+        if c2:
+            s2, cu2, h2 = armar(l2, f2, x2, tam0 * k, estira=True)
+            if not h2:
+                tam, lineas, f, xs, salida, cubre, hueco = tam0 * k, l2, f2, x2, s2, cu2, 0
+    # Si le queda un renglón vacío, se reparte en tantos renglones como el inglés (más angostos); el último se estira.
+    q = 1.0
+    while cabe and hueco and q > ESTIRA + 0.01:
+        q -= 0.02
+        c2, l2, f2, x2 = acomodar(tam, n, q=q)
+        if c2 and len(l2) == n:
+            s2, cu2, h2 = armar(l2, f2, x2, tam, estira=True)
+            if not h2:
+                lineas, f, xs, salida, cubre, hueco = l2, f2, x2, s2, cu2, 0
     cubre = [{"r": r, "fondo": _orillas(img, r, fondo)} for r in cubre]
     return {"lineas": salida, "tam": round(tam, 1), "peso": peso, "italica": italica, "serif": serif, "cubre": cubre,
             "fondo": _hexa(fondo), "tinta": _hexa(tinta), **({"familia": L["familia"]} if L else {}),
@@ -525,9 +610,21 @@ def traduccion(fuente: str, renglones: list[dict], texto: str, peso: int = 400, 
 
 def caja_texto(fuente: str, frase: str, en: str | None = None, t: float | None = None, ocurrencia: int = 1,
                pad: int = 2, **kw) -> dict:
-    """Una caja roja alrededor de toda la frase. `pad` en píxeles de la imagen; el componente suma 8 px de pantalla."""
+    """Una caja roja alrededor de toda la frase. `pad` en píxeles de la imagen; el componente suma 8 px de pantalla.
+
+    La caja no traduce: sobre una oración en inglés cuenta como sin traducir (FALTA TRADUCIR), igual que un resaltador
+    sin `es=`. En un episodio de prueba de Haiku (3 nov 2026), cambiaba el resaltador por cajas para no traducir. Un
+    nombre, una cifra o código sí van en caja.
+    """
     cuando = {"en": en} if en else {"t": t or 0}
-    return {"r": _union(buscar(fuente, frase, ocurrencia), pad), **cuando, **kw}
+    caja = {"r": _union(buscar(fuente, frase, ocurrencia), pad), **cuando, **kw}
+    if pagina(fuente):
+        o = oracion(fuente, frase, ocurrencia)
+        if en_ingles(frase, o and o["oracion"]):
+            print(f'aviso: "{frase}" ({fuente}) está en inglés y una caja no lo traduce: usa marca_texto y '
+                  f'{_como_traducir(frase, o)}', file=sys.stderr)
+            caja["ingles"] = frase
+    return caja
 
 
 def renglones(fuente: str, idioma: str = "en-US") -> list[list[int]]:

@@ -116,7 +116,8 @@ la vez otros agentes, cada uno en su hilo:
    `fuentes/material/` y lo que entra al video, a `public/img/`: los recortes con
    `python <base>/scripts/recorte.py fuentes/material/<foto> public/img/<nombre>.png` (limpios, sin borde), los
    logos en SVG con `scripts/svg_png.py`, las capturas con `scripts/captura.py`.
-   Lo que hay que buscar con licencia libre encárgaselo a un subagente con `model: "sonnet"`: qué foto (la criatura de
+   Lo que hay que buscar con licencia libre encárgaselo a un subagente en tu mismo modelo y esfuerzo (los de la
+   línea `Subagentes:`): qué foto (la criatura de
    cuerpo entero y de lado, el escenario con piso y en el formato del reel), licencias que valen (CC0, dominio público,
    Unsplash, Pexels; no CC-BY-SA), dónde buscar (Wikimedia Commons, Pexels, Met Museum Open Access), y que devuelva texto, no imágenes.
    Una persona que recibe los golpes es de dominio público o CC0, o no se le reconoce la cara: la licencia de Pexels no

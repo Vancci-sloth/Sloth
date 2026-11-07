@@ -212,8 +212,9 @@ objeto), y nada de etiquetas de cambio sueltas («−94 %»): el número ya lo d
    no investigues más de dos rondas, y en una serie tampoco: el tema es el primero que cumpla lo que pide, del banco o
    de la primera ronda de búsquedas, no el mejor posible (elegir entre muchos se comía de 2 a 4 minutos y el doble de
    costo). La segunda ronda es solo para la fuente primaria y las fotos del que elegiste.
-3. **El guion lo escribe el subagente `guionista`** (Opus, solo escribe: Agent con `subagent_type: "guionista"`),
-   siempre que tu lista de agentes lo traiga; solo si no está, lo escribes tú. Pásale en unas doce
+3. **El guion lo escribe el subagente `guionista`** (Opus, solo escribe: Agent con `subagent_type: "guionista"`, sin
+   `model` ni `effort`, aunque el mensaje traiga la línea `Subagentes:`: va en Opus a propósito, que es lo que mejora
+   el guion), siempre que tu lista de agentes lo traiga; solo si no está, lo escribes tú. Pásale en unas doce
    líneas lo que necesita y nada más: los datos que vas a usar con su fuente, la marca (`habla` y la frase del cierre),
    los segundos y las palabras (3.4 por segundo), la ruta `<proyecto>/guion.md` con su formato (`# Título de dos a
    cinco palabras`, la línea `Corte de datos: …` y el texto en párrafos) y las reglas de «Para que lo vean» copiadas tal

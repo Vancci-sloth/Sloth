@@ -106,8 +106,8 @@ ancho: lo citado tiene que leerse.
 
 ## El agente de pantalla
 
-Para un video del tema de más de unos minutos, lánzalo en segundo plano (`model: "sonnet"`, `effort: "high"`) junto con el de
-captura, en cuanto tengas la transcripción. Con menos esfuerzo se salta lo que dura poco y lo que solo se lee con OCR. Recorre el video con `cuadros.py hoja` (pasos de 2-3 s y luego 0.5 s donde hace
+Para un video del tema de más de unos minutos, lánzalo en segundo plano (con el `model` y el `effort` de la línea `Subagentes:`) junto con el
+de captura, en cuanto tengas la transcripción. Con menos esfuerzo se salta lo que dura poco y lo que solo se lee con OCR. Recorre el video con `cuadros.py hoja` (pasos de 2-3 s y luego 0.5 s donde hace
 falta) y devuelve solo texto. En el episodio 5 costó $1.9 por 14 minutos de video. Dale:
 
 - La lista numerada de momentos que vas a contar, con su minuto aproximado de la transcripción y el detalle que tiene
@@ -136,9 +136,8 @@ aviso, VACÍA (la página no cargó) o FALTA (la frase no está en la página: n
 octubre tres agentes tardaron 12 minutos en 54 capturas; 12 páginas a la vez tardan unos 40 s.
 
 El agente de captura queda para lo que necesita criterio: memes y clips (`metraje.py`), fotos de personas, el video y
-las fotos de un post (`tuit.py`), una app. Lánzalo en segundo plano (`model: "sonnet"`, `effort: "medium"`, o lo que
-diga `captura` en la línea `Subagentes:`) en cuanto sepas qué hace falta. Con `medium` hace lo mismo que con `high` por
-un 40 % menos; con `low` llegó a capturar el canal equivocado. Lánzalos en cuanto tengas el ángulo (no al terminar el
+las fotos de un post (`tuit.py`), una app. Lánzalo en segundo plano (con el `model` y el `effort` de la línea `Subagentes:`)
+en cuanto sepas qué hace falta. Lánzalos en cuanto tengas el ángulo (no al terminar el
 guion), todos a la vez en un mismo mensaje y numerados: **uno por cada clip o meme de video**, uno para las fotos de
 personas y los logos, y uno para lo demás (posts, apps, páginas que `capturar.mjs` no pudo). En el-diff-9 (25 de
 octubre), uno solo con siete clips tardó 29 minutos, uno tras otro, y todo el episodio lo esperó. El de personas deja

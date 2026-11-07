@@ -121,12 +121,16 @@ Eres uno de {len(bloques)} agentes que escriben a la vez las escenas de este epi
    tabla dice «sí», tu primer beat lleva `seccion=True`; tu primer beat no lleva `sigue`.
 3. Corre `python guion.py` y arregla todos los `aviso:` y `FALTA` de tu bloque (lo de otros bloques no es tuyo), hasta
    que no quede ninguno: cada aviso es algo que la revisión tendría que arreglar después, con otro render. Termina ahí y
-   reporta en dos líneas. No toques otros archivos.
+   reporta en dos líneas. No toques otros archivos. Edita tu bloque con Edit, no con `python -c`, un heredoc ni `sed`:
+   convierten el `\\n` de los rótulos en un salto de línea y dejan las comillas abiertas.
 
 Lo que más se arregló en las revisiones (el-diff-7 y el-diff-8), para que no pase:
 - Recortes y rótulos tapando la cita: sigue «Encima» de ESCENAS.md (en un beat con marcas, el recorte chico en una
   esquina de abajo y el rótulo fuera de la cita). Un rótulo no repite lo que dice la voz.
 - Marcas heredadas: un beat con `sigue` que marca otra frase lleva `limpia=True` (guion.py lo avisa).
+- Inglés sin traducir: cada `marca_texto` sobre inglés lleva `es="…"` con la oración entera en español (`en=` es la
+  palabra de la voz en que aparece, no la traducción); `es=False` solo en un nombre, una cifra o código, nunca en una
+  oración. Si avisa `no se traduce`, haz lo que dice (la oración entera, de su largo) hasta que no quede `FALTA TRADUCIR`.
 - Escenas en tira: una imagen más ancha que alta, o un clip en `encuadre="ajusta"` sin `vista` (guion.py lo avisa).
 - La imagen corresponde a lo que dice la voz en ese beat, no al siguiente; una página se usa ya dibujada.
 
