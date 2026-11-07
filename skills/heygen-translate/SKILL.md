@@ -291,10 +291,10 @@ heygen video-translate proofreads srt update <proofread-id> \
 
 # 6. Kick off final render — returns a video_translation_id
 heygen video-translate proofreads generate <proofread-id> --captions
-# → {"data":{"video_translation_id":"<vid-id>","status":"processing"}}
+# → {"data":{"video_translation_id":"<video-id>","status":"processing"}}
 
 # 7. Poll the translation to completion (NOT proofreads get — graduates here)
-heygen video-translate get <vid-id>
+heygen video-translate get <video-id>
 # → status: running → completed; data.video_url has the final mp4
 ```
 

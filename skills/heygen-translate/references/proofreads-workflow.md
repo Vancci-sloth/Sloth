@@ -220,7 +220,7 @@ The URL must return `Content-Type` of `application/x-subrip` or `text/plain` and
 **After this call**, polling shifts to:
 
 ```bash
-heygen video-translate get "$VID_ID"
+heygen video-translate get "$VIDEO_ID"
 ```
 
 …which returns the standard translation response shape (`status`, eventual `video_url`, `failure_message`, etc.).
@@ -229,7 +229,7 @@ heygen video-translate get "$VID_ID"
 
 ## Full CLI walkthrough (verified end-to-end)
 
-Substitute `<proofread-id>` and `<vid-id>` with the actual ids you receive.
+Substitute `<proofread-id>` and `<video-id>` with the actual ids you receive.
 
 ```bash
 # 1. Submit proofread session
@@ -268,10 +268,10 @@ heygen video-translate proofreads srt update <proofread-id> \
 
 # 6. Kick off the final render with the corrected captions
 heygen video-translate proofreads generate <proofread-id> --captions
-# → {"data":{"video_translation_id":"<vid-id>","status":"processing"}}
+# → {"data":{"video_translation_id":"<video-id>","status":"processing"}}
 
 # 7. Poll the resulting translation to completion
-heygen video-translate get <vid-id>
+heygen video-translate get <video-id>
 # → status: running → completed; data.video_url has the final mp4
 ```
 
