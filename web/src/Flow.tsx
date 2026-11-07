@@ -201,7 +201,7 @@ export function FlowOpciones({ voz }: { voz: UsoVoz }) {
       </div>
       {e?.agregando && (
         <p className="muted small fila-extra">
-          Al llegar a Flow, acepta su aviso si te lo enseña y cierra la ventana: la cuenta queda en Sloth. Cada cuenta gratis da 50 créditos al día; cuando una se queda sin ellos, Sloth sigue con otra.
+          Cuando Flow abra con tu foto arriba a la derecha, acepta su aviso si te lo enseña y cierra la ventana: la cuenta queda en Sloth. Cada cuenta gratis da 50 créditos al día; cuando una se queda sin ellos, Sloth sigue con otra.
         </p>
       )}
       {n > 0 && e && (

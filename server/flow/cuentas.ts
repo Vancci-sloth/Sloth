@@ -121,8 +121,19 @@ function edgeDe(perfil: string) {
     lanzar,
     cerrar,
     paginas,
-    /** Si ya tiene la sesión de Google. */
-    conSesion: () => alNavegador<{ cookies: { name: string; domain: string }[] }>('Storage.getCookies').then((r) => r.cookies.some((c) => c.name === 'SAPISID' && /(^|\.)google\.com$/.test(c.domain.replace(/^\./, ''))), () => false),
+    /**
+     * Si ya tiene la sesión de Google y la de Flow. La de Flow (`OSID` en su dominio) la pone Google un momento después de
+     * llegar: sin ella, el Edge sin ventana tenía que pedirla otra vez y Google no se la daba, así que Flow abría sin
+     * cuenta («Entraste, pero Flow no dijo con qué cuenta»), a quien cerraba la ventana en cuanto veía Flow.
+     */
+    sesiones: () =>
+      alNavegador<{ cookies: { name: string; domain: string }[] }>('Storage.getCookies').then(
+        ({ cookies }) => {
+          const de = (dominio: RegExp, nombre: RegExp) => cookies.some((c) => nombre.test(c.name) && dominio.test(c.domain.replace(/^\./, '')))
+          return { google: de(/(^|\.)google\.com$/, /^SAPISID$/), flow: de(new RegExp(`^${new URL(URL_FLOW).hostname.replaceAll('.', '\\.')}$`), /^(__Secure-)?OSID$/) }
+        },
+        () => ({ google: false, flow: false })
+      ),
     enEdge: <T>(fn: (b: Browser) => Promise<T>) =>
       enTurno(async () => {
         await lanzar(false)
@@ -138,8 +149,11 @@ function edgeDe(perfil: string) {
   }
 }
 
-/** El correo de la cuenta con que está Flow, de su botón de cuenta («Cuenta de Google: Nombre (correo)»). */
-async function correoEnFlow(b: Browser): Promise<string | null> {
+/**
+ * El correo de la cuenta con que está Flow, de su botón de cuenta («Cuenta de Google: Nombre (correo)»). Si no lo
+ * enseña, deja en `captura` lo que enseñó, para saber por qué.
+ */
+async function correoEnFlow(b: Browser, captura: string): Promise<string | null> {
   const page = await paginaNueva(b)
   try {
     await page.goto(URL_FLOW, { waitUntil: 'domcontentloaded', timeout: 60_000 })
@@ -149,7 +163,9 @@ async function correoEnFlow(b: Browser): Promise<string | null> {
       .first()
       .getAttribute('aria-label', { timeout: 15_000 })
       .catch(() => null)
-    return etiqueta?.match(/\(([^()\s]+@[^()\s]+)\)/)?.[1] ?? null
+    const correo = etiqueta?.match(/\(([^()\s]+@[^()\s]+)\)/)?.[1] ?? null
+    if (!correo) await page.screenshot({ path: captura }).catch(() => {})
+    return correo
   } finally {
     await page.close().catch(() => {})
   }
@@ -193,17 +209,23 @@ export function cuentasFlow(carpeta: string) {
     const e = edge(id)
     try {
       await e.lanzar(true, ENTRAR)
-      let sesion = false
+      let google = false
+      let flow = false
       // Sin pestañas dos veces seguidas es que cerraste la ventana: recién abierto, Edge puede tardar en enseñar la suya.
       for (let fin = Date.now() + PLAZO_ENTRAR, vacias = 0; Date.now() < fin && vacias < 2; ) {
         await espera(1500)
         const abiertas = await e.paginas()
         vacias = abiertas.length ? 0 : vacias + 1
-        if (!sesion && abiertas.some((p) => p.url.startsWith(URL_FLOW))) sesion = await e.conSesion()
+        if (!flow && abiertas.some((p) => p.url.startsWith(URL_FLOW))) {
+          const s = await e.sesiones()
+          google ||= s.google
+          flow = s.google && s.flow
+        }
       }
       await e.cerrar()
-      if (!sesion) throw new Error(`No entraste con Google en ${nombreNavegador()}, o cerraste la ventana antes de llegar a Flow. Vuelve a intentarlo.`)
-      const correo = await e.enEdge(correoEnFlow)
+      if (!google) throw new Error(`No entraste con Google en ${nombreNavegador()}, o cerraste la ventana antes de llegar a Flow. Vuelve a intentarlo.`)
+      if (!flow) throw new Error('Cerraste la ventana antes de que Flow abriera con tu cuenta. Vuelve a intentarlo y ciérrala cuando veas tu foto arriba a la derecha de Flow.')
+      const correo = await e.enEdge((b) => correoEnFlow(b, join(carpeta, 'error.png')))
       if (!correo) throw new Error('Entraste, pero Flow no dijo con qué cuenta. Vuelve a intentarlo.')
       if (correo === deLaVoz) throw new Error(`${correo} es la cuenta de la voz: ya genera en Flow.`)
       const vieja = lista.find((c) => c.correo === correo)
