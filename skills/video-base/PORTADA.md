@@ -63,8 +63,9 @@ Mírala (paso 4) y sigue en el paso 5. **Con ella:**
 5. `node <base>/scripts/portada.mjs out/<video>.mp4 portada.png`. La pone como primer fotograma, en el mismo archivo;
    correrlo otra vez cambia la portada, no suma otra. El `final.py` de cada estilo la vuelve a poner sola si
    `portada.png` ya existe, así que un render nuevo no la pierde. Codifica solo ese fotograma, con los mismos ajustes
-   de x264 que el vídeo, y lo pega delante sin recodificar el resto (un segundo, sin segunda compresión); si el vídeo no
-   lo deja, lo recodifica entero, como antes, y lo dice. El Diff no usa `portada.mjs`: su `final.py` la renderiza como
+   de x264 que el vídeo (también dónde va su color, `chromaloc`: sin eso ningún render de Remotion lo dejaba), y lo
+   pega delante sin recodificar el resto (unos 3 s, sin segunda compresión); si el vídeo no lo deja, lo recodifica
+   entero con NVENC si hay NVIDIA (o x264, como antes; `SLOTH_SIN_NVENC=1` lo apaga) y dice con cuál. El Diff no usa `portada.mjs`: su `final.py` la renderiza como
    un tramo más.
 
 ## En horizontal: la miniatura de YouTube
