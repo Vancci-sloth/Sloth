@@ -17,6 +17,7 @@ import { LINK, pedirMejora, threadIcons, threadRef } from './etiquetas'
 import { Confirm } from './Confirm'
 import { TusCambios } from './TusCambios'
 import { EstiloCambio } from './EstiloCambio'
+import { Novedades } from './Novedades'
 import { ActualizarSloth, AvisoAgentes } from './Actualizar' // versiones nuevas
 import { TarjetasEnlaces } from './Enlaces' // tarjeta de los enlaces
 import { esDeEstudio, Estudio } from './Estudio' // panel de etapas
@@ -705,6 +706,7 @@ export function App() {
           />
         )}
       </main>
+      <Novedades />
       <EstiloCambio cards={cards} activa={newCard?.id} />
     </div>
   )

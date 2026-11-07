@@ -5,6 +5,7 @@ import { api } from './api'
 import { bienvenidaPendiente, BIENVENIDA_CERRADA } from './Bienvenida'
 import { abrirBorrador } from './Estilos'
 import { Icono } from './Iconos'
+import { novedadesPendiente, NOVEDADES_CERRADAS } from './Novedades'
 import './EstiloCambio.css'
 
 type Aviso = EstiloAnterior & { card: Card }
@@ -24,7 +25,8 @@ export function EstiloCambio({ cards, activa }: { cards: Card[]; activa?: string
   const [avisos, setAvisos] = useState<Aviso[]>([])
   /** Los que se cerraron sin acabar: vuelven al entrar a su estilo. */
   const [cerrados, setCerrados] = useState<string[]>([])
-  const [bienvenida, setBienvenida] = useState(bienvenidaPendiente)
+  /** Espera a que se cierre lo que sale antes al abrir Sloth: la bienvenida o la guía de lo nuevo. */
+  const [bienvenida, setBienvenida] = useState(() => bienvenidaPendiente() || novedadesPendiente())
   const [leido, setLeido] = useState(false)
   const [olvidar, setOlvidar] = useState(false)
   const [hecho, setHecho] = useState<Hecho | null>(null)
@@ -48,7 +50,11 @@ export function EstiloCambio({ cards, activa }: { cards: Card[]; activa?: string
   useEffect(() => {
     const alCerrar = () => setBienvenida(false)
     addEventListener(BIENVENIDA_CERRADA, alCerrar)
-    return () => removeEventListener(BIENVENIDA_CERRADA, alCerrar)
+    addEventListener(NOVEDADES_CERRADAS, alCerrar)
+    return () => {
+      removeEventListener(BIENVENIDA_CERRADA, alCerrar)
+      removeEventListener(NOVEDADES_CERRADAS, alCerrar)
+    }
   }, [])
 
   useEffect(() => {

@@ -53,6 +53,9 @@ ramas ni bloquea por sí solo un push a `venta`.
 ## App instalada: este repo, rama venta
 
 1. Actualiza `novedad.txt`: un renglón corto con lo que trae la versión, que se ve al pasar el cursor sobre «Actualizar».
+   Una versión grande puede llevar además su guía animada (`web/src/Novedades.tsx`, la 0.4.0 en
+   `web/public/novedades/0.4.0.html`), que sale una vez al abrirla a quien actualizó. Su número va en `package.json`:
+   `version-venta.mjs` solo sube la última cifra.
 2. Comprueba el diff completo entre `origin/venta` y `main`: se publicará todo lo que haya entrado a `main`. Guarda la
    lista de sus commits (`git log --no-merges --format="%s%n%b" origin/venta..main`): de ahí sale el anuncio del paso 5,
    y después del push ya no se puede sacar así.
