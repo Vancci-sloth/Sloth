@@ -30,6 +30,9 @@ function preparar(t: { after(fn: () => void): void }) {
       }
     },
     DESCARGAS: { head: async () => null },
+    MONEDA: 'USD',
+    PRECIO_MENSUAL: 15,
+    PRECIO_MENSUAL_MXN: 299,
     CORREO_DE: 'Sloth <avisos@example.com>',
     CORREO_RESPUESTA: 'soporte@example.com',
     RESEND_API_KEY: 're_prueba'
@@ -49,13 +52,15 @@ function preparar(t: { after(fn: () => void): void }) {
   })
   let n = 0
   /** Una persona con su licencia y su miembro de la comunidad. */
-  const persona = (email: string, plan = 'cuenta', estado = 'gratis', hasta: string | null = null, fundador = 0): QuienRifa => {
+  const persona = (email: string, plan = 'cuenta', estado = 'gratis', hasta: string | null = null, fundador = 0, monto = 15, moneda = 'USD'): QuienRifa => {
     const id = `lic${++n}`
-    db.prepare("INSERT INTO licencias (id, clave, email, plan, monto, fundador, estado, modo, pagado_hasta, autorizada, creada) VALUES (?, ?, ?, ?, 15, ?, ?, 'produccion', ?, ?, ?)").run(
+    db.prepare("INSERT INTO licencias (id, clave, email, plan, monto, moneda, fundador, estado, modo, pagado_hasta, autorizada, creada) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'produccion', ?, ?, ?)").run(
       id,
       `SLOTH-${id}`,
       email,
       plan,
+      monto,
+      moneda,
       fundador,
       estado,
       hasta,
@@ -71,12 +76,15 @@ function preparar(t: { after(fn: () => void): void }) {
   return { db, env, ctx, esperas, correos, persona, creador, pedir }
 }
 
-test('solo entra quien usa Sloth gratis; quien apoya o es Fundador ve por qué no', async (t) => {
+test('entra quien usa Sloth gratis o apoya con menos del sugerido; quien apoya con el sugerido o es Fundador ve por qué no', async (t) => {
   const { persona, creador, pedir } = preparar(t)
   const gratis = persona('gratis@example.com')
   const vencido = persona('vencido@example.com', 'mensual', 'cancelled', '2026-01-01')
   const apoya = persona('apoya@example.com', 'mensual', 'authorized', '2099-01-01')
   const fundador = persona('fundador@example.com', 'gratis', 'gratis')
+  const poquito = persona('cinco@example.com', 'mensual', 'authorized', '2099-01-01', 0, 5)
+  const pesos = persona('pesos@example.com', 'mensual', 'authorized', '2099-01-01', 0, 299, 'MXN')
+  const anual = persona('anual@example.com', 'anual', 'authorized', '2099-01-01', 0, 150)
   await pedir(creador, '/comunidad/rifa/crear', { premio: 'Una clave de Sloth', creditos: 0, ganadores: 1 })
 
   const v = await pedir<RifaComunidad>(gratis, '/comunidad/rifa')
@@ -89,9 +97,12 @@ test('solo entra quien usa Sloth gratis; quien apoya o es Fundador ve por qué n
   assert.match((await pedir<RifaComunidad>(apoya, '/comunidad/rifa')).fuera ?? '', /ya apoyas/)
   await assert.rejects(pedir(apoya, '/comunidad/rifa/participar', {}), /ya apoyas/)
   await assert.rejects(pedir(fundador, '/comunidad/rifa/participar', {}), /Fundador/)
+  await assert.rejects(pedir(pesos, '/comunidad/rifa/participar', {}), /ya apoyas/)
+  await assert.rejects(pedir(anual, '/comunidad/rifa/participar', {}), /ya apoyas/)
+  assert.equal((await pedir<RifaComunidad>(poquito, '/comunidad/rifa/participar', {})).participo, true)
   await assert.rejects(pedir(creador, '/comunidad/rifa/participar', {}), /creador/)
   // Pulsar dos veces no cuenta dos.
-  assert.equal((await pedir<RifaComunidad>(gratis, '/comunidad/rifa/participar', {})).abierta?.participantes, 2)
+  assert.equal((await pedir<RifaComunidad>(gratis, '/comunidad/rifa/participar', {})).abierta?.participantes, 3)
 })
 
 test('una sola abierta, el sorteo deja fuera a quien empezó a apoyar y avisa al ganador', async (t) => {
@@ -105,7 +116,7 @@ test('una sola abierta, el sorteo deja fuera a quien empezó a apoyar y avisa al
   await pedir(a, '/comunidad/rifa/participar', {})
   await pedir(b, '/comunidad/rifa/participar', {})
   // b empieza a apoyar después de entrar: ya no gana.
-  db.prepare("INSERT INTO licencias (id, clave, email, plan, monto, estado, modo, pagado_hasta, autorizada, creada) VALUES ('apoyo-b', 'SLOTH-B2', 'b@example.com', 'mensual', 15, 'authorized', 'produccion', '2099-01-01', '2026-11-05', '2026-11-05')").run()
+  db.prepare("INSERT INTO licencias (id, clave, email, plan, monto, moneda, estado, modo, pagado_hasta, autorizada, creada) VALUES ('apoyo-b', 'SLOTH-B2', 'b@example.com', 'mensual', 15, 'USD', 'authorized', 'produccion', '2099-01-01', '2026-11-05', '2026-11-05')").run()
   assert.match((await pedir<RifaAdmin>(creador, '/comunidad/rifa/admin')).abierta!.lista[1].fuera ?? '', /ya apoyas/)
 
   const s = await pedir<SorteoRifa>(creador, '/comunidad/rifa/sortear', { rifa: id })

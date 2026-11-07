@@ -4,8 +4,8 @@
  * con su ruleta (`web/src/RifaAdmin.tsx`).
  *
  * - Participa una persona por correo (`externo`, el id de la primera licencia de su correo, el mismo usuario que en las
- *   voces), con un botón. Quien apoya pagando (Apoya, Donador PRO) o es Fundador queda fuera (`fuera`): ya tiene sus
- *   créditos cada mes. Se vuelve a mirar al sortear: quien empezó a apoyar después ya no entra.
+ *   voces), con un botón. Quien apoya con el precio sugerido o más (Apoya, Donador PRO) o es Fundador queda fuera
+ *   (`fuera`): ya tiene sus créditos cada mes. Quien apoya con menos sí entra. Se vuelve a mirar al sortear: quien empezó a apoyar después ya no entra.
  * - Solo una abierta a la vez (migración 0025). Sortear elige al azar (`crypto.getRandomValues`, sin sesgo) y deja la
  *   rifa sorteada y sus ganadores en una sola transacción: dos sorteos a la vez no dan dos resultados.
  * - A cada ganador se le suman sus créditos en su cuenta de voz de Sloth (el repartidor de `voz.ts`, como los mensuales),
@@ -48,13 +48,18 @@ const POR_QUE: Record<Fuera, string> = {
 
 /**
  * Lo que deja fuera de la rifa al correo `email` (una expresión SQL), o NULL si puede entrar: bloqueado, Fundador (el
- * que pagó su lugar o el gratis de por vida) o un apoyo pagado y vigente, la misma cuenta que la insignia de la comunidad.
+ * que pagó su lugar o el gratis de por vida) o un apoyo pagado y vigente de al menos el precio sugerido (`PRECIO_MENSUAL`
+ * en `MONEDA`, `PRECIO_MENSUAL_MXN` en pesos, o el anual). Quien apoya con menos (el monto que elige, desde $1) sí
+ * participa, por decisión del creador (7 de noviembre de 2026): lo que trae el apoyo empieza en el sugerido.
  * Su alias (`rf`) no es el de ninguna consulta que la use: con el mismo, compararía cada correo consigo mismo.
  */
-export const fuera = (email: string) => `(SELECT CASE
+export const fuera = (env: Env, email: string) => `(SELECT CASE
   WHEN MAX(rf.estado = 'vetada') THEN 'vetada'
   WHEN MAX(${esFundador('rf')}) THEN 'fundador'
-  WHEN MAX(rf.modo = 'produccion' AND rf.plan IN ('mensual', 'anual', 'unico') AND julianday(rf.pagado_hasta) > julianday('now')) THEN 'apoya'
+  WHEN MAX(rf.modo = 'produccion' AND rf.plan IN ('mensual', 'anual', 'unico') AND julianday(rf.pagado_hasta) > julianday('now')
+    AND (rf.plan = 'anual'
+      OR (rf.moneda = '${String(env.MONEDA ?? 'USD').replace(/[^A-Z]/g, '')}' AND rf.monto >= ${Number(env.PRECIO_MENSUAL) || 15})
+      OR (rf.moneda = 'MXN' AND rf.monto >= ${Number(env.PRECIO_MENSUAL_MXN) || 299}))) THEN 'apoya'
   END FROM licencias rf WHERE rf.email = ${email})`
 
 interface Guardada {
@@ -117,7 +122,7 @@ export async function rifa(req: Request, env: Env, ctx: ExecutionContext, yo: Qu
 /** La persona de una clave: su correo, su usuario (`externo`) y si la rifa la deja fuera. El creador no tiene. */
 async function persona(env: Env, clave: string) {
   return env.DB.prepare(
-    `SELECT l.email, (SELECT v.id FROM licencias v WHERE v.email = l.email ORDER BY v.creada, v.id LIMIT 1) AS externo, ${fuera('l.email')} AS fuera FROM licencias l WHERE l.clave = ?`
+    `SELECT l.email, (SELECT v.id FROM licencias v WHERE v.email = l.email ORDER BY v.creada, v.id LIMIT 1) AS externo, ${fuera(env, 'l.email')} AS fuera FROM licencias l WHERE l.clave = ?`
   )
     .bind(clave)
     .first<{ email: string; externo: string; fuera: Fuera | null }>()
@@ -226,7 +231,7 @@ export function elegir<T>(lista: T[], n: number, azar: (max: number) => number =
 
 const participantes = (env: Env, rifa: string) =>
   env.DB.prepare(
-    `SELECT p.externo, p.miembro, p.desde, COALESCE(m.nombre, '') AS nombre, o.email, ${fuera('o.email')} AS fuera
+    `SELECT p.externo, p.miembro, p.desde, COALESCE(m.nombre, '') AS nombre, o.email, ${fuera(env, 'o.email')} AS fuera
     FROM rifa_participantes p JOIN licencias o ON o.id = p.externo LEFT JOIN miembros m ON m.id = p.miembro WHERE p.rifa = ? ORDER BY p.desde`
   )
     .bind(rifa)
