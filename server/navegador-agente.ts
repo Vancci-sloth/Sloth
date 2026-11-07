@@ -3,11 +3,17 @@ import { closeSync, existsSync, openSync, readFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { direccionChromeAgente } from './chrome-agente.ts'
+import { detectados, elegirNavegador, leerPreferencia } from './navegador-sistema.ts'
 
 /**
  * El navegador del agente: Playwright MCP en todos los hilos, para abrir, leer y fotografiar páginas que no se dejan leer
  * con WebFetch (`browser_navigate`, `browser_snapshot`, `browser_take_screenshot`…). No se confunde con el de las redes
  * (`server/redes/navegador.ts`).
+ *
+ * Con Opciones → Navegador en `chrome` o `edge`, un hilo normal navega en una ventana de ese navegador instalado, con el
+ * perfil del agente de Sloth: Playwright entra por CDP al relevo de `chrome-agente.ts`, que lo abre y aplica la política
+ * del navegador (esquemas, descargas, confirmación de publicar, pagar o borrar). Con `automatico` (lo normal), lo de abajo.
  *
  * Con la ventana de Sloth abierta, un hilo normal usa su página del navegador integrado (`electron/navegador.ts`): lo que
  * abre el agente se ve en el hilo, sin otra ventana. Playwright se conecta a ella por CDP, a la dirección que la ventana
@@ -96,6 +102,13 @@ export function navegadorAgente(lote?: boolean, hilo?: string): Record<string, M
   })
   // Rutas absolutas: las capturas quedan fuera de la carpeta del hilo, y Read de Claude Code las pide así.
   const salida = ['--output-dir', CAPTURAS, '--output-max-size', String(TOPE_CAPTURAS), '--file-paths', 'absolute']
+  if (!lote && hilo) {
+    const elegido = elegirNavegador(leerPreferencia(), detectados())
+    const relevo = elegido ? direccionChromeAgente(hilo, elegido) : null
+    // Con `OCIOSO`: tras ese rato sin usarlo se suelta Playwright, el relevo cuenta al hilo como ido y el perfil queda libre.
+    // Sin relevo (aún no arrancó o no hay navegador), sigue con lo de siempre.
+    if (relevo) return mcp(['--cdp-endpoint', relevo.cdp, ...(relevo.aislado ? ['--isolated'] : []), ...salida], OCIOSO)
+  }
   const ventana = !lote && hilo ? integrado() : null
   if (ventana) {
     const cdp = `ws://127.0.0.1:${ventana.puerto}/${ventana.secreto}/${encodeURIComponent(hilo!)}`

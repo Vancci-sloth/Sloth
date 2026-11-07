@@ -11,7 +11,7 @@ import { conectarCDP } from '../playwright.ts'
 import { type EstadoVoz, type ProveedorVoz, NAVEGADOR_VOZ, type TrabajoVoz, type VozStudio } from '../../shared/types.ts'
 import { VENTA } from '../../shared/venta.ts'
 import { MOTORES, motorDe, segundosWav, textoParaVoz, vocesDelPanel } from '../../shared/voz.ts'
-import { chromiumDelSistema, lanzarChromium, nombreDe, paginaNueva, SIN_CHROMIUM, SIN_VENTANA } from '../chromium.ts'
+import { chromiumElegido, lanzarChromium, nombreDe, paginaNueva, perfilDe, SIN_CHROMIUM, SIN_VENTANA } from '../chromium.ts'
 import { guardar } from '../disco.ts'
 import { bytes, cuerpo } from '../http.ts'
 import { integrado } from '../navegador-agente.ts'
@@ -56,9 +56,10 @@ const ENTRAR = `https://accounts.google.com/ServiceLogin?continue=${encodeURICom
 const PUERTO = 9336
 /**
  * Donde se entra con Google, el primero que haya: en Windows Edge, que viene con el sistema; en Mac Chrome, que es el que
- * suele haber (allí la comunidad no podía entrar en Edge). Safari no sirve (`server/chromium.ts`).
+ * suele haber (allí la comunidad no podía entrar en Edge). Opciones → Navegador lo cambia a Chrome o Edge. Safari no sirve
+ * (`server/chromium.ts`).
  */
-const navegadorDeGoogle = () => chromiumDelSistema(process.platform === 'darwin')
+const navegadorDeGoogle = () => chromiumElegido(process.platform === 'darwin')
 /** Su nombre, para decirte dónde entrar. */
 const nombreEdge = () => nombreDe(navegadorDeGoogle() ?? (process.platform === 'win32' ? 'msedge' : undefined))
 /** Lo más que espera una petición a que acabe su voz: el MCP repite, y Codex corta una herramienta a los 60 s. */
@@ -78,7 +79,11 @@ export function voz(app: string, socio: Parameters<typeof voicesCloning>[1]) {
   // haya uno de Sloth.
   const nuevo = join(carpeta, 'perfil')
   const viejo = join(process.env.LOCALAPPDATA ?? join(homedir(), '.cache'), 'video-el-diff', 'aistudio')
-  const perfil = () => (existsSync(nuevo) || !existsSync(viejo) ? nuevo : viejo)
+  // Con el otro navegador elegido en Opciones, su perfil va aparte (`perfilDe`): el del script viejo solo es del habitual.
+  const perfil = () => {
+    const propio = perfilDe(nuevo, process.platform === 'darwin')
+    return propio !== nuevo || existsSync(nuevo) || !existsSync(viejo) ? propio : viejo
+  }
   const archivoCuenta = join(carpeta, 'cuenta.json')
 
   let guardada: { correo?: string | null; voces?: VozStudio[] } = {}
@@ -393,7 +398,7 @@ export function voz(app: string, socio: Parameters<typeof voicesCloning>[1]) {
       })
     await enTurno(async () => {
       if (await responde()) await cerrarEdge()
-      if (perfil() !== nuevo) return void mkdirSync(nuevo, { recursive: true })
+      if (perfil() === viejo) return void mkdirSync(nuevo, { recursive: true })
       await lanzarEdge(false)
       await alNavegador('Storage.clearCookies').catch(() => {})
       await cerrarEdge()

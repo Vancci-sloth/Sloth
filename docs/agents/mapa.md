@@ -97,6 +97,7 @@ Este es el mapa:
   `<webview>` y Sloth una vista nativa: el tamaño fijo es `enableDeviceEmulation`, y por eso el relevo reescala los clics.
   Google no deja iniciar sesión dentro de la app: ese paso se da en Edge (Chrome en Mac) y la sesión pasa a sus páginas (`electron/google.ts`).
   Qué sitios abre cada perfil, qué descargas se cancelan y cuándo el agente espera tu Permitir/Bloquear: `docs/agents/navegador-seguridad.md`.
+  Opciones → Navegador (`server/navegador-sistema.ts`, `web/src/NavegadorOpciones.tsx`): con `chrome` o `edge` el agente navega en una ventana de ese navegador instalado, por el relevo `server/chrome-agente.ts` (misma política); además la voz, las redes y Google lo abren a él (`chromiumElegido` y `perfilDe`, `server/chromium.ts`). En `automatico` (por omisión) nada de esto corre.
 - `server/ideas/` y `web/src/Ideas.tsx`: Ideas, qué video hacer: largo en YouTube o vertical en TikTok e Instagram
   (`formato: 'vertical'`), en `trabajo/ideas/<id>/`. Investigar mide cada video contra su canal (outlier: 3× o más),
   transcribe lo dicho (`transcribir.ts`) y agrupa temas con vectores locales (`vectores.ts`); en vertical busca con

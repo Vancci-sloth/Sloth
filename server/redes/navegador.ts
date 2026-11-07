@@ -1,7 +1,7 @@
 import { mkdirSync } from 'node:fs'
 import { join } from 'node:path'
 import type { Browser, BrowserContext, Page } from 'playwright-core'
-import { chromiumDelSistema, lanzarChromium, SIN_CHROMIUM } from '../chromium.ts'
+import { chromiumElegido, lanzarChromium, perfilDe, SIN_CHROMIUM } from '../chromium.ts'
 import { conectarCDP } from '../playwright.ts'
 import { NAVEGADOR_REDES } from '../../shared/types.ts'
 import { integrado } from '../navegador-agente.ts'
@@ -60,9 +60,9 @@ export async function navegador(app: string, url = 'about:blank'): Promise<Brows
 async function abrirEdge(app: string, url: string): Promise<Browser> {
   if (!(await responde())) {
     // Edge si está y, si no (lo normal en Mac y Linux), Chrome: Google deja entrar en los dos.
-    const edge = chromiumDelSistema(false)
-    if (!edge) throw new Error(process.platform === 'win32' ? 'No encontré Microsoft Edge, que es el navegador con el que Sloth publica.' : SIN_CHROMIUM)
-    const perfil = join(app, 'data', 'redes', 'perfil')
+    const edge = chromiumElegido(false)
+    if (!edge) throw new Error(process.platform === 'win32' ? 'No encontré Microsoft Edge ni Google Chrome, que son los navegadores con los que Sloth publica.' : SIN_CHROMIUM)
+    const perfil = perfilDe(join(app, 'data', 'redes', 'perfil'), false)
     mkdirSync(perfil, { recursive: true })
     lanzarChromium(edge, [`--remote-debugging-port=${PUERTO}`, `--user-data-dir=${perfil}`, '--no-first-run', '--no-default-browser-check', url], true)
     for (let i = 0; i < 40 && !(await responde()); i++) await new Promise((r) => setTimeout(r, 500))

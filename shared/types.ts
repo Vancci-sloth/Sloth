@@ -1355,6 +1355,23 @@ export const NAVEGADOR_REDES = 'redes'
  */
 export const NAVEGADOR_VOZ = 'voz'
 
+/**
+ * Opciones → Navegador (`server/navegador-sistema.ts`): `automatico` deja todo como estaba (el agente en la ventana de
+ * Sloth; Google, la voz y las redes en Edge, o Chrome en Mac); `chrome` y `edge` hacen que el agente navegue en una
+ * ventana de ese navegador instalado, y que la voz y las redes lo abran a él, siempre con un perfil de Sloth.
+ */
+export type PreferenciaNavegador = 'automatico' | 'chrome' | 'edge'
+export type MarcaNavegador = 'chrome' | 'edge'
+
+export interface OpcionNavegador {
+  preferencia: PreferenciaNavegador
+  /** La ruta de Chrome instalado, o `null` si no se encontró. */
+  chrome: string | null
+  edge: string | null
+  /** El que se usa de verdad con esa preferencia; `null` con `automatico` o si no hay ninguno. */
+  usa: MarcaNavegador | null
+}
+
 /** Una voz de AI Studio: su nombre allí (`Fola`), cómo suena y el grupo en que la pone la página (`Podcast`). */
 export interface VozStudio {
   nombre: string

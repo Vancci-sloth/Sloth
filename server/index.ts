@@ -5,7 +5,7 @@ import { createServer as servidorTcp } from 'node:net'
 import { basename, dirname, extname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { WebSocketServer, type WebSocket } from 'ws'
-import type { Card, Model, ServerPush } from '../shared/types.ts'
+import type { Card, Model, PreferenciaNavegador, ServerPush } from '../shared/types.ts'
 import { VENTA } from '../shared/venta.ts'
 import { cambiarAcceso } from './acceso.ts'
 import { cuerpo as body, json as send } from './http.ts'
@@ -23,6 +23,8 @@ import { conectandoCodex, conectarCodex, cuentaCodex, limitesCodex, salirCodex }
 import { alEntrarClaude, conectando, conectarClaude, cuentaClaude, limitesClaude, salirClaude } from './cuenta.ts'
 import { cancelarOpenCode, conectandoOpenCode, conectarOpenCode, cuentaOpenCode, limitesOpenCode, quitarCuentaOpenCode, usarCuentaOpenCode } from './cuenta-opencode.ts'
 import { enlacesApi } from './enlaces.ts' // tarjeta de los enlaces
+import { iniciarChromeAgente } from './chrome-agente.ts' // navegador del agente
+import { estadoNavegador, guardarPreferencia, leerPreferencia, usarCarpeta } from './navegador-sistema.ts' // navegador del agente
 import { cerrarVigilantesOciosos, etapasApi, folderOf, mismaCwd, queFalta, videosApi, videosDe } from './etapas.ts' // panel de etapas
 import { cerrarMotoresOciosos } from './motor.ts'
 import { modelos3d } from './modelos3d.ts' // modelos 3D
@@ -54,6 +56,7 @@ import { type Agente, version } from './version.ts'
 import { cargarPreciosCodex } from './precios.ts'
 
 const APP = resolve(dirname(fileURLToPath(import.meta.url)), '..')
+usarCarpeta(APP)
 const PORT = Number(process.env.PORT ?? 4848)
 const CARDS = join(APP, 'cards.json')
 /**
@@ -355,6 +358,22 @@ async function api(req: IncomingMessage, res: ServerResponse, url: URL): Promise
 
   if (path === '/api/opciones' && method === 'GET') {
     send(res, 200, opciones())
+    return true
+  }
+
+  // Opciones → Navegador: en qué navegador instalado navega el agente y se abren la voz y las redes.
+  if (path === '/api/navegador' && method === 'GET') {
+    send(res, 200, estadoNavegador(url.searchParams.has('fresco')))
+    return true
+  }
+  if (path === '/api/navegador' && method === 'POST') {
+    try {
+      guardarPreferencia((await body<{ preferencia: PreferenciaNavegador }>(req)).preferencia)
+      if (leerPreferencia() !== 'automatico') await iniciarChromeAgente()
+      send(res, 200, estadoNavegador())
+    } catch (error) {
+      send(res, 400, { error: error instanceof Error ? error.message : String(error) })
+    }
     return true
   }
 
@@ -825,6 +844,8 @@ v6.on('error', () => {})
 v6.listen(PORT, '::1')
 server.listen(PORT, '127.0.0.1', () => {
   console.log(`Sloth en http://localhost:${PORT}`)
+  // El relevo del agente en Chrome o Edge (`chrome-agente.ts`), solo si se eligió uno: escucha, y el navegador se abre cuando un hilo lo usa.
+  if (leerPreferencia() !== 'automatico') iniciarChromeAgente().catch((e) => console.error('navegador: no pude levantar el relevo:', e instanceof Error ? e.message : e))
   setTimeout(() => {
     cargandoModelos = false
     pedirModelos()

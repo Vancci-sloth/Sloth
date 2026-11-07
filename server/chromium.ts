@@ -3,6 +3,7 @@ import { existsSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import type { Browser, Page } from 'playwright-core'
+import { detectados, elegirNavegador, leerPreferencia, marcaDe } from './navegador-sistema.ts'
 
 /**
  * Chrome o Edge del sistema, con un perfil de Sloth y CDP, donde se entra con Google (la voz y Flow, `server/voz/`; las
@@ -29,6 +30,26 @@ const EDGE =
 /** El primero que haya, Chrome antes que Edge si `chromePrimero`. */
 export function chromiumDelSistema(chromePrimero: boolean): string | undefined {
   return (chromePrimero ? [...CHROME, ...EDGE] : [...EDGE, ...CHROME]).find((e) => existsSync(e))
+}
+
+/**
+ * El navegador de la voz, las redes y Google: el que se eligió en Opciones → Navegador (`chrome` o `edge`) y, con
+ * «automático», `chromiumDelSistema(chromePrimero)`, como siempre. Flow no pasa por aquí.
+ */
+export const chromiumElegido = (chromePrimero: boolean, pref = leerPreferencia(), hay = detectados()): string | undefined =>
+  elegirNavegador(pref, hay)?.exe ?? chromiumDelSistema(chromePrimero)
+
+/**
+ * El perfil de Sloth de `base` para el navegador elegido. El que se usaba antes sigue en `base`; si eligieron el otro
+ * navegador, va en `base-chrome` o `base-edge`: las cookies de uno no se pueden leer en el otro (cada navegador las cifra
+ * con su llave), así que ahí se inicia sesión una vez, y la que ya había queda intacta por si vuelven.
+ */
+export function perfilDe(base: string, chromePrimero: boolean, pref = leerPreferencia(), hay = detectados()): string {
+  const exe = chromiumElegido(chromePrimero, pref, hay)
+  if (!exe) return base
+  const de = chromiumDelSistema(chromePrimero)
+  const habitual = de ? marcaDe(de) : process.platform === 'win32' ? 'edge' : 'chrome'
+  return marcaDe(exe) === habitual ? base : `${base}-${marcaDe(exe)}`
 }
 
 export const nombreDe = (exe: string | undefined) => (exe && /edge/i.test(exe) ? 'Edge' : 'Chrome')

@@ -11,7 +11,8 @@ import { mkdirSync } from 'node:fs'
 import { join } from 'node:path'
 import type { Session, WebContents } from 'electron'
 import { WebSocket } from 'ws'
-import { chromiumDelSistema, lanzarChromium, nombreDe, SIN_CHROMIUM } from '../server/chromium.ts'
+import { archivoPreferencia, leerPreferencia } from '../server/navegador-sistema.ts'
+import { chromiumElegido, lanzarChromium, nombreDe, perfilDe, SIN_CHROMIUM } from '../server/chromium.ts'
 
 /** El de la voz es 9336 y el de las redes 9334. */
 const PUERTO = 9337
@@ -59,12 +60,13 @@ let reloj: ReturnType<typeof setInterval> | undefined
 let pasada = 0
 
 function entrar(perfil: Session, carpeta: string, wc: WebContents, url: string, en: EnGoogle) {
-  const exe = chromiumDelSistema(process.platform === 'darwin')
+  const pref = leerPreferencia(archivoPreferencia(carpeta))
+  const exe = chromiumElegido(process.platform === 'darwin', pref)
   if (!exe) return en.listo(wc, url, SIN_CHROMIUM)
   esperando.set(wc, { url, en })
   en.esperar(wc, nombreDe(exe))
   if (reloj) return
-  const dir = join(carpeta, 'data', 'navegador-google')
+  const dir = perfilDe(join(carpeta, 'data', 'navegador-google'), process.platform === 'darwin', pref)
   mkdirSync(dir, { recursive: true })
   lanzarChromium(exe, [`--remote-debugging-port=${PUERTO}`, `--user-data-dir=${dir}`, '--no-first-run', '--no-default-browser-check', ENTRAR], true)
   const desde = Date.now()

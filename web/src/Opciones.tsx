@@ -19,6 +19,7 @@ import { ConNavegadorRedes, RedesOpciones } from './Redes' // redes
 import { YoutubeOpciones } from './Youtube'
 import { useVoz, VozOpciones } from './Voz' // voz de AI Studio
 import { FlowOpciones } from './Flow' // Google Flow
+import { NavegadorOpciones } from './NavegadorOpciones' // navegador del agente
 import { VENTA } from '../../shared/venta'
 import './Opciones.css'
 
@@ -102,6 +103,9 @@ function Ajustes({ onDone, iniciando, onIniciando }: { onDone(): void; iniciando
         nota="Los agentes generan imágenes y videos con tus cuentas de Google: la de la Voz y las que agregues aquí, hasta 50. Las imágenes son gratis; los videos gastan créditos de Flow, y si una cuenta se queda sin ellos, Sloth sigue con otra. Agrega solo cuentas tuyas: Google puede limitar o bloquear las que usa de más."
       >
         <FlowOpciones voz={voz} />
+      </Grupo>
+      <Grupo titulo="Navegador" nota="En «Automático» nada cambia. Con Chrome o Edge, el agente navega en una ventana del navegador instalado, siempre con un perfil de Sloth y nunca el tuyo.">
+        <NavegadorOpciones />
       </Grupo>
       {/* Solo sirven a Ideas: sin la de YouTube, las recomendaciones van con el canal conectado. */}
       {!VENTA && (
