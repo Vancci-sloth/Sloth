@@ -98,6 +98,7 @@ Todos dicen cómo se usan si los corres sin argumentos. Node sin dependencias y 
 | Script | Qué hace |
 |---|---|
 | `masterizar.mjs crudo.wav audio.wav` | −14 LUFS y true peak ≤ −1 dBTP, 48 kHz 24 bits; falla si no lo clava |
+| `musica.py <segundos> <salida.wav>` · `musica.py --poner video.mp4 [--pista a.mp3]` | Música de fondo sintetizada (libre de derechos); `--poner` la mezcla bajo la voz del video a −34 LUFS, con ducking, sin tocar la imagen |
 | `comprobar.mjs video.mp4 --duracion 10 --fps 30 --tamano 1080x1920` | Códec, tamaño, fps, fotogramas, audio, sonoridad, pico, faststart, negros, arranque vacío |
 | `hoja.mjs video.mp4 hoja.png [--n 16 \| --cada 0.25 \| --t …] [--zonas] [--recomprimir 3M]` | Hoja de contacto con tiempos; zonas seguras; prueba de recompresión |
 | `hoja.mjs carpeta hoja.png` | Hoja de una carpeta de imágenes |

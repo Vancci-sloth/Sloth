@@ -11,6 +11,9 @@ Final (~2 min):
    menos con 6 Chrome y con 2 (el codificador deja de quitarle procesador al dibujo) y pesa un 33 % más.
    Antes se renderizaba y se volvía a codificar con ffmpeg: medido en el de Celsius, directo tarda 36 s menos y se
    parece más a los cuadros sin comprimir (PSNR 45.7 contra 42.2).
+   Luego, si hay música, se la pone bajo la voz sin tocar la imagen (`musica`): la primera pista de `fuentes/musica/`
+   (la que el usuario tenga derecho a usar) o, con `--musica`, una sintetizada (video-base/scripts/musica.py, libre de
+   derechos); `--sin-musica` la quita. Sin pista y sin `--musica`, el video sale sin música, como antes.
 2. Pasa comprobar.mjs de video-base: tamaño, fps, sonoridad, pico, negros, arranque. Si algo sale con ✘, falla.
 3. Mide el centro de la pantalla (medir.py): cuánto tiempo está quieto, cuánto se mueve y qué tan lleno está; y en
    toda la pantalla, los parpadeos (algo que sale un solo cuadro).
@@ -49,6 +52,25 @@ def render(raiz: Path, salida: Path, *opciones: str) -> None:
     subprocess.run(["node", str(SKILL / "scripts" / "render.cjs"), str(salida), *opciones], check=True, cwd=raiz)
 
 
+AUDIO = {".wav", ".mp3", ".m4a", ".aac", ".ogg", ".opus", ".flac"}
+# Para que toda salida lleve música sintetizada aunque no haya pista (hacer.py no pasa opciones), ponlo en True.
+MUSICA_SINTETIZADA = False
+
+
+def musica(raiz: Path, video: Path) -> None:
+    """
+    Le pone música bajo la voz (`video-base/scripts/musica.py --poner`): la primera pista de `fuentes/musica/` o, con
+    `--musica` (o `MUSICA_SINTETIZADA`), una sintetizada. `--sin-musica` la quita.
+    """
+    if "--sin-musica" in sys.argv:
+        return
+    carpeta = raiz / "fuentes" / "musica"
+    pistas = sorted(p for p in carpeta.iterdir() if p.suffix.lower() in AUDIO) if carpeta.is_dir() else []
+    if not pistas and not (MUSICA_SINTETIZADA or "--musica" in sys.argv):
+        return
+    correr(sys.executable, "-B", "-X", "utf8", str(BASE / "musica.py"), "--poner", str(video), *(["--pista", str(pistas[0])] if pistas else []))
+
+
 def sin_guardar(raiz: Path) -> list[str]:
     """Lo que el video hizo a mano y no está en la biblioteca de modelos ni en el kit."""
     biblioteca = SKILL.parent / "modelos-3d"
@@ -74,6 +96,7 @@ def final(raiz: Path) -> None:
     if faltan := sin_guardar(raiz):
         print("Sin guardar (guárdalo mientras renderiza; lo que solo sirve a este video, díselo al usuario):\n  " + "\n  ".join(faltan), flush=True)
     render(raiz, video, "--crf=14", "--x264-preset=veryfast", "--pixel-format=yuv420p", "--color-space=bt709")
+    musica(raiz, video)
     tamano = "1920x1080" if horizontal(raiz) else "1080x1920"
     r = subprocess.run(["node", str(BASE / "comprobar.mjs"), str(video), "--tamano", tamano], capture_output=True, text=True, encoding="utf8")
     print(r.stdout[-1500:])
