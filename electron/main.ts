@@ -24,6 +24,7 @@ import { guardar } from '../server/disco.ts'
 import { anclada, anclar } from './barra.ts'
 import { opcionesClicDerecho } from './clic-derecho.ts'
 import { archivos, huella, huellas, nombreCopia, quitarViejos, respaldar } from '../server/originales.ts'
+import { guardarAnteriores } from '../server/anteriores.ts'
 import { MODELOS_VIEJOS } from './modelos-viejos.ts'
 import { destinoDe, donde, junto, libre, mudar, pesadas, porCopiar, porQueNo, recuperar } from './mudanza.ts'
 import { iniciarNavegador, ventanaDelNavegador } from './navegador.ts'
@@ -344,13 +345,20 @@ async function prepararApp() {
  * antes: lo que cada skill guarda de los tuyos (las huellas, el banco de temas, la biblioteca 3D) se queda. Los modelos
  * 3D del dueño de Sloth que traían las versiones de antes (la moneda incluida) se van, menos los que cambiaste
  * (`MODELOS_VIEJOS`). Lo que cambiaste en las skills se pisa, pero antes se copia a `data/skills-tuyas`
- * (`respaldarCambios`). Lo que la versión de antes traía y esta ya no se va, si no lo cambiaste (`quitarViejos`).
+ * (`respaldarCambios`). Lo que la versión de antes traía y esta ya no se va, si no lo cambiaste (`quitarViejos`). Un
+ * estilo que esta versión cambia a fondo (`cambio` en su card) se guarda antes como estaba (`guardarAnteriores`).
  */
 async function prepararSkills() {
   const marca = join(APP, 'data', 'skills.txt')
   if (existsSync(marca) && readFileSync(marca, 'utf8') === app.getVersion()) return
   const antes = originalesDeAntes()
   respaldarCambios(antes)
+  // Lo que esta versión cambia a fondo (`cambio` en su card), antes de pisarlo: quien lo usaba puede quedarse con el de antes.
+  try {
+    guardarAnteriores({ cards: JSON.parse(readFileSync(join(APP, 'cards.json'), 'utf8')), skills: join(APP, 'skills'), nuevas: join(process.resourcesPath, 'skills'), datos: join(APP, 'data'), originales: antes })
+  } catch (e) {
+    anotar(`No se pudieron guardar los estilos de antes: ${e instanceof Error ? e.message : e}`)
+  }
   await cp(join(process.resourcesPath, 'skills'), join(APP, 'skills'), { recursive: true })
   // Lo que la versión de antes traía y esta ya no, si sigue como llegó: si no, se quedaría para siempre.
   quitarViejos(antes, join(process.resourcesPath, 'skills'), join(APP, 'skills'))

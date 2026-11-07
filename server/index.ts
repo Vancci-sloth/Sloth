@@ -47,6 +47,7 @@ import { mantenerVoz } from './voz-viva.ts'
 import { avisoDeVideos } from '../shared/limites.ts'
 import { eventosEnVivo } from './eventos-en-vivo.ts'
 import { enviarCliente } from './enviar-cliente.ts'
+import { anteriorDe, conservarAnterior, olvidarAnterior } from './anteriores.ts'
 import { cambiosDeCard, carpetaSkill, configClaudeDev, duplicateCard, enlazarSkills, enlazarSkillsCodex, guardarSkillTuya, readCards, removeCard, seriesDe, SKILLS, skillRef, volverAOriginal } from './skills.ts'
 import { estaticos } from './estaticos.ts'
 import { type Agente, version } from './version.ts'
@@ -497,6 +498,25 @@ async function api(req: IncomingMessage, res: ServerResponse, url: URL): Promise
       const { skill, archivo } = await body<{ skill?: string; archivo?: string }>(req)
       await volverAOriginal(card, todas, join(APP, 'data'), skill && archivo ? { skill, archivo } : undefined)
       return send(res, 200, await cambiosDeCard(card, todas, join(APP, 'data'))), true
+    }
+  }
+
+  // Un estilo de Sloth que cambió a fondo y del que se guardó el de antes al actualizar (`server/anteriores.ts`): su aviso,
+  // guardarlo entre los tuyos o quedarse solo con el nuevo.
+  const ant = /^\/api\/cards\/([\w-]+)\/anterior$/.exec(path)
+  if (ant) {
+    const card = cards().find((c) => c.id === ant[1])
+    if (!card) return send(res, 404, { error: 'No existe esa card' }), true
+    const datos = join(APP, 'data')
+    if (method === 'GET') return send(res, 200, anteriorDe(card, datos)), true
+    if (method === 'POST') {
+      const { accion } = await body<{ accion?: string }>(req)
+      if (accion === 'olvidar') return olvidarAnterior(card, datos), send(res, 200, { ok: true }), true
+      try {
+        return send(res, 200, conservarAnterior({ card, datos, skills: join(APP, 'skills'), tusCards: CARDS_TUYAS })), true
+      } catch (error) {
+        return send(res, 409, { error: error instanceof Error ? error.message : String(error) }), true
+      }
     }
   }
 

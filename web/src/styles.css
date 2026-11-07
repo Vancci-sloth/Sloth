@@ -98,6 +98,14 @@ input, textarea, select { font: inherit; color: inherit; }
 .tus-cambios-lista button { flex: none; padding: 2px 9px; border-radius: 999px; color: var(--muted); font-size: 12px; transition: background 0.15s, color 0.15s; }
 .tus-cambios-lista button:hover { background: var(--panel-2); color: var(--text); }
 .new-bottom .cuenta-aviso, .new-bottom .requisitos-aviso { border-color: var(--amber); }
+/* «Este estilo cambió» (EstiloCambio.tsx): qué cambió y quedarse también con el de antes. */
+.estilo-cambio .fila { align-items: flex-start; }
+.estilo-cambio-acciones { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 14px; margin-top: 10px; }
+.estilo-cambio-acciones a, .estilo-cambio-acciones button:not(.primary) { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: 13px; }
+.estilo-cambio-acciones a:hover, .estilo-cambio-acciones button:not(.primary):hover { color: var(--text); }
+.estilo-cambio-listo { margin: 0; text-align: center; font-size: 13px; color: var(--muted); }
+.estilo-cambio-listo button { color: var(--amber); font-size: inherit; }
+.estilo-cambio-listo button:hover { text-decoration: underline; }
 
 /* El estante: cada skill es un cartel. Con previa, su último video (quieto hasta pasar el ratón); sin ella, su icono y
    qué hace. Abajo, sobre una sombra, el nombre y cuánto se usa. */

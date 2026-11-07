@@ -43,6 +43,32 @@ export interface Card {
    * sloth-medidor): menos herramientas ofrecidas, menos contexto en cada mensaje.
    */
   sinHerramientas?: string[]
+  /**
+   * Una versión de Sloth cambió este estilo a fondo: quien ya lo usaba puede quedarse también con el de antes
+   * (`server/anteriores.ts`).
+   */
+  cambio?: CambioEstilo
+}
+
+/** Lo que dice la card de un estilo de Sloth que cambió a fondo (`Card.cambio`). */
+export interface CambioEstilo {
+  /** El día del cambio, `AAAA-MM-DD`: lo distingue de otro y nombra el de antes («hasta el 7 nov 2026»). */
+  fecha: string
+  /** Qué cambió, en un párrafo y en palabras de quien hace videos: más rápido, más barato, qué se ve distinto. */
+  texto: string
+  /** Dónde ver los dos lado a lado. */
+  compara?: string
+  /** Lo de la card de antes que ya no es igual (las etapas, por ejemplo); `null` quita un campo. */
+  antes?: Partial<Record<keyof Card, unknown>>
+}
+
+/** El aviso de una card cuyo estilo cambió y del que hay guardado el de antes (`GET /api/cards/<id>/anterior`). */
+export interface EstiloAnterior {
+  fecha: string
+  texto: string
+  compara?: string
+  /** Cómo se llamará entre los tuyos si lo guardas. */
+  titulo: string
 }
 
 /** De dónde vino un estilo instalado: de un archivo (sin `publicacion`) o de la comunidad, y de qué versión de Sloth. */

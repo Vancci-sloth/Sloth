@@ -235,7 +235,52 @@
         "listo": "{portada.png,portada/*.png}",
         "fase": "entrega"
       }
-    ]
+    ],
+    "cambio": {
+      "fecha": "2026-11-07",
+      "texto": "Ahora sale en unos 5 minutos en vez de más de media hora, y gasta mucho menos de tu plan (con el mismo guion y la misma voz, 46 veces menos): el agente ya no programa cada video, llena la lista de lo que pasa en cada frase y Sloth arma la cámara, las fotos, las cifras y las animaciones. El guion lo escribe Opus, con un gancho que te contradice y una situación concreta. Si preferías cómo salían antes, guarda también el de antes: queda entre tus estilos tal cual.",
+      "antes": {
+        "etapas": [
+          {
+            "nombre": "Investigación",
+            "listo": "fuentes/investigacion.md",
+            "fase": "idea"
+          },
+          {
+            "nombre": "Guion",
+            "listo": "guion.md",
+            "copiar": true,
+            "fase": "guion"
+          },
+          {
+            "nombre": "Tu voz",
+            "listo": "fuentes/voz/original.wav",
+            "espera": "Graba el guion (con el celular basta) y súbelo aquí o mándalo por el chat.",
+            "fase": "sonido"
+          },
+          {
+            "nombre": "Voz lista",
+            "listo": "fuentes/voz/rapida.wav",
+            "fase": "sonido"
+          },
+          {
+            "nombre": "Revisión",
+            "listo": "revision/borrador-*.png",
+            "fase": "video"
+          },
+          {
+            "nombre": "Video",
+            "listo": "out/!(render*|borrador*|_*).mp4",
+            "fase": "video"
+          },
+          {
+            "nombre": "Portada",
+            "listo": "{portada.png,portada/*.png}",
+            "fase": "entrega"
+          }
+        ]
+      }
+    }
   },
   {
     "id": "reel-collage",
