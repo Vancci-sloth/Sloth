@@ -167,7 +167,7 @@ export function App() {
     let ws: WebSocket
     let retry: ReturnType<typeof setTimeout>
     const connect = () => {
-      ws = new WebSocket(`ws://${location.host}/ws`)
+      ws = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`)
       socket.current = ws
       ws.onopen = async () => {
         const socket = ws
