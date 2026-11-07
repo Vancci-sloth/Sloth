@@ -1,0 +1,6 @@
+/* Opciones → Avatar y el menú «Avatar» del compositor (Avatar.tsx). */
+.av-etiqueta { display: inline-block; margin-left: 6px; padding: 1px 7px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); font-size: 11px; font-weight: normal; white-space: nowrap; }
+.av-etiqueta.ok { color: var(--ok); border-color: var(--ok); }
+.av-acciones { display: flex; align-items: center; gap: 8px; flex-shrink: 0; flex-wrap: wrap; justify-content: flex-end; margin-left: auto; }
+.av-nota { color: var(--muted); font-size: 12px; }
+.av-nota a { color: var(--amber-2); }

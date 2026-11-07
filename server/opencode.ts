@@ -11,6 +11,7 @@ import { INSTRUCCIONES } from './instrucciones.ts'
 import { navegadorAgente } from './navegador-agente.ts'
 import { mcpVoz } from './voz/index.ts'
 import { mcpFlow } from './flow/index.ts'
+import { mcpAvatar } from './avatar/index.ts'
 import { SKILLS } from './skills.ts'
 
 /**
@@ -248,7 +249,7 @@ export function startOpenCode(opts: AgentOptions, conectar: () => Promise<Servid
   // El nombre de los MCP del hilo: `sloth-<hilo>-<nombre>`. OpenCode esconde los nombres de más de 64 letras.
   const mcp = `sloth-${(opts.hilo ?? randomBytes(4).toString('hex')).replace(/[^a-zA-Z0-9-]/g, '-').slice(0, 24)}`
   // El navegador y la voz: las herramientas de Ideas corren dentro del servidor de Sloth (como con Codex, no llegan).
-  const servidoresMcp = { ...navegadorAgente(opts.lote, opts.hilo), ...mcpVoz(), ...mcpFlow() }
+  const servidoresMcp = { ...navegadorAgente(opts.lote, opts.hilo), ...mcpVoz(), ...mcpFlow(), ...mcpAvatar() }
   const reglas = [...REGLAS, { action: 'sloth-*', resource: '*', effect: 'deny' as const }, { action: `${mcp}-*`, resource: '*', effect: 'allow' as const }]
   const emit = opts.onEvent
   // Lo que va llegando a trozos, por id; las herramientas, con su nombre hasta que llega su entrada.

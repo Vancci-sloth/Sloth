@@ -41,6 +41,8 @@ import { NombreDelHilo, Renombrar } from './Renombrar'
 import { Segmento } from './Segmento'
 import { nombreDeVoz, SelectorVoz, useVoz, vozPosible } from './Voz' // voz de AI Studio, Fish Audio o ElevenLabs
 import { lineaVoz } from '../../shared/voz'
+import { lineaAvatar } from '../../shared/avatar' // avatar
+import { SelectorAvatar, useAvatar } from './Avatar' // avatar
 import { SelectorClips, SelectorImagenes, useChatGPT, useFlow } from './Flow' // Google Flow
 import { imagenPosible, lineaClips, lineaImagenes, MODELOS_VIDEO, OPCIONES_CLIPS } from '../../shared/flow'
 import { Timeline } from './Timeline'
@@ -855,6 +857,12 @@ function NewSession(props: {
   const voz = useVoz()
   const [voces, setVoces] = useStored<Record<string, string>>('voz', {})
   const vozElegida = vozPosible(voz.estado, voces[card.id] ?? '') ? voces[card.id] : ''
+  // Cómo habla el personaje (`Avatar.tsx`): sprites si no eliges otro. El menú sale en los estilos con voz y solo si
+  // preparaste otro motor en Opciones → Avatar: sin eso, el compositor queda como siempre.
+  const avatar = useAvatar()
+  const [avatares, setAvatares] = useStored<Record<string, string>>('avatar', {})
+  const conAvatar = card.voz !== false && !!avatar.estado?.motores.some((m) => m.id !== 'sprites' && m.listo)
+  const avatarElegido = conAvatar ? (avatares[card.id] ?? '') : ''
   // Las imágenes: con ChatGPT o con un modelo de Google Flow (`Flow.tsx`), según lo que tengas conectado.
   const hayChatGPT = useChatGPT()
   const [imagenes, setImagenes] = useStored<string>('imagenes', '')
@@ -918,6 +926,7 @@ function NewSession(props: {
               />
             )}
             {conFormato && <SelectorVoz card={card} voz={voz} valor={vozElegida} onCambio={(v) => setVoces({ ...voces, [card.id]: v })} />}
+            {conFormato && conAvatar && <SelectorAvatar avatar={avatar} valor={avatarElegido} onCambio={(m) => setAvatares({ ...avatares, [card.id]: m })} />}
             {conFormato && <SelectorImagenes valor={imagenElegida} hayChatGPT={hayChatGPT} voz={voz} flow={flow} onCambio={setImagenes} />}
             {conFormato && card.clips && <SelectorClips valor={clipsElegidos} onCambio={setClips} />}
             {card.lote && enlaces.length > 1 && (
@@ -949,6 +958,7 @@ function NewSession(props: {
             laSerie && `Serie: ${laSerie.nombre} (${laSerie.archivo}; cómo se usa, en video-base/SERIES.md)${text ? '' : '. Elige tú el tema.'}`,
             conFormato && !formatoEscrito && `Formato: ${formato}`,
             conFormato && lineaVoz(card, vozElegida, nombreDeVoz(voz.estado, vozElegida)),
+            conFormato && lineaAvatar(avatarElegido),
             conFormato && lineaImagenes(imagenElegida),
             conFormato && card.clips && lineaClips(clipsElegidos),
             // El modelo de cada subagente: lo medido, o lo que elegiste en «Avanzado». La skill lo lee aquí.

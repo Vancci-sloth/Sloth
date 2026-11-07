@@ -140,6 +140,10 @@ cpSync(join(REPO, 'server', 'motor-pagina.jsx'), join(APP, 'server', 'motor-pagi
 // Los MCP de la voz y de Flow los lanza cada agente con el Node de Sloth: van tal cual, sin paquetes.
 cpSync(join(REPO, 'server', 'voz', 'mcp.mjs'), join(APP, 'server', 'voz', 'mcp.mjs'))
 cpSync(join(REPO, 'server', 'flow', 'mcp.mjs'), join(APP, 'server', 'flow', 'mcp.mjs'))
+// El del avatar, igual, con el flujo de LatentSync que trae; y el servidor de Chatterbox, que corre con el Python del usuario.
+cpSync(join(REPO, 'server', 'avatar', 'mcp.mjs'), join(APP, 'server', 'avatar', 'mcp.mjs'))
+cpSync(join(REPO, 'server', 'avatar', 'flujos'), join(APP, 'server', 'avatar', 'flujos'), { recursive: true })
+cpSync(join(REPO, 'server', 'voz', 'chatterbox-servidor.py'), join(APP, 'server', 'voz', 'chatterbox-servidor.py'))
 // El que lanza Playwright MCP a demanda, igual.
 cpSync(join(REPO, 'server', 'navegador-mcp.mjs'), join(APP, 'server', 'navegador-mcp.mjs'))
 // El puente con el SDK de Cursor: server/cursor.ts lo copia junto al SDK que se baja y lo corre con el Node de Sloth.

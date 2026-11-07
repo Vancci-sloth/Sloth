@@ -36,6 +36,7 @@ import { carpetaTrabajo } from './trabajo.ts'
 import { redes } from './redes/index.ts' // redes
 import { voz } from './voz/index.ts' // voz de AI Studio
 import { flow } from './flow/index.ts' // Google Flow
+import { avatar } from './avatar/index.ts' // avatar
 import { youtube } from './youtube.ts'
 import { peticionDeConfianza } from './origen.ts'
 import { actualizarYtDlp, instalandoAlgo, instalar, pythonSlothEntero, requisitos } from './requisitos.ts'
@@ -204,6 +205,8 @@ const maquina = equipo({ app: APP, ocupado }) // tu equipo
 const narrar = voz(APP, { credencial: () => llaveDelCreador() ?? suscripcion?.credencial(), creador: () => llaveDelCreador() as { llave: string } | undefined }) // voz de AI Studio
 // Las imágenes y videos de Google Flow, con esa misma cuenta y en ese mismo Edge.
 const generarFlow = flow(APP, narrar.google) // Google Flow
+// El personaje hablando: los labios con LatentSync en el ComfyUI del usuario, o un avatar de HeyGen (`server/avatar/`).
+const animar = avatar({ datos: join(APP, 'data') }) // avatar
 
 // Si el agente (o tú) edita cards.json, las cards se actualizan solas.
 watch(CARDS, () => broadcast({ type: 'cards', cards: cards() }))
@@ -222,6 +225,7 @@ function ocupado(): string | null {
   if (idear?.ocupado()) return idear.ocupado() // ideas: una investigación en curso
   if (narrar.ocupado()) return narrar.ocupado() // voz de AI Studio: una a medias
   if (generarFlow.ocupado()) return generarFlow.ocupado() // Google Flow: un pedido a medias
+  if (animar.ocupado()) return animar.ocupado() // avatar: un video a medias
   return maquina.ocupado() ?? instalandoAlgo() ?? bajandoAgente() ?? conectando() ?? conectandoCodex() ?? conectandoOpenCode() ?? conectandoOtro()
 }
 
@@ -352,6 +356,7 @@ async function api(req: IncomingMessage, res: ServerResponse, url: URL): Promise
   if (await maquina.api(req, res, path)) return true // tu equipo
   if (await narrar.api(req, res, path)) return true // voz de AI Studio
   if (await generarFlow.api(req, res, path)) return true // Google Flow
+  if (await animar.api(req, res, path)) return true // avatar
 
   if (path === '/api/opciones' && method === 'GET') {
     send(res, 200, opciones())

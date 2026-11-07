@@ -82,6 +82,11 @@ Este es el mapa:
   quien (`server/voz/apis.ts`, voces `fish:<id>` y `elevenlabs:<id>`), también clonando la voz del usuario. Voices
   Cloning, el proveedor de Sloth (voces `vc:<id>`, `server/voz/voices-cloning.ts`, ADR 0018), va por el cobro
   (`licencias/src/voz.ts`), que guarda la llave del socio y los créditos de cada quien; se elige en su ventana.
+  Chatterbox (voces `chatterbox:<id>`, `server/voz/chatterbox.ts`) corre en la computadora con el Python que dice el
+  usuario; apagado hasta entonces.
+- `server/avatar/` y `web/src/Avatar.tsx`: cómo habla el personaje (la línea `Avatar:`, `shared/avatar.ts`): los labios
+  con LatentSync 1.5 (o MuseTalk) en el ComfyUI del usuario (`comfy.ts`, `flujos.ts`), que Sloth no instala, o un avatar
+  de HeyGen con su llave (`heygen.ts`). Los agentes lo piden con el MCP `avatar` (`mcp.mjs`); la guía, `video-base/AVATAR.md`.
 - Administrador (`web/src/Admin.tsx`, `/api/admin*`): solo en la computadora del creador, la que tiene su `publicar.txt`.
   Saldo, usuarios, consumo y registro de Voices Cloning; dar, quitar y suspender.
 - `server/flow/` y `web/src/Flow.tsx`: imágenes (Nano Banana) y videos (Veo) de Google Flow, con la cuenta de la voz (en

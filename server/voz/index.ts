@@ -16,6 +16,7 @@ import { guardar } from '../disco.ts'
 import { bytes, cuerpo } from '../http.ts'
 import { integrado } from '../navegador-agente.ts'
 import { vozPorApi } from './apis.ts'
+import { chatterbox } from './chatterbox.ts'
 import { voicesCloning } from './voices-cloning.ts'
 
 /**
@@ -41,7 +42,7 @@ import { voicesCloning } from './voices-cloning.ts'
  * Las voces de Fish Audio y ElevenLabs (`fish:<id>`, `elevenlabs:<id>`) van por su API, con la llave de cada quien
  * (`apis.ts`): no pasan por la página ni esperan su fila, y dejan el WAV en el mismo sitio, con la misma huella. Igual
  * las de Voices Cloning (`vc:<id>`, `voices-cloning.ts`), el proveedor de Sloth, que van por el cobro con los créditos
- * que da Sloth.
+ * que da Sloth, y las de Chatterbox (`chatterbox:<id>`, `chatterbox.ts`), que se hacen en esta computadora.
  */
 
 const URL_VOZ = 'https://aistudio.google.com/generate-speech'
@@ -95,6 +96,8 @@ export function voz(app: string, socio: Parameters<typeof voicesCloning>[1]) {
 
   const apis = vozPorApi(carpeta)
   const vc = voicesCloning(carpeta, socio)
+  // Chatterbox, la voz local: apagada hasta que dices dónde está su Python (`chatterbox.ts`).
+  const local = chatterbox({ carpeta })
   /** Las que se están generando por API, que no hacen fila. */
   let porApi = 0
 
@@ -479,13 +482,13 @@ export function voz(app: string, socio: Parameters<typeof voicesCloning>[1]) {
     }
   }
 
-  /** Una voz de Fish Audio o ElevenLabs: por su API, sin la página. */
+  /** Una voz de Fish Audio, ElevenLabs, Voices Cloning o Chatterbox: por su API, sin la página. */
   async function generarPorApi(t: Trabajo) {
     t.estado = 'generando'
     porApi++
     try {
       const { motor, id } = motorDe(t.voz)
-      const { wav, segundos } = motor === 'vc' ? await vc.generar(id, t.texto) : await apis.generar(t.voz, t.texto)
+      const { wav, segundos } = motor === 'vc' ? await vc.generar(id, t.texto) : motor === 'chatterbox' ? await local.generar(id, t.texto) : await apis.generar(t.voz, t.texto)
       mkdirSync(dirname(t.salida), { recursive: true })
       guardar(t.salida, wav)
       guardar(`${t.salida}.huella`, t.huella)
@@ -515,7 +518,7 @@ export function voz(app: string, socio: Parameters<typeof voicesCloning>[1]) {
   }
 
   const publico = ({ texto: _t, salida: _s, huella: _h, ...t }: Trabajo): TrabajoVoz => t
-  const estado = (): EstadoVoz => ({ cuenta, conectando, navegador: nombreEdge(), voces, enFila: fila.length + (trabajando ? 1 : 0) + porApi, ...(error ? { error } : {}), motores: apis.estado(), vc: vc.estado() })
+  const estado = (): EstadoVoz => ({ cuenta, conectando, navegador: nombreEdge(), voces, enFila: fila.length + (trabajando ? 1 : 0) + porApi, ...(error ? { error } : {}), motores: apis.estado(), vc: vc.estado(), chatterbox: local.estado() })
 
   // ── La API ─────────────────────────────────────────────────────────────────────────────────────────────────────
 
@@ -545,7 +548,9 @@ export function voz(app: string, socio: Parameters<typeof voicesCloning>[1]) {
       }
     }
     if (path === '/api/voz/generar' && metodo === 'POST') {
-      const d = await cuerpo<{ texto?: string; archivo?: string; voz?: string; salida?: string }>(req)
+      const d = await cuerpo<{ texto?: string; archivo?: string; voz?: string; salida?: string; proveedor?: string }>(req)
+      // `proveedor: chatterbox` con una voz sin prefijo es lo mismo que `chatterbox:<voz>`.
+      if (d.proveedor === 'chatterbox' && d.voz?.trim() && !d.voz.trim().startsWith('chatterbox:')) d.voz = `chatterbox:${d.voz.trim()}`
       let texto = d.texto?.trim()
       // Un guion en Markdown se narra como lo copia «Copiar»: sin títulos ni encabezados.
       if (!texto && d.archivo) {
@@ -556,16 +561,36 @@ export function voz(app: string, socio: Parameters<typeof voicesCloning>[1]) {
       if (!texto || !d.voz?.trim() || !d.salida || !isAbsolute(d.salida) || !/\.wav$/i.test(d.salida))
         return enviar(400, { error: 'Pide el texto (o el archivo con él), la voz y la ruta absoluta del .wav donde va.' }), true
       const { motor } = motorDe(d.voz)
+      if (motor === 'chatterbox' && !local.estado().listo)
+        return enviar(409, { error: `Chatterbox no está listo: ${local.estado().texto} Que el usuario lo prepare en Opciones → Voz; mientras, usa otra voz o pídesela.` }), true
       if (motor === 'vc' && !vc.puede()) await vc.refrescar()
       if (motor === 'vc' && !vc.puede())
         return enviar(409, { error: 'Las voces de Voices Cloning no están disponibles en esta computadora (hace falta la cuenta de Sloth y créditos de voz). Mientras, pídele la voz al usuario.' }), true
-      if (motor !== 'ai-studio' && motor !== 'vc' && !apis.tieneLlave(motor))
+      if (motor !== 'ai-studio' && motor !== 'vc' && motor !== 'chatterbox' && !apis.tieneLlave(motor))
         return enviar(409, { error: `No hay llave de ${MOTORES[motor]}: que el usuario la ponga en Opciones → Voz. Mientras, pídele la voz.` }), true
       if (motor === 'ai-studio' && !cuenta)
         return enviar(409, { error: 'No hay cuenta de Google conectada para AI Studio: que el usuario la conecte en Opciones → Voz (o en el selector Voz del compositor). Mientras, pídele la voz.' }), true
       return enviar(200, publico(pedir(texto, d.voz.trim(), resolve(d.salida)))), true
     }
     if (await vc.api(req, res, path, estado)) return true
+    // Chatterbox: dónde está su Python, clonar una voz (guardar la grabación) y quitarla.
+    const c = /^\/api\/voz\/chatterbox\/(python|clonar|quitar)$/.exec(path)
+    if (c && metodo === 'POST') {
+      try {
+        if (c[1] === 'python') await local.configurar((await cuerpo<{ python?: string | null }>(req)).python ?? null)
+        if (c[1] === 'quitar') local.quitar(String((await cuerpo<{ id?: string }>(req)).id ?? ''))
+        if (c[1] === 'clonar') {
+          const q = new URL(req.url ?? '', 'http://x').searchParams
+          const audio = await bytes(req)
+          if (audio.length < 1000) return enviar(400, { error: 'Elige una grabación de tu voz.' }), true
+          if (audio.length > 25e6) return enviar(400, { error: 'La grabación pesa más de 25 MB: con 10 a 20 s basta.' }), true
+          local.clonar(q.get('nombre')?.trim() || 'Mi voz', audio, q.get('archivo') || 'voz.wav')
+        }
+        return enviar(200, estado()), true
+      } catch (e) {
+        return enviar(400, { error: mensaje(e) }), true
+      }
+    }
     // Fish Audio y ElevenLabs: poner o quitar la llave, volver a leer sus voces y clonar la tuya.
     const m = /^\/api\/voz\/(fish|elevenlabs)\/(llave|voces|clonar)$/.exec(path)
     if (m && metodo === 'POST') {

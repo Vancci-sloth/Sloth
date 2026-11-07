@@ -4,6 +4,7 @@ import type { SkillRef } from './agent.ts'
 import { OPCIONES, UN_VIDEO_POR_HILO } from './claude.ts'
 import { mcpVoz } from './voz/index.ts'
 import { mcpFlow } from './flow/index.ts'
+import { mcpAvatar } from './avatar/index.ts'
 import { navegadorAgente, USA_EL_NAVEGADOR } from './navegador-agente.ts'
 import { SKILLS } from './skills.ts'
 
@@ -38,11 +39,11 @@ interface McpLocal {
 }
 
 /**
- * Los MCP de Sloth para el agente de un hilo: su navegador, la voz de AI Studio y Google Flow. Las herramientas de Ideas corren
+ * Los MCP de Sloth para el agente de un hilo: su navegador, la voz de AI Studio, Google Flow y el avatar. Las herramientas de Ideas corren
  * dentro del servidor de Sloth: como con Codex, solo llegan a Claude.
  */
 export function mcpSloth(lote?: boolean, hilo?: string): Record<string, McpLocal> {
-  const todos = { ...navegadorAgente(lote, hilo), ...mcpVoz(), ...mcpFlow() } as Record<string, { command: string; args?: string[]; env?: Record<string, string | undefined> }>
+  const todos = { ...navegadorAgente(lote, hilo), ...mcpVoz(), ...mcpFlow(), ...mcpAvatar() } as Record<string, { command: string; args?: string[]; env?: Record<string, string | undefined> }>
   return Object.fromEntries(
     Object.entries(todos).map(([nombre, s]) => [
       nombre,

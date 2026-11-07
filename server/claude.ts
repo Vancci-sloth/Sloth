@@ -7,6 +7,7 @@ import { herramientasIdeas } from './ideas/mcp.ts' // ideas
 import { navegadorAgente } from './navegador-agente.ts'
 import { mcpVoz } from './voz/index.ts'
 import { mcpFlow } from './flow/index.ts'
+import { mcpAvatar } from './avatar/index.ts'
 import { alBajarAgente, descartarRoto, programaClaude, rutaAgente } from './agentes.ts'
 import { sitiosDeAgente } from './tope-agentes.ts'
 import { dolaresDeepSeek, entornoDeepSeek, modeloDeepSeek, SIN_LLAVE, tarifaDeepSeek } from './deepseek.ts'
@@ -147,9 +148,9 @@ export function startClaude(opts: AgentOptions): AgentRun {
       // El guionista: Opus que escribe un solo archivo de un resumen, sin más herramientas que Write. Con todas, el que
       // escribía el guion de un video arrancaba con 38 mil tokens y costaba $0,26 por 100 palabras (6-nov).
       ...(deepseek ? {} : { agents: { guionista: GUIONISTA } }),
-      // El navegador del agente, la voz de AI Studio, Google Flow y, en un canal de Ideas, sus herramientas (`parecidos`; en uno vertical,
+      // El navegador del agente, la voz de AI Studio, Google Flow, el avatar y, en un canal de Ideas, sus herramientas (`parecidos`; en uno vertical,
       // también las de TikTok e Instagram): se suman a los MCP del usuario.
-      mcpServers: { ...navegadorAgente(opts.lote, opts.hilo), ...mcpVoz(), ...mcpFlow(), ...herramientasIdeas(opts.cwd) },
+      mcpServers: { ...navegadorAgente(opts.lote, opts.hilo), ...mcpVoz(), ...mcpFlow(), ...mcpAvatar(), ...herramientasIdeas(opts.cwd) },
       includePartialMessages: true,
       // Un subagente espera su sitio en la máquina antes de arrancar (`TOPE_AGENTES`). El que lanza otro subagente ya tiene
       // el suyo: si esperara, ninguno soltaría nada.

@@ -99,6 +99,11 @@ test('las voces de Fish Audio, ElevenLabs y Voices Cloning van con su prefijo; l
   assert.match(lineaVoz({ voz: { propia: 'Voz de edge-tts' } }, 'elevenlabs:x'), /^Voz: genérala tú con ElevenLabs/)
 })
 
+test('las de Chatterbox, la voz local, también van con su prefijo', () => {
+  assert.deepEqual(motorDe('chatterbox:base'), { motor: 'chatterbox', id: 'base' })
+  assert.equal(lineaVoz({}, 'chatterbox:mi-voz', 'Mi voz'), 'Voz: genérala tú con Chatterbox (local), voz «Mi voz»: en generar_voz pon la voz chatterbox:mi-voz (cómo, en video-base/VOZ.md).')
+})
+
 test('el guion se parte por párrafos en trozos que caben, y una frase larga por frases', () => {
   assert.deepEqual(trozosParaVoz('Uno.\n\nDos.\n\nTres.', 12), ['Uno.\n\nDos.', 'Tres.'])
   assert.deepEqual(trozosParaVoz('Una frase. Otra frase. Y otra.', 15), ['Una frase.', 'Otra frase.', 'Y otra.'])

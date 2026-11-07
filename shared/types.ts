@@ -1378,13 +1378,29 @@ export interface EstadoVoz {
   motores: Record<ProveedorVoz, EstadoProveedorVoz>
   /** Voices Cloning, el proveedor de Sloth (`server/voz/voices-cloning.ts`). */
   vc: EstadoVoicesCloning
+  /** Chatterbox, la voz local y gratis (`server/voz/chatterbox.ts`). Apagada hasta que le dices dónde está su Python. */
+  chatterbox: EstadoChatterbox
+}
+
+/**
+ * Chatterbox Multilingual en esta computadora. `python`: el del entorno donde está instalado (`null`: sin decir). `listo`:
+ * ese Python tiene el paquete `chatterbox`. `texto`: qué falta o cómo va, para Opciones y el agente. `voces`: la de
+ * Chatterbox (`base`) y las grabaciones tuyas que clona (`chatterbox:<id>`). `encendido`: su servidor ya cargó el modelo.
+ */
+export interface EstadoChatterbox {
+  python: string | null
+  listo: boolean
+  texto: string
+  voces: VozApi[]
+  encendido: boolean
+  error?: string
 }
 
 /** Los proveedores de voz con llave de API, además de AI Studio. */
 export type ProveedorVoz = 'fish' | 'elevenlabs'
 
-/** Los motores de voz que no son AI Studio: los de llave y Voices Cloning (`vc:<id>`). */
-export type FuenteVoz = ProveedorVoz | 'vc'
+/** Los motores de voz que no son AI Studio: los de llave, Voices Cloning (`vc:<id>`) y Chatterbox (`chatterbox:<id>`). */
+export type FuenteVoz = ProveedorVoz | 'vc' | 'chatterbox'
 
 /**
  * Voices Cloning, el proveedor de voz de Sloth: sin llave propia, con los créditos que da Sloth (su cobro guarda la del

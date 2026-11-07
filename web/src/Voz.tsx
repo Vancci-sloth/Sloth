@@ -119,8 +119,11 @@ export function useVoz() {
         }
       ),
     llave: (p: ProveedorVoz, llave: string | null) => aProveedor(api(`/api/voz/${p}/llave`, { llave })),
+    /** Chatterbox, la voz local: dónde está su Python (`null` lo apaga) y quitar una voz tuya. */
+    pythonChatterbox: (python: string | null) => aProveedor(api('/api/voz/chatterbox/python', { python })),
+    quitarChatterbox: (id: string) => aProveedor(api('/api/voz/chatterbox/quitar', { id })),
     releer: (p: ProveedorVoz) => aProveedor(api(`/api/voz/${p}/voces`, {})),
-    clonar: async (p: ProveedorVoz, nombre: string, audio: File) => {
+    clonar: async (p: ProveedorVoz | 'chatterbox', nombre: string, audio: File) => {
       const q = new URLSearchParams({ nombre, archivo: audio.name })
       const r = await fetch(`/api/voz/${p}/clonar?${q}`, { method: 'POST', headers: { 'content-type': audio.type || 'audio/wav' }, body: audio })
       const datos = await r.json().catch(() => ({ error: `El servidor respondió ${r.status}` }))
@@ -136,11 +139,12 @@ const PROVEEDORES: ProveedorVoz[] = ['fish', 'elevenlabs']
 
 /**
  * ¿Se puede generar con esta voz? La de AI Studio, con la cuenta; la de Fish Audio o ElevenLabs, con su llave; la de
- * Voices Cloning, si Sloth la ofrece aquí.
+ * Voices Cloning, si Sloth la ofrece aquí; la de Chatterbox, si está lista y la voz existe.
  */
 export function vozPosible(e: EstadoVoz | undefined, voz: string): boolean {
   if (!voz || !e || voz === ABRIR_VC) return false
-  const { motor } = motorDe(voz)
+  const { motor, id } = motorDe(voz)
+  if (motor === 'chatterbox') return !!e.chatterbox?.listo && e.chatterbox.voces.some((v) => v.id === id)
   return motor === 'ai-studio' ? !!e.cuenta : motor === 'vc' ? !!e.vc?.disponible : !!e.motores?.[motor]?.llave
 }
 
@@ -148,7 +152,7 @@ export function vozPosible(e: EstadoVoz | undefined, voz: string): boolean {
 export function nombreDeVoz(e: EstadoVoz | undefined, voz: string): string {
   const { motor, id } = motorDe(voz)
   if (motor === 'ai-studio') return voz
-  return (motor === 'vc' ? e?.vc?.voces : e?.motores?.[motor]?.voces)?.find((v) => v.id === id)?.nombre ?? id
+  return (motor === 'vc' ? e?.vc?.voces : motor === 'chatterbox' ? e?.chatterbox?.voces : e?.motores?.[motor]?.voces)?.find((v) => v.id === id)?.nombre ?? id
 }
 
 /** «9,878 créditos», los que te quedan de Voices Cloning. */
@@ -214,7 +218,10 @@ function gruposDeVoces(e: EstadoVoz | undefined, valor = ''): Grupo[] {
         }
       ]
     : []
-  const todos = [...tuyas, ...vc, ...[...studio].map(([label, options]) => ({ label, options })), ...bibliotecas].filter((g) => g.options.length)
+  const local: Grupo[] = e?.chatterbox?.listo
+    ? [{ label: 'Chatterbox · en tu computadora, gratis', options: e.chatterbox.voces.map((v) => ({ value: `chatterbox:${v.id}`, label: `${v.nombre} · ${v.descripcion}` })) }]
+    : []
+  const todos = [...tuyas, ...vc, ...local, ...[...studio].map(([label, options]) => ({ label, options })), ...bibliotecas].filter((g) => g.options.length)
   if (valor && vozPosible(e, valor) && !todos.some((g) => g.options.some((o) => o.value === valor))) todos.unshift({ label: 'Elegida', options: [{ value: valor, label: etiqueta(e, valor) }] })
   return todos
 }
@@ -233,7 +240,7 @@ export function GenerarVoz({ onGenerar }: { onGenerar(texto: string): Promise<vo
   const [elegida, setElegida] = useState(() => localStorage.getItem(ULTIMA) ?? '')
   const [mandando, setMandando] = useState(false)
   if (!e) return null
-  const conApi = PROVEEDORES.some((p) => e.motores?.[p]?.llave && e.motores[p].voces.length) || !!e.vc?.disponible
+  const conApi = PROVEEDORES.some((p) => e.motores?.[p]?.llave && e.motores[p].voces.length) || !!e.vc?.disponible || !!e.chatterbox?.listo
   // La guardada solo vale si se puede usar; si no, la primera que haya.
   const primera = gruposDeVoces(e).flatMap((g) => g.options).find((o) => o.value !== CONECTAR && o.value !== ABRIR_VC)?.value ?? ''
   const valor = vozPosible(e, elegida) ? elegida : primera
@@ -321,6 +328,7 @@ export function VozOpciones({ voz }: { voz: UsoVoz }) {
       {PROVEEDORES.map((p) => (
         <ProveedorOpciones key={p} p={p} voz={voz} />
       ))}
+      <ChatterboxOpciones voz={voz} />
     </>
   )
 }
@@ -500,6 +508,119 @@ function ProveedorOpciones({ p, voz }: { p: ProveedorVoz; voz: UsoVoz }) {
         </form>
       )}
       {(error || (m?.error && !ocupado)) && <p className="bad small fila-extra">{error || m?.error}</p>}
+    </div>
+  )
+}
+
+/**
+ * Chatterbox en Opciones → Voz: la voz local, gratis. Apagada hasta que pones el Python del entorno donde lo instalaste
+ * (se comprueba que tenga el paquete antes de guardarlo). Ya lista, «Clonar tu voz» guarda una grabación que imita.
+ */
+function ChatterboxOpciones({ voz }: { voz: UsoVoz }) {
+  const c = voz.estado?.chatterbox
+  const [poniendo, setPoniendo] = useState(false)
+  const [python, setPython] = useState('')
+  const [clonando, setClonando] = useState(false)
+  const [nombre, setNombre] = useState('Mi voz')
+  const [ocupado, setOcupado] = useState('')
+  const [error, setError] = useState('')
+  const archivo = useRef<HTMLInputElement>(null)
+  if (!c) return null
+  const hacer = (que: string, promesa: Promise<unknown>) => {
+    setOcupado(que)
+    setError('')
+    return promesa.then(
+      () => true,
+      (x: Error) => (setError(x.message), false)
+    ).finally(() => setOcupado(''))
+  }
+  const tuyas = c.voces.filter((v) => v.propia)
+  const ejemplo = navigator.userAgent.includes('Windows') ? 'C:\\ruta\\chatterbox\\Scripts\\python.exe' : '/ruta/chatterbox/bin/python'
+  return (
+    <div className="item">
+      <div className="fila">
+        <Logo de="chatterbox" nombre="Chatterbox" />
+        <div className="fila-nombre">
+          <strong>Chatterbox (local)</strong>
+          <span>{c.python ? c.texto : 'Voz gratis en tu computadora, en español y 22 idiomas más, que clona la tuya de una grabación corta. Mejor con una GPU. Se instala aparte.'}</span>
+        </div>
+        {c.python ? (
+          <Picker
+            className="acciones"
+            label={<span className="estado">{ocupado || (c.listo ? `${c.voces.length} ${c.voces.length === 1 ? 'voz' : 'voces'}` : 'Revisar')}</span>}
+            value=""
+            disabled={!!ocupado}
+            groups={[
+              {
+                label: 'Chatterbox',
+                options: [...(c.listo ? [{ value: 'clonar', label: 'Clonar tu voz…' }] : []), { value: 'cambiar', label: 'Cambiar de Python' }, { value: 'apagar', label: 'Apagar' }]
+              },
+              ...(tuyas.length ? [{ label: 'Quitar una voz tuya', options: tuyas.map((v) => ({ value: `quitar:${v.id}`, label: v.nombre })) }] : [])
+            ]}
+            onChange={(q) => {
+              if (q === 'clonar') setClonando(true)
+              if (q === 'cambiar') (setPython(c.python ?? ''), setPoniendo(true))
+              if (q === 'apagar') void hacer('Apagando…', voz.pythonChatterbox(null))
+              if (q.startsWith('quitar:')) void hacer('Quitando…', voz.quitarChatterbox(q.slice(7)))
+            }}
+          />
+        ) : (
+          !poniendo && (
+            <button className="primary" onClick={() => setPoniendo(true)}>
+              Encender
+            </button>
+          )
+        )}
+      </div>
+      {poniendo && (
+        <form
+          className="fila-extra"
+          onSubmit={(ev) => {
+            ev.preventDefault()
+            if (python.trim()) void hacer('Comprobando…', voz.pythonChatterbox(python.trim())).then((ok) => ok && (setPoniendo(false), setPython('')))
+          }}
+        >
+          <div className="opcion-fila">
+            <input autoFocus placeholder={ejemplo} value={python} onChange={(ev) => setPython(ev.target.value)} />
+            <button className="primary" disabled={!!ocupado || !python.trim()}>
+              {ocupado || 'Guardar'}
+            </button>
+            <button type="button" className="ghost" onClick={() => (setPoniendo(false), setPython(''))}>
+              Cancelar
+            </button>
+          </div>
+          <p className="muted small">
+            La ruta del Python del entorno donde instalaste Chatterbox: <span className="mono">python -m venv chatterbox</span> y, dentro, <span className="mono">pip install chatterbox-tts</span>.
+            Sloth no instala nada; la primera voz baja el modelo (unos 3 GB).{' '}
+            <a href="https://github.com/resemble-ai/chatterbox" target="_blank" rel="noreferrer">
+              Chatterbox ↗
+            </a>
+          </p>
+        </form>
+      )}
+      {clonando && (
+        <form
+          className="fila-extra"
+          onSubmit={(ev) => {
+            ev.preventDefault()
+            const f = archivo.current?.files?.[0]
+            if (f && nombre.trim()) void hacer('Guardando…', voz.clonar('chatterbox', nombre.trim(), f)).then((ok) => ok && setClonando(false))
+          }}
+        >
+          <div className="opcion-fila">
+            <input placeholder="Cómo se llama" value={nombre} onChange={(ev) => setNombre(ev.target.value)} />
+            <input ref={archivo} type="file" accept="audio/*,.m4a,.opus" />
+            <button className="primary" disabled={!!ocupado || !nombre.trim()}>
+              {ocupado || 'Clonar'}
+            </button>
+            <button type="button" className="ghost" onClick={() => setClonando(false)}>
+              Cancelar
+            </button>
+          </div>
+          <p className="muted small">Una grabación tuya de 10 a 20 s, sin música ni ruido. Se queda en esta computadora y Chatterbox la imita cada vez.</p>
+        </form>
+      )}
+      {(error || (c.error && !ocupado)) && <p className="bad small fila-extra">{error || c.error}</p>}
     </div>
   )
 }

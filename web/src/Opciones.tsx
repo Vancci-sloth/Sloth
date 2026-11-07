@@ -19,6 +19,7 @@ import { ConNavegadorRedes, RedesOpciones } from './Redes' // redes
 import { YoutubeOpciones } from './Youtube'
 import { useVoz, VozOpciones } from './Voz' // voz de AI Studio
 import { FlowOpciones } from './Flow' // Google Flow
+import { AvatarOpciones } from './Avatar' // avatar
 import { VENTA } from '../../shared/venta'
 import './Opciones.css'
 
@@ -96,6 +97,9 @@ function Ajustes({ onDone, iniciando, onIniciando }: { onDone(): void; iniciando
       </Grupo>
       <Grupo titulo="Voz" nota="Al pedir un video eliges en «Voz» si la mandas tú o si el agente la genera con una de estas. La sesión de Google vive en un perfil aparte del navegador de Sloth, que ningún agente usa; las llaves, en tu usuario de esta computadora.">
         <VozOpciones voz={voz} />
+      </Grupo>
+      <Grupo titulo="Avatar" nota="Cómo habla el personaje de tus videos: con las bocas de siempre, con sus labios movidos en tu GPU por LatentSync (en tu ComfyUI) o con un avatar de HeyGen. Sloth no instala nada ni gasta créditos solo; en el compositor, «Avatar» elige el de cada video.">
+        <AvatarOpciones />
       </Grupo>
       <Grupo
         titulo="Google Flow"
