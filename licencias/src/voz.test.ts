@@ -1,6 +1,35 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { MAX_LETRAS, mensajeDe, pedidoTts } from './voz.ts'
+import type { Env } from './index.ts'
+import { MAX_LETRAS, idDe, laDeMasSaldo, llavesDe, mensajeDe, pedidoTts } from './voz.ts'
+
+test('las llaves del socio se leen de cada VOICES_PK_LIVE_n, en orden, sin vacías ni repetidas', async () => {
+  const env = { VOICES_PK_LIVE_10: 'pk_live_diez', VOICES_PK_LIVE_2: 'pk_live_dos', VOICES_PK_LIVE: ' pk_live_uno ', VOICES_PK_LIVE_3: '', VOICES_PK_LIVE_4: 'pk_live_dos', OTRA: 'pk_live_x', VOICES_PK_LIVE_X: 'pk_live_y' } as unknown as Env
+  const llaves = await llavesDe(env)
+  assert.deepEqual(
+    llaves.map((l) => [l.nombre, l.valor, l.fin]),
+    [
+      ['VOICES_PK_LIVE', 'pk_live_uno', '_uno'],
+      ['VOICES_PK_LIVE_2', 'pk_live_dos', '_dos'],
+      ['VOICES_PK_LIVE_10', 'pk_live_diez', 'diez']
+    ]
+  )
+  // El id es de la llave, no del secreto: la misma llave con otro nombre es la misma cuenta.
+  assert.equal(llaves[1].id, await idDe('pk_live_dos'))
+  assert.match(llaves[0].id, /^[0-9a-f]{12}$/)
+  assert.ok(!llaves[0].id.includes('uno'))
+  assert.deepEqual(await llavesDe({} as Env), [])
+})
+
+test('los nuevos y los que se mudan van a la llave con más saldo, nunca a una vacía', async () => {
+  const [a, b, c] = await llavesDe({ VOICES_PK_LIVE: 'pk_live_a', VOICES_PK_LIVE_2: 'pk_live_b', VOICES_PK_LIVE_3: 'pk_live_c' } as unknown as Env)
+  const saldo = (balance: unknown, status = 200) => ({ status, datos: { balance } })
+  assert.equal(laDeMasSaldo([{ llave: a, r: saldo(500_000) }, { llave: b, r: saldo(3_000_000) }, { llave: c, r: saldo(10) }]), b)
+  // Una que no se pudo leer no cuenta, aunque diga mucho.
+  assert.equal(laDeMasSaldo([{ llave: a, r: saldo(5) }, { llave: b, r: saldo(9_000_000, 401) }]), a)
+  assert.equal(laDeMasSaldo([{ llave: a, r: saldo(0) }, { llave: b, r: saldo('mucho') }]), undefined)
+  assert.equal(laDeMasSaldo([]), undefined)
+})
 
 test('a Voices Cloning solo va un trozo con texto, voz y una velocidad que acepta', () => {
   assert.deepEqual(pedidoTts({ text: '  Hola.  ', voice_id: 'v1' }), { text: 'Hola.', voice_id: 'v1' })

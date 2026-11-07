@@ -15,6 +15,12 @@ la sacaría del instalador, y con ella el encabezado `X-Partner-User` dejaría g
 - **La llave vive en el cobro** (`licencias/`, secreto `VOICES_PK_LIVE`), y el cobro es el único que habla con Voices
   Cloning (`licencias/src/voz.ts`). Sabe quién pide como en la comunidad (la clave y la computadora de una cuenta o un
   apoyo activos, o el creador con su llave) y pone él el `X-Partner-User`.
+- **Puede haber varias llaves, cada una con su saldo** (7 de noviembre de 2026): `VOICES_PK_LIVE`, `VOICES_PK_LIVE_2`,
+  `_3`…, un secreto cada una. Cada llave es una cuenta de socio aparte: sus usuarios, créditos y voces clonadas no
+  pasan a otra. Por eso cada quien vive en una sola (`voz_cuentas`, por el id de la llave, no por el nombre del secreto).
+  Los nuevos entran en la de más saldo, y a quien se le acaba el saldo de la suya se muda a la de más saldo con sus
+  créditos (se le quitan de la vieja) y se repite el pedido. Lo que clonó se queda en la vieja. Una llave nueva va en
+  el siguiente número libre, nunca encima de otra: reemplazarla deja a sus usuarios sin su cuenta.
 - **El usuario es el `id` de la primera licencia de su correo** (su cuenta gratis y su apoyo son el mismo), y el del
   creador, `creador`. Ni el correo ni la clave salen hacia Voices Cloning.
 - **Los créditos los da el creador.** `VOZ_CREDITOS` (0 de entrada) son los de cada alta; con 0, la app solo ofrece
@@ -31,8 +37,9 @@ la sacaría del instalador, y con ella el encabezado `X-Partner-User` dejaría g
 
 ## Consecuencias
 
-- Si el saldo general se acaba (`partner_balance_empty`), falla para todos a la vez: el creador lo ve en
-  Administrador, y AI Studio, Fish Audio y ElevenLabs siguen como respaldo.
+- Si el saldo de una llave se acaba (`partner_balance_empty`), sus usuarios se mudan a otra con saldo; si se acaba el
+  de todas, falla para todos a la vez: el creador lo ve en Administrador, y AI Studio, Fish Audio y ElevenLabs siguen
+  como respaldo. Quien se muda pierde sus voces clonadas (la app se lo dice al pedir una).
 - Clonar con el micrófono no funciona dentro de su ventana (su `Permissions-Policy` lo bloquea, y Sloth no da permisos a
   páginas de fuera): se clona subiendo una grabación.
 - La forma de su consumo (`/usage`) no está documentada: Administrador la enseña tal cual, como tabla.

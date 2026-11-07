@@ -7,7 +7,8 @@
 // NOWPAYMENTS_API_KEY y NOWPAYMENTS_IPN_SECRET (la llave de la API y la clave de los avisos IPN, en Settings del panel de
 // NOWPayments, del modo `NOWPAYMENTS_MODO`; sin ellas no se ofrece pagar con cripto), STRIPE_SECRET_KEY y
 // STRIPE_WEBHOOK_SECRET (la tarjeta, con Stripe: `npm run stripe` pone las dos con la llave secreta; sin ellas no se ofrece),
-// VOICES_PK_LIVE (la llave de socio `pk_live_…` de Voices Cloning, para las voces de src/voz.ts; sin ella, la app no las ofrece),
+// VOICES_PK_LIVE, VOICES_PK_LIVE_2, VOICES_PK_LIVE_3… (las llaves de socio `pk_live_…` de Voices Cloning, una por secreto,
+// para las voces de src/voz.ts; una nueva va en el siguiente número libre y nunca encima de otra, que tiene sus usuarios),
 // FIRMA (la llave privada Ed25519 en PKCS8 y base64; la pública va en server/licencia.ts), PUBLICAR (la llave de
 // `npm run publicar`, solo en los secretos de GitHub: sube versiones) y ADMIN (la del creador, en
 // %APPDATA%\sloth\licencias\admin.txt: administra la comunidad, las voces y los apoyos a mano, no publica). La base de datos se crea con

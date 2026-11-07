@@ -130,8 +130,12 @@ export interface Env {
   /** De quién salen (`Sloth <avisos@vancci.org>`, dominio verificado en Resend) y adónde se responden. */
   CORREO_DE: string
   CORREO_RESPUESTA: string
-  /** La llave de socio de Voices Cloning (`pk_live_…`). Sin ella, la app no ofrece sus voces (`voz.ts`). */
+  /**
+   * Las llaves de socio de Voices Cloning (`pk_live_…`), cada una su cuenta y su saldo: `VOICES_PK_LIVE` y, si hay más,
+   * `VOICES_PK_LIVE_2`, `_3`… Sin ninguna, la app no ofrece sus voces (`voz.ts`).
+   */
   VOICES_PK_LIVE?: string
+  [llave: `VOICES_PK_LIVE_${number}`]: string | undefined
   /** Los créditos de voz con que se da de alta a cada quien la primera vez que abre las voces de Voices Cloning. */
   VOZ_CREDITOS?: number
   /** Con `"1"`, las voces de Voices Cloning son solo del creador, aunque alguien más tenga créditos. */

@@ -18,6 +18,9 @@
 .admin-seccion h2 { margin: 0; color: var(--muted); font-size: 11.5px; font-weight: 650; letter-spacing: 0.07em; text-transform: uppercase; }
 .admin-seccion > p { margin: 0; }
 .admin-vacio { padding: 4px 0; }
+.admin-llave { display: flex; flex-direction: column; gap: 8px; }
+.admin-llave + .admin-llave { margin-top: 8px; }
+.admin-llave h3 { margin: 0; font-size: 14px; font-weight: 650; }
 
 .admin-cifras { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 10px; }
 .admin-cifra { display: flex; flex-direction: column; gap: 4px; padding: 12px 14px; border: 1px solid var(--line); border-radius: var(--radio); background: var(--panel-2); }

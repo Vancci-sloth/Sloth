@@ -101,7 +101,9 @@ Aplica las migraciones cuando el cambio incluya alguna, antes de desplegar códi
 Comprueba la ruta afectada en `https://api.sloth.vancci.org`. Este despliegue es independiente de
 `main` y `venta`; subir la app no actualiza el Worker. Los nombres de sus secretos están en la cabecera de su configuración.
 Para guardar uno que el usuario copió, pásalo desde Git Bash: `tr -d ' \r\n' < /dev/clipboard | npm run licencias -- secret
-put NOMBRE`. Desde PowerShell, la tubería le pone un BOM delante y la pasarela rechaza la llave.
+put NOMBRE`. Desde PowerShell, la tubería le pone un BOM delante y la pasarela rechaza la llave. Una llave de Voices
+Cloning (`pk_live_…`) va en el siguiente `VOICES_PK_LIVE_<n>` libre (mira `secret list`), nunca encima de una que ya
+está: cada una es su cuenta, con sus usuarios (ADR 0018). Su saldo se ve en Administrador.
 
 Cuando el usuario pida un link de Fundador, dale uno nuevo con `npm run fundador -- nuevo <para quién>`. Es de una sola
 persona: la página ofrece los $15 (cada mes o una vez) hasta que alguien paga con él, aunque los 25 lugares públicos

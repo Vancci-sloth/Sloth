@@ -7,7 +7,7 @@ import './Admin.css'
 /**
  * Administrador: solo en la computadora del creador (la que tiene su llave de `publicar.txt`; en las demás, la barra no
  * la enseña y el servidor no la sirve). Todo lo de Voices Cloning, el proveedor de voz de Sloth (`licencias/src/voz.ts`):
- * el saldo general de Sloth, cada usuario con su correo y su plan, sus créditos y lo que gasta, el consumo que da Voices
+ * el saldo de cada llave de socio (cada una, su cuenta), cada usuario con su correo, su plan y su llave, sus créditos y lo que gasta, el consumo que da Voices
  * Cloning, el registro de cada llamada que pasó por el cobro (con sus errores) y el resumen de 30 días. Aquí se suman y
  * quitan créditos, se suspende o reactiva a alguien y se da de alta una cuenta de Sloth por su correo. Lo que responde
  * Voices Cloning se puede ver también tal cual, al final.
@@ -49,17 +49,30 @@ interface Panel {
   creditosIniciales: number
   pagina: number
   consumo: number
-  saldo?: Respuesta
-  usuarios?: Respuesta
-  uso?: Respuesta
+  /** Cada llave de socio, con lo que respondió su cuenta. */
+  llaves: Llave[]
+  /** La llave donde entran los nuevos ahora: la de más saldo. */
+  nuevos: string | null
   cuentas: Record<string, Cuenta>
   registro: Registro[]
   resumen: { accion: string; llamadas: number; fallidas: number; letras: number | null; creditos: number | null; usuarios: number; ms: number | null }[]
   errores: { status: number; codigo: string | null; veces: number; ultima: string; error: string | null }[]
 }
 
+/** Una llave de socio: el secreto donde está en el cobro, su id y sus últimas cuatro letras. */
+interface Llave {
+  id: string
+  nombre: string
+  fin: string
+  saldo: Respuesta
+  usuarios: Respuesta
+  uso: Respuesta
+}
+
 interface Usuario {
   external_id: string
+  /** Las últimas letras de la llave donde vive, si hay más de una. */
+  cuenta?: string
   name?: string
   credits?: number
   used_total?: number
@@ -95,7 +108,11 @@ export function Admin() {
   }, [pagina, consumo])
   useEffect(cargar, [cargar])
 
-  const usuarios = (Array.isArray(panel?.usuarios?.datos.users) ? panel.usuarios.datos.users : []) as Usuario[]
+  const llaves = panel?.llaves ?? []
+  const varias = llaves.length > 1
+  const usuarios = llaves.flatMap((l) => (Array.isArray(l.usuarios.datos.users) ? (l.usuarios.datos.users as Usuario[]) : []).map((u) => ({ ...u, cuenta: varias ? `…${l.fin}` : undefined })))
+  // Las listas van por página en cada llave a la vez: manda la que más tiene.
+  const mayor = (campo: 'usuarios' | 'uso') => llaves.map((l) => l[campo]).sort((a, b) => Number(b.datos.total ?? 0) - Number(a.datos.total ?? 0))[0]
   const quien = (externo: string) => (externo === CREADOR ? 'Tú (creador)' : (panel?.cuentas[externo]?.email ?? externo))
 
   return (
@@ -104,7 +121,7 @@ export function Admin() {
         <div>
           <span className="admin-antetitulo">Solo en tu computadora</span>
           <h1>Administrador</h1>
-          <p>Todo lo de Voices Cloning, el proveedor de voz de Sloth: tu saldo general, quién gasta cuánto, cada llamada que pasa por el cobro y sus errores. La llave del socio vive en el cobro; ninguna app la ve.</p>
+          <p>Todo lo de Voices Cloning, el proveedor de voz de Sloth: el saldo de cada llave, quién gasta cuánto, cada llamada que pasa por el cobro y sus errores. Las llaves del socio viven en el cobro; ninguna app las ve.</p>
         </div>
         <button className="ghost admin-recargar" disabled={cargando} onClick={cargar}>
           <Icono de="recargar" /> {cargando ? 'Leyendo…' : 'Volver a leer'}
@@ -114,7 +131,7 @@ export function Admin() {
       {error && <p className="bad admin-aviso">{error}</p>}
       {panel && !panel.configurado && (
         <p className="admin-aviso">
-          Falta la llave de socio en el cobro. Ponla con <span className="mono">npm run licencias -- secret put VOICES_PK_LIVE</span> (desde Git Bash) y vuelve a leer.
+          Falta la llave de socio en el cobro. Ponla con <span className="mono">npm run licencias -- secret put VOICES_PK_LIVE</span> (desde Git Bash; las siguientes, en <span className="mono">VOICES_PK_LIVE_2</span>, <span className="mono">_3</span>…) y vuelve a leer.
         </p>
       )}
 
@@ -126,13 +143,31 @@ export function Admin() {
 
       {panel && (
         <>
-          <Seccion titulo="Tu cuenta general" fallo={panel.saldo}>
-            <Saldo r={panel.saldo} iniciales={panel.creditosIniciales} />
+          <Seccion
+            titulo={varias ? 'Tus llaves de socio' : 'Tu cuenta general'}
+            nota={
+              varias
+                ? 'Cada llave es su propia cuenta, con sus usuarios y sus voces clonadas. Los nuevos entran en la de más saldo; a quien se le acaba el saldo de la suya se muda a la de más saldo con sus créditos.'
+                : undefined
+            }
+          >
+            {llaves.map((l) => (
+              <div key={l.id} className="admin-llave">
+                {varias && (
+                  <h3>
+                    Llave …{l.fin} <span className="muted small mono">{l.nombre}</span>
+                    {panel.nuevos === l.id && <span className="ok small"> · aquí entran los nuevos</span>}
+                  </h3>
+                )}
+                {l.saldo.status >= 400 && <p className="bad small">Voices Cloning respondió {l.saldo.status}: {String(l.saldo.datos.error ?? 'sin mensaje')}</p>}
+                <Saldo r={l.saldo} iniciales={panel.creditosIniciales} />
+              </div>
+            ))}
           </Seccion>
 
-          <Seccion titulo="Usuarios" nota="Los créditos de cada quien. Asignarlos no gasta tu saldo: solo lo gasta generar." fallo={panel.usuarios}>
+          <Seccion titulo="Usuarios" nota="Los créditos de cada quien. Asignarlos no gasta tu saldo: solo lo gasta generar." fallo={llaves.find((l) => l.usuarios.status >= 400)?.usuarios}>
             <Usuarios usuarios={usuarios} cuentas={panel.cuentas} onCambio={cargar} onVer={setDetalle} />
-            <Paginas r={panel.usuarios} pagina={panel.pagina} cargando={cargando} onPagina={setPagina} />
+            <Paginas r={mayor('usuarios')} pagina={panel.pagina} cargando={cargando} onPagina={setPagina} />
           </Seccion>
 
           {detalle && <Detalle externo={detalle} quien={quien(detalle)} onCerrar={() => setDetalle(undefined)} onCambio={cargar} />}
@@ -156,9 +191,9 @@ export function Admin() {
             )}
           </Seccion>
 
-          <Seccion titulo="Movimientos según Voices Cloning" nota="Las recargas de tu saldo y lo que gasta cada usuario, como lo anota Voices Cloning." fallo={panel.uso}>
-            <Movimientos r={panel.uso} quien={quien} />
-            <Paginas r={panel.uso} pagina={panel.consumo} cargando={cargando} onPagina={setConsumo} />
+          <Seccion titulo="Movimientos según Voices Cloning" nota="Las recargas de tu saldo y lo que gasta cada usuario, como lo anota Voices Cloning." fallo={llaves.find((l) => l.uso.status >= 400)?.uso}>
+            <Movimientos llaves={llaves} quien={quien} />
+            <Paginas r={mayor('uso')} pagina={panel.consumo} cargando={cargando} onPagina={setConsumo} />
           </Seccion>
 
           <Seccion titulo="Cada llamada" nota="Las últimas 300 que pasaron por el cobro: quién, qué, cuánto y cómo respondió.">
@@ -166,9 +201,13 @@ export function Admin() {
           </Seccion>
 
           <Seccion titulo="Las respuestas tal cual">
-            <Crudo titulo="Saldo (GET /api/partner/v1/balance)" r={panel.saldo} />
-            <Crudo titulo="Usuarios (GET /api/partner/v1/users)" r={panel.usuarios} />
-            <Crudo titulo="Consumo (GET /api/partner/v1/usage)" r={panel.uso} />
+            {llaves.map((l) => (
+              <div key={l.id}>
+                <Crudo titulo={`Saldo${varias ? ` de …${l.fin}` : ''} (GET /api/partner/v1/balance)`} r={l.saldo} />
+                <Crudo titulo={`Usuarios${varias ? ` de …${l.fin}` : ''} (GET /api/partner/v1/users)`} r={l.usuarios} />
+                <Crudo titulo={`Consumo${varias ? ` de …${l.fin}` : ''} (GET /api/partner/v1/usage)`} r={l.uso} />
+              </div>
+            ))}
           </Seccion>
         </>
       )}
@@ -226,6 +265,7 @@ function Usuarios({ usuarios, cuentas, onCambio, onVer }: { usuarios: Usuario[];
       filas={usuarios.map((u) => [
         <button className="admin-quien" onClick={() => onVer(u.external_id)} title={`external_id: ${u.external_id}`}>
           {u.external_id === CREADOR ? 'Tú (creador)' : (cuentas[u.external_id]?.email ?? u.name ?? u.external_id)}
+          {u.cuenta && <span className="muted small mono"> {u.cuenta}</span>}
         </button>,
         <span className="admin-planes">{u.external_id === CREADOR ? '—' : planes(cuentas[u.external_id])}</span>,
         <strong>{num(u.credits)}</strong>,
@@ -365,7 +405,7 @@ function Llamadas({ filas, quien, onVer }: { filas: Registro[]; quien(externo: s
 
 /** Un usuario: lo que dice Voices Cloning, su cuenta de Sloth y todas sus llamadas. */
 function Detalle({ externo, quien, onCerrar, onCambio }: { externo: string; quien: string; onCerrar(): void; onCambio(): void }) {
-  const [d, setD] = useState<{ usuario: Respuesta; registro: Registro[]; cuenta: Cuenta | null }>()
+  const [d, setD] = useState<{ usuario: Respuesta; llave: { nombre: string; fin: string } | null; registro: Registro[]; cuenta: Cuenta | null }>()
   const [error, setError] = useState('')
   const leer = useCallback(() => void api<NonNullable<typeof d>>(`/api/admin/voz/usuario?externo=${encodeURIComponent(externo)}`).then(setD, (e: Error) => setError(e.message)), [externo])
   useEffect(leer, [leer])
@@ -403,6 +443,14 @@ function Detalle({ externo, quien, onCerrar, onCambio }: { externo: string; quie
       )}
       <p className="muted small">
         external_id <span className="mono">{externo}</span>
+        {d?.llave && (
+          <>
+            {' · llave '}
+            <span className="mono">
+              …{d.llave.fin} ({d.llave.nombre})
+            </span>
+          </>
+        )}
         {d?.cuenta && (
           <>
             {' · '}
@@ -441,21 +489,29 @@ function Paginas({ r, pagina, cargando, onPagina }: { r?: Respuesta; pagina: num
   )
 }
 
-/** Los movimientos de `/usage` (`items`: `date`, `kind`, `external_id`, `function`, `credits`); con otra forma, tal cual. */
-function Movimientos({ r, quien }: { r?: Respuesta; quien(externo: string): string }) {
-  if (!r || r.status >= 400) return null
-  const items = r.datos.items
-  if (!Array.isArray(items)) return <Generica r={r} />
-  if (!items.length) return <p className="muted small admin-vacio">Ningún movimiento.</p>
+/**
+ * Los movimientos de `/usage` de todas las llaves, los más nuevos primero (`items`: `date`, `kind`, `external_id`,
+ * `function`, `credits`); con otra forma, tal cual.
+ */
+function Movimientos({ llaves, quien }: { llaves: Llave[]; quien(externo: string): string }) {
+  const leidas = llaves.filter((l) => l.uso.status < 400)
+  const rara = leidas.find((l) => !Array.isArray(l.uso.datos.items))
+  if (rara) return <Generica r={rara.uso} />
+  const varias = llaves.length > 1
+  const items = leidas
+    .flatMap((l) => (l.uso.datos.items as Datos[]).map((m): Datos => ({ ...m, cuenta: l.fin })))
+    .sort((a, b) => String(b.date ?? '').localeCompare(String(a.date ?? '')))
+  if (!items.length) return leidas.length ? <p className="muted small admin-vacio">Ningún movimiento.</p> : null
   return (
     <Tabla
-      cabeza={['Cuándo', 'Tipo', 'Usuario', 'Qué', 'Créditos']}
-      filas={(items as Datos[]).map((m) => [
+      cabeza={['Cuándo', 'Tipo', 'Usuario', 'Qué', 'Créditos', ...(varias ? ['Llave'] : [])]}
+      filas={items.map((m) => [
         fecha(m.date),
         String(m.kind ?? '—'),
         m.external_id ? quien(String(m.external_id)) : '—',
         String(m.function ?? '—'),
-        <strong className={m.kind === 'recarga' ? 'ok' : ''}>{num(m.credits)}</strong>
+        <strong className={m.kind === 'recarga' ? 'ok' : ''}>{num(m.credits)}</strong>,
+        ...(varias ? [<span className="mono">…{String(m.cuenta)}</span>] : [])
       ])}
     />
   )
