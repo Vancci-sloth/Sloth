@@ -14,7 +14,7 @@ la sacaría del instalador, y con ella el encabezado `X-Partner-User` dejaría g
 
 - **La llave vive en el cobro** (`licencias/`, secreto `VOICES_PK_LIVE`), y el cobro es el único que habla con Voices
   Cloning (`licencias/src/voz.ts`). Sabe quién pide como en la comunidad (la clave y la computadora de una cuenta o un
-  apoyo activos, o el creador con `PUBLICAR`) y pone él el `X-Partner-User`.
+  apoyo activos, o el creador con su llave) y pone él el `X-Partner-User`.
 - **El usuario es el `id` de la primera licencia de su correo** (su cuenta gratis y su apoyo son el mismo), y el del
   creador, `creador`. Ni el correo ni la clave salen hacia Voices Cloning.
 - **Los créditos los da el creador.** `VOZ_CREDITOS` (0 de entrada) son los de cada alta; con 0, la app solo ofrece
@@ -26,7 +26,7 @@ la sacaría del instalador, y con ella el encabezado `X-Partner-User` dejaría g
   (`data/voz/voices-cloning.json`). Generar es el mismo `generar_voz` de siempre: el guion va por trozos, cada MP3 pasa a
   PCM con ffmpeg y queda el mismo WAV, así que ninguna skill cambia.
 - **Todo queda anotado en el cobro** (`voz_registro`, 180 días): cada alta, pase, voz, tarea y cambio de créditos, con lo
-  que gastó y si falló, por qué. Administrador, en la Sloth del creador (la que tiene su `publicar.txt`), lo junta con
+  que gastó y si falló, por qué. Administrador, en la Sloth del creador (la que tiene su `admin.txt`), lo junta con
   lo que dice Voices Cloning (saldo, usuarios, consumo) y deja sumar, quitar, suspender y dar de alta.
 
 ## Consecuencias

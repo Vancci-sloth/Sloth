@@ -77,7 +77,9 @@ ramas ni bloquea por sí solo un push a `venta`.
 5. Cuando los cinco salieron bien, cuéntalo en Anuncios de la comunidad, sin preguntar: escribe el anuncio como lo
    escribe Vancci ([anuncios.md](anuncios.md)) y publícalo con `node scripts/anuncio.mjs <archivo>`.
 
-La llave `PUBLICAR` del workflow autoriza la subida. Los secretos de Apple y el comportamiento sin firma están en
+La llave `PUBLICAR` del workflow autoriza la subida, y solo vive en los secretos de GitHub: con ella se reparte una
+versión a todos. En la computadora del creador va otra, `ADMIN` (`%APPDATA%\sloth\licencias\admin.txt`), que administra
+la comunidad, las voces y los apoyos a mano, pero no publica, porque ahí la leen sus agentes. Los secretos de Apple y el comportamiento sin firma están en
 [ADR 0006](../adr/0006-mac-y-linux.md). La comprobación de empaquetado no demuestra que la app abra y funcione en una
 máquina real: una prueba de arranque debe usar datos y carpeta de usuario aparte, porque Sloth enlaza las skills.
 

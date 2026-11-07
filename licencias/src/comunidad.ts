@@ -1,7 +1,7 @@
 /**
  * La comunidad de Sloth: lo que la gente hace con Sloth y cómo lo hace, en un feed como el de Skool
  * (`web/src/Comunidad.tsx`). Entra quien tiene una clave activa (una cuenta gratis o un apoyo) en una computadora que ya la usa (las cabeceras
- * `x-sloth-clave` y `x-sloth-equipo`, que pone `server/comunidad.ts`), y el creador, con la llave `PUBLICAR`: él fija,
+ * `x-sloth-clave` y `x-sloth-equipo`, que pone `server/comunidad.ts`), y el creador, con su llave (`delCreador`): él fija,
  * borra lo de cualquiera, publica en Anuncios, dice cómo va cada mejora y revisa lo reportado. De cada miembro se ve su
  * `id`, su nombre y su foto, nunca su clave.
  *
@@ -12,8 +12,9 @@
  * de cada una (`likes`, `likes_comentarios`), los `reportes` y los `avisos` de cada miembro: te comentaron, te
  * respondieron, te dieron me gusta, cambió tu mejora, hay un anuncio. Lo que reportan `OCULTAR` personas deja de verse
  * (salvo para quien lo escribió y el creador) hasta que el creador lo revisa. Las imágenes y los videos van a R2
- * (`DESCARGAS`, bajo `comunidad/`) con un nombre al azar, y `GET /comunidad/archivo/<llave>` los sirve sin preguntar quién
- * eres, para que `<img>` y `<video>` los carguen directo.
+ * (`DESCARGAS`, bajo `comunidad/`) con un nombre al azar y quién los subió, y `GET /comunidad/archivo/<llave>` los sirve
+ * sin preguntar quién eres, para que `<img>` y `<video>` los carguen directo. Solo se adjunta (y así se borra) lo que uno
+ * subió (`soloSuyos`); lo que nada usa se borra a los dos días (`olvidarSueltos`).
  *
  * En Estilos, cada publicación lleva un estilo empaquetado (`server/estilos.ts`), que se instala desde ahí. Es código que
  * corre en la computadora de quien lo instala: uno nuevo, o uno al que le cambian el paquete, queda `aprobada = 0` y solo
@@ -36,7 +37,7 @@
  *   `POST` la da a todos ya (`liberar` en `index.ts`), cuando el chat de un live cumple su meta.
  */
 import type { AdjuntoComunidad, Autor, AvisoComunidad, CategoriaComunidad, ComentarioComunidad, FeedComunidad, PublicacionComunidad, RoadmapComunidad } from '../../shared/types.ts'
-import { BLOQUEADA, CLAVE, EQUIPO, cupo, esFundador, type Env, type Fila, Rechazo, cuerpo, iguales, json, letras, liberar, servir, vigencia, vigilar } from './index.ts'
+import { BLOQUEADA, CLAVE, EQUIPO, cupo, delCreador, esFundador, type Env, type Fila, Rechazo, cuerpo, json, letras, liberar, servir, vigencia, vigilar } from './index.ts'
 
 export const CATEGORIAS: CategoriaComunidad[] = ['general', 'hice', 'ayuda', 'mejoras', 'estilos', 'anuncios']
 
@@ -70,8 +71,13 @@ const LLAVE = /^[a-z0-9]{20}\.(png|jpg|webp|gif|mp4|webm|mov|estilo)$/
 const IMAGEN = /\.(png|jpg|webp|gif)$/
 const ESTILO = /\.estilo$/
 const ID = /^[a-z0-9]+$/
-/** Lo más que publica, comenta o reporta cada miembro en un día (`cupo`): que un error o un abuso no llene la comunidad. */
-const AL_DIA = { publicaciones: 10, comentarios: 100, reportes: 20 }
+/**
+ * Lo más que publica, comenta, reporta o sube cada miembro en un día (`cupo`): que un error o un abuso no llene la
+ * comunidad ni la cuenta de R2. Un video pesa hasta 50 MB: van aparte, menos.
+ */
+const AL_DIA = { publicaciones: 10, comentarios: 100, reportes: 20, archivos: 60, videos: 10 }
+/** Lo subido con dueño que nada usa (una publicación que no se hizo, o un abuso) se borra pasado esto. */
+const SUELTO = 2 * 24 * 3600_000
 /** El identificador que manda la app (`server/licencia.ts`): el de la computadora resumido, o un UUID. Otro lo inventó alguien. */
 export const DE_LA_APP = /^(?:[0-9a-f]{32}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/
 
@@ -161,7 +167,7 @@ export async function comunidad(req: Request, env: Env, url: URL): Promise<Respo
     await env.DB.prepare('UPDATE avisos SET leido = 1 WHERE para = ? AND leido = 0').bind(yo.id).run()
     return json({ ok: true })
   }
-  if (ruta === '/comunidad/archivo' && req.method === 'PUT') return json(await subir(req, env))
+  if (ruta === '/comunidad/archivo' && req.method === 'PUT') return json(await subir(req, env, yo))
   if (ruta === '/comunidad/liberar' && (req.method === 'GET' || req.method === 'POST')) {
     if (!esCreador(yo)) throw new Rechazo(403, 'Eso solo lo hace el creador de Sloth.')
     return json(await liberar(env, req.method === 'POST'))
@@ -192,14 +198,14 @@ export async function comunidad(req: Request, env: Env, url: URL): Promise<Respo
 }
 
 /**
- * Quién pide: el creador, con la llave `PUBLICAR`, o una clave activa en una computadora que la usa. Quien entra por
+ * Quién pide: el creador, con su llave (`delCreador`), o una clave activa en una computadora que la usa. Quien entra por
  * primera vez queda como miembro, sin nombre: lo pone al publicar o comentar. Las claves de un mismo correo (su cuenta
  * gratis y la de su apoyo) son el mismo miembro.
  */
 async function quien(req: Request, env: Env): Promise<Miembro> {
   const ahora = Date.now()
   let clave = CREADOR
-  if (!env.PUBLICAR || !iguales(req.headers.get('authorization') ?? '', `Bearer ${env.PUBLICAR}`)) {
+  if (!delCreador(req, env)) {
     clave = (req.headers.get('x-sloth-clave') ?? '').replace(/\s+/g, '').toUpperCase()
     const equipo = req.headers.get('x-sloth-equipo') ?? ''
     const fila =
@@ -475,6 +481,7 @@ async function publicar(env: Env, yo: Miembro, c: Record<string, unknown>): Prom
   const adjuntos = adjuntosDe(c.adjuntos)
   if (!titulo && !cuerpoTexto && !adjuntos.length) throw new Rechazo(400, 'Escribe algo o agrega una imagen.')
   estiloEnSuSitio(categoria, adjuntos)
+  await soloSuyos(env, yo, llavesDe(JSON.stringify(adjuntos)))
   if (!esCreador(yo) && !(await conCupo(env, yo, 'publicaciones')))
     throw new Rechazo(429, `Ya publicaste ${AL_DIA.publicaciones} veces hoy. Mañana sigues.`)
   const ahora = new Date().toISOString()
@@ -523,7 +530,11 @@ async function cambiar(env: Env, yo: Miembro, f: Guardada, c: Record<string, unk
   if (c.categoria !== undefined) nueva.categoria = categoriaDe(c.categoria, yo)
   if (c.titulo !== undefined) nueva.titulo = texto(c.titulo, 140)
   if (c.texto !== undefined) nueva.texto = texto(c.texto, 20_000)
-  if (c.adjuntos !== undefined) nueva.adjuntos = JSON.stringify(adjuntosDe(c.adjuntos))
+  if (c.adjuntos !== undefined) {
+    nueva.adjuntos = JSON.stringify(adjuntosDe(c.adjuntos))
+    // Los que ya llevaba siguen; los nuevos, solo si los subió quien la escribe.
+    await soloSuyos(env, yo, llavesDe(nueva.adjuntos), llavesDe(f.adjuntos))
+  }
   if (contenido && !nueva.titulo && !nueva.texto && nueva.adjuntos === '[]') throw new Rechazo(400, 'No puede quedar vacía: bórrala.')
   if (contenido) nueva.editada = new Date().toISOString()
   if (c.fijada !== undefined) nueva.fijada = c.fijada ? 1 : 0
@@ -600,6 +611,7 @@ async function comentar(env: Env, yo: Miembro, f: Guardada, c: Record<string, un
   const t = texto(c.texto, 5000)
   const fotos = fotosDeComentario(c.adjuntos)
   if (!t && !fotos.length) throw new Rechazo(400, 'Escribe tu comentario o agrega una imagen.')
+  await soloSuyos(env, yo, llavesDe(JSON.stringify(fotos)))
   if (!esCreador(yo) && !(await conCupo(env, yo, 'comentarios'))) throw new Rechazo(429, 'Ya comentaste mucho hoy. Mañana sigues.')
   let padre: ComentarioGuardado | null = null
   if (c.responde) {
@@ -705,6 +717,7 @@ async function perfil(env: Env, yo: Miembro, c: Record<string, unknown>): Promis
   if (c.foto !== undefined) {
     foto = typeof c.foto === 'string' && LLAVE.test(c.foto) && IMAGEN.test(c.foto) ? c.foto : null
     if (c.foto && !foto) throw new Rechazo(400, 'La foto debe ser una imagen.')
+    if (foto) await soloSuyos(env, yo, [foto], yo.foto ? [yo.foto] : [])
   }
   if (c.creditos === true && yo.insignia !== 'fundador') throw new Rechazo(403, 'Los créditos de la página son de los Fundadores.')
   const creditos = c.creditos === undefined ? yo.creditos : c.creditos === true ? 1 : 0
@@ -740,14 +753,63 @@ function aceptar(contentType: string, bytes: number): { tipo: AdjuntoComunidad['
 const pesoLegible = (b: number) => `${b / 1024 ** 2} MB`
 const metadatos = (contentType: string) => ({ httpMetadata: { contentType, cacheControl: 'public, max-age=31536000, immutable' } })
 
-/** Una imagen, un video o un estilo. */
-async function subir(req: Request, env: Env): Promise<{ llave: string; url: string }> {
+/** Una imagen, un video o un estilo, con quién lo subió (`miembro`, ver `soloSuyos`), pocos al día. */
+async function subir(req: Request, env: Env, yo: Miembro): Promise<{ llave: string; url: string }> {
   const bytes = Number(req.headers.get('content-length'))
   const a = aceptar(req.headers.get('content-type') ?? '', bytes)
   if (!req.body) throw new Rechazo(411, 'Falta el archivo.')
-  await env.DESCARGAS.put(`comunidad/${a.llave}`, req.body, metadatos(a.contentType))
+  if (!esCreador(yo) && !(await conCupo(env, yo, a.tipo === 'video' ? 'videos' : 'archivos')))
+    throw new Rechazo(429, `Ya subiste muchos ${a.tipo === 'video' ? 'videos' : 'archivos'} hoy. Mañana sigues.`)
+  await env.DESCARGAS.put(`comunidad/${a.llave}`, req.body, { ...metadatos(a.contentType), customMetadata: { miembro: yo.id } })
   return { llave: a.llave, url: urlDe(env, a.llave) }
 }
+
+/**
+ * Que cada llave nueva (las que no estén en `ya`) la haya subido `yo`: las llaves se ven en el feed, y con la de otro se
+ * podría poner su archivo en lo tuyo y luego borrarlo al editar. El creador usa cualquiera.
+ */
+async function soloSuyos(env: Env, yo: Miembro, llaves: string[], ya: string[] = []) {
+  if (esCreador(yo)) return
+  for (const llave of new Set(llaves.filter((l) => !ya.includes(l)))) {
+    const cabeza = await env.DESCARGAS.head(`comunidad/${llave}`)
+    if (!cabeza) throw new Rechazo(400, 'Ese archivo ya no está: súbelo otra vez.')
+    if (!esDe(cabeza.customMetadata, yo.id)) throw new Rechazo(400, 'Ese archivo no lo subiste tú: súbelo otra vez.')
+  }
+}
+
+/** Si los metadatos de un archivo de R2 dicen que lo subió `miembro`. */
+export const esDe = (metadatos: Record<string, string> | undefined, miembro: string) => metadatos?.miembro === miembro
+
+/**
+ * Cada mañana: lo subido con dueño (desde que se anota, ver `subir`) que pasado `SUELTO` nada usa (ni una publicación,
+ * ni un comentario, ni una foto de perfil) se borra.
+ */
+export async function olvidarSueltos(env: Env, ahora = Date.now()) {
+  const viejos: string[] = []
+  let cursor: string | undefined
+  do {
+    const r = await env.DESCARGAS.list({ prefix: 'comunidad/', cursor, include: ['customMetadata'] })
+    for (const o of r.objects) if (o.customMetadata?.miembro && ahora - o.uploaded.getTime() > SUELTO) viejos.push(o.key.slice('comunidad/'.length))
+    cursor = r.truncated ? r.cursor : undefined
+  } while (cursor)
+  if (!viejos.length) return
+  const usadas = new Set<string>()
+  for (const sql of [
+    "SELECT coalesce(adjuntos, '') || ' ' || coalesce(texto, '') AS t FROM publicaciones",
+    "SELECT coalesce(adjuntos, '') || ' ' || coalesce(texto, '') AS t FROM comentarios",
+    'SELECT foto AS t FROM miembros WHERE foto IS NOT NULL'
+  ]) {
+    const { results } = await env.DB.prepare(sql).all<{ t: string }>()
+    for (const r of results) for (const l of llavesEn(r.t)) usadas.add(l)
+  }
+  await quitarArchivos(env, sueltos(viejos, usadas))
+}
+
+/** Las llaves de la comunidad que aparecen en `texto` (un JSON de adjuntos, un texto con enlaces o una foto). */
+export const llavesEn = (texto: string) => [...texto.matchAll(/[a-z0-9]{20}\.(?:png|jpg|webp|gif|mp4|webm|mov|estilo)/g)].map((m) => m[0])
+
+/** De `viejas`, las que nada usa. */
+export const sueltos = (viejas: string[], usadas: Set<string>) => viejas.filter((l) => !usadas.has(l))
 
 async function servirArchivo(req: Request, env: Env, llave: string): Promise<Response> {
   const cabeza = LLAVE.test(llave) ? await env.DESCARGAS.head(`comunidad/${llave}`) : null

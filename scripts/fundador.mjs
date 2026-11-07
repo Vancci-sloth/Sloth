@@ -9,7 +9,7 @@
 //                                        con 0 meses, solo se le vuelve a mandar. Usa la llave de `npm run publicar`.
 import { spawnSync } from 'node:child_process'
 import { randomBytes } from 'node:crypto'
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
 const [orden, ...resto] = process.argv.slice(2)
@@ -53,7 +53,13 @@ if (orden === 'nuevo') {
   d1(`UPDATE enlaces_fundador SET revocado = '${new Date().toISOString()}' WHERE codigo = '${resto[0]}'`)
   console.log(`Revocado: ${resto[0]}`)
 } else if (orden === 'dar' && resto[0]) {
-  const llave = (process.env.PUBLICAR || readFileSync(join(process.env.APPDATA ?? '', 'sloth', 'licencias', 'publicar.txt'), 'utf8')).trim()
+  // La del creador: admin.txt (administra, no publica); sin ella, publicar.txt.
+  const llave = (
+    process.env.SLOTH_ADMIN ||
+    process.env.PUBLICAR ||
+    ['admin.txt', 'publicar.txt'].map((a) => join(process.env.APPDATA ?? '', 'sloth', 'licencias', a)).flatMap((r) => (existsSync(r) ? [readFileSync(r, 'utf8')] : []))[0] ||
+    ''
+  ).trim()
   const r = await fetch('https://api.sloth.vancci.org/a-mano', {
     method: 'POST',
     headers: { authorization: `Bearer ${llave}`, 'content-type': 'application/json' },

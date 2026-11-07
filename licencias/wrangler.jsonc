@@ -8,8 +8,9 @@
 // NOWPayments, del modo `NOWPAYMENTS_MODO`; sin ellas no se ofrece pagar con cripto), STRIPE_SECRET_KEY y
 // STRIPE_WEBHOOK_SECRET (la tarjeta, con Stripe: `npm run stripe` pone las dos con la llave secreta; sin ellas no se ofrece),
 // VOICES_PK_LIVE (la llave de socio `pk_live_…` de Voices Cloning, para las voces de src/voz.ts; sin ella, la app no las ofrece),
-// FIRMA (la llave privada Ed25519 en PKCS8 y base64; la pública va en server/licencia.ts) y PUBLICAR (la llave de
-// `npm run publicar`, que también está en %APPDATA%\sloth\licencias\publicar.txt). La base de datos se crea con
+// FIRMA (la llave privada Ed25519 en PKCS8 y base64; la pública va en server/licencia.ts), PUBLICAR (la llave de
+// `npm run publicar`, solo en los secretos de GitHub: sube versiones) y ADMIN (la del creador, en
+// %APPDATA%\sloth\licencias\admin.txt: administra la comunidad, las voces y los apoyos a mano, no publica). La base de datos se crea con
 // `npm run licencias -- d1 migrations apply sloth-licencias --remote`. El instalador vive en el bucket DESCARGAS.
 {
   "name": "sloth-licencias",

@@ -65,15 +65,20 @@
  * (`/voz/*`, en `voz.ts`), que guarda aquí la llave del socio.
  */
 import type { VersionLiberable } from '../../shared/types.ts'
-import { comunidad, creditos } from './comunidad.ts'
+import { comunidad, creditos, olvidarSueltos } from './comunidad.ts'
 import { cancelarStripe, firmaDeStripe, leerStripe, modoStripe, pagoDeSesion, sesion, sesionStripe, suscripcionStripe, type PagoStripe, type SesionStripe } from './stripe.ts'
 import { olvidarRegistroVoz, voz } from './voz.ts'
 
 export interface Env {
   DB: D1Database
   DESCARGAS: R2Bucket
-  /** La llave de `npm run publicar`. */
+  /** La llave de `npm run publicar`, que solo vive en GitHub (el secreto PUBLICAR): sube versiones y lo puede todo. */
   PUBLICAR?: string
+  /**
+   * La llave del creador en su computadora (%APPDATA%\sloth\licencias\admin.txt): la comunidad, las voces y los apoyos a
+   * mano, pero no publicar. Ahí la leen sus agentes, y con ella no se reparte una versión a todos.
+   */
+  ADMIN?: string
   /** `prueba` cobra en el sandbox de PayPal; `produccion`, de verdad. Las llaves son las de la app de PayPal de ese modo. */
   PAYPAL_MODO: 'prueba' | 'produccion'
   PAYPAL_CLIENT_ID?: string
@@ -330,6 +335,10 @@ const EQUIPOS = 2
 const VISTO = 30 * DIA
 /** Las cuentas gratis que se piden (o se vuelven a pedir) desde una misma conexión en un día. */
 const CUENTAS_AL_DIA = 5
+/** Los correos de cuenta que recibe una misma dirección en un día: pedirla otra vez no manda correos sin fin. */
+const CORREOS_AL_DIA = 3
+/** Los pagos que se abren desde una misma conexión en un día (un doble clic no cuenta: reusa el de la última hora). */
+const PAGOS_AL_DIA = 20
 /** 32 letras y números sin los que se confunden (0, 1, I, O). */
 const ALFABETO = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ'
 export const CLAVE = /^SLOTH(-[2-9A-HJ-NP-Z]{4}){4}$/
@@ -360,6 +369,16 @@ export function instaladorDe(archivo: string): Sistema | undefined {
   if (tipo?.endsWith('.dmg')) return tipo.includes('arm64') ? 'mac-arm64' : tipo.includes('mac12') ? 'mac12' : 'mac'
   return tipo === '.exe' ? 'windows' : tipo?.endsWith('.AppImage') ? 'linux' : undefined
 }
+/** El sistema de un instalador, del .zip de Mac o de su mapa de bloques; `undefined` si no es uno. */
+export function sistemaDelBinario(archivo: string): Sistema | undefined {
+  const tipo = BINARIO.exec(archivo.replace(/\.blockmap$/, ''))?.groups?.tipo
+  if (!tipo) return
+  if (tipo === '.exe') return 'windows'
+  if (tipo.endsWith('.AppImage')) return 'linux'
+  return tipo.includes('arm64') ? 'mac-arm64' : tipo.includes('mac12') ? 'mac12' : 'mac'
+}
+/** La versión en el nombre de un archivo publicado (`0.3.4`). */
+export const versionDe = (archivo: string) => /\d+\.\d+\.\d+/.exec(archivo)?.[0]
 /** El sistema de un `latest*.yml`. */
 export const sistemaDelYml = (archivo: string): Sistema => (Object.entries(YML).find(([, y]) => y === archivo)?.[0] as Sistema | undefined) ?? 'windows'
 /** De cada tipo de archivo (el .exe, el .dmg y el .zip de Mac, el AppImage) se quedan el último y el de antes en R2, por si alguien lo está bajando al publicar. */
@@ -440,6 +459,7 @@ export default {
     ctx.waitUntil(avisarCobros(env).catch((e) => console.error('Avisos de cobro', e instanceof Error ? e.message : e)))
     ctx.waitUntil(env.DB.prepare('DELETE FROM cupos WHERE creado < ?').bind(new Date(Date.now() - 2 * DIA).toISOString()).run())
     ctx.waitUntil(olvidarRegistroVoz(env).catch((e) => console.error('Registro de la voz', e instanceof Error ? e.message : e)))
+    ctx.waitUntil(olvidarSueltos(env).catch((e) => console.error('Archivos sueltos de la comunidad', e instanceof Error ? e.message : e)))
   }
 } satisfies ExportedHandler<Env>
 
@@ -556,8 +576,7 @@ async function apoya(req: Request, env: Env): Promise<boolean> {
  */
 async function ultimaPara(req: Request, env: Env, so: Sistema): Promise<Ultima & { nueva?: string }> {
   const u = await ultima(env, so)
-  const publica = !!env.PUBLICAR && iguales(req.headers.get('authorization') ?? '', `Bearer ${env.PUBLICAR}`)
-  if (deTodos(u) || publica || (await apoya(req, env))) return u
+  if (deTodos(u) || delCreador(req, env) || (await apoya(req, env))) return u
   const anterior = await anteriorDe(env, so)
   if (anterior) return { ...anterior, nueva: u.version }
   // Sin el instalador de la anterior, la última ya se le da a todos: sin `todos`, que diría que aún no.
@@ -571,18 +590,22 @@ async function anteriorDe(env: Env, so: Sistema): Promise<Ultima | undefined> {
   return a && (await env.DESCARGAS.head(a.archivo)) ? a : undefined
 }
 
-/** Lo que pide electron-updater: `latest.yml`, que nunca se guarda en caché, y los instaladores y sus mapas por pedazos. */
+/**
+ * Lo que pide electron-updater: `latest.yml`, que nunca se guarda en caché, y los instaladores y sus mapas por pedazos.
+ * Mientras la última sea solo de quien apoya, a los demás se les da el `latest.yml` de la anterior, y los archivos de la
+ * última no: con el número de `/ultima`, que es público, cualquiera armaría su nombre.
+ */
 async function actualizaciones(req: Request, env: Env, url: URL): Promise<Response> {
   const archivo = decodeURIComponent(url.pathname.slice('/actualizaciones/'.length))
   if (!publicable(archivo)) throw new Rechazo(404, 'No existe')
   const yml = AL_DIA.test(archivo)
   let llave = archivo
-  // latest.yml: a quien no apoya, el de la anterior mientras la última sea solo de quien apoya.
-  if (yml) {
-    const so = sistemaDelYml(archivo)
-    const u = await env.DESCARGAS.get(ULTIMAS[so])
-    if (u && !deTodos(await u.json<Ultima>()) && !(await apoya(req, env)) && (await anteriorDe(env, so)) && (await env.DESCARGAS.head(`anterior/${archivo}`)))
-      llave = `anterior/${archivo}`
+  const so = yml ? sistemaDelYml(archivo) : sistemaDelBinario(archivo)
+  const u = so && (await (await env.DESCARGAS.get(ULTIMAS[so]))?.json<Ultima>())
+  const deQuienApoya = !!u && !deTodos(u) && (yml || versionDe(archivo) === u.version)
+  if (so && deQuienApoya && !delCreador(req, env) && !(await apoya(req, env)) && (await anteriorDe(env, so))) {
+    if (!yml) throw new Rechazo(404, 'No existe')
+    if (await env.DESCARGAS.head(`anterior/${archivo}`)) llave = `anterior/${archivo}`
   }
   const cabeza = await env.DESCARGAS.head(llave)
   if (!cabeza) throw new Rechazo(404, 'No existe')
@@ -624,7 +647,7 @@ export function rangoDe(cabecera: string | null, bytes: number): { offset: numbe
  * Las subidas que no terminan, R2 las borra solas a la semana.
  */
 async function publicar(req: Request, env: Env, url: URL): Promise<Response> {
-  if (!env.PUBLICAR || !iguales(req.headers.get('authorization') ?? '', `Bearer ${env.PUBLICAR}`)) throw new Rechazo(401, 'No autorizado.')
+  if (!conLlave(req, env)) throw new Rechazo(401, 'No autorizado.')
   const archivo = url.searchParams.get('archivo') ?? ''
   if (!publicable(archivo)) throw new Rechazo(400, 'El archivo debe ser un instalador de Sloth (.exe, .dmg, .zip de Mac o .AppImage), su .blockmap o latest.yml.')
   if (req.method === 'POST' && url.pathname === '/publicar/inicio')
@@ -747,15 +770,19 @@ export function montoDe(plan: 'mensual' | 'anual' | 'unico', elegido: unknown, p
 }
 
 /**
- * Crea la suscripción mensual en PayPal, o la orden del año, pendiente de pago, y da el enlace donde el cliente paga. Desde la página, sin `equipo`, nada más: la clave se ve en `/gracias` cuando se confirma el pago, nunca antes, porque cualquiera puede
- * escribir el correo de otro. Desde la app de antes, con su `equipo`, también la clave, que espera el pago. Con `plan`
- * `gratis`, una cuenta gratis (solo desde la app): la clave, ya activa.
+ * Crea la suscripción mensual en PayPal, o la orden del año, pendiente de pago, y da el enlace donde el cliente paga, nada
+ * más: la clave de un apoyo solo llega al correo, al confirmarse el pago. Cualquiera puede escribir el correo de otro, y
+ * la comunidad junta las claves de un mismo correo: verla aquí o en `/gracias` sería entrar como esa persona. La app de
+ * antes (con su `equipo`) esperaba la clave aquí: se le dice que apoye desde la página. Con `plan` `gratis`, una cuenta
+ * gratis (solo desde la app), que también va por correo.
  */
 async function suscribir(env: Env, c: Record<string, unknown>, desde: string): Promise<Response> {
   const email = String(c.email ?? '').trim().toLowerCase()
   if (!EMAIL.test(email) || email.length > 254) throw new Rechazo(400, 'Escribe un correo válido.')
   const plan: Plan = c.plan === 'gratis' ? 'gratis' : c.plan === 'anual' ? 'anual' : c.plan === 'unico' ? 'unico' : 'mensual'
-  const equipo = c.equipo === undefined && plan !== 'gratis' ? undefined : equipoDe(c)
+  if (plan !== 'gratis' && c.equipo !== undefined)
+    throw new Rechazo(409, 'Para apoyar, entra a sloth.vancci.org: tu clave te llega por correo al confirmarse el pago. Luego escríbela en Opciones de Sloth, en «Ya apoyo».')
+  const equipo = plan === 'gratis' ? equipoDe(c) : undefined
   // Con Mercado Pago, en pesos; con PayPal o con cripto, en `MONEDA`. La app de antes no manda `pasarela`: PayPal.
   const pasa: Pasarela = c.pasarela === 'mercadopago' || c.pasarela === 'tarjeta' || c.pasarela === 'cripto' ? c.pasarela : 'paypal'
   // El consentimiento expreso de los términos y, si se paga cada mes, del cobro automático (LFPC art. 76 Bis VIII), con
@@ -789,8 +816,10 @@ async function suscribir(env: Env, c: Record<string, unknown>, desde: string): P
     .first<Fila>()
   if (previa) {
     await env.DB.prepare('UPDATE licencias SET acepto = ?, terminos = ? WHERE id = ?').bind(acepto, terminos, previa.id).run()
-    return json(equipo ? { clave: previa.clave, enlace: previa.enlace } : { enlace: previa.enlace })
+    return json({ enlace: previa.enlace })
   }
+  // Cada intento abre un pago en la pasarela y una fila: pocos al día por conexión, que nadie llene D1 ni alarme a la pasarela.
+  if (!(await cupo(env, desde, 'pago', PAGOS_AL_DIA))) throw new Rechazo(429, 'Desde esta conexión ya se abrieron muchos pagos hoy. Prueba mañana, o escríbenos.')
 
   // Fundador, cada mes o una vez, con el precio de Fundador de su moneda o más: con un enlace de Fundador que nadie ha
   // usado (aunque no queden lugares; el enlace queda usado con su pago), o en uno de los lugares públicos libres.
@@ -844,9 +873,7 @@ async function suscribir(env: Env, c: Record<string, unknown>, desde: string): P
     throw error instanceof Rechazo ? new Rechazo(502, `${quien} no pudo abrir el pago. Revisa tu correo e intenta otra vez.`) : error
   }
   await env.DB.prepare(`UPDATE licencias SET ${abierto.columna} = ?, enlace = ?, revisada = ? WHERE id = ?`).bind(abierto.id, abierto.enlace, new Date().toISOString(), fila.id).run()
-  if (!equipo) return json({ enlace: abierto.enlace })
-  await recordarEquipo(env, fila.clave, equipo, Date.now())
-  return json({ clave: fila.clave, enlace: abierto.enlace })
+  return json({ enlace: abierto.enlace })
 }
 
 /** La página de PayPal en español, sin dirección de envío, y de vuelta a `/gracias` al pagar o al salir. */
@@ -1030,13 +1057,14 @@ async function renovar(env: Env, f: Fila): Promise<string> {
 
 /**
  * Una cuenta gratis, para la comunidad, activa desde ya. Su clave solo va al correo: así cada cuenta es de un correo
- * de verdad, y quien escribe uno ajeno no entra. Pedirla otra vez la vuelve a mandar. La misma computadora (reinstaló
- * Sloth) recupera la suya, y también un lugar gratis de por vida que ya tuviera. `desde` (su conexión) pide pocas al
- * día. La app de antes no manda `porCorreo` y espera la clave: se le dice dónde escribirla.
+ * de verdad, y quien escribe uno ajeno no entra. Pedirla otra vez la vuelve a mandar, pocas veces al día. La misma
+ * computadora con el mismo correo (reinstaló Sloth) recupera la suya, y también un lugar gratis de por vida que ya
+ * tuviera: el `equipo` solo no basta, porque cualquier programa de esa computadora lo lee. `desde` (su conexión) pide
+ * pocas al día. La app de antes no manda `porCorreo` y espera la clave: se le dice dónde escribirla.
  */
 async function unirse(env: Env, email: string, equipo: string, acepto: string, terminos: string, desde: string, porCorreo: boolean): Promise<Response> {
-  const suya = await env.DB.prepare("SELECT l.clave FROM licencias l JOIN equipos e ON e.clave = l.clave WHERE e.equipo = ? AND l.estado = 'gratis' LIMIT 1")
-    .bind(equipo)
+  const suya = await env.DB.prepare("SELECT l.clave FROM licencias l JOIN equipos e ON e.clave = l.clave WHERE e.equipo = ? AND l.email = ? AND l.estado = 'gratis' LIMIT 1")
+    .bind(equipo, email)
     .first<{ clave: string }>()
   if (suya) return json({ clave: suya.clave })
   if (await env.DB.prepare("SELECT 1 FROM licencias WHERE email = ? AND estado = 'vetada'").bind(email).first()) {
@@ -1044,6 +1072,8 @@ async function unirse(env: Env, email: string, equipo: string, acepto: string, t
     throw new Rechazo(403, BLOQUEADA)
   }
   if (!(await cupo(env, desde, 'cuenta', CUENTAS_AL_DIA))) throw new Rechazo(429, 'Desde esta conexión ya se pidieron muchas cuentas hoy. Prueba mañana.')
+  if (!(await cupo(env, await resumen(`correo:${email}`), 'correo', CORREOS_AL_DIA)))
+    throw new Rechazo(429, `Ya te mandamos tu clave a ${email} varias veces hoy. Búscala en ese correo (también en spam o promociones).`)
   let clave = (await env.DB.prepare("SELECT clave FROM licencias WHERE email = ? AND plan = 'cuenta' AND estado = 'gratis' LIMIT 1").bind(email).first<{ clave: string }>())?.clave
   if (!clave) {
     await sinOtra(env, email, false)
@@ -1472,9 +1502,10 @@ async function guardarEstado(env: Env, fila: Fila, l: Lectura): Promise<Fila> {
   // El primer pago: la clave por correo, una sola vez aunque el aviso y `/gracias` lleguen a la vez.
   if (!fila.autorizada && nueva.autorizada) {
     const r = await env.DB.prepare('UPDATE licencias SET autorizada = ? WHERE id = ? AND autorizada IS NULL').bind(ahora, fila.id).run()
-    // Su enlace de Fundador ya se usó: es de una sola persona.
-    if (r.meta.changes && fila.enlace_fundador)
-      await env.DB.prepare('UPDATE enlaces_fundador SET usado = ? WHERE codigo = ? AND usado IS NULL').bind(fila.id, fila.enlace_fundador).run()
+    if (r.meta.changes && fila.fundador && !(await sigueDeFundador(env, fila))) {
+      await env.DB.prepare('UPDATE licencias SET fundador = 0 WHERE id = ?').bind(fila.id).run()
+      nueva.fundador = 0
+    }
     // Si no sale, `clave_enviada` queda vacía y el cron lo reintenta.
     if (r.meta.changes) await mandarClave(env, nueva)
   }
@@ -1482,6 +1513,20 @@ async function guardarEstado(env: Env, fila: Fila, l: Lectura): Promise<Fila> {
     .bind(estado, nueva.pagado_hasta, nueva.autorizada, ahora, fila.id)
     .run()
   return nueva
+}
+
+/**
+ * Al primer pago de un apoyo de Fundador, si lo sigue siendo: con su enlace, si nadie pagó antes con el mismo (lo deja
+ * usado: es de una sola persona); si no, si aún queda un lugar público sin contar este. Varios pudieron abrir el pago a
+ * la vez con el mismo enlace o con el último lugar: el apoyo de los demás sigue, pero ya no es de Fundador.
+ */
+async function sigueDeFundador(env: Env, f: Fila): Promise<boolean> {
+  if (f.enlace_fundador && (await env.DB.prepare('UPDATE enlaces_fundador SET usado = ? WHERE codigo = ? AND usado IS NULL').bind(f.id, f.enlace_fundador).run()).meta.changes) return true
+  if (f.modo !== 'produccion') return true
+  const otros = await env.DB.prepare(`SELECT COUNT(*) AS n FROM licencias WHERE plan IN ('mensual', 'anual', 'unico') AND modo = 'produccion' AND id != ? AND ${esFundador('licencias')}`)
+    .bind(f.id)
+    .first<{ n: number }>()
+  return (otros?.n ?? 0) < Number(env.FUNDADORES)
 }
 
 /** Manda la clave y, si Resend la aceptó, lo anota en `clave_enviada`. `false` si no salió: no lanza. */
@@ -1547,7 +1592,7 @@ export function hastaAMano(pagadoHasta: string | null, meses: number, ahora: num
  * con `meses: 0`, solo se le vuelve a mandar. La clave le llega por correo.
  */
 async function aMano(req: Request, env: Env): Promise<Response> {
-  if (!env.PUBLICAR || !iguales(req.headers.get('authorization') ?? '', `Bearer ${env.PUBLICAR}`)) throw new Rechazo(401, 'No autorizado.')
+  if (!delCreador(req, env)) throw new Rechazo(401, 'No autorizado.')
   const c = await cuerpo(req)
   const email = String(c.email ?? '').trim().toLowerCase()
   const meses = Number(c.meses ?? 1)
@@ -1696,9 +1741,35 @@ export async function vigilar(env: Env, email: string, motivo: string, bloqueada
 
 /** La conexión de quien pide, resumida: para su cupo, sin guardar su IP. */
 async function conexion(req: Request): Promise<string> {
-  const ip = new TextEncoder().encode(`sloth:${req.headers.get('cf-connecting-ip') ?? ''}`)
-  return `ip:${[...new Uint8Array(await crypto.subtle.digest('SHA-256', ip))].slice(0, 12).map((b) => b.toString(16).padStart(2, '0')).join('')}`
+  return `ip:${await resumen(`sloth:${redDe(req.headers.get('cf-connecting-ip') ?? '')}`)}`
 }
+
+/** `texto` resumido (SHA-256, sus primeros 12 bytes en hex): para contar sin guardar la IP ni el correo. */
+async function resumen(texto: string): Promise<string> {
+  return [...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(texto)))].slice(0, 12).map((b) => b.toString(16).padStart(2, '0')).join('')
+}
+
+/**
+ * La red de una IP, para los cupos: una IPv4 entera; de una IPv6, su /64, porque una sola conexión casera tiene 2^64
+ * direcciones y con cada una se saltaría el cupo.
+ */
+export function redDe(ip: string): string {
+  if (!ip.includes(':')) return ip
+  const [antes, despues] = ip.toLowerCase().split('::')
+  const a = antes ? antes.split(':') : []
+  const d = despues === undefined ? [] : despues ? despues.split(':') : []
+  const grupos = despues === undefined ? a : [...a, ...Array(Math.max(0, 8 - a.length - d.length)).fill('0'), ...d]
+  return `${grupos
+    .slice(0, 4)
+    .map((g) => g.replace(/^0+(?=.)/, ''))
+    .join(':')}::/64`
+}
+
+/** Si pide quien publica, con la llave `PUBLICAR`. */
+const conLlave = (req: Request, env: Env) => !!env.PUBLICAR && iguales(req.headers.get('authorization') ?? '', `Bearer ${env.PUBLICAR}`)
+
+/** Si pide el creador: con su llave `ADMIN`, o con la de publicar, que también lo es. */
+export const delCreador = (req: Request, env: Env) => conLlave(req, env) || (!!env.ADMIN && iguales(req.headers.get('authorization') ?? '', `Bearer ${env.ADMIN}`))
 
 /** Compara sin cortar en la primera diferencia: el tiempo no dice cuánto se acertó. */
 export function iguales(a: string, b: string): boolean {
@@ -1874,8 +1945,9 @@ function fecha(iso: string): string {
 
 /**
  * Adonde vuelve el cliente tras pagar en PayPal, o al salir sin pagar (`?s=` es su suscripción, que solo conocen él y PayPal).
- * Mientras no se confirme el pago, se recarga sola y vuelve a preguntar; confirmado, enseña la clave y el instalador de
- * cada sistema. Sin `s` viene de la app de antes, que espera abierta y se desbloquea sola.
+ * Mientras no se confirme el pago, se recarga sola y vuelve a preguntar; confirmado, dice a qué correo llegó la clave y
+ * da el instalador de cada sistema. La clave no se enseña: quien pagó con el correo de otro no se queda con su cuenta
+ * (ver `suscribir`). Sin `s` viene de la app de antes, que espera abierta y se desbloquea sola.
  */
 async function gracias(env: Env, url: URL): Promise<Response> {
   const id = url.searchParams.get('s') ?? ''
@@ -1892,20 +1964,18 @@ async function gracias(env: Env, url: URL): Promise<Response> {
   if (vigencia(fila, Date.now()).activa)
     return pagina(
       '¡Gracias por apoyar a Sloth!',
-      `<p>Esta es tu clave:</p>
-<div class="clave"><code>${fila.clave}</code><button type="button" onclick="navigator.clipboard.writeText('${fila.clave}').then(()=>this.textContent='Copiada')">Copiar</button></div>
-${correoAviso(escapar(fila.email))}
+      `${correoAviso(escapar(fila.email))}
 <a class="boton" href="/descargar">Descargar Sloth para Windows</a>
 <p class="otros">También para <a href="/descargar?so=mac">Mac</a> y <a href="/descargar?so=linux">Linux</a>.</p>
 <ol><li>Instálala. Si Windows dice «Windows protegió tu PC», da clic en <b>Más información</b> y luego en <b>Ejecutar de todas formas</b>.</li>
-<li>Ábrela y pega tu clave en Opciones: deja de salirte el recordatorio. Sirve en dos computadoras a la vez.</li>
+<li>Ábrela y pega en Opciones la clave de tu correo: deja de salirte el recordatorio. Sirve en dos computadoras a la vez.</li>
 <li>Conecta tu IA en Opciones, en Agentes (Claude, ChatGPT, OpenCode, que tiene modelos gratis, u otra), elige un estilo y escribe el tema.</li></ol>`
     )
   // Quien sale de PayPal sin pagar también vuelve aquí: puede volver al pago.
   if (fila.estado === 'pending')
     return pagina(
       'Esperando tu pago…',
-      `<p>En cuanto ${pasarela(fila)} lo confirme, aquí aparecen tu clave y el instalador. ${fila.cripto ? 'Con cripto tarda lo que la red en confirmar el pago: unos minutos.' : 'Suele tardar unos segundos.'}</p>${correoAviso(escapar(fila.email))}${fila.enlace ? `<p class="otros">¿Saliste sin pagar? <a href="${escapar(fila.enlace)}">Volver al pago</a></p>` : ''}`,
+      `<p>En cuanto ${pasarela(fila)} lo confirme, tu clave te llega por correo y aquí aparece el instalador. ${fila.cripto ? 'Con cripto tarda lo que la red en confirmar el pago: unos minutos.' : 'Suele tardar unos segundos.'}</p>${correoAviso(escapar(fila.email))}${fila.enlace ? `<p class="otros">¿Saliste sin pagar? <a href="${escapar(fila.enlace)}">Volver al pago</a></p>` : ''}`,
       5
     )
   return pagina(
@@ -1967,7 +2037,7 @@ ${!elegir && intel ? '<p class="otros">Para Mac con Intel. En un Mac con M1 o m�
 
 /** Que la clave llega también por correo, bien a la vista: es lo que queda si se cierra la página. */
 function correoAviso(para: string): string {
-  return `<div class="correo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg><div><b>Tu clave también te llega a ${para}</b>, con el enlace para descargar Sloth. Puedes cerrar esta página: la tienes ahí. Si no la ves en unos minutos, revisa spam o promociones.</div></div>`
+  return `<div class="correo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg><div><b>Tu clave te llega a ${para}</b>, con el enlace para descargar Sloth. Puedes cerrar esta página: la tienes ahí. Si no la ves en unos minutos, revisa spam o promociones.</div></div>`
 }
 
 /** Una página suelta con los colores de Sloth. Con `recargar`, se recarga sola cada tantos segundos. */
