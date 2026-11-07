@@ -37,6 +37,12 @@ export interface Card {
   basadoEn?: string
   /** Un estilo que instalaste de otro: de dónde vino. Al volver a instalarlo de ahí, se pone al día. */
   origen?: OrigenEstilo
+  /**
+   * Lo que el agente de Claude de esta card no ve: herramientas (`NotebookEdit`, `mcp__21st__bookmark`) o servidores MCP
+   * enteros (`mcp__openseo`), también los del usuario. Sale de lo que sus hilos nunca usaron (`medidor economizar`, en
+   * sloth-medidor): menos herramientas ofrecidas, menos contexto en cada mensaje.
+   */
+  sinHerramientas?: string[]
 }
 
 /** De dónde vino un estilo instalado: de un archivo (sin `publicacion`) o de la comunidad, y de qué versión de Sloth. */

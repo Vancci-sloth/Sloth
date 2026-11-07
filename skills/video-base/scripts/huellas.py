@@ -10,23 +10,17 @@ Desde la raíz del proyecto:
                                          ¿ya se hizo un tema parecido? (todos los candidatos de una vez: el modelo de
                                          vectores tarda en cargar) y los temas de los dos últimos de la serie
     python -B -X utf8 <base>/scripts/huellas.py revisar <skill> [--aunque "<por qué>"]
-    python -B -X utf8 <base>/scripts/huellas.py parecidos <skill> [video.mp4]
     python -B -X utf8 <base>/scripts/huellas.py cerrar <skill> [video.mp4]   (lo corre el final del estilo)
 
 - `revisar` lee `fuentes/huella.json` y la compara: el tema, contra todos; la forma, la apertura, el lugar, el
   protagonista, la pieza, la paleta y los objetos, contra los dos últimos; y contra los demás, si se parece en tres
   cosas o más a uno solo. Sin choques, la **reserva**: los otros videos de un lote ya la ven. Con `--aunque`, la
   reserva igual y guarda el porqué (para un choque que no lo es).
-- `parecidos` saca ocho cuadros parejos del video a medio hacer (de un borrador ya renderizado, o con `fotos.mjs`), busca en todo el historial los dos que
-  más se le parecen en imagen y arma `revision/parecidos.jpg` con los tres, para que lo mire alguien que no lo hizo.
 - `cerrar` guarda la hoja del video terminado y marca la huella como terminada.
 
 Lo dicho se compara con vectores (multilingual-e5, el proceso `vectores.py` de Sloth: «sala» y «living» quedan cerca),
 guardados en `huellas/.cache`; sin el Python de Sloth, por palabras. El modelo queda cargado entre llamadas
-(`vectores_vivo.py`): un texto nuevo tarda menos de un segundo, no ~18. La imagen, por sus colores y por cuánto se parece
-cada cuadro al más cercano del otro video, solo en la zona del medio (el texto de arriba y el perro son iguales a
-propósito en todos).
-"""
+(`vectores_vivo.py`): un texto nuevo tarda menos de un segundo, no ~18. """
 
 import hashlib
 import json
@@ -40,7 +34,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 import numpy as np
-from PIL import Image, ImageDraw, ImageFont, ImageOps
+from PIL import Image, ImageOps
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from sloth import MODELOS, ffmpeg, turno, vectorizar  # noqa: E402
@@ -63,7 +57,6 @@ CADUCA = timedelta(days=7)
 CUADROS = 8
 CELDA = (144, 256)
 # La zona del medio del cuadro (1920 de alto): entre el texto de arriba y el perro.
-ZONA = (470 / 1920, 1390 / 1920)
 
 
 def sin_acentos(t: str) -> str:
@@ -255,29 +248,6 @@ def revisar(skill: Path, aunque: str | None) -> None:
           f"(comparada con {len(previas)}, por {vec.modo}).")
 
 
-def rasgos(hoja: Image.Image) -> tuple[np.ndarray, np.ndarray]:
-    """De una hoja de ocho cuadros: el histograma de colores (64) y una miniatura normalizada por cuadro."""
-    w, h = CELDA
-    y0, y1 = int(ZONA[0] * h), int(ZONA[1] * h)
-    zonas = [np.asarray(hoja.crop((i * w, y0, (i + 1) * w, y1)).convert("RGB")) for i in range(CUADROS)]
-    todo = np.concatenate([z.reshape(-1, 3) for z in zonas]) // 64
-    hist = np.bincount(todo[:, 0] * 16 + todo[:, 1] * 4 + todo[:, 2], minlength=64).astype(float)
-    hist /= hist.sum()
-    minis = []
-    for z in zonas:
-        m = np.asarray(Image.fromarray(z).convert("L").resize((12, 10), Image.BILINEAR), dtype=float).ravel()
-        m -= m.mean()
-        n = np.linalg.norm(m)
-        minis.append(m / n if n > 1e-6 else m)
-    return hist, np.stack(minis)
-
-
-def semejanza(a, b) -> float:
-    colores = float(np.minimum(a[0], b[0]).sum())
-    tomas = float(np.clip(a[1] @ b[1].T, 0, 1).max(axis=1).mean())
-    return (colores + tomas) / 2
-
-
 def hoja_de(cuadros: list[Image.Image]) -> Image.Image:
     # Un cuadro horizontal se recorta al centro en 9:16 en vez de aplastarlo: así se compara con los verticales. Un
     # vertical ya es 9:16 y sale igual que antes.
@@ -285,10 +255,6 @@ def hoja_de(cuadros: list[Image.Image]) -> Image.Image:
     for i, c in enumerate(cuadros[:CUADROS]):
         hoja.paste(ImageOps.fit(c.convert("RGB"), CELDA, Image.LANCZOS), (i * CELDA[0], 0))
     return hoja
-
-
-def duracion_voz(raiz: Path) -> float:
-    return float(json.loads((raiz / "src" / "datos" / "voz.json").read_text(encoding="utf-8"))["duracion"])
 
 
 def cuadros_de(video: Path) -> list[Image.Image]:
@@ -302,54 +268,6 @@ def cuadros_de(video: Path) -> list[Image.Image]:
             ffmpeg("-ss", f"{(i + 0.5) / CUADROS * dur:.2f}", "-i", str(video), "-frames:v", "1", str(png))
             cuadros.append(Image.open(png).copy())
     return cuadros
-
-
-def parecidos(skill: Path, video: Path | None) -> None:
-    raiz = Path.cwd()
-    if video:
-        cuadros = cuadros_de(video)
-    else:
-        dur = duracion_voz(raiz)
-        carpeta = raiz / "revision" / "huella"
-        for viejo in carpeta.glob("*.png"):
-            viejo.unlink()
-        segundos = [f"{(i + 0.5) / CUADROS * dur:.2f}" for i in range(CUADROS)]
-        subprocess.run(["node", "scripts/fotos.mjs", str(carpeta), *segundos], cwd=raiz, check=True, shell=False, stdout=subprocess.DEVNULL)
-        cuadros = [Image.open(p) for p in sorted(carpeta.glob("*.png"), key=lambda p: float(p.stem))]
-    nueva = hoja_de(cuadros)
-    reg = Registro(skill)
-    yo = rasgos(nueva)
-    otras = []
-    for h in reg.vigentes(sin=raiz):
-        ruta = reg.hojas / f"{h['id']}.jpg"
-        if ruta.exists():
-            otras.append((semejanza(yo, rasgos(Image.open(ruta))), h, ruta))
-    otras.sort(key=lambda x: -x[0])
-    salida = raiz / "revision" / "parecidos.jpg"
-    filas = [("NUEVO: este video", nueva)] + [(f"{h['id']} ({s:.2f})", Image.open(r)) for s, h, r in otras[:2]]
-    banda = 34
-    lienzo = Image.new("RGB", (CELDA[0] * CUADROS, len(filas) * (CELDA[1] + banda)), "white")
-    d = ImageDraw.Draw(lienzo)
-    try:
-        letra = ImageFont.truetype("C:/Windows/Fonts/arialbd.ttf", 22)
-    except OSError:
-        letra = ImageFont.load_default()
-    for i, (titulo, img) in enumerate(filas):
-        y = i * (CELDA[1] + banda)
-        d.text((8, y + 6), titulo, fill="black", font=letra)
-        lienzo.paste(img, (0, y + banda))
-    lienzo.save(salida, quality=85)
-    if not otras:
-        print(f"No hay hojas de otros videos con qué comparar. Hoja nueva: {salida}")
-        return
-    for s, h, _ in otras[:2]:
-        print(f"{s:.2f}  {nombre(h)}")
-    print(f"\nLanza un subagente (que no lea el enfoque) con esto:\n\n"
-          f"Abre {salida}. La fila 1 es un video nuevo; las de abajo, los dos más parecidos de los que ya se hicieron, "
-          f"ocho cuadros de cada uno de principio a fin. El perro de abajo y el texto de arriba son iguales a propósito "
-          f"en todos: no cuentan. ¿Alguien que ya vio los de abajo creería que el nuevo es otra vez el mismo video? "
-          f"Contesta sí o no en la primera línea y, si es sí, qué se repite: los colores, el lugar, los objetos, dónde "
-          f"está el protagonista o el primer cuadro.")
 
 
 def cerrar(skill: Path, video: Path | None) -> None:
@@ -381,7 +299,7 @@ def cerrar(skill: Path, video: Path | None) -> None:
 def main() -> None:
     sys.stdout.reconfigure(encoding="utf-8")
     args = sys.argv[1:]
-    if len(args) < 2 or args[0] not in ("buscar", "revisar", "parecidos", "cerrar"):
+    if len(args) < 2 or args[0] not in ("buscar", "revisar", "cerrar"):
         sys.exit(__doc__)
     comando, skill = args[0], Path(args[1]).expanduser().resolve()
     if not (skill / "SKILL.md").exists():
@@ -393,8 +311,6 @@ def main() -> None:
     elif comando == "revisar":
         aunque = args[args.index("--aunque") + 1] if "--aunque" in args else None
         revisar(skill, aunque)
-    elif comando == "parecidos":
-        parecidos(skill, Path(args[2]) if len(args) > 2 else None)
     else:
         cerrar(skill, Path(args[2]) if len(args) > 2 else None)
 

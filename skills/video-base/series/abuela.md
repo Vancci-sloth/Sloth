@@ -1,7 +1,7 @@
 # Explicado como para tu abuela
 
 Un concepto del nicho del canal explicado con algo de la vida diaria de quien lo ve, tan claro
-que lo entiende cualquiera. Es «explicar algo» (en video-explicativo, ese género de su `GUION.md`), pero todo el
+que lo entiende cualquiera. Es «explicar algo» (en video-explicativo, ese género de su `SKILL.md`), pero todo el
 video vive dentro de la comparación.
 
 ## El tema, si no te dieron uno

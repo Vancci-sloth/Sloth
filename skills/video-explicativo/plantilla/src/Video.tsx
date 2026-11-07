@@ -7,6 +7,9 @@ import { AbsoluteFill, Audio, continueRender, delayRender, staticFile, useCurren
 import { temaEn } from "./capitulos";
 import { CAPITULOS, PERSONAJE } from "./escenas";
 import { CON_PERSONAJE } from "./marca";
+import { Sonidos } from "./director/Escena";
+import { Titular, TITULAR } from "./director/Titular";
+import { ContadorVivo } from "./director/Contador";
 import { CamaraContexto, camaraDe, rapidezDe } from "./mundo/camara";
 import { Escena3D } from "./mundo/Escena3D";
 import { PLANOS } from "./mundo/guion";
@@ -59,11 +62,14 @@ const Cuadro: React.FC = () => {
             </TemaContexto.Provider>
           </AbsoluteFill>
         </CamaraContexto.Provider>
-        <Subtitulos texto={t.color("texto")} tenue={t.color("tenue")} />
+        {/* El gancho va en el titular, enorme; los subtítulos siguen desde la frase de después. */}
+        {TITULAR && f <= TITULAR.hasta ? <Titular /> : <Subtitulos texto={t.color("texto")} tenue={t.color("tenue")} />}
+        <ContadorVivo />
         {CON_PERSONAJE ? <Personaje {...PERSONAJE} /> : null}
         {t.borroso ? <AbsoluteFill style={{ backgroundColor: "#7a7a7a", opacity: t.borroso * 0.25 }} /> : null}
       </AbsoluteFill>
       <Audio src={staticFile("voz.wav")} />
+      <Sonidos />
     </AbsoluteFill>
   );
 };

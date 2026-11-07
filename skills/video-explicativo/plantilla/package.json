@@ -4,8 +4,7 @@
   "type": "module",
   "scripts": {
     "studio": "remotion studio src/index.ts",
-    "render": "remotion render src/index.ts Video out/video.mp4",
-    "encuadre": "esbuild scripts/encuadre.ts --bundle --platform=node --outfile=out/encuadre.cjs --log-level=warning && node out/encuadre.cjs"
+    "render": "remotion render src/index.ts Video out/video.mp4"
   },
   "dependencies": {
     "@phosphor-icons/core": "^2.1.1",

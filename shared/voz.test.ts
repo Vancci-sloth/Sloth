@@ -116,3 +116,8 @@ test('los trozos de PCM se juntan en un WAV entero, con su respiro entre uno y o
   sinTam.writeUInt32LE(0, 40)
   assert.equal(pcmDeWav(sinTam)!.datos.length, 200)
 })
+
+test('la línea del corte de datos no se narra', () => {
+  const md = '# La pulsera\n\nCorte de datos: 3 de noviembre de 2026.\n\nUn astronauta te escribe.\n'
+  assert.equal(textoParaVoz(md), 'Un astronauta te escribe.')
+})

@@ -16,7 +16,9 @@ Cloning: el mismo `generar_voz`, el mismo archivo y los mismos pasos.
 
 ## Generarla
 
-Con la herramienta `generar_voz` del MCP `voz` (en Claude, `mcp__voz__generar_voz`), en cuanto el guion esté listo:
+Con la herramienta `generar_voz` del MCP `voz` (en Claude, `mcp__voz__generar_voz`), en cuanto el guion esté listo.
+Si tu skill trae un script que la pide a Sloth por la misma vía (`/api/voz/generar`), como `voz.py --studio` del
+explicativo, usa solo el script: con los dos se pide dos veces. La herramienta lleva:
 
 - `voz`: la que trae la línea, tal cual (`Fola`, o `fish:…` / `elevenlabs:…` / `vc:…` con su id).
 - `texto`: lo que se narra, tal como lo leería el usuario: el guion que le darías para grabar, sin títulos,

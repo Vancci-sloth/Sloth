@@ -8,9 +8,12 @@ import * as THREE from "three";
 
 /** Un punto del mundo, en metros. El piso es y = 0. */
 export type V3 = [number, number, number];
+/** El `V3` como vector de three, para sumar, restar o medir distancias. */
 export const v3 = (p: V3) => new THREE.Vector3(p[0], p[1], p[2]);
 
+/** Las opciones de `interpolate` para que no se pase de sus extremos (como `sujeta` de piezas/ui). */
 export const sujeta = { extrapolateLeft: "clamp", extrapolateRight: "clamp" } as const;
+/** La curva de entrada de todos los videos (como `suave` de piezas/ui). */
 export const suave = Easing.bezier(0.2, 0.7, 0.2, 1);
 
 /** Un número fijo entre 0 y 1 para cada (i, k): el mismo en cada render. */
@@ -50,6 +53,7 @@ export const enCurva = (de: THREE.Vector3, a: THREE.Vector3, alto: number, t: nu
   return de.clone().lerp(c, t).lerp(c.clone().lerp(a, t), t);
 };
 
+/** Cuándo está en escena: [cuadro en que entra, cuadro en que sale], los dos con `en`. Varias, si sale y vuelve. */
 export type Ventana = [entra: number, sale: number];
 
 /** Cuánto está en escena (0 → 1) lo que sale en estas ventanas: entra con un resorte y sale en 10 cuadros. */
@@ -67,6 +71,7 @@ export const presencia = (f: number, ventanas: Ventana[], fps = 30) => {
 /**
  * Lo que está en escena solo en sus ventanas de tiempo: crece desde su `pos` al entrar y se encoge al salir. Quieto: no
  * flota ni gira por su cuenta. Lo de adentro va en [0, 0, 0]: si va en su sitio del mundo, al entrar viaja desde el origen.
+ * `giro`: cuánto gira sobre su eje vertical, en radianes (Math.PI / 2, un cuarto de vuelta: lo que miraba a +z mira a +x).
  */
 export const EnEscena: React.FC<{ ventanas: Ventana[]; pos: V3; escala?: number; giro?: number; children: React.ReactNode }> = ({ ventanas, pos, escala = 1, giro = 0, children }) => {
   const f = useCurrentFrame();

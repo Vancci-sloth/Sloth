@@ -1,7 +1,7 @@
 # Mitos vs. realidad
 
 Una cosa que todo mundo repite sobre el nicho del canal, puesta a prueba con datos. Cada video, un mito. Se parece a
-«un misterio» (en video-explicativo, ese género de su `GUION.md`): la duda primero, las pruebas una por una y la
+«un misterio» (en video-explicativo, ese género de su `SKILL.md`): la duda primero, las pruebas una por una y la
 respuesta al final.
 
 ## El tema, si no te dieron uno

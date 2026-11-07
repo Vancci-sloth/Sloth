@@ -5,7 +5,8 @@ const USO = `
 Uso:
   node portada_sin_ia.mjs <video.mp4> <portada.png> --titulo "De dos a cinco palabras" [--t 12.5] [--fuente letra.ttf] [--color "#ffd84a"] [--horizontal]
 
---t           el segundo del cuadro de fondo (por defecto, el 40 % del vídeo): el de su mejor momento.
+--t           el segundo del cuadro de fondo (por defecto, el 40 % del vídeo): el de su mejor momento. En vez del
+              vídeo puede ir una imagen (.png, .jpg): un cuadro de la revisión, para tener la portada antes del render.
 --fuente      la letra del estilo (.ttf, .otf, .woff o .woff2); sin ella, Arial Black.
 --color       el color del título (por defecto, blanco); el contorno es negro.
 --horizontal  la miniatura de YouTube de un vídeo horizontal: 1280x720, el título en la mitad izquierda. Va al final.
@@ -39,7 +40,9 @@ const t = o.t !== undefined ? Number(o.t) : duracion * 0.4
 const temporal = mkdtempSync(join(tmpdir(), 'portada-sin-ia-'))
 try {
   const cuadro = join(temporal, 'cuadro.jpg')
-  ffmpeg(['-ss', String(t), '-i', video, '-frames:v', '1', '-vf', `scale=${W}:${H}:force_original_aspect_ratio=increase,crop=${W}:${H}`, '-q:v', '2', cuadro])
+  // De una imagen (un cuadro de la revisión, antes del render) no se busca el segundo: con -ss FFmpeg no saca nada.
+  const imagen = /\.(png|jpe?g|webp)$/i.test(video)
+  ffmpeg([...(imagen ? [] : ['-ss', String(t)]), '-i', video,'-frames:v', '1', '-vf', `scale=${W}:${H}:force_original_aspect_ratio=increase,crop=${W}:${H}`, '-q:v', '2', cuadro])
   const fuente = o.fuente && existsSync(resolve(o.fuente)) ? pathToFileURL(resolve(o.fuente)).href : null
   const escapar = (s) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c])
   const html = `<!doctype html><meta charset="utf-8"><style>

@@ -147,6 +147,8 @@ def silencio(nivel: np.ndarray, desde: float, hasta: float, paso: float = 0.05) 
     """El momento más callado entre dos tiempos, para cortar sin partir una palabra."""
     desde, hasta = max(0.0, desde), min(len(nivel) * paso, hasta)
     i, j = int(desde / paso), max(int(desde / paso) + 1, int(hasta / paso))
+    if i >= len(nivel):  # lo que falta llega al final del audio: no hay después donde buscar
+        return len(nivel) * paso
     return (i + int(np.argmin(np.convolve(nivel[i:j], np.ones(6) / 6, mode="same")))) * paso
 
 

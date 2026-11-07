@@ -1,8 +1,8 @@
 // El encuadre de cada toma, sin adivinar: la cámara más cercana que deja todo lo que la toma tiene que enseñar (objetos
 // 3D con su radio y tarjetas 2D con su tamaño en px) dentro de la zona útil: en vertical, entre el texto de arriba (o
 // el índice) y el perro; en horizontal, arriba a la izquierda del texto y del personaje (`ZONA.escena` en tema.ts).
-// guion.ts escribe sus TOMAS y saca de ellas sus PLANOS con `planosDe`: la cámara no se copia a mano, y al cambiar una
-// toma su plano cambia solo. `npm run encuadre -- --revisa` los mide.
+// El director (src/director/guion.ts) arma las TOMAS y saca de ellas los PLANOS con `planosDe`: la cámara no se copia a
+// mano, y al cambiar una toma su plano cambia solo.
 import * as THREE from "three";
 import { ANCHO, ALTO, ZONA } from "../tema";
 import { centrar, FOV, Plano, proyectar, V3 } from "./camara";
@@ -17,7 +17,7 @@ export type Cosa = { n: string; p: V3; r?: number; caja?: { w: number; h: number
  * empieza la zona útil (575 si hay un índice fijo arriba); `lejos`, cuánto más lejos que la distancia justa (1.3 deja
  * aire). `deriva`, `arco` y `fov`, como en `Plano`.
  */
-export type Toma = { n: string; en: number; dura?: number; az: number; el: number; arriba?: number; cosas: Cosa[]; lejos?: number; deriva?: number; arco?: V3; fov?: number };
+export type Toma = { n: string; en: number; dura?: number; az: number; el: number; arriba?: number; abajo?: number; cosas: Cosa[]; lejos?: number; deriva?: number; arco?: V3; fov?: number; empuja?: number; grua?: number };
 
 /** Si hay un índice fijo arriba (1 · 2 · 3), lo de arriba empieza debajo de él: `arriba: INDICE`. */
 export const INDICE = ZONA.indice;
@@ -50,7 +50,7 @@ const todo = (cam: THREE.PerspectiveCamera, cosas: Cosa[]) =>
   cosas.map((c) => cajaDe(cam, c)).reduce((a, b) => [Math.min(a[0], b[0]), Math.min(a[1], b[1]), Math.max(a[2], b[2]), Math.max(a[3], b[3])]);
 
 /** La zona útil de una toma (en vertical, x de 90 a 990 e y de 500 a 1320). */
-export const zona = (t: Toma) => ({ x0: ZONA.escena.izquierda, x1: ZONA.escena.derecha, y0: t.arriba ?? ZONA.escena.arriba + 30, y1: ZONA.escena.abajo - 70 });
+export const zona = (t: Toma) => ({ x0: ZONA.escena.izquierda, x1: ZONA.escena.derecha, y0: t.arriba ?? ZONA.escena.arriba + 30, y1: (t.abajo ?? ZONA.escena.abajo) - 70 });
 
 const r2 = (v: THREE.Vector3) => v.toArray().map((x) => Math.round(x * 100) / 100) as V3;
 
@@ -90,5 +90,5 @@ export const encuadra = (t: Toma): { pos: V3; mira: V3; d: number } => {
 export const planosDe = (tomas: Toma[]): Plano[] =>
   tomas.map((t) => {
     const { pos, mira } = encuadra(t);
-    return { en: t.en, pos, mira, dura: t.dura, deriva: t.deriva, arco: t.arco, fov: t.fov };
+    return { en: t.en, pos, mira, dura: t.dura, deriva: t.deriva, arco: t.arco, fov: t.fov, empuja: t.empuja, grua: t.grua };
   });

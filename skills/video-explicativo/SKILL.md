@@ -5,325 +5,240 @@ description: Hace un video explicativo, vertical (TikTok, Instagram, Shorts) u h
 
 # Video explicativo
 
-`<skill>` es esta carpeta y `<base>` es `video-base`, la carpeta junto a ella: masterizar,
-comprobar y la hoja de contacto. Lee su [`LEEME.md`](../video-base/LEEME.md) antes de empezar (los errores ya vistos). Los scripts
-van con el `python` del sistema (el que tiene rembg) y se corren desde la raíz del proyecto.
+Escribes tres archivos y corres un comando. El guion (`guion.md`), sus pruebas (`fuentes/investigacion.md`) y
+`momentos.json`: qué se ve en cada palabra. El director de la plantilla arma solo el mundo 3D, la cámara, el encuadre,
+el texto, las poses, los sonidos y el cierre, y `hacer.py` hace la voz, renderiza, mide y pone la portada. **No escribas
+código ni abras la plantilla**: todo lo que el video necesita se dice en `momentos.json`.
 
-**Sirve para cualquier tema y cualquier propósito.** Hoy puede ser un proyecto de crypto y mañana cómo cazan los gatos,
-una noticia de tecnología o la historia de una marca. El primer video fue de crypto (Berachain) y por eso el ejemplo y
-algunas piezas de la plantilla hablan de monedas: tómalos como ejemplo, no como el tema del estilo. De qué habla el
-canal, quién narra y a dónde invita el cierre lo dice la **marca** del usuario (ver "La marca").
-
-## La esencia
-
-Un video que explica algo en el tiempo que eso pide, tan claro que se entiende sin saber nada antes, y que termina llevando al que lo ve
-a donde dice la marca. Tres palabras lo sostienen:
-
-- **Un mundo.** Todo pasa en un solo mundo 3D que la cámara recorre de principio a fin, sin cortes: se acerca a un
-  detalle, sale al conjunto y vuelve a sitios ya vistos. Cambiar de capítulo es repintar el mismo mundo entre sus dos
-  fondos, que son de cada video.
-- **Un foco.** En cada momento solo se mueve y tiene color lo que se está diciendo. Lo demás no está, o está de fondo:
-  gris, quieto y apagado.
-- **Una prueba.** Cada dato es verdadero y se ve con su fuente: el número pegado a lo que mide, la cita corta con su
-  dato subrayado, el logo real de quien lo dijo.
-
-El primer video, Berachain, está en [`ejemplos/berachain/`](ejemplos/berachain/): ábrelo cuando dudes cómo se resolvió
-algo.
-
-## Cada video es único
-
-Lo fijo del estilo es poco: un mundo 3D en una sola toma, el texto palabra por palabra, el personaje (dónde va cada
-uno, en "Formato") y "Las reglas de la imagen". Todo lo demás sale del tema y cambia de un video a otro: la forma del
-guion, cómo suena, el lugar y cómo se recorre, sus colores, el protagonista y dónde está en el cuadro, el primer cuadro, cómo cambia de
-capítulo, la pieza que solo tiene ese video y qué hace el personaje. Una historia de Reddit tiene que sentirse historia de
-Reddit; una noticia, noticia. El de Berachain es un ejemplo de cómo se resolvió un tema, no el molde. Cómo se decide,
-en "El enfoque" de [`GUION.md`](GUION.md).
-
-- **Cada video arranca de la plantilla y de la biblioteca de modelos**, no del código de otro video. Lo que sirve a
-  una serie entera vive en la plantilla (el post de Reddit, `src/piezas/reddit.tsx`).
-- **Que no se parezca a otro lo comprueba un script**: `<base>/scripts/huellas.py` compara la huella de este video (lo
-  que cuenta y cómo se ve) con la de todos los que ya se hicieron, y solo dice lo que choca. Va dos veces: en el
-  enfoque (paso 3) y con el mundo armado (paso 8).
-
-## Formato
-
-Lo elige el usuario en Sloth y llega en el mensaje. Lo común a todos los estilos (un video, un formato; nada recortado
-ni con barras; revisar a 480×270; la portada) está en [`FORMATO.md`](../video-base/FORMATO.md); aquí, cómo se acomoda
-este.
-
-- **`Formato: vertical`, o sin esa línea:** 1080×1920, como siempre: el texto arriba, el mundo al centro y el
-  personaje abajo. `nuevo.py <nombre>`.
-- **`Formato: horizontal`:** 1920×1080, para YouTube: `nuevo.py <nombre> --formato horizontal`, y el proyecto nace así
-  (`src/datos/formato.json`). La plantilla ya lo compone: el personaje en el tercio de la derecha, del mismo tamaño
-  que en vertical; el texto en el tercio de abajo, a su izquierda, con la misma letra (no se encoge); y lo que se
-  explica arriba a la izquierda, con el mundo detrás a todo el ancho. Sin personaje, texto y escena van centrados.
-  `final.py` comprueba el 1920×1080 y saca las hojas a 480×270.
-- **Al armar uno horizontal:** el mundo se ve el triple de ancho, así que se reparte a los lados y el lugar llena los
-  lados del cuadro ("El mapa" de [`MUNDO.md`](MUNDO.md)); la zona de cada toma es más baja (de 70 a 720 px), y lo
-  que no cabe lo dice `npm run encuadre -- --revisa`; lo fijo en la pantalla se coloca con `ZONA` de `src/tema.ts`,
-  nunca con los números del vertical (540, 1080, 470). Su portada no va dentro: `portada.png` es la miniatura de
-  YouTube (paso 9).
-- Si en el hilo piden el otro formato, no hagas una copia: que cree otro video en Sloth con ese formato.
-
-## Series
-
-Si el mensaje trae la línea `Serie:`, sigue [`SERIES.md`](../video-base/SERIES.md) de la base: lee el archivo de la
-serie antes de investigar, elige el tema del banco o de lo que pide la serie, y el nicho es el de la marca. La forma, el
-mundo y la imagen siguen siendo de cada video (ver "Cada video es único").
+`<skill>` es esta carpeta y `<base>` es `video-base`, junto a ella. Los scripts van con el `python` del sistema.
 
 ## Lo que el usuario pidió y no se negocia
 
-- **Lo único de collage es el personaje**: el narrador de la marca es una imagen recortada como sticker con borde
-  blanco (el que trae la skill: la foto de un salchicha negro y fuego con sudadera naranja, cadena de oro y puro). Nada de papel,
-  stickers ni letra de meme en el resto (lo único escrito a mano es el cartel que sostiene el personaje). Con
-  `personaje: ninguno`, el video va sin narrador.
-- **Las imágenes nuevas se hacen con Codex** (`codex exec` con su herramienta `image_gen`): poses del personaje, bocas
-  abiertas, las caras o texturas del protagonista. Solo con ChatGPT conectado; cómo, en "Imágenes con Codex". Si el
-  mensaje trae `Imágenes: genéralas en Google Flow…`, van con Flow (`<base>/FLOW.md`).
-- **La voz la graba el usuario**, o la generas tú en AI Studio si el mensaje trae `Voz:` con una voz
-  ([`<base>/VOZ.md`](../video-base/VOZ.md)). Ninguna otra voz sintética.
-- **El cierre es el de la marca.** La última frase del guion, en todos los videos y de cualquier tema, es `cierre.frase`
-  de la marca, tal cual; en la imagen, la tarjeta `Canal`, que ya lee su red, su nombre y su foto. Con red `ninguna`,
-  el video termina en su propio remate, sin invitar a nada.
-- **El video informa, no aconseja.** Si el tema es de dinero, nada de «compra» o «vende» (el de Berachain dice «yo no
-  te digo que compres ni que vendas»).
-- **La duración la pone lo que hay que contar**, no un número fijo: el tiempo justo para que se entienda, y ni un
-  segundo que no se gane su lugar. Si el usuario quiere un video más largo, se amplía con más que contar (otro punto,
-  más contexto, una comparación, lo que sigue), nunca estirando lo mismo ni hablando más lento. Cómo se calcula, en
-  "La duración" de [`GUION.md`](GUION.md).
-- **Ningún modelo 3D se hace dos veces.** Antes de modelar un objeto se busca en la biblioteca
-  ([`modelos-3d`](../modelos-3d/SKILL.md)) y, si está, se usa o se mejora; lo nuevo se guarda ahí para los siguientes
-  videos y se le dice al usuario qué se sumó.
-- **Cada dato es verdadero**, de su fuente primaria, con fecha de corte. Si una fuente choca con otra, gana la
-  primaria y se dice en `fuentes/investigacion.md`.
-- El proyecto va en la carpeta de la línea `Carpeta: <nombre>` del mensaje, con ese nombre exacto y sin añadirle nada
-  (`nuevo.py <nombre>`): el panel de Sloth la busca así. Sin esa línea, `explicado-<tema>`. Va en la carpeta donde
-  Sloth te lanza (`trabajo/video-explicativo`), junto a `marca.json`; `nuevo.py` lo decide.
+- **Cada dato es verdadero**, de su fuente primaria, con fecha de corte. Al video solo van cifras primarias o de medios
+  serios; una dudosa no se dice.
+- **La voz la graba el usuario**, o la generas en AI Studio si el mensaje trae `Voz:`. Ninguna otra voz sintética.
+- **El cierre es el de la marca**: la última frase del guion es `cierre.frase` de `marca.json`, tal cual (si su red no
+  es `ninguna`). La tarjeta del canal la pone el director.
+- **El video informa, no aconseja.** Si el tema es de dinero, nada de «compra» o «vende».
+- **Nada de emojis**, tampoco en los subtítulos: íconos de Phosphor o imágenes.
+- **Ningún modelo 3D se hace dos veces**: los objetos salen de la biblioteca (`modelos.py lista`) o son íconos de
+  Phosphor extruidos, y lo nuevo se guarda en la biblioteca (skill [`modelos-3d`](../modelos-3d/SKILL.md)).
+- El proyecto va en la carpeta de la línea `Carpeta: <nombre>` (sin ella, `explicado-<tema>`), y en el formato de
+  `Formato:` (sin ella, vertical). Con `Formato: horizontal` (1920×1080, para YouTube) es `nuevo.py <carpeta> --formato
+  horizontal` y nada más: el director acomoda el texto abajo, el personaje a la derecha y el mundo a todo el ancho, y
+  `hacer.py` deja `portada.png` como miniatura de YouTube (no entra en el video). Si piden el otro formato, es otro video.
 
-## La marca
+## Para que lo vean
 
-`marca.json`, en la carpeta de la card (la de los proyectos), es lo que hace suyos los videos: el `nicho` del canal
-(de qué habla), cómo `habla` (su país, de tú o de usted), el `personaje` que narra (`perro`, uno propio o `ninguno`) y
-el `cierre` (a qué red invita, con qué nombre, qué frase dice y qué foto lleva la tarjeta). Se lee y se guarda con
-`python -B -X utf8 <skill>/scripts/marca.py` (`ver`, `guardar '<json>'`, `aplicar <proyecto>`; el formato, en su
-cabecera). Es la misma para todos los videos: se pregunta una vez.
+Lo que decide si alguien se queda es el guion: el mundo ya se mueve solo. Antes de pedir la voz, léelo como alguien que
+va pasando videos y no sabe nada del tema, y ponle de 1 a 10: ¿se detendría?, ¿lo entiende a la primera?, ¿se ríe?,
+¿se queda hasta el final?, ¿se lleva algo que no sabía? Lo que no llegue a 9, reescríbelo antes de pedir la voz: es lo
+más barato de cambiar.
 
-Si `marca.py ver` dice `Falta:`, pregúntaselo al usuario en un solo mensaje, antes de investigar:
+- **El gancho, en la primera frase**, de menos de diez palabras, sobre algo que todos conocen: el dato que no se cree,
+  la promesa que suena demasiado bien. Nada de presentaciones («Hoy te cuento…», «¿Sabías que…?»). «Tu tamal lleva
+  cal.» sirve; «Tu tamal lleva cal. Sí, la de pintar paredes.» detiene el dedo. Que contradiga lo que el que mira ya
+  cree: «Tu cuchillo te hace llorar» (la culpa no es de la cebolla) detiene; «La cebolla es un arma química» repite
+  lo que todos suponen y se pasa.
+- **Habla el personaje**, con su actitud: el perro es un salchicha con puro y cadena de oro, de vuelta de todo, que se
+  burla de lo que desmiente. **Un remate cada ocho o diez segundos**: las últimas palabras de una frase giran lo que
+  venía (una comparación absurda, una exageración, el sarcasmo del perro), y el remate también enseña. «Te mandan un
+  informe con gráficos. Gráficos, para tu pelo.» «El agua se hace juntando hidrógeno y oxígeno. Y una explosión.» Una
+  broma que no sale del tema, o que lo estira, se va. El que hace reír es una escena que se puede dibujar, con alguien
+  que todos tienen (tu tía, tu jefe) o algo que ya vivieron: «les pide dinero a tus contactos» informa; «y tu tía le
+  deposita dos mil pesos a tu foto de perfil» hace reír y enseña lo mismo. «Con funda, el calor no sale» → «con funda
+  es correr un maratón con chamarra». Su momento lo enseña (la cifra, los billetes que vuelan). Quién sale lo pide el
+  tema (el compa del grupo, el mesero, tu mamá, el vecino), no estos ejemplos: «no al de tu tía» metida en el café,
+  que no tenía que ver, no hizo gracia.
+- **Una situación de allá, muy concreta**: del lugar y la gente de `habla` de la marca (en México: la salsa del
+  domingo en el molcajete, el pozole del 15 de septiembre, la fila del Oxxo a las once), con su hora y quién está. «Tu
+  cuchillo» enseña; «el cuchillo que heredaste de tu abuela, el que también corta el pan y abre las latas» se reconoce.
+  La primera cebolla sacó 7 en «lo vería» y en «divierte» con el usuario: pidió «una situación más específica de
+  México». **El humor es el de `habla`**: si dice humor negro, sin miedo a la muerte, la desgracia y la familia sin
+  filtro (la abuela que te heredó el cuchillo y el trauma), nunca contra quien ya la pasa mal.
+- **Una idea por frase, frases cortas**, palabras de todos los días, de tú (o como diga `habla` de la marca). Cada cifra
+  en letra («sesenta y nueve por ciento»): la voz las dice y el alineador no sabe situar dígitos.
+- **Nombra lo que enseñas**: «suelta la niacina», no «suelta la vitamina». El nombre es lo que se lleva y lo que
+  repite; sin él, el tamal se quedó en 8 en «enseña». Uno por video, el que alguien repetiría en la mesa
+  («capsaicina»); el del laboratorio («el receptor TRPV uno», «lo clonó») se dice con palabras de todos («un sensor
+  de calor»).
+- **No anuncies lo que vas a decir: dilo.** Nada de «Lo peor: …», «Dato curioso: …», «Ahora, la parte buena».
+- **El giro**: lo que el que mira creía, y por qué no es así, con la prueba (quién lo dice y cuándo).
+- **En cadena**: cada frase abre la pregunta que cierra la siguiente («Entonces cavas un escalón… pero en cuanto te
+  asomas, te ven. Entonces…»), en segunda persona y con algo que el que mira ya vivió. Así se queda hasta el final.
+- **El final vuelve al principio** (el gancho, ya resuelto) y se ve: su momento repite la tarjeta o la cosa del gancho
+  (en el tamal, «las paredes ni se enteran» cayó en la olla de siempre y el chiste de la cal de pintar no volvió),
+  luego «Mándaselo a quien…» (a alguien concreto: «a quien cree que una trinchera es solo una zanja») y la frase de la
+  marca.
 
-- **De qué habla su canal**, si falta `nicho`. `habla` no se pregunta: sale de cómo escribe.
-- **A dónde invita el final** de cada video: su Telegram, WhatsApp, Instagram, TikTok, YouTube, X, una página o a
-  ningún lado; con qué nombre de cuenta o canal; y, si quiere, una foto para la tarjeta (sin ella va la cara del
-  personaje). La frase la propones tú con eso («Si quieres más así, sígueme en Instagram: @cocina.facil.») y se la
-  enseñas para que la cambie si quiere.
-- **Quién narra**, al final del mensaje, con el bloque de opciones: «El perro salchicha», «Uno nuevo» (desde su foto o
-  una descripción: [`personaje/NUEVO.md`](personaje/NUEVO.md)) o «Ninguno».
+Los videos de este género que pegan y lo que tienen, en [`REFERENCIAS.md`](REFERENCIAS.md): la vara con que se
+califica.
+- **Dura lo que pide**: ~3.4 palabras por segundo (la voz ya acelerada). Si piden un largo, se cumple: 30 s son ~100 palabras con el cierre
+  (`hacer.py --dura` lo cuenta antes de pedir la voz).
 
-Lo que conteste va con `marca.py guardar` (una foto adjunta, con su ruta: la copia a `marca/`). Si después pide
-cambiar algo («que el cierre sea a Instagram»), `guardar` y `aplicar <proyecto>` en el video que está haciendo.
+La forma sale del tema: una historia se cuenta en orden y con tensión; una noticia, lo que pasó primero; un cómo se
+hace, el resultado y los pasos; un misterio, la pregunta, las pistas y la respuesta; una estafa, la promesa, el truco y
+la prueba que la desmiente. Con la línea `Serie:`, sigue [`SERIES.md`](../video-base/SERIES.md).
 
-## Las reglas de la imagen
+## momentos.json
 
-Las corrigió el usuario viendo ocho versiones del video de prueba, y valen para cualquier tema. Revisa cada escena
-contra esta lista antes de enseñarla.
+Un momento por idea, cada 2 o 3 segundos de voz (una o dos frases; ninguno de más de 4 s, unas 13 palabras: si una idea
+tarda más, se parte en dos con otra tarjeta o la misma cosa que cambia): en la `palabra` que lo dispara, entra su `cosa` (un
+objeto 3D), su `tarjeta` (lo 2D, encima de la cosa) y la `pose` del personaje. La cámara va sola de una cosa a la otra;
+lo ya dicho se queda atrás, gris. El primer momento es el primer cuadro y la portada: **el protagonista 3D haciendo
+ya lo que sorprende** (la masa inflándose, el celular vibrando con el mensaje falso, la burbuja naciendo en el
+nudillo), con `anima` o `accion` desde el cuadro cero, una tarjeta corta encima si hace falta (`cifra`, `boton`) y la
+pose más fuerte que pida (`susto`, `reojo`, `lentes`). Una foto quieta de entrada no detiene a nadie: un revisor a
+ciegas le dio 5 a 7 de «lo vería» a los cinco que abrían con foto. Cada remate, con su pose (`ladra`, `lentes`, `susto`,
+`tapa`): con ellas la cámara se mete de cerca y el perro entra de golpe. El remate se ve en la escena (la cosa que cambia con su `anima`, la persona que lo vive), nunca en una foto ni un logo: hacer.py lo revisa. **De dos a tres fotos reales por video**,
+después del gancho, como prueba (quién lo dice, la cosa real): sin ellas, todo es un ícono genérico.
+- **Lo que dice la tarjeta es lo que dice la voz**: la misma cifra, en el mismo momento («la mitad» es `50 %`, no `38`;
+  «más de setenta y cinco dólares» no es `$25+`). Una que no coincide se nota y tumba lo claro.
 
-**Palabras**
-
-1. **Pocas palabras en el centro**: un número o una o dos palabras. Lo que se dice ya va en el texto; el centro enseña.
-2. **Imágenes en vez de nombres**: el logo real (de un fondo, un exchange, una empresa), un ícono o un objeto 3D. Un
-   nombre escrito en una píldora es lo que hay que cambiar.
-3. **Nada de emojis**, tampoco en los subtítulos: íconos SVG de Phosphor (`Glifo`, `Icono`, `Icono3D`) o imágenes.
-4. **Fuera las etiquetas de cambio en rojo** («−94 %», «+43 %» sueltos): el número ya lo dice.
-5. **Para marcar texto, subrayado**, no círculos: los círculos a mano no cierran.
-6. **«No se puede» = el botón parpadea y se queda rojo**, sin cruces ni bordes remarcados.
-
-**El mundo**
-
-7. **Un solo mundo 3D por video** y una sola toma: nada de paradas en fila ni de cortar de una tarjeta a otra.
-8. **Un protagonista de principio a fin** (lo que el video explica: en Berachain, su moneda): cada idea es algo que le
-   pasa. Cambia de estado (se voltea, se pone gris, se deshace, se enciende), no de objeto.
-9. **Que nunca se quede quieto**: un plano nuevo cada 3 o 4 s que cambie de lado, de distancia o de altura; meterse al
-   detalle, salir al conjunto, volver a sitios ya vistos, rápido en cada giro de la historia. Cómo, en "Que se mueva"
-   de [`MUNDO.md`](MUNDO.md).
-10. **Solo se mueve lo que se está diciendo, y se mueve de verdad.** Cada cosa entra a escena al decirse, hace algo (cae,
-    se llena, viaja, se rompe) y sale al dejar de decirse; lo que se queda de fondo está gris, quieto y medio fundido
-    con el fondo. Nada flota, gira ni fluye por su cuenta.
-11. **Un color, un significado**, igual en todo el video (`SIGNIFICA` en `src/tema.ts`). Lo decorativo usa colores que
-    no significan nada (`DECORATIVOS`).
-12. **Un indicador** que cambia con la historia (en Berachain, el precio; en otro tema, su número: la población, la
-    velocidad, los usuarios). Dónde va lo pide el lugar: pegado al protagonista, o en una pantalla, un marcador o un
-    letrero del mundo.
-13. **3D sencillo, reutilizado y variado**: un logo extruido, un ícono en 3D, el protagonista que se reusa, bloques de
-    colores sin texto.
-
-**Pruebas y flechas**
-
-14. **Nada apunta a la nada**: una flecha o un cable aparece cuando su destino ya está en pantalla.
-15. **Cada flecha se corrobora**: apunta justo a lo que debe y no tapa información. `Flecha` busca sus dos `Ancla` en
-    pantalla; aun así, mira cada una en una foto del cuadro en que termina de dibujarse.
-16. **El material de apoyo, de alta calidad**: si vale la pena enseñarlo, que se vea hecho con cuidado (el calendario
-    de mesa con hojas que se arrancan, no un cuadro con un número).
-
-## De qué está hecho
-
-La plantilla trae el motor y un ejemplo; lo de cada video es poco. Cómo se arma, pieza por pieza:
-[`MUNDO.md`](MUNDO.md).
-
-| Archivo | Qué es | ¿De cada video? |
-|---|---|---|
-| `src/mundo/guion.ts` | Los tiempos (`T`, atados a la voz), los lugares (`L`), los planos de la cámara, lo que le pasa al protagonista y el indicador | Sí |
-| `src/mundo/Escena3D.tsx` | Qué hay en el mundo y en qué ventanas de tiempo está | Sí |
-| `src/escenas/*.tsx` | Lo 2D de cada capítulo, clavado en el mundo (pruebas, números, botones) y las poses del personaje | Sí |
-| `src/tema.ts` | Los colores del video (`PALETA`: sus dos fondos y su luz), si el piso lleva cuadrícula (`REJILLA`) y qué significa cada color (`SIGNIFICA`) | Sí |
-| `src/capitulos.ts` | Con qué fondo empieza y dónde cambia | Sí |
-| `subtitulos.txt`, `terminos.txt` | El texto, frase por frase, y los nombres que el transcriptor tiene que reconocer | Sí |
-| `src/datos/formato.json`, `ZONA` en `src/tema.ts` | El formato (lo pone `nuevo.py`) y dónde va cada cosa en él: el texto, la escena, la mira de la cámara y el personaje | No |
-| `src/mundo/camara.ts`, `Mundo.tsx`, `EnMundo.tsx` | El motor 3D: la cámara, la luz, el piso, lo 2D clavado en el mundo | No |
-| `src/modelos/` | Los modelos 3D, copiados de la biblioteca ([`modelos-3d`](../modelos-3d/SKILL.md)) con `comun.tsx` (`EnEscena`, `conGris`) | Los nuevos, y se guardan en la biblioteca |
-| `src/piezas/`, `src/escenas/comun.tsx` | El texto, el perro, tarjetas, íconos, flechas, subrayado, el precio pegado, el post de Reddit, el cierre al canal | No |
-| `public/perro/`, `src/datos/marca.json` | Las poses del personaje, con boca cerrada y abierta ([`personaje/POSES.md`](personaje/POSES.md); la carpeta se llama `perro` sea cual sea), y la red, el nombre y la foto del cierre: los pone `marca.py aplicar` | No |
-
-## Pasos
-
-Los tiempos de los pasos son de una computadora con NVIDIA. En otra tardan más, sobre todo la voz y el render: sus
-scripts dicen al empezar cuánto tardarán aquí y luego cuánto falta. Lánzalos en segundo plano y dile al usuario esa cifra.
-
-1. **Proyecto y marca.** `python <skill>/scripts/nuevo.py <nombre>` (con `--formato horizontal` si el mensaje trae
-   `Formato: horizontal`: ver "Formato"), **en segundo plano** (tarda un minuto y medio:
-   deja el proyecto empaquetado, con la marca aplicada, y el modelo de vectores de `huellas.py` cargado), y a la vez
-   `marca.py ver`. Si a la marca le falta algo, pregúntalo ya ("La marca") y, con la respuesta guardada, `marca.py
-   aplicar <proyecto>` cuando `nuevo.py` haya terminado. Mientras, lee la serie y empieza a buscar. Todo lo que no dependa de otra cosa va junto, en el mismo mensaje o en el mismo
-   comando (las búsquedas, las lecturas, los logos): cada ida y vuelta cuesta de 12 a 16 s, y en un video eran 50.
-   Listo cuando la carpeta tiene `node_modules` y `public/perro/`, y `marca.py ver` dice `Completa.` Su `node_modules`
-   es un enlace al que comparten todos los videos del estilo: no corras `npm install` en el video, cambiaría el de todos.
-2. **Investigación.** En `fuentes/investigacion.md`, en corto y sin prosa ("Investigar" en [`GUION.md`](GUION.md)):
-   la ficha, la historia con fechas y la tabla de cifras, cada una con su fuente y su marca (**[PRIMARIA]**,
-   **[SECUNDARIA]**, **[DUDOSO]**, **[NO ENCONTRADO]**), con la fecha y hora del corte. Los datos
-   crudos (una serie de precios, de población, de usuarios) se bajan de su fuente a `fuentes/datos/` y lo que usa el
-   video a `src/datos/`.
-   Cómo y dónde buscar: [`GUION.md`](GUION.md). Listo cuando cada cifra que pensabas decir tiene su fuente.
-3. **Enfoque y guion.** Primero el enfoque y su huella, juntos en `fuentes/huella.json` ("El enfoque" de
-   [`GUION.md`](GUION.md)), y `python -B -X utf8 <base>/scripts/huellas.py revisar <skill>`: si algo choca, cambia
-   el enfoque y vuelve a revisar. Después el guion en `guion.md` (lo que el usuario lee en voz alta). **En cuanto esté,
-   dáselo para grabar** (con `Voz:` de AI Studio, en vez de dárselo pide la voz con `generar_voz`, `archivo` el
-   guion). Antes, tú mismo (son segundos) corre `python -B -X utf8 <skill>/scripts/subtitulos.py` (parte
-   `guion.md` en renglones y pone las cifras como se ven y como se dicen) y escribe los nombres del tema en
-   `terminos.txt`, uno por renglón: con eso ya se puede alinear la voz en cuanto llegue. Y lanza en segundo plano:
-   - un subagente con tu mismo modelo para marcar los subtítulos, con este encargo: «en `<proyecto>`, marca
-     `subtitulos.txt` según "Los subtítulos" de `<skill>/GUION.md`: negritas, una caja por frase, íconos, las cifras
-     o fechas que el script no juntó y los cortes feos; luego los logos con
-     `<skill>/scripts/logos.py <nombre>[=x:<cuenta>|sitio:<dominio>]…` (mira `fuentes/logos/hoja.png`). No cambies
-     las palabras ni toques nada más»;
-   - y los subagentes de los modelos 3D que ya sepas que faltan (paso 5).
-   Listo cuando `revisar` reservó la huella, cada frase se gana su lugar (quitarla dejaría algo sin entender), las
-   cifras van en letra, cierra con `cierre.frase` de la marca (si su red no es `ninguna`) y le dijiste el enfoque y
-   cuánto va a durar.
-   **Al darle el guion no termines el turno**: dile que lo grabe y sigue con lo que no necesita los tiempos de la voz
-   (el paso 5, y del 6 la plantilla, `tema.ts`, los capítulos y el mapa del mundo, `L`). Su voz te llega como mensaje
-   mientras trabajas; en nuevo-9 el turno se cerró y el video estuvo parado un minuto esperándola.
-4. **Su voz.** Llega en cualquier formato (el m4a del celular, mp3, ogg, opus, un video): pásala a
-   `fuentes/voz/original.wav` con `ffmpeg -nostdin -v error -y -i <audio> -vn -c:a pcm_s16le -ar 48000
-   fuentes/voz/original.wav` (si trae silencio largo al principio o al final, recórtalo en el mismo comando). Si
-   Sloth ya la dejó ahí, sigue. La de AI Studio llega en `fuentes/voz/ai-studio.wav`: pásala igual. Luego, **en segundo plano** mientras sigues con lo de arriba,
-   `python -I -B -X utf8 scripts/alinear.py fuentes/voz/original.wav` (la nivela, la transcribe, rehace solo lo que
-   Whisper se saltó o cambió, y empareja los subtítulos; ~75 s) y
-   `python -I -B -X utf8 scripts/acelerar.py fuentes/voz/original.wav fuentes/voz/voz-lenta.json` (la acerca a 224
-   palabras por minuto acortando pausas y con `atempo` 1.12, sin volver a transcribir). No esperes al subagente de
-   los subtítulos: si termina después, `python -I -B -X utf8 scripts/alinear.py --frases` empareja sus marcas sin
-   volver a transcribir, y otra vez `acelerar.py` con las mismas opciones (segundos los dos). Si `alinear.py` avisa
-   con ⚠ que faltan palabras seguidas, no las busques en el audio: pregúntale al usuario en seguida (en nuevo-10 la
-   voz generada se saltó una frase y se perdieron minutos buscándola). Listo cuando
-   `src/datos/voz.json` trae cada palabra del guion y cada frase de `subtitulos.txt` encontró su lugar.
-5. **Material.** Los logos reales, si falta alguno, con `logos.py` (todos en una llamada; Reddit ya viene en la
-   plantilla y los logos de las redes del cierre los dibuja su tarjeta). Los objetos 3D que pide el guion, de la biblioteca: `modelos.py buscar` con varias palabras
-   por cada uno, mira su vista y `usar` (la skill [`modelos-3d`](../modelos-3d/SKILL.md)). **Lo que no esté o haya
-   que mejorar lo hacen subagentes, uno por modelo y todos a la vez, en segundo plano**, mientras tú sigues con el
-   paso 6: hacer un modelo es probar y mirar su vista muchas veces, y en fila se comía doce minutos. Cada uno con tu
-   mismo modelo (o el de la línea `Subagentes:` si el mensaje la trae) y este encargo: qué es y qué representa en el
-   video, qué tiene que poder hacer y con qué props (`abre`, `lleno`, `gris`…), cuánto mide y dónde va su origen, y
-   «sigue la skill modelos-3d (4 y 5): escríbelo en `src/modelos/<id>.tsx` de `<proyecto>`. **Primero, en unos 10
-   minutos, una versión que compile con todas sus props, aunque sea sencilla**: el video se arma con ella mientras
-   tanto. Luego afínala, guárdala con `modelos.py guardar` y mira su vista hasta que se entienda; no cambies sus props
-   ni su tamaño, no toques nada más del proyecto y devuélveme su import, sus props y lo que no quedó bien». Tú
-   escribes la escena contra esas props desde el principio y compilas con la primera versión, sin esperar la final.
-   Un lugar entero (un hotel, una calle, una oficina) no es un modelo: se reparte en piezas, un subagente cada una (la
-   fachada, el pasillo, la puerta), porque uno solo con todo fue el más lento (el hotel tardó 28 minutos).
-   El protagonista, en 3D (ver "El protagonista" en [`MUNDO.md`](MUNDO.md)): si es una moneda, una medalla
-   o un sello, sus dos caras con Codex (`texturas/pedido-moneda.txt` y `pedido-otra-cara.txt`) a
-   `public/img/moneda_frente.png` y `moneda_atras.png`, que se le pasan a `Moneda` (mientras, lleva unas lisas; sin
-   con qué generar, en su cara va el logo real del tema). Las poses del personaje que falten, con Codex ("Poses nuevas"); sin
-   con qué generar, la más parecida de las que tiene. Listo cuando cada cosa que nombra el guion tiene su imagen o su modelo y
-   los miraste.
-6. **El mundo.** Arma `guion.ts`, `Escena3D.tsx`, los capítulos 2D y las poses según [`MUNDO.md`](MUNDO.md). Corre
-   `npx tsc --noEmit -p .`, con la primera versión de cada modelo de los subagentes. Cuando llegue la final, compila y
-   mírala en su lugar. Listo cuando compila, cada cosa entra en la palabra que la nombra y lo nuevo está guardado.
-7. **Encuadre.** Las tomas van en `TOMAS` de `src/mundo/guion.ts` (qué tiene que verse en cada una y desde dónde) y
-   `encuadra.ts` saca de ellas los planos, con la cámara más cercana que deja los objetos y las tarjetas entre el texto
-   y el personaje (en horizontal, arriba a la izquierda de los dos): no copies cámaras a mano. `npm run encuadre -- --revisa` (vuelve a empaquetar cada vez) dice
-   qué se sale y mide el ritmo de la cámara. Listo cuando la línea `ritmo` va toda en ✓ y no queda un ✗ grande; el video entero se mira en
-   el borrador, no en fotos.
-8. **Revisión, con un borrador.** El borrador es la primera vez que se ve el video entero, sin fotos antes (cuestan lo
-   mismo y no miden nada), a media resolución y en dos mitades: `python -B <skill>/scripts/final.py --borrador 1`
-   (~45 s) deja la hoja de la primera, un cuadro cada 2 s, en `revision/borrador-1.png`; lanza en seguida
-   `final.py --borrador 2` en segundo plano y, mientras, mira la hoja 1 y anota sus arreglos (hazlos cuando termine:
-   antes se colarían a medias en la segunda mitad). El 2 junta las mitades, mide el ritmo, deja `-2.png` y arma
-   `revision/parecidos.jpg` con la pregunta para un subagente. Lánzalo en cuanto salga, sin el enfoque (juzga lo que
-   ve, no lo que querías hacer), y mira las hojas enteras: cada momento cuando ya terminó de entrar, cada
-   flecha cuando termina de dibujarse, nada tapado, cortado ni asomando antes de tiempo. Si el subagente dice que se
-   parece, cambia lo que nombra (los colores, el lugar, los objetos, dónde está el protagonista, el primer cuadro).
-   **Todos los arreglos de una vez, y los de ritmo con margen** (un 10 % mejor que el mínimo: nuevo-4 quedó en 2.47
-   contra 2.5 y costó dos borradores más). Lo que arregles, compruébalo con `fotos.mjs` en esos segundos (8 como
-   mucho); otro borrador solo si cambiaste planos, tiempos o lo que dijo el subagente. Listo cuando el borrador sale
-   sin ✘, el subagente contestó que no se parece, cada celda cumple "Las reglas de la imagen" y nada queda tapado o
-   cortado. **Hasta entonces no hay render final**: en el de Celsius se renderizó tres veces por cosas que se veían
-   en el borrador.
-   Mientras se renderiza el primer borrador, si es de una serie, llena su banco como dice el final de
-   [`SERIES.md`](../video-base/SERIES.md): esos minutos de render son de espera.
-9. **Final.** Si algún subagente de modelos sigue afinando, pídele que entregue ya (`SendMessage`) y espera su versión
-   antes del final: en nuevo-11 se renderizó, llegó la versión buena y hubo que renderizar otra vez (7 min).
-   `python -B <skill>/scripts/final.py` (~2 min): renderiza una sola vez, directo a H.264 bt709, pasa
-   `comprobar.mjs`, mide el ritmo y guarda la huella con su hoja. Si algo sale con ✘, arréglalo antes de entregar.
-   Deja `out/<carpeta>.mp4`. Antes de entregar, su portada ([`PORTADA.md`](../video-base/PORTADA.md) de la base, que
-   dice también qué hacer sin ChatGPT): el mundo 3D del video y el personaje (si la marca tiene), recortado como
-   sticker con borde blanco, con la cara que dice el título (pásale su pose de referencia con otro `-i`), y el título
-   en la letra sans redonda del texto, blanco con la palabra clave resaltada. En vertical va de primer cuadro, con el
-   personaje abajo. En horizontal es la miniatura de YouTube ("En horizontal" de `PORTADA.md`), con el título a un
-   lado y el personaje al otro: se queda en `portada.png`, no se corre `portada.mjs` y `final.py` no la pega.
-   Entrega la ruta, los modelos que sumaste a la biblioteca y lo que no
-   revisaste: el audio no lo oyes, solo lo transcribes. No le propongas al usuario cambios a la skill al entregar.
-
-## Imágenes con Codex
-
-Codex usa la cuenta de ChatGPT del usuario. Antes de la primera imagen de cada video, `codex login status` (sale 0 si
-hay sesión). Sin sesión no se genera ninguna: se usa lo que ya hay (las poses que tiene el personaje, el logo real en
-vez de una textura) y se le dice al usuario una vez, en una frase llana, qué quedó sin hacer y que conectando ChatGPT
-en Sloth (Opciones → Codex) sale completo.
-
-Con su `image_gen` (no dibuja con código). El pedido va en un `.txt`, en inglés, y dice
-qué archivo dejar:
-
-```
-codex exec --skip-git-repo-check -s workspace-write -C <carpeta> -i <referencia.png> - < pedido.txt
+```json
+{
+  "paleta": { "oscuro": "#2a1d14", "claro": "#f3ead8", "luz": "#ffb347" },
+  "cosas": {
+    "sobre": { "modelo": "sobre-mechon", "tam": 1.5 },
+    "revista": { "icono": "BookOpenText", "color": "regla" },
+    "medico": { "icono": "Stethoscope", "color": "regla" }
+  },
+  "momentos": [
+    { "palabra": "Mándanos un mechón", "cosa": "sobre", "pose": "reojo", "anima": { "mechon": 1 },
+      "tarjeta": { "tipo": "boton", "texto": "Enviar mi mechón", "icono": "Scissors", "no": "No lo contestes" } },
+    { "palabra": "dos mil dieciocho", "cosa": "revista", "pose": "lupa", "tema": "claro",
+      "tarjeta": { "tipo": "prueba", "icono": "Newspaper", "fuente": "J Allergy Clin Immunol Pract · 2018",
+                   "antes": "Análisis de pelo: ", "frase": "pruebas sin probar", "subraya": "sin probar" } },
+    { "palabra": "ninguno", "cosa": "sobre", "gris": true, "pose": "pata",
+      "tarjeta": { "tipo": "cifra", "valor": "0", "nota": "diagnósticos válidos", "color": "pierde" } },
+    { "palabra": "ve al médico", "cosa": "medico", "pose": "feliz" }
+  ]
+}
 ```
 
-El pedido empieza con «Use your built-in image_gen tool (do not draw with code). Generate one image with image_gen,
-then copy the PNG from $CODEX_HOME/generated_images/... into this working directory as <nombre>.png. Reply only with
-the file name.» y sigue con la imagen. `-i` le pasa una referencia (la pose del personaje, la otra cara de la moneda) para
-que salga igual. Tarda 30–85 s y se pueden lanzar varios a la vez. Si no copió el archivo, se vuelve a pedir. Pedidos
-que funcionaron: `texturas/` del proyecto (las caras de una moneda o medalla), `personaje/pedidos/` (las poses y la
-boca) y `ejemplos/berachain/texturas/`.
+- **`palabra`**: las palabras de `guion.md` (de una a tres, seguidas y tal cual se escriben ahí), en el orden en que se
+  dicen; `vez: 2` si es la segunda vez que salen. Las cifras, en letra, como en el guion.
+- **`cosas`**: cada una, `modelo` (un id de `modelos.py lista`) o `icono` (un nombre de Phosphor en PascalCase:
+  `ShieldCheck`, `Syringe`), con `color` (por significado: `protagonista`, `segundo`, `dinero`, `pierde`, `regla`,
+  `ajeno`, `apagado`; o `#rrggbb`), `tam` (metros: 1.6 un modelo, 1.1 un ícono), `props` (las del modelo al entrar) y
+  `giro` (grados) y `sale: true` (se va al acabar su momento: lo de un chiste, que no se quede de escenografía). **Un protagonista** (lo que el video explica, mejor un modelo de la biblioteca que un ícono) que
+  vuelve en la mitad de los momentos o más y cambia de estado (`anima`, `gris`), y cinco cosas como mucho en todo el
+  video (hacer.py lo exige): una escena que se va armando, no un objeto por idea; verlo transformarse entretiene más
+  que un ícono nuevo en cada idea. Un ícono es para lo que se nombra una vez. Un objeto es una sola cosa: el celular
+  del mensaje y el de «llama a tu banco» son la misma, y un modelo no hace de otro objeto (un celular no es «la
+  pantalla» que se compra). Antes de usar un modelo, di qué ve quien no sabe nada: si no diría lo que dice la voz, no
+  sirve (el sueño de después de comer enseñó un tamal en «no del taco», un medidor en «tu reloj» y un vaso de agua en
+  «la glucosa»). Usa el ícono de eso (`BowlFood`, `ClockAfternoon`, `Brain`, `Flask`) o, si es el protagonista, hazlo. Lo mismo un
+  ícono: si Phosphor no tiene el objeto (un hígado), no va otro que se le parezca (un matraz), va la foto o la tarjeta.
+  Lo mismo cada momento: enseña aquello de lo que habla la frase, no un símbolo suelto. «Doce mil quinientos millones
+  perdidos en fraudes» con billetes flotando no se entendió (el usuario, 6-nov): es la estafa misma (la caja con el
+  Android) con la cifra encima. Un ícono se ve entero, nunca en `detalle`, y contra su fondo: el director le sube el contraste, pero un modelo claro en una escena clara se pierde (la caja del iPhone): ahí va uno oscuro o la escena oscura. Si el modelo dice algo (`mensaje`, `de` y `hora` del celular; `alerta`; `pantalla`), dilo:
+  el mensaje falso escrito en la pantalla explica más que la voz.
+- **`anima`**: props del modelo que cambian en ese momento, con un resorte (`{ "abierto": 1 }`). **Cada cambio, cuando la voz lo dice y en ese orden**: el gancho no gasta lo que se explica después (los dedos traían la burbuja y los huesos separados desde el primer cuadro, y en «nace una burbuja» no pasó nada); mientras cambia, sin `accion` encima. hacer.py lo revisa; las que tiene cada
+  modelo las dice `modelos.py lista`. Lo que animas arranca en 0 si la cosa no lo trae en `props`: si en ese modelo el 0
+  no es como se ve siempre (la hogaza con `dorado` 0 es masa cruda), ponlo en `props`. **`gris: true`**: lo desmentido o lo que se acaba se queda gris desde ahí.
+- **`tarjeta`**, una de:
+  - `imagen`: `src` (en `public/`), `pie` (dos a cuatro palabras) y `fuente`. **Lo real se reconoce más que un ícono**:
+    el producto, el anuncio, la página, la persona, el lugar. De dos a tres por video, de las páginas que ya
+    leíste (la de una noticia o una tienda trae su foto):
+    `python -B -X utf8 <skill>/scripts/imagenes.py <nombre>=<url de la página o de la imagen>…` (todas en una
+    llamada, ~3 s) las deja en `public/img/<nombre>.jpg`. Si una no sale, va un ícono: no se inventan. La foto enseña la cosa (el estómago, el pájaro, el habanero), nunca el logo de quien lo dice: eso va en `fuente`; el logo de Scientific American en «nada apaga el eco» no enseñó nada. **La foto
+    entra cuando el protagonista ya se vio**: nunca en los dos primeros momentos ni antes de unos 5 s (15 palabras), y
+    se queda 2 s o más (6 palabras); mientras se ve, el director para y quita lo de detrás. En el del corazón entró a
+    los 3 s y «al modelo 3D ya no se le permitió ver nada».
+  - `cifra`: `valor` (corto y con su unidad: «0», «$200», «8 €», «69 %», «4 cm»), `nota`, `fuente`, `icono`, `color`; `cuenta: [0, 200]` la hace correr.
+  - `prueba`: quién lo dijo (su `logo` real, con `logos.py`; si no tiene, un `icono`; y `fuente` con la fecha) y solo
+    la frase que importa: `antes`, `frase`
+    (subrayada en rojo cuando se dice `subraya`, o al entrar) y `despues`. Diez palabras como mucho.
+  - `iconos`: `iconos` (de dos a cuatro) y `color`. `logos`: `logos` (de public/logos).
+  - `boton`: `texto`, `icono`; con `no` (palabras del guion), ahí parpadea y se queda rojo: «no se puede».
+  - `versus`: `a` ≠ `b`, dos palabras cada uno. `post`: un post de Reddit (`sub`, `fecha`, `titulo`, `votos`).
+- **`pose`** (del perro; cambia en ese momento y se queda): `normal` explica · `ladea` pregunta · `arriba` enumera o
+  lee · `lado` pasa a lo siguiente · `reojo` algo sospechoso · `lentes` descaro o un truco · `pata` niega o pone un
+  límite · `tapa` vergüenza o dolor · `susto` un número que asusta · `triste` algo que se acaba · `feliz` algo bueno ·
+  `ladra` un remate fuerte · `acostado` ya no tiene remedio · `lupa` se investiga · `llave` se desbloquea · `billetes`
+  dinero que se paga. Una por idea, ni muy seguido ni de más. Un personaje propio tiene las suyas (las dice `hacer.py`
+  si una no está).
+- **`titular`** (arriba, junto a `paleta`): el gancho, enorme y palabra por palabra en el primer segundo. Sin él va
+  la primera frase de la voz si tiene diez palabras o menos, entera en el primer medio segundo (por eso el gancho es una frase corta y sola), con la
+  última palabra del color de la luz: que sea la que sorprende («Tu tamal lleva **cal**»).
+- **`tema`**: `claro` u `oscuro`, el fondo desde ahí (en el giro). `paleta`: los dos fondos y la luz, sacados del
+  lugar del tema (la oficina de correos en madera y kraft; el laboratorio en blanco y azul).
+- **Dirígelo como un set: lee [`CINE.md`](CINE.md) antes de escribir los momentos.** `escenas` (dos a cuatro lugares,
+  cada uno con su `luz` y su `fondo`) y en los momentos `escena` (dónde pasa desde ahí), `en` en las cosas (dónde va
+  cada una dentro de su escena: se quedan puestas y la escena se arma) y `camara` (`plano`, `angulo`, `lente`,
+  `movimiento`, `corte`). Un plano distinto en cada momento importante: sin `camara`, todo es un plano medio que va de
+  objeto en objeto, y aburre.
+- **`accion`**: lo que la cosa hace una y otra vez desde ese momento hasta que otro suyo pida otra (o `quieta`): `golpea` (el martillo, el sello, el
+  metate), `late` (solo un corazón), `tiembla` (lo que hierve, lo que va a romperse), `gira` (una moneda, la
+  Tierra) o `salta` (lo que de verdad salta). **Cada movimiento es lo que esa cosa hace en la vida real y lo que dice la
+  voz en ese momento**; si no hay uno, ninguno: un celular que late, una gota que salta o un rayo que brinca detrás de
+  una foto son «animaciones que no tienen que ver» (el usuario, 6-nov). Lo que ya actúa solo (`actua` en `modelos.py
+  lista`: el cuchillo que pica, el corazón, el celular que suena) no lleva `accion`: cambia con `anima`. hacer.py lo
+  revisa.
+- **`contador`** (arriba: `{ "nota": "golpes" }`, con `color`, `prefijo`, `sufijo`, `decimales`) y **`cuenta`** en los
+  momentos: un número vivo bajo el texto que corre de un valor al siguiente («GOLPES 99», la población que baja, los
+  metros, los días). Uno por video si hay algo verdadero que se cuenta (el dinero que se va con cada cuota, las señales de
+  alarma), desde el primer momento: es lo que más sube «entretiene». Uno inventado (lágrimas 0, 2, 4… 120) baja «enseña». Es un dato como cualquier otro: verdadero,
+  o un ejemplo que la voz dice como ejemplo («si tienes diez mil en la cuenta…»).
 
-## Poses nuevas
+Las reglas de la imagen que siguen valiendo, y que el director no puede poner por ti: pocas palabras en lo que se ve
+(un número o dos palabras: el texto de arriba ya dice el resto), imágenes en vez de nombres (un logo, un ícono, un
+objeto), y nada de etiquetas de cambio sueltas («−94 %»): el número ya lo dice.
 
-El perro tiene 19 poses; uno propio, las que se le hicieron ([`personaje/POSES.md`](personaje/POSES.md)): elige la que
-dice lo mismo que la frase. Si el guion pide una que no está (sostener algo nuevo, otro gesto) y hay ChatGPT, o Flow si lo trae la línea `Imágenes:`
-(los mismos pasos, con `<base>/FLOW.md` en vez de Codex):
+## Los pasos
 
-1. Codex la hace con la foto base del personaje de referencia (el perro: `<skill>/personaje/perro.png`; uno propio:
-   `personajes/<id>/base.png`) y `personaje/pedidos/pose.txt` (la misma foto, el mismo personaje, solo cambia la pose)
-   a `perro/pose_<nombre>.png` del proyecto.
-2. Codex le abre la boca (`personaje/pedidos/boca.txt`) a `perro/bocas/boca_<nombre>.png`, y
-   `python -B scripts/bocas.py <nombre>` pega solo la boca sobre la pose, para que al hablar no tiemble.
-3. `python -B scripts/perro.py` la recorta como sticker (cerrada y abierta con la misma silueta) y la suma a
-   `src/datos/personaje.json`. Si sostiene algo, mide su `ancla` (dónde va lo que enseña).
+1. **En un solo mensaje**: `python -B -X utf8 <skill>/scripts/nuevo.py <carpeta>` (con `--formato horizontal` si
+   toca) en segundo plano (con `run_in_background`); `python -B -X utf8 <skill>/scripts/marca.py ver`;
+   `python -B -X utf8 <skill>/../modelos-3d/scripts/modelos.py lista`; y de dos a cuatro búsquedas web a la vez. Si a
+   la marca le falta algo, pregúntalo ([`MARCA.md`](MARCA.md)).
+   **La pieza central**: si la biblioteca no tiene el objeto que sostiene la historia (la olla del tamal, el aparato del
+   baño de pies, la hogaza del pan), en cuanto sepas cuál es lanza **un** subagente en segundo plano que lo haga a
+   medida, con tu mismo modelo: «sigue la skill modelos-3d (4 y 5): escríbelo en `src/modelos/<id>.tsx` de
+   `<proyecto>`: <qué es y qué partes trae>. El objeto mismo llena su caja: sin mesa, piso ni base debajo (el mundo ya
+   trae piso), porque el video lo escala por su caja y una mesa lo deja diminuto. Compacto, casi tan alto como ancho: lo
+   largo va de pie (el video es vertical; la articulación de los dedos, dos huesos acostados, quedó una tira delgada). Con props de 0 a 1 para lo que cambia
+   en la historia (<cuáles>), que se vean de frente a la cámara y a su tamaño, y una que la haga actuar sola todo el
+   video mientras vale más de 0 (<la acción que no para: pica, late, gotea>; guárdala con `--actua`). Que la acción
+   tenga el detalle de la vida real: lo que salta, se deshace o salpica al hacerla (las capas de la cebolla que se
+   separan, el jugo, las gotitas), no solo el objeto que sube y baja. Primero, en unos 4 minutos, una versión
+   que compile con todas sus props; luego guárdalo con `modelos.py guardar`. No toques nada más.» Úsalo como la cosa de tu escena principal, con sus props en `anima`.
+   Es lo que más sube un video: con ella, la escena se arma frente al que mira; sin ella, son íconos sueltos.
+   **Prefiere las piezas que actúan** (`modelos.py lista` dice «ACTÚA con `<prop>`»): de protagonista, encendidas desde
+   el primer momento, el video tiene una acción que no para (el cuchillo que pica, el corazón que late). Si el tema pide
+   comparar (con filo y sin filo, antes y después), una pieza que enseñe los dos lados a la vez con su contador
+   (`duelo-cuchillos`) se lee sin sonido.
+2. **Una lectura más, si hace falta** (la fuente primaria de la cifra que lo sostiene), todas a la vez. Con eso basta:
+   no investigues más de dos rondas, y en una serie tampoco: el tema es el primero que cumpla lo que pide, del banco o
+   de la primera ronda de búsquedas, no el mejor posible (elegir entre muchos se comía de 2 a 4 minutos y el doble de
+   costo). La segunda ronda es solo para la fuente primaria y las fotos del que elegiste.
+3. **El guion lo escribe el subagente `guionista`** (Opus, solo escribe: Agent con `subagent_type: "guionista"`),
+   siempre que tu lista de agentes lo traiga; solo si no está, lo escribes tú. Pásale en unas doce
+   líneas lo que necesita y nada más: los datos que vas a usar con su fuente, la marca (`habla` y la frase del cierre),
+   los segundos y las palabras (3.4 por segundo), la ruta `<proyecto>/guion.md` con su formato (`# Título de dos a
+   cinco palabras`, la línea `Corte de datos: …` y el texto en párrafos) y las reglas de «Para que lo vean» copiadas tal
+   cual. Espéralo (unos 30 s): al usuario le gustó más su guion que el del agente solo (el chile, 6-nov), y con solo
+   Write arranca con poco contexto (un subagente general cargaba 38 mil tokens para escribir 100 palabras).
+   Luego, **en un solo mensaje**, con Write: `fuentes/investigacion.md` (la fecha del corte, cada cifra en una tabla `| dato |
+   valor | fuente (enlace) |` y las citas textuales; corto), `terminos.txt` (los nombres del tema, uno por renglón, para el
+   transcriptor) y `momentos.json`; los logos que pida, con `python -B -X utf8 <skill>/scripts/logos.py
+   <nombre>=sitio:<dominio>…` (todos en una llamada), y sus imágenes con `imagenes.py`. Corre `python -B -X utf8
+   <skill>/scripts/hacer.py --revisa` (sin fondo, un segundo) hasta que diga ✓: dice todo lo que falla de una vez, y
+   cada ✗ con hacer.py de fondo te cuesta tres vueltas. Luego `python -B -X utf8 <skill>/scripts/hacer.py --studio <Voz> --dura <los segundos que pidieron>`
+   **en segundo plano** desde la carpeta del proyecto (sin `Voz:`, dale el guion al usuario para que lo grabe y, con su
+   audio, `hacer.py --audio <archivo>`). Si lanzaste la pieza central, corre `hacer.py` cuando el subagente te avise
+   que su primera versión compila. Termina tu mensaje: te avisa al terminar (~3 min). Mientras, no esperes con
+   `sleep` ni lo vigiles.
+4. **Si dice ✗**, arregla lo que dice y vuelve a correrlo de fondo, sin `--studio` si el guion no cambió (la voz se
+   guarda). Si dice ✓, mira `revision/hoja.png` (un cuadro cada 1.5 s) y `portada.png`: que cada momento enseñe lo que
+   se dice, que nada se tape ni se corte y que se entienda sin sonido. Otro render cuesta minuto y medio: solo si algo
+   se tapa, se corta o queda vacío, y todo en una vuelta (lo que solo podría verse un poco mejor, no). Un
+   ✘ de movimiento o de parpadeo es del director: no lo busques, entrega y díselo al usuario.
+5. **Entrega**: la ruta de `out/<carpeta>.mp4`, el enfoque en una línea, cuánto dura y que el audio no lo oíste. Si
+   hiciste la pieza central al vuelo, avísalo: «El <objeto> no estaba en la biblioteca: lo hice al vuelo y se ve
+   menos pulido; si va a volver a salir, que se pula en Modelos 3D». Nunca dejes un video sin su pieza porque no estaba.
 
-Si sirve para otros videos, súmala a la biblioteca de su personaje ("Una pose nueva" en `POSES.md`).
+Si algo que el video necesita de verdad no cabe en `momentos.json` (una pieza 2D que no hay), escríbela en
+`src/piezas/<nombre>.tsx` (las piezas del kit, en [`KIT.md`](KIT.md)) y úsala con
+`"tarjeta": { "tipo": "pieza", "nombre": "<nombre>", "props": {…}, "w": <ancho px>, "h": <alto px> }`; recibe además
+`en` y `hasta` (sus cuadros). Y díselo al usuario: falta en el director.

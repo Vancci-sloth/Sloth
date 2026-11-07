@@ -1,8 +1,10 @@
 // Las piezas 2D chicas: la ficha de una moneda o un sello, la píldora, el logo redondo y el botón que dice que no.
+// `Simbolo` es lo que va delante de un texto en cualquier pieza: un ícono de Phosphor, un logo real o una imagen.
 import { getLength, getPointAtLength } from "@remotion/paths";
 import React from "react";
 import { Img, interpolate, spring, staticFile, useCurrentFrame, useVideoConfig } from "remotion";
 import { LETRA, MONO, ROJO } from "../tema";
+import { Glifo, type NombreIcono } from "./iconos";
 import { sujeta, suave, useColores } from "./ui";
 
 /** La ficha redonda de una moneda, un token o un sello, con su texto o su imagen. */
@@ -30,26 +32,50 @@ export const Ficha: React.FC<{ texto: string; color: string; tam?: number; img?:
   </div>
 );
 
-export const Pildora: React.FC<{ children: React.ReactNode; color?: string; fondo?: string; style?: React.CSSProperties }> = ({ children, color, fondo, style }) => {
+/** Lo que va delante de un texto: un ícono de Phosphor (`icono`), un logo real redondo (`logo`, de public/logos) o
+ * una imagen redonda (`img`, de public: una bandera, una cara). */
+export type ConSimbolo = { icono?: NombreIcono; logo?: string; img?: string };
+
+/** El ícono, logo o imagen de `ConSimbolo`, solo, de `tam` px: para ponerlo delante de un texto en una pieza propia. */
+export const Simbolo: React.FC<ConSimbolo & { tam: number }> = ({ icono, logo, img, tam }) => {
+  if (icono) return <Glifo nombre={icono} tam={tam} />;
+  const src = logo ? `logos/${logo}.png` : img;
+  if (!src) return null;
+  return <Img src={staticFile(src)} style={{ width: tam, height: tam, borderRadius: tam, background: logo ? "#fff" : undefined, objectFit: "cover", flexShrink: 0 }} />;
+};
+
+/** La píldora: un nombre, un lugar o una etiqueta, con su ícono, logo o bandera delante. `apagado` (0–1) la pasa a gris. */
+export const Pildora: React.FC<ConSimbolo & { children: React.ReactNode; color?: string; fondo?: string; tam?: number; apagado?: number; style?: React.CSSProperties }> = ({
+  children,
+  color,
+  fondo,
+  tam = 34,
+  apagado = 0,
+  style,
+  ...simbolo
+}) => {
   const c = useColores();
   return (
     <div
       style={{
         display: "inline-flex",
         alignItems: "center",
-        gap: 10,
-        padding: "12px 24px",
+        gap: tam * 0.3,
+        padding: `${tam * 0.35}px ${tam * 0.7}px`,
         borderRadius: 999,
         background: fondo ?? c.tarjeta2,
         border: `2px solid ${color ?? c.borde}`,
         color: color ?? c.texto,
         fontFamily: LETRA,
-        fontSize: 34,
+        fontSize: tam,
         fontWeight: 700,
         whiteSpace: "nowrap",
+        filter: apagado ? `grayscale(${apagado})` : undefined,
+        opacity: 1 - apagado * 0.55,
         ...style,
       }}
     >
+      <Simbolo {...simbolo} tam={tam * 1.1} />
       {children}
     </div>
   );

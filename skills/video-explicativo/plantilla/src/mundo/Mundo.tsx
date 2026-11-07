@@ -14,6 +14,7 @@ import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment
 import { temaEn } from "../capitulos";
 import { ALTO, ANCHO, PALETA, REJILLA } from "../tema";
 import { camaraDe, centrar, FOV, Plano, vistaEn } from "./camara";
+import { luzEn } from "../director/guion";
 
 const Rodaje: React.FC<{ planos: Plano[] }> = ({ planos }) => {
   const f = useCurrentFrame();
@@ -57,14 +58,16 @@ const Luces: React.FC<{ planos: Plano[] }> = ({ planos }) => {
   blanco.position.copy(mira);
   blanco.updateMatrixWorld();
   const k = t.claridad;
+  // La luz de la escena en que está (luz de `escenas` en momentos.json); sin escenas, la de estudio de siempre.
+  const l = luzEn(f, PALETA.luz);
   return (
     <>
       <primitive object={blanco} />
       <directionalLight
-        position={[mira.x + 3.5, mira.y + 9, mira.z + 6]}
+        position={[mira.x + 3.5, mira.y + l.alto, mira.z + 6]}
         target={blanco}
-        intensity={2.4 - 0.6 * k}
-        color="#fff4e6"
+        intensity={l.fuerza - 0.6 * k}
+        color={l.principal}
         castShadow
         shadow-mapSize={[2048, 2048]}
         shadow-camera-left={-8}
@@ -76,8 +79,8 @@ const Luces: React.FC<{ planos: Plano[] }> = ({ planos }) => {
         shadow-bias={-0.0004}
         shadow-radius={6}
       />
-      <directionalLight position={[mira.x - 6, mira.y + 3, mira.z - 6]} target={blanco} intensity={2.6 - 1.8 * k} color={PALETA.luz} />
-      <hemisphereLight args={["#ffffff", "#d8d8d8", 0.25 + 0.6 * k]} />
+      <directionalLight position={[mira.x - 6, mira.y + 3, mira.z - 6]} target={blanco} intensity={l.contraFuerza - 1.8 * k * (l.contraFuerza / 2.6)} color={l.contra} />
+      <hemisphereLight args={["#ffffff", "#d8d8d8", l.cielo + 0.6 * k]} />
     </>
   );
 };

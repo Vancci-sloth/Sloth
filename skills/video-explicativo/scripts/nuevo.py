@@ -3,9 +3,9 @@ Crea el proyecto de un video en la carpeta `<nombre>`, tal cual (la de la línea
 `explicado-<tema>` fuera de Sloth): copia la plantilla de Remotion, la marca (el personaje con sus poses en
 public/perro, la foto y la red del cierre: `marca.py aplicar`), enlaza node_modules al que comparten todos los videos
 explicativos (espacio.py de video-base: antes cada uno copiaba el suyo, ~1 GB) y,
-de skills/modelos-3d/plantilla, la moneda que la plantilla trae de protagonista. Al final empaqueta
+de skills/modelos-3d/plantilla, el ícono 3D (`Icono3D`, con `comun.tsx`): el protagonista lo elige cada video. Al final empaqueta
 el proyecto una vez (render.cjs --empaqueta): el primer empaquetado de un proyecto tarda ~40 s y los siguientes ~10,
-así el primer borrador no los paga.
+así el render de hacer.py no los paga. Al terminar deja `.listo`, que hacer.py espera.
 
     python -B nuevo.py <nombre> [--formato vertical|horizontal]
 
@@ -51,8 +51,9 @@ def main() -> None:
     from espacio import enlazar_modulos
     from sloth import calentar_vectores
 
-    calentar_vectores()
+    # La carpeta, lo primero: el agente escribe ahí guion.md y momentos.json mientras esto sigue.
     shutil.copytree(SKILL / "plantilla", destino, ignore=shutil.ignore_patterns("__pycache__"))
+    calentar_vectores()
     (destino / "src" / "datos" / "formato.json").write_text(json.dumps({"formato": formato}) + "\n", encoding="utf-8", newline="\n")
     aplicar(destino)
     for d in ("fuentes/voz", "fuentes/datos", "fuentes/logos", "public/logos", "perro/bocas", "revision", "out"):
@@ -63,9 +64,11 @@ def main() -> None:
     # de la carpeta de la card (todos son de este estilo) o de npm ci.
     vecinos = list(aqui.glob("*/node_modules"))
     enlazar_modulos(destino, "video-explicativo", SKILL / "plantilla", [p for p in vecinos if p.parent != destino])
-    # La protagonista de la plantilla, de modelos-3d/plantilla (con los íconos que usa, que salen de node_modules).
-    subprocess.run([sys.executable, "-B", "-X", "utf8", str(MODELOS), "usar", "moneda"], cwd=destino, check=True, stdout=subprocess.DEVNULL)
+    # El ícono 3D, que usan casi todos los videos, con lo común de los modelos (modelos-3d/plantilla).
+    subprocess.run([sys.executable, "-B", "-X", "utf8", str(MODELOS), "usar", "icono-3d"], cwd=destino, check=True, stdout=subprocess.DEVNULL)
     subprocess.run(["node", str(SKILL / "scripts" / "render.cjs"), "--empaqueta"], cwd=destino, check=True)
+    # hacer.py espera esta marca: renderizar mientras esto empaqueta pisaría la caché de webpack.
+    (destino / ".listo").write_text("", encoding="utf-8")
     print(f"listo ({formato}): {destino}")
 
 

@@ -11,12 +11,20 @@ import * as THREE from "three";
 import { ALTO, ANCHO, ZONA } from "../tema";
 
 export type V3 = [number, number, number];
-export type Plano = { en: number; pos: V3; mira: V3; fov?: number; dura?: number; arco?: V3; deriva?: number };
+/**
+ * `empuja`: cuánto se acerca mientras sostiene el plano (0.25, un dolly; negativo, se aleja; 0.14 por omisión). `grua`:
+ * cuántos grados sube (o baja, negativo) mientras lo sostiene, como una grúa.
+ */
+export type Plano = { en: number; pos: V3; mira: V3; fov?: number; dura?: number; arco?: V3; deriva?: number; empuja?: number; grua?: number };
 
 /** El campo de visión vertical, en grados: el mismo en los dos formatos (en horizontal, a lo ancho cabe el triple). */
 export const FOV = 32;
-/** Cuántos grados rodea la mira un plano sostenido si no dice otra cosa (0, quieta; negativo, al otro lado). */
-export const DERIVA = 6;
+/**
+ * Cuántos grados rodea la mira un plano sostenido si no dice otra cosa (0, quieta; negativo, al otro lado). Era 6, y
+ * el de estafas (3 de noviembre) gastó cuatro `revisar.py --movimiento` en subirlo a mano a 14 y a 22 para no salir quieto;
+ * con 22 el usuario lo dio por bueno.
+ */
+export const DERIVA = 22;
 /**
  * Dónde cae la mira en la pantalla: el centro de la zona entre el texto de arriba y el perro (vertical), o arriba a la
  * izquierda del texto y del personaje (horizontal). Ver `ZONA` en tema.ts.
@@ -52,8 +60,17 @@ export const vistaEn = (planos: Plano[], f: number): Vista => {
     // Ya llegó: rodea la mira hasta que arranca el plano siguiente (ahí se queda, y de ahí sale el siguiente).
     const quieto = Math.min(f, planos[i + 1]?.en ?? f) - (i > 0 ? p.en + (p.dura ?? 30) : 0);
     if (quieto <= 0) return;
-    const grados = (p.deriva ?? (i % 2 ? -DERIVA : DERIVA)) * (1 - Math.exp(-quieto / 90)) * Math.min(1, quieto / 20);
-    v.pos = v.pos.clone().sub(v.mira).applyAxisAngle(ARRIBA, (grados * Math.PI) / 180).add(v.mira);
+    const grados = (p.deriva ?? (i % 2 ? -DERIVA : DERIVA)) * (1 - Math.exp(-quieto / 70)) * Math.min(1, quieto / 14);
+    // Y se acerca despacio (hasta un 14 %): rodear algo gris sobre un fondo claro casi no cambia la imagen, y el de la
+    // caja que cura el cáncer quedó 30 % quieto aunque la cámara nunca paraba.
+    const avance = 1 - Math.exp(-quieto / 80);
+    const acerca = 1 - (p.empuja ?? 0.14) * avance;
+    let rel = v.pos.clone().sub(v.mira).applyAxisAngle(ARRIBA, (grados * Math.PI) / 180);
+    if (p.grua) {
+      const lado = rel.clone().cross(ARRIBA).normalize();
+      rel = rel.applyAxisAngle(lado, (-p.grua * avance * Math.PI) / 180);
+    }
+    v.pos = rel.multiplyScalar(acerca).add(v.mira);
   });
   return v;
 };

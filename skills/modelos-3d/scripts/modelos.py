@@ -2,6 +2,7 @@
 La biblioteca de modelos 3D: buscar uno antes de hacerlo, traerlo al proyecto y guardar los nuevos.
 
     python -B -X utf8 modelos.py buscar [palabra…]        qué hay que sirva (sin palabras, todo)
+    python -B -X utf8 modelos.py lista                     una línea por modelo: id, qué es y sus props
     python -B -X utf8 modelos.py usar <id> [<id>…]         lo copia al proyecto, con lo que necesita [--pisa]
     python -B -X utf8 modelos.py iconos <nombre> […]       íconos de Phosphor a public/iconos (para Icono3D)
     python -B -X utf8 modelos.py guardar <id> --nombre "…" --resumen "…" --categoria "…" --descripcion "…"
@@ -31,7 +32,7 @@ MODELOS = BIBLIOTECA / "modelos"
 PLANTILLA = BIBLIOTECA / "plantilla"
 # Lo único que un modelo puede importar, además de comun y otros modelos: lo demás le llega por props.
 PERMITIDOS = re.compile(r"^(react|react-dom|three|three/.+|@react-three/fiber|remotion|@remotion/.+)$")
-ORDEN = ["nombre", "resumen", "categoria", "descripcion", "hace", "etiquetas", "exporta", "usa", "iconos", "cuadro", "origen", "creado", "actualizado"]
+ORDEN = ["nombre", "resumen", "categoria", "descripcion", "hace", "etiquetas", "exporta", "usa", "iconos", "cuadro", "caja", "frente", "actua", "origen", "creado", "actualizado"]
 # Los tipos de modelo, en el orden en que Sloth los enseña. Uno nuevo se suma ahí, con su «para».
 CATEGORIAS = [c["nombre"] for c in json.loads((BIBLIOTECA / "categorias.json").read_text("utf-8"))]
 # Lo que la ficha tiene que traer cuando el modelo es nuevo.
@@ -97,6 +98,31 @@ def buscar(palabras: list[str]) -> None:
     print(f"\n{len(filas)} de {len(todos())}. Para traerlo: python -B -X utf8 {Path(__file__).name} usar <id>")
 
 
+def props_de(id_: str) -> str:
+    """Las props del componente de un modelo con su valor por omisión («abierto=0, nivel=0.85»), sin gris, apaga ni fondo."""
+    texto = (carpeta(id_) / f"{id_}.tsx").read_text("utf-8")
+    nombre = next((n for n in ficha(id_)["exporta"] if not n.endswith("Props") and n != "Muestra"), "")
+    m = re.search(rf"export const {nombre}\s*:[^=]*=\s*\(\{{([^}}]*)\}}", texto)
+    if not m:
+        return ""
+    fuera = []
+    for parte in m.group(1).split(","):
+        # Solo los espacios de fuera y los que rodean el «=»: quitarlos todos dejaba los textos sin espacios y el agente los
+        # copiaba así («Tupaqueteestáretenido» en el celular de la paquetería).
+        parte = re.sub(r"\s*=\s*", "=", " ".join(parte.split()))
+        if parte and parte.split("=")[0] not in ("gris", "apaga", "fondo"):
+            fuera.append(parte)
+    return ", ".join(fuera)
+
+
+def lista() -> None:
+    """Una línea por modelo: su id, qué es y sus props. Para elegir de una vez los de un video (hacer.py los trae)."""
+    for id_ in todos():
+        m = ficha(id_)
+        props = props_de(id_)
+        print(f"{id_}: {m.get('resumen') or m['nombre']}" + (f" ({props})" if props else "") + (f" · ACTÚA con `{m['actua']}`" if m.get("actua") else ""))
+
+
 def proyecto() -> Path:
     aqui = Path.cwd()
     if not (aqui / "package.json").exists():
@@ -154,6 +180,23 @@ def usar(ids: list[str], pisa: bool = False, callado: bool = False) -> None:
         iconos(m["iconos"])
         if not callado:
             print(f'{id_}: import {{ {", ".join(m["exporta"])} }} from "../modelos/{id_}";')
+            # Su cabecera (qué es, cuánto mide, dónde está su origen y sus props): así no hay que abrir el archivo.
+            for linea in (carpeta(id_) / f"{id_}.tsx").read_text("utf-8").splitlines():
+                if not linea.startswith("//"):
+                    break
+                print("   " + linea[2:].strip())
+
+
+def de_fondo() -> dict:
+    """
+    Con qué lanzar el render de la vista para que vaya con prioridad baja (su Chrome la hereda): la saca casi siempre un
+    subagente mientras el agente del video revisa el suyo. En el de la alerta falsa (3 de noviembre), con dos subagentes
+    sacando vistas, cada `revisar.py` tardó 30–55 s en vez de 14–22. En Windows va en el lanzamiento (bajar la del propio
+    Python no pasa a sus hijos); en Mac y Linux, `nice`, que sí se hereda.
+    """
+    if sys.platform == "win32":
+        return {"creationflags": 0x4000}  # BELOW_NORMAL_PRIORITY_CLASS
+    return {"preexec_fn": lambda: os.nice(10)}
 
 
 def vista(ids: list[str]) -> None:
@@ -182,7 +225,7 @@ def vista(ids: list[str]) -> None:
         corre_ = (BIBLIOTECA / "scripts" / "vitrina.mjs").read_text("utf-8").replace("src/modelos/_vitrina.tsx", f"src/modelos/_vitrina{n}.tsx")
         corre.write_text(corre_, "utf-8", newline="\n")
         pares = [f"{id_}:{ficha(id_).get('cuadro', 0)}" for id_ in ids]
-        r = subprocess.run(["node", str(corre), str(MODELOS), *pares], cwd=raiz_)
+        r = subprocess.run(["node", str(corre), str(MODELOS), *pares], cwd=raiz_, **de_fondo())
         if r.returncode:
             sys.exit("No salió la vista: mira el error de arriba (la Muestra tiene que verse sola, sin el resto del video).")
     finally:
@@ -190,7 +233,7 @@ def vista(ids: list[str]) -> None:
             temporal.unlink(missing_ok=True)
 
 
-def guardar(id_: str, dados: dict[str, str | None], cuadro: int | None, sin_vista: bool) -> None:
+def guardar(id_: str, dados: dict[str, str | None], cuadro: int | None, sin_vista: bool, caja: str | None = None, frente: bool = False, actua: str | None = None) -> None:
     raiz_ = proyecto()
     fuente = raiz_ / "src" / "modelos" / f"{id_}.tsx"
     if not re.fullmatch(r"[a-z0-9]+(-[a-z0-9]+)*", id_):
@@ -240,6 +283,9 @@ def guardar(id_: str, dados: dict[str, str | None], cuadro: int | None, sin_vist
         "usa": sorted(set(usa)),
         "iconos": iconos_,
         "cuadro": cuadro if cuadro is not None else previo.get("cuadro", 0),
+        "caja": [float(x) for x in caja.split(",")] if caja else previo.get("caja"),
+        "frente": True if frente else previo.get("frente"),
+        "actua": actua or previo.get("actua"),
         "origen": previo.get("origen", raiz_.name),
         "creado": previo.get("creado", hoy),
         "actualizado": hoy,
@@ -252,7 +298,7 @@ def guardar(id_: str, dados: dict[str, str | None], cuadro: int | None, sin_vist
         shutil.rmtree(destino / "archivos")
     if publicos.exists() and any(publicos.iterdir()):
         shutil.copytree(publicos, destino / "archivos")
-    (destino / "modelo.json").write_text(json.dumps({k: m[k] for k in ORDEN}, ensure_ascii=False, indent=2) + "\n", "utf-8", newline="\n")
+    (destino / "modelo.json").write_text(json.dumps({k: m[k] for k in ORDEN if m.get(k) is not None}, ensure_ascii=False, indent=2) + "\n", "utf-8", newline="\n")
     print(f"{'actualizado' if previo else 'nuevo'}: {destino}", flush=True)
     if not sin_vista:
         vista([id_])
@@ -262,6 +308,7 @@ def main() -> None:
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = p.add_subparsers(dest="orden", required=True)
     sub.add_parser("buscar").add_argument("palabras", nargs="*")
+    sub.add_parser("lista")
     u = sub.add_parser("usar")
     u.add_argument("ids", nargs="+")
     u.add_argument("--pisa", action="store_true", help="cambia la copia del proyecto por la de la biblioteca")
@@ -272,10 +319,15 @@ def main() -> None:
         g.add_argument(f"--{campo}")
     g.add_argument("--cuadro", type=int, help="el cuadro de la Muestra que sale en la vista")
     g.add_argument("--sin-vista", action="store_true")
+    g.add_argument("--actua", help="la prop que lo hace moverse solo todo el video mientras vale más de 0 (pica, late, respira)")
+    g.add_argument("--frente", action="store_true", help="tiene cara (un reloj, un celular, una persona): el video no lo enseña de lado")
+    g.add_argument("--caja", help="ancho,alto,fondo: solo si es mucho más alto que ancho (un celular, una botella)")
     sub.add_parser("vista").add_argument("ids", nargs="+")
     a = p.parse_args()
     if a.orden == "buscar":
         buscar(a.palabras)
+    elif a.orden == "lista":
+        lista()
     elif a.orden == "usar":
         usar(a.ids, a.pisa)
     elif a.orden == "iconos":
@@ -283,7 +335,7 @@ def main() -> None:
         iconos(a.nombres)
         print(", ".join(f"public/iconos/{n}.svg" for n in a.nombres))
     elif a.orden == "guardar":
-        guardar(a.id, {k: getattr(a, k) for k in PIDE}, a.cuadro, a.sin_vista)
+        guardar(a.id, {k: getattr(a, k) for k in PIDE}, a.cuadro, a.sin_vista, a.caja, a.frente, a.actua)
     else:
         vista(a.ids)
 

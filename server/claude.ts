@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { extname } from 'node:path'
-import { query, type ModelInfo, type SDKMessage, type SDKUserMessage } from '@anthropic-ai/claude-agent-sdk'
+import { query, type AgentDefinition, type McpServerStatus, type ModelInfo, type Query, type SDKMessage, type SDKUserMessage } from '@anthropic-ai/claude-agent-sdk'
 import type { AgentEvent, Model, Tokens } from '../shared/types.ts'
 import { IMAGE_TYPES, Inbox, sinArrancar, stringify, type AgentOptions, type AgentRun, type SkillRef } from './agent.ts'
 import { herramientasIdeas } from './ideas/mcp.ts' // ideas
@@ -15,6 +15,18 @@ import { proveedorDe } from '../shared/providers.ts'
 
 /** Las herramientas que lanzan un subagente. */
 const AGENTE = 'Agent|Task'
+/**
+ * El subagente `guionista`: escribe un archivo (un guion, un texto corto) con Opus, de lo que le pase quien lo llama. No
+ * investiga ni lee: todo lo que necesita va en el pedido. Con solo Write arranca con poco contexto; el general cargaba
+ * todas las herramientas y los MCP (38 mil tokens) para escribir 100 palabras.
+ */
+const GUIONISTA: AgentDefinition = {
+  description: 'Escribe un solo archivo de texto (un guion corto, un texto) con Opus, de un resumen que le pasas con todo lo que necesita: datos, tono y reglas. No investiga ni lee archivos.',
+  prompt: 'Eres guionista. Escribe el archivo que te piden, en la ruta que te dan, con Write, siguiendo al pie de la letra las reglas del pedido (largo, tono, estructura). No investigues ni inventes datos: usa solo los que te dan. Al terminar, responde en una línea qué archivo escribiste y cuántas palabras tiene.',
+  tools: ['Write'],
+  model: 'opus',
+  maxTurns: 3,
+}
 /** La que vuelve a poner a trabajar a un subagente que ya acabó. */
 const DESPIERTA = 'SendMessage'
 /** Lo más que un subagente espera su sitio, en segundos. Después arranca igual: un agente de más es mejor que uno colgado. */
@@ -80,6 +92,32 @@ Al pulsar una, te llega su texto como mensaje del usuario. No lo uses en pregunt
 export const UN_VIDEO_POR_HILO = `En Sloth, cada hilo es un solo video. Si en un hilo donde ya hiciste o empezaste uno el usuario pide otro video distinto (otro tema, otro episodio, otra parte), no lo empieces aquí: dile en una línea que el siguiente video lo haga en un hilo nuevo, con «Nuevo chat» arriba a la izquierda y la card del estilo, y que este hilo se queda con el video que ya tiene. Los cambios al mismo video, sus shorts o sus subidas sí siguen aquí.`
 
 /**
+ * Los servidores MCP que `sinHerramientas` quita enteros (`mcp__openseo`, no `mcp__21st__bookmark`) y siguen encendidos.
+ * Claude Code los nombra en `mcpServerStatus` como el usuario (`claude.ai Claude Docs`) y en las herramientas, normalizados.
+ */
+export function aApagar(quitar: string[] | undefined, estado: Pick<McpServerStatus, 'name' | 'status'>[]): string[] {
+  const enteros = new Set((quitar ?? []).filter((q) => q.split('__').length === 2 && q.startsWith('mcp__')).map((q) => q.slice(5)))
+  return estado.filter((s) => s.status !== 'disabled' && enteros.has(s.name.replace(/[^a-zA-Z0-9_-]/g, '_'))).map((s) => s.name)
+}
+
+/**
+ * `disallowedTools` esconde las herramientas, pero el servidor se conecta igual y sus instrucciones entran en cada mensaje.
+ * Apagado, no. Claude Code lo recuerda en la carpeta del hilo (`disabledMcpServers` de su proyecto, en `.claude.json`):
+ * los siguientes hilos de la card ya arrancan sin él, y fuera de esa carpeta el servidor sigue como estaba.
+ */
+async function apagarServidores(run: Query, quitar: string[] | undefined) {
+  if (!quitar?.some((q) => q.startsWith('mcp__') && q.split('__').length === 2)) return
+  try {
+    for (let i = 0; i < 30; i++) {
+      const estado = await run.mcpServerStatus()
+      for (const nombre of aApagar(quitar, estado.filter((s) => s.status !== 'pending'))) await run.toggleMcpServer(nombre, false).catch(() => {})
+      if (estado.every((s) => s.status !== 'pending')) return
+      await new Promise((r) => setTimeout(r, 1000))
+    }
+  } catch {}
+}
+
+/**
  * Claude con el Agent SDK, como lo usa T3 Code: el mismo Claude Code, con tus skills, tu CLAUDE.md y sin pedir
  * permisos. Los mensajes del usuario entran por una cola, así la sesión sigue viva entre turnos.
  */
@@ -103,7 +141,12 @@ export function startClaude(opts: AgentOptions): AgentRun {
       permissionMode: 'bypassPermissions',
       allowDangerouslySkipPermissions: true,
       settingSources: ['user', 'project', 'local'],
+      // Lo que su card nunca usó, fuera del contexto: un servidor entero (`mcp__openseo`) o una herramienta.
+      disallowedTools: opts.sinHerramientas,
       systemPrompt: { type: 'preset', preset: 'claude_code', append: `${OPCIONES}\n\n${UN_VIDEO_POR_HILO}` },
+      // El guionista: Opus que escribe un solo archivo de un resumen, sin más herramientas que Write. Con todas, el que
+      // escribía el guion de un video arrancaba con 38 mil tokens y costaba $0,26 por 100 palabras (6-nov).
+      ...(deepseek ? {} : { agents: { guionista: GUIONISTA } }),
       // El navegador del agente, la voz de AI Studio, Google Flow y, en un canal de Ideas, sus herramientas (`parecidos`; en uno vertical,
       // también las de TikTok e Instagram): se suman a los MCP del usuario.
       mcpServers: { ...navegadorAgente(opts.lote, opts.hilo), ...mcpVoz(), ...mcpFlow(), ...herramientasIdeas(opts.cwd) },
@@ -117,6 +160,15 @@ export function startClaude(opts: AgentOptions): AgentRun {
           hooks: [async (entrada, id, { signal }) => {
             if (id && !entrada.agent_id) await agentes.pedir(id, signal)
             return {}
+          }]
+        }, {
+          // Esperar con `sleep` lo que corre de fondo es tiempo parado: se le dice cómo esperar sin perderlo.
+          matcher: 'Bash|PowerShell',
+          hooks: [async (entrada) => {
+            const { command, run_in_background } = (entrada as { tool_input?: { command?: unknown; run_in_background?: unknown } }).tool_input ?? {}
+            const por = frenarEspera(String(command ?? ''), run_in_background === true)
+            if (!por) return {}
+            return { hookSpecificOutput: { hookEventName: 'PreToolUse' as const, permissionDecision: 'deny' as const, permissionDecisionReason: por } }
           }]
         }],
         PostToolUse: [{
@@ -157,6 +209,7 @@ export function startClaude(opts: AgentOptions): AgentRun {
     } catch {}
   }
   state.measure = () => void measure()
+  void apagarServidores(run, opts.sinHerramientas)
 
   ;(async () => {
     let error = ''
@@ -312,6 +365,35 @@ function partialString(json: string, key: string): string | undefined {
       return JSON.parse(`"${s.slice(0, s.length - cut)}"`)
     } catch {}
   }
+}
+
+/**
+ * Cuánto espera un comando a ciegas, en segundos: el `sleep` o `Start-Sleep` más largo que lleve (0 si no lleva). Un
+ * agente que lanzó algo con `run_in_background` y esperaba su fin con `until …; do sleep 15; done` se quedó parado ese
+ * rato sin hacer nada (el tamal del 4 de noviembre): el aviso de Claude Code ya lo despierta al terminar.
+ */
+export function esperaACiegas(command: string): number {
+  let mas = 0
+  const por: Record<string, number> = { s: 1, m: 60, h: 3600 }
+  for (const m of command.matchAll(/\b(?:sleep|Start-Sleep)\s+(?:-(Seconds|s|Milliseconds|ms)\s+)?(\d+(?:\.\d+)?)([smh]?)(?![\w.])/gi)) {
+    const ms = /^m/i.test(m[1] ?? '')
+    mas = Math.max(mas, (Number(m[2]) * (por[m[3].toLowerCase()] ?? 1)) / (ms ? 1000 : 1))
+  }
+  return mas
+}
+/** Desde cuántos segundos `esperaACiegas` ya no deja correr el comando: esperar a que arranque un servidor (1–2 s) sí. */
+const CIEGAS = 5
+
+/**
+ * Si Sloth frena el comando, por qué. Una espera larga, siempre. Y de fondo, cualquier bucle que espere (`until grep …
+ * salida.output; do sleep 4; done`): lo que vigila ya avisa al terminar, y si lo que busca nunca sale, el vigilante sigue
+ * hasta su límite con el hilo «trabajando» (el de estafas del 4 de noviembre, 15 min de más).
+ */
+export function frenarEspera(command: string, deFondo: boolean): string | null {
+  const segundos = esperaACiegas(command)
+  const bucle = segundos > 0 && /\b(until|while|for|do)\b/i.test(command)
+  if (segundos < CIEGAS && !(deFondo && bucle)) return null
+  return `Sloth no deja esperar con sleep${bucle ? ' en un bucle' : ` (${segundos} s)`}. Lo que lanzaste con run_in_background te avisa solo al terminar, con su salida, y un subagente también: no lo vigiles. Si mientras tanto no tienes nada que hacer, termina tu mensaje y su aviso te despierta.`
 }
 
 /**

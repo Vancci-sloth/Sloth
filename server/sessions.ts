@@ -110,6 +110,8 @@ export class Sessions {
   private compactando = new Set<string>()
   /** Si el hilo hace un video: lo decide su card, que este módulo no conoce. */
   esVideo: (meta: SessionMeta) => boolean = () => false
+  /** Lo que su card no le ofrece al agente (`Card.sinHerramientas`). */
+  sinHerramientas: (meta: SessionMeta) => string[] | undefined = () => undefined
 
   constructor(
     private dir: string,
@@ -623,6 +625,7 @@ export class Sessions {
       lote: !!meta.lote,
       hilo: meta.id,
       conLlave,
+      sinHerramientas: this.sinHerramientas(meta),
       onEvent: (event) => this.emit(meta.id, event),
       onDraft: (draft) => this.pushDraft(meta.id, draft),
       // Un proceso muerto no recibe nada: se olvida, y el siguiente mensaje abre otro que retoma la sesión. Si se cayó,

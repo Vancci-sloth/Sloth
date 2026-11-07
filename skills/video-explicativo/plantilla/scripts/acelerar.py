@@ -1,10 +1,11 @@
 """
-Acerca la voz al ritmo del estilo (224 palabras por minuto): acorta las pausas largas y la acelera un poco.
+Acerca la voz al ritmo del estilo (de 180 a 220 palabras por minuto): acorta las pausas largas y la acelera un poco.
 
     python -I -B scripts/acelerar.py <voz.wav> <voz.json de esa voz> [--tempo 1.12] [--pausa 0.18]
 
 Va después de alinear.py: con los tiempos por palabra de esa voz, cada hueco de más de `pausa` segundos se acorta a
-`pausa`, cortando solo dentro del tramo callado que mide el propio audio (así no se come el final de una palabra que el
+`pausa` dentro de una frase, a PAUSA_COMA tras una coma y a PAUSA_PUNTO tras un punto: con 0.18 en todas, el remate
+llegaba pegado a lo anterior y no daba risa (el de la paquetería: 0.24 s entre frases; los que sí, 0.35 o más), cortando solo dentro del tramo callado que mide el propio audio (así no se come el final de una palabra que el
 alineador cerró antes de tiempo). Las uniones llevan un fundido de 8 ms. Luego ffmpeg la acelera con `atempo`, que no
 cambia el tono.
 
@@ -26,6 +27,8 @@ from alinear import BASE, nivel_por_cuadro  # noqa: E402
 
 SR = 48000
 RESPIRO = 20  # dB bajo la voz: lo que queda debajo (silencio y respiraciones) se puede quitar
+PAUSA_PUNTO = 0.30  # tras . ! ?: ~0.38 s medidos con el tempo, el respiro antes del remate (0.40 dejó el bostezo a 177 por minuto)
+PAUSA_COMA = 0.20  # tras , : ;
 
 
 def leer(wav: Path) -> np.ndarray:
@@ -40,7 +43,9 @@ def pausas(x: np.ndarray, palabras: list[dict], pausa: float) -> list[tuple[int,
     umbral = np.percentile(rms[rms > 1e-4], 70) * 10 ** (-RESPIRO / 20)
     quitar = []
     for a, b in zip(palabras, palabras[1:]):
-        if b["s"] - a["e"] <= pausa + 0.08:
+        fin = a["w"].rstrip("»\"')")[-1:]
+        tope = PAUSA_PUNTO if fin in ".!?" else PAUSA_COMA if fin in ",:;" else pausa
+        if b["s"] - a["e"] <= tope + 0.08:
             continue
         i0, i1 = int(a["e"] * SR), int(b["s"] * SR)
         callado = rms[i0:i1] < umbral
@@ -48,7 +53,7 @@ def pausas(x: np.ndarray, palabras: list[dict], pausa: float) -> list[tuple[int,
             continue
         bordes = np.flatnonzero(np.diff(np.r_[0, callado.astype(np.int8), 0]))
         c0, c1 = max(zip(bordes[::2], bordes[1::2]), key=lambda t: t[1] - t[0])
-        sobra = (c1 - c0) / SR - pausa
+        sobra = (c1 - c0) / SR - tope
         if sobra <= 0.03:
             continue
         medio = i0 + (c0 + c1) // 2

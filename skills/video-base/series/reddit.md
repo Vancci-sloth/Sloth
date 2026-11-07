@@ -2,7 +2,7 @@
 
 Historias reales de gente a la que algo del nicho del canal le salió muy mal por un error (perdió dinero, tiempo o
 algo que no vuelve), sacadas de Reddit y contadas con nuestras palabras. Es «una historia» (en video-explicativo, ese
-género de su `GUION.md`).
+género de su `SKILL.md`).
 
 ## El tema, si no te dieron uno
 

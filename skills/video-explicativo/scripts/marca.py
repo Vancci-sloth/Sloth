@@ -39,7 +39,14 @@ REDES = ("telegram", "whatsapp", "instagram", "tiktok", "youtube", "x", "web", "
 def carpeta_de_la_card(aqui: Path | None = None) -> Path:
     """La carpeta donde se crean los proyectos: la actual, o la de arriba si se está dentro de un proyecto."""
     aqui = aqui or Path.cwd()
-    return aqui.parent if (aqui / "remotion.config.ts").exists() else aqui
+    carpeta = aqui.parent if (aqui / "remotion.config.ts").exists() else aqui
+    # Desde otra carpeta (el agente hizo `cd` a las skills) no hay marca y se le preguntaba todo otra vez al usuario: los
+    # dedos del 6-nov se pararon a pedir el nicho y la red que ya estaban en marca.json.
+    raiz = SKILL.parent.resolve()
+    if carpeta.resolve() == raiz or raiz in carpeta.resolve().parents:
+        sys.exit(f"✗ {carpeta} es la de las skills, no la de la card: corre marca.py desde la "
+                 "carpeta donde se crean los proyectos (la de tu sesión), sin `cd` a otro lado.")
+    return carpeta
 
 
 def leer(carpeta: Path) -> dict:

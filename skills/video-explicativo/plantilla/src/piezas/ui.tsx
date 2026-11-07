@@ -1,13 +1,19 @@
-// Las piezas 2D: cómo entra cada cosa, la tarjeta, el crédito de la fuente, el contador, el resaltado, el subrayado y
+// Las piezas 2D: cómo entra cada cosa (y una tras otra), la tarjeta, el crédito de la fuente, el contador, el resaltado, el subrayado y
 // la flecha. Todas toman los colores del tema del capítulo (TemaContexto, lo pone Video.tsx).
 import React, { createContext, useContext, useLayoutEffect, useRef, useState } from "react";
 import { AbsoluteFill, Easing, interpolate, spring, useCurrentFrame, useVideoConfig } from "remotion";
-import { ALTO, ANCHO, COLORES, LETRA, MONO, ROJO, Tema } from "../tema";
+import { ALTO, ANCHO, COLORES, LETRA, ROJO, Tema, ZONA } from "../tema";
 
 export const TemaContexto = createContext<Tema>("oscuro");
+/**
+ * Los colores del capítulo en que está (oscuro o claro, de `COLORES` en tema.ts), para una pieza propia: `fondo`,
+ * `texto`, `tenue`, `tarjeta`, `tarjeta2`, `borde`, `sombra` y `solido` (`const c = useColores()`).
+ */
 export const useColores = () => COLORES[useContext(TemaContexto)];
 
+/** Las opciones de `interpolate` para que no se pase de sus extremos: `interpolate(f, [a, b], [0, 1], sujeta)`. */
 export const sujeta = { extrapolateLeft: "clamp", extrapolateRight: "clamp" } as const;
+/** La curva con que entra lo de todos los videos: rápido al empezar y suave al llegar (`easing: suave`). */
 export const suave = Easing.bezier(0.2, 0.7, 0.2, 1);
 
 /** Un giro de -max a max grados que depende de `semilla`, no del azar: el mismo en cada render (el perro chueco). */
@@ -56,6 +62,7 @@ export const Aparece: React.FC<{
   );
 };
 
+/** La caja de una tarjeta, con el fondo, el borde y la sombra del tema: para armar una tarjeta propia. */
 export const Tarjeta: React.FC<{ ancho?: number; style?: React.CSSProperties; children: React.ReactNode }> = ({ ancho, style, children }) => {
   const c = useColores();
   return (
@@ -106,19 +113,6 @@ export const Resaltado: React.FC<{ en: number; color?: string; children: React.R
   return (
     <span style={{ backgroundImage: `linear-gradient(${color}, ${color})`, backgroundSize: `${p}% 100%`, backgroundRepeat: "no-repeat", borderRadius: 4, padding: "0 2px" }}>
       {children}
-    </span>
-  );
-};
-
-/** Texto de código o de terminal que se escribe letra por letra. */
-export const Tecleo: React.FC<{ texto: string; desde: number; hasta: number; style?: React.CSSProperties }> = ({ texto, desde, hasta, style }) => {
-  const f = useCurrentFrame();
-  const n = Math.round(interpolate(f, [desde, hasta], [0, texto.length], sujeta));
-  const cursor = f >= desde && (n < texto.length || Math.floor(f / 8) % 2 === 0);
-  return (
-    <span style={{ fontFamily: MONO, whiteSpace: "pre", ...style }}>
-      {texto.slice(0, n)}
-      {cursor ? <span style={{ opacity: 0.8 }}>▍</span> : null}
     </span>
   );
 };
@@ -322,3 +316,32 @@ export const Entra: React.FC<{ en: number; sale?: number; desde?: { y?: number; 
     </div>
   );
 };
+
+/**
+ * Una cosa a la vez en la pantalla: cada una entra en su `en` y sale cuando entra la siguiente (la última, en `hasta`).
+ * Para una lista de datos, de pasos o de nombres que se van diciendo. Va arriba de la zona de la escena; `style` la mueve.
+ */
+export const Secuencia: React.FC<{ items: { en: number; nodo: React.ReactNode }[]; hasta: number; style?: React.CSSProperties }> = ({ items, hasta, style }) => (
+  <>
+    {items.map((it, i) => (
+      <Aparece
+        key={i}
+        en={it.en}
+        sale={items[i + 1]?.en ?? hasta}
+        style={{
+          left: ZONA.escena.izquierda,
+          width: ZONA.escena.derecha - ZONA.escena.izquierda,
+          top: ZONA.escena.arriba + 6,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: 18,
+          flexWrap: "wrap",
+          ...style,
+        }}
+      >
+        {it.nodo}
+      </Aparece>
+    ))}
+  </>
+);

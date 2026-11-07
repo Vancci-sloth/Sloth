@@ -1,44 +1,36 @@
-// Lo 2D que comparten los capítulos: el precio que la moneda lleva pegado (el indicador que cambia con la historia),
-// los botones que dicen que no (parpadean y se quedan rojos), el cursor que pulsa, el número en su píldora, el hueco
-// que marca un objeto 3D para que una Flecha lo encuentre, y el cierre: la cuenta o el canal al que manda el video, en
-// su red (`MARCA`: la tarjeta, y en chiquito en el celular del personaje). Si el cierre es otro (comentar una palabra),
-// se hace su pieza.
+// Lo 2D que comparten los capítulos, en cualquier video: el indicador de cualquier tema (lo que cambia con la
+// historia), los botones que dicen que no (parpadean y se quedan rojos), el cursor que pulsa, el número
+// en su píldora, el hueco que marca un objeto 3D para que una Flecha lo encuentre, y el cierre: la cuenta o el canal al
+// que manda el video, en su red (`MARCA`: la tarjeta, y en chiquito en el celular del personaje). Si el cierre es otro
+// (comentar una palabra), se hace su pieza.
 import React from "react";
 import { interpolate, interpolateColors, useCurrentFrame } from "remotion";
 import { K, proyectar, useCamara, V3 } from "../mundo/camara";
 import { EnMundo } from "../mundo/EnMundo";
-import { monedaEn, precioEn } from "../mundo/guion";
-import { Pildora, useNegado } from "../piezas/diagrama";
+import { type ConSimbolo, Pildora, Simbolo, useNegado } from "../piezas/diagrama";
 import { Glifo } from "../piezas/iconos";
 import { MARCA } from "../marca";
 import { colorDeRed, TarjetaCierre } from "../piezas/tarjetas";
 import { Ancla, Aparece, Pulso, sujeta, suave, useColores } from "../piezas/ui";
 import { HORIZONTAL, LETRA, MONO, ROJO, ZONA } from "../tema";
 
-const dinero = (v: number) => `$${v.toFixed(2)}`;
+/** Lo que un `Indicador` enseña en un cuadro: dónde (un punto del mundo), qué y cuánto se ve (0–1). */
+export type Lectura = { p: V3; texto: string; nota?: string; color?: string; visible: number };
 
-/** El precio pegado debajo de la moneda, cuando la historia habla de él (precioEn en guion.ts). */
-export const PrecioPegado: React.FC = () => {
+/**
+ * El indicador de cualquier tema (la temperatura, la población, el año, los usuarios), pegado a su objeto y cambiando
+ * con la historia: `de(f)` es una función de guion.ts que dice qué enseña en cada cuadro, o `null` cuando no está.
+ */
+export const Indicador: React.FC<{ de: (f: number) => Lectura | null; tam?: number; origen?: [number, number] }> = ({ de, tam = 56, origen = [0.5, 1] }) => {
   const f = useCurrentFrame();
   const c = useColores();
-  const p = precioEn(f);
-  const m = monedaEn(f).e;
-  if (!p || p.visible <= 0.01 || m.escala < 0.05) return null;
-  const grande = p.tam >= 120;
-  const color = p.rojo ? ROJO : c.texto;
+  const l = de(f);
+  if (!l || l.visible <= 0.01) return null;
   return (
-    // En el gancho el precio baja un poco más: entre la moneda y él se ve el montón de cubos.
-    <EnMundo p={[m.pos[0], m.pos[1] - m.escala * 1.12, m.pos[2]]} origen={[0.5, 0]} desplaza={[0, grande ? 70 : 0]}>
-      <div
-        style={{
-          opacity: p.visible,
-          textAlign: "center",
-          fontFamily: LETRA,
-          ...(grande ? {} : { background: c.tarjeta, border: `2px solid ${c.borde}`, borderRadius: 28, boxShadow: c.sombra, padding: "14px 30px 16px" }),
-        }}
-      >
-        <div style={{ fontSize: p.tam, fontWeight: 800, letterSpacing: "-0.04em", lineHeight: 1, color, fontVariantNumeric: "tabular-nums" }}>{dinero(p.valor)}</div>
-        <div style={{ fontSize: grande ? 34 : 26, fontWeight: 600, color: c.tenue, marginTop: grande ? 12 : 6 }}>{p.nota}</div>
+    <EnMundo p={l.p} origen={origen}>
+      <div style={{ opacity: l.visible, textAlign: "center", fontFamily: LETRA, background: c.tarjeta, border: `2px solid ${l.color ?? c.borde}`, borderRadius: 28, boxShadow: c.sombra, padding: "12px 28px 14px" }}>
+        <div style={{ fontFamily: MONO, fontSize: tam, fontWeight: 700, lineHeight: 1, color: l.color ?? c.texto, fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>{l.texto}</div>
+        {l.nota ? <div style={{ fontSize: tam * 0.46, fontWeight: 600, color: c.tenue, marginTop: 6 }}>{l.nota}</div> : null}
       </div>
     </EnMundo>
   );
@@ -87,8 +79,8 @@ export const Cursor: React.FC<{ de: [number, number]; a: [number, number]; desde
   );
 };
 
-/** Un número grande en su píldora, del color de lo que cuenta. */
-export const Numero: React.FC<{ color: string; tam?: number; children: React.ReactNode }> = ({ color, tam = 56, children }) => {
+/** Un número grande en su píldora, del color de lo que cuenta, con su ícono o logo delante. */
+export const Numero: React.FC<ConSimbolo & { color: string; tam?: number; children: React.ReactNode }> = ({ color, tam = 56, children, ...simbolo }) => {
   const c = useColores();
   return (
     <div
@@ -109,6 +101,7 @@ export const Numero: React.FC<{ color: string; tam?: number; children: React.Rea
         fontVariantNumeric: "tabular-nums",
       }}
     >
+      <Simbolo {...simbolo} tam={tam} />
       {children}
     </div>
   );
@@ -137,7 +130,8 @@ export const PantallaCanal: React.FC<{ nombre?: string; avatar?: string }> = ({ 
  * El cierre: la tarjeta de la cuenta o el canal de `MARCA` (su red, su nombre y su foto) entra en `pero` («pero si
  * quieres enterarte…»), el botón se pulsa en `unete` y en `enlace` sale dónde está («en mi perfil», o la página). Va
  * fija en la pantalla, arriba del personaje en vertical y a su izquierda en horizontal (él enseña el canal en su
- * celular). Sin red de cierre no dibuja nada.
+ * celular). Sin red de cierre no dibuja nada. Va en el capítulo del cierre, con las palabras de la frase de la marca:
+ * `<Canal pero={en("pero si quieres")} unete={en("únete")} enlace={en("el enlace")} />`.
  */
 export const Canal: React.FC<{ nombre?: string; avatar?: string; pero: number; unete: number; enlace: number }> = ({ nombre = MARCA.nombre, avatar = MARCA.avatar, pero, unete, enlace }) => {
   const red = MARCA.red;
@@ -164,7 +158,7 @@ export const Canal: React.FC<{ nombre?: string; avatar?: string; pero: number; u
 
 /**
  * Un hueco invisible del tamaño de algo 3D (centro `p` y `radio` en metros), con su `Ancla`: para que una Flecha llegue
- * a un objeto del mundo (la moneda, el bloque que falta) sin coordenadas a mano. Va solo mientras la flecha lo necesita.
+ * a un objeto del mundo (el protagonista, el bloque que falta) sin coordenadas a mano. Va solo mientras la flecha lo necesita.
  */
 export const Hueco: React.FC<{ id: string; p: V3; radio: number }> = ({ id, p, radio }) => {
   const cam = useCamara();

@@ -32,6 +32,8 @@ export interface AgentOptions {
   hilo?: string
   /** Codex: si trabaja con la llave de API o con la cuenta de ChatGPT. Sin él, lo que esté elegido en Opciones. */
   conLlave?: boolean
+  /** Claude: las herramientas y los MCP que no se le ofrecen (`Card.sinHerramientas`). */
+  sinHerramientas?: string[]
   onEvent(event: AgentEvent): void
   onProviderSession(id: string): void
   /** Lo que lleva escrito un `Write` antes de terminar. Opcional: no todo proveedor lo da. */

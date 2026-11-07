@@ -10,6 +10,7 @@ import datos from "../datos/personaje.json";
 import { BOCA } from "../tiempo";
 import { ALTO, ZONA } from "../tema";
 import { chueco } from "./ui";
+import { esquinaEn, REMATES } from "../director/guion";
 
 type Bocas = { cerrada: string; abierta?: string };
 type Ancla = { x: number; y: number; ancho: number; alto: number; radio: number };
@@ -27,8 +28,26 @@ const voz = (f: number) => {
   return suma / 4;
 };
 
-/** ¿Boca abierta? La sílaba que suena en este cuadro o el siguiente (la boca se adelanta un poco al sonido). */
-const abierta = (f: number) => ((BOCA[f] ?? 0) + (BOCA[f + 1] ?? 0)) / 2 > 0.3;
+/**
+ * ¿Boca abierta en cada cuadro? La sílaba que suena en este cuadro o el siguiente (la boca se adelanta un poco al
+ * sonido). Abre con más voz de la que la cierra y cada estado dura al menos dos cuadros: sin eso, la boca abría o cerraba
+ * un solo cuadro de 16 a 48 veces por video, y se veía como un parpadeo.
+ */
+const ABIERTA = (() => {
+  const fuera: boolean[] = [];
+  let abre = false;
+  let desde = -2;
+  for (let f = 0; f < BOCA.length; f++) {
+    const nivel = ((BOCA[f] ?? 0) + (BOCA[f + 1] ?? 0)) / 2;
+    if ((abre ? nivel < 0.2 : nivel > 0.35) && f - desde >= 2) {
+      abre = !abre;
+      desde = f;
+    }
+    fuera.push(abre);
+  }
+  return fuera;
+})();
+const abierta = (f: number) => ABIERTA[f] ?? false;
 
 export const Personaje: React.FC<{ tramos: Tramo[]; entra: number; sale?: number }> = ({ tramos, entra, sale }) => {
   const f = useCurrentFrame();
@@ -50,25 +69,36 @@ export const Personaje: React.FC<{ tramos: Tramo[]; entra: number; sale?: number
 
   // Cada pose nueva se pega con un golpe: llega más grande y girada, y se asienta.
   const golpe = actual > 0 ? spring({ frame: f - tramo.desde, fps, config: { damping: 10, stiffness: 260, mass: 0.5 } }) : 1;
-  const giro = chueco(actual + 3, 3) + (1 - golpe) * 6;
+  // Las poses de un remate (`REMATES`) pegan más fuerte: más grandes y más giradas al llegar.
+  const fuerte = REMATES.has(tramo.pose) ? 2 : 1;
+  const giro = chueco(actual + 3, 3) + (1 - golpe) * 6 * fuerte;
   const nivel = voz(f);
-  const escala = interpolate(golpe, [0, 1], [1.12, 1]) * (1 + nivel * 0.035);
-  const rebote = -nivel * 16;
+  // Y en un remate, el zoom a su cara: crece y sube un instante (~0.8 s) y vuelve, como el corte al que reacciona en un
+  // video de humor.
+  // En el gancho no: taparía la foto o la cosa del primer cuadro, que es lo que tiene que verse.
+  const zoom = actual > 0 && REMATES.has(tramo.pose) && !tramo.objeto ? interpolate(f - tramo.desde, [0, 5, 20, 28], [0, 1, 1, 0], { extrapolateLeft: "clamp", extrapolateRight: "clamp", easing: Easing.inOut(Easing.cubic) }) : 0;
+  // 1.18 y 70 px: con 1.32 y 120 tapaba lo que se estaba explicando (el agua del 5 de noviembre).
+  const escala = interpolate(golpe, [0, 1], [1 + 0.12 * fuerte, 1]) * (1 + nivel * 0.035) * (1 + 0.18 * zoom);
+  const rebote = -nivel * 16 - zoom * 70;
 
   const xDe = (t: Tramo) => t.x ?? ZONA.personaje.x;
-  const x = previo ? interpolate(paso, [0, 1], [xDe(previo), xDe(tramo)]) : xDe(tramo);
+  const enSitio = previo ? interpolate(paso, [0, 1], [xDe(previo), xDe(tramo)]) : xDe(tramo);
+  // En los primeros planos, chico en la esquina de abajo a la derecha (esquinaEn del director).
+  const rincon = esquinaEn(f);
+  const x = enSitio + rincon * (ALTO > 1200 ? 330 : 120);
   const ancla = ANCLAS[tramo.pose];
   const foto = bocas.abierta && abierta(f) ? bocas.abierta : bocas.cerrada;
 
   return (
     <div
+      data-perro
       style={{
         position: "absolute",
         left: x - lado / 2,
         top: y + rebote,
         width: lado,
         height: lado,
-        transform: `rotate(${giro}deg) scale(${escala})`,
+        transform: `translateY(${rincon * lado * 0.06}px) rotate(${giro}deg) scale(${escala * (1 - 0.32 * rincon)})`,
         transformOrigin: "50% 100%",
         filter: "drop-shadow(0 18px 24px rgba(0,0,0,0.5))",
       }}

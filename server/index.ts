@@ -117,6 +117,7 @@ const conEtapas = (id: string) => !!cards().find((c) => c.id === sessions.meta(i
 sessions.esVideo = (meta) => !!cards().find((c) => c.id === meta.cardId)?.etapas?.some((e) => e.fase)
 // Con otra cuenta de Claude, los hilos quietos sueltan su Claude Code: el siguiente mensaje ya va con ella.
 alEntrarClaude(() => sessions.soltarQuietos('claude'))
+sessions.sinHerramientas = (meta) => cards().find((c) => c.id === meta.cardId)?.sinHerramientas
 // Mientras un video trabaja, Whisper se queda cargado: el primero que empieza lo carga, antes de que sus agentes llenen la memoria.
 setInterval(() => {
   if (sessions.videosTrabajando()) void mantenerVoz(SKILLS)

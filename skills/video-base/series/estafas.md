@@ -2,7 +2,7 @@
 
 Una estafa del nicho del canal que circula hoy, desarmada pieza por pieza para que el que lo ve
 la reconozca y se la mande a quien le pueda caer. Es «explicar algo» con forma de alerta (en video-explicativo, ese
-género de su `GUION.md`).
+género de su `SKILL.md`).
 
 ## El tema, si no te dieron uno
 

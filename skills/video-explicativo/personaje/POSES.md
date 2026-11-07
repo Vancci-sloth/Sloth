@@ -40,7 +40,7 @@ lienzo, y el radio de las esquinas), con `objeto: { nodo: … }` en el tramo. Cu
 
 ## Una pose nueva
 
-Con Codex y ChatGPT conectado, o con Flow si lo trae la línea `Imágenes:` (`video-base/FLOW.md`) ("Imágenes con Codex" en `SKILL.md`). Los pedidos, en
+Con Codex y ChatGPT conectado, o con Flow si lo trae la línea `Imágenes:` (`video-base/FLOW.md`) (`IMAGENES.md`). Los pedidos, en
 `pedidos/`; la foto de referencia y la descripción son las del personaje (el perro: `perro.png` y la de
 `pedidos/ejemplo-poses.txt`; uno propio: `base.png` y `descripcion.txt` de su carpeta):
 

@@ -24,6 +24,8 @@ nada de lo que recibe la gente. Varias ideas razonables de abajo no sirvieron: p
 - **Una computadora lenta:** `Emulation.setCPUThrottlingRate` (4× y 6×). No simula un disco lento ni poca memoria.
 - `percentCPUUsage` de Electron se reparte entre todos los núcleos: 3 % con 12 núcleos es un tercio de uno.
 - Windows no pinta una ventana tapada: el primer pintado puede no llegar. Usa cuándo se monta `#root`.
+- **Cuánto tarda un video y en qué:** `npm run medir-videos -- --estilo <skill> --fases`, de las transcripciones de Claude
+  y de Codex, de esta copia y de la app instalada. El plan para bajarlo: `docs/plan-videos-rapidos.md`.
 
 ## Lo que ya se hizo (31 de octubre, Windows, 42 hilos reales)
 

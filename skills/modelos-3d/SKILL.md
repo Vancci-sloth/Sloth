@@ -52,6 +52,11 @@ Se escribe directo en `src/modelos/<id>.tsx` del proyecto, con estas reglas, par
   valores por omisión que se vean bien.
 - **No se mueve solo.** Sus animaciones son funciones del cuadro (`useCurrentFrame`) y empiezan en el cuadro que le
   pasen (`abre`, `aparece`); sin él, quieto. Lo que pueda quedar de fondo usa `conGris` (pasa a gris y se apaga).
+- **Lo que existe se anima como en la vida real.** Si hace una acción que existe (un martillo que pega, agua que
+  hierve, una broca que perfora, una puerta que se abre), mira antes un video real de esa acción y cópiale el ritmo,
+  el peso, la anticipación y el rebote: baja uno con `fuente.py` de la skill video-base, junto a esta (`python -B …/video-base/scripts/fuente.py <url> fuentes/ref-<id>`),
+  y saca sus cuadros (`ffmpeg -i fuentes/ref-<id>/video.mp4 -vf fps=10,scale=200:-1,tile=8x4 ref.jpg`). Sin eso, todo se
+  mueve con la misma curva y se nota hecho a máquina.
 - **No frena el render**: nada de `delayRender` propio. Las letras ya las carga el video (`tema.ts`, con su espera); un
   texto en un lienzo mira `document.fonts.check` y se vuelve a dibujar cuando llega la letra. En nuevo-10 uno esperaba
   una letra que nunca llegó y tumbó el borrador.
@@ -91,6 +96,12 @@ Su ficha es lo que el usuario lee en Sloth para decidir si le sirve, así que ca
   primero que se lee para saber si sirve.
 - `--etiquetas`: las palabras con que alguien lo buscaría, en español y sin miedo a repetir: la cosa, sus sinónimos y
   lo que representó en el video.
+- `--caja`: «ancho,alto,fondo», solo si es mucho más alto que ancho (un celular, una botella, un cohete): con ella el
+  video lo encuadra por su silueta; sin ella, por una esfera, y en vertical queda en un tercio del cuadro.
+- `--actua`: la prop que lo hace moverse solo todo el video mientras vale más de 0 (`pica`, `late`, `respira`): los
+  videos lo usan de protagonista y lo encienden desde el primer cuadro. Toda pieza nueva que pueda, que la tenga.
+- `--frente`: si tiene cara que se lee de frente (un reloj, un celular, una persona, un aparato): el video no lo
+  enseña de lado, gira lo justo para verlo de frente o de tres cuartos. Su cara mira a +z.
 
 Revisa que solo importe lo permitido, lo copia aquí con sus archivos, escribe su `modelo.json` (además: lo que
 exporta, qué modelos usa, sus íconos, de qué video salió) y saca su vista con la tarjeta de video (necesita el

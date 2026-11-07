@@ -1,76 +1,20 @@
 // Los íconos: SVG de Phosphor (@phosphor-icons/react), nunca emojis (se ven mal). `Glifo` es el ícono suelto, del color
 // del texto, para ir junto a un número; `Icono` es el grande en su azulejo de color, como el ícono de una app: lo que en
-// un diagrama sería «Validadores», «Tú» o «Apps». Para uno nuevo, se importa aquí y se suma a ICONOS.
-import {
-  ArrowFatUp,
-  ArrowRight,
-  ArrowsLeftRight,
-  ArrowUUpLeft,
-  Bank,
-  ChartLineDown,
-  ChatCircle,
-  Check,
-  Gift,
-  Globe,
-  HandCoins,
-  Handshake,
-  InstagramLogo,
-  Link,
-  LockSimple,
-  LockSimpleOpen,
-  Printer,
-  ShieldCheck,
-  Skull,
-  SquaresFour,
-  TelegramLogo,
-  TiktokLogo,
-  TrendDown,
-  User,
-  UsersThree,
-  Warning,
-  WhatsappLogo,
-  XLogo,
-  YoutubeLogo,
-} from "@phosphor-icons/react/ssr";
-import type { IconWeight } from "@phosphor-icons/react";
+// un diagrama sería «Validadores», «Tú» o «Apps». Valen todos los de Phosphor por su nombre (`LockSimpleOpen`,
+// `TiktokLogo`, `Thermometer`: https://phosphoricons.com), sin importarlos uno por uno.
+import * as Phosphor from "@phosphor-icons/react/ssr";
+import type { Icon, IconWeight } from "@phosphor-icons/react";
 import React from "react";
 import { interpolateColors } from "remotion";
 import { useColores } from "./ui";
 
-export const ICONOS = {
-  ArrowFatUp,
-  ArrowRight,
-  ArrowsLeftRight,
-  ArrowUUpLeft,
-  Bank,
-  ChartLineDown,
-  ChatCircle,
-  Check,
-  Gift,
-  Globe,
-  HandCoins,
-  Handshake,
-  InstagramLogo,
-  Link,
-  LockSimple,
-  LockSimpleOpen,
-  Printer,
-  ShieldCheck,
-  Skull,
-  SquaresFour,
-  TelegramLogo,
-  TiktokLogo,
-  TrendDown,
-  User,
-  UsersThree,
-  Warning,
-  WhatsappLogo,
-  XLogo,
-  YoutubeLogo,
-};
-export type NombreIcono = keyof typeof ICONOS;
+type Todos = typeof Phosphor;
+/** El nombre de un ícono de Phosphor como lo exporta su paquete, en PascalCase: "ShieldCheck", "Warning", "Syringe". */
+export type NombreIcono = { [K in keyof Todos]: Todos[K] extends Icon ? K : never }[keyof Todos];
+export const ICONOS = Phosphor as unknown as Record<NombreIcono, Icon>;
 
-export const esIcono = (nombre: string): nombre is NombreIcono => nombre in ICONOS;
+/** Si `nombre` es un ícono de Phosphor que existe: para no adivinarlo antes de usarlo. */
+export const esIcono = (nombre: string): nombre is NombreIcono => nombre !== "SSRBase" && /^[A-Z]\w*$/.test(nombre) && nombre in Phosphor;
 
 /** El ícono suelto, del color de lo que lo rodea (o `color`). */
 export const Glifo: React.FC<{ nombre: NombreIcono; tam: number; color?: string; peso?: IconWeight; style?: React.CSSProperties }> = ({

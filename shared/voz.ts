@@ -143,13 +143,15 @@ export function segundosWav(b: Uint8Array): number | null {
 }
 
 /**
- * Lo que se narra de un guion en Markdown, como lo copia «Copiar» de Sloth: sin títulos, encabezados ni comentarios, y
- * cada párrafo en un renglón.
+ * Lo que se narra de un guion en Markdown, lo mismo que copia «Copiar» de Sloth: sin títulos, encabezados, comentarios
+ * ni la línea del corte de datos del video explicativo (la que se salta su `subtitulos.py`), y cada párrafo en un
+ * renglón. La voz la leía en alto cuando no se quitaba aquí (el de estafas del 3 de noviembre).
  */
 export function textoParaVoz(md: string): string {
   return md
     .replace(/<!--[\s\S]*?-->/g, '')
     .replace(/^#+ .*$/gm, '')
+    .replace(/^\s*(Corte de datos|Datos al)\b.*$/gm, '')
     .split(/\n\s*\n/)
     .map((p) => p.split(/\s+/).join(' ').trim())
     .filter(Boolean)

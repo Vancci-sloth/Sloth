@@ -47,7 +47,13 @@ const piezasDe = (url: string, datos: SVGResult, capa: number): Pieza[] => {
   return piezas;
 };
 
-export const Icono3D: React.FC<{ icono: string; color?: string; degradado?: string; gris?: number; capa?: number }> = ({ icono, color, degradado = "#f5a524", gris = 0, capa = 0.03 }) => {
+/**
+ * Un ícono de Phosphor (`modelos.py iconos <nombre>` lo deja en public/iconos) o un SVG de public, extruido, de 1 de alto.
+ * `color` lo pinta todo (un ícono); sin él, cada trazo con el suyo (un logo), y lo que viene en degradado toma
+ * `degradado`. `gris` (0–1) lo pasa a gris y `apaga` (0–1) lo funde con `fondo`. `capa`: cuánto va cada trazo delante del anterior (0.03; un logo de muchas piezas
+ * que no se enciman, 0.002). Mira a +z; se coloca, escala y gira con el `EnEscena` que lo envuelve.
+ */
+export const Icono3D: React.FC<{ icono: string; color?: string; degradado?: string; gris?: number; apaga?: number; fondo?: string; capa?: number }> = ({ icono, color, degradado = "#f5a524", gris = 0, apaga = 0, fondo = "#000000", capa = 0.03 }) => {
   const url = staticFile(icono.endsWith(".svg") ? icono : `iconos/${icono}.svg`);
   const datos = useLoader(SVGLoader, url);
   const lista = piezasDe(url, datos, capa);
@@ -59,7 +65,11 @@ export const Icono3D: React.FC<{ icono: string; color?: string; degradado?: stri
       }),
     [lista, color, degradado],
   );
-  mats.forEach((x) => (x.gris.value = gris));
+  mats.forEach((x) => {
+    x.gris.value = gris;
+    x.apaga.value = apaga;
+    x.fondo.value.set(fondo);
+  });
   return (
     <group>
       {lista.map((p, i) => (

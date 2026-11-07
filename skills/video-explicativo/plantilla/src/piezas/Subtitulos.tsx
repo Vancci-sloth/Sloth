@@ -6,6 +6,7 @@
 import { measureText } from "@remotion/layout-utils";
 import React from "react";
 import { Easing, Img, interpolate, staticFile, useCurrentFrame } from "remotion";
+import datos from "../datos/momentos.json";
 import { cuadro, FRASES, PALABRAS } from "../tiempo";
 import { AZUL, LETRA, ZONA } from "../tema";
 import { esIcono, Glifo } from "./iconos";
@@ -33,11 +34,18 @@ const IconoPalabra: React.FC<{ valor: string; color: string }> = ({ valor, color
   </span>
 );
 
+// Lo que carga sentido, en negra; el relleno, más fino y algo transparente, del mismo color: en gris (#8a8a8a sobre
+// casi negro) no se leía en el celular.
+const PESO = { clave: 800, relleno: 600 };
+const RELLENO = 0.74;
+
 const medir = (texto: string, clave: boolean) =>
-  measureText({ text: texto, fontFamily: LETRA, fontSize: TAM, fontWeight: clave ? "700" : "500", letterSpacing: "-0.01em" })
+  measureText({ text: texto, fontFamily: LETRA, fontSize: TAM, fontWeight: String(clave ? PESO.clave : PESO.relleno), letterSpacing: "-0.01em" })
     .width;
 
 const inicio = (i: number) => cuadro(PALABRAS[i].s) - ANTES;
+
+const CON_CONTADOR = Boolean((datos as { contador?: unknown }).contador);
 
 export const Subtitulos: React.FC<{ texto: string; tenue: string }> = ({ texto, tenue }) => {
   const f = useCurrentFrame();
@@ -74,13 +82,14 @@ export const Subtitulos: React.FC<{ texto: string; tenue: string }> = ({ texto, 
         let visible = 0;
         renglon.forEach((fi, k) => (visible += avance(fi) * (fi.ancho + (k ? ESPACIO : 0))));
         let x = ZONA.texto.x - visible / 2;
-        const y = ZONA.texto.centro - TAM / 2 + r * RENGLON;
+        // Con contador debajo, los renglones de más crecen hacia arriba: hacia abajo se encimaban con él («cebolla.» sobre «40×»).
+        const y = ZONA.texto.centro - TAM / 2 + (r - (CON_CONTADOR ? renglones.length - 1 : 0)) * RENGLON;
         return renglon.map((fi, k) => {
           const a = avance(fi);
           const izquierda = x + (k ? ESPACIO * a : 0);
           x += a * (fi.ancho + (k ? ESPACIO : 0));
           if (a <= 0) return null;
-          const color = fi.clave ? texto : tenue;
+          const color = texto;
           return (
             <div key={`${r}-${k}`} style={{ position: "absolute", left: izquierda, top: y, height: TAM * 1.15, whiteSpace: "nowrap" }}>
               {fi.caja ? <Caja ancho={fi.ancho} alto={TAM * 1.12} avance={a} /> : null}
@@ -89,11 +98,11 @@ export const Subtitulos: React.FC<{ texto: string; tenue: string }> = ({ texto, 
                   display: "inline-block",
                   fontFamily: LETRA,
                   fontSize: TAM,
-                  fontWeight: fi.clave ? 700 : 500,
+                  fontWeight: fi.clave ? PESO.clave : PESO.relleno,
                   letterSpacing: "-0.01em",
                   lineHeight: 1.12,
                   color,
-                  opacity: a,
+                  opacity: a * (fi.clave ? 1 : RELLENO),
                   filter: `blur(${(1 - a) * 12}px)`,
                   transform: `translateY(${(1 - a) * 10}px)`,
                 }}

@@ -5,6 +5,7 @@ import { loadFont as figtree } from "@remotion/google-fonts/Figtree";
 import { loadFont as mono } from "@remotion/google-fonts/JetBrainsMono";
 import { loadFont as marcador } from "@remotion/google-fonts/PermanentMarker";
 import formato from "./datos/formato.json";
+import momentos from "./datos/momentos.json";
 import { CON_PERSONAJE } from "./marca";
 
 /**
@@ -30,14 +31,13 @@ export const FUENTES = Promise.all([letra.waitUntilDone(), mono_.waitUntilDone()
 export type Tema = "oscuro" | "claro";
 
 /**
- * Los colores de este video, que salen de su lugar (la `paleta` de fuentes/huella.json): el fondo de los capítulos
- * oscuros, con texto blanco encima (oscuro de verdad: un azul noche, un verde bosque, un café de madera vieja), el de
- * los claros, con texto negro (un papel, un hielo, un arena), y la luz de contra que tiñe los bordes (la tele, una
- * lámpara, el hielo). Estos son los de los primeros videos, un negro y un blanco: cada video pone los suyos.
+ * Los colores de este video (la `paleta` de momentos.json): el fondo de los capítulos oscuros, con texto blanco encima
+ * (oscuro de verdad: un azul noche, un verde bosque, un café de madera vieja), el de los claros, con texto negro (un
+ * papel, un hielo, un arena), y la luz de contra que tiñe los bordes. Sin paleta, un negro y un blanco.
  */
-export const PALETA = { oscuro: "#0f0f0f", claro: "#f9f9f9", luz: "#f5a524" };
-/** La cuadrícula del piso, la de los primeros videos. Si el lugar tiene su propio piso (madera, pasto, baldosa), false. */
-export const REJILLA = true;
+export const PALETA = { oscuro: "#0f0f0f", claro: "#f9f9f9", luz: "#f5a524", ...(momentos as { paleta?: object }).paleta };
+/** La cuadrícula del piso (`rejilla` de momentos.json, sí por omisión). */
+export const REJILLA = (momentos as { rejilla?: boolean }).rejilla ?? true;
 
 /** Mezcla dos colores #rrggbb: `t` = 0 es `a`, 1 es `b`. */
 const mezcla = (a: string, b: string, t: number) => {

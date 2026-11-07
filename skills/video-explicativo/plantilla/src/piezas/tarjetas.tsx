@@ -1,12 +1,12 @@
-// Las pruebas, rehechas en limpio: la prueba corta (logo, fuente y la frase con su dato subrayado), el calendario de
-// mesa que arranca sus hojas, las barras que comparan y la tarjeta del cierre (la cuenta o el canal al que invita el
+// Las pruebas, rehechas en limpio: la prueba corta (logo, fuente y la frase con su dato subrayado), la cifra en su
+// tarjeta, el calendario de mesa que arranca sus hojas, las barras que comparan y la tarjeta del cierre (la cuenta o el canal al que invita el
 // video, en su red). El texto citado es el original, palabra por palabra; lo que se resalta se marca cuando la voz lo dice.
 import React from "react";
 import { Easing, Img, interpolate, staticFile, useCurrentFrame } from "remotion";
 import type { Red } from "../marca";
 import { AZUL, LETRA, MONO } from "../tema";
 import { Glifo, type NombreIcono } from "./iconos";
-import { Contador, Resaltado, Subrayado, sujeta, suave, useColores } from "./ui";
+import { Resaltado, Subrayado, sujeta, suave, useColores } from "./ui";
 
 /**
  * Texto con tramos marcados: ["texto normal", { t: "lo resaltado", en: cuadro }, …]. Con `subraya`, en vez del
@@ -159,26 +159,27 @@ export const Barras: React.FC<{
   );
 };
 
-/** Un número grande con su etiqueta, que corre entre dos valores. */
-export const Cifra: React.FC<{
-  de: number;
-  a: number;
-  desde: number;
-  hasta: number;
-  etiqueta?: string;
-  color?: string;
-  decimales?: number;
-  prefijo?: string;
-  sufijo?: string;
-  tam?: number;
-}> = ({ de, a, desde, hasta, etiqueta, color, decimales = 0, prefijo, sufijo, tam = 150 }) => {
+/**
+ * El dato en su tarjeta: la cifra grande (un texto, o un `<Contador>` que corre), lo que mide debajo y, si va, de dónde
+ * sale. Con `icono`, el ícono del color de la cifra a su izquierda.
+ */
+export const Cifra: React.FC<{ valor: React.ReactNode; nota?: string; fuente?: string; icono?: NombreIcono; color?: string; tam?: number }> = ({
+  valor,
+  nota,
+  fuente,
+  icono,
+  color,
+  tam = 120,
+}) => {
   const c = useColores();
   return (
-    <div style={{ textAlign: "center", fontFamily: LETRA, color: color ?? c.texto }}>
-      <div style={{ fontSize: tam, fontWeight: 800, lineHeight: 1, letterSpacing: "-0.03em" }}>
-        <Contador de={de} a={a} desde={desde} hasta={hasta} decimales={decimales} prefijo={prefijo} sufijo={sufijo} />
+    <div style={{ display: "flex", alignItems: "center", gap: tam * 0.22, background: c.tarjeta, border: `2px solid ${c.borde}`, borderRadius: 30, padding: `${tam * 0.16}px ${tam * 0.36}px`, boxShadow: c.sombra, fontFamily: LETRA, color: c.texto }}>
+      {icono ? <Glifo nombre={icono} tam={tam * 0.8} color={color ?? c.texto} /> : null}
+      <div style={{ display: "flex", flexDirection: "column", alignItems: icono ? "flex-start" : "center", gap: 6 }}>
+        <span style={{ fontFamily: MONO, fontWeight: 700, fontSize: tam, lineHeight: 1, color: color ?? c.texto, fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>{valor}</span>
+        {nota ? <span style={{ fontWeight: 600, fontSize: tam * 0.3, color: c.tenue }}>{nota}</span> : null}
+        {fuente ? <span style={{ fontWeight: 500, fontSize: tam * 0.2, color: c.tenue, opacity: 0.8 }}>{fuente}</span> : null}
       </div>
-      {etiqueta ? <div style={{ fontSize: 38, fontWeight: 600, color: c.tenue, marginTop: 10 }}>{etiqueta}</div> : null}
     </div>
   );
 };
@@ -296,15 +297,16 @@ export const Plazo: React.FC<{ desde: number; hasta: number; inicio: string; fin
 };
 
 /**
- * La prueba en corto: el logo de quien lo dijo, de dónde y cuándo, y solo la frase que importa (con su dato subrayado
- * en rojo). En vez de la cita entera: el texto de arriba ya dice el resto.
+ * La prueba en corto: el logo de quien lo dijo (o, si no tiene, un `icono`: un libro, una ley), de dónde y cuándo, y
+ * solo la frase que importa (con su dato subrayado en rojo). En vez de la cita entera: el texto de arriba ya dice el resto.
  */
-export const Prueba: React.FC<{ logo: string; fuente: string; partes: Partes; ancho?: number; tam?: number }> = ({ logo, fuente, partes, ancho, tam = 50 }) => {
+export const Prueba: React.FC<{ logo?: string; icono?: NombreIcono; fuente: string; partes: Partes; ancho?: number; tam?: number }> = ({ logo, icono, fuente, partes, ancho, tam = 50 }) => {
   const c = useColores();
   return (
     <div style={{ width: ancho, maxWidth: 940, background: c.tarjeta, border: `2px solid ${c.borde}`, borderRadius: 28, boxShadow: c.sombra, padding: `${tam * 0.48}px ${tam * 0.64}px ${tam * 0.6}px`, fontFamily: LETRA, color: c.texto }}>
       <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: tam * 0.28 }}>
-        <Img src={staticFile(`logos/${logo}.png`)} style={{ width: tam * 1.16, height: tam * 1.16, borderRadius: tam, background: "#fff" }} />
+        {logo ? <Img src={staticFile(`logos/${logo}.png`)} style={{ width: tam * 1.16, height: tam * 1.16, borderRadius: tam, background: "#fff" }} /> : null}
+        {icono ? <Glifo nombre={icono} tam={tam * 1.05} peso="bold" /> : null}
         <span style={{ fontSize: tam * 0.56, fontWeight: 600, color: c.tenue }}>{fuente}</span>
       </div>
       <div style={{ fontSize: tam, lineHeight: 1.25, fontWeight: 700 }}>

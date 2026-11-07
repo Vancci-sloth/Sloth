@@ -1,7 +1,12 @@
 """
 El primer borrador de subtitulos.txt, sacado de guion.md: lo mecánico, para que solo quede marcar lo que importa.
 
-    python -B -X utf8 <skill>/scripts/subtitulos.py [--pisa]     (desde la raíz del proyecto)
+    python -B -X utf8 <skill>/scripts/subtitulos.py [--dura 40] [--pisa]     (desde la raíz del proyecto)
+
+Primero dice cuánto va a durar la voz del guion (sus palabras a ~3.4 por segundo, ya acelerada). Con `--dura` (los
+segundos que pidieron), si se pasa o se queda corto por más del 10 %, dice cuántas palabras sobran o faltan y no escribe
+nada: se ajusta el guion **antes** de pedir la voz, porque cada voz de más es otra vuelta (en el de estafas del 3 de
+noviembre, tres voces, ~3 min).
 
 - Parte el guion en frases y cada frase en renglones de unas 30 letras (máximo 34), por las comas o antes de «y»,
   «que», «pero», «para»… Así salieron los de los videos anteriores: mediana 25 letras, el 90 % con 37 o menos.
@@ -21,6 +26,9 @@ import unicodedata
 from pathlib import Path
 
 LARGO = 34
+# Palabras por segundo de la voz ya acelerada: 3.26 a 3.54 en los cuatro videos con AI Studio del 29 de octubre y el 3
+# de noviembre (Berachain, con la del usuario, 3.7). Mejor que sobre un segundo a que falte.
+POR_SEGUNDO = 3.4
 CABECERA = ("# Una frase por renglón. *negrita*, [caja de selección], {Icono}palabra (nombre de Phosphor o imagen de "
             "public, nunca emoji), visto=dicho_con_guiones.")
 
@@ -175,11 +183,21 @@ def main() -> None:
     sys.stdout.reconfigure(encoding="utf-8")
     raiz = Path.cwd()
     salida = raiz / "subtitulos.txt"
-    if salida.exists() and "--pisa" not in sys.argv[1:]:
-        sys.exit("Ya hay subtitulos.txt: con --pisa lo rehace desde el guion.")
+    a = sys.argv[1:]
     lineas = (raiz / "guion.md").read_text(encoding="utf-8").splitlines()
     texto = " ".join(l.strip() for l in lineas if l.strip() and not l.startswith("#")
                      and not re.match(r"^(Corte de datos|Datos al)", l.strip()))
+    palabras = len(re.findall(r"\w+", texto))
+    segundos = palabras / POR_SEGUNDO
+    print(f"Guion: {palabras} palabras, unos {segundos:.0f} s de voz.")
+    if "--dura" in a:
+        pedida = float(a[a.index("--dura") + 1])
+        if abs(segundos - pedida) > max(2.0, pedida * 0.1):
+            sobra = round(abs(segundos - pedida) * POR_SEGUNDO)
+            sys.exit(f"✗ Pidieron {pedida:.0f} s: {'sobran' if segundos > pedida else 'faltan'} unas {sobra} palabras. "
+                     "Ajusta guion.md y vuelve a correrlo antes de pedir la voz.")
+    if salida.exists() and "--pisa" not in a:
+        sys.exit("Ya hay subtitulos.txt: con --pisa lo rehace desde el guion.")
     # Las comillas rectas, de dos en dos, pasan a «».
     texto = re.sub(r'"([^"]*)"', r"«\1»", texto)
     frases = re.findall(r"[^.?!]+[.?!]+»?|[^.?!]+$", texto)

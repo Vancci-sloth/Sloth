@@ -1,7 +1,7 @@
 # Historia y drama
 
 Los grandes escándalos, misterios y caídas del nicho del canal, contados como una historia con
-giros. Es «una historia» o «una caída», según el caso (en video-explicativo, esos géneros de su `GUION.md`).
+giros. Es «una historia» o «una caída», según el caso (en video-explicativo, esos géneros de su `SKILL.md`).
 
 ## El tema, si no te dieron uno
 

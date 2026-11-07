@@ -1,6 +1,7 @@
 import { markdown } from './markdown'
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { enCurso } from '../../shared/etapas'
+import { textoParaVoz } from '../../shared/voz'
 import type { AgentEvent, Avance, CarpetaDeVideo, FileDraft } from '../../shared/types'
 import { api } from './api'
 import { Picker } from './Composer'
@@ -367,7 +368,7 @@ function Texto({ url, copiar }: { url: string; copiar?: boolean }) {
     }
   }, [url])
   function copy() {
-    navigator.clipboard.writeText(paraLeer(text)).then(() => {
+    navigator.clipboard.writeText(textoParaVoz(text)).then(() => {
       setCopied(true)
       setTimeout(() => setCopied(false), 1600)
     })
@@ -384,19 +385,6 @@ function Texto({ url, copiar }: { url: string; copiar?: boolean }) {
       <div className="md etapa-texto" dangerouslySetInnerHTML={{ __html: body }} />
     </div>
   )
-}
-
-/**
- * Lo que se lee en voz alta, sin los encabezados ni la línea del corte de datos del video explicativo (la misma que
- * se salta su `subtitulos.py`).
- */
-function paraLeer(text: string): string {
-  return text
-    .split(/\r?\n/)
-    .filter((line) => !/^#{1,6} /.test(line) && !/^(Corte de datos|Datos al)/.test(line.trim()))
-    .join('\n')
-    .replace(/\n{3,}/g, '\n\n')
-    .trim()
 }
 
 /** Un texto que crece mientras el agente lo escribe. Si lo estabas siguiendo, la fase del estudio baja con él. */

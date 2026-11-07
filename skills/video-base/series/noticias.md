@@ -1,7 +1,7 @@
 # Qué pasó esta semana
 
 Lo más importante de la semana en el nicho del canal, en unos 30 segundos. Es «una noticia» (en
-video-explicativo, ese género de su `GUION.md`).
+video-explicativo, ese género de su `SKILL.md`).
 
 ## El tema, si no te dieron uno
 
