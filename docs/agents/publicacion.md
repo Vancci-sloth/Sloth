@@ -58,7 +58,9 @@ ramas ni bloquea por sí solo un push a `venta`.
    `version-venta.mjs` solo sube la última cifra.
 2. Comprueba el diff completo entre `origin/venta` y `main`: se publicará todo lo que haya entrado a `main`. Guarda la
    lista de sus commits (`git log --no-merges --format="%s%n%b" origin/venta..main`): de ahí sale el anuncio del paso 5,
-   y después del push ya no se puede sacar así.
+   y después del push ya no se puede sacar así. Si en ese diff hay cambios de `licencias/` que esperan esta versión
+   (desde el 7 de noviembre de 2026, los mensajes de las voces con «Sloth» en vez del socio), despliega el cobro después
+   del push, como dice «Cobro y comunidad»: `venta` no lo hace.
 3. Tras verificar la cuenta de GitHub indicada en `AGENTS.md`, `git push origin main:venta` inicia
    `.github/workflows/venta.yml`. Genera una versión común, compila los tres instaladores con `npm run compilar` y los
    sube al cobro con `npm run publicar`. No hace falta compilar localmente para publicar.
