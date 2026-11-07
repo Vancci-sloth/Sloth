@@ -17,6 +17,7 @@ import { build as esbuild } from 'esbuild'
 import { build as vite } from 'vite'
 import { Arch, build as empaquetar, Platform } from 'electron-builder'
 import { armarVentana } from './electron.mjs'
+import { compresionInstalador } from './instalador-config.ts'
 
 const REPO = join(dirname(fileURLToPath(import.meta.url)), '..')
 const DIST = join(REPO, 'dist')
@@ -300,6 +301,7 @@ const hechos = await empaquetar({
     ],
     win: { icon: ICONO },
     nsis: {
+      ...compresionInstalador,
       // Con sus pasos, para elegir en qué disco va (scripts/instalador.nsh). Las actualizaciones siguen sin preguntar nada.
       oneClick: false,
       allowToChangeInstallationDirectory: true,

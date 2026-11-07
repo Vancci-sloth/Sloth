@@ -60,7 +60,8 @@ jobs:
       # La sintaxis de los scripts de las skills; sin videos hechos, las plantillas se saltan.
       - run: npm run comprobar-skills
       # compilar incluye el typecheck y comprueba los paquetes que llevará el servidor.
-      - run: npm run compilar -- --sin-instalador
+      # En Windows se arma y se ejecuta el NSIS real: empaquetar sin instalar no descubre fallos del extractor.
+      - run: npm run compilar -- ${{ runner.os != 'Windows' && '--sin-instalador' || '' }}
         env:
           SLOTH_MAC12: ${{ matrix.mac12 }}
           SLOTH_TUYO: ${{ secrets.SLOTH_TUYO }}
@@ -71,3 +72,6 @@ jobs:
           APPLE_ID: ''
           APPLE_APP_SPECIFIC_PASSWORD: ''
           APPLE_TEAM_ID: ''
+      - name: Instalar y actualizar en Windows sin abrir Sloth
+        if: runner.os == 'Windows'
+        run: node scripts/comprobar-instalacion.mjs

@@ -2,7 +2,7 @@
 # macOS 12) y Linux,
 # y publica sus instaladores en el cobro (`npm run compilar` y `npm run publicar` en cada sistema), los que da sloth.vancci.org.
 # Cada push sale como versión nueva (scripts/version-venta.mjs, una sola vez para todos), y la app instalada ofrece
-# «Actualizar a Sloth X» y baja solo lo que cambió (electron/main.ts).
+# «Actualizar a Sloth X» y la baja (entera en Windows, por diferencias en Mac y Linux; electron/main.ts).
 # Para publicar lo de main: `git push origin main:venta`. La llave para publicar es el secreto PUBLICAR del repo. La firma
 # de Apple, si está, va en los secretos CSC_LINK, CSC_KEY_PASSWORD, APPLE_ID, APPLE_APP_SPECIFIC_PASSWORD y APPLE_TEAM_ID
 # (docs/adr/0006-mac-y-linux.md); sin ellos, las de Mac salen sin firma. Siempre el mismo certificado: macOS solo se
@@ -75,6 +75,9 @@ jobs:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      - name: Comprobar instalación y actualización antes de publicar Windows
+        if: runner.os == 'Windows'
+        run: node scripts/comprobar-instalacion.mjs
       - run: npm run publicar
         env:
           SLOTH_MAC12: ${{ matrix.mac12 }}

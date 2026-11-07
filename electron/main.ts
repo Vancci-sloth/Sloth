@@ -2,8 +2,8 @@
  * La app de escritorio de Sloth, con Electron. En la que se vende (`npm run compilar`) es Sloth.exe: levanta el servidor
  * con su propio Node (`node\node.exe app\scripts\start.mjs`) y lo enseña en su ventana; al cerrarla se cierra todo, sin
  * quedarse de fondo. También pone las versiones nuevas: electron-updater pregunta al cobro de Sloth y baja
- * solo lo que cambió. En el repo, `npm start` levanta el servidor y abre esta misma ventana con `SLOTH_VENTANA`, su
- * dirección: entonces solo se pone la ventana.
+ * el instalador completo en Windows y solo lo que cambió en Mac y Linux. En el repo, `npm start` levanta el servidor
+ * y abre esta misma ventana con `SLOTH_VENTANA`, su dirección: entonces solo se pone la ventana.
  *
  * En Windows todo va junto a Sloth.exe, como hasta la 0.2: `app\` (el servidor, la interfaz, y tus videos y tus hilos en
  * `app\trabajo` y `app\data`) y `node\`. Al actualizar, el instalador cambia lo demás y deja eso (scripts/instalador.nsh).
@@ -624,8 +624,8 @@ function anotar(texto: unknown) {
 /**
  * Las versiones nuevas, del cobro de Sloth (`/actualizaciones`, lo que sube `npm run publicar`). Al abrir y cada 6 horas
  * pregunta, y antes si el vistazo de cada 5 minutos ve que cambió la última (la que el creador libera en un live llega
- * así); «Actualizar» (web/src/Actualizar.tsx) la baja: solo los pedazos del instalador que cambiaron desde esta
- * versión. Luego cierra Sloth, el instalador la pone y la vuelve a abrir.
+ * así); «Actualizar» (web/src/Actualizar.tsx) la baja, entera en Windows y por diferencias en Mac y Linux.
+ * Luego cierra Sloth, el instalador la pone y la vuelve a abrir.
  */
 function actualizaciones() {
   // La versión que se bajó la última vez ya está puesta: su instalador sobra. El de esta versión se queda aparte
@@ -639,6 +639,8 @@ function actualizaciones() {
   if (cache) guardarInstalador(cache)
   autoUpdater.autoDownload = false
   autoUpdater.autoInstallOnAppQuit = false
+  // El ZIP de Windows evita Nsis7z (scripts/instalador-config.ts) y no lleva mapa de bloques.
+  autoUpdater.disableDifferentialDownload = WINDOWS
   autoUpdater.logger = { info: anotar, warn: anotar, error: anotar }
   autoUpdater.on('update-available', (i) => {
     // Lo que trae, en un renglón (novedad.txt al compilarla).
