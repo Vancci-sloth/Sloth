@@ -141,6 +141,8 @@ Este es el mapa:
 - `server/cuenta.ts`, `server/version.ts` y `server/opciones.ts`: la cuenta de Claude, la versión de Claude y de Codex
   (la que trae Sloth: se ponen al día al subirlas en package.json y publicar) y las credenciales de YouTube e Instagram (en las variables de entorno del usuario).
   `server/acceso.ts`: si Claude y Codex pagan con la suscripción o con una llave de API (Opciones → Agentes), guardada en
-  `data/agentes.json`.
+  `data/agentes.json`. Ese archivo y `variables.json` van cifrados (`server/secretos.ts`).
+- `server/token.ts`: el token del servidor local (`data/servidor-token`), que con `SLOTH_EXIGIR_TOKEN=1` se pide en `/api`
+  y `/ws`. Quien llame desde fuera de la ventana manda `x-sloth-token` con `SLOTH_TOKEN`.
 - `web/src`: React. `api.ts` habla con el servidor; `eventos.ts` guarda los eventos fuera de `App`, `items.ts` los junta
   en bloques y `Timeline.tsx` los dibuja; `Composer.tsx` es el campo de texto.

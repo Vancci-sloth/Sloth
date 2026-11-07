@@ -19,18 +19,14 @@ const camino = [dirname(process.execPath), join(APP, 'node_modules', '.bin')]
  * Fuera de Windows, lo que allí es %APPDATA% (el Python de Sloth y sus modelos, la llave de publicar) es
  * ~/Library/Application Support en Mac y ~/.config en Linux. Va en APPDATA para que el servidor, los agentes y los
  * scripts de las skills lo busquen igual en los tres. Ahí deja Sloth el Python y el FFmpeg que instala, en
- * sloth/piezas/bin (server/requisitos.ts), y las llaves de Opciones, en sloth/variables.json (server/opciones.ts). Una
+ * sloth/piezas/bin (server/requisitos.ts), y las llaves de Opciones, cifradas, en sloth/variables.json, que el servidor
+ * pasa a su entorno al arrancar (server/opciones.ts). Una
  * app abierta desde el Finder no hereda el PATH de la terminal: sin Homebrew, no vería lo que se instaló con él.
  */
 if (process.platform !== 'win32') {
   const mac = process.platform === 'darwin'
   process.env.APPDATA ??= mac ? join(homedir(), 'Library', 'Application Support') : process.env.XDG_CONFIG_HOME || join(homedir(), '.config')
   camino.push(join(process.env.APPDATA, 'sloth', 'piezas', 'bin'), ...(mac ? ['/opt/homebrew/bin', '/usr/local/bin'] : []))
-  try {
-    for (const [k, v] of Object.entries(JSON.parse(readFileSync(join(process.env.APPDATA, 'sloth', 'variables.json'), 'utf8')))) process.env[k] ??= v
-  } catch {
-    // Aún no se guardó ninguna.
-  }
 }
 // En Windows, el Python solo existe si el tuyo no servía (server/requisitos.ts): entonces va delante del que haya en el
 // sistema. En `bin`, el FFmpeg que baja Sloth.
@@ -79,7 +75,10 @@ function run() {
 
 let caidas = []
 
-// Si Sloth ya corre (se abrió otra vez), solo abre su ventana: un segundo servidor no tendría puerto.
-if (await fetch(`${URL}/api/state`, { signal: AbortSignal.timeout(2000) }).then((r) => r.ok, () => false)) {
+// Si Sloth ya corre (se abrió otra vez), solo abre su ventana: un segundo servidor no tendría puerto. Con el token del
+// servidor (`data/servidor-token`, server/token.ts); un 401 también es que ya corre.
+const TOKEN = join(APP, 'data', 'servidor-token')
+const token = process.env.SLOTH_TOKEN ?? (existsSync(TOKEN) ? readFileSync(TOKEN, 'utf8').trim() : '')
+if (await fetch(`${URL}/api/state`, { headers: { 'x-sloth-token': token }, signal: AbortSignal.timeout(2000) }).then((r) => r.ok || r.status === 401, () => false)) {
   if (!opened) await abrir()
 } else run()

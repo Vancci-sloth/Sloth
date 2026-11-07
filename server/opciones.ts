@@ -1,9 +1,8 @@
 import { execFileSync } from 'node:child_process'
-import { chmodSync, mkdirSync, readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import type { Opciones } from '../shared/types.ts'
-import { guardar } from './disco.ts'
 import { preguntarAlRegistro } from './registro.ts'
+import { guardarSecreto, leerSecreto } from './secretos.ts'
 
 /**
  * Las llaves de API no viven en la app: van a las variables de entorno del usuario de Windows, donde las leen los
@@ -40,17 +39,21 @@ export const variablesListas: Promise<void> = process.platform !== 'win32'
     )
 
 /**
- * Fuera de Windows no hay variables del usuario que lean todos los programas: van a este archivo, que scripts/start.mjs
- * pasa al entorno al arrancar (y de ahí a los agentes y a sus scripts).
+ * Fuera de Windows no hay variables del usuario que lean todos los programas: van a este archivo, cifrado
+ * (`secretos.ts`, con su llave maestra en la misma carpeta), que el servidor pasa a su entorno al arrancar (y de ahí a
+ * los agentes y a sus scripts). Uno en texto plano de antes se vuelve a guardar cifrado al leerlo.
  */
 const VARIABLES = join(process.env.APPDATA ?? '', 'sloth', 'variables.json')
 const variables = (): Record<string, string> => {
   try {
-    return JSON.parse(readFileSync(VARIABLES, 'utf8'))
-  } catch {
+    return leerSecreto<Record<string, string>>(VARIABLES, dirname(VARIABLES)) ?? {}
+  } catch (e) {
+    console.error(`No se pudieron leer las llaves de Opciones (variables.json): ${e instanceof Error ? e.message : 'error'}`)
     return {}
   }
 }
+// Antes lo hacía scripts/start.mjs, que no sabe descifrar.
+if (process.platform !== 'win32') for (const [k, v] of Object.entries(variables())) process.env[k] ??= v
 
 export function leer(nombre: string): string {
   let valor = leidas.get(nombre)
@@ -76,10 +79,8 @@ export function leer(nombre: string): string {
 export function escribir(nombre: string, valor: string | null) {
   if (process.platform !== 'win32') {
     const { [nombre]: _, ...resto } = variables()
-    mkdirSync(dirname(VARIABLES), { recursive: true })
-    guardar(VARIABLES, JSON.stringify(valor ? { ...resto, [nombre]: valor } : resto, null, 2))
-    // Solo de quien la guardó: son llaves.
-    chmodSync(VARIABLES, 0o600)
+    // Cifrado y solo de quien la guardó (600): son llaves.
+    guardarSecreto(VARIABLES, valor ? { ...resto, [nombre]: valor } : resto, dirname(VARIABLES))
   } else
     execFileSync('powershell.exe', ['-NoProfile', '-Command', `[Environment]::SetEnvironmentVariable('${nombre}', $env:SLOTH_VALOR, 'User')`], {
       env: { ...process.env, SLOTH_VALOR: valor ?? '' }

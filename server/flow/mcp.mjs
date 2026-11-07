@@ -10,6 +10,8 @@
 import { createInterface } from 'node:readline'
 
 const URL_SLOTH = process.env.SLOTH_URL ?? 'http://127.0.0.1:4848'
+/** El token del servidor local (`server/token.ts`), que el servidor da junto a `SLOTH_URL`. */
+const TOKEN = { 'x-sloth-token': process.env.SLOTH_TOKEN ?? '' }
 const ESPERA = 40
 const PROMPT = { type: 'string', description: 'Lo que se genera, dicho con detalle' }
 
@@ -59,7 +61,7 @@ const HERRAMIENTAS = [
 ]
 
 async function pedir(ruta, datos) {
-  const r = await fetch(`${URL_SLOTH}${ruta}`, datos ? { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(datos) } : {})
+  const r = await fetch(`${URL_SLOTH}${ruta}`, datos ? { method: 'POST', headers: { ...TOKEN, 'content-type': 'application/json' }, body: JSON.stringify(datos) } : { headers: TOKEN })
   const json = await r.json().catch(() => ({}))
   if (!r.ok) throw new Error(json.error ?? `Sloth respondió ${r.status}`)
   return json

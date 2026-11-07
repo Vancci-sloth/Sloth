@@ -467,7 +467,7 @@ export function mcpFlow(): Record<string, McpStdioServerConfig> {
   // Compilada (`scripts/compilar.mjs`), el servidor va en un solo archivo, server/index.mjs, y el MCP a su lado.
   const script = VENTA ? join(aqui, 'flow', 'mcp.mjs') : join(aqui, 'mcp.mjs')
   if (!existsSync(script) || !process.env.SLOTH_URL) return {}
-  return { flow: { type: 'stdio', command: process.execPath, args: [script], env: { SLOTH_URL: process.env.SLOTH_URL } } }
+  return { flow: { type: 'stdio', command: process.execPath, args: [script], env: { SLOTH_URL: process.env.SLOTH_URL, SLOTH_TOKEN: process.env.SLOTH_TOKEN ?? '' } } }
 }
 
 const mensaje = (e: unknown) => String(e instanceof Error ? e.message : e).split('\n')[0]

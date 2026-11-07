@@ -1,17 +1,16 @@
-import { chmodSync, mkdirSync, readFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type { Proveedor } from '../shared/providers.ts'
 import type { LlaveAgente } from '../shared/types.ts'
-import { guardar } from './disco.ts'
+import { guardarSecreto, leerSecreto } from './secretos.ts'
 
 /**
  * Cómo paga cada agente: con su cuenta (la suscripción de Claude o de ChatGPT) o con una llave de API, que se cobra por
  * uso. Se cambia en Opciones → Agentes, y la llave se queda guardada para volver a ella sin pegarla otra vez. Los hilos
  * que ya trabajan siguen como empezaron; lo nuevo sale con lo elegido.
  *
- * Las llaves van en `data/agentes.json`, no en las variables del usuario: ahí las leerían también su Claude Code y su
- * Codex de la terminal, que dejarían de usar su suscripción.
+ * Las llaves van en `data/agentes.json`, cifradas (`secretos.ts`), no en las variables del usuario: ahí las leerían también
+ * su Claude Code y su Codex de la terminal, que dejarían de usar su suscripción.
  * - Claude: Claude Code usa `ANTHROPIC_API_KEY` antes que la cuenta. Va en el entorno de Sloth, que heredan todos sus
  *   `query` y `claude auth status`; con la cuenta se quita, también si venía de fuera.
  * - Codex: el app-server usa un proveedor propio que la lee de su entorno (`codexConLlave`), así el inicio de sesión de
@@ -32,10 +31,15 @@ const CODEX_ENV = 'SLOTH_OPENAI_API_KEY'
 type Guardado = Partial<Record<Proveedor, { llave?: string; api?: boolean; prestar?: boolean }>>
 
 let datos: Guardado = {}
+/** El archivo está pero no se pudo abrir (la llave maestra no respondió): no se escribe encima, para no perder las llaves. */
+let ilegible = false
 try {
-  datos = JSON.parse(readFileSync(ARCHIVO, 'utf8'))
-} catch {
-  // Sin archivo, los dos con su cuenta.
+  // Sin archivo, los dos con su cuenta. Uno en texto plano (de antes) se vuelve a guardar cifrado aquí mismo.
+  datos = leerSecreto<Guardado>(ARCHIVO) ?? {}
+} catch (e) {
+  ilegible = true
+  // Solo el motivo: ni el contenido ni la llave.
+  console.error(`No se pudieron leer las llaves de los agentes (data/agentes.json): ${e instanceof Error ? e.message : 'error'}`)
 }
 aplicar()
 
@@ -91,10 +95,8 @@ export function prestarLlaves(p: Proveedor, usar: boolean) {
 }
 
 function escribir() {
-  mkdirSync(dirname(ARCHIVO), { recursive: true })
-  guardar(ARCHIVO, JSON.stringify(datos, null, 2))
-  // Solo de quien la guardó: son llaves.
-  if (process.platform !== 'win32') chmodSync(ARCHIVO, 0o600)
+  if (ilegible) throw new Error('No se pudo abrir data/agentes.json (la llave maestra no respondió); no guardo nada para no perder tus llaves.')
+  guardarSecreto(ARCHIVO, datos)
 }
 
 /** La llave guardada, aunque ahora se pague con la cuenta. DeepSeek y Gemini solo trabajan con ella. */

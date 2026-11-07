@@ -9,10 +9,12 @@ import { test } from 'node:test'
 // El MCP de la voz (`voz/mcp.mjs`) contra un servidor de Sloth de mentira: lo que el agente ve al pedir una voz.
 test('el MCP de la voz pide la voz, espera su turno y dice dónde quedó', async (t) => {
   const pedidos: string[] = []
+  const tokens: string[] = []
   const sloth = createServer(async (req, res) => {
     let cuerpo = ''
     for await (const p of req) cuerpo += p
     pedidos.push(`${req.method} ${req.url} ${cuerpo}`)
+    tokens.push(String(req.headers['x-sloth-token']))
     res.setHeader('content-type', 'application/json')
     if (req.url === '/api/voz') return res.end(JSON.stringify({ cuenta: 'yo@gmail.com', conectando: false, enFila: 0, voces: [{ nombre: 'Fola', descripcion: 'Clear and friendly · Medium pitch', grupo: 'Call Center' }, { nombre: 'Riko', descripcion: 'Confident and clear · Deep pitch', grupo: 'Storyteller' }] }))
     if (req.url === '/api/voz/generar') return res.end(JSON.stringify({ id: 'abc', estado: 'en-fila', voz: 'Fola', palabras: 3 }))
@@ -22,7 +24,7 @@ test('el MCP de la voz pide la voz, espera su turno y dice dónde quedó', async
   })
   await new Promise<void>((r) => sloth.listen(0, '127.0.0.1', r))
   t.after(() => sloth.close())
-  const mcp = spawn(process.execPath, [join(import.meta.dirname, 'voz', 'mcp.mjs')], { env: { ...process.env, SLOTH_URL: `http://127.0.0.1:${(sloth.address() as AddressInfo).port}` } })
+  const mcp = spawn(process.execPath, [join(import.meta.dirname, 'voz', 'mcp.mjs')], { env: { ...process.env, SLOTH_URL: `http://127.0.0.1:${(sloth.address() as AddressInfo).port}`, SLOTH_TOKEN: 'prueba' } })
   t.after(() => mcp.kill())
   const respuestas = createInterface({ input: mcp.stdout })[Symbol.asyncIterator]()
   let n = 0
@@ -42,4 +44,6 @@ test('el MCP de la voz pide la voz, espera su turno y dice dónde quedó', async
   assert.equal(hecha.isError, undefined)
   assert.match(hecha.content[0].text, /^Lista: C:\\v\\fuentes\\voz\\ai-studio\.wav \(1\.5 s/)
   assert.ok(pedidos.some((p) => p.startsWith('GET /api/voz/trabajos/abc?esperar=40')))
+  // Cada pedido lleva el token del servidor local (SLOTH_TOKEN).
+  assert.ok(tokens.length > 0 && tokens.every((t) => t === 'prueba'))
 })

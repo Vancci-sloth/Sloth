@@ -57,6 +57,17 @@ const REGISTRO = join(APP, 'data', 'sloth.log')
 const LUGAR = join(APP, 'data', 'ventana.json')
 /** Existe si marcaste «No volver a mostrar» en el aviso al cerrar. */
 const SIN_AVISO = join(APP, 'data', 'sin-aviso-al-cerrar.json')
+/**
+ * Lo que este proceso le pide al servidor no lleva la cookie de la ventana: va con el token en su cabecera
+ * (server/token.ts), que el servidor deja en `data/servidor-token` al arrancar.
+ */
+function conToken(): RequestInit {
+  try {
+    return { headers: { 'x-sloth-token': readFileSync(join(APP, 'data', 'servidor-token'), 'utf8').trim() } }
+  } catch {
+    return {}
+  }
+}
 /** --bg de web/src/styles.css: el fondo mientras carga y el de la barra de título. */
 const FONDO = '#0f0e0c'
 /** Cada cuánto se pregunta si hay versión nueva. */
@@ -546,7 +557,7 @@ async function llevar(): Promise<{ error?: string }> {
   const v = ventana
   if (SOLO_VENTANA || !v || mudando) return { error: 'Solo se puede en la app instalada.' }
   const ocupado = await net
-    .fetch(`${URL_SLOTH}/api/ocupado`)
+    .fetch(`${URL_SLOTH}/api/ocupado`, conToken())
     .then((r) => r.json() as Promise<{ ocupado: string | null }>)
     .then((r) => r.ocupado, () => null)
   if (ocupado) return { error: ocupado }
@@ -671,7 +682,7 @@ function actualizaciones() {
     // abrir Sloth, se espera a que arranque: sin la clave, la versión de quien apoya le llegaba 6 horas después. Si no
     // arranca en 2 minutos, se pregunta igual: una versión nueva puede ser el arreglo.
     await Promise.race([servidorListo, new Promise((ok) => setTimeout(ok, 120_000))])
-    const c = (await fetch(`${URL_SLOTH}/api/licencia/credencial`).then((r) => r.json()).catch(() => ({}))) as { clave?: string; equipo?: string }
+    const c = (await fetch(`${URL_SLOTH}/api/licencia/credencial`, conToken()).then((r) => r.json()).catch(() => ({}))) as { clave?: string; equipo?: string }
     autoUpdater.requestHeaders = c.clave && c.equipo ? { 'x-sloth-clave': c.clave, 'x-sloth-equipo': c.equipo } : null
     await autoUpdater.checkForUpdates().catch(() => {})
   }

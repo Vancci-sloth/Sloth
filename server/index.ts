@@ -52,6 +52,7 @@ import { cambiosDeCard, carpetaSkill, configClaudeDev, duplicateCard, enlazarSki
 import { estaticos } from './estaticos.ts'
 import { type Agente, version } from './version.ts'
 import { cargarPreciosCodex } from './precios.ts'
+import { cookieDelToken, exentaDeToken, exigirToken, pideLaPagina, tokenDelServidor, tokenValido } from './token.ts'
 
 const APP = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const PORT = Number(process.env.PORT ?? 4848)
@@ -71,6 +72,10 @@ process.env.SLOTH_PROCESOS ??= join(APP, 'python', 'procesos')
 process.env.SLOTH_SKILLS ??= SKILLS
 // Y aquí, este servidor: el MCP de la voz (`server/voz/mcp.mjs`) y los scripts que piden algo a Sloth.
 process.env.SLOTH_URL = `http://127.0.0.1:${PORT}`
+// Y con qué token (`server/token.ts`). Con SLOTH_EXIGIR_TOKEN=1, sin él no se atiende `/api` ni `/ws`. Lo heredan los
+// agentes, sus MCP y los scripts de las skills.
+const TOKEN = tokenDelServidor(join(APP, 'data', 'servidor-token'))
+process.env.SLOTH_TOKEN = TOKEN
 if (VENTA) {
   // La app que se vende trae sus skills: las enlaza en ~/.claude/skills, donde las busca Claude, y Codex las lee de esas
   // mismas carpetas, no de copias suyas.
@@ -792,12 +797,16 @@ server.on('request', async (req, res) => {
   const url = new URL(req.url ?? '/', `http://${req.headers.host}`)
   try {
     if (url.pathname.startsWith('/api/')) {
+      // `token: true`: la ventana se abrió antes de que hubiera token (o con otro); al recargarse recibe la cookie.
+      if (exigirToken() && !tokenValido(req, TOKEN, PORT) && !exentaDeToken(req)) return send(res, 401, { error: 'Falta el token del servidor: recarga la ventana.', token: true })
       if (suscripcion && (await suscripcion.api(req, res, url))) return // suscripción
       if (await api(req, res, url)) return
     }
   } catch (error) {
     return send(res, 500, { error: error instanceof Error ? error.message : String(error) })
   }
+  // La página de la app lleva el token en su cookie (HttpOnly): con ella habla con `/api` y `/ws`.
+  if (pideLaPagina(req)) res.setHeader('Set-Cookie', cookieDelToken(TOKEN, PORT))
   interfaz(req, res)
 })
 
@@ -805,7 +814,7 @@ const wss = new WebSocketServer({ noServer: true })
 server.on('upgrade', (req, socket, head) => {
   if (req.url !== '/ws') return
   // El WebSocket lleva todo lo que pasa en los hilos: ninguna otra página lo puede abrir.
-  if (!deConfianza(req)) return void socket.destroy()
+  if (!deConfianza(req) || (exigirToken() && !tokenValido(req, TOKEN, PORT))) return void socket.destroy()
   wss.handleUpgrade(req, socket, head, (ws) => {
     clients.add(ws)
     ws.on('message', (data) => {
