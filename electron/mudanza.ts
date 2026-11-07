@@ -51,14 +51,16 @@ export const destinoDe = (elegida: string) => (basename(elegida).toLowerCase() =
  * Por qué no se puede llevar ahí, o `null`. `prohibidas`: donde el instalador o una versión nueva borran (la carpeta de
  * Sloth.exe, la app).
  */
-export function porQueNo(destino: string, lista: Pesada[], prohibidas: string[]): string | null {
-  if (prohibidas.some((p) => dentro(destino, p))) return 'Esa carpeta es de la instalación de Sloth, que se cambia en cada versión. Elige otra.'
+export function porQueNo(elegido: string, lista: Pesada[], prohibidas: string[]): string | null {
+  if (prohibidas.some((p) => dentro(elegido, p))) return 'Esa carpeta es de la instalación de Sloth, que se cambia en cada versión. Elige otra.'
+  // Con sus enlaces resueltos, como lo que se mueve: en Mac, /var es /private/var.
+  const destino = realHastaDonde(elegido)
   for (const p of lista) {
     const r = real(p.enlace)
     const a = join(destino, p.nombre)
     const igual = resolve(a).toLowerCase() === resolve(r).toLowerCase()
     if (dentro(destino, r) || (!igual && dentro(r, a))) return `Esa carpeta está dentro de lo que se va a mover (${r}). Elige otra.`
-    if (!igual && existsSync(a) && readdirSync(a).length) return `Ya hay una carpeta «${p.nombre}» con cosas en ${destino}. Elige otra.`
+    if (!igual && existsSync(a) && readdirSync(a).length) return `Ya hay una carpeta «${p.nombre}» con cosas en ${elegido}. Elige otra.`
   }
   return null
 }
@@ -214,6 +216,12 @@ function existente(ruta: string) {
   let r = resolve(ruta)
   while (!existsSync(r) && dirname(r) !== r) r = dirname(r)
   return r
+}
+
+/** La ruta con los enlaces resueltos de lo que ya existe de ella, aunque el final aún no exista. */
+function realHastaDonde(ruta: string) {
+  const hay = existente(ruta)
+  return join(realpathSync(hay), relative(hay, resolve(ruta)))
 }
 
 const dispositivo = (ruta: string) => statSync(existente(ruta)).dev
