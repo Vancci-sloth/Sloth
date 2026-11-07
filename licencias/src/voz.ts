@@ -442,6 +442,15 @@ function repartidor(env: Env, ctx: ExecutionContext, llaves: Llave[]): Repartido
   }
 }
 
+/** Para la rifa (`rifa.ts`): el mismo repartidor de los créditos mensuales, o nada si el cobro no tiene llaves de socio. */
+export async function repartidorVoz(env: Env, ctx: ExecutionContext): Promise<RepartidorVoz | undefined> {
+  const llaves = await llavesDe(env)
+  return llaves.length ? repartidor(env, ctx, llaves) : undefined
+}
+
+/** Si las voces de Sloth ya son de todos (no solo del creador). */
+export const vozAbierta = async (env: Env) => !(await soloCreador(env))
+
 /** Cada diez minutos: créditos y correo de quienes apoyan, sin que necesiten abrir la app. */
 export async function renovarVoces(env: Env, ctx: ExecutionContext): Promise<void> {
   const llaves = await llavesDe(env)

@@ -2,6 +2,7 @@ import { type ReactNode, useCallback, useEffect, useState } from 'react'
 import { api } from './api'
 import { Confirm } from './Confirm'
 import { Icono } from './Iconos'
+import { RifaAdmin } from './RifaAdmin'
 import './Admin.css'
 
 /**
@@ -10,7 +11,7 @@ import './Admin.css'
  * el saldo de cada llave de socio (cada una, su cuenta), cada usuario con su correo, su plan y su llave, sus créditos y lo que gasta, el consumo que da Voices
  * Cloning, el registro de cada llamada que pasó por el cobro (con sus errores) y el resumen de 30 días. Aquí se suman y
  * quitan créditos, se suspende o reactiva a alguien y se da de alta una cuenta de Sloth por su correo. Lo que responde
- * Voices Cloning se puede ver también tal cual, al final.
+ * Voices Cloning se puede ver también tal cual, al final. Arriba, la rifa de la comunidad (`RifaAdmin.tsx`).
  */
 
 type Datos = Record<string, unknown>
@@ -142,6 +143,8 @@ export function Admin() {
           Por ahora las voces de Sloth son <strong>solo para ti</strong>. Los créditos mensuales se abren automáticamente cuando se termine de publicar la actualización que los incluye.
         </p>
       )}
+
+      <RifaAdmin />
 
       {panel && (
         <>
@@ -557,7 +560,7 @@ function Crudo({ titulo, r }: { titulo: string; r?: Respuesta }) {
   )
 }
 
-function Tabla({ cabeza, filas }: { cabeza: string[]; filas: ReactNode[][] }) {
+export function Tabla({ cabeza, filas }: { cabeza: string[]; filas: ReactNode[][] }) {
   return (
     <div className="admin-tabla-caja">
       <table className="admin-tabla">
@@ -582,9 +585,9 @@ function Tabla({ cabeza, filas }: { cabeza: string[]; filas: ReactNode[][] }) {
   )
 }
 
-const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v.toLocaleString('es-MX', { maximumFractionDigits: 2 }) : '—')
+export const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v.toLocaleString('es-MX', { maximumFractionDigits: 2 }) : '—')
 const segundos = (ms: unknown) => (typeof ms === 'number' ? `${(ms / 1000).toLocaleString('es-MX', { maximumFractionDigits: 1 })} s` : '—')
-function fecha(v: unknown): string {
+export function fecha(v: unknown): string {
   const t = typeof v === 'string' || typeof v === 'number' ? new Date(v) : undefined
   return t && !Number.isNaN(t.getTime()) ? t.toLocaleString('es-MX', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '—'
 }

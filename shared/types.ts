@@ -1219,6 +1219,56 @@ export interface FeedComunidad {
   mas: boolean
 }
 
+/** Un premio de la rifa que ganaste y aún no ves en tu Sloth (`GET /api/comunidad/avisos?cuenta` y `/rifa`). */
+export interface RifaGanada {
+  rifa: string
+  premio: string
+  /** Los créditos de voz que te llevas; 0, un premio que el creador te da a mano. */
+  creditos: number
+  /** Ya están en tu cuenta. */
+  entregados: boolean
+}
+
+/** La rifa de la comunidad (`licencias/src/rifa.ts`), como la ve cada quien: `GET /api/comunidad/rifa`. */
+export interface RifaComunidad {
+  abierta?: { id: string; premio: string; creditos: number; ganadores: number; creada: string; participantes: number }
+  /** Ya participas en la abierta. */
+  participo: boolean
+  /** Por qué no puedes participar (quien apoya o es Fundador ya tiene sus créditos); sin él, puedes. */
+  fuera?: string
+  /** Tu correo, adonde llega el aviso si ganas. */
+  correo?: string
+  /** La última que se sorteó, mientras es reciente: qué se rifó y los nombres de quienes ganaron. */
+  ultima?: { premio: string; ganadores: string[]; sorteada: string }
+  gane?: RifaGanada
+}
+
+/** Un ganador, como lo ve el creador en Administrador. */
+export interface GanadorRifa {
+  externo: string
+  nombre: string
+  email: string
+  creditos: number
+  estado: 'pendiente' | 'preparando' | 'enviando' | 'entregado' | 'revisar' | 'a-mano'
+  correo: string | null
+  visto: string | null
+  error: string | null
+}
+
+/** `GET /api/comunidad/rifa/admin`, solo el creador. */
+export interface RifaAdmin {
+  /** Si las voces de Sloth ya se abrieron a todos: sin eso no se rifan créditos. */
+  vozAbierta: boolean
+  abierta?: RifaComunidad['abierta'] & { lista: { externo: string; nombre: string; email: string; desde: string; fuera?: string }[] }
+  rifas: { id: string; premio: string; creditos: number; ganadores: number; estado: 'sorteada' | 'cancelada'; creada: string; sorteada: string | null; participantes: number; lista: GanadorRifa[] }[]
+}
+
+/** `POST /api/comunidad/rifa/sortear`: quiénes entraron al sorteo (para la ruleta) y quiénes ganaron, en orden. */
+export interface SorteoRifa {
+  participantes: { externo: string; nombre: string }[]
+  ganadores: { externo: string; nombre: string }[]
+}
+
 /** `/api/comunidad/liberar`, solo del creador: la última versión de un sistema y, mientras es solo de quien apoya, desde cuándo será de todos. */
 export interface VersionLiberable {
   so: 'windows' | 'mac' | 'mac-arm64' | 'mac12' | 'linux'

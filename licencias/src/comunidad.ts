@@ -28,7 +28,8 @@
  *   imágenes, migración 0009), `/reportar`
  *   `{motivo}` y `/revisada` (el creador quita sus reportes).
  * - `POST /comunidad/c/<id>/borrar`, `/megusta`, `/reportar` y `/revisada`: lo mismo para un comentario.
- * - `GET /comunidad/avisos` (`?cuenta`: solo cuántos sin leer) y `POST /comunidad/avisos/leidos`.
+ * - `GET /comunidad/avisos` (`?cuenta`: solo cuántos sin leer, y lo que ganaste en la rifa) y `POST /comunidad/avisos/leidos`.
+ * - `/comunidad/rifa*`: la rifa del creador (`rifa.ts`).
  * - `POST /comunidad/roadmap` `{meta}`: tu voto de qué sigue (uno por miembro; el de un Fundador vale dos). Da la votación.
  * - `POST /comunidad/perfil` `{nombre?, foto?, creditos?}`: `creditos`, solo un Fundador (sale en `GET /creditos`).
  * - `PUT /comunidad/archivo`, con el archivo de cuerpo y su `content-type`: una imagen o un video (sus primeros
@@ -36,7 +37,8 @@
  * - `GET /comunidad/liberar`, solo el creador: la última versión de cada sistema y si aún es solo de quien apoya.
  *   `POST` la da a todos ya (`liberar` en `index.ts`), cuando el chat de un live cumple su meta.
  */
-import type { AdjuntoComunidad, Autor, AvisoComunidad, CategoriaComunidad, ComentarioComunidad, FeedComunidad, PublicacionComunidad, RoadmapComunidad } from '../../shared/types.ts'
+import type { AdjuntoComunidad, Autor, AvisoComunidad, CategoriaComunidad, ComentarioComunidad, FeedComunidad, PublicacionComunidad, RifaGanada, RoadmapComunidad } from '../../shared/types.ts'
+import { ganada, rifa } from './rifa.ts'
 import { BLOQUEADA, CLAVE, EQUIPO, cupo, delCreador, esFundador, type Env, type Fila, Rechazo, cuerpo, json, letras, liberar, servir, vigencia, vigilar } from './index.ts'
 
 export const CATEGORIAS: CategoriaComunidad[] = ['general', 'hice', 'ayuda', 'mejoras', 'estilos', 'anuncios']
@@ -144,7 +146,7 @@ interface ComentarioGuardado {
 /** Un adjunto como se guarda: sin URLs, que dependen de `ORIGEN`. */
 type Adjunto = Pick<AdjuntoComunidad, 'tipo' | 'llave' | 'poster' | 'vertical' | 'nombre'>
 
-export async function comunidad(req: Request, env: Env, url: URL): Promise<Response> {
+export async function comunidad(req: Request, env: Env, url: URL, ctx: ExecutionContext): Promise<Response> {
   const ruta = url.pathname
   // Lo único libre: los archivos, que se piden por un nombre que no se adivina.
   const archivo = /^\/comunidad\/archivo\/([^/]+)$/.exec(ruta)
@@ -168,6 +170,7 @@ export async function comunidad(req: Request, env: Env, url: URL): Promise<Respo
     return json({ ok: true })
   }
   if (ruta === '/comunidad/archivo' && req.method === 'PUT') return json(await subir(req, env, yo))
+  if (ruta === '/comunidad/rifa' || ruta.startsWith('/comunidad/rifa/')) return json(await rifa(req, env, ctx, { id: yo.id, clave: yo.clave, nombre: yo.nombre, creador: esCreador(yo) }, ruta))
   if (ruta === '/comunidad/liberar' && (req.method === 'GET' || req.method === 'POST')) {
     if (!esCreador(yo)) throw new Rechazo(403, 'Eso solo lo hace el creador de Sloth.')
     return json(await liberar(env, req.method === 'POST'))
@@ -681,9 +684,13 @@ async function revisada(env: Env, yo: Miembro, tabla: 'publicaciones' | 'comenta
 }
 
 /** Tus avisos, del más nuevo al más viejo, y cuántos sin leer. Con `soloCuenta`, solo cuántos (para la barra lateral). */
-async function avisos(env: Env, yo: Miembro, soloCuenta: boolean): Promise<{ avisos?: AvisoComunidad[]; sinLeer: number }> {
+async function avisos(env: Env, yo: Miembro, soloCuenta: boolean): Promise<{ avisos?: AvisoComunidad[]; sinLeer: number; rifa?: RifaGanada }> {
   const cuenta = env.DB.prepare('SELECT COUNT(*) AS n FROM avisos WHERE para = ? AND leido = 0').bind(yo.id)
-  if (soloCuenta) return { sinLeer: (await cuenta.first<{ n: number }>())?.n ?? 0 }
+  // Con la cuenta va lo que ganaste en la rifa y aún no ves: la app lo pide cada dos minutos y saca su aviso.
+  if (soloCuenta) {
+    const [n, gane] = await Promise.all([cuenta.first<{ n: number }>(), ganada(env, yo.id)])
+    return { sinLeer: n?.n ?? 0, ...(gane ? { rifa: gane } : {}) }
+  }
   const [, filas, n] = await env.DB.batch([
     env.DB.prepare('DELETE FROM avisos WHERE para = ? AND creado < ?').bind(yo.id, new Date(Date.now() - AVISOS).toISOString()),
     env.DB.prepare(

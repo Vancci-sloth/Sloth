@@ -8,6 +8,7 @@ import { LINK } from './etiquetas'
 import { Unirse } from './Licencia'
 import { Icono as IconoBase, type NombreIcono } from './Iconos'
 import { Liberar } from './Liberar'
+import { Rifa } from './Rifa'
 import './Comunidad.css'
 
 /**
@@ -283,6 +284,8 @@ export function Comunidad() {
             </div>
             {feed && <Avisos sinLeer={feed.avisos} onAbrir={setAbierta} onLeidos={() => setFeed((f) => f && { ...f, avisos: 0 })} />}
           </header>
+
+          {feed && <Rifa creador={!!yo?.creador} conNombre={conNombre} />}
 
           {yo?.creador && <Liberar onAnunciar={(v) => abrirCompositor('anuncios', `Sloth ${v} ya es para todos`)} />}
 

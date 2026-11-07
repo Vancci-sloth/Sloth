@@ -68,6 +68,7 @@ import type { VersionLiberable } from '../../shared/types.ts'
 import { comunidad, creditos, olvidarSueltos } from './comunidad.ts'
 import { cancelarStripe, firmaDeStripe, leerStripe, modoStripe, pagoDeSesion, sesion, sesionStripe, suscripcionStripe, type PagoStripe, type SesionStripe } from './stripe.ts'
 import { olvidarRegistroVoz, renovarVoces, voz } from './voz.ts'
+import { entregarRifas } from './rifa.ts'
 import { APERTURA_VOZ } from './voz-mensual.ts'
 
 export interface Env {
@@ -458,11 +459,12 @@ export default {
     return r
   },
 
-  /** Cada 10 minutos, las claves que no salieron; cada mañana, el aviso de los cobros que vienen. */
+  /** Cada 10 minutos, las claves que no salieron, los créditos de voz y los premios de la rifa; cada mañana, el aviso de los cobros que vienen. */
   async scheduled(evento: ScheduledController, env: Env, ctx: ExecutionContext) {
     if (evento.cron === '*/10 * * * *') {
       ctx.waitUntil(reenviarClaves(env).catch((e) => console.error('Claves sin mandar', e instanceof Error ? e.message : e)))
       ctx.waitUntil(renovarVoces(env, ctx).catch((e) => console.error('Créditos mensuales de voz', e instanceof Error ? e.message : e)))
+      ctx.waitUntil(entregarRifas(env, ctx).catch((e) => console.error('Premios de la rifa', e instanceof Error ? e.message : e)))
       return
     }
     ctx.waitUntil(avisarCobros(env).catch((e) => console.error('Avisos de cobro', e instanceof Error ? e.message : e)))
@@ -504,7 +506,7 @@ async function atender(req: Request, env: Env, ctx: ExecutionContext, url: URL):
     if (req.method === 'POST' && url.pathname === '/cancelar') return await cancelar(env, await cuerpo(req))
     if (req.method === 'POST' && url.pathname === '/pago') return await pago(env, await cuerpo(req))
     if (req.method === 'POST' && url.pathname === '/a-mano') return await aMano(req, env)
-    if (url.pathname === '/comunidad' || url.pathname.startsWith('/comunidad/')) return await comunidad(req, env, url)
+    if (url.pathname === '/comunidad' || url.pathname.startsWith('/comunidad/')) return await comunidad(req, env, url, ctx)
     if (url.pathname === '/voz' || url.pathname.startsWith('/voz/')) return await voz(req, env, ctx, url)
     return json({ error: 'No existe' }, 404)
   } catch (error) {

@@ -110,6 +110,8 @@ apoyos de producción pagados y vigentes, y solo a ellos: los lugares gratis de 
 decisión del creador. También lo hace al consultar `/voz`. Refrescar es sumar lo que falta para llegar a 100.000: lo
 no usado no se acumula, nunca se quita lo que el creador dio de más, y no se recuperan meses anteriores. El correo lleva
 la **clave de Sloth existente**, que se pega en Opciones → Voz → Voces de Sloth, y se reintenta sin repetir la entrega. Todo sale de las mismas llaves de socio y aparece en Administrador.
+La rifa necesita la migración `0025_rifas.sql` y el Worker desplegado; con créditos, además, las voces ya abiertas.
+Su sección y su ruleta llegan a la Administrador instalada con la siguiente versión de la app.
 Un reparto en `enviando` o `revisar` requiere comprobar el movimiento en el proveedor antes de volver a sumarlo: su API
 no documenta idempotencia para créditos. No se reintenta esa suma automáticamente.
 Para guardar uno que el usuario copió, pásalo desde Git Bash: `tr -d ' \r\n' < /dev/clipboard | npm run licencias -- secret

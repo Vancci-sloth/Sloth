@@ -1,6 +1,6 @@
 import { memo, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { CANAL_CARD, IDEAS_CARD } from '../../shared/ideas' // ideas
-import type { AvanceCorto, AvisoComunidad, Card, Model, Previa, Serie, ServerPush, SessionMeta, VideoHecho } from '../../shared/types'
+import type { AvanceCorto, AvisoComunidad, Card, RifaGanada, Model, Previa, Serie, ServerPush, SessionMeta, VideoHecho } from '../../shared/types'
 import { NOMBRE_AGENTE, PROVEEDORES, proveedorDe } from '../../shared/providers'
 import { AvisoVideos } from './AvisoVideos'
 import { VENTA } from '../../shared/venta'
@@ -19,6 +19,7 @@ import { TusCambios } from './TusCambios'
 import { EstiloCambio } from './EstiloCambio'
 import { Novedades } from './Novedades'
 import { CreditosVoz } from './CreditosVoz'
+import { avisarGanasteRifa, GanasteRifa } from './GanasteRifa'
 import { ActualizarSloth, AvisoAgentes } from './Actualizar' // versiones nuevas
 import { TarjetasEnlaces } from './Enlaces' // tarjeta de los enlaces
 import { esDeEstudio, Estudio } from './Estudio' // panel de etapas
@@ -365,6 +366,7 @@ export function App() {
   const campoBusca = useRef<HTMLInputElement>(null)
   // comunidad: tus avisos sin leer, junto a «Comunidad». Se piden cada 2 minutos mientras se ve Sloth, cada 10 con la
   // ventana oculta (un anuncio avisa aunque no la estés mirando), y al leerlos. Si subieron, se mira si hay un anuncio.
+  // Con ellos llega lo que ganaste en la rifa, que sale a toda la pantalla (`GanasteRifa`).
   const [avisosComunidad, setAvisosComunidad] = useState(0)
   const esCreador = useEsCreador()
   useEffect(() => {
@@ -374,8 +376,9 @@ export function App() {
       if (document.visibilityState !== 'visible' && Date.now() - pedida < 600_000) return
       pedida = Date.now()
       try {
-        const { sinLeer } = await api<{ sinLeer: number }>('/api/comunidad/avisos?cuenta')
+        const { sinLeer, rifa } = await api<{ sinLeer: number; rifa?: RifaGanada }>('/api/comunidad/avisos?cuenta')
         setAvisosComunidad(sinLeer)
+        if (rifa) avisarGanasteRifa(rifa)
         if (sinLeer > sabidos) avisarAnuncio((await api<{ avisos: AvisoComunidad[] }>('/api/comunidad/avisos')).avisos, abrirPublicacion)
         sabidos = sinLeer
       } catch {
@@ -709,6 +712,7 @@ export function App() {
       </main>
       <Novedades />
       <CreditosVoz />
+      <GanasteRifa />
       <EstiloCambio cards={cards} activa={newCard?.id} />
     </div>
   )
