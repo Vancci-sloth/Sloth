@@ -56,14 +56,14 @@ test('a Voices Cloning solo va un trozo con texto, voz y una velocidad que acept
   assert.throws(() => pedidoTts({ text: 'Hola.', voice_id: 'v1', speed: 2 }), /0.5 a 1.5/)
 })
 
-test('cada error de Voices Cloning se dice en español y con qué hacer', () => {
+test('cada error de las voces se dice en español y con qué hacer', () => {
   const de = (status: number, code?: string, espera?: string) => mensajeDe({ status, datos: code ? { code, error: 'x' } : {}, espera })
   assert.match(de(402, 'insufficient_credits'), /acabaron los créditos/)
-  assert.match(de(402, 'partner_balance_empty'), /saldo de Sloth/)
+  assert.match(de(402, 'partner_balance_empty'), /se acabó su saldo/)
   assert.match(de(402, 'partner_daily_limit'), /medianoche, hora de Lima/)
   assert.match(de(429, 'queue_full', '12'), /en 12 segundos/)
   assert.match(de(504), /no se cobró/)
-  assert.match(de(401), /llave de Sloth/)
+  assert.match(de(401), /no aceptaron su llave/)
   assert.match(de(403), /suspendido/)
-  assert.match(de(500), /respondió 500/)
+  assert.match(de(500), /respondieron 500/)
 })

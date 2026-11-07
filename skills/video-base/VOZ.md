@@ -2,7 +2,7 @@
 
 El usuario elige en el compositor de Sloth si manda él la voz o si la generas tú. Puedes generarla con una voz de Google
 AI Studio (Gemini 3.8 Flash TTS, en su cuenta de Google), con una de Fish Audio o ElevenLabs (con su llave; puede ser
-la suya, clonada) o con una de Voices Cloning, el proveedor de Sloth (con los créditos que le da Sloth). Lo elegido
+la suya, clonada) o con una de las voces de Sloth (`vc:`, con los créditos que le da Sloth; al usuario llámalas «voces de Sloth»). Lo elegido
 llega en el primer mensaje:
 
 - `Voz: genérala tú en AI Studio con la voz <Nombre> …` o `Voz: genérala tú con Fish Audio (o ElevenLabs), voz «…»: en
@@ -42,7 +42,7 @@ pídela otra vez una sola vez; si se repite, díselo al usuario.
 - **Sin cuenta conectada, o se fue la sesión (AI Studio), o sin llave (Fish Audio, ElevenLabs):** dile al usuario que
   la conecte en Opciones → Voz. Mientras, pídele su voz como siempre.
 - **La cuota del día, sin saldo o sin créditos, u otro error:** dile el error tal cual y pídele su voz. Lo gratis de
-  Fish Audio era hasta el 30 de noviembre de 2026. Los créditos de Voices Cloning los da el creador de Sloth.
+  Fish Audio era hasta el 30 de noviembre de 2026. Los créditos de las voces de Sloth los da el creador de Sloth.
 - **Una voz que no existe:** `voces` dice las que hay. Usa la más parecida del mismo proveedor y díselo.
 
 Si el usuario eligió una voz, no la generes de otra forma (edge-tts, otro proveedor): o sale de donde eligió o la

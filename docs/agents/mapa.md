@@ -81,7 +81,10 @@ Este es el mapa:
   siguen las skills (`skills/video-base/VOZ.md`). ADR 0011. Fish Audio y ElevenLabs van por su API con la llave de cada
   quien (`server/voz/apis.ts`, voces `fish:<id>` y `elevenlabs:<id>`), también clonando la voz del usuario. Voices
   Cloning, el proveedor de Sloth (voces `vc:<id>`, `server/voz/voices-cloning.ts`, ADR 0018), va por el cobro
-  (`licencias/src/voz.ts`), que guarda la llave del socio y los créditos de cada quien; se elige en su ventana.
+  (`licencias/src/voz.ts`), que guarda la llave del socio y los créditos de cada quien; su catálogo sale en el menú «Voz» con el pase del cobro. El menú
+  «Voz» es `web/src/ElegirVoz.tsx`: buscar en español, oír la muestra (`server/voz/muestras.ts` la guarda) o tu frase
+  (`/api/voz/probar`) y clonar grabando ahí. Su eval contra ElevenLabs, Fish Audio, AI Studio y Suno:
+  `docs/agents/eval-voz.md` (`node scripts/eval-voz.mjs <puerto>`).
 - Administrador (`web/src/Admin.tsx`, `/api/admin*`): solo en la computadora del creador, la que tiene su `admin.txt` (o `publicar.txt`).
   Saldo, usuarios, consumo y registro de Voices Cloning; dar, quitar y suspender.
 - `server/flow/` y `web/src/Flow.tsx`: imágenes (Nano Banana) y videos (Veo) de Google Flow, con la cuenta de la voz (en

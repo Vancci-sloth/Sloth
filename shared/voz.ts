@@ -10,7 +10,7 @@ import type { Card, FuenteVoz, VozStudio } from './types.ts'
 const GUIA = 'video-base/VOZ.md'
 
 /** El nombre de cada motor que no es AI Studio, como se ve en Sloth. */
-export const MOTORES: Record<FuenteVoz, string> = { fish: 'Fish Audio', elevenlabs: 'ElevenLabs', vc: 'Voices Cloning' }
+export const MOTORES: Record<FuenteVoz, string> = { fish: 'Fish Audio', elevenlabs: 'ElevenLabs', vc: 'Sloth' }
 
 /**
  * De qué motor es una voz: las de Fish Audio, ElevenLabs y Voices Cloning van con su prefijo (`fish:<id>`,
@@ -120,6 +120,145 @@ export function vocesDelPanel(texto: string): VozStudio[] {
     voces.push({ nombre: r[i], descripcion: desc.replace(/\.\s*·/, ' ·'), grupo })
   }
   return voces
+}
+
+// ── Cómo se ve y se busca una voz ──────────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Las palabras con que AI Studio, Fish Audio y ElevenLabs dicen cómo suena una voz, en español y en femenino (es «la
+ * voz»). Lo que no está aquí se queda como viene.
+ */
+const PALABRAS: Record<string, string> = {
+  quiet: 'tranquila', intimate: 'íntima', warm: 'cálida', approachable: 'cercana', gentle: 'suave', relaxed: 'relajada',
+  direct: 'directa', helpful: 'servicial', cool: 'fresca', confident: 'segura', clear: 'clara', energetic: 'enérgica',
+  colorful: 'colorida', crisp: 'nítida', eager: 'entusiasta', friendly: 'amable', deep: 'profunda', velvety: 'aterciopelada',
+  light: 'ligera', precise: 'precisa', calm: 'calmada', comforting: 'reconfortante', engaging: 'cautivadora',
+  professional: 'profesional', empathetic: 'empática', conversational: 'conversacional', poised: 'serena',
+  resonant: 'resonante', soothing: 'relajante', bright: 'brillante', upbeat: 'alegre', breathy: 'susurrante',
+  firm: 'firme', smooth: 'suave', mature: 'madura', youthful: 'juvenil', casual: 'casual', lively: 'animada',
+  informative: 'informativa', knowledgeable: 'experta', easygoing: 'tranquila', excitable: 'entusiasta', forward: 'directa',
+  even: 'pareja', gravelly: 'rasposa', breezy: 'fresca', 'easy-going': 'tranquila', natural: 'natural', engaged: 'atenta', 'laid-back': 'relajada',
+  chill: 'tranquila', character: 'personaje', 'character-voice': 'personaje', entertainment: 'entretenimiento',
+  'social-media': 'redes', medium: 'media', soft: 'suave', serious: 'seria', authoritative: 'con autoridad', narration: 'narración',
+  narrative: 'narración', storytelling: 'narración', news: 'noticias', calmada: 'calmada', male: 'hombre', female: 'mujer',
+  old: 'mayor', young: 'joven', 'middle-aged': 'edad media', middle_aged: 'edad media', 'middle aged': 'edad media', adult: 'edad media', classy: 'elegante', cute: 'tierna', pleasant: 'agradable',
+  sassy: 'atrevida', australian: 'australiana', hyped: 'emocionada', rough: 'áspera', formal: 'formal', mexico: 'mexicana',
+  spain: 'de España', colombia: 'colombiana', argentina: 'argentina', chile: 'chilena', peru: 'peruana', venezuela: 'venezolana', senior: 'mayor', child: 'infantil', teen: 'adolescente', neutral: 'neutra', funny: 'graciosa',
+  happy: 'alegre', sad: 'triste', angry: 'enojada', dramatic: 'dramática', emotional: 'emotiva', expressive: 'expresiva',
+  social_media: 'redes', 'social media': 'redes', characters: 'personajes', characters_animation: 'personajes', narrative_story: 'narración',
+  conversational_ai: 'asistente', entertainment_tv: 'televisión', advertisement: 'anuncios', educational: 'educativa',
+  informative_educational: 'educativa', podcast: 'pódcast', audiobook: 'audiolibro', gaming: 'videojuegos', asmr: 'ASMR',
+  spanish: 'español', english: 'inglés', mexican: 'mexicana', latin: 'latina', american: 'estadounidense', british: 'británica',
+  argentine: 'argentina', colombian: 'colombiana', peninsular: 'de España', castilian: 'de España', 'latin american': 'latina'
+}
+
+/** Los usos con que AI Studio agrupa sus voces, como sustantivos: valen igual para una voz de hombre que de mujer. */
+const GRUPOS: Record<string, string> = {
+  tutor: 'Tutoría', 'commercial voiceover': 'Locución comercial', instructional: 'Instrucción', podcast: 'Pódcast',
+  storyteller: 'Narración', 'digital assistant': 'Asistente digital', 'call center': 'Centro de llamadas',
+  concierge: 'Recepción', 'tech support': 'Soporte técnico', professional: 'Profesional'
+}
+
+/** El tono de una voz, del más grave al más agudo, como lo dice AI Studio («Medium-low pitch»). */
+export const TONOS = ['grave', 'media', 'aguda'] as const
+export type Tono = (typeof TONOS)[number]
+const TONO: Record<string, { texto: string; tono: Tono }> = {
+  deep: { texto: 'muy grave', tono: 'grave' }, 'very low': { texto: 'muy grave', tono: 'grave' }, low: { texto: 'grave', tono: 'grave' },
+  'medium-low': { texto: 'media grave', tono: 'grave' }, medium: { texto: 'media', tono: 'media' },
+  'medium-high': { texto: 'media aguda', tono: 'aguda' }, high: { texto: 'aguda', tono: 'aguda' }, 'very high': { texto: 'muy aguda', tono: 'aguda' },
+  // Las voces de antes lo dicen así: «Soft · Higher pitch».
+  lower: { texto: 'grave', tono: 'grave' }, 'lower middle': { texto: 'media grave', tono: 'grave' }, middle: { texto: 'media', tono: 'media' },
+  'upper middle': { texto: 'media aguda', tono: 'aguda' }, higher: { texto: 'aguda', tono: 'aguda' }
+}
+
+const primeraMayuscula = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
+
+/** Una palabra o etiqueta en español, si se sabe («warm» → «cálida»). */
+export function palabraEnEspanol(p: string): string {
+  const w = p.trim().toLowerCase()
+  // ElevenLabs escribe algunos acentos con su idioma delante y guiones: «es-latin-american».
+  const sinIdioma = w.replace(/^es[-_]/, '').replace(/[-_]/g, ' ')
+  return PALABRAS[w] ?? PALABRAS[sinIdioma] ?? p.trim()
+}
+
+/** El uso de un grupo de AI Studio en español («Call Center» → «Centro de llamadas»). */
+export function grupoEnEspanol(g: string): string {
+  return GRUPOS[g.trim().toLowerCase()] ?? g
+}
+
+/**
+ * Cómo suena una voz, dicho en español: «Warm and approachable · Low pitch» → «Cálida y cercana · grave»; unas
+ * etiquetas sueltas («male, calm, narration») → «Hombre, calmada, narración». Y su tono, si lo dice.
+ */
+export function comoSuena(descripcion: string): { texto: string; tono?: Tono } {
+  let tono: Tono | undefined
+  const partes = descripcion.split('·').map((parte) => {
+    const p = parte.trim().replace(/\.$/, '')
+    const t = /^(.+?)\s+pitch$/i.exec(p)
+    if (t && TONO[t[1].toLowerCase()]) return (tono = TONO[t[1].toLowerCase()].tono), TONO[t[1].toLowerCase()].texto
+    const y = /^([\w-]+) and ([\w-]+)$/i.exec(p)
+    if (y) return primeraMayuscula(`${palabraEnEspanol(y[1])} y ${palabraEnEspanol(y[2])}`)
+    return primeraMayuscula(p.split(/\s*,\s*/).map(palabraEnEspanol).join(', '))
+  })
+  tono ??= /\b(deep|low)\b/i.test(descripcion) ? 'grave' : /\bhigh\b/i.test(descripcion) ? 'aguda' : undefined
+  return { texto: partes.filter(Boolean).join(' · '), ...(tono ? { tono } : {}) }
+}
+
+/**
+ * La muestra pública de una voz de AI Studio: la que su panel toca al pulsar su botón de oír (vista el 6 de noviembre de 2026). Solo
+ * la hay en inglés; en español hay que generarla.
+ */
+export const muestraDeStudio = (nombre: string) =>
+  ANTIGUAS.has(nombre.toLowerCase()) ? `https://www.gstatic.com/aistudio/voices/samples/${nombre}.wav` : `https://www.gstatic.com/aistudio/voices/samples/daikon/en-us-${nombre.toLowerCase()}.wav`
+/** Las 30 voces de antes de Gemini 3.8 (Kore, Puck…): su muestra está en otra carpeta. */
+const ANTIGUAS = new Set(
+  'zephyr puck charon kore fenrir leda orus aoede callirrhoe autonoe enceladus iapetus umbriel algieba despina erinome algenib rasalgethi laomedeia achernar alnilam schedar gacrux pulcherrima achird zubenelgenubi vindemiatrix sadachbia sadaltager sulafat'.split(' ')
+)
+
+/** Lo que se compara al buscar: sin mayúsculas ni acentos. */
+export const paraBuscar = (s: string) => s.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase()
+
+/**
+ * ¿Encaja la voz con lo que se busca? Cada palabra buscada tiene que estar en alguno de sus textos (nombre, cómo suena
+ * en inglés y en español, su uso, su motor), sin importar acentos ni el orden: «grave narradora», «mujer calida».
+ */
+export function encaja(busqueda: string, textos: string[]): boolean {
+  const palabras = paraBuscar(busqueda).split(/\s+/).filter(Boolean)
+  if (!palabras.length) return true
+  const todo = paraBuscar(textos.join(' '))
+  return palabras.every((p) => todo.includes(p))
+}
+
+/**
+ * Las voces del panel filtrado por género: entonces AI Studio las da todas en una lista, sin grupos (unas 70, contra
+ * las 3 por grupo que enseña sin filtro). Cada una es su nombre y debajo cómo suena; la de arriba («Current voice») no.
+ */
+export function vocesDeLista(texto: string): { nombre: string; descripcion: string }[] {
+  const r = texto.split('\n').map((l) => l.trim()).filter(Boolean)
+  const voces: { nombre: string; descripcion: string }[] = []
+  for (let i = 0; i < r.length; i++) {
+    if (r[i] === 'Current' || !/^[\p{L}][\p{L}\p{N}' -]*$/u.test(r[i])) continue
+    const desc = r[i + 1] === 'Current' ? r[i + 2] : r[i + 1]
+    if (!desc || !/·.*pitch/i.test(desc) || voces.some((v) => v.nombre === r[i])) continue
+    voces.push({ nombre: r[i], descripcion: desc.replace(/\.\s*·/, ' ·') })
+  }
+  return voces
+}
+
+/**
+ * Las voces del menú: las de los grupos (con su uso), con el género que dicen las listas filtradas, y detrás las que
+ * solo salen en esas listas, en «Más voces».
+ */
+export function juntarVoces(grupos: VozStudio[], porGenero: Partial<Record<'mujer' | 'hombre', { nombre: string; descripcion: string }[]>>): VozStudio[] {
+  const genero = new Map<string, 'mujer' | 'hombre'>()
+  for (const [g, voces] of Object.entries(porGenero) as ['mujer' | 'hombre', { nombre: string }[]][]) for (const v of voces) genero.set(v.nombre, g)
+  const conGenero = (v: VozStudio): VozStudio => (genero.has(v.nombre) ? { ...v, genero: genero.get(v.nombre)! } : v)
+  const vistas = new Set(grupos.map((v) => v.nombre))
+  const mas = (Object.entries(porGenero) as ['mujer' | 'hombre', { nombre: string; descripcion: string }[]][])
+    .flatMap(([g, voces]) => voces.map((v) => ({ ...v, grupo: 'Más voces', genero: g })))
+    .filter((v) => !vistas.has(v.nombre) && (vistas.add(v.nombre), true))
+    .sort((a, b) => a.nombre.localeCompare(b.nombre))
+  return [...grupos.map(conGenero), ...mas]
 }
 
 /**

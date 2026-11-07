@@ -1,0 +1,137 @@
+/* El menú «Voz» (`ElegirVoz.tsx`): buscador y filtros arriba, la lista en medio y «Tu frase» abajo. */
+.voz-panel { --suave: color-mix(in srgb, var(--muted) 60%, var(--text)); font-size: 14.5px; display: flex; flex-direction: column; padding: 0; overflow: hidden; max-width: calc(100vw - 24px); background: var(--panel); }
+.voz-panel .logo.chico { flex: none; display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 5px; background: var(--bg); box-shadow: inset 0 0 0 1px var(--line); font-size: 14.5px; font-weight: 700; color: var(--suave); }
+.voz-panel .logo.chico svg { width: 11px; height: 11px; }
+.voz-panel .ico { width: 15px; height: 15px; flex: none; }
+
+.voz-cabeza { flex: none; padding: 10px 10px 0; border-bottom: 1px solid var(--line); }
+.voz-buscar { display: flex; align-items: center; gap: 8px; height: 36px; padding: 0 10px; border-radius: 10px; background: var(--bg); border: 1px solid var(--line); color: var(--suave); }
+.voz-buscar:focus-within { border-color: color-mix(in srgb, var(--amber) 55%, var(--line)); }
+.voz-buscar input { flex: 1; min-width: 0; height: 100%; border: 0; outline: 0; background: none; font-size: 15px; color: var(--text); }
+.voz-buscar input::placeholder { color: var(--suave); }
+.voz-limpiar { display: grid; place-items: center; width: 22px; height: 22px; border-radius: 6px; color: var(--suave); }
+.voz-limpiar:hover { color: var(--text); background: var(--panel-2); }
+.voz-limpiar .ico { width: 13px; height: 13px; }
+
+/* Filtros como texto con su raya debajo, no cápsulas. */
+.voz-filtros { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0 12px; }
+.voz-pestanas { display: flex; flex-wrap: wrap; align-items: center; gap: 0 2px; }
+.voz-pestanas button { display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 8px; font-size: 14.5px; color: var(--suave); white-space: nowrap; box-shadow: inset 0 -2px 0 transparent; transition: color 0.15s, box-shadow 0.15s; }
+.voz-pestanas button:hover { color: var(--text); }
+.voz-pestanas button.on { color: var(--text); box-shadow: inset 0 -2px 0 var(--amber); }
+.voz-pestanas button:focus-visible, .voz-fila:focus-visible, .voz-pie button:focus-visible { outline: 1px solid var(--amber); outline-offset: -1px; }
+.voz-cuenta { font-size: 14.5px; color: var(--suave); font-variant-numeric: tabular-nums; }
+.voz-rasgos { justify-content: flex-start; border-top: 1px solid var(--line); }
+.voz-rasgos .voz-pestanas button { height: 30px; }
+.voz-tonos { padding-left: 10px; border-left: 1px solid var(--line); }
+
+.voz-lista { flex: 1; min-height: 0; overflow-y: auto; padding: 4px; overscroll-behavior: contain; }
+.voz-seccion { position: sticky; top: -4px; z-index: 1; padding: 9px 10px 5px; background: var(--panel); font-size: 14.5px; font-weight: 600; letter-spacing: 0.01em; text-transform: uppercase; color: var(--suave); }
+
+.voz-fila { position: relative; display: flex; align-items: center; gap: 10px; min-height: 56px; padding: 5px 8px; border-radius: 9px; cursor: pointer; overflow: hidden; }
+.voz-fila.activa { background: var(--panel-2); }
+.voz-fila.on { background: var(--amber-tinte); }
+.voz-fila.on strong { color: var(--amber-2); }
+/* Sobre el ámbar de la elegida, el texto de debajo un poco más claro: así no baja de contraste. */
+.voz-fila.on small, .voz-fila.on em { color: color-mix(in srgb, var(--muted) 35%, var(--text)); }
+.voz-texto { flex: 1; min-width: 0; display: flex; flex-direction: column; line-height: 1.3; text-align: left; }
+.voz-texto strong { display: flex; align-items: baseline; gap: 8px; font-size: 15.5px; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.voz-texto em { font-style: normal; font-weight: 400; font-size: 14.5px; color: var(--suave); overflow: hidden; text-overflow: ellipsis; }
+.voz-texto small { font-size: 14.5px; color: var(--suave); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* Lo que tu plan no deja (ElevenLabs gratis): en ámbar, delante de lo demás, para que no se confunda con las que sirven. */
+.voz-pago { color: var(--amber); font-weight: 600; margin-right: 6px; }
+.voz-pestanas .voz-pago { font-size: 13px; margin: 0 0 0 4px; }
+
+/* El botón de oír, siempre a la vista: oír no espera a pasar el ratón. */
+.voz-oir { flex: none; display: grid; place-items: center; width: 30px; height: 30px; border-radius: 8px; background: var(--bg); box-shadow: inset 0 0 0 1px var(--line); color: var(--text); transition: background 0.15s, color 0.15s; }
+.voz-oir .ico { width: 14px; height: 14px; }
+.voz-oir:hover, .voz-fila.activa .voz-oir { background: var(--amber); color: var(--sobre-ambar); box-shadow: none; }
+.voz-oir.quieto, .voz-fila.activa .voz-oir.quieto { background: var(--bg); color: var(--suave); box-shadow: inset 0 0 0 1px var(--line); }
+.voz-oir.quieto .ico { width: 15px; height: 15px; fill: none; }
+.voz-fila.sonando .voz-oir { background: var(--amber); color: var(--sobre-ambar); box-shadow: none; }
+
+/* Mientras suena: tres barras a saltos (steps), sin gastar en una animación suave. */
+.voz-ecualizador { display: flex; align-items: flex-end; gap: 2px; height: 12px; }
+.voz-ecualizador i { width: 3px; height: 100%; background: currentColor; border-radius: 1px; transform-origin: bottom; animation: voz-salto 0.9s steps(3) infinite; }
+.voz-ecualizador i:nth-child(2) { animation-delay: -0.3s; }
+.voz-ecualizador i:nth-child(3) { animation-delay: -0.6s; }
+@keyframes voz-salto { 0% { transform: scaleY(0.35); } 33% { transform: scaleY(1); } 66% { transform: scaleY(0.6); } 100% { transform: scaleY(0.35); } }
+.voz-girando { width: 12px; height: 12px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: voz-giro 0.8s steps(8) infinite; }
+@keyframes voz-giro { to { transform: rotate(360deg); } }
+.voz-avance { position: absolute; left: 0; bottom: 0; height: 2px; width: 100%; background: var(--amber); transform-origin: left; animation: voz-avance linear forwards; }
+@keyframes voz-avance { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+
+.voz-huella { flex: none; width: 20px; height: 20px; fill: none; stroke: var(--muted); stroke-width: 2; stroke-linecap: round; opacity: 0.6; }
+.voz-fila.on .voz-huella, .voz-fila.sonando .voz-huella { stroke: var(--amber); opacity: 1; }
+.voz-motor { flex: none; display: flex; }
+.voz-fav { flex: none; display: grid; place-items: center; width: 26px; height: 26px; border-radius: 7px; color: var(--suave); opacity: 0.35; transition: opacity 0.15s, color 0.15s; }
+.voz-fav .ico { width: 14px; height: 14px; }
+.voz-fila.activa .voz-fav, .voz-fav.on, .voz-fav:focus-visible { opacity: 1; }
+.voz-fav:hover { color: var(--text); background: var(--bg); }
+.voz-fav.on { color: var(--amber); }
+.voz-fav.on .ico { stroke-width: 2.6; }
+.voz-hecha { color: var(--amber); }
+
+.voz-vacio { margin: 0; padding: 18px 12px; font-size: 14.5px; color: var(--suave); text-align: center; }
+.voz-acciones { margin-top: 4px; padding-top: 4px; border-top: 1px solid var(--line); }
+.voz-acciones > button, .voz-acciones > a { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 42px; padding: 5px 8px; border-radius: 9px; color: var(--text); text-decoration: none; }
+.voz-acciones > button:hover, .voz-acciones > a:hover { background: var(--panel-2); }
+.voz-acciones .ico { width: 18px; height: 18px; padding: 1px; color: var(--suave); }
+
+.voz-pie { flex: none; display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 4px 10px; padding: 8px 10px 10px; border-top: 1px solid var(--line); background: var(--panel); }
+.voz-frase { grid-column: 1 / -1; display: flex; align-items: center; gap: 8px; height: 34px; padding: 0 10px; border-radius: 9px; background: var(--bg); border: 1px solid var(--line); }
+.voz-frase:focus-within { border-color: color-mix(in srgb, var(--amber) 55%, var(--line)); }
+.voz-frase span { flex: none; font-size: 14.5px; font-weight: 600; letter-spacing: 0.01em; text-transform: uppercase; color: var(--suave); }
+.voz-frase input { flex: 1; min-width: 0; height: 100%; border: 0; outline: 0; background: none; font-size: 14.5px; }
+.voz-aviso { margin: 0; font-size: 14.5px; color: var(--suave); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.voz-aviso.bad { color: color-mix(in srgb, var(--bad) 60%, var(--text)); white-space: normal; }
+.voz-clonar { display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 8px; border-radius: 7px; font-size: 14.5px; color: var(--suave); white-space: nowrap; }
+.voz-clonar:hover { color: var(--text); background: var(--panel-2); }
+.voz-clonar .ico { width: 14px; height: 14px; }
+
+/* Clonar tu voz, dentro del mismo menú. */
+.voz-clonar-panel { display: flex; flex-direction: column; gap: 10px; padding: 10px 12px 12px; overflow-y: auto; }
+.voz-clonar-cabeza { display: flex; align-items: center; gap: 8px; }
+.voz-volver { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 8px; color: var(--suave); }
+.voz-volver:hover { color: var(--text); background: var(--panel-2); }
+.voz-clonar-panel p { margin: 0; }
+.voz-grabar { display: flex; align-items: center; gap: 10px; }
+.voz-boton { position: relative; flex: none; display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 12px; border-radius: 9px; font-size: 14.5px; color: var(--text); background: var(--panel-2); box-shadow: inset 0 0 0 1px var(--line); cursor: pointer; }
+.voz-boton:hover { box-shadow: inset 0 0 0 1px var(--muted); }
+.voz-boton.grabando { color: var(--text); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--bad) 60%, transparent); }
+.voz-nivel { flex: 1; height: 6px; border-radius: 1px; background: var(--bg); box-shadow: inset 0 0 0 1px var(--line); overflow: hidden; }
+.voz-nivel i { display: block; height: 100%; background: var(--ok); transform-origin: left; transition: transform 0.25s steps(4); }
+.voz-subir input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+.voz-nombre { height: 32px; padding: 0 10px; border-radius: 9px; border: 1px solid var(--line); background: var(--bg); outline: 0; }
+.voz-nombre:focus { border-color: color-mix(in srgb, var(--amber) 55%, var(--line)); }
+.voz-clonar-pie { display: flex; justify-content: flex-end; }
+
+@media (prefers-reduced-motion: reduce) {
+  .voz-ecualizador i, .voz-girando, .voz-avance { animation: none; }
+}
+
+/* Lo que no es la lista también se lee: el texto del menú no baja de 14,5 px (medido en docs/agents/eval-voz.md). */
+.voz-panel p, .voz-panel .small, .voz-panel .bad { font-size: 14.5px; }
+.voz-panel .bad { color: color-mix(in srgb, var(--bad) 60%, var(--text)); }
+.voz-panel .muted { color: var(--suave); }
+
+/* Armado antes de abrirlo (`ElegirVoz`): no se ve, no se toca y no se anima hasta que se abre. */
+.voz-panel.voz-oculto { visibility: hidden; pointer-events: none; animation: none; }
+.voz-quitar.on { color: var(--bad); }
+
+/* El texto para leer mientras grabas tu voz. */
+.voz-leer { margin: 0; padding: 10px 12px; border-radius: 10px; background: var(--bg); box-shadow: inset 0 0 0 1px var(--line); }
+.voz-leer blockquote { margin: 0; font-size: 15px; line-height: 1.5; color: var(--text); }
+.voz-leer figcaption { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 6px; color: var(--suave); }
+.voz-otro { display: inline-flex; align-items: center; gap: 5px; padding: 2px 6px; border-radius: 7px; color: var(--suave); }
+.voz-otro:hover { color: var(--text); background: var(--panel-2); }
+.voz-otro .ico { width: 13px; height: 13px; }
+
+/* El catálogo de Voices Cloning: sus proveedores y «Ver más». */
+.voz-aviso-de { font-size: 14.5px; color: var(--amber-2); }
+/* Los créditos de voz que te quedan, en la pestaña Sloth. */
+.voz-creditos { margin: 0; padding: 8px 12px 2px; font-size: 14.5px; color: var(--suave); }
+.voz-creditos strong { color: var(--amber); font-weight: 600; }
+.voz-creditos.bad { color: var(--bad); }
+.voz-mas { display: block; width: 100%; margin-top: 4px; padding: 10px; border-radius: 9px; font-size: 14.5px; color: var(--suave); box-shadow: inset 0 0 0 1px var(--line); }
+.voz-mas:hover { color: var(--text); background: var(--panel-2); }

@@ -1360,6 +1360,10 @@ export interface VozStudio {
   nombre: string
   descripcion: string
   grupo: string
+  /** Un MP3 o WAV público con cómo suena, si AI Studio lo da: el menú lo oye sin gastar la cuota. */
+  muestra?: string
+  /** Como la filtra AI Studio (Feminine, Masculine). */
+  genero?: 'mujer' | 'hombre'
 }
 
 /**
@@ -1413,12 +1417,32 @@ export interface VozApi {
   nombre: string
   descripcion: string
   propia: boolean
+  /** Un MP3 público con cómo suena (el `preview_url` de ElevenLabs, la muestra de Fish Audio): se oye sin gastar nada. */
+  muestra?: string
+  /** Cuántas veces la han usado en su biblioteca (Fish Audio), para ordenar las de todos. */
+  usos?: number
+  /** En Voices Cloning, de cuál de los suyos sale (`elevenlabs`, `edge`, `minimax`, `vbee`, `fishaudio`, `clone`). */
+  de?: string
+  /** Por qué tu plan no deja generar con ella (su muestra sí se oye): las de la biblioteca de ElevenLabs en el gratis. */
+  bloqueo?: string
+}
+
+/**
+ * El plan de tu cuenta en un proveedor (por ahora ElevenLabs, `/v1/user/subscription`): si es el gratis, si deja clonar
+ * y cuántas letras del mes llevas de cuántas.
+ */
+export interface PlanVoz {
+  gratis: boolean
+  nombre: string
+  clonar: boolean
+  letras?: { usadas: number; limite: number }
 }
 
 /** Un proveedor con llave: los cuatro últimos de la llave (`null`: sin poner) y sus voces. `error`: lo último que falló. */
 export interface EstadoProveedorVoz {
   llave: string | null
   voces: VozApi[]
+  plan?: PlanVoz
   error?: string
 }
 

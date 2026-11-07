@@ -8,7 +8,7 @@ import { promisify } from 'node:util'
 import type { EstadoVoicesCloning, VozApi } from '../../shared/types.ts'
 import { trozosParaVoz, wavDePcm } from '../../shared/voz.ts'
 import { guardar } from '../disco.ts'
-import { cuerpo, json as enviar } from '../http.ts'
+import { bytes, cuerpo, json as enviar } from '../http.ts'
 import { COBRO } from '../licencia.ts'
 
 /**
@@ -16,8 +16,10 @@ import { COBRO } from '../licencia.ts'
  * llave aquí: la del socio la guarda el cobro (`licencias/src/voz.ts`), que sabe quién eres (tu cuenta o tu apoyo, o el
  * creador con su llave de `publicar.txt`) y gasta tus créditos, no los de otro. Sus voces van como `vc:<voice_id>`.
  *
- * Las voces se eligen en su ventana (`embed.js`, que abre `web/src/Voz.tsx` con el pase de `/api/voz/vc/sesion`): la
- * que eliges o clonas se guarda en `data/voz/voices-cloning.json` para el menú «Voz». Generar es pedir el guion por
+ * Sus voces se ven en el menú «Voz» de Sloth, como las demás: con el pase de una hora que da el cobro (`/voz/sesion`),
+ * este servidor pide a su API (la misma que usa su ventana, `embed.js`) los proveedores, el catálogo con su búsqueda y
+ * sus filtros, y clona tu voz (`/api/voz/vc/proveedores`, `/catalogo`, `/clonar`). La que eliges o clonas se guarda en
+ * `data/voz/voices-cloning.json`. Su ventana queda para lo demás que ofrecen (diálogo, texto largo, transcribir). Generar es pedir el guion por
  * trozos (`MAX` letras) a `/voz/tts`; cada trozo llega en MP3, que ffmpeg pasa a PCM, y se juntan en el mismo WAV de 16
  * bits que dan los demás motores, así que las skills no cambian. Si un trozo tarda de más (504 con `task_id`), se espera
  * su tarea; si hay mucha demanda (429), lo que diga `Retry-After`.
@@ -36,8 +38,36 @@ const FRECUENCIA = 44_100
 const RESPIRO = 0.3
 /** Lo más que se espera una tarea que tardó. */
 const ESPERA_TAREA = 10 * 60_000
-const SIN_CUENTA = 'Para usar las voces de Voices Cloning, crea tu cuenta gratis de Sloth (Opciones → Apoyo).'
-const SIN_CONEXION = 'No hay conexión con el cobro de Sloth, que pide las voces de Voices Cloning. Revisa tu internet.'
+const SIN_CUENTA = 'Para usar las voces de Sloth, crea tu cuenta gratis de Sloth (Opciones → Apoyo).'
+const SIN_CONEXION = 'No hay conexión con Sloth para pedir sus voces. Revisa tu internet.'
+/** Su API, la que usa su ventana, con el pase de sesión (`Authorization: Bearer et_…`). */
+const VC = 'https://www.voicescloning.art'
+/** Los proveedores que tiene dentro (`/api/v1/providers`), y lo que se puede pedir de su catálogo. */
+const PROVEEDORES_VC = /^(elevenlabs|edge|minimax|vbee|fishaudio|clone)$/
+const FILTROS_VC = ['gender', 'accent', 'age', 'category'] as const
+/** El país de una voz por su `locale` (`es-MX`), como se dice de una voz: «mexicana». */
+const PAISES: Record<string, [pais: string, de: string]> = {
+  MX: ['México', 'mexicana'], AR: ['Argentina', 'argentina'], ES: ['España', 'de España'], CO: ['Colombia', 'colombiana'],
+  CL: ['Chile', 'chilena'], PE: ['Perú', 'peruana'], VE: ['Venezuela', 'venezolana'], US: ['Estados Unidos', 'estadounidense'],
+  BO: ['Bolivia', 'boliviana'], EC: ['Ecuador', 'ecuatoriana'], UY: ['Uruguay', 'uruguaya'], PY: ['Paraguay', 'paraguaya'],
+  CR: ['Costa Rica', 'costarricense'], CU: ['Cuba', 'cubana'], DO: ['República Dominicana', 'dominicana'], GT: ['Guatemala', 'guatemalteca'],
+  HN: ['Honduras', 'hondureña'], NI: ['Nicaragua', 'nicaragüense'], PA: ['Panamá', 'panameña'], PR: ['Puerto Rico', 'puertorriqueña'],
+  SV: ['El Salvador', 'salvadoreña'], GQ: ['Guinea Ecuatorial', 'ecuatoguineana']
+}
+/** El nombre de una voz de Edge, que viene técnico («es-AR-ElenaNeural»): «Elena (Argentina)». Las demás, tal cual. */
+/** Un error del cobro como lo lee el cliente: «las voces de Sloth», sin el nombre del socio. */
+export function sinSocio(error: string): string {
+  return error
+    .replace(/(créditos de voz|usuario) de (las voces de )?Voices Cloning/g, '$1 de Sloth')
+    .replace(/(las )?voces de Voices Cloning( en Sloth)?/g, 'las voces de Sloth')
+    .replace(/Voices Cloning/g, 'las voces de Sloth')
+    .replace(/(^|[.:] )las/g, (_, a: string) => `${a}Las`)
+}
+
+export function nombreVc(nombre: string): string {
+  const m = /^[a-z]{2,3}-([A-Z]{2})-([A-Z][a-z]+)(?:Multilingual)?Neural$/.exec(nombre.trim())
+  return m ? `${m[2]} (${PAISES[m[1]]?.[0] ?? m[1]})` : nombre.trim()
+}
 const correr = promisify(execFile)
 
 class Fallo extends Error {
@@ -83,8 +113,40 @@ export function voicesCloning(carpeta: string, o: { credencial(): Credencial | u
       throw new Fallo(502, SIN_CONEXION)
     }
     const datos = ((await r.json().catch(() => ({}))) ?? {}) as Respuesta<T>['datos']
+    // Al cliente las voces son de Sloth: un cobro de antes aún nombra al socio en sus errores (Administrador lo ve tal cual).
+    if (!ruta.startsWith('/voz/admin') && typeof datos.error === 'string') datos.error = sinSocio(datos.error)
     const espera = Number(r.headers.get('retry-after'))
     return { status: r.status, datos, ...(Number.isFinite(espera) && espera > 0 ? { espera } : {}) }
+  }
+
+  /** El pase de una hora para su API, pedido al cobro y guardado hasta 5 minutos antes de que caduque. */
+  let pase: { token: string; hasta: number } | undefined
+  /** Sus proveedores con cuántas voces trae cada uno (`/api/v1/providers`), hasta `hasta`. */
+  let proveedores: { lista: { id: string; nombre: string; voces: number; aviso?: string }[]; hasta: number } | undefined
+  async function conPase(): Promise<string> {
+    if (pase && pase.hasta - 5 * 60_000 > Date.now()) return pase.token
+    const s = await pedirBien<{ token: string; expires_at?: string }>('/voz/sesion', { json: {} })
+    pase = { token: s.token, hasta: (s.expires_at && Date.parse(s.expires_at)) || Date.now() + 50 * 60_000 }
+    return pase.token
+  }
+
+  /** Su API con el pase. Si caducó antes de tiempo (401), se pide otro una vez. */
+  async function suApi<T>(ruta: string, init: { form?: FormData } = {}): Promise<T> {
+    for (let intento = 0; ; intento++) {
+      let r: Response
+      try {
+        r = await fetch(`${VC}${ruta}`, { method: init.form ? 'POST' : 'GET', headers: { authorization: `Bearer ${await conPase()}` }, body: init.form, signal: AbortSignal.timeout(2 * 60_000) })
+      } catch {
+        throw new Fallo(502, 'No hay conexión con las voces de Sloth. Revisa tu internet.')
+      }
+      if (r.status === 401 && intento === 0) {
+        pase = undefined
+        continue
+      }
+      const datos = ((await r.json().catch(() => ({}))) ?? {}) as T & { error?: string }
+      if (!r.ok) throw new Fallo(r.status, datos.error ?? `Las voces de Sloth respondieron ${r.status}.`)
+      return datos
+    }
   }
 
   async function pedirBien<T>(ruta: string, init?: Parameters<typeof pedir>[1]): Promise<T> {
@@ -132,7 +194,7 @@ export function voicesCloning(carpeta: string, o: { credencial(): Credencial | u
         await espera(Math.min(60, r.espera ?? [5, 15, 30][intento]) * 1000)
         continue
       }
-      throw new Fallo(r.status, r.datos.error ?? `Voices Cloning respondió ${r.status}.`)
+      throw new Fallo(r.status, r.datos.error ?? `Las voces de Sloth respondieron ${r.status}.`)
     }
   }
 
@@ -160,14 +222,16 @@ export function voicesCloning(carpeta: string, o: { credencial(): Credencial | u
       return s
     },
 
-    /** La voz que elegiste (o clonaste) en la ventana: va primero en el menú. */
-    elegida(v: { voice_id?: unknown; name?: unknown; provider?: unknown }, clonada = false) {
+    /** La voz que elegiste (o clonaste): va primero en el menú, con cómo suena y su muestra si las da. */
+    elegida(v: { voice_id?: unknown; name?: unknown; provider?: unknown; descripcion?: unknown; muestra?: unknown }, clonada = false) {
       const id = String(v.voice_id ?? '').trim()
       if (!id || id.length > 200) throw new Fallo(400, 'La ventana no dio el id de la voz.')
       const nombre = String(v.name ?? '').trim().slice(0, 80) || (clonada ? 'Mi voz' : id)
       const antes = voces.find((x) => x.id === id)
-      const descripcion = clonada ? 'Tu voz clonada' : String(v.provider ?? '').trim().slice(0, 60) || antes?.descripcion || ''
-      voces = [{ id, nombre, descripcion, propia: clonada || !!antes?.propia }, ...voces.filter((x) => x.id !== id)].slice(0, 50)
+      const descripcion = clonada ? 'Tu voz clonada' : String(v.descripcion ?? '').trim().slice(0, 80) || String(v.provider ?? '').trim().slice(0, 60) || antes?.descripcion || ''
+      const muestra = typeof v.muestra === 'string' && /^https:\/\/www\.voicescloning\.art\/api\/media\//.test(v.muestra) ? v.muestra : antes?.muestra
+      const de = String(v.provider ?? '').trim().slice(0, 40) || antes?.de
+      voces = [{ id, nombre, descripcion, propia: clonada || !!antes?.propia, ...(muestra ? { muestra } : {}), ...(de ? { de } : {}) }, ...voces.filter((x) => x.id !== id)].slice(0, 50)
       guardarVoces()
     },
 
@@ -182,7 +246,7 @@ export function voicesCloning(carpeta: string, o: { credencial(): Credencial | u
     /** La voz de un guion entero, como WAV, y cuánto dura. */
     async generar(id: string, texto: string): Promise<{ wav: Uint8Array; segundos: number }> {
       if (!info.configurado) await refrescar()
-      if (!info.configurado) throw new Error(error || 'Las voces de Voices Cloning no están disponibles en esta computadora: hace falta la cuenta de Sloth (Opciones → Apoyo). Mientras, pídele la voz al usuario.')
+      if (!info.configurado) throw new Error(error || 'Las voces de Sloth no están disponibles en esta computadora: hace falta la cuenta de Sloth (Opciones → Apoyo). Mientras, pídele la voz al usuario.')
       const partes: Uint8Array[] = []
       for (const t of trozosParaVoz(texto, MAX)) partes.push(await trozo(id, t))
       void refrescar()
@@ -211,14 +275,68 @@ export function voicesCloning(carpeta: string, o: { credencial(): Credencial | u
       }
     },
 
-    /** `/api/voz/vc*`: el pase de la ventana, la voz elegida, quitarla y volver a preguntar. */
+    /**
+     * `/api/voz/vc*`: sus proveedores y su catálogo (`GET`), clonar tu voz, el pase de su ventana, la voz elegida,
+     * quitarla y volver a preguntar.
+     */
     async api(req: IncomingMessage, res: ServerResponse, path: string, estadoVoz: () => unknown): Promise<boolean> {
+      if (req.method === 'GET' && (path === '/api/voz/vc/proveedores' || path === '/api/voz/vc/catalogo')) {
+        try {
+          if (path === '/api/voz/vc/proveedores') {
+            // El menú los pide al abrirse el compositor, para contar todas desde el principio: se guardan 10 minutos.
+            if (!proveedores || proveedores.hasta < Date.now()) {
+              const d = await suApi<{ providers?: { id: string; name: string; badge?: string; voice_count?: number }[] }>('/api/v1/providers?language=es')
+              proveedores = { lista: (d.providers ?? []).map((p) => ({ id: p.id, nombre: p.name, voces: p.voice_count ?? 0, ...(p.badge ? { aviso: p.badge } : {}) })), hasta: Date.now() + 10 * 60_000 }
+            }
+            return enviar(res, 200, { proveedores: proveedores.lista })
+          }
+          const q = new URL(req.url ?? '', 'http://x').searchParams
+          const proveedor = q.get('proveedor') ?? 'elevenlabs'
+          if (!PROVEEDORES_VC.test(proveedor)) return enviar(res, 400, { error: 'Ese proveedor no está en las voces de Sloth.' })
+          const p = new URLSearchParams({ provider: proveedor, page: String(Math.max(1, Number(q.get('pagina')) || 1)), per_page: '30' })
+          if (proveedor !== 'clone') p.set('language', 'es')
+          for (const f of FILTROS_VC) if (q.get(f)) p.set(f, q.get(f)!.slice(0, 40))
+          if (q.get('q')?.trim()) p.set('q', q.get('q')!.trim().slice(0, 80))
+          type V = { voice_id: string; name: string; provider?: string; locale?: string | null; gender?: string; age?: string; accent?: string; category?: string; description?: string; tier?: string; preview_url?: string }
+          const d = await suApi<{ voices?: V[]; has_more?: boolean; total?: number }>(`/api/v1/voices?${p}`)
+          const voz = (v: V): VozApi => ({
+            id: v.voice_id,
+            nombre: nombreVc(v.name),
+            // Como las de Fish: unas palabras que el menú dice en español («male, young, mexicana»); el país, por su locale.
+            descripcion: [v.gender, v.age, PAISES[v.locale?.split('-')[1] ?? '']?.[1] ?? v.accent, v.category].filter((x) => x && !/^(high_quality|standard|professional)$/.test(x)).join(', ').slice(0, 80),
+            propia: proveedor === 'clone',
+            ...(v.preview_url ? { muestra: v.preview_url } : {}),
+            ...(v.provider ? { de: v.provider } : {})
+          })
+          return enviar(res, 200, { voces: (d.voices ?? []).map(voz), mas: !!d.has_more, total: d.total ?? 0 })
+        } catch (e) {
+          return enviar(res, e instanceof Fallo && e.status < 500 ? e.status : 502, { error: mensaje(e) })
+        }
+      }
+      // Clonar tu voz con su API: la grabación (o el archivo) y su nombre. Queda la primera del menú.
+      if (req.method === 'POST' && path === '/api/voz/vc/clonar') {
+        try {
+          const q = new URL(req.url ?? '', 'http://x').searchParams
+          const audio = await bytes(req)
+          if (audio.length < 1000) return enviar(res, 400, { error: 'Elige una grabación de tu voz.' })
+          if (audio.length > 25e6) return enviar(res, 400, { error: 'La grabación pesa más de 25 MB: con un minuto basta.' })
+          const f = new FormData()
+          f.set('name', q.get('nombre')?.trim().slice(0, 80) || 'Mi voz')
+          f.set('audio_file', new Blob([audio as Uint8Array<ArrayBuffer>], { type: String(req.headers['content-type'] ?? 'audio/webm') }), q.get('archivo') || 'voz.webm')
+          const d = await suApi<{ voice_id?: string; name?: string }>('/api/v1/voices/clone', { form: f })
+          this.elegida({ voice_id: d.voice_id, name: d.name ?? f.get('name') }, true)
+          void refrescar()
+          return enviar(res, 200, estadoVoz())
+        } catch (e) {
+          return enviar(res, e instanceof Fallo && e.status < 500 ? e.status : 502, { error: mensaje(e) })
+        }
+      }
       const m = /^\/api\/voz\/vc(?:\/(sesion|elegida|quitar))?$/.exec(path)
       if (!m || req.method !== 'POST') return false
       try {
         if (m[1] === 'sesion') return enviar(res, 200, await this.sesion())
         if (m[1] === 'elegida') {
-          const d = await cuerpo<{ voz?: { voice_id?: unknown; name?: unknown; provider?: unknown }; clonada?: boolean }>(req)
+          const d = await cuerpo<{ voz?: { voice_id?: unknown; name?: unknown; provider?: unknown; descripcion?: unknown; muestra?: unknown }; clonada?: boolean }>(req)
           this.elegida(d.voz ?? {}, !!d.clonada)
         }
         if (m[1] === 'quitar') this.quitar(String((await cuerpo<{ id?: string }>(req)).id ?? ''))
@@ -237,13 +355,13 @@ async function bajar(url: string): Promise<Uint8Array> {
   try {
     u = new URL(url)
   } catch {
-    throw new Error('Voices Cloning dio un enlace de audio que no sirve.')
+    throw new Error('Las voces de Sloth dieron un enlace de audio que no sirve.')
   }
-  if (u.protocol !== 'https:' || !/(^|\.)voicescloning\.art$/.test(u.hostname)) throw new Error(`Voices Cloning dio el audio en otro sitio (${u.hostname}).`)
+  if (u.protocol !== 'https:' || !/(^|\.)voicescloning\.art$/.test(u.hostname)) throw new Error(`Las voces de Sloth dieron el audio en otro sitio (${u.hostname}).`)
   for (let intento = 0; ; intento++) {
     try {
       const r = await fetch(u, { signal: AbortSignal.timeout(2 * 60_000) })
-      if (!r.ok) throw new Error(`Voices Cloning no dio el audio (${r.status}).`)
+      if (!r.ok) throw new Error(`Las voces de Sloth no dieron el audio (${r.status}).`)
       return new Uint8Array(await r.arrayBuffer())
     } catch (e) {
       if (intento >= 2) throw e
@@ -260,7 +378,7 @@ export async function pcmDeMp3(mp3: Uint8Array): Promise<Uint8Array> {
     await correr('ffmpeg', ['-nostdin', '-v', 'error', '-y', '-i', `${base}.mp3`, '-f', 's16le', '-acodec', 'pcm_s16le', '-ac', '1', '-ar', String(FRECUENCIA), `${base}.pcm`], { timeout: 120_000 })
     return new Uint8Array(readFileSync(`${base}.pcm`))
   } catch (e) {
-    throw new Error(`No se pudo leer el audio de Voices Cloning con ffmpeg: ${mensaje(e)}`)
+    throw new Error(`No se pudo leer el audio de las voces de Sloth con ffmpeg: ${mensaje(e)}`)
   } finally {
     rmSync(`${base}.mp3`, { force: true })
     rmSync(`${base}.pcm`, { force: true })

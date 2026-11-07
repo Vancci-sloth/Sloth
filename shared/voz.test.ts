@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { lineaVoz, motorDe, pcmDeWav, segundosWav, textoParaVoz, trozosParaVoz, vocesDelPanel, wavDePcm } from './voz.ts'
+import { comoSuena, encaja, grupoEnEspanol, juntarVoces, lineaVoz, motorDe, muestraDeStudio, pcmDeWav, segundosWav, textoParaVoz, trozosParaVoz, vocesDeLista, vocesDelPanel, wavDePcm } from './voz.ts'
 
 // El principio del panel de voces de AI Studio, como lo dio su `innerText` el 29 de octubre de 2026.
 const PANEL = `Speaker settings
@@ -91,7 +91,7 @@ test('del guion se narra lo de debajo de los encabezados, sin ellos ni comentari
 
 test('las voces de Fish Audio, ElevenLabs y Voices Cloning van con su prefijo; lo demás es AI Studio', () => {
   assert.deepEqual(motorDe('vc:voz-123'), { motor: 'vc', id: 'voz-123' })
-  assert.equal(lineaVoz({}, 'vc:voz-123', 'Enya'), 'Voz: genérala tú con Voices Cloning, voz «Enya»: en generar_voz pon la voz vc:voz-123 (cómo, en video-base/VOZ.md).')
+  assert.equal(lineaVoz({}, 'vc:voz-123', 'Enya'), 'Voz: genérala tú con Sloth, voz «Enya»: en generar_voz pon la voz vc:voz-123 (cómo, en video-base/VOZ.md).')
   assert.deepEqual(motorDe('fish:8ef4a238'), { motor: 'fish', id: '8ef4a238' })
   assert.deepEqual(motorDe('elevenlabs:21m00Tcm'), { motor: 'elevenlabs', id: '21m00Tcm' })
   assert.deepEqual(motorDe('Fola'), { motor: 'ai-studio', id: 'Fola' })
@@ -120,4 +120,84 @@ test('los trozos de PCM se juntan en un WAV entero, con su respiro entre uno y o
 test('la línea del corte de datos no se narra', () => {
   const md = '# La pulsera\n\nCorte de datos: 3 de noviembre de 2026.\n\nUn astronauta te escribe.\n'
   assert.equal(textoParaVoz(md), 'Un astronauta te escribe.')
+})
+
+test('cómo suena una voz se dice en español, con su tono', () => {
+  assert.deepEqual(comoSuena('Warm and approachable · Low pitch'), { texto: 'Cálida y cercana · grave', tono: 'grave' })
+  assert.deepEqual(comoSuena('Gentle and relaxed · Very high pitch'), { texto: 'Suave y relajada · muy aguda', tono: 'aguda' })
+  assert.deepEqual(comoSuena('Direct and helpful · Medium-low pitch'), { texto: 'Directa y servicial · media grave', tono: 'grave' })
+  // Las etiquetas de Fish Audio y ElevenLabs.
+  assert.deepEqual(comoSuena('male, old, narration, deep'), { texto: 'Hombre, mayor, narración, profunda', tono: 'grave' })
+  assert.equal(comoSuena('female, young, mexican').texto, 'Mujer, joven, mexicana')
+  // Los acentos de ElevenLabs con su idioma delante.
+  assert.equal(comoSuena('male, adult, es-latin-american').texto, 'Hombre, edad media, latina')
+  assert.equal(comoSuena('male, old, narrative_story').texto, 'Hombre, mayor, narración')
+  // Lo que no se sabe queda como viene.
+  assert.equal(comoSuena('Anime girl').texto, 'Anime girl')
+  assert.equal(grupoEnEspanol('Storyteller'), 'Narración')
+  assert.equal(grupoEnEspanol('Algo nuevo'), 'Algo nuevo')
+})
+
+test('se busca por cualquier palabra, sin acentos ni orden', () => {
+  const textos = ['Enzo', 'Crisp and eager · Low pitch', 'Nítida y entusiasta · grave', 'Narración', 'Storyteller']
+  assert.ok(encaja('grave narración', textos))
+  assert.ok(encaja('gra nar', textos))
+  assert.ok(encaja('NARRACION  nitida', textos))
+  assert.ok(encaja('storyteller', textos))
+  assert.ok(!encaja('aguda', textos))
+  assert.ok(encaja('', textos))
+})
+
+test('la muestra de AI Studio sale del nombre de la voz; las de antes, de otra carpeta', () => {
+  assert.equal(muestraDeStudio('Fola'), 'https://www.gstatic.com/aistudio/voices/samples/daikon/en-us-fola.wav')
+  assert.equal(muestraDeStudio('Kore'), 'https://www.gstatic.com/aistudio/voices/samples/Kore.wav')
+})
+
+// El panel filtrado por género (Feminine), como lo dio su `innerText` el 6 de noviembre de 2026: todas en una lista.
+const FEMENINAS = `Speaker settings
+close
+VOICE
+Current voice
+Fola
+play_arrow
+search
+Feminine
+arrow_drop_down
+Pitch
+arrow_drop_down
+Cleo
+Warm and engaging. · Medium-high pitch
+favorite
+sync
+play_arrow
+check
+Fola
+Current
+Clear and friendly. · Medium pitch
+favorite
+sync
+play_arrow
+Kore
+Firm · Middle pitch
+favorite
+sync
+play_arrow`
+
+test('filtrado por género, el panel da todas; se juntan con las de los grupos y su género', () => {
+  const mujeres = vocesDeLista(FEMENINAS)
+  assert.deepEqual(mujeres, [
+    { nombre: 'Cleo', descripcion: 'Warm and engaging · Medium-high pitch' },
+    { nombre: 'Fola', descripcion: 'Clear and friendly · Medium pitch' },
+    { nombre: 'Kore', descripcion: 'Firm · Middle pitch' }
+  ])
+  const grupos = [{ nombre: 'Fola', descripcion: 'Clear and friendly · Medium pitch', grupo: 'Call Center' }, { nombre: 'Daro', descripcion: 'Confident and clear · Low pitch', grupo: 'Call Center' }]
+  assert.deepEqual(juntarVoces(grupos, { mujer: mujeres, hombre: [{ nombre: 'Daro', descripcion: '' }] }), [
+    { nombre: 'Fola', descripcion: 'Clear and friendly · Medium pitch', grupo: 'Call Center', genero: 'mujer' },
+    { nombre: 'Daro', descripcion: 'Confident and clear · Low pitch', grupo: 'Call Center', genero: 'hombre' },
+    { nombre: 'Cleo', descripcion: 'Warm and engaging · Medium-high pitch', grupo: 'Más voces', genero: 'mujer' },
+    { nombre: 'Kore', descripcion: 'Firm · Middle pitch', grupo: 'Más voces', genero: 'mujer' }
+  ])
+  // Sin listas (la página cambió), quedan las de los grupos tal cual.
+  assert.deepEqual(juntarVoces(grupos, {}), grupos)
+  assert.deepEqual(comoSuena('Firm · Middle pitch'), { texto: 'Firme · media', tono: 'media' })
 })

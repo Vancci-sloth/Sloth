@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { test } from 'node:test'
 import { segundosWav, wavDePcm } from '../shared/voz.ts'
-import { vozPorApi } from './voz/apis.ts'
+import { msgpack, vozPorApi } from './voz/apis.ts'
 
 /** Fish Audio y ElevenLabs de mentira: lo que se les pide y lo que contestan, sin salir a internet. */
 function conApis(t: { after(f: () => void): void }) {
@@ -18,6 +18,8 @@ function conApis(t: { after(f: () => void): void }) {
     const cabeceras = init.headers as Record<string, string>
     pedidos.push({ url, cabeceras, cuerpo: typeof init.body === 'string' ? JSON.parse(init.body) : undefined })
     if (url.includes('/model?self=true')) return Response.json({ items: [{ _id: 'mia', title: 'Mi voz', tags: ['es'] }] })
+    // Sin saldo de API, Fish no deja crear voces (como contesta de verdad, visto el 6-nov-2026).
+    if (url.endsWith('/model')) return Response.json({ message: 'API model creation limit reached (0/0). Top up API credit to raise the limit.' }, { status: 402 })
     if (url.includes('/model?language=es')) return Response.json({ items: [{ _id: 'mia', title: 'Mi voz' }, { _id: 'pub', title: 'Narrador', tags: ['narration', 'male'] }] })
     if (url.endsWith('/v1/tts')) {
       // La primera vez está saturado: se repite sola.
@@ -72,4 +74,37 @@ test('ElevenLabs: genera en PCM de 24 kHz y, sin créditos, lo dice para el agen
   assert.equal((pedido.cuerpo as { model_id: string }).model_id, 'eleven_v3')
   assert.equal(segundos, 0.5)
   await assert.rejects(apis.generar('elevenlabs:otra', 'Hola.'), /ElevenLabs se quedó sin créditos este mes, o tu plan no deja hacer esto: You have 0 credits left/)
+})
+
+test('msgpack, lo justo para mandarle a Fish Audio tu grabación de referencia', () => {
+  assert.deepEqual([...msgpack({ a: 'b' })], [0x81, 0xa1, 0x61, 0xa1, 0x62])
+  assert.deepEqual([...msgpack([true, false])], [0x92, 0xc3, 0xc2])
+  // Un texto de 40 letras ya no cabe en el corto: va con su largo en un byte.
+  assert.deepEqual([...msgpack('x'.repeat(40)).subarray(0, 2)], [0xd9, 40])
+  assert.deepEqual([...msgpack('ñ')], [0xa2, 0xc3, 0xb1])
+  // Los bytes de una grabación: de 8, 16 o 32 bits según cuánto pesen.
+  assert.deepEqual([...msgpack(Uint8Array.of(1, 2))], [0xc4, 2, 1, 2])
+  assert.deepEqual([...msgpack(new Uint8Array(300)).subarray(0, 3)], [0xc5, 1, 44])
+  assert.deepEqual([...msgpack(new Uint8Array(70_000)).subarray(0, 5)], [0xc6, 0, 1, 0x11, 0x70])
+  // Lo que no se pone (undefined) no viaja.
+  assert.deepEqual([...msgpack({ a: undefined, b: true })], [0x81, 0xa1, 0x62, 0xc3])
+  // Lo que no sabe mandar, lo dice (antes un número salía como un mapa vacío).
+  assert.throws(() => msgpack({ n: 3 }), /no sé mandar number/)
+  assert.throws(() => msgpack(null), /no sé mandar null/)
+})
+
+test('Fish Audio sin saldo para crear voces: tu grabación se queda aquí y va de referencia en cada pedido', async (t) => {
+  const { pedidos, apis } = conApis(t)
+  await apis.actualizar('fish')
+  const id = await apis.clonar('fish', 'Yo', Uint8Array.of(1, 2, 3), 'audio/webm', 'yo.webm')
+  assert.match(id, /^tuya-/)
+  assert.deepEqual(apis.estado().fish.voces[0], { id, nombre: 'Yo', descripcion: 'Tu voz, guardada en esta computadora', propia: true })
+  await apis.generar(`fish:${id}`, 'Hola.')
+  const ultimo = pedidos.filter((p) => p.url.endsWith('/v1/tts')).at(-1)!
+  assert.equal(ultimo.cabeceras['content-type'], 'application/msgpack')
+  // Quitarla borra su grabación: ya no se puede generar con ella.
+  apis.quitarTuya('fish', id)
+  assert.ok(!apis.estado().fish.voces.some((v) => v.id === id))
+  await assert.rejects(apis.generar(`fish:${id}`, 'Hola.'), /Ya no está la grabación/)
+  assert.throws(() => apis.quitarTuya('fish', 'mia'), /Solo se quitan desde aquí/)
 })
