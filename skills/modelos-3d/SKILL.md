@@ -112,3 +112,39 @@ La biblioteca es de cada quien y empieza vacía: la moneda y el ícono 3D que tr
 en `plantilla/`, que `usar` encuentra y `buscar` no enseña (si mejoras uno y lo guardas, pasa a la biblioteca). Lo
 guardado queda en la biblioteca de esta computadora (`modelos/` de esta skill), que se ve en «Modelos 3D» de Sloth: al
 entregar el video, dile al usuario qué modelos sumaste o mejoraste.
+
+## 6. Hacer, ampliar o importar un modelo sin un video (card «Nuevo modelo 3D»)
+
+Desde «Modelos 3D» en Sloth, el usuario puede pedir un modelo sin que haya un video detrás: **Nuevo modelo** (describe el
+objeto y, si quiere, sube una imagen de referencia), **Ampliar** (en la ficha de un modelo: una variante, una animación o
+los colores de un proyecto) e **Importar .glb**. Los dos primeros abren un hilo de la card «Nuevo modelo 3D» con el primer
+mensaje ya armado; el tercero lo hace Sloth sin agente. Todo ocurre en un **proyecto de prueba compartido**, la carpeta
+donde trabaja el hilo (la de la card, con `package.json`, Remotion, three y React Three Fiber; comparte el `node_modules`
+de los videos explicativos). Si falta, `nuevo` lo arma.
+
+```
+python -B -X utf8 <esta skill>/scripts/modelos.py nuevo <id> --nombre "…" --descripcion "…" [--referencia imagen.png]
+python -B -X utf8 <esta skill>/scripts/modelos.py ampliar <id> --que "variante|animación|colores de proyecto" [--como <id-nuevo>]
+python -B -X utf8 <esta skill>/scripts/modelos.py importar <ruta.glb> --nombre "…" [--categoria "Objetos"] [--licencia "…"]
+```
+
+**Nuevo.** Busca antes (1). Con `nuevo` queda el andamio `src/modelos/<id>.tsx` (un cubo con biseles y su `Muestra`) y, si
+hay referencia, `public/modelos/<id>/referencia.<ext>`: **mírala** (Read) antes de modelar. Escribe el modelo con las
+reglas de (4), sácale la vista con `vista <id>`, **mírala**, y guárdalo con `guardar` (5). El `<id>` sale del nombre:
+minúsculas, sin acentos y con guiones.
+
+**Ampliar.** `ampliar <id> --que "…"` copia el modelo de la biblioteca (con lo que usa y sus archivos) a `<id>-v2` (o el
+nombre de `--como`), renombrando lo que exporta (`CajaFuerteV2`). El original no se toca: lo que cambia es una prop nueva
+con valor por omisión, otra animación o los colores del proyecto que lo pidió. Luego `vista` y `guardar <id>-v2` con su
+ficha (nombre, resumen, categoría, descripción, qué hace, etiquetas). `ampliar` imprime también `--caja`, `--frente` y `--actua` del original: repítelos al guardar. Si la mejora de verdad es del mismo modelo (no una
+variante), mejóralo con (3) en vez de ampliar.
+
+**Importar.** `importar` mete un `.glb` hecho fuera: lo copia a `public/modelos/<id>/modelo.glb`, escribe el componente que
+lo carga con `useLoader(GLTFLoader, staticFile(…))` (centrado, apoyado en el piso, escalado a `alto`; quieto salvo que
+se le pase `giro`), arma su ficha y saca su vista. Revisa la licencia del archivo: si el usuario la dio, queda en el
+comentario y en la descripción. Solo importa `react`, `three`, `@react-three/fiber` y `remotion` (lo que ya permite
+`PERMITIDOS`); nada de `@react-three/drei`.
+
+**Lo que ve Sloth.** La card «Nuevo modelo 3D» enseña tres etapas, leídas de la carpeta `estado/` del proyecto de prueba:
+«Modelo escrito» (`estado/escrito`, al sacar la vista o guardar), «Vista generada» (`estado/vista`) y «Guardado en la
+biblioteca» (`estado/guardado`). `nuevo` y `ampliar` las borran. El proyecto de prueba es uno solo: un modelo a la vez.

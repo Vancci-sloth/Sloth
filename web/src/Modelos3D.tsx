@@ -2,6 +2,7 @@ import { memo, type ReactNode, useEffect, useRef, useState } from 'react'
 import type { Biblioteca3D, Modelo3D } from '../../shared/types'
 import { api } from './api'
 import { useDesplazando } from './desplazando'
+import { Acciones3D, BotonAmpliar } from './Modelos3DAcciones'
 import './Modelos3D.css'
 
 /**
@@ -39,9 +40,8 @@ export const Modelos3D = memo(function Modelos3D() {
   const [abierto, setAbierto] = useState<string | null>(null)
   const campo = useRef<HTMLInputElement>(null)
   const raiz = useRef<HTMLDivElement>(null)
-  useEffect(() => {
-    api<Biblioteca3D>('/api/modelos3d').then(setBiblioteca, (e) => setError(e.message))
-  }, [])
+  const cargar = () => api<Biblioteca3D>('/api/modelos3d').then(setBiblioteca, (e) => setError(e.message))
+  useEffect(() => void cargar(), [])
   // `desplazando` mientras se mueve y hasta 200 ms después (el CSS quita el ratón a la rejilla).
   useDesplazando(raiz)
   // «/» lleva al buscador, salvo escribiendo en otro campo o con una ficha abierta.
@@ -100,6 +100,7 @@ export const Modelos3D = memo(function Modelos3D() {
             <kbd>/</kbd>
           )}
         </label>
+        <Acciones3D tipos={nombres} onImportado={() => void cargar()} />
       </header>
 
       {biblioteca && modelos.length > 0 && (
@@ -386,6 +387,7 @@ function Ficha({
             <button className="m3d-boton" onClick={() => copiar(modelo.id)}>
               {copiado ? 'Copiado' : 'Copiar'}
             </button>
+            <BotonAmpliar modelo={modelo} />
           </div>
         </div>
       </div>

@@ -468,6 +468,27 @@
     ]
   },
   {
+    "id": "nuevo-modelo-3d",
+    "title": "Nuevo modelo 3D",
+    "description": "Cuéntale qué objeto 3D quieres, o pásale una imagen de referencia, y Sloth lo modela con three.js en un proyecto de prueba, le saca su vista y lo guarda en la biblioteca de Modelos 3D para tus próximos videos.",
+    "skill": "modelos-3d",
+    "icon": "escena",
+    "etapas": [
+      {
+        "nombre": "Modelo escrito",
+        "listo": "estado/escrito"
+      },
+      {
+        "nombre": "Vista generada",
+        "listo": "estado/vista"
+      },
+      {
+        "nombre": "Guardado en la biblioteca",
+        "listo": "estado/guardado"
+      }
+    ]
+  },
+  {
     "id": "nuevo-estilo",
     "title": "Nuevo estilo",
     "description": "Cuéntale el video que quieres hacer, o pásale ejemplos, y Sloth arma tu propio estilo con su card, listo para usarlo como los demás.",

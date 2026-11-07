@@ -8,8 +8,16 @@ La biblioteca de modelos 3D: buscar uno antes de hacerlo, traerlo al proyecto y 
     python -B -X utf8 modelos.py guardar <id> --nombre "…" --resumen "…" --categoria "…" --descripcion "…"
                                           --hace "a; b" --etiquetas "a, b" [--cuadro N]
     python -B -X utf8 modelos.py vista <id> [<id>…]        vuelve a sacar su miniatura
+    python -B -X utf8 modelos.py nuevo <id> --nombre "…" --descripcion "…" [--referencia imagen]
+                                                           arma el proyecto de prueba (si falta) y el andamio del modelo
+    python -B -X utf8 modelos.py ampliar <id> --que "variante|animación|colores de proyecto" [--como <id-nuevo>]
+                                                           copia un modelo de la biblioteca a <id>-v2 para modificarlo
+    python -B -X utf8 modelos.py importar <ruta.glb> --nombre "…" [--categoria "…"] [--licencia "…"]
+                                                           mete un .glb hecho fuera en la biblioteca, con su vista
 
-Todo menos `buscar` se corre en la carpeta del proyecto (la que tiene package.json). Un modelo vive en el proyecto en
+Todo menos `buscar` se corre en la carpeta del proyecto (la que tiene package.json); `nuevo`, `ampliar` e `importar`
+trabajan en el proyecto de prueba compartido de los modelos (`proyecto_prueba`): el de la carpeta si ya es un proyecto,
+y si no, lo arman ahí mismo (card «Nuevo modelo 3D») o en `modelos-3d-prueba/`. Un modelo vive en el proyecto en
 src/modelos/<id>.tsx (con src/modelos/comun.tsx) y sus archivos en public/modelos/<id>/; en la biblioteca, en
 modelos/<id>/ con su modelo.json y su vista (vista.webp, la foto, y vista.webm, la cámara que se mece). Cada proyecto lleva su copia: guardar una versión nueva no rompe
 los videos ya hechos. La biblioteca de cada quien empieza vacía: los que trae la plantilla del explicativo (la moneda, con
@@ -123,6 +131,267 @@ def lista() -> None:
         print(f"{id_}: {m.get('resumen') or m['nombre']}" + (f" ({props})" if props else "") + (f" · ACTÚA con `{m['actua']}`" if m.get("actua") else ""))
 
 
+# ── Proyecto de prueba compartido y modelos nuevos, ampliados o importados ───────────────────────────────────────────
+
+PRUEBA = "modelos-3d-prueba"
+EXPLICATIVO = BIBLIOTECA.parent / "video-explicativo" / "plantilla"
+# Lo mínimo de la plantilla del explicativo para dibujar y fotografiar un modelo (Remotion + three + R3F).
+BASE_PRUEBA = ["package.json", "package-lock.json", "tsconfig.json", "remotion.config.ts"]
+ID_VALIDO = re.compile(r"[a-z0-9]+(-[a-z0-9]+)*")
+
+
+def pascal(id_: str) -> str:
+    return "".join(p.capitalize() for p in id_.split("-"))
+
+
+def slug(texto: str) -> str:
+    """«Caja fuerte» → caja-fuerte."""
+    limpio = re.sub(r"[^a-z0-9]+", "-", plano(texto)).strip("-")
+    return limpio or "modelo"
+
+
+# Si el proyecto donde se corre es el de prueba: solo en él se lleva el avance. Un video que usa `vista` o `guardar` no lo ve.
+ESTADO = False
+
+
+def marca(nombre: str | None) -> None:
+    """El avance que lee Sloth (etapas de la card «Nuevo modelo 3D»): estado/escrito, estado/vista y estado/guardado."""
+    carpeta_ = Path.cwd() / "estado"
+    if not (ESTADO or carpeta_.exists() or Path.cwd().name in ("nuevo-modelo-3d", PRUEBA)):
+        return
+    if nombre is None:
+        shutil.rmtree(carpeta_, ignore_errors=True)
+        return
+    carpeta_.mkdir(exist_ok=True)
+    (carpeta_ / nombre).write_text(date.today().isoformat() + "\n", "utf-8", newline="\n")
+
+
+def proyecto_prueba(sin_modulos: bool = False) -> Path:
+    """
+    El proyecto de prueba compartido de los modelos, en el que se prueba y se saca la vista de cada uno. Es la carpeta
+    donde se corre si ya tiene package.json; si no, la de `SLOTH_PRUEBA_3D`, la propia carpeta de la card «Nuevo modelo 3D»
+    (`nuevo-modelo-3d`) o `modelos-3d-prueba/` junto a donde se corre. Si falta, se arma con lo mínimo de la plantilla del
+    explicativo y el `node_modules` que comparten esos videos. Deja el directorio de trabajo en él.
+    """
+    aqui = Path.cwd()
+    if (aqui / "package.json").exists():
+        destino = aqui
+    elif os.environ.get("SLOTH_PRUEBA_3D"):
+        destino = Path(os.environ["SLOTH_PRUEBA_3D"])
+    elif aqui.name == "nuevo-modelo-3d":
+        destino = aqui
+    else:
+        destino = aqui / PRUEBA
+    if not (destino / "package.json").exists():
+        destino.mkdir(parents=True, exist_ok=True)
+        for f in BASE_PRUEBA:
+            if (EXPLICATIVO / f).exists():
+                shutil.copyfile(EXPLICATIVO / f, destino / f)
+        if (destino / "package.json").exists():
+            datos = json.loads((destino / "package.json").read_text("utf-8"))
+            datos["name"] = "modelos-3d-prueba"
+            datos["scripts"] = {"studio": "remotion studio src/index.ts"}
+            (destino / "package.json").write_text(json.dumps(datos, indent=2) + "\n", "utf-8", newline="\n")
+        else:
+            (destino / "package.json").write_text('{"name": "modelos-3d-prueba", "private": true, "type": "module"}\n', "utf-8", newline="\n")
+        for d in ("src/modelos", "public/modelos", "out"):
+            (destino / d).mkdir(parents=True, exist_ok=True)
+        print(f"proyecto de prueba: {destino}", flush=True)
+    os.chdir(destino)
+    global ESTADO
+    ESTADO = destino.name in ("nuevo-modelo-3d", PRUEBA) or bool(os.environ.get("SLOTH_PRUEBA_3D"))
+    (destino / "src" / "modelos").mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(BIBLIOTECA / "comun.tsx", destino / "src" / "modelos" / "comun.tsx")
+    if not sin_modulos and not (destino / "node_modules").exists() and EXPLICATIVO.exists():
+        sys.path.insert(0, str(BIBLIOTECA.parent / "video-base" / "scripts"))
+        from espacio import enlazar_modulos  # noqa: PLC0415
+
+        vecinos = [p for p in destino.parent.glob("*/node_modules") if p.parent != destino]
+        enlazar_modulos(destino, "video-explicativo", EXPLICATIVO, vecinos)
+    return destino
+
+
+ANDAMIO = """// {nombre}: {descripcion}
+// Mide 1 de lado y se para en el piso, en el origen. Cambia esta cabecera por lo que de verdad es: qué es, para qué sirve,
+// cuánto mide y dónde está su origen. Lo que es de cada video (colores, imágenes, tiempos) le llega por props.
+import React from "react";
+import * as THREE from "three";
+import {{ RoundedBoxGeometry }} from "three/examples/jsm/geometries/RoundedBoxGeometry.js";
+
+export const {componente}: React.FC<{{ color?: string; pos?: [number, number, number] }}> = ({{ color = "#f5a524", pos = [0, 0, 0] }}) => {{
+  // TODO: sustituye este cubo por el modelo. Biseles, materiales con brillo (clearcoat) y castShadow.
+  const caja = React.useMemo(() => new RoundedBoxGeometry(1, 1, 1, 4, 0.06), []);
+  return (
+    <group position={{pos}}>
+      <mesh geometry={{caja}} position={{[0, 0.5, 0]}} castShadow>
+        <meshPhysicalMaterial color={{new THREE.Color(color)}} roughness={{0.4}} clearcoat={{0.6}} />
+      </mesh>
+    </group>
+  );
+}};
+
+export const Muestra: React.FC = () => <{componente} />;
+"""
+
+
+def nuevo(id_: str, nombre: str, descripcion: str, referencia: str | None, sin_modulos: bool = False) -> None:
+    if not ID_VALIDO.fullmatch(id_):
+        sys.exit("El id va en minúsculas con guiones: «caja-fuerte».")
+    if (MODELOS / id_ / "modelo.json").exists() or (PLANTILLA / id_ / "modelo.json").exists():
+        sys.exit(f"Ya hay un «{id_}» en la biblioteca: para hacerle una variante, ampliar {id_} --que \"…\".")
+    ref = Path(referencia).expanduser() if referencia else None
+    if ref and not ref.is_file():
+        sys.exit(f"No encuentro la imagen de referencia: {referencia}")
+    raiz_ = proyecto_prueba(sin_modulos)
+    destino = raiz_ / "src" / "modelos" / f"{id_}.tsx"
+    if destino.exists():
+        sys.exit(f"{destino.relative_to(raiz_)} ya existe en el proyecto de prueba: sigue con él o usa otro id.")
+    marca(None)
+    destino.write_text(ANDAMIO.format(nombre=nombre, descripcion=descripcion, componente=pascal(id_)), "utf-8", newline="\n")
+    print(f"andamio: {destino.relative_to(raiz_)}")
+    if ref:
+        carpeta_ref = raiz_ / "public" / "modelos" / id_
+        carpeta_ref.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(ref, carpeta_ref / f"referencia{ref.suffix.lower()}")
+        print(f"referencia: public/modelos/{id_}/referencia{ref.suffix.lower()} (mírala con Read antes de modelar)")
+    marca("pendiente")
+    print(
+        f"Siguiente: escribe el modelo en src/modelos/{id_}.tsx (reglas en la skill), sácale la vista con `vista {id_}`, mírala, "
+        f"y guárdalo con `guardar {id_} --nombre \"{nombre}\" --resumen … --categoria … --descripcion … --hace … --etiquetas …`."
+    )
+
+
+def renombrar(texto: str, de: str, a: str) -> str:
+    return re.sub(rf"\b{re.escape(de)}\b", a, texto)
+
+
+def ampliar(id_: str, que: str, como: str | None, sin_modulos: bool = False) -> None:
+    ficha_base = ficha(id_)  # sale si no está en la biblioteca
+    nuevo_id = como
+    if not nuevo_id:
+        n = 2
+        while (MODELOS / f"{id_}-v{n}" / "modelo.json").exists():
+            n += 1
+        nuevo_id = f"{id_}-v{n}"
+    if not ID_VALIDO.fullmatch(nuevo_id):
+        sys.exit("El id nuevo va en minúsculas con guiones: «caja-fuerte-v2».")
+    if nuevo_id == id_ or (MODELOS / nuevo_id / "modelo.json").exists():
+        sys.exit(f"Ya hay un «{nuevo_id}» en la biblioteca: elige otro nombre con --como.")
+    raiz_ = proyecto_prueba(sin_modulos)
+    destino = raiz_ / "src" / "modelos" / f"{nuevo_id}.tsx"
+    if destino.exists():
+        sys.exit(f"{destino.relative_to(raiz_)} ya existe en el proyecto de prueba.")
+    # La copia de origen y lo que usa (otros modelos, comun, sus archivos, íconos), tal como están en la biblioteca.
+    usar([id_], pisa=True, callado=True)
+    marca(None)
+    texto = (raiz_ / "src" / "modelos" / f"{id_}.tsx").read_text("utf-8")
+    sufijo = pascal(nuevo_id[len(id_):].strip("-")) if nuevo_id.startswith(id_ + "-") else pascal(nuevo_id)
+    for nombre in ficha_base["exporta"]:
+        texto = renombrar(texto, nombre, nombre + sufijo)
+    texto = texto.replace(f"modelos/{id_}/", f"modelos/{nuevo_id}/")
+    texto = f"// Variante de «{id_}» ({que}). Parte de su código: cambia lo que pide y deja el resto.\n" + texto
+    destino.write_text(texto, "utf-8", newline="\n")
+    archivos = raiz_ / "public" / "modelos" / id_
+    if archivos.exists():
+        shutil.copytree(archivos, raiz_ / "public" / "modelos" / nuevo_id, dirs_exist_ok=True)
+    marca("pendiente")
+    print(f"copia: src/modelos/{nuevo_id}.tsx (de {id_}); exporta {', '.join(n + sufijo for n in ficha_base['exporta'])}")
+    print(f"Qué cambiar: {que}")
+    # Lo que la ficha del original dice de su forma y su movimiento no se hereda solo: se repite al guardar la copia.
+    extras = ""
+    if ficha_base.get("caja"):
+        extras += f' --caja "{",".join(f"{x:g}" for x in ficha_base["caja"])}"'
+    if ficha_base.get("frente"):
+        extras += " --frente"
+    if ficha_base.get("actua"):
+        extras += f' --actua "{ficha_base["actua"]}"'
+    print(
+        f"Siguiente: modifícalo, `vista {nuevo_id}`, mírala, y `guardar {nuevo_id} --nombre \"…\" --resumen … --categoria \"{ficha_base.get('categoria', '')}\" "
+        f"--descripcion … --hace … --etiquetas …{extras}` (el original «{id_}» no se toca)."
+    )
+
+
+IMPORTADO = """// {nombre}: modelo 3D importado de un archivo .glb ({archivo}). Se centra en el origen, apoyado en el piso, y se escala
+// para que lo más alto mida `alto` (1.5 por omisión). Quieto, salvo que se le pase `giro` (grados por segundo). Revisa la
+// licencia del archivo antes de usarlo en un video que se publique.{licencia}
+import {{ useLoader }} from "@react-three/fiber";
+import React, {{ useMemo }} from "react";
+import {{ staticFile, useCurrentFrame, useVideoConfig }} from "remotion";
+import * as THREE from "three";
+import {{ GLTFLoader }} from "three/examples/jsm/loaders/GLTFLoader.js";
+
+export const {componente}: React.FC<{{ alto?: number; giro?: number; pos?: [number, number, number] }}> = ({{ alto = 1.5, giro = 0, pos = [0, 0, 0] }}) => {{
+  const gltf = useLoader(GLTFLoader, staticFile("modelos/{id}/modelo.glb"));
+  const frame = useCurrentFrame();
+  const {{ fps }} = useVideoConfig();
+  const {{ objeto, escala, base }} = useMemo(() => {{
+    const objeto = gltf.scene.clone(true);
+    objeto.traverse((o) => {{
+      if ((o as THREE.Mesh).isMesh) {{
+        o.castShadow = true;
+        o.receiveShadow = true;
+      }}
+    }});
+    const caja = new THREE.Box3().setFromObject(objeto);
+    const tam = caja.getSize(new THREE.Vector3());
+    const centro = caja.getCenter(new THREE.Vector3());
+    return {{ objeto, escala: alto / Math.max(tam.y, 1e-6), base: new THREE.Vector3(-centro.x, -caja.min.y, -centro.z) }};
+  }}, [gltf, alto]);
+  return (
+    <group position={{pos}} rotation={{[0, THREE.MathUtils.degToRad((giro * frame) / fps), 0]}}>
+      <group scale={{escala}}>
+        <primitive object={{objeto}} position={{base}} />
+      </group>
+    </group>
+  );
+}};
+
+export const Muestra: React.FC = () => <{componente} />;
+"""
+
+
+def importar(ruta: str, nombre: str, categoria: str, id_: str | None, licencia: str | None, sin_modulos: bool = False, sin_vista: bool = False) -> None:
+    origen = Path(ruta).expanduser().resolve()
+    if not origen.is_file() or origen.suffix.lower() != ".glb":
+        sys.exit(f"{ruta} no es un archivo .glb.")
+    with origen.open("rb") as f:
+        if f.read(4) != b"glTF":
+            sys.exit(f"{origen.name} no parece un .glb (no empieza con «glTF»).")
+    if categoria not in CATEGORIAS:
+        sys.exit(f"«{categoria}» no es un tipo: {', '.join(CATEGORIAS)}.")
+    id_ = id_ or slug(nombre)
+    if not ID_VALIDO.fullmatch(id_):
+        sys.exit("El id va en minúsculas con guiones: «caja-fuerte».")
+    if (MODELOS / id_ / "modelo.json").exists():
+        sys.exit(f"Ya hay un «{id_}» en la biblioteca: usa otro nombre o --id.")
+    raiz_ = proyecto_prueba(sin_modulos)
+    marca(None)
+    carpeta_glb = raiz_ / "public" / "modelos" / id_
+    carpeta_glb.mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(origen, carpeta_glb / "modelo.glb")
+    fuente = raiz_ / "src" / "modelos" / f"{id_}.tsx"
+    fuente.write_text(
+        IMPORTADO.format(nombre=nombre, archivo=origen.name, id=id_, componente=pascal(id_), licencia=f"\n// Licencia: {licencia}" if licencia else ""),
+        "utf-8",
+        newline="\n",
+    )
+    palabras = [w for w in plano(nombre).split() if len(w) > 2]
+    guardar(
+        id_,
+        {
+            "nombre": nombre,
+            "resumen": nombre[:45],
+            "categoria": categoria,
+            "descripcion": f"{nombre}, un modelo 3D importado de {origen.name}.{f' Licencia: {licencia}.' if licencia else ''}",
+            "hace": "se escala a la altura que pidas; gira sobre sí mismo; se apoya en el piso",
+            "etiquetas": ", ".join([*palabras, "glb", "importado", nombre.lower()]),
+        },
+        None,
+        sin_vista,
+    )
+
+
+
 def proyecto() -> Path:
     aqui = Path.cwd()
     if not (aqui / "package.json").exists():
@@ -141,6 +410,8 @@ def copia(origen: Path, destino: Path, pisa: bool) -> None:
 
 def iconos(nombres: list[str]) -> None:
     """Los íconos de Phosphor (peso fill) que extruye Icono3D, de node_modules a public/iconos/<nombre>.svg."""
+    if not nombres:
+        return
     fuente = Path("node_modules/@phosphor-icons/core/assets/fill")
     if not fuente.exists():
         sys.exit("No está @phosphor-icons/core en node_modules: npm i @phosphor-icons/core")
@@ -203,6 +474,7 @@ def vista(ids: list[str]) -> None:
     raiz_ = proyecto()
     if not (raiz_ / "node_modules" / "@remotion" / "renderer").exists():
         sys.exit("Al proyecto le falta node_modules (con @remotion/renderer y @remotion/three).")
+    marca("escrito")
     src = raiz_ / "src" / "modelos"
     faltan = [i for i in ids if not (src / f"{i}.tsx").exists()]
     if faltan:
@@ -231,6 +503,7 @@ def vista(ids: list[str]) -> None:
     finally:
         for temporal in (muestras, vitrina, corre):
             temporal.unlink(missing_ok=True)
+    marca("vista")
 
 
 def guardar(id_: str, dados: dict[str, str | None], cuadro: int | None, sin_vista: bool, caja: str | None = None, frente: bool = False, actua: str | None = None) -> None:
@@ -300,8 +573,10 @@ def guardar(id_: str, dados: dict[str, str | None], cuadro: int | None, sin_vist
         shutil.copytree(publicos, destino / "archivos")
     (destino / "modelo.json").write_text(json.dumps({k: m[k] for k in ORDEN if m.get(k) is not None}, ensure_ascii=False, indent=2) + "\n", "utf-8", newline="\n")
     print(f"{'actualizado' if previo else 'nuevo'}: {destino}", flush=True)
+    marca("escrito")
     if not sin_vista:
         vista([id_])
+    marca("guardado")
 
 
 def main() -> None:
@@ -323,6 +598,25 @@ def main() -> None:
     g.add_argument("--frente", action="store_true", help="tiene cara (un reloj, un celular, una persona): el video no lo enseña de lado")
     g.add_argument("--caja", help="ancho,alto,fondo: solo si es mucho más alto que ancho (un celular, una botella)")
     sub.add_parser("vista").add_argument("ids", nargs="+")
+    n = sub.add_parser("nuevo")
+    n.add_argument("id")
+    n.add_argument("--nombre", required=True)
+    n.add_argument("--descripcion", required=True)
+    n.add_argument("--referencia", help="una imagen de referencia, que se copia al proyecto")
+    n.add_argument("--sin-modulos", action="store_true", help="no enlaza node_modules (para pruebas)")
+    am = sub.add_parser("ampliar")
+    am.add_argument("id")
+    am.add_argument("--que", required=True, help="qué cambiar: una variante, una animación, los colores de un proyecto…")
+    am.add_argument("--como", help="el id de la copia (por omisión <id>-v2)")
+    am.add_argument("--sin-modulos", action="store_true", help="no enlaza node_modules (para pruebas)")
+    im = sub.add_parser("importar")
+    im.add_argument("ruta")
+    im.add_argument("--nombre", required=True)
+    im.add_argument("--categoria", default="Objetos")
+    im.add_argument("--id")
+    im.add_argument("--licencia")
+    im.add_argument("--sin-modulos", action="store_true", help="no enlaza node_modules (para pruebas)")
+    im.add_argument("--sin-vista", action="store_true")
     a = p.parse_args()
     if a.orden == "buscar":
         buscar(a.palabras)
@@ -336,6 +630,12 @@ def main() -> None:
         print(", ".join(f"public/iconos/{n}.svg" for n in a.nombres))
     elif a.orden == "guardar":
         guardar(a.id, {k: getattr(a, k) for k in PIDE}, a.cuadro, a.sin_vista, a.caja, a.frente, a.actua)
+    elif a.orden == "nuevo":
+        nuevo(a.id, a.nombre, a.descripcion, a.referencia, a.sin_modulos)
+    elif a.orden == "ampliar":
+        ampliar(a.id, a.que, a.como, a.sin_modulos)
+    elif a.orden == "importar":
+        importar(a.ruta, a.nombre, a.categoria, a.id, a.licencia, a.sin_modulos, a.sin_vista)
     else:
         vista(a.ids)
 

@@ -26,6 +26,7 @@ import { enlacesApi } from './enlaces.ts' // tarjeta de los enlaces
 import { cerrarVigilantesOciosos, etapasApi, folderOf, mismaCwd, queFalta, videosApi, videosDe } from './etapas.ts' // panel de etapas
 import { cerrarMotoresOciosos } from './motor.ts'
 import { modelos3d } from './modelos3d.ts' // modelos 3D
+import { modelos3dHilos } from './modelos3d-hilos.ts' // modelos 3D
 import { miniaturas } from './miniaturas.ts' // panel de etapas
 import { guardarMeta, guardarYoutube, opciones } from './opciones.ts'
 import { previas } from './previas.ts' // previas de las cards
@@ -38,7 +39,7 @@ import { voz } from './voz/index.ts' // voz de AI Studio
 import { flow } from './flow/index.ts' // Google Flow
 import { youtube } from './youtube.ts'
 import { peticionDeConfianza } from './origen.ts'
-import { actualizarYtDlp, instalandoAlgo, instalar, pythonSlothEntero, requisitos } from './requisitos.ts'
+import { actualizarYtDlp, instalandoAlgo, instalar, pythonSlothEntero, requisitos, rutaPythonSloth } from './requisitos.ts'
 import { espacio } from './espacio.ts' // espacio en disco
 import { equipo } from './equipo.ts' // tu equipo
 import { licencia } from './licencia.ts' // suscripción
@@ -174,6 +175,19 @@ const { miniatura, cuadro } = miniaturas(join(APP, 'data', 'miniaturas')) // pan
 const idear = VENTA ? undefined : ideas(APP, sessions, broadcast, subirLargos?.lectura) // ideas
 // La biblioteca de modelos 3D que llenan los videos, para verla: la de la skill que usan los agentes, que es donde guardan.
 const biblioteca3d = modelos3d(carpetaSkill('modelos-3d') ?? join(APP, 'skills', 'modelos-3d')) // modelos 3D
+// Hacer, ampliar e importar un modelo 3D desde esa biblioteca.
+const hilos3d = modelos3dHilos({
+  cards: () => cards(),
+  sessions,
+  skillRef,
+  modeloPorOmision: () => {
+    const m = modelos.find((x) => proveedorDe(x.id) === 'claude') ?? modelos[0]
+    return m && { model: m.id }
+  },
+  adjuntos: ATTACHMENTS,
+  biblioteca: carpetaSkill('modelos-3d') ?? join(APP, 'skills', 'modelos-3d'),
+  python: () => rutaPythonSloth() ?? (process.platform === 'win32' ? 'python' : 'python3')
+}) // modelos 3D
 // El buscador propio de noticias de tecnología: lee sus fuentes en segundo plano y las skills buscan ahí.
 const noticias = radar(APP) // radar
 // Tus estilos en un archivo para compartirlos, y los de otros, instalados entre los tuyos.
@@ -623,6 +637,7 @@ async function api(req: IncomingMessage, res: ServerResponse, url: URL): Promise
   if (subirLargos && (await subirLargos.api(req, res, url))) return true // videos largos de YouTube
   if (await previa.api(req, res, url)) return true // previas de las cards
   if (idear && (await idear.api(req, res, url))) return true // ideas
+  if (await hilos3d.api(req, res, url)) return true // modelos 3D
   if (await biblioteca3d.api(req, res, url)) return true // modelos 3D
   if (await noticias.api(req, res, url)) return true // radar
   if (await comunidadApi.api(req, res, url)) return true // comunidad
