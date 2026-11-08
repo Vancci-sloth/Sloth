@@ -1,10 +1,10 @@
--- Las rifas del creador (`src/rifa.ts`): qué se rifa (`premio`, lo que ve la comunidad), cuántos ganan y los créditos de
--- voz que se lleva cada uno (0: un premio que el creador da a mano). Solo una abierta a la vez.
+-- Las rifas del creador (`src/rifa.ts`). Se abren sin decir qué se rifa; al sortear se guarda qué fue (`premio`),
+-- cuántos ganaron y los créditos de voz de cada uno (0: un premio que el creador da a mano). Solo una abierta a la vez.
 CREATE TABLE rifas (
   id TEXT PRIMARY KEY,
-  premio TEXT NOT NULL,
-  creditos INTEGER NOT NULL,
-  ganadores INTEGER NOT NULL,
+  premio TEXT NOT NULL DEFAULT '',
+  creditos INTEGER NOT NULL DEFAULT 0,
+  ganadores INTEGER NOT NULL DEFAULT 0,
   estado TEXT NOT NULL DEFAULT 'abierta',
   creada TEXT NOT NULL,
   sorteada TEXT

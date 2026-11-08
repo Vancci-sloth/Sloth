@@ -116,7 +116,6 @@
 .admin-rifa-cabeza p { margin: 0; }
 .admin-rifa-botones { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .admin-rifa-botones .ruleta-girar { padding: 12px 34px; }
-.admin-rifa-probar { align-self: flex-start; }
 .ruleta-focos.girando circle { animation: ruleta-foco 0.5s steps(2) infinite; }
 .ruleta-focos.girando circle.on { animation-delay: -0.25s; }
 @keyframes ruleta-foco { 0% { fill: var(--amber-2); } 100% { fill: var(--sobre-ambar); } }

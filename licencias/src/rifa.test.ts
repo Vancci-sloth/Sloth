@@ -85,10 +85,11 @@ test('entra quien usa Sloth gratis o apoya con menos del sugerido; quien apoya c
   const poquito = persona('cinco@example.com', 'mensual', 'authorized', '2099-01-01', 0, 5)
   const pesos = persona('pesos@example.com', 'mensual', 'authorized', '2099-01-01', 0, 299, 'MXN')
   const anual = persona('anual@example.com', 'anual', 'authorized', '2099-01-01', 0, 150)
-  await pedir(creador, '/comunidad/rifa/crear', { premio: 'Una clave de Sloth', creditos: 0, ganadores: 1 })
+  await pedir(creador, '/comunidad/rifa/crear', {})
 
   const v = await pedir<RifaComunidad>(gratis, '/comunidad/rifa')
-  assert.equal(v.abierta?.premio, 'Una clave de Sloth')
+  // La comunidad no sabe qué se rifa: el creador lo elige al sortear.
+  assert.deepEqual(Object.keys(v.abierta ?? {}).sort(), ['creada', 'id', 'participantes'])
   assert.equal(v.fuera, undefined)
   assert.equal(v.correo, 'gratis@example.com')
   assert.equal((await pedir<RifaComunidad>(gratis, '/comunidad/rifa/participar', {})).participo, true)
@@ -109,20 +110,22 @@ test('una sola abierta, el sorteo deja fuera a quien empezó a apoyar y avisa al
   const { db, persona, creador, pedir, esperas, correos, env } = preparar(t)
   const a = persona('a@example.com')
   const b = persona('b@example.com')
-  await pedir(creador, '/comunidad/rifa/crear', { premio: 'Una clave de Sloth', creditos: 0, ganadores: 5 })
-  await assert.rejects(pedir(creador, '/comunidad/rifa/crear', { premio: 'Otra', creditos: 0, ganadores: 1 }), /Ya hay una rifa abierta/)
+  await pedir(creador, '/comunidad/rifa/crear', {})
+  await assert.rejects(pedir(creador, '/comunidad/rifa/crear', {}), /Ya hay una rifa abierta/)
+  const premio = { premio: 'Una clave de Sloth', creditos: 0, ganadores: 5 }
   const id = (await pedir<RifaAdmin>(creador, '/comunidad/rifa/admin')).abierta!.id
-  await assert.rejects(pedir(creador, '/comunidad/rifa/sortear', { rifa: id }), /no hay participantes/)
+  await assert.rejects(pedir(creador, '/comunidad/rifa/sortear', { rifa: id, ...premio }), /no hay participantes/)
+  await assert.rejects(pedir(creador, '/comunidad/rifa/sortear', { rifa: id, creditos: 0, ganadores: 1 }), /Di qué se rifa/)
   await pedir(a, '/comunidad/rifa/participar', {})
   await pedir(b, '/comunidad/rifa/participar', {})
   // b empieza a apoyar después de entrar: ya no gana.
   db.prepare("INSERT INTO licencias (id, clave, email, plan, monto, moneda, estado, modo, pagado_hasta, autorizada, creada) VALUES ('apoyo-b', 'SLOTH-B2', 'b@example.com', 'mensual', 15, 'USD', 'authorized', 'produccion', '2099-01-01', '2026-11-05', '2026-11-05')").run()
   assert.match((await pedir<RifaAdmin>(creador, '/comunidad/rifa/admin')).abierta!.lista[1].fuera ?? '', /ya apoyas/)
 
-  const s = await pedir<SorteoRifa>(creador, '/comunidad/rifa/sortear', { rifa: id })
+  const s = await pedir<SorteoRifa>(creador, '/comunidad/rifa/sortear', { rifa: id, ...premio })
   assert.deepEqual(s.ganadores.map((g) => g.nombre), ['Persona 1'])
   assert.equal(s.participantes.length, 1)
-  await assert.rejects(pedir(creador, '/comunidad/rifa/sortear', { rifa: id }), /ya se sorteó/)
+  await assert.rejects(pedir(creador, '/comunidad/rifa/sortear', { rifa: id, ...premio }), /ya se sorteó/)
   await Promise.all(esperas)
   // Sin créditos, el premio es a mano: el correo sale igual, y el aviso espera en su Sloth.
   assert.equal(correos.length, 1)

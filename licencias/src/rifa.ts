@@ -6,6 +6,8 @@
  * - Participa una persona por correo (`externo`, el id de la primera licencia de su correo, el mismo usuario que en las
  *   voces), con un botón. Quien ya recibe los créditos de cada mes (paga activamente $15 USD o más, `daCreditos`) o es
  *   Fundador queda fuera (`fuera`). Las cuentas gratis y quien apoya con menos sí entran. Se vuelve a mirar al sortear: quien empezó a apoyar después ya no entra.
+ * - Abrirla no dice qué se rifa: la comunidad solo ve «llévate créditos de Sloth». Cuántos ganan y los créditos de cada
+ *   uno (o un premio a mano) los elige el creador al sortear.
  * - Solo una abierta a la vez (migración 0025). Sortear elige al azar (`crypto.getRandomValues`, sin sesgo) y deja la
  *   rifa sorteada y sus ganadores en una sola transacción: dos sorteos a la vez no dan dos resultados.
  * - A cada ganador se le suman sus créditos en su cuenta de voz de Sloth (el repartidor de `voz.ts`, como los mensuales),
@@ -16,8 +18,8 @@
  * Rutas (dentro de `/comunidad`, con quién eres de `comunidad.ts`):
  * - `GET /comunidad/rifa`: la abierta, si participas o por qué no puedes, la última sorteada y lo que ganaste.
  * - `POST /comunidad/rifa/participar` y `POST /comunidad/rifa/visto` `{rifa}` (cerraste el aviso de que ganaste).
- * - Solo el creador: `GET /comunidad/rifa/admin`; `POST /comunidad/rifa/crear` `{premio?, creditos, ganadores}`,
- *   `/sortear` `{rifa}`, `/cancelar` `{rifa}` y `/ganador` `{rifa, externo, accion: 'reintentar' | 'entregado'}`.
+ * - Solo el creador: `GET /comunidad/rifa/admin`; `POST /comunidad/rifa/crear`, `/sortear` `{rifa, ganadores, creditos,
+ *   premio?}`, `/cancelar` `{rifa}` y `/ganador` `{rifa, externo, accion: 'reintentar' | 'entregado'}`.
  */
 import type { GanadorRifa, RifaAdmin, RifaComunidad, RifaGanada, SorteoRifa } from '../../shared/types.ts'
 import { correo, cuerpo, esFundador, type Env, letras, Rechazo } from './index.ts'
@@ -103,7 +105,7 @@ export async function rifa(req: Request, env: Env, ctx: ExecutionContext, yo: Qu
   if (req.method === 'GET' && ruta === '/comunidad/rifa/admin') return panel(env)
   if (req.method !== 'POST') throw new Rechazo(404, 'No existe')
   const c = await cuerpo(req)
-  if (ruta === '/comunidad/rifa/crear') return crear(env, ctx, c)
+  if (ruta === '/comunidad/rifa/crear') return crear(env)
   if (ruta === '/comunidad/rifa/sortear') return sortear(env, ctx, c)
   if (ruta === '/comunidad/rifa/cancelar') {
     const r = await env.DB.prepare("UPDATE rifas SET estado = 'cancelada' WHERE id = ? AND estado = 'abierta'").bind(String(c.rifa ?? '')).run()
@@ -128,14 +130,8 @@ async function persona(env: Env, clave: string) {
 const abiertaAhora = (env: Env) =>
   env.DB.prepare("SELECT r.*, (SELECT COUNT(*) FROM rifa_participantes p WHERE p.rifa = r.id) AS participantes FROM rifas r WHERE r.estado = 'abierta'").first<Guardada>()
 
-const publica = (r: Guardada): NonNullable<RifaComunidad['abierta']> => ({
-  id: r.id,
-  premio: r.premio,
-  creditos: r.creditos,
-  ganadores: r.ganadores,
-  creada: r.creada,
-  participantes: r.participantes ?? 0
-})
+/** La abierta, como la ve la comunidad: sin qué se rifa, que el creador decide al sortear. */
+const publica = (r: Guardada): NonNullable<RifaComunidad['abierta']> => ({ id: r.id, creada: r.creada, participantes: r.participantes ?? 0 })
 
 async function vista(env: Env, yo: QuienRifa): Promise<RifaComunidad> {
   const [abierta, p, ultima, gane] = await Promise.all([
@@ -184,21 +180,10 @@ async function participar(env: Env, yo: QuienRifa): Promise<RifaComunidad> {
 /** «1 llave de 10,000 créditos de Sloth», «3 llaves de 236,483 créditos de Sloth». */
 export const premioDe = (ganadores: number, creditos: number) => `${ganadores === 1 ? '1 llave' : `${ganadores} llaves`} de ${creditos.toLocaleString('en-US')} créditos de Sloth`
 
-async function crear(env: Env, ctx: ExecutionContext, c: Record<string, unknown>): Promise<RifaAdmin> {
-  const ganadores = Number(c.ganadores)
-  const creditos = Number(c.creditos ?? 0)
-  if (!Number.isInteger(ganadores) || ganadores < 1 || ganadores > MAX_GANADORES) throw new Rechazo(400, `Di cuántos ganan: de 1 a ${MAX_GANADORES}.`)
-  if (!Number.isInteger(creditos) || creditos < 0 || creditos > MAX_CREDITOS) throw new Rechazo(400, 'Los créditos de cada ganador son un número entero, 0 si no lleva créditos.')
-  const premio = String(c.premio ?? '').replace(/\s+/g, ' ').trim().slice(0, 140) || (creditos ? premioDe(ganadores, creditos) : '')
-  if (!premio) throw new Rechazo(400, 'Di qué se rifa.')
-  if (creditos > 0) {
-    if (!(await vozAbierta(env))) throw new Rechazo(409, 'Las voces de Sloth aún son solo para ti: los créditos se rifan cuando se publique la actualización que las abre.')
-    if (!(await repartidorVoz(env, ctx))) throw new Rechazo(503, 'Falta la llave de socio de Voices Cloning en el cobro.')
-  }
+/** Abrir no dice qué se rifa: la comunidad solo ve «llévate créditos de Sloth». Cuánto y cuántos ganan, al sortear. */
+async function crear(env: Env): Promise<RifaAdmin> {
   try {
-    await env.DB.prepare("INSERT INTO rifas (id, premio, creditos, ganadores, estado, creada) VALUES (?, ?, ?, ?, 'abierta', ?)")
-      .bind(letras(12).toLowerCase(), premio, creditos, ganadores, new Date().toISOString())
-      .run()
+    await env.DB.prepare("INSERT INTO rifas (id, estado, creada) VALUES (?, 'abierta', ?)").bind(letras(12).toLowerCase(), new Date().toISOString()).run()
   } catch (e) {
     if (/UNIQUE/i.test(String(e instanceof Error ? e.message : e))) throw new Rechazo(409, 'Ya hay una rifa abierta: sortéala o cancélala antes de abrir otra.')
     throw e
@@ -242,26 +227,41 @@ export function nombreDe(p: { nombre: string; email: string }): string {
   return `${usuario.slice(0, 2)}•••@${dominio ?? ''}`
 }
 
+/** Lo que se rifa, elegido al sortear: cuántos ganan, los créditos de cada uno (0: un premio a mano) y cómo se llama. */
+export function premioDelSorteo(c: Record<string, unknown>): { ganadores: number; creditos: number; premio: string } {
+  const ganadores = Number(c.ganadores)
+  const creditos = Number(c.creditos ?? 0)
+  if (!Number.isInteger(ganadores) || ganadores < 1 || ganadores > MAX_GANADORES) throw new Rechazo(400, `Di cuántos ganan: de 1 a ${MAX_GANADORES}.`)
+  if (!Number.isInteger(creditos) || creditos < 0 || creditos > MAX_CREDITOS) throw new Rechazo(400, 'Los créditos de cada ganador son un número entero, 0 si no lleva créditos.')
+  const premio = String(c.premio ?? '').replace(/\s+/g, ' ').trim().slice(0, 140) || (creditos ? premioDe(ganadores, creditos) : '')
+  if (!premio) throw new Rechazo(400, 'Di qué se rifa.')
+  return { ganadores, creditos, premio }
+}
+
 async function sortear(env: Env, ctx: ExecutionContext, c: Record<string, unknown>): Promise<SorteoRifa> {
   const id = String(c.rifa ?? '')
   const r = ID.test(id) ? await env.DB.prepare('SELECT * FROM rifas WHERE id = ?').bind(id).first<Guardada>() : null
   if (!r || r.estado !== 'abierta') throw new Rechazo(409, 'Esa rifa ya se sorteó o se canceló.')
-  if (r.creditos > 0 && !(await vozAbierta(env))) throw new Rechazo(409, 'Las voces de Sloth aún son solo para ti: abre las voces antes de sortear créditos.')
+  const { ganadores, creditos, premio } = premioDelSorteo(c)
+  if (creditos > 0) {
+    if (!(await vozAbierta(env))) throw new Rechazo(409, 'Las voces de Sloth aún son solo para ti: los créditos se rifan cuando se publique la actualización que las abre.')
+    if (!(await repartidorVoz(env, ctx))) throw new Rechazo(503, 'Falta la llave de socio de Voices Cloning en el cobro.')
+  }
   const entran = (await participantes(env, id)).filter((p) => !p.fuera)
   if (!entran.length) throw new Rechazo(409, 'Nadie puede ganar todavía: no hay participantes.')
-  const elegidos = elegir(entran, r.ganadores)
+  const elegidos = elegir(entran, ganadores)
   const cuando = new Date().toISOString()
-  const estado: GanadorRifa['estado'] = r.creditos > 0 ? 'pendiente' : 'a-mano'
+  const estado: GanadorRifa['estado'] = creditos > 0 ? 'pendiente' : 'a-mano'
   // Una sola transacción: si otro sorteo ganó la carrera, el UPDATE no cambia nada y los ganadores de este no entran.
   const hechos = await env.DB.batch([
-    env.DB.prepare("UPDATE rifas SET estado = 'sorteada', sorteada = ? WHERE id = ? AND estado = 'abierta'").bind(cuando, id),
+    env.DB.prepare("UPDATE rifas SET estado = 'sorteada', sorteada = ?, premio = ?, creditos = ?, ganadores = ? WHERE id = ? AND estado = 'abierta'").bind(cuando, premio, creditos, ganadores, id),
     ...elegidos.map((g) =>
       env.DB.prepare('INSERT INTO rifa_ganadores (rifa, externo, miembro, email, creditos, estado) SELECT ?, ?, ?, ?, ?, ? WHERE (SELECT sorteada FROM rifas WHERE id = ?) = ?').bind(
         id,
         g.externo,
         g.miembro,
         g.email,
-        r.creditos,
+        creditos,
         estado,
         id,
         cuando

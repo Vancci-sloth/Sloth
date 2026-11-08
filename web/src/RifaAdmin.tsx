@@ -10,9 +10,9 @@ import { RIFA_CAMBIO } from './Rifa'
 import './Rifa.css'
 
 /**
- * La rifa, en Administrador (`licencias/src/rifa.ts`): qué se rifa (cuántos ganan y los créditos de cada uno, o un
- * premio que das a mano), quién participa, «Rifar» y lo que pasó con cada premio. «Rifar» abre la ruleta a toda la
- * pantalla; «Girar» sortea en el cobro y la ruleta cae en quien ganó, uno por uno. El aviso y el correo salen al sortear.
+ * La rifa, en Administrador (`licencias/src/rifa.ts`): «Abrir la rifa» (la comunidad solo ve «llévate créditos de
+ * Sloth»), quién participa y, al rifar, qué se rifa (cuántos ganan y los créditos de cada uno, o un premio que das a
+ * mano) y lo que pasó con cada premio. «Rifar» abre la ruleta a toda la pantalla; «Girar» sortea en el cobro y la ruleta cae en quien ganó, uno por uno. El aviso y el correo salen al sortear.
  */
 const ESTADOS: Record<GanadorRifa['estado'], string> = {
   pendiente: 'Por sumar',
@@ -33,6 +33,11 @@ export function RifaAdmin() {
   const [error, setError] = useState('')
   const [ruleta, setRuleta] = useState(false)
   const [cancelar, setCancelar] = useState(false)
+  const [abriendo, setAbriendo] = useState(false)
+  // Lo que se rifa: se elige al rifar, no al abrir (la comunidad solo ve «llévate créditos de Sloth»).
+  const [ganadores, setGanadores] = useState('1')
+  const [creditos, setCreditos] = useState('10000')
+  const [premio, setPremio] = useState('')
 
   const cargar = useCallback(
     () =>
@@ -45,36 +50,83 @@ export function RifaAdmin() {
   useEffect(cargar, [cargar])
   const cambio = (p: Panel) => (setPanel(p), dispatchEvent(new Event(RIFA_CAMBIO)))
 
+  function abrir() {
+    setAbriendo(true)
+    setError('')
+    api<Panel>('/api/comunidad/rifa/crear', {})
+      .then(cambio, (e: Error) => setError(e.message))
+      .finally(() => setAbriendo(false))
+  }
+
   const a = panel?.abierta
   const entran = a?.lista.filter((p) => !p.fuera) ?? []
+  const n = Math.floor(Number(ganadores))
+  const c = Math.max(0, Math.floor(Number(creditos) || 0))
+  const nombre = premio.trim() || (c > 0 && n >= 1 ? premioDe(n, c) : '')
+  const valido = n >= 1 && n <= 100 && !!nombre
+  const cerrada = c > 0 && !panel?.vozAbierta
   return (
     <section className="admin-seccion admin-rifa">
       <h2>Rifa</h2>
       <p className="muted small">
-        Entre quienes no tienen los créditos de cada mes: cuentas gratis y apoyos de menos de $15 USD. Quien paga $15 o más y los Fundadores no participan. Mientras está abierta sale hasta arriba de la comunidad con su botón para participar. Al rifar, cada ganador recibe sus créditos en su cuenta de voz, el aviso en su Sloth y un correo.
+        Entre quienes no tienen los créditos de cada mes: cuentas gratis y apoyos de menos de $15 USD. Quien paga $15 o más y los Fundadores no participan. Mientras está abierta sale hasta arriba de la comunidad como «Participa en la rifa · Llévate créditos de Sloth», sin decir cuántos: eso lo eliges al rifar. Cada ganador recibe sus créditos en su cuenta de voz, el aviso en su Sloth y un correo.
       </p>
       {error && <p className="bad small">{error}</p>}
-      {panel && !a && <Nueva vozAbierta={panel.vozAbierta} onHecho={cambio} />}
+      {panel && !a && (
+        <div className="admin-rifa-nueva">
+          <p className="muted small ancho">No hay ninguna rifa abierta. Al abrirla sale en la comunidad y la gente empieza a participar.</p>
+          <button className="primary" disabled={abriendo} onClick={abrir}>
+            {abriendo ? 'Abriendo…' : 'Abrir la rifa'}
+          </button>
+        </div>
+      )}
       {a && (
         <div className="admin-rifa-abierta">
           <div className="admin-rifa-cabeza">
             <div>
               <span className="admin-antetitulo">Abierta desde {fecha(a.creada)}</span>
-              <h3>{a.premio}</h3>
-              <p className="muted small">
-                {num(entran.length)} {entran.length === 1 ? 'participa' : 'participan'} · {a.ganadores === 1 ? 'gana 1' : `ganan ${a.ganadores}`}
-                {a.creditos > 0 ? ` · ${num(a.creditos)} créditos para cada uno` : ' · el premio lo das tú'}
-              </p>
+              <h3>
+                {num(entran.length)} {entran.length === 1 ? 'persona participa' : 'personas participan'}
+              </h3>
             </div>
-            <div className="admin-rifa-botones">
-              <button className="ruleta-girar" disabled={!entran.length} onClick={() => setRuleta(true)} title={entran.length ? undefined : 'Aún no participa nadie'}>
+            <button className="admin-boton peligro" onClick={() => setCancelar(true)}>
+              Cancelar la rifa
+            </button>
+          </div>
+          <form
+            className="admin-rifa-nueva"
+            onSubmit={(e) => {
+              e.preventDefault()
+              setRuleta(true)
+            }}
+          >
+            <label>
+              <span>Cuántos ganan</span>
+              <input type="number" min={1} max={100} step={1} value={ganadores} onChange={(e) => setGanadores(e.target.value)} />
+            </label>
+            <label>
+              <span>Créditos para cada uno</span>
+              <input type="number" min={0} step={1} value={creditos} onChange={(e) => setCreditos(e.target.value)} />
+            </label>
+            <label className="ancho">
+              <span>Cómo se llama el premio (lo ven los ganadores y la comunidad al terminar)</span>
+              <input type="text" maxLength={140} placeholder={c > 0 && n >= 1 ? premioDe(n, c) : 'Por ejemplo: una clave de Sloth PRO por un año'} value={premio} onChange={(e) => setPremio(e.target.value)} />
+            </label>
+            <p className="muted small ancho">
+              {c > 0
+                ? `Cada ganador recibe ${c.toLocaleString('en-US')} créditos de voz en su cuenta de Sloth en cuanto la ruleta lo elige.`
+                : 'Sin créditos: el premio lo das tú a mano; al ganador le llega el aviso y el correo diciendo que le escribes.'}
+            </p>
+            {cerrada && <p className="bad small ancho">Las voces de Sloth aún son solo para ti: los créditos se rifan cuando se publique la actualización que las abre. Puedes rifar algo sin créditos (0).</p>}
+            <div className="admin-rifa-botones ancho">
+              <button className="ruleta-girar" disabled={!entran.length || !valido || cerrada} title={entran.length ? undefined : 'Aún no participa nadie'}>
                 Rifar
               </button>
-              <button className="admin-boton peligro" onClick={() => setCancelar(true)}>
-                Cancelar la rifa
+              <button type="button" className="admin-boton" onClick={() => avisarGanasteRifa({ rifa: 'prueba', premio: nombre || premioDe(1, 10_000), creditos: c, entregados: true }, true)}>
+                Ver el aviso del ganador
               </button>
             </div>
-          </div>
+          </form>
           {a.lista.length ? (
             <Tabla
               cabeza={['Participa', 'Correo', 'Desde', '']}
@@ -85,14 +137,10 @@ export function RifaAdmin() {
           )}
         </div>
       )}
-      <button className="admin-boton admin-rifa-probar" onClick={() => avisarGanasteRifa({ rifa: 'prueba', premio: a?.premio ?? premioDe(1, 10_000), creditos: a ? a.creditos : 10_000, entregados: true }, true)}>
-        Ver el aviso del ganador
-      </button>
       {panel && panel.rifas.length > 0 && <Historial rifas={panel.rifas} onCambio={cambio} />}
       {ruleta && a && (
         <Ruleta
-          premio={a.premio}
-          rifa={a.id}
+          sorteo={{ rifa: a.id, ganadores: n, creditos: c, premio: nombre }}
           nombres={entran.map((p) => ({ externo: p.externo, nombre: tapado(p) }))}
           onCerrar={() => (setRuleta(false), cargar(), dispatchEvent(new Event(RIFA_CAMBIO)))}
         />
@@ -103,55 +151,6 @@ export function RifaAdmin() {
         </Confirm>
       )}
     </section>
-  )
-}
-
-function Nueva({ vozAbierta, onHecho }: { vozAbierta: boolean; onHecho(p: Panel): void }) {
-  const [ganadores, setGanadores] = useState('1')
-  const [creditos, setCreditos] = useState('10000')
-  const [premio, setPremio] = useState('')
-  const [ocupado, setOcupado] = useState(false)
-  const [error, setError] = useState('')
-  const n = Math.floor(Number(ganadores))
-  const c = Math.max(0, Math.floor(Number(creditos) || 0))
-  const valido = n >= 1 && n <= 100 && (c > 0 || premio.trim())
-  const cerrada = c > 0 && !vozAbierta
-  return (
-    <form
-      className="admin-rifa-nueva"
-      onSubmit={(e) => {
-        e.preventDefault()
-        setOcupado(true)
-        setError('')
-        api<Panel>('/api/comunidad/rifa/crear', { ganadores: n, creditos: c, premio: premio.trim() })
-          .then(onHecho, (e: Error) => setError(e.message))
-          .finally(() => setOcupado(false))
-      }}
-    >
-      <label>
-        <span>Cuántos ganan</span>
-        <input type="number" min={1} max={100} step={1} value={ganadores} onChange={(e) => setGanadores(e.target.value)} disabled={ocupado} />
-      </label>
-      <label>
-        <span>Créditos para cada uno</span>
-        <input type="number" min={0} step={1} value={creditos} onChange={(e) => setCreditos(e.target.value)} disabled={ocupado} />
-      </label>
-      <label className="ancho">
-        <span>Qué se rifa (lo ve la comunidad)</span>
-        <input type="text" maxLength={140} placeholder={c > 0 && n >= 1 ? premioDe(n, c) : 'Por ejemplo: una clave de Sloth PRO por un año'} value={premio} onChange={(e) => setPremio(e.target.value)} disabled={ocupado} />
-      </label>
-      <p className="muted small ancho">
-        {c > 0
-          ? `Cada ganador recibe ${c.toLocaleString('en-US')} créditos de voz en su cuenta de Sloth al momento del sorteo.`
-          : 'Sin créditos: el premio lo das tú a mano; al ganador le llega el aviso y el correo diciendo que le escribes.'}
-        {premio.trim() && c > 0 ? ' En la comunidad sale lo que escribiste.' : ''}
-      </p>
-      {cerrada && <p className="bad small ancho">Las voces de Sloth aún son solo para ti: los créditos se rifan cuando se publique la actualización que las abre. Puedes rifar algo sin créditos (0).</p>}
-      {error && <p className="bad small ancho">{error}</p>}
-      <button className="primary" disabled={ocupado || !valido || cerrada}>
-        {ocupado ? 'Abriendo…' : 'Abrir la rifa'}
-      </button>
-    </form>
   )
 }
 
@@ -166,7 +165,7 @@ function Historial({ rifas, onCambio }: { rifas: Panel['rifas']; onCambio(p: Pan
         cabeza={['Rifa', 'Sorteada', 'Participaron', 'Ganó', 'Premio', 'Correo', 'Lo vio en Sloth', '']}
         filas={rifas.flatMap((r) =>
           r.estado === 'cancelada'
-            ? [[r.premio, <span className="muted">Cancelada</span>, num(r.participantes), '—', '—', '—', '—', '']]
+            ? [[r.premio || '—', <span className="muted">Cancelada</span>, num(r.participantes), '—', '—', '—', '—', '']]
             : r.lista.map((g, i) => [
                 i ? '' : r.premio,
                 i ? '' : fecha(r.sorteada),
@@ -224,7 +223,8 @@ const punto = (grados: number, r = R) => {
 }
 const corto = (s: string, n: number) => (s.length > n ? `${s.slice(0, n - 1)}…` : s)
 
-function Ruleta({ rifa, premio, nombres, onCerrar }: { rifa: string; premio: string; nombres: Persona[]; onCerrar(): void }) {
+function Ruleta({ sorteo: pedido, nombres, onCerrar }: { sorteo: { rifa: string; ganadores: number; creditos: number; premio: string }; nombres: Persona[]; onCerrar(): void }) {
+  const premio = pedido.premio
   const [sorteo, setSorteo] = useState<SorteoRifa>()
   const [turno, setTurno] = useState(0)
   const [gajos, setGajos] = useState(() => gajosDe(nombres))
@@ -250,7 +250,7 @@ function Ruleta({ rifa, premio, nombres, onCerrar }: { rifa: string; premio: str
     if (!s) {
       setPidiendo(true)
       try {
-        s = await api<SorteoRifa>('/api/comunidad/rifa/sortear', { rifa })
+        s = await api<SorteoRifa>('/api/comunidad/rifa/sortear', pedido)
         setSorteo(s)
       } catch (e) {
         setError(e instanceof Error ? e.message : String(e))
@@ -356,7 +356,7 @@ function Ruleta({ rifa, premio, nombres, onCerrar }: { rifa: string; premio: str
             </>
           ) : (
             <button className="ruleta-girar" disabled={girando || pidiendo} onClick={() => void girar()}>
-              {pidiendo ? 'Sorteando…' : girando ? 'Girando…' : sorteo ? `Girar por el ganador ${turno + 1}` : 'Girar'}
+              {pidiendo ? 'Sorteando…' : girando ? 'Girando…' : sorteo ? 'Siguiente giro' : 'Girar'}
             </button>
           )}
           {!sorteo && <p className="muted small">Al girar se sortea de verdad: ya no se puede deshacer.</p>}

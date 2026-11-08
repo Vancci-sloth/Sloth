@@ -1231,7 +1231,8 @@ export interface RifaGanada {
 
 /** La rifa de la comunidad (`licencias/src/rifa.ts`), como la ve cada quien: `GET /api/comunidad/rifa`. */
 export interface RifaComunidad {
-  abierta?: { id: string; premio: string; creditos: number; ganadores: number; creada: string; participantes: number }
+  /** La abierta: sin qué se rifa, que el creador elige al sortear. */
+  abierta?: { id: string; creada: string; participantes: number }
   /** Ya participas en la abierta. */
   participo: boolean
   /** Por qué no puedes participar (quien apoya o es Fundador ya tiene sus créditos); sin él, puedes. */

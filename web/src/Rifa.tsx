@@ -6,7 +6,7 @@ import './Rifa.css'
 
 /**
  * «Participa en la rifa», hasta arriba de la comunidad mientras el creador tiene una abierta (`licencias/src/rifa.ts`):
- * qué se rifa, cuántos participan y un solo botón. Al pulsarlo queda claro que ya estás dentro y adónde llega el aviso
+ * «Llévate créditos de Sloth» (cuántos y para cuántos lo decide el creador al sortear), cuántos participan y un solo botón. Al pulsarlo queda claro que ya estás dentro y adónde llega el aviso
  * si ganas. Quien ya tiene los créditos de cada mes (paga $15 USD o más) o es Fundador la ve, con por qué no participa. Sin rifa abierta, durante unos días, quién ganó
  * la última. Al creador le lleva a Administrador, donde se sortea (`RifaAdmin.tsx`).
  */
@@ -64,11 +64,8 @@ export function Rifa({ creador, conNombre }: { creador: boolean; conNombre(accio
           <Icono de="boleto" /> Rifa de Sloth · gratis
         </p>
         <h2 id="rifa-titulo">Participa en la rifa</h2>
-        <p className="rifa-premio">{a.premio}</p>
-        <p className="rifa-texto">
-          {a.creditos > 0 ? 'Te puedes llevar créditos de Sloth completamente gratis' : 'Te lo puedes llevar completamente gratis'}: solo pulsa el botón y ya estás participando.
-          {a.ganadores > 1 && ` Ganan ${a.ganadores} personas.`}
-        </p>
+        <p className="rifa-premio">Llévate créditos de Sloth</p>
+        <p className="rifa-texto">Completamente gratis: solo pulsa el botón y ya estás participando.</p>
 
         {rifa.participo ? (
           <div className={`rifa-dentro${recien ? ' recien' : ''}`} role="status">
