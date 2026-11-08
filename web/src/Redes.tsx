@@ -876,6 +876,19 @@ function Programar({ videos, redes, fijos = [], onClose, onHecho }: { videos: Vi
                     {f.borrador.aviso && <p className="muted small">No se pudo escribir solo ({f.borrador.aviso}). Escríbelo tú:</p>}
                     <textarea rows={3} value={f.borrador.texto} placeholder="El texto del video" onChange={(e) => cambiar(f.video.ruta, { texto: e.target.value })} />
                     <Tags tags={f.borrador.tags} onCambio={(tags) => cambiar(f.video.ruta, { tags })} placeholder="Añadir hashtag…" />
+                    {/* Lo que YouTube pide declarar, como en los largos. */}
+                    {redes.includes('youtube') && (
+                      <div className="programar-audiencia" title="Para YouTube Shorts">
+                        <label>
+                          <input type="checkbox" checked={!!f.borrador.infantil} onChange={(e) => cambiar(f.video.ruta, { infantil: e.target.checked })} />
+                          Creado para niños
+                        </label>
+                        <label>
+                          <input type="checkbox" checked={!!f.borrador.sintetico} onChange={(e) => cambiar(f.video.ruta, { sintetico: e.target.checked })} />
+                          Material sintético que parece real
+                        </label>
+                      </div>
+                    )}
                   </>
                 )}
               </div>

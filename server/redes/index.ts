@@ -72,7 +72,7 @@ export interface ModuloRed {
    * error con `captura` (un PNG) guarda lo que se veía en la página al fallar. Si en un reintento ve que ya estaba (en
    * TikTok, con otra hora), devuelve la hora con la que quedó.
    */
-  programar(nav: Navegador, p: { ruta: string; huella: string; texto: string; tags: string[]; cuando: string; ref: string; reintento: boolean }): Promise<void | { cuando: string }>
+  programar(nav: Navegador, p: { ruta: string; huella: string; texto: string; tags: string[]; cuando: string; ref: string; reintento: boolean; infantil?: boolean; sintetico?: boolean }): Promise<void | { cuando: string }>
   /** Quita de la red lo que se dejó con esa `ref`. Si falla, Sloth no la olvida: se puede volver a intentar. */
   quitar?(ref: string): Promise<void>
   /**
@@ -427,7 +427,7 @@ export function redes(app: string, sessions: Sessions, cards: () => Card[], avis
     const a = ajustes(card.id)
     // Si ya va a otra red, va el mismo texto: el video es el mismo.
     const otra = REDES.map((r) => publicacion(r.id, ruta)).find((p) => p?.texto)
-    if (otra) return { ruta, texto: otra.texto, tags: unirTags(a.tags, otra.tags) }
+    if (otra) return { ruta, texto: otra.texto, tags: unirTags(a.tags, otra.tags), infantil: otra.infantil, sintetico: otra.sintetico }
     const partes = ruta.split(`${sep}out${sep}`)
     const carpeta = partes.length > 1 ? partes[0] : dirname(ruta)
     // Primero lo que mejor dice de qué trata el video; luego lo demás, de lo más corto a lo más largo.
@@ -480,7 +480,7 @@ export function redes(app: string, sessions: Sessions, cards: () => Card[], avis
     const { texto, tags } = sinTagsEnTexto(b.texto, b.tags)
     const h = huella(b.ruta)
     // Con la `ref` del intento que falló: si había llegado a la red, el reintento lo encuentra en vez de duplicarlo.
-    datos.publicaciones.push({ red, cardId: card.id, ruta: b.ruta, huella: h, texto, tags, cuando, estado: 'cola', t: Date.now(), ...(previa?.ref ? { ref: previa.ref } : {}) })
+    datos.publicaciones.push({ red, cardId: card.id, ruta: b.ruta, huella: h, texto, tags, cuando, estado: 'cola', t: Date.now(), infantil: b.infantil === true, sintetico: b.sintetico === true, ...(previa?.ref ? { ref: previa.ref } : {}) })
     ;(tanda ??= new Set()).add(h)
   }
 
@@ -548,7 +548,7 @@ export function redes(app: string, sessions: Sessions, cards: () => Card[], avis
         subidos++
         guardar()
         try {
-          const ya = await red.programar(nav, { ruta: p.ruta, huella: p.huella, texto: p.texto, tags: p.tags, cuando: p.cuando!, ref: p.ref, reintento })
+          const ya = await red.programar(nav, { ruta: p.ruta, huella: p.huella, texto: p.texto, tags: p.tags, cuando: p.cuando!, ref: p.ref, reintento, infantil: p.infantil, sintetico: p.sintetico })
           if (ya) p.cuando = ya.cuando
           p.estado = 'programado'
           delete p.error

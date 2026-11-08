@@ -495,6 +495,9 @@ export interface Borrador {
   texto: string
   tags: string[]
   aviso?: string
+  /** Lo que YouTube pide declarar de cada video (en Shorts se marca al programar, como en los largos). */
+  infantil?: boolean
+  sintetico?: boolean
 }
 
 /**

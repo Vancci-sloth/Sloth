@@ -52,17 +52,23 @@ test('sube el Short privado con su hora, y al moverlo solo cambia la hora', asyn
       assert.equal(b.status.privacyStatus, 'private')
       assert.equal(b.snippet.title, 'Pidió frenar a los hackers.')
       assert.match(b.snippet.description, /#IA #Shorts$/)
+      assert.equal(b.status.selfDeclaredMadeForKids, false)
+      assert.equal(b.status.containsSyntheticMedia, true)
       publishAt = b.status.publishAt
       return new Response(null, { headers: { location: URL_SUBIDA } })
     }
     if (url === URL_SUBIDA) return Response.json({ id: 'short-1' })
     if (init.method === 'PUT') {
-      publishAt = JSON.parse(String(init.body)).status.publishAt
+      const status = JSON.parse(String(init.body)).status
+      // Al cambiar la hora, lo declarado sigue igual: YouTube borraría lo que no se manda.
+      assert.equal(status.containsSyntheticMedia, true)
+      assert.equal(status.selfDeclaredMadeForKids, false)
+      publishAt = status.publishAt
       return Response.json({})
     }
     return Response.json({ items: [{ id: 'short-1', status: { privacyStatus: 'private', publishAt } }] })
   })
-  const p = { ruta, huella: huella(ruta), texto: 'Pidió frenar a los hackers.', tags: ['IA'], cuando: '2099-01-02 12:00', ref: 'r1', reintento: false }
+  const p = { ruta, huella: huella(ruta), texto: 'Pidió frenar a los hackers.', tags: ['IA'], cuando: '2099-01-02 12:00', ref: 'r1', reintento: false, sintetico: true }
   await red.programar(nav, p)
   assert.equal(Date.parse(publishAt), new Date('2099-01-02T12:00').getTime())
   assert.deepEqual(llamadas, ['POST videos', 'PUT videos'])

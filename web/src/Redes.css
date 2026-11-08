@@ -60,6 +60,9 @@
 .programar-nombre .muted { font-family: var(--mono); font-size: 11px; font-weight: 400; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .programar-texto textarea { width: 100%; resize: vertical; padding: 8px 10px; border-radius: 8px; background: var(--panel); border: 1px solid var(--line); outline: none; font: inherit; font-size: 13px; line-height: 1.45; color: var(--text); }
 .programar-texto textarea:focus { border-color: var(--amber); }
+.programar-audiencia { display: flex; flex-wrap: wrap; gap: 8px 14px; font-size: 12px; color: var(--muted); }
+.programar-audiencia label { display: inline-flex; align-items: center; gap: 4px; cursor: pointer; }
+.programar-audiencia input { accent-color: var(--amber); }
 
 /* En la barra lateral, junto a Opciones: lo que falló en redes, con un punto rojo. Un clic lleva a donde se arregla. */
 .pie .aviso-redes { display: flex; align-items: center; gap: 9px; height: 32px; padding: 0 8px; border-radius: 8px; color: var(--bad); font-size: 13px; text-align: left; }

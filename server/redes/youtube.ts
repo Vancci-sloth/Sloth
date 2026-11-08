@@ -83,12 +83,15 @@ export function youtubeShorts(app: string, canal: CanalYoutube): ModuloRed {
     }
     return vistos
   }
-  /** Le pone otra hora a un video ya subido, sin subirlo de nuevo. Al cambiar `status` se manda entero: lo que falta se borra. */
-  async function nuevaHora(id: string, publishAt: string) {
+  /**
+   * Le pone otra hora a un video ya subido, sin subirlo de nuevo. Al cambiar `status` se manda entero (lo que falta se
+   * borra): van también lo de niños y lo sintético que se marcó al programarlo.
+   */
+  async function nuevaHora(s: Subida, publishAt: string) {
     const res = await pedir(`${API}?part=status`, {
       method: 'PUT',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ id, status: { privacyStatus: 'private', publishAt, selfDeclaredMadeForKids: false } }),
+      body: JSON.stringify({ id: s.id, status: { privacyStatus: 'private', publishAt, selfDeclaredMadeForKids: s.datos.infantil, containsSyntheticMedia: s.datos.sintetico } }),
     })
     if (!res.ok) throw await errorYoutube(res)
   }
@@ -124,7 +127,7 @@ export function youtubeShorts(app: string, canal: CanalYoutube): ModuloRed {
           const antes = actual.publishAt ? Date.parse(actual.publishAt) : NaN
           if (antes === Date.parse(publishAt)) return
           if (antes - Date.now() < CERCA) return { cuando: fechaRitmo(new Date(antes)) }
-          await nuevaHora(s.id, publishAt)
+          await nuevaHora(s, publishAt)
           return
         }
         // Lo borraron en YouTube Studio: se sube otra vez.
@@ -139,7 +142,7 @@ export function youtubeShorts(app: string, canal: CanalYoutube): ModuloRed {
           enviados: 0,
           total: statSync(p.ruta).size,
           publicarAl: publishAt,
-          datos: { titulo: tituloShort(p.texto), descripcion: descripcionShort(p.texto, p.tags), privacidad: 'private', infantil: false, sintetico: false },
+          datos: { titulo: tituloShort(p.texto), descripcion: descripcionShort(p.texto, p.tags), privacidad: 'private', infantil: p.infantil === true, sintetico: p.sintetico === true },
         }
         datos.subidas[p.ref] = s
         guardarDatos()
@@ -147,7 +150,7 @@ export function youtubeShorts(app: string, canal: CanalYoutube): ModuloRed {
       await subirYoutube(p.ruta, s, () => canal.token(), guardarDatos)
       // Una subida retomada lleva la hora con que empezó: si cambió, se pone la de ahora.
       if (s.publicarAl !== publishAt) {
-        await nuevaHora(s.id!, publishAt)
+        await nuevaHora(s, publishAt)
         s.publicarAl = publishAt
         guardarDatos()
       }
