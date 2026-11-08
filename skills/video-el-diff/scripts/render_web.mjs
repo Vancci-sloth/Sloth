@@ -5,7 +5,7 @@
  *     node <skill>/scripts/render_web.mjs <encargo.json>
  *
  * encargo.json: { bitrate, tramos: [{ nombre, desde, hasta, salida, tipo }] }. Cada tramo sale en un .mov con el video
- * en H.264 (lo codifica la tarjeta con WebCodecs) y el audio en PCM, sin pérdida, para normalizarlo después. Con
+ * en H.264 (lo codifica la tarjeta con WebCodecs; en Mac, la CPU) y el audio en PCM, sin pérdida, para normalizarlo después. Con
  * `tipo: "portada"`, un solo cuadro con portada.png (y su cuadro de silencio): sale con el mismo H.264 que los demás y
  * se pega delante sin recodificar. Sacar el audio aparte para masterizarlo mientras se renderiza no conviene: el
  * episodio de des-to solo en audio tardó 109 s en un Edge.
@@ -26,6 +26,10 @@ import { abrirEdge, pagina, procesos, servir } from "./web.mjs";
 const RAIZ = resolve(".");
 const { bitrate = 20_000_000, tramos } = JSON.parse(readFileSync(process.argv[2], "utf8"));
 const PROCESOS = procesos(tramos.length);
+// En Mac, el H.264 lo hace la CPU: con el codificador del chip (VideoToolbox), una MacBook Pro M3 con Sonoma 14.7.2 se
+// apagó sola al terminar el render, con un kernel panic de «dart-ave» (el codificador escribió en memoria que ya no era
+// suya, al cerrarse los Edge). En Windows la tarjeta sigue: ahí no ha fallado y es mucho más rápida.
+const ACELERACION = process.platform === "darwin" ? "prefer-software" : "prefer-hardware";
 
 // El episodio, empaquetado en memoria con el esbuild del proyecto: renderizar() hace un tramo y lo sube al servidor.
 const ENTRADA = `
@@ -43,7 +47,7 @@ window.renderizar = async ({ desde, hasta, bitrate, a, tipo }) => {
     container: "mov",
     videoCodec: "h264",
     audioCodec: "pcm-s16",
-    hardwareAcceleration: "prefer-hardware",
+    hardwareAcceleration: ${JSON.stringify(ACELERACION)},
     videoBitrate: bitrate,
     allowHtmlInCanvas: true,
     pageResponsiveness: "disabled",
