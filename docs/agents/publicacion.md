@@ -65,6 +65,9 @@ el motivo. Ver un envío: `xcrun notarytool info <id>` o `history`, en un Mac co
 los secretos. Si `Completar Mac de Sloth` (`recuperar-mac.yml`, desde `main`) hace falta porque Windows ya salió,
 publica solo las tres Mac con el número indicado, firmadas igual, sin repetir Windows o Linux. El cobro rechaza poner una
 de firma local encima de una firmada: desde la primera firmada, todas deben serlo.
+Pendiente al 8-nov-2026 ([#23](https://github.com/Vancci-sloth/Sloth/issues/23)): ninguna publicada va firmada aún, y
+antes de la primera publicación con esto hay que desplegar el cobro, o ignora `sinTicket`. Ahí está también el estado de
+los envíos a Apple.
 
 1. Actualiza `novedad.txt`: un renglón corto con lo que trae la versión, que se ve al pasar el cursor sobre «Actualizar».
    Una versión grande puede llevar además su guía animada (`web/src/Novedades.tsx`, la 0.4.0 en
