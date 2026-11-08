@@ -43,6 +43,11 @@
 /* Escribe algo: cerrado, una fila con tu cara; abierto, el compositor con quién publica y dónde. */
 .com-escribe { display: flex; align-items: center; gap: 12px; width: 100%; margin-top: 22px; padding: 12px 16px; border-radius: 16px; border: 1px solid var(--line); background: linear-gradient(180deg, var(--panel-2), var(--panel)); color: var(--muted); font-size: 16px; text-align: left; transition: border-color 0.2s, box-shadow 0.2s; }
 .com-escribe:hover:not(:disabled) { border-color: #4a4236; box-shadow: 0 0 0 4px var(--amber-tinte); color: var(--text); }
+/* En Estilos, escribir es compartir uno tuyo (`CompartirTuyo`). */
+.com-compartir-estilo { font-size: 13.5px; line-height: 1.4; }
+.com-compartir-estilo strong { display: block; color: var(--amber); font-size: 16px; font-weight: 650; }
+.com-compartir-icono { flex: none; display: grid; place-items: center; width: 40px; height: 40px; border-radius: 12px; background: var(--amber-tinte); color: var(--amber); }
+.com-compartir-icono .com-ico { width: 20px; height: 20px; }
 .com-nueva { margin-top: 22px; }
 .com-nueva-cabeza { display: flex; align-items: center; gap: 10px; margin: 0 0 10px 2px; color: var(--muted); font-size: 13px; }
 .com-nueva-cabeza .com-cara { width: 30px; height: 30px; font-size: 12px; }

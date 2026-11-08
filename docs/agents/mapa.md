@@ -50,9 +50,10 @@ Este es el mapa:
   (un agente la puso en `cards.json`, que cada versión reemplaza, o no llegó a escribirla), la venta la devuelve al
   arrancar y al acabar cada turno de «Nuevo estilo», desde su hilo o rehecha con su SKILL.md
   (`server/estilos-perdidos.ts`). Son las únicas que la
-  venta deja borrar (`tuya`); la skill sale a `data/skills-tuyas` (`guardarSkillTuya`). «Compartir» en su card lo
-  empaqueta en un `.sloth-estilo` (`server/estilos.ts`, ADR 0017): como archivo, o en la comunidad, en Estilos, donde
-  sale cuando el creador lo aprueba; «Importar» o «Instalar» lo pone entre los tuyos, con su `origen`.
+  venta deja borrar (`tuya`); la skill sale a `data/skills-tuyas` (`guardarSkillTuya`). «Compartir» (en su card, junto a
+  su nombre o en Comunidad → Estilos) abre `CompartirEstilo` (`web/src/Estilos.tsx`): una pantalla ya llena que lo
+  empaqueta en un `.sloth-estilo` (`server/estilos.ts`, ADR 0017) y lo publica en Estilos, donde sale cuando el creador
+  lo aprueba, o lo guarda como archivo; «Importar» o «Instalar» lo pone entre los tuyos, con su `origen`.
 - Lo que el estudio ve en vivo: `server/claude.ts` saca los borradores de lo que escribe el agente (Write y los heredocs
   de Bash), el WebSocket los lleva a `web/src/App.tsx` y `Etapas.tsx` los dibuja.
 - El estudio de video (`web/src/Estudio.tsx`): toda card cuyas etapas tengan `fase` se ve igual, con las cinco fases

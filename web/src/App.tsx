@@ -1016,6 +1016,11 @@ function NewSession(props: {
           <h1>{card.title}</h1>
           <p>{card.description}</p>
           {card.version && <p className="estilo-version">Versión {card.version}</p>}
+          {card.tuya && (
+            <button className="compartir-boton" onClick={() => setCompartiendo(card)}>
+              <Icono de="compartir" className="icon-trazo" /> Compartir en la comunidad
+            </button>
+          )}
           <TusCambios card={card} clave={hilos.map((s) => s.id + s.updatedAt).join()} />
         </div>
         {/* Hasta saber qué cuentas hay no sale: el aviso de Claude no se asoma a quien solo tiene ChatGPT u OpenCode. */}

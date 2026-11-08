@@ -64,10 +64,8 @@ export function Escribir(props: {
   conVideo?: boolean
   /** Uno de «Mis videos» que ya está subiendo (lo compartiste desde ahí), con su portada de aquí. */
   videoCompartido?: { subida: Promise<AdjuntoComunidad>; poster?: string }
-  /** Deja elegir uno de tus estilos (en la sección Estilos). */
+  /** Deja cambiar el estilo de una publicación de Estilos, al editarla (se publica con `CompartirEstilo`). */
   conEstilo?: boolean
-  /** Uno de tus estilos que ya está subiendo («Compartir» en su card). */
-  estiloCompartido?: Promise<AdjuntoComunidad>
   /** A la izquierda del botón: dónde se publica. */
   extra?: ReactNode
   /** Dentro de una tarjeta o de una caja: sin resplandor ni avatar. */
@@ -137,9 +135,6 @@ export function Escribir(props: {
   useEffect(() => {
     if (props.videoCompartido) void conSubida(props.videoCompartido.poster, props.videoCompartido.subida)
   }, [props.videoCompartido])
-  useEffect(() => {
-    if (props.estiloCompartido) void conSubida(undefined, props.estiloCompartido, true)
-  }, [props.estiloCompartido])
 
   function elegirVideo(v: VideoHecho) {
     setEligiendo(false)
@@ -322,6 +317,8 @@ export function Escribir(props: {
           )}
         </div>
       )}
+      {/* El error va en su línea: en el pie, entre todos sus botones, se quedaba sin ancho y no se veía. */}
+      {error && <p className="esc-error">{error}</p>}
       <div className="esc-pie">
         <button className="esc-adjuntar" title="Agregar capturas (también puedes pegarlas o soltarlas)" onClick={() => elegir.current?.click()}>
           <Icono de="imagen" />
@@ -359,7 +356,7 @@ export function Escribir(props: {
             {pensando ? `${nombre} está pensando…` : 'Ayúdame a decirlo'}
           </button>
         )}
-        {error ? <span className="esc-error">{error}</span> : <span className="esc-pista">Enter para {props.accion.toLowerCase()} · Mayús+Enter, otra línea</span>}
+        <span className="esc-pista">Enter para {props.accion.toLowerCase()} · Mayús+Enter, otra línea</span>
         {props.extra}
         {props.onCancelar && (
           <button className="esc-cancelar" onClick={props.onCancelar}>
