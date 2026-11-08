@@ -28,7 +28,7 @@
  * - `GET /voz/tareas/<id>`: esa tarea (en la llave donde se pidió); 202 mientras sigue.
  *
  * Para el creador (Administrador, en su Sloth):
- * - `GET /voz/admin?pagina=&consumo=`: de cada llave (`llaves`), su saldo, sus usuarios y el consumo que da Voices
+ * - `GET /voz/admin?pagina=&consumo=`: `reparto`, cuánto saldo queda libre para repartir (`cuentaDeReparto`); de cada llave (`llaves`), su saldo, sus usuarios y el consumo que da Voices
  *   Cloning (recargas y gastos, `items`); `nuevos`, la llave donde entran los nuevos ahora; los correos y planes de
  *   Sloth de cada usuario, el registro de aquí y su resumen de 30 días. Cada lista va por páginas de 100 (`pagina` la de
  *   usuarios, `consumo` la del consumo). Lo de Voices Cloning va tal cual lo responde.
@@ -47,7 +47,7 @@
  */
 import { BLOQUEADA, CLAVE, EQUIPO, type Env, Rechazo, cuerpo, delCreador, json, vigencia, vigilar } from './index.ts'
 import { DE_LA_APP } from './comunidad.ts'
-import { beneficiarioVoz, CREDITOS_MENSUALES, desdeTexto, entregarVozMensual, repartirVozMensual, vocesPublicadas, type RepartidorVoz } from './voz-mensual.ts'
+import { beneficiarioVoz, beneficiariosVoz, CREDITOS_MENSUALES, cuentaDeReparto, desdeTexto, entregarVozMensual, periodoVoz, repartirVozMensual, vocesPublicadas, type RepartidorVoz } from './voz-mensual.ts'
 
 const BASE = 'https://www.voicescloning.art'
 /** El usuario del creador en Voices Cloning. */
@@ -288,6 +288,7 @@ async function admin(req: Request, env: Env, ctx: ExecutionContext, url: URL, ll
     return json({
       configurado: llaves.length > 0,
       soloCreador: await soloCreador(env),
+      reparto: await reparto(env, llaves, deCadaLlave.map((l) => l.saldo)),
       mensuales: CREDITOS_MENSUALES,
       mensualesDesde: desdeTexto(env),
       repartos: (await env.DB.prepare('SELECT externo, periodo, creditos, estado, entregado, correo, error FROM voz_mensual ORDER BY periodo DESC, externo LIMIT 300').all()).results,
@@ -375,6 +376,36 @@ export function juntas(cuentas: { saldo: Respuesta; usuarios: Respuesta; uso: Re
     return { status: 200, datos }
   }
   return cuentas.length ? { saldo: junta('saldo'), usuarios: junta('usuarios', 'users'), uso: junta('uso', 'items') } : {}
+}
+
+/**
+ * Para «Créditos para repartir» de Administrador (`cuentaDeReparto`): el saldo de todas las llaves, los créditos de todos
+ * sus usuarios (todas las páginas, hasta 2.000 por llave) y quién recibe los de este mes y a quién ya se le entregaron.
+ * Si una llave no responde, no se adivina: va `error`.
+ */
+async function reparto(env: Env, llaves: Llave[], saldos: Respuesta[]) {
+  if (!llaves.length) return null
+  const fallo = saldos.find((r) => r.status >= 400)
+  if (fallo) return { error: mensajeDe(fallo) }
+  const usuarios: { externo: string; creditos: number }[] = []
+  for (const l of llaves)
+    for (let pagina = 1; pagina <= 20; pagina++) {
+      const r = await vc(l, 'GET', `/api/partner/v1/users?per_page=100&page=${pagina}`)
+      if (r.status >= 400) return { error: mensajeDe(r) }
+      const lista = Array.isArray(r.datos.users) ? (r.datos.users as { external_id?: unknown; credits?: unknown }[]) : []
+      for (const u of lista) usuarios.push({ externo: String(u.external_id ?? ''), creditos: numero(u.credits) ?? 0 })
+      if (lista.length < 100) break
+    }
+  const [beneficiarios, entregados] = await Promise.all([
+    env.DB.prepare(beneficiariosVoz(env)).bind(new Date().toISOString(), null).all<{ externo: string }>(),
+    env.DB.prepare('SELECT externo FROM voz_mensual WHERE periodo = ? AND entregado IS NOT NULL').bind(periodoVoz()).all<{ externo: string }>()
+  ])
+  return cuentaDeReparto({
+    saldo: saldos.reduce((t, r) => t + (numero(r.datos.balance) ?? 0), 0),
+    usuarios,
+    beneficiarios: beneficiarios.results.map((b) => b.externo),
+    entregados: new Set(entregados.results.map((e) => e.externo))
+  })
 }
 
 /** Los usuarios que el registro conoce, aunque Voices Cloning no los liste en esta página. */

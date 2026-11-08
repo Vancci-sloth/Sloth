@@ -69,3 +69,9 @@
   .admin { padding: 24px 16px 56px; }
   .admin-cabeza { flex-direction: column; align-items: flex-start; }
 }
+
+/* «Créditos para repartir»: lo libre, en grande y en ámbar; en rojo si falta saldo. */
+.admin-libres { border-color: var(--amber); background: var(--amber-tinte); }
+.admin-libres strong { color: var(--amber-2); font-size: 28px; }
+.admin-libres.corto { border-color: var(--bad); background: rgba(224, 108, 85, 0.1); }
+.admin-libres.corto strong { color: var(--bad); }

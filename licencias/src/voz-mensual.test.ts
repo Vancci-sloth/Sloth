@@ -4,7 +4,7 @@ import { DatabaseSync } from 'node:sqlite'
 import test from 'node:test'
 import worker, { type Env } from './index.ts'
 import { idDe } from './voz.ts'
-import { APERTURA_VOZ, beneficiariosVoz, entregarVozMensual, periodoVoz, repartirVozMensual, type RepartidorVoz } from './voz-mensual.ts'
+import { APERTURA_VOZ, beneficiariosVoz, cuentaDeReparto, entregarVozMensual, periodoVoz, repartirVozMensual, type RepartidorVoz } from './voz-mensual.ts'
 
 const NOVIEMBRE = new Date('2026-11-07T12:00:00Z')
 const beneficiario = { externo: 'cuenta-original', email: 'persona@example.com', clave: 'SLOTH-AAAA-BBBB-CCCC-DDDD' }
@@ -244,4 +244,27 @@ test('la clave de Sloth recibe sus créditos en la llave del lote donde ya vive,
   assert.equal(movimientos.length, 1)
   assert.equal(p.db.prepare('SELECT llave FROM voz_cuentas').get()?.llave, await idDe('pk_live_segunda'))
   await Promise.all(pendientes)
+})
+
+test('lo libre para repartir es el saldo menos lo que tienen los usuarios y lo que falta entregar este mes', () => {
+  // 3.5 millones de saldo y 32 personas sin entregar todavía: quedan 300,000.
+  const beneficiarios = Array.from({ length: 32 }, (_, i) => `b${i}`)
+  assert.deepEqual(cuentaDeReparto({ saldo: 3_500_000, usuarios: [], beneficiarios, entregados: new Set() }), {
+    saldo: 3_500_000,
+    enUsuarios: 0,
+    beneficiarios: 32,
+    porEntregar: 3_200_000,
+    cadaMes: 3_200_000,
+    libres: 300_000
+  })
+  // b0 ya tiene 40,000 sin gastar (le faltan 60,000), a b1 ya se le entregó y le quedan 90,000, y el creador tiene 5,000.
+  const r = cuentaDeReparto({
+    saldo: 3_500_000,
+    usuarios: [{ externo: 'b0', creditos: 40_000 }, { externo: 'b1', creditos: 90_000 }, { externo: 'creador', creditos: 5_000 }],
+    beneficiarios,
+    entregados: new Set(['b1'])
+  })
+  assert.equal(r.enUsuarios, 135_000)
+  assert.equal(r.porEntregar, 60_000 + 30 * 100_000)
+  assert.equal(r.libres, 3_500_000 - 135_000 - 3_060_000)
 })

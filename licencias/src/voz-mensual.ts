@@ -167,6 +167,25 @@ async function avisarEntrega(env: Env, b: Entrega): Promise<void> {
   if (enviada) await env.DB.prepare('UPDATE voz_mensual SET correo = ? WHERE externo = ? AND periodo = ?').bind(new Date().toISOString(), b.externo, periodo).run()
 }
 
+/**
+ * Cuánto saldo queda libre para repartir (rifas, regalos) sin quedarse corto con lo de cada mes: el saldo general de
+ * todas las llaves, menos lo que ya tienen los usuarios sin gastar (asignar no gasta el saldo, pero generar sí), menos
+ * lo que falta por entregar este mes a quien apoya con $15 o más (a cada uno, lo que le falta para llegar a 100,000).
+ */
+export function cuentaDeReparto(o: { saldo: number; usuarios: { externo: string; creditos: number }[]; beneficiarios: string[]; entregados: Set<string> }) {
+  const tienen = new Map(o.usuarios.map((u) => [u.externo, Math.max(0, Math.floor(u.creditos))]))
+  const enUsuarios = [...tienen.values()].reduce((t, c) => t + c, 0)
+  const porEntregar = o.beneficiarios.filter((b) => !o.entregados.has(b)).reduce((t, b) => t + faltanPara(tienen.get(b) ?? 0), 0)
+  return {
+    saldo: o.saldo,
+    enUsuarios,
+    beneficiarios: o.beneficiarios.length,
+    porEntregar,
+    cadaMes: o.beneficiarios.length * CREDITOS_MENSUALES,
+    libres: o.saldo - enUsuarios - porEntregar
+  }
+}
+
 /** Lotes pequeños: un correo o proveedor que falla no impide entregar al resto. */
 export async function repartirVozMensual(env: Env, repartidor: RepartidorVoz): Promise<void> {
   if (!(await vocesPublicadas(env))) return

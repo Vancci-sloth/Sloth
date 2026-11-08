@@ -49,6 +49,8 @@ interface Panel {
   soloCreador: boolean
   creditosIniciales: number
   mensuales?: number
+  /** Cuánto saldo queda libre para repartir (`cuentaDeReparto` del cobro); `error` si una llave no respondió. */
+  reparto?: Reparto | { error: string } | null
   /** Desde cuánto se reciben: «$15 USD (299 MXN en los apoyos en pesos)». */
   mensualesDesde?: string
   repartos?: { externo: string; periodo: string; creditos: number; estado: string; entregado: string | null; correo: string | null; error: string | null }[]
@@ -62,6 +64,15 @@ interface Panel {
   registro: Registro[]
   resumen: { accion: string; llamadas: number; fallidas: number; letras: number | null; creditos: number | null; usuarios: number; ms: number | null }[]
   errores: { status: number; codigo: string | null; veces: number; ultima: string; error: string | null }[]
+}
+
+interface Reparto {
+  saldo: number
+  enUsuarios: number
+  beneficiarios: number
+  porEntregar: number
+  cadaMes: number
+  libres: number
 }
 
 /** Una llave de socio: el secreto donde está en el cobro, su id y sus últimas cuatro letras. */
@@ -145,6 +156,8 @@ export function Admin() {
           Por ahora las voces de Sloth son <strong>solo para ti</strong>. Los créditos mensuales se abren automáticamente cuando se termine de publicar la actualización que los incluye.
         </p>
       )}
+
+      {panel?.reparto && <ParaRepartir r={panel.reparto} desde={panel.mensualesDesde} />}
 
       <RifaAdmin />
 
@@ -230,6 +243,56 @@ export function Admin() {
         </>
       )}
     </div>
+  )
+}
+
+/**
+ * Cuánto puedes repartir (rifas, regalos) sin quedarte corto con los créditos de cada mes: tu saldo general, menos lo
+ * que ya tienen los usuarios sin gastar, menos lo que falta entregar este mes a quien paga $15 o más.
+ */
+function ParaRepartir({ r, desde }: { r: Reparto | { error: string }; desde?: string }) {
+  if ('error' in r)
+    return (
+      <Seccion titulo="Créditos para repartir">
+        <p className="bad small">No se pudo leer Voices Cloning: {r.error}</p>
+      </Seccion>
+    )
+  const corto = r.libres < 0
+  return (
+    <Seccion
+      titulo="Créditos para repartir"
+      nota={`Lo libre es tu saldo general menos lo que ya tienen los usuarios sin gastar y lo que falta entregar este mes a quien paga ${desde ?? '$15 USD'} o más. Asignar créditos no gasta el saldo, pero cuando los usen sí: esto es lo que puedes rifar o regalar sin quedarte corto.`}
+    >
+      <div className="admin-cifras">
+        <div className={`admin-cifra admin-libres${corto ? ' corto' : ''}`}>
+          <span className="admin-cifra-titulo">{corto ? 'Te faltan' : 'Libres para repartir'}</span>
+          <strong>{num(Math.abs(r.libres))}</strong>
+          <span className="muted small">{corto ? 'Recarga tu saldo antes de rifar' : 'Para rifas y regalos'}</span>
+        </div>
+        <div className="admin-cifra">
+          <span className="admin-cifra-titulo">Saldo general</span>
+          <strong>{num(r.saldo)}</strong>
+          <span className="muted small">De todas tus llaves</span>
+        </div>
+        <div className="admin-cifra">
+          <span className="admin-cifra-titulo">Ya tienen los usuarios</span>
+          <strong>{num(r.enUsuarios)}</strong>
+          <span className="muted small">Asignados y sin gastar</span>
+        </div>
+        <div className="admin-cifra">
+          <span className="admin-cifra-titulo">Falta entregar este mes</span>
+          <strong>{num(r.porEntregar)}</strong>
+          <span className="muted small">A quien apoya y aún no los recibe</span>
+        </div>
+        <div className="admin-cifra">
+          <span className="admin-cifra-titulo">Cada mes</span>
+          <strong>{num(r.cadaMes)}</strong>
+          <span className="muted small">
+            {num(r.beneficiarios)} {r.beneficiarios === 1 ? 'persona' : 'personas'} × 100,000
+          </span>
+        </div>
+      </div>
+    </Seccion>
   )
 }
 
