@@ -2,12 +2,17 @@
 // que publica una versión (docs/agents/publicacion.md, paso 5), con la llave del creador
 // (%APPDATA%\sloth\licencias\admin.txt): el comentario va a nombre de Vancci y la mejora queda «hecha», y a quien la
 // pidió le llegan los dos avisos.
+// Lo que alguien pidió fuera de Mejoras (en un comentario de General, por ejemplo) va en `pedidos.json`, con el commit
+// que lo resuelve: sale aquí con las mejoras y, al avisarle, se quita de la lista.
 //   node scripts/mejoras.mjs                          las que faltan, con su id y sus comentarios
 //   node scripts/mejoras.mjs <id> <archivo> [--probar]  comenta el texto del archivo y la marca hecha
-import { readFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { readFileSync, renameSync, writeFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 
 const COBRO = 'https://api.sloth.vancci.org'
+const PEDIDOS = join(dirname(fileURLToPath(import.meta.url)), 'pedidos.json')
+const pedidos = JSON.parse(readFileSync(PEDIDOS, 'utf8'))
 const [id, archivo] = process.argv.slice(2).filter((a) => !a.startsWith('--'))
 const LLAVE = llaveDelCreador()
 
@@ -45,6 +50,11 @@ if (!id) {
     }
     antes = publicaciones.at(-1).actividad
   }
+  for (const p of pedidos) {
+    const { publicacion, comentarios } = await comunidad(`/p/${p.id}`)
+    console.log(`\n${p.id} · ${publicacion.autor.nombre} · pedido fuera de Mejoras: ${p.que} (${p.commit})\n  ${[publicacion.titulo, publicacion.texto].filter(Boolean).join(' — ').replace(/\n+/g, ' ')}`)
+    for (const c of comentarios) console.log(`    ${c.autor.nombre}: ${c.texto.replace(/\n+/g, ' ')}`)
+  }
   process.exit(0)
 }
 
@@ -63,7 +73,12 @@ if (comentarios.some((c) => c.autor.creador && c.texto.trim() === texto)) {
   await comunidad(`/p/${id}/comentar`, { texto })
   console.log(`Comenté en la mejora de ${publicacion.autor.nombre}.`)
 }
-if (publicacion.estado !== 'hecha') {
+if (pedidos.some((p) => p.id === id)) {
+  const tmp = `${PEDIDOS}.tmp`
+  writeFileSync(tmp, `${JSON.stringify(pedidos.filter((p) => p.id !== id), null, 2)}\n`)
+  renameSync(tmp, PEDIDOS)
+  console.log('Lo quité de scripts/pedidos.json: haz commit.')
+} else if (publicacion.estado !== 'hecha') {
   await comunidad(`/p/${id}`, { estado: 'hecha' })
   console.log('La marqué hecha.')
 }
