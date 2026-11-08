@@ -47,8 +47,9 @@ Este es el mapa:
   globs `listo`. Los videos terminados son los de la etapa «Video» (los `_*` son a medias); `server/reglas-repo.test.ts`
   comprueba que ningún glob cuente un borrador. Los estilos que cada quien hace con la card «Nuevo estilo» (skill
   `crear-estilo`) van en `data/tus-cards.json` y `skills/<id>`, que ninguna actualización toca. Si su card se pierde
-  (un agente la puso en `cards.json`, que cada versión reemplaza), la venta la devuelve al arrancar desde su hilo de
-  «Nuevo estilo» o rehecha con su SKILL.md (`server/estilos-perdidos.ts`). Son las únicas que la
+  (un agente la puso en `cards.json`, que cada versión reemplaza, o no llegó a escribirla), la venta la devuelve al
+  arrancar y al acabar cada turno de «Nuevo estilo», desde su hilo o rehecha con su SKILL.md
+  (`server/estilos-perdidos.ts`). Son las únicas que la
   venta deja borrar (`tuya`); la skill sale a `data/skills-tuyas` (`guardarSkillTuya`). «Compartir» en su card lo
   empaqueta en un `.sloth-estilo` (`server/estilos.ts`, ADR 0017): como archivo, o en la comunidad, en Estilos, donde
   sale cuando el creador lo aprueba; «Importar» o «Instalar» lo pone entre los tuyos, con su `origen`.

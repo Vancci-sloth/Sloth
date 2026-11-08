@@ -111,7 +111,12 @@ function broadcast(msg: ServerPush) {
   avance?.oir(msg)
 }
 
-const eventos = eventosEnVivo((sessionId, from, events) => broadcast({ type: 'events', sessionId, from, events }))
+const eventos = eventosEnVivo((sessionId, from, events) => {
+  broadcast({ type: 'events', sessionId, from, events })
+  // Al acabar cada turno de «Nuevo estilo», el estilo que ya está en `skills/` y no tiene card la recibe ahí mismo (la
+  // que escribió el hilo, o una hecha con su SKILL.md), aunque el agente no la haya guardado o la haya puesto en cards.json.
+  if (events.some((e) => e.t === 'turn_end') && sessions.meta(sessionId)?.cardId === 'nuevo-estilo') cuidarTuyas(cuidarEstilos)
+})
 const sessions = new Sessions(
   join(APP, 'data', 'sessions'),
   eventos,

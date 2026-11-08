@@ -31,6 +31,9 @@ Sloth la enseña en el inicio en cuanto ese archivo cambia, y enlaza la skill do
    `<id>` va en minúsculas y con guiones (`receta-rapida`), y no es el de ningún estilo que ya exista. En la copia,
    busca el nombre del original (`video-documental`, `reel-collage`…) en todos los archivos y cámbialo por `<id>`:
    algunos scripts se buscan a sí mismos por él, y si no, seguirían usando el original. `video-base` se queda igual.
+   En cuanto está la copia, escribe su card (paso 4) con el título y la descripción que acordaron, y las `etapas` del
+   original: así sale en el inicio desde ya, aunque el hilo se corte. Al final la ajustas a lo que quedó.
+   Listo cuando la carpeta está y su card sale en el inicio de Sloth.
 3. **Hacerlo suyo.** Reescribe `SKILL.md` para el estilo nuevo: arriba `name: <id>` y una `description` en español que
    diga qué hace y cuándo usarla. Pasos numerados, cada uno con su «Listo cuando…». El proyecto de cada video va en la
    carpeta de la línea `Carpeta: <nombre>` del mensaje, con ese nombre exacto (la pone Sloth y su estudio la busca ahí).
@@ -42,9 +45,9 @@ Sloth la enseña en el inicio en cuanto ese archivo cambia, y enlaza la skill do
    **La voz, como elija el usuario:** si el estilo lleva voz narrada, el mensaje puede traer la línea `Voz:` (mandarla
    él o generarla tú en AI Studio). `SKILL.md` dice en qué paso está el guion y remite a
    [VOZ.md](../video-base/VOZ.md) para lo demás.
-4. **La card.** Añádela a `<skills>/../data/tus-cards.json` (un arreglo; créalo si no está y no toques las demás; si ya
-   hay una con su `id`, cámbiala), al final, cuando la skill ya existe. Nunca en `<skills>/../cards.json`: es de Sloth y
-   cada versión lo reemplaza.
+4. **La card.** Va en `<skills>/../data/tus-cards.json` (un arreglo; créalo si no está y no toques las demás; si ya
+   hay una con su `id`, cámbiala). La escribiste en el paso 2; ahora déjala como quedó el estilo: sus `etapas`, su
+   `description` y lo demás. Nunca en `<skills>/../cards.json`: es de Sloth y cada versión lo reemplaza.
 
    ```json
    {
@@ -78,13 +81,13 @@ Sloth la enseña en el inicio en cuanto ese archivo cambia, y enlaza la skill do
      y si el estilo hace la suya (edge-tts), `"voz": { "propia": "Voz de edge-tts" }`. Si hace sus clips con
      `generar_video` (Google Flow), `"clips": true`: el compositor deja elegir el modelo (`video-base/FLOW.md`).
 
-   Listo cuando el archivo es JSON válido y la card sale en el inicio de Sloth.
+   Listo cuando el archivo es JSON válido, la card sale en el inicio de Sloth y sus `etapas` son las del estilo nuevo.
 5. **Probar.** Haz dos videos de prueba cortos (de 10 a 15 s) siguiendo la skill nueva, uno vertical y uno horizontal,
    en `<skills>/../trabajo/<id>/prueba-vertical` y `prueba-horizontal`: si pide la voz del usuario, usa una de
    `edge-tts` solo para probar. Arregla lo que falle en la skill, no en el video. Listo cuando salen los dos MP4, los
    miraste en una hoja y el horizontal se ve pensado para YouTube, no un vertical estirado.
-6. **Entregar.** Dile al usuario en pocas líneas qué hace su estilo, qué le va a pedir cada vez y dónde están las dos
-   pruebas.
+6. **Entregar.** Dile al usuario en pocas líneas qué hace su estilo, que ya tiene su card en el inicio (con su nombre)
+   para usarlo como los demás, qué le va a pedir cada vez y dónde están las dos pruebas.
 
 ## Cambiar un estilo tuyo
 
