@@ -347,7 +347,8 @@ export function Comunidad() {
           {sinCuenta && <Unirse onListo={() => void cargar()} />}
           {error && !sinCuenta && (
             <div className="com-error">
-              {error}
+              {/* Con enlaces: cuando D1 llega a su tope, el aviso del Worker manda al grupo de WhatsApp. */}
+              <Texto texto={error} className="com-error-texto" />
               <button onClick={() => void cargar()}>Reintentar</button>
             </div>
           )}

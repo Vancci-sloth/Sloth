@@ -77,7 +77,9 @@
 .com-paso-marca .com-ico { width: 12px; height: 12px; stroke-width: 3.5; }
 
 .com-error { display: flex; align-items: center; gap: 10px; margin-top: 16px; padding: 9px 10px 9px 14px; border-radius: 10px; border: 1px solid rgba(224, 108, 85, 0.35); background: rgba(224, 108, 85, 0.1); color: var(--bad); font-size: 13px; }
-.com-error button { margin-left: auto; padding: 3px 11px; border-radius: 999px; color: var(--text); font-size: 12.5px; font-weight: 600; }
+.com-error-texto { margin: 0; line-height: 1.45; }
+.com-error-texto a { color: var(--text); text-decoration: underline; word-break: break-all; }
+.com-error button { flex: none; margin-left: auto; padding: 3px 11px; border-radius: 999px; color: var(--text); font-size: 12.5px; font-weight: 600; }
 .com-error button:hover { background: rgba(224, 108, 85, 0.15); }
 .com-cargando { margin-top: 40px; text-align: center; color: var(--muted); }
 .com-cargando.chico { margin: 8px 0; font-size: 13px; text-align: left; }

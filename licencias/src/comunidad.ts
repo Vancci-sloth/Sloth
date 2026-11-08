@@ -98,6 +98,16 @@ const DIA = 24 * 3600_000
 /** Cuánto se guardan los avisos. */
 const AVISOS = 60 * DIA
 
+/**
+ * Lo que es igual para todos y cuesta leer (D1 cobra por fila leída y el plan gratis corta a los 5 millones al día):
+ * cada copia del Worker lo guarda `GUARDADO` en vez de recorrer las tablas en cada visita. Los miembros y activos de
+ * hoy recorren `licencias` y `equipos` enteras; el roadmap y los créditos calculan la insignia de cada uno.
+ */
+const GUARDADO = 10 * 60_000
+let numeros: { miembros: number; activos: number; hasta: number } | undefined
+let votosGuardados: { votos: Map<string, number>; hasta: number } | undefined
+let creditosGuardados: { nombres: string[]; hasta: number } | undefined
+
 interface Miembro {
   id: string
   clave: string
@@ -162,7 +172,8 @@ export async function comunidad(req: Request, env: Env, url: URL, ctx: Execution
     await env.DB.prepare('INSERT INTO votos (miembro, meta, creado) VALUES (?, ?, ?) ON CONFLICT (miembro) DO UPDATE SET meta = excluded.meta, creado = excluded.creado')
       .bind(yo.id, meta, new Date().toISOString())
       .run()
-    return json(await roadmap(env, yo))
+    // Quien vota ve su voto contado al momento.
+    return json(await roadmap(env, yo, true))
   }
   if (ruta === '/comunidad/avisos' && req.method === 'GET') return json(await avisos(env, yo, url.searchParams.has('cuenta')))
   if (ruta === '/comunidad/avisos/leidos' && req.method === 'POST') {
@@ -301,25 +312,33 @@ async function feed(env: Env, yo: Miembro, url: URL): Promise<FeedComunidad> {
   // Las fijadas van solo en la primera página; las siguientes siguen por actividad.
   if (antes) donde.push('fijada = 0 AND actividad < ?'), valores.push(antes)
   const sql = `SELECT * FROM publicaciones${donde.length ? ` WHERE ${donde.join(' AND ')}` : ''} ORDER BY ${antes ? '' : 'fijada DESC, '}actividad DESC LIMIT ${PAGINA + 1}`
-  const haceUnDia = new Date(Date.now() - DIA).toISOString()
-  const ahora = new Date().toISOString()
-  const [pubs, cuentas] = await env.DB.batch([
+  const ahora = Date.now()
+  const contar = !numeros || numeros.hasta < ahora
+  const [pubs, cuentas, totales] = await env.DB.batch([
     env.DB.prepare(sql).bind(...valores),
     env.DB.prepare(
       `SELECT
-        (SELECT COUNT(*) FROM licencias WHERE estado IN ('authorized', 'gratis') OR pagado_hasta > ?) AS miembros,
-        (SELECT COUNT(DISTINCT clave) FROM equipos WHERE visto > ?) AS activos,
         (SELECT COUNT(*) FROM publicaciones WHERE autor = ?) AS publicaciones,
         (SELECT COUNT(*) FROM comentarios WHERE autor = ?) AS comentarios,
         (SELECT COUNT(*) FROM avisos WHERE para = ? AND leido = 0) AS avisos`
-    ).bind(ahora, haceUnDia, yo.id, yo.id, yo.id)
+    ).bind(yo.id, yo.id, yo.id),
+    ...(contar
+      ? [
+          env.DB.prepare(
+            `SELECT
+              (SELECT COUNT(*) FROM licencias WHERE estado IN ('authorized', 'gratis') OR pagado_hasta > ?) AS miembros,
+              (SELECT COUNT(DISTINCT clave) FROM equipos WHERE visto > ?) AS activos`
+          ).bind(new Date(ahora).toISOString(), new Date(ahora - DIA).toISOString())
+        ]
+      : [])
   ])
+  if (totales) numeros = { ...(totales.results[0] as { miembros: number; activos: number }), hasta: ahora + GUARDADO }
   const filas = pubs.results as unknown as Guardada[]
-  const n = cuentas.results[0] as { miembros: number; activos: number; publicaciones: number; comentarios: number; avisos: number }
+  const n = cuentas.results[0] as { publicaciones: number; comentarios: number; avisos: number }
   return {
     yo: { ...autor(env, yo), creditos: !!yo.creditos, publicaciones: n.publicaciones, comentarios: n.comentarios },
-    miembros: n.miembros,
-    activos: n.activos,
+    miembros: numeros!.miembros,
+    activos: numeros!.activos,
     avisos: n.avisos,
     roadmap: await roadmap(env, yo),
     publicaciones: await armar(env, yo, filas.slice(0, PAGINA)),
@@ -734,18 +753,29 @@ async function perfil(env: Env, yo: Miembro, c: Record<string, unknown>): Promis
 }
 
 /** La votación del roadmap, como la ve `yo`: los votos de cada meta (el de un Fundador vale dos) y el suyo. */
-async function roadmap(env: Env, yo: Miembro): Promise<RoadmapComunidad> {
-  const { results } = await env.DB.prepare(`SELECT v.miembro, v.meta, ${insignia(env)} FROM votos v JOIN miembros m ON m.id = v.miembro`).all<{ miembro: string; meta: string; insignia: string | null }>()
-  const votos = new Map<string, number>()
-  for (const v of results) votos.set(v.meta, (votos.get(v.meta) ?? 0) + (v.insignia === 'fundador' ? 2 : 1))
-  const mio = results.find((v) => v.miembro === yo.id)?.meta
+async function roadmap(env: Env, yo: Miembro, recontar = false): Promise<RoadmapComunidad> {
+  const ahora = Date.now()
+  const [mio] = await Promise.all([
+    env.DB.prepare('SELECT meta FROM votos WHERE miembro = ?').bind(yo.id).first<string>('meta'),
+    (async () => {
+      if (!recontar && votosGuardados && votosGuardados.hasta > ahora) return
+      const { results } = await env.DB.prepare(`SELECT v.meta, ${insignia(env)} FROM votos v JOIN miembros m ON m.id = v.miembro`).all<{ meta: string; insignia: string | null }>()
+      const votos = new Map<string, number>()
+      for (const v of results) votos.set(v.meta, (votos.get(v.meta) ?? 0) + (v.insignia === 'fundador' ? 2 : 1))
+      votosGuardados = { votos, hasta: ahora + GUARDADO }
+    })()
+  ])
+  const votos = votosGuardados!.votos
   return { metas: METAS.map((m) => ({ ...m, votos: votos.get(m.id) ?? 0 })), ...(mio ? { mio } : {}) }
 }
 
 /** Los nombres de los Fundadores que pidieron salir en los créditos de sloth.vancci.org, del primero al último. */
 export async function creditos(env: Env): Promise<string[]> {
+  if (creditosGuardados && creditosGuardados.hasta > Date.now()) return creditosGuardados.nombres
   const { results } = await env.DB.prepare(`SELECT m.nombre, ${insignia(env)} FROM miembros m WHERE m.creditos = 1 AND m.nombre != '' ORDER BY m.creado`).all<Pick<Miembro, 'nombre' | 'insignia'>>()
-  return results.filter((m) => m.insignia === 'fundador').map((m) => m.nombre)
+  const nombres = results.filter((m) => m.insignia === 'fundador').map((m) => m.nombre)
+  creditosGuardados = { nombres, hasta: Date.now() + GUARDADO }
+  return nombres
 }
 
 /** El tipo de un archivo y su llave nueva, si se acepta y no pesa de más. */

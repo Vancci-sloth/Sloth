@@ -67,17 +67,20 @@ export function daCreditos(env: Env, t: string, ahora: string): string {
     AND (${t}.plan = 'anual' OR (${t}.moneda = '${d.moneda}' AND ${t}.monto >= ${d.monto}) OR (${t}.moneda = 'MXN' AND ${t}.monto >= ${d.pesos})))`
 }
 
-/** Quiénes reciben los créditos (`?1`, ahora; `?2`, un solo correo o NULL). Se excluye todo el correo si hay un bloqueo. */
-export const beneficiariosVoz = (env: Env) => `SELECT
+/**
+ * Quiénes reciben los créditos (`?1`, ahora; `?2`, NULL, o el correo con `unCorreo`). Se excluye todo el correo si hay
+ * un bloqueo. Con un correo va por su índice; un `?2 IS NULL OR` recorrería la tabla entera en cada consulta de `/voz`.
+ */
+export const beneficiariosVoz = (env: Env, unCorreo = false) => `SELECT
   (SELECT v.id FROM licencias v WHERE v.email = l.email ORDER BY v.creada, v.id LIMIT 1) AS externo,
   l.email, l.clave FROM licencias l
   WHERE NOT EXISTS (SELECT 1 FROM licencias v WHERE v.email = l.email AND v.estado = 'vetada')
   AND ${daCreditos(env, 'l', '?1')}
-  AND (?2 IS NULL OR l.email = ?2)
+  AND ${unCorreo ? 'l.email = ?2' : '?2 IS NULL'}
   GROUP BY l.email`
 
 export async function beneficiarioVoz(env: Env, email: string): Promise<BeneficiarioVoz | null> {
-  return env.DB.prepare(beneficiariosVoz(env)).bind(new Date().toISOString(), email).first<BeneficiarioVoz>()
+  return env.DB.prepare(beneficiariosVoz(env, true)).bind(new Date().toISOString(), email).first<BeneficiarioVoz>()
 }
 
 /**

@@ -512,9 +512,21 @@ async function atender(req: Request, env: Env, ctx: ExecutionContext, url: URL):
   } catch (error) {
     if (error instanceof Rechazo) return json({ error: error.message }, error.status)
     console.error(url.pathname, error instanceof Error ? error.message : error)
+    if ((url.pathname === '/comunidad' || url.pathname.startsWith('/comunidad/')) && esTopeDeD1(error)) return json({ error: comunidadCaida() }, 503)
     return json({ error: 'Algo falló en el cobro de Sloth. Intenta otra vez en un momento.' }, 500)
   }
 }
+
+/** D1 cortó por el tope del día del plan gratis (lecturas o escrituras). Vuelve a medianoche UTC. */
+export const esTopeDeD1 = (e: unknown) => /exceeded D1's .*limit/i.test(e instanceof Error ? e.message : String(e))
+
+/** Lo que ve la comunidad mientras D1 está en su tope, con la hora a la que vuelve (en la del centro de México). */
+export function comunidadCaida(ahora = new Date()): string {
+  const vuelve = new Date(Date.UTC(ahora.getUTCFullYear(), ahora.getUTCMonth(), ahora.getUTCDate() + 1))
+  const hora = vuelve.toLocaleTimeString('es-MX', { hour: 'numeric', minute: '2-digit', timeZone: 'America/Mexico_City' })
+  return `Los servidores de la comunidad se cayeron por tanto apoyo, jajaja. Vuelven a las ${hora} (hora del centro de México). Si quieren comentar algo mientras, únanse a la comunidad: ${WHATSAPP}`
+}
+const WHATSAPP = 'https://chat.whatsapp.com/KXzXmw8yPLYKlTJHGuVSXd'
 
 async function ultima(env: Env, so: Sistema = 'windows'): Promise<Ultima> {
   const u = await env.DESCARGAS.get(ULTIMAS[so])

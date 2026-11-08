@@ -3,7 +3,7 @@ import { createHmac } from 'node:crypto'
 import test from 'node:test'
 import { readFileSync } from 'node:fs'
 import { DatabaseSync } from 'node:sqlite'
-import { CUPO, VIGILAR, deTodos, esFundador, faltaAvisar, firmaDeMercadoPago, firmaDeNowpayments, hastaAMano, instaladorDe, leerPagos, leerPaypal, liberada, mensualRechazado, montoDe, rangoDe, reenviarClaves, sistema, sistemaDelYml, sobran, tarifa, vigencia } from './index.ts'
+import { CUPO, VIGILAR, comunidadCaida, deTodos, esFundador, faltaAvisar, firmaDeMercadoPago, firmaDeNowpayments, esTopeDeD1, hastaAMano, instaladorDe, leerPagos, leerPaypal, liberada, mensualRechazado, montoDe, rangoDe, reenviarClaves, sistema, sistemaDelYml, sobran, tarifa, vigencia } from './index.ts'
 import { DE_LA_APP } from './comunidad.ts'
 
 test('un apoyo a mano suma sus meses desde lo ya pagado, o desde hoy si ya se acabó', () => {
@@ -338,4 +338,13 @@ test('la clave que no salió se reintenta hasta que Resend la acepta, y a la hor
   } finally {
     globalThis.fetch = antes
   }
+})
+
+test('con D1 en su tope, la comunidad dice a qué hora vuelve y manda al grupo de WhatsApp', () => {
+  assert.ok(esTopeDeD1(new Error("D1_ERROR: Your account has exceeded D1's free tier daily row read limit. Upgrade to a paid plan")))
+  assert.ok(!esTopeDeD1(new Error('D1_ERROR: no such table: votos')))
+  // Medianoche UTC son las 6 de la tarde en el centro de México, el mismo día o, pasada la medianoche UTC, el siguiente.
+  const texto = comunidadCaida(new Date('2026-11-08T18:58:00Z'))
+  assert.match(texto, /a las 6:00 p\.\s?m\./)
+  assert.match(texto, /https:\/\/chat\.whatsapp\.com\/KXzXmw8yPLYKlTJHGuVSXd/)
 })
