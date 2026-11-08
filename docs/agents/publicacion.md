@@ -55,6 +55,13 @@ ramas ni bloquea por sí solo un push a `venta`.
 
 ## App instalada: este repo, rama venta
 
+Las Mac salen con firma local, como la 0.3.61. Tener `CSC_LINK` en secretos no activa la validación de Apple: para usar
+el certificado y notarizar se elige `firmar_mac` al lanzar `Publicar Sloth` a mano. El 7 de noviembre de 2026 la 0.4.0
+quedó esperando más de media hora en `notarytool`; el creador pidió volver al método anterior. Si Windows ya salió,
+`Completar Mac de Sloth` (`recuperar-mac.yml`, desde `main`) publica solo las tres Mac con el número indicado, sin
+repetir Windows o Linux. Antes comprueba que esa versión de Mac no estuviera ya firmada con certificado: el cobro
+rechaza sustituir una firmada por una de firma local. La firma local conserva el paso «Abrir de todos modos» de macOS.
+
 1. Actualiza `novedad.txt`: un renglón corto con lo que trae la versión, que se ve al pasar el cursor sobre «Actualizar».
    Una versión grande puede llevar además su guía animada (`web/src/Novedades.tsx`, la 0.4.0 en
    `web/public/novedades/0.4.0.html`), que sale una vez al abrirla a quien actualizó. Su número va en `package.json`:

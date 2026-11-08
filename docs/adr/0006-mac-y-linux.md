@@ -40,8 +40,10 @@ con macOS 12 (cada uno con su `.zip`, con el que se actualiza) y un AppImage par
 - **Firma de Apple.** Sin cuenta de desarrollador, la de Mac sale con firma ad hoc: se abre la primera vez desde
   Configuración → Privacidad y seguridad → «Abrir de todos modos», y «Actualizar» abre la descarga en el navegador
   (electron-updater solo pone versiones nuevas en una app firmada). Con los secretos de Apple en GitHub (`CSC_LINK`,
-  `CSC_KEY_PASSWORD`, `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD`, `APPLE_TEAM_ID`), las dos salen firmadas y notarizadas
-  y se actualizan solas, sin tocar nada más; el cobro lo sabe (`firmada`) y deja de explicar el paso de la primera vez.
+  `CSC_KEY_PASSWORD`, `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD`, `APPLE_TEAM_ID`) y `firmar_mac` elegido al publicar a
+  mano, salen firmadas y notarizadas. Desde el 7 de noviembre de 2026, por pedido del creador tras una espera de más
+  de media hora en `notarytool`, el flujo habitual conserva la firma local de la 0.3.61. Con certificado se actualizan
+  solas, sin tocar nada más; el cobro lo sabe (`firmada`) y deja de explicar el paso de la primera vez.
   macOS solo pone una versión nueva si la firma el mismo equipo de Apple que la instalada: cambiar de certificado deja
   sin actualizar a quien ya tiene una firmada, y una sin firma no se publica encima de una firmada (el cobro la
   rechaza). La 0.3.43 de Apple Silicon, que se armó a mano, la firmó una sola vez un colaborador (Developer ID
