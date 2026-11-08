@@ -7,11 +7,17 @@ export type Item =
   | { kind: 'text'; key: string; text: string; parent?: string; opciones?: string[] }
   | { kind: 'thinking'; key: string; text: string; parent?: string; at?: number }
   | { kind: 'tool'; key: string; id: string; name: string; input: any; output: string; largo?: number; done: boolean; error: boolean; parent?: string; subagente?: Subagente }
-  | { kind: 'turn_end'; key: string; ok: boolean; error?: string; caida?: boolean; costUsd?: number; agente?: Proveedor; ms: number }
+  | { kind: 'turn_end'; key: string; ok: boolean; error?: string; caida?: boolean; costUsd?: number; agente?: Proveedor; ms: number; pedido?: Pedido }
   | { kind: 'info'; key: string; text: string }
   | { kind: 'arranque'; key: string; nombre: string; desde: number; dura: number; acabado?: boolean }
 
-export type EstadoSubagente = Extract<AgentEvent, { t: 'subagent' }>['status']
+/** Lo que pediste en un turno que acabó sin que el agente hiciera nada: «Reintentar» lo vuelve a mandar tal cual. */
+export interface Pedido {
+  text: string
+  images: string[]
+}
+
+export type EstadoSubagente =Extract<AgentEvent, { t: 'subagent' }>['status']
 
 /**
  * Un subagente, como en T3 Code: en el hilo es una fila que dice cómo va, y abierta enseña lo suyo. Cuelga de la
@@ -97,6 +103,18 @@ function acabarArranque(a: Armado) {
   a.arranque = undefined
 }
 
+/**
+ * El último mensaje tuyo, si el agente no escribió ni hizo nada después: el turno falló antes de empezar (sin conexión,
+ * por ejemplo), y puede que el agente ni lo recibiera. «Sigue donde te quedaste» no le diría qué hacer.
+ */
+function sinRespuesta(bloques: Item[]): Pedido | undefined {
+  for (let k = bloques.length - 1; k >= 0; k--) {
+    const b = bloques[k]
+    if (b.kind === 'user') return b.text.trim() || b.images.length ? { text: b.text, images: b.images } : undefined
+    if (b.kind === 'text' || b.kind === 'tool' || b.kind === 'turn_end') return undefined
+  }
+}
+
 /** Suma un evento a lo armado. */
 function leer(a: Armado, e: AgentEvent, i: number) {
   const { bloques, donde } = a
@@ -155,7 +173,7 @@ function leer(a: Armado, e: AgentEvent, i: number) {
     }
     case 'turn_end':
       acabarArranque(a)
-      poner({ kind: 'turn_end', key: `end${i}`, ok: e.ok, error: e.error, caida: e.caida, costUsd: e.costUsd, agente: e.agente, ms: a.turnStart ? e.at - a.turnStart : 0 })
+      poner({ kind: 'turn_end', key: `end${i}`, ok: e.ok, error: e.error, caida: e.caida, costUsd: e.costUsd, agente: e.agente, ms: a.turnStart ? e.at - a.turnStart : 0, pedido: e.ok ? undefined : sinRespuesta(bloques) })
       // Lo que quedó a medias cuando el turno acabó (cortado o con error) ya no va a terminar. Lo de un subagente sí
       // puede: trabaja aparte, y lo suyo se cierra con él.
       for (const k of a.abiertas) {
@@ -359,6 +377,13 @@ export const REINTENTAR = 'Sigue donde te quedaste.'
 /** Que no cupo en el disco: Node dice ENOSPC; npm, «insufficient space»; Windows, «not enough space». */
 export const discoLleno = (error = '') => /ENOSPC|no space left|insufficient space|not enough space|disk (is )?full/i.test(error)
 
+/**
+ * Que no llegó al servidor del agente: sin internet, o algo en medio que lo corta (firewall, antivirus, VPN, proxy, que a
+ * veces cambia el certificado). Node dice ECONNREFUSED; Claude Code, «Unable to connect to API (ConnectionRefused)».
+ */
+export const sinConexion = (error = '') =>
+  /ENOTFOUND|EAI_AGAIN|getaddrinfo|ECONNREFUSED|ConnectionRefused|connection refused|conexi[oó]n rechazada|ECONNRESET|ConnectionReset|ENETUNREACH|EHOSTUNREACH|NetworkUnreachable|HostUnreachable|FailedToOpenSocket|Unable to connect|ERR_PROXY|\bproxy\b|certificate|network|fetch failed|connection error|socket hang up/i.test(error)
+
 export function errorLlano(error = '', caida = false, agente: Proveedor = 'claude'): { titulo: string; ayuda: string; reintentar: boolean; tuyo?: boolean; limite?: boolean } {
   const nombre = NOMBRE_AGENTE[agente]
   // La caída la marca el servidor. Los hilos de antes de la marca traen la frase con que sessions.ts cierra el turno.
@@ -386,8 +411,12 @@ export function errorLlano(error = '', caida = false, agente: Proveedor = 'claud
   if (/\/login|not logged in|authenticat|oauth|\b401\b|invalid api key|credential/i.test(error)) {
     return { titulo: `Tu cuenta de ${nombre} se desconectó`, ayuda: 'Vuelve a conectarla en Opciones y pulsa «Reintentar».', reintentar: true }
   }
-  if (/ENOTFOUND|EAI_AGAIN|ECONNREFUSED|ECONNRESET|network|fetch failed|connection error|socket hang up/i.test(error)) {
-    return { titulo: 'No hay conexión a internet', ayuda: 'Revisa la conexión y pulsa «Reintentar».', reintentar: true }
+  if (sinConexion(error)) {
+    return {
+      titulo: `No se pudo conectar con ${nombre}`,
+      ayuda: `Tu computadora no llegó a ${nombre}. Revisa que tengas internet. Si lo tienes, algo bloquea a Sloth: el firewall o el antivirus (déjalo pasar), una VPN o el proxy de una red de trabajo o escuela. Tu pedido no se pierde: pulsa «Reintentar» cuando se arregle.`,
+      reintentar: true
+    }
   }
   if (/overload|API Error:? 5\d\d|ETIMEDOUT|timed? ?out|service unavailable|internal server error|bad gateway/i.test(error)) {
     return { titulo: `${nombre} no respondió`, ayuda: 'Suele ser pasajero: espera un momento y pulsa «Reintentar».', reintentar: true }

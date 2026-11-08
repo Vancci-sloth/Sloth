@@ -1207,7 +1207,7 @@ const SessionView = memo(function SessionView({ id, session, card, models }: { i
   const totals = useResumen(id)
   // Un video del lote que espera su turno arranca con su propio mensaje: un clic no le manda otro.
   const pendiente = !!session?.pendiente
-  const onResponder = useMemo(() => (pendiente ? undefined : (text: string) => api(`/api/sessions/${id}/send`, { text })), [id, pendiente])
+  const onResponder = useMemo(() => (pendiente ? undefined : (text: string, images?: string[]) => api(`/api/sessions/${id}/send`, { text, images })), [id, pendiente])
   // Con quién puede seguir el hilo si su agente llega al límite: el primer modelo de cada otro agente conectado.
   const actual = proveedorDe(session?.model ?? '')
   const relevos = useMemo(() => PROVEEDORES.filter((p) => p !== actual).flatMap((p) => (p === 'opencode' ? conOpenCode(models) : conPrimero(models, p))?.principal ?? []), [models, actual])

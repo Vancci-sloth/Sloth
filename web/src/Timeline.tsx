@@ -154,7 +154,7 @@ function plegarTrabajo(lista: Item[], acabado: boolean): (Item | Trabajo)[] {
  * la fila que cambió (`Row` va memorizada y `buildTimeline` deja igual lo que no cambió). `relevos`: un modelo de cada
  * otro agente conectado, con los que el hilo sigue si el suyo llega al límite.
  */
-export function Timeline({ running, background, sessionId, proveedor = 'claude', subagente, onSubagente, onResponder, relevos }: { running: boolean; background: string[]; sessionId: string; proveedor?: string; subagente?: string; onSubagente?(id: string | null): void; onResponder?(text: string): Promise<unknown>; relevos?: Choice[] }) {
+export function Timeline({ running, background, sessionId, proveedor = 'claude', subagente, onSubagente, onResponder, relevos }: { running: boolean; background: string[]; sessionId: string; proveedor?: string; subagente?: string; onSubagente?(id: string | null): void; onResponder?(text: string, images?: string[]): Promise<unknown>; relevos?: Choice[] }) {
   const events = useEventos(sessionId) ?? SIN_EVENTOS
   const items = buildTimeline(events)
   const lanzador = subagente ? items.find((i): i is Extract<Item, { kind: 'tool' }> => i.kind === 'tool' && i.id === subagente && !!i.subagente) : undefined
@@ -484,7 +484,7 @@ function WithLinks({ text }: { text: string }) {
  * `anidado`: lo de un subagente que no se sabe cuál es, suelto en el hilo, va sangrado. Memorizada: mientras el agente
  * escribe, solo se vuelve a dibujar la fila que crece.
  */
-const Row = memo(function Row({ item, sessionId, anidado, proveedor, onAbrir, onResponder, relevos }: { item: Item; sessionId?: string; anidado: boolean; proveedor: string; onAbrir(id: string): void; onResponder?(text: string): Promise<unknown>; relevos?: Choice[] }) {
+const Row = memo(function Row({ item, sessionId, anidado, proveedor, onAbrir, onResponder, relevos }: { item: Item; sessionId?: string; anidado: boolean; proveedor: string; onAbrir(id: string): void; onResponder?(text: string, images?: string[]): Promise<unknown>; relevos?: Choice[] }) {
   const nested = anidado ? 'nested' : ''
   switch (item.kind) {
     case 'user':
@@ -551,7 +551,8 @@ function Respuestas({ opciones, onElegir }: { opciones: string[]; onElegir?(text
 
 /**
  * Un turno que acabó mal, dicho en llano; el error tal cual, al pasar el ratón. El último, con el hilo quieto
- * (`onResponder`), dice además qué hacer y deja «Reintentar», que le pide que siga donde se quedó. Todos llevan el símbolo
+ * (`onResponder`), dice además qué hacer y deja «Reintentar», que le pide que siga donde se quedó. Si falló antes de que el
+ * agente hiciera nada (sin conexión, por ejemplo), vuelve a mandar tu pedido tal cual (`item.pedido`). Todos llevan el símbolo
  * del agente del hilo, que pide una mejora con el error para que no vuelva a pasar. El error habla de ese agente: con
  * Codex, el plan y la cuenta son los de ChatGPT; si el hilo pasó luego a otro, el de quien falló (`item.agente`).
  *
@@ -559,7 +560,7 @@ function Respuestas({ opciones, onElegir }: { opciones: string[]; onElegir?(text
  * servidor le da lo hablado, la carpeta y la skill (`setModel` en sessions.ts), y sigue donde se quedó. Con Claude, además,
  * cuánto queda del límite y entrar con otra cuenta (`LimiteClaude.tsx`).
  */
-function Fallo({ item, datos, proveedor, sessionId, onResponder, relevos = [] }: { item: Extract<Item, { kind: 'turn_end' }>; datos: string; proveedor: string; sessionId?: string; onResponder?(text: string): Promise<unknown>; relevos?: Choice[] }) {
+function Fallo({ item, datos, proveedor, sessionId, onResponder, relevos = [] }: { item: Extract<Item, { kind: 'turn_end' }>; datos: string; proveedor: string; sessionId?: string; onResponder?(text: string, images?: string[]): Promise<unknown>; relevos?: Choice[] }) {
   const actual = proveedorDe(proveedor === 'claude' ? '' : `${proveedor}:`)
   const agente = item.agente ?? actual
   const e = errorLlano(item.error, item.caida, agente)
@@ -608,7 +609,12 @@ function Fallo({ item, datos, proveedor, sessionId, onResponder, relevos = [] }:
             </button>
           ))}
           {e.reintentar && (
-            <button className="primary" disabled={enviando} onClick={() => intentar(() => onResponder(REINTENTAR))}>
+            <button
+              className="primary"
+              disabled={enviando}
+              title={item.pedido ? 'Vuelve a mandar tu pedido' : 'Le pide que siga donde se quedó'}
+              onClick={() => intentar(() => (item.pedido ? onResponder(item.pedido.text, item.pedido.images) : onResponder(REINTENTAR)))}
+            >
               Reintentar
             </button>
           )}
