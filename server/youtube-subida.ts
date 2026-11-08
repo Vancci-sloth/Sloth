@@ -13,6 +13,8 @@ export interface SubidaYoutube extends EstadoSubidaYoutube {
   cardId?: string
   huella?: string
   miniaturaPuesta?: boolean
+  /** La hora en que YouTube lo publica solo (ISO), puesta al subirlo: la usan los Shorts de la cola de redes. */
+  publicarAl?: string
 }
 
 const BLOQUE = 8 * 1024 * 1024
@@ -69,7 +71,8 @@ export async function subirYoutube(ruta: string, subida: SubidaYoutube, token: (
       method: 'POST',
       headers: { 'content-type': 'application/json; charset=UTF-8', 'x-upload-content-length': String(subida.total), 'x-upload-content-type': 'video/mp4' },
       body: JSON.stringify({ snippet: snippetYoutube(d), status: {
-        privacyStatus: d.cuando ? 'private' : d.privacidad, selfDeclaredMadeForKids: d.infantil, containsSyntheticMedia: d.sintetico
+        privacyStatus: d.cuando || subida.publicarAl ? 'private' : d.privacidad, selfDeclaredMadeForKids: d.infantil, containsSyntheticMedia: d.sintetico,
+        ...(subida.publicarAl ? { publishAt: subida.publicarAl } : {})
       } })
     })
     if (!res.ok) throw await errorYoutube(res)

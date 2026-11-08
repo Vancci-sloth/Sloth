@@ -498,7 +498,7 @@ export function youtube(app: string, sessions: Sessions, cards: () => Card[], re
   }
   setTimeout(() => { void seguir() }, 0).unref()
   /** El canal conectado y un token para leer sus números (Ideas → «Tus videos»). */
-  const lectura = { canal: () => (conectado() ? datos.cuenta?.id : undefined), token }
+  const lectura = { canal: () => (conectado() ? datos.cuenta?.id : undefined), cuenta: () => (conectado() ? datos.cuenta : null), token }
   return { api, lectura, ocupado: () => eliminando ? 'Se están enviando videos de YouTube a la Papelera.' : activa || procesando ? 'Se está preparando una publicación de YouTube. Espera a que termine.' : recomendar.ocupado() ?? (autorizando || permiso && permiso.hasta > Date.now() ? 'Se está conectando el canal de YouTube.' : null) }
 }
 

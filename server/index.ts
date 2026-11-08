@@ -175,10 +175,10 @@ function cards(): Card[] {
   return leidas?.cards ?? []
 }
 
-// Publicar los videos verticales terminados en TikTok e Instagram (y en las redes que se sumen), y los largos en YouTube.
-// La app que se vende aún no publica.
-const publicar = redes(APP, sessions, cards, broadcast) // redes
+// Publicar los videos verticales terminados en TikTok, Instagram y YouTube Shorts, y los largos en YouTube. Los Shorts
+// van con el canal que conecta YouTube.
 const subirLargos = youtube(APP, sessions, cards, `http://127.0.0.1:${PORT}/api/youtube/oauth`, undefined, () => modelos)
+const publicar = redes(APP, sessions, cards, broadcast, subirLargos.lectura) // redes
 
 // Cada card de estilo enseña su último video terminado, en pequeño.
 const previa = previas(join(APP, 'data', 'previas'), cards) // previas de las cards

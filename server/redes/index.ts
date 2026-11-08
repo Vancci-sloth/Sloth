@@ -16,6 +16,7 @@ import { montarNube, nubeAlDia } from './cloudflare.ts'
 import { hayNube, instagram } from './instagram.ts'
 import { abierto, conGoogle, contextoDeGoogle, deGoogle, deLaApp, desconectar, enGoogle, navegador, pasarDeEdge, pestana, SinSesion, sinAviso, soltar } from './navegador.ts'
 import { tiktok } from './tiktok.ts'
+import { type CanalYoutube, youtubeShorts } from './youtube.ts'
 import { redactar } from '../redactar.ts'
 import { NOMBRE_AGENTE, proveedorDe } from '../../shared/providers.ts'
 
@@ -38,12 +39,17 @@ export interface Sesion {
 }
 
 /**
- * Lo que sabe hacer cada red. Para sumar YouTube: otro archivo como `tiktok.ts` (por su página) o `instagram.ts` (por la
- * nube de Sloth), y añadirlo a `REDES`.
+ * Lo que sabe hacer cada red: `tiktok.ts` (por su página), `instagram.ts` (por la nube de Sloth) y `youtube.ts` (por su
+ * API, con el canal de Opciones → YouTube). Una red nueva es otro archivo así, añadido a `REDES`.
  */
 export interface ModuloRed {
   id: RedId
   nombre: string
+  /**
+   * Va con una cuenta que ya conectaste en otro lado (YouTube, con el canal de los largos): no pide token ni sesión, solo
+   * se enciende (`token('si')`) o se apaga (`token(null)`).
+   */
+  interruptor?: boolean
   /** La página donde se inicia sesión, en el navegador de las redes. Sin ella, la red va por su API y se conecta con `token`. */
   login?: string
   /** Hasta cuántos días antes deja programar la red. Lo que cae más lejos espera en la cola, sin error, hasta que entre. */
@@ -81,7 +87,6 @@ export interface ModuloRed {
   estados?(): Promise<Record<string, { estado: 'publicado' } | { estado: 'error'; error: string }>>
 }
 
-const REDES: ModuloRed[] = [tiktok, instagram]
 /** Lo más pronto que se programa: las redes piden un margen. */
 const MARGEN = 20 * 60000
 const DIA = 24 * 3600000
@@ -159,7 +164,8 @@ export function sinTagsEnTexto(texto: string, tags: string[]) {
   return { texto: limpio, tags: unirTags(tags, sueltos) }
 }
 
-export function redes(app: string, sessions: Sessions, cards: () => Card[], avisar: (msg: ServerPush) => void) {
+export function redes(app: string, sessions: Sessions, cards: () => Card[], avisar: (msg: ServerPush) => void, canal?: CanalYoutube) {
+  const REDES: ModuloRed[] = [tiktok, instagram, ...(canal ? [youtubeShorts(app, canal)] : [])]
   const archivo = join(app, 'data', 'redes', 'redes.json')
   const fallos = join(app, 'data', 'redes', 'fallos')
   let datos: Datos = { ritmo: RITMO_VERTICAL, cuentas: {}, estilos: {}, publicaciones: [] }
@@ -741,6 +747,7 @@ export function redes(app: string, sessions: Sessions, cards: () => Card[], avis
           cuenta: datos.cuentas[r.id] ?? null,
           ritmo: datos.ritmo,
           token: !!r.token,
+          interruptor: r.interruptor,
           sinSesion: sinSesion.has(r.id),
           enEdge: (enGoogle() && redDeLaApp() === r) || undefined,
           sinNube: (r.enLaNube && !hayNube()) || undefined,

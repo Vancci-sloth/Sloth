@@ -7,8 +7,8 @@ import { Logo } from './Logos'
 import './Ritmos.css'
 
 /**
- * En «Mis videos»: a qué ritmo salen los videos, uno para TikTok e Instagram (`server/redes/`) y otro para YouTube
- * (`server/youtube.ts`). Guardarlo vale para lo que programes después. Lo que ya tiene hora pasa al ritmo nuevo solo con
+ * En «Mis videos»: a qué ritmo salen los videos, uno para los verticales (TikTok, Instagram y YouTube Shorts,
+ * `server/redes/`) y otro para los largos de YouTube (`server/youtube.ts`). Guardarlo vale para lo que programes después. Lo que ya tiene hora pasa al ritmo nuevo solo con
  * «Pasar al ritmo nuevo», que pide confirmación: es una decisión aparte, no un efecto de guardar.
  */
 export function Ritmos() {
@@ -16,8 +16,8 @@ export function Ritmos() {
   const ver = (base: string) => (si: boolean) => setHay((h) => ({ ...h, [base]: si }))
   return (
     <div className="ritmos">
-      <RitmoDe base="/api/redes" titulo="TikTok e Instagram" logos={['tiktok', 'instagram']} evento="sloth-redes" onConectada={ver('/api/redes')} />
-      <RitmoDe base="/api/youtube" titulo="YouTube" logos={['youtube']} evento="sloth-youtube" onConectada={ver('/api/youtube')} />
+      <RitmoDe base="/api/redes" titulo="Verticales: TikTok, Instagram y Shorts" logos={['tiktok', 'instagram', 'youtube']} evento="sloth-redes" onConectada={ver('/api/redes')} />
+      <RitmoDe base="/api/youtube" titulo="Largos de YouTube" logos={['youtube']} evento="sloth-youtube" onConectada={ver('/api/youtube')} />
       {Object.keys(hay).length === 2 && !hay['/api/redes'] && !hay['/api/youtube'] && (
         <p className="muted small">Conecta TikTok, Instagram o YouTube en Opciones → Redes para elegir a qué ritmo salen.</p>
       )}
