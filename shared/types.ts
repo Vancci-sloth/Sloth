@@ -1275,10 +1275,10 @@ export interface RifaAdmin {
   ganadores: GanadorRifa[]
 }
 
-/** `POST /api/comunidad/rifa/sortear`: quiénes entraron a este sorteo (para la ruleta: los que aún no ganan) y quiénes ganaron, en orden. */
+/** `POST /api/comunidad/rifa/sortear`: quiénes entraron a este sorteo (para la ruleta: los que aún no ganan) y quiénes ganaron qué, en orden (el premio mayor primero). */
 export interface SorteoRifa {
   participantes: { externo: string; nombre: string }[]
-  ganadores: { externo: string; nombre: string }[]
+  ganadores: { externo: string; nombre: string; premio: string }[]
 }
 
 /** `/api/comunidad/liberar`, solo del creador: la última versión de un sistema y, mientras es solo de quien apoya, desde cuándo será de todos. */

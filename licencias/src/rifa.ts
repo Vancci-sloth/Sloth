@@ -8,8 +8,8 @@
  *   Fundador queda fuera (`fuera`). Las cuentas gratis y quien apoya con menos sí entran. Se vuelve a mirar en cada
  *   sorteo: quien empezó a apoyar después ya no entra.
  * - Abrirla no dice qué se rifa. La rifa sigue abierta hasta que el creador la cierra, y mientras sortea cuando quiere:
- *   ahora un premio, veinte minutos después otro. Cada sorteo (`rifa_sorteos`, migración 0025) lleva su premio: cuántos
- *   ganan y los créditos de cada uno (o uno a mano). Nadie gana dos veces en la misma rifa, y quien entra entre sorteos
+ *   ahora unos premios, veinte minutos después otros. Cada sorteo lleva una lista de premios, del mayor al menor, y cada
+ *   premio (`rifa_sorteos`, migración 0025) dice cuántos lo ganan y los créditos de cada uno (o es uno a mano). Nadie gana dos veces en la misma rifa, y quien entra entre sorteos
  *   participa en los siguientes. Solo una abierta a la vez.
  * - Sortear elige al azar (`crypto.getRandomValues`, sin sesgo) y guarda el sorteo y sus ganadores en una sola
  *   transacción: con la rifa ya cerrada no entra nada, y dos sorteos cruzados no dan el mismo ganador dos veces.
@@ -22,8 +22,8 @@
  * - `GET /comunidad/rifa`: la abierta (con quién ya ganó), si participas, ganaste o por qué no puedes, la última que se
  *   cerró y lo que ganaste sin verlo.
  * - `POST /comunidad/rifa/participar` y `POST /comunidad/rifa/visto` `{rifa}` (cerraste el aviso de que ganaste).
- * - Solo el creador: `GET /comunidad/rifa/admin`; `POST /comunidad/rifa/crear`, `/sortear` `{rifa, ganadores, creditos,
- *   premio?}`, `/cerrar` `{rifa}` y `/ganador` `{rifa, externo, accion: 'reintentar' | 'entregado'}`.
+ * - Solo el creador: `GET /comunidad/rifa/admin`; `POST /comunidad/rifa/crear`, `/sortear` `{rifa, premios: [{ganadores,
+ *   creditos, premio?}]}`, `/cerrar` `{rifa}` y `/ganador` `{rifa, externo, accion: 'reintentar' | 'entregado'}`.
  */
 import type { GanadorRifa, RifaAdmin, RifaComunidad, RifaGanada, SorteoRifa } from '../../shared/types.ts'
 import { correo, cuerpo, esFundador, type Env, letras, Rechazo } from './index.ts'
@@ -191,8 +191,8 @@ async function participar(env: Env, yo: QuienRifa): Promise<RifaComunidad> {
 
 // ── El creador ──────────────────────────────────────────────────────────────────────────────────────────────────
 
-/** «1 llave de 10,000 créditos de Sloth», «3 llaves de 236,483 créditos de Sloth». */
-export const premioDe = (ganadores: number, creditos: number) => `${ganadores === 1 ? '1 llave' : `${ganadores} llaves`} de ${creditos.toLocaleString('en-US')} créditos de Sloth`
+/** Lo que se lleva cada ganador de un premio con créditos, sin nombre: «1 llave de 10,000 créditos de Sloth». */
+export const premioDe = (creditos: number) => `1 llave de ${creditos.toLocaleString('en-US')} créditos de Sloth`
 
 /** Abrir no dice qué se rifa: la comunidad solo ve «llévate créditos de Sloth». Qué y para cuántos, en cada sorteo. */
 async function crear(env: Env): Promise<RifaAdmin> {
@@ -242,13 +242,28 @@ export function nombreDe(p: { nombre: string; email: string }): string {
   return `${usuario.slice(0, 2)}•••@${dominio ?? ''}`
 }
 
-/** Lo que se rifa, elegido al sortear: cuántos ganan, los créditos de cada uno (0: un premio a mano) y cómo se llama. */
+/** Un premio del sorteo: cuántos lo ganan, los créditos de cada uno (0: un premio a mano) y lo que se lleva cada ganador. */
+/** Lo más que lleva una lista de premios. */
+const MAX_PREMIOS = 20
+
+/**
+ * Los premios de un sorteo, en el orden en que se rifan (el mayor primero): `premios` es la lista; sin ella, el cuerpo
+ * es un premio solo. Entre todos, no más de `MAX_GANADORES` ganadores.
+ */
+export function premiosDelSorteo(c: Record<string, unknown>): { ganadores: number; creditos: number; premio: string }[] {
+  const lista = Array.isArray(c.premios) ? c.premios : [c]
+  if (!lista.length || lista.length > MAX_PREMIOS) throw new Rechazo(400, `Pon de 1 a ${MAX_PREMIOS} premios.`)
+  const premios = lista.map((x) => premioDelSorteo(x && typeof x === 'object' ? (x as Record<string, unknown>) : {}))
+  if (premios.reduce((n, x) => n + x.ganadores, 0) > MAX_GANADORES) throw new Rechazo(400, `Entre todos los premios, no más de ${MAX_GANADORES} ganadores.`)
+  return premios
+}
+
 export function premioDelSorteo(c: Record<string, unknown>): { ganadores: number; creditos: number; premio: string } {
   const ganadores = Number(c.ganadores)
   const creditos = Number(c.creditos ?? 0)
   if (!Number.isInteger(ganadores) || ganadores < 1 || ganadores > MAX_GANADORES) throw new Rechazo(400, `Di cuántos ganan: de 1 a ${MAX_GANADORES}.`)
   if (!Number.isInteger(creditos) || creditos < 0 || creditos > MAX_CREDITOS) throw new Rechazo(400, 'Los créditos de cada ganador son un número entero, 0 si no lleva créditos.')
-  const premio = String(c.premio ?? '').replace(/\s+/g, ' ').trim().slice(0, 140) || (creditos ? premioDe(ganadores, creditos) : '')
+  const premio = String(c.premio ?? '').replace(/\s+/g, ' ').trim().slice(0, 140) || (creditos ? premioDe(creditos) : '')
   if (!premio) throw new Rechazo(400, 'Di qué se rifa.')
   return { ganadores, creditos, premio }
 }
@@ -257,38 +272,47 @@ async function sortear(env: Env, ctx: ExecutionContext, c: Record<string, unknow
   const id = String(c.rifa ?? '')
   const r = ID.test(id) ? await env.DB.prepare('SELECT * FROM rifas WHERE id = ?').bind(id).first<Guardada>() : null
   if (!r || r.estado !== 'abierta') throw new Rechazo(409, 'Esa rifa ya está cerrada.')
-  const { ganadores, creditos, premio } = premioDelSorteo(c)
-  if (creditos > 0) {
+  const premios = premiosDelSorteo(c)
+  if (premios.some((x) => x.creditos > 0)) {
     if (!(await vozAbierta(env))) throw new Rechazo(409, 'Las voces de Sloth aún son solo para ti: los créditos se rifan cuando se publique la actualización que las abre.')
     if (!(await repartidorVoz(env, ctx))) throw new Rechazo(503, 'Falta la llave de socio de Voices Cloning en el cobro.')
   }
   // Entran quienes siguen pudiendo participar y aún no ganan en esta rifa.
   const entran = (await participantes(env, id)).filter((p) => !p.fuera && !p.gano)
   if (!entran.length) throw new Rechazo(409, 'Nadie puede ganar: no hay participantes que no hayan ganado ya.')
-  const elegidos = elegir(entran, ganadores)
-  const sorteo = letras(12).toLowerCase()
+  // Todos los ganadores de una vez, sin repetir, y se reparten en orden: los primeros, el primer premio. Si hay menos
+  // participantes que ganadores, se quedan sin rifar los últimos premios.
+  const elegidos = elegir(entran, premios.reduce((n, x) => n + x.ganadores, 0))
   const cuando = new Date().toISOString()
-  const estado: GanadorRifa['estado'] = creditos > 0 ? 'pendiente' : 'a-mano'
-  // Una sola transacción: con la rifa cerrada el sorteo no entra, ni sus ganadores; si otro sorteo cruzado ya eligió a
-  // alguien de estos, la llave lo rechaza y no entra nada.
+  const reparto: { sorteo: string; premio: (typeof premios)[number]; quienes: Participante[] }[] = []
+  let i = 0
+  for (const premio of premios) {
+    const quienes = elegidos.slice(i, i + premio.ganadores)
+    i += premio.ganadores
+    if (quienes.length) reparto.push({ sorteo: letras(12).toLowerCase(), premio, quienes })
+  }
+  // Una sola transacción: con la rifa cerrada no entra ningún premio, ni sus ganadores; si otro sorteo cruzado ya eligió
+  // a alguien de estos, la llave lo rechaza y no entra nada.
   let hechos: D1Result[]
   try {
-    hechos = await env.DB.batch([
-      env.DB.prepare("INSERT INTO rifa_sorteos (id, rifa, premio, creditos, ganadores, cuando) SELECT ?, ?, ?, ?, ?, ? WHERE EXISTS (SELECT 1 FROM rifas WHERE id = ? AND estado = 'abierta')").bind(
-        sorteo,
-        id,
-        premio,
-        creditos,
-        elegidos.length,
-        cuando,
-        id
-      ),
-      ...elegidos.map((g) =>
-        env.DB.prepare(
-          'INSERT INTO rifa_ganadores (rifa, externo, sorteo, miembro, email, premio, creditos, estado, cuando) SELECT ?, ?, ?, ?, ?, ?, ?, ?, ? WHERE EXISTS (SELECT 1 FROM rifa_sorteos WHERE id = ?)'
-        ).bind(id, g.externo, sorteo, g.miembro, g.email, premio, creditos, estado, cuando, sorteo)
-      )
-    ])
+    hechos = await env.DB.batch(
+      reparto.flatMap(({ sorteo, premio, quienes }) => [
+        env.DB.prepare("INSERT INTO rifa_sorteos (id, rifa, premio, creditos, ganadores, cuando) SELECT ?, ?, ?, ?, ?, ? WHERE EXISTS (SELECT 1 FROM rifas WHERE id = ? AND estado = 'abierta')").bind(
+          sorteo,
+          id,
+          premio.premio,
+          premio.creditos,
+          quienes.length,
+          cuando,
+          id
+        ),
+        ...quienes.map((g) =>
+          env.DB.prepare(
+            'INSERT INTO rifa_ganadores (rifa, externo, sorteo, miembro, email, premio, creditos, estado, cuando) SELECT ?, ?, ?, ?, ?, ?, ?, ?, ? WHERE EXISTS (SELECT 1 FROM rifa_sorteos WHERE id = ?)'
+          ).bind(id, g.externo, sorteo, g.miembro, g.email, premio.premio, premio.creditos, premio.creditos > 0 ? 'pendiente' : 'a-mano', cuando, sorteo)
+        )
+      ])
+    )
   } catch (e) {
     if (/UNIQUE|PRIMARY|constraint/i.test(String(e instanceof Error ? e.message : e))) throw new Rechazo(409, 'Se cruzó con otro sorteo: vuelve a girar.')
     throw e
@@ -296,8 +320,10 @@ async function sortear(env: Env, ctx: ExecutionContext, c: Record<string, unknow
   if (!hechos[0].meta.changes) throw new Rechazo(409, 'Esa rifa ya está cerrada.')
   // La ruleta empieza ya; los créditos y los correos salen mientras gira.
   ctx.waitUntil(entregarRifas(env, ctx, id).catch((e) => console.error('Premios de la rifa', id, e instanceof Error ? e.message : e)))
-  const ver = (p: Participante) => ({ externo: p.externo, nombre: nombreDe(p) })
-  return { participantes: entran.map(ver), ganadores: elegidos.map(ver) }
+  return {
+    participantes: entran.map((p) => ({ externo: p.externo, nombre: nombreDe(p) })),
+    ganadores: reparto.flatMap(({ premio, quienes }) => quienes.map((p) => ({ externo: p.externo, nombre: nombreDe(p), premio: premio.premio })))
+  }
 }
 
 async function ganador(env: Env, ctx: ExecutionContext, c: Record<string, unknown>): Promise<RifaAdmin> {

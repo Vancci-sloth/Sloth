@@ -11,8 +11,9 @@ import './Rifa.css'
 
 /**
  * La rifa, en Administrador (`licencias/src/rifa.ts`): «Abrir la rifa» (la comunidad solo ve «llévate créditos de
- * Sloth»), quién participa y la ruleta, cuando quieras y cuantas veces quieras mientras esté abierta: cada «Rifar» es un
- * sorteo con su premio (cuántos ganan y los créditos de cada uno, o uno que das a mano), entre quienes aún no ganan.
+ * Sloth»), quién participa y la ruleta, cuando quieras y cuantas veces quieras mientras esté abierta: cada «Rifar» lleva
+ * una lista de premios, del mayor al menor (cuántos ganan cada uno y sus créditos, o uno que das a mano), que la ruleta
+ * reparte en orden entre quienes aún no ganan.
  * «Rifar» abre la ruleta a toda la pantalla; «Girar» sortea en el cobro y la ruleta cae en quien ganó, uno por uno. El
  * aviso y el correo salen al sortear. «Cerrar la rifa» la termina: la comunidad ve quién ganó qué. Abajo, cada ganador y
  * cómo va su premio.
@@ -26,8 +27,17 @@ const ESTADOS: Record<GanadorRifa['estado'], string> = {
   'a-mano': 'Lo das tú'
 }
 
-/** Lo mismo que dice el cobro (`premioDe`). */
-const premioDe = (ganadores: number, creditos: number) => `${ganadores === 1 ? '1 llave' : `${ganadores} llaves`} de ${creditos.toLocaleString('en-US')} créditos de Sloth`
+/** Una fila de la lista de premios, como se escribe. */
+type Fila = { ganan: string; creditos: string; premio: string }
+/** La fila como la manda el sorteo: sin nombre, el de siempre si lleva créditos. */
+const leerFila = (f: Fila) => {
+  const ganadores = Math.floor(Number(f.ganan))
+  const creditos = Math.max(0, Math.floor(Number(f.creditos) || 0))
+  return { ganadores, creditos, premio: f.premio.trim() || (creditos > 0 ? premioDe(creditos) : '') }
+}
+
+/** Lo mismo que dice el cobro (`premioDe`): lo que se lleva cada ganador. */
+const premioDe = (creditos: number) => `1 llave de ${creditos.toLocaleString('en-US')} créditos de Sloth`
 /** Como `nombreDe` del cobro: el nombre o el correo tapado, que la ruleta puede salir en un live. */
 const tapado = (p: { nombre: string; email: string }) => p.nombre || `${p.email.split('@')[0].slice(0, 2)}•••@${p.email.split('@')[1] ?? ''}`
 
@@ -37,10 +47,9 @@ export function RifaAdmin() {
   const [ruleta, setRuleta] = useState(false)
   const [cerrar, setCerrar] = useState(false)
   const [abriendo, setAbriendo] = useState(false)
-  // Lo que se rifa: se elige al rifar, no al abrir (la comunidad solo ve «llévate créditos de Sloth»).
-  const [ganadores, setGanadores] = useState('1')
-  const [creditos, setCreditos] = useState('10000')
-  const [premio, setPremio] = useState('')
+  // Lo que se rifa: una lista de premios, del mayor al menor, que se elige al rifar, no al abrir (la comunidad solo ve
+  // «llévate créditos de Sloth»).
+  const [premios, setPremios] = useState<Fila[]>([{ ganan: '1', creditos: '10000', premio: '' }])
 
   const cargar = useCallback(
     () =>
@@ -64,11 +73,11 @@ export function RifaAdmin() {
   const a = panel?.abierta
   // En la ruleta, quienes aún pueden ganar: ni fuera ni con premio ya en esta rifa.
   const entran = a?.lista.filter((p) => !p.fuera && !p.gano) ?? []
-  const n = Math.floor(Number(ganadores))
-  const c = Math.max(0, Math.floor(Number(creditos) || 0))
-  const nombre = premio.trim() || (c > 0 && n >= 1 ? premioDe(n, c) : '')
-  const valido = n >= 1 && n <= 100 && !!nombre
-  const cerrada = c > 0 && !panel?.vozAbierta
+  const lista = premios.map(leerFila)
+  const total = lista.reduce((t, x) => t + (x.ganadores > 0 ? x.ganadores : 0), 0)
+  const valido = lista.every((x) => x.ganadores >= 1 && x.ganadores <= 100 && !!x.premio) && total <= 100
+  const cerrada = lista.some((x) => x.creditos > 0) && !panel?.vozAbierta
+  const cambiarFila = (i: number, cambio: Partial<Fila>) => setPremios((ps) => ps.map((x, j) => (j === i ? { ...x, ...cambio } : x)))
   return (
     <section className="admin-seccion admin-rifa">
       <h2>Rifa</h2>
@@ -106,29 +115,57 @@ export function RifaAdmin() {
               setRuleta(true)
             }}
           >
-            <label>
-              <span>Cuántos ganan</span>
-              <input type="number" min={1} max={100} step={1} value={ganadores} onChange={(e) => setGanadores(e.target.value)} />
-            </label>
-            <label>
-              <span>Créditos para cada uno</span>
-              <input type="number" min={0} step={1} value={creditos} onChange={(e) => setCreditos(e.target.value)} />
-            </label>
-            <label className="ancho">
-              <span>Cómo se llama el premio (lo ven los ganadores y la comunidad al terminar)</span>
-              <input type="text" maxLength={140} placeholder={c > 0 && n >= 1 ? premioDe(n, c) : 'Por ejemplo: una clave de Sloth PRO por un año'} value={premio} onChange={(e) => setPremio(e.target.value)} />
-            </label>
+            <div className="ancho admin-rifa-premios">
+              <div className="admin-rifa-fila cabeza">
+                <span>Premio</span>
+                <span>Ganan</span>
+                <span>Créditos c/u</span>
+                <span>Qué se lleva cada ganador (lo ve quien gana y, al cerrar, la comunidad)</span>
+                <span />
+              </div>
+              {premios.map((f, i) => {
+                const x = lista[i]
+                return (
+                  <div key={i} className="admin-rifa-fila">
+                    <span className="admin-rifa-numero">{i + 1}</span>
+                    <input aria-label={`Cuántos ganan el premio ${i + 1}`} type="number" min={1} max={100} step={1} value={f.ganan} onChange={(e) => cambiarFila(i, { ganan: e.target.value })} />
+                    <input aria-label={`Créditos de cada ganador del premio ${i + 1}`} type="number" min={0} step={1} value={f.creditos} onChange={(e) => cambiarFila(i, { creditos: e.target.value })} />
+                    <input
+                      aria-label={`Nombre del premio ${i + 1}`}
+                      type="text"
+                      maxLength={140}
+                      placeholder={x.creditos > 0 ? premioDe(x.creditos) : 'Escribe qué es: una clave de Sloth PRO, una playera…'}
+                      value={f.premio}
+                      onChange={(e) => cambiarFila(i, { premio: e.target.value })}
+                    />
+                    {premios.length > 1 ? (
+                      <button type="button" className="admin-boton" aria-label={`Quitar el premio ${i + 1}`} title="Quitar este premio" onClick={() => setPremios((ps) => ps.filter((_, j) => j !== i))}>
+                        <Icono de="cerrar" />
+                      </button>
+                    ) : (
+                      <span />
+                    )}
+                  </div>
+                )
+              })}
+              {premios.length < 20 && (
+                <button type="button" className="admin-boton admin-rifa-agregar" onClick={() => setPremios((ps) => [...ps, { ganan: '1', creditos: '0', premio: '' }])}>
+                  <Icono de="mas" /> Agregar premio
+                </button>
+              )}
+            </div>
             <p className="muted small ancho">
-              {c > 0
-                ? `Cada ganador recibe ${c.toLocaleString('en-US')} créditos de voz en su cuenta de Sloth en cuanto la ruleta lo elige.`
-                : 'Sin créditos: el premio lo das tú a mano; al ganador le llega el aviso y el correo diciendo que le escribes.'}
+              La ruleta gira primero por el premio 1 y luego por los demás, en orden: {num(total)} {total === 1 ? 'ganador' : 'ganadores'}
+              {total > entran.length ? `, pero solo ${num(entran.length)} pueden ganar: los últimos premios se quedan sin rifar` : ''}. Nadie gana dos veces. Con
+              créditos, se le suman a su cuenta de voz en cuanto la ruleta lo elige; sin créditos, el premio lo das tú y su aviso y su correo dicen que le
+              escribes.
             </p>
             {cerrada && <p className="bad small ancho">Las voces de Sloth aún son solo para ti: los créditos se rifan cuando se publique la actualización que las abre. Puedes rifar algo sin créditos (0).</p>}
             <div className="admin-rifa-botones ancho">
               <button className="ruleta-girar" disabled={!entran.length || !valido || cerrada} title={entran.length ? undefined : 'Nadie más puede ganar todavía'}>
                 Rifar
               </button>
-              <button type="button" className="admin-boton" onClick={() => avisarGanasteRifa({ rifa: 'prueba', premio: nombre || premioDe(1, 10_000), creditos: c, entregados: true }, true)}>
+              <button type="button" className="admin-boton" onClick={() => avisarGanasteRifa({ rifa: 'prueba', premio: lista[0].premio || premioDe(10_000), creditos: lista[0].creditos, entregados: true }, true)}>
                 Ver el aviso del ganador
               </button>
             </div>
@@ -151,7 +188,7 @@ export function RifaAdmin() {
       {panel && panel.ganadores.length > 0 && <Ganadores ganadores={panel.ganadores} onCambio={cambio} />}
       {ruleta && a && (
         <Ruleta
-          sorteo={{ rifa: a.id, ganadores: n, creditos: c, premio: nombre }}
+          sorteo={{ rifa: a.id, premios: lista }}
           nombres={entran.map((p) => ({ externo: p.externo, nombre: tapado(p) }))}
           onCerrar={() => (setRuleta(false), cargar(), dispatchEvent(new Event(RIFA_CAMBIO)))}
         />
@@ -226,6 +263,7 @@ function gajosDe(lista: Persona[], ganador?: Persona): Persona[] {
   return copia
 }
 type Persona = { externo: string; nombre: string }
+type Ganador = SorteoRifa['ganadores'][number]
 
 const punto = (grados: number, r = R) => {
   const a = (grados * Math.PI) / 180
@@ -233,15 +271,16 @@ const punto = (grados: number, r = R) => {
 }
 const corto = (s: string, n: number) => (s.length > n ? `${s.slice(0, n - 1)}…` : s)
 
-function Ruleta({ sorteo: pedido, nombres, onCerrar }: { sorteo: { rifa: string; ganadores: number; creditos: number; premio: string }; nombres: Persona[]; onCerrar(): void }) {
-  const premio = pedido.premio
+function Ruleta({ sorteo: pedido, nombres, onCerrar }: { sorteo: { rifa: string; premios: ReturnType<typeof leerFila>[] }; nombres: Persona[]; onCerrar(): void }) {
+  // Antes de sortear, el premio de cada giro sale de la lista; después, de lo que dio el cobro.
+  const porGiro = pedido.premios.flatMap((x) => Array<string>(x.ganadores).fill(x.premio)).slice(0, nombres.length)
   const [sorteo, setSorteo] = useState<SorteoRifa>()
   const [turno, setTurno] = useState(0)
   const [gajos, setGajos] = useState(() => gajosDe(nombres))
   const [giro, setGiro] = useState(0)
   const [girando, setGirando] = useState(false)
-  const [cayo, setCayo] = useState<Persona>()
-  const [revelados, setRevelados] = useState<Persona[]>([])
+  const [cayo, setCayo] = useState<Ganador>()
+  const [revelados, setRevelados] = useState<Ganador[]>([])
   const [error, setError] = useState('')
   const [pidiendo, setPidiendo] = useState(false)
 
@@ -251,8 +290,9 @@ function Ruleta({ sorteo: pedido, nombres, onCerrar }: { sorteo: { rifa: string;
     return () => removeEventListener('keydown', alPulsar)
   }, [girando, onCerrar])
 
-  const total = sorteo?.ganadores.length ?? 0
+  const total = sorteo?.ganadores.length ?? porGiro.length
   const acabo = !!sorteo && revelados.length >= total && !girando
+  const premioDelGiro = sorteo?.ganadores[turno]?.premio ?? porGiro[turno]
 
   async function girar() {
     setError('')
@@ -340,10 +380,15 @@ function Ruleta({ sorteo: pedido, nombres, onCerrar }: { sorteo: { rifa: string;
         <div className="ruleta-lado">
           <span className="admin-antetitulo">Rifa de Sloth</span>
           <h2>{acabo ? (total > 1 ? '¡Ya hay ganadores!' : '¡Ya hay ganador!') : girando ? 'Girando…' : sorteo ? 'Siguiente ganador' : `Entre ${num(nombres.length)} ${nombres.length === 1 ? 'persona' : 'personas'}`}</h2>
-          <p className="ruleta-premio">{premio}</p>
+          {!acabo && premioDelGiro && (
+            <p className="ruleta-premio">
+              {total > 1 ? `Giro ${turno + 1} de ${total}: ` : ''}
+              {premioDelGiro}
+            </p>
+          )}
           {cayo && (
             <div className="ruleta-gano" key={cayo.externo}>
-              <span>{total > 1 ? `Ganador ${revelados.length} de ${total}` : 'Ganó'}</span>
+              <span>{cayo.premio}</span>
               <strong>{cayo.nombre}</strong>
             </div>
           )}
@@ -351,7 +396,7 @@ function Ruleta({ sorteo: pedido, nombres, onCerrar }: { sorteo: { rifa: string;
             <ul className="ruleta-lista">
               {revelados.map((p) => (
                 <li key={p.externo}>
-                  <Icono de="palomita" /> {p.nombre}
+                  <Icono de="palomita" /> {p.nombre} <span className="muted small">· {p.premio}</span>
                 </li>
               ))}
             </ul>

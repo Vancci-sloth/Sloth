@@ -120,3 +120,13 @@
 .ruleta-focos.girando circle.on { animation-delay: -0.25s; }
 @keyframes ruleta-foco { 0% { fill: var(--amber-2); } 100% { fill: var(--sobre-ambar); } }
 .admin-rifa-subtitulo { margin: 8px 0 0; }
+/* La lista de premios: número, cuántos ganan, créditos de cada uno, nombre y quitar. */
+.admin-rifa-premios { display: flex; flex-direction: column; gap: 8px; }
+.admin-rifa-fila { display: grid; grid-template-columns: 34px 90px 140px minmax(0, 1fr) 36px; gap: 8px; align-items: center; }
+.admin-rifa-fila.cabeza span { color: var(--muted); font-size: 11.5px; font-weight: 600; }
+.admin-rifa-fila input { width: 100%; min-width: 0; }
+.admin-rifa-fila .admin-boton { display: grid; place-items: center; height: 34px; padding: 0; }
+.admin-rifa-fila .admin-boton .ico { width: 14px; height: 14px; }
+.admin-rifa-numero { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 8px; background: var(--amber-tinte); color: var(--amber-2); font-weight: 750; }
+.admin-rifa-agregar { display: inline-flex; align-items: center; gap: 6px; align-self: flex-start; }
+.admin-rifa-agregar .ico { width: 14px; height: 14px; }

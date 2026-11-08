@@ -169,12 +169,42 @@ test('la rifa sigue abierta entre sorteos, nadie gana dos veces y al cerrarla la
   assert.equal((await pedir<RifaComunidad>(b, '/comunidad/rifa')).ultima?.ganadores.length, 2)
 })
 
+test('una lista de premios se reparte en orden, del mayor al menor, sin repetir ganador', async (t) => {
+  const { db, persona, creador, pedir } = preparar(t)
+  const gente = ['a', 'b', 'c', 'd'].map((x) => persona(`${x}@example.com`))
+  await pedir(creador, '/comunidad/rifa/crear', {})
+  const id = (await pedir<RifaAdmin>(creador, '/comunidad/rifa/admin')).abierta!.id
+  for (const g of gente) await pedir(g, '/comunidad/rifa/participar', {})
+  await assert.rejects(pedir(creador, '/comunidad/rifa/sortear', { rifa: id, premios: [] }), /de 1 a 20 premios/)
+  await assert.rejects(pedir(creador, '/comunidad/rifa/sortear', { rifa: id, premios: [{ ganadores: 1, creditos: 0 }] }), /Di qué se rifa/)
+  // Pide 1 + 2 + 5 ganadores con solo 4 participantes: el último premio se queda con uno.
+  const s = await pedir<SorteoRifa>(creador, '/comunidad/rifa/sortear', {
+    rifa: id,
+    premios: [
+      { premio: 'Premio mayor', ganadores: 1, creditos: 0 },
+      { premio: 'Segundo lugar', ganadores: 2, creditos: 0 },
+      { premio: 'Una playera', ganadores: 5, creditos: 0 }
+    ]
+  })
+  assert.deepEqual(s.ganadores.map((g) => g.premio), ['Premio mayor', 'Segundo lugar', 'Segundo lugar', 'Una playera'])
+  assert.equal(new Set(s.ganadores.map((g) => g.externo)).size, 4)
+  assert.deepEqual(db.prepare('SELECT premio, ganadores FROM rifa_sorteos ORDER BY rowid').all().map((x) => ({ ...x })), [
+    { premio: 'Premio mayor', ganadores: 1 },
+    { premio: 'Segundo lugar', ganadores: 2 },
+    { premio: 'Una playera', ganadores: 1 }
+  ])
+  const panel = await pedir<RifaAdmin>(creador, '/comunidad/rifa/admin')
+  assert.equal(panel.abierta?.lista.filter((p) => p.gano).length, 4)
+  // Ya ganaron todos: la rifa sigue abierta, pero nadie más puede ganar.
+  await assert.rejects(pedir(creador, '/comunidad/rifa/sortear', { rifa: id, premios: [{ premio: 'Otro', ganadores: 1, creditos: 0 }] }), /no hay participantes que no hayan ganado/)
+})
+
 test('los créditos se suman una vez; un corte en la suma queda para revisar', async (t) => {
   const { db, env, correos } = preparar(t)
   db.prepare("INSERT INTO rifas (id, estado, creada) VALUES ('r1', 'abierta', '2026-11-07')").run()
-  const fila = (externo: string) => ({ rifa: 'r1', externo, miembro: `m-${externo}`, email: `${externo}@example.com`, creditos: 10000, estado: 'pendiente' as const, intento: null, correo: null, premio: premioDe(2, 10000) })
+  const fila = (externo: string) => ({ rifa: 'r1', externo, miembro: `m-${externo}`, email: `${externo}@example.com`, creditos: 10000, estado: 'pendiente' as const, intento: null, correo: null, premio: premioDe(10000) })
   for (const e of ['uno', 'dos'])
-    db.prepare("INSERT INTO rifa_ganadores (rifa, externo, sorteo, miembro, email, premio, creditos, estado, cuando) VALUES ('r1', ?, 's1', ?, ?, ?, 10000, 'pendiente', '2026-11-07')").run(e, `m-${e}`, `${e}@example.com`, premioDe(2, 10000))
+    db.prepare("INSERT INTO rifa_ganadores (rifa, externo, sorteo, miembro, email, premio, creditos, estado, cuando) VALUES ('r1', ?, 's1', ?, ?, ?, 10000, 'pendiente', '2026-11-07')").run(e, `m-${e}`, `${e}@example.com`, premioDe(10000))
   const sumas: string[] = []
   const repartidor: RepartidorVoz = {
     preparar: async () => 'llave',
@@ -193,7 +223,7 @@ test('los créditos se suman una vez; un corte en la suma queda para revisar', a
   assert.ok(estado('uno').correo)
   assert.equal(estado('dos').estado, 'revisar')
   assert.equal(correos.length, 1)
-  assert.match(correos[0].subject, /2 llaves de 10,000 créditos de Sloth/)
+  assert.match(correos[0].subject, /1 llave de 10,000 créditos de Sloth/)
   assert.match(correos[0].text, /10,000 CREDITOS DE VOZ/)
 })
 
@@ -206,6 +236,7 @@ test('elegir da distintos, a lo más los que hay; la ruleta tapa el correo de qu
   assert.deepEqual(elegir(lista, 2, () => 0), ['a', 'b'])
   assert.equal(nombreDe({ nombre: '', email: 'arisa@proton.me' }), 'ar•••@proton.me')
   assert.equal(nombreDe({ nombre: 'Moy', email: 'x@y.z' }), 'Moy')
-  assert.equal(premioDe(1, 10000), '1 llave de 10,000 créditos de Sloth')
-  assert.equal(premioDe(3, 236483), '3 llaves de 236,483 créditos de Sloth')
+  // Es lo que se lleva cada uno, aunque ganen varios.
+  assert.equal(premioDe(10000), '1 llave de 10,000 créditos de Sloth')
+  assert.equal(premioDe(236483), '1 llave de 236,483 créditos de Sloth')
 })
