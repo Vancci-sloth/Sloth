@@ -2,6 +2,7 @@ import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, write
 import { dirname, join, relative, sep } from 'node:path'
 import type { Card, EstiloAnterior } from '../shared/types.ts'
 import { guardar } from './disco.ts'
+import { abrirTusCards } from './estilos-perdidos.ts'
 import { huella } from './originales.ts'
 
 /**
@@ -161,7 +162,8 @@ export function conservarAnterior(o: { card: Card; datos: string; skills: string
     const skill = join(destino, 'SKILL.md')
     writeFileSync(skill, renombrar(readFileSync(skill, 'utf8'), id, `Versión de «${card.title}» de hasta el ${fechaCorta(g.fecha)}, que el usuario conservó al actualizar Sloth; se usa solo desde su card.`))
   }
-  const lista = leer<Partial<Card>[]>(o.tusCards) ?? []
+  // Uno que no se lee no se pisa con solo esta card: se aparta.
+  const lista = abrirTusCards(o.tusCards)
   const nueva: Partial<Card> = { ...g.card, id, skill: id, title: titulo, basadoEn: card.skill }
   const i = lista.findIndex((c) => c.id === id)
   if (i >= 0) lista[i] = nueva

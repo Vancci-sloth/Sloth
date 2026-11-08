@@ -198,7 +198,8 @@ export function seriesDe(skill: string, estilo: boolean): Serie[] {
 }
 
 export function readCards(file: string, appDir: string): Card[] {
-  const cards = JSON.parse(readFileSync(file, 'utf8')) as Partial<Card>[]
+  // Con BOM, como lo deja PowerShell.
+  const cards = JSON.parse(readFileSync(file, 'utf8').replace(/^﻿/, '')) as Partial<Card>[]
   if (!Array.isArray(cards)) throw new Error(`${file} no es una lista de cards`)
   // Sin `cwd`, la card trabaja en su propia carpeta de `carpetaTrabajo`. Una etapa sin `muestra` enseña lo de `listo`.
   // Una sin `id` (a medio escribir por un agente) no cuenta.

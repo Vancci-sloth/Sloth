@@ -42,8 +42,9 @@ Sloth la enseña en el inicio en cuanto ese archivo cambia, y enlaza la skill do
    **La voz, como elija el usuario:** si el estilo lleva voz narrada, el mensaje puede traer la línea `Voz:` (mandarla
    él o generarla tú en AI Studio). `SKILL.md` dice en qué paso está el guion y remite a
    [VOZ.md](../video-base/VOZ.md) para lo demás.
-4. **La card.** Añádela a `<skills>/../data/tus-cards.json` (un arreglo; créalo si no está y no toques las demás), al
-   final, cuando la skill ya existe:
+4. **La card.** Añádela a `<skills>/../data/tus-cards.json` (un arreglo; créalo si no está y no toques las demás; si ya
+   hay una con su `id`, cámbiala), al final, cuando la skill ya existe. Nunca en `<skills>/../cards.json`: es de Sloth y
+   cada versión lo reemplaza.
 
    ```json
    {
