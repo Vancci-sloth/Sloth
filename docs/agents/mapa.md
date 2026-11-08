@@ -98,7 +98,7 @@ Este es el mapa:
   Sus capturas y los logs de consola quedan en `data/navegador-capturas/`. Copia lo mejor del de T3 Code (`C:\dev\t3code`):
   pestañas (el agente solo usa la primera), tamaños fijos (`navegador-medidas.ts`) y bordes que se arrastran. T3 usa
   `<webview>` y Sloth una vista nativa: el tamaño fijo es `enableDeviceEmulation`, y por eso el relevo reescala los clics.
-  Google no deja iniciar sesión dentro de la app: ese paso se da en Edge (Chrome en Mac) y la sesión pasa a sus páginas (`electron/google.ts`).
+  Google no deja iniciar sesión dentro de la app: ese paso se da en Edge (Chrome en Mac; en Windows sin Edge, tu predeterminado si es Chrome, Brave o Vivaldi, o el que haya: `server/chromium.ts`) y la sesión pasa a sus páginas (`electron/google.ts`).
 - `server/ideas/` y `web/src/Ideas.tsx`: Ideas, qué video hacer: largo en YouTube o vertical en TikTok e Instagram
   (`formato: 'vertical'`), en `trabajo/ideas/<id>/`. Investigar mide cada video contra su canal (outlier: 3× o más),
   transcribe lo dicho (`transcribir.ts`) y agrupa temas con vectores locales (`vectores.ts`); en vertical busca con
