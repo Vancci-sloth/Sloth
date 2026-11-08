@@ -1093,6 +1093,7 @@ const Carteles = memo(function Carteles({ cards, activa, previas, sessions, acci
               {!VENTA && (
                 <span
                   role="button"
+                  className="duplicar"
                   title={`Duplicar: sale una card nueva con la misma skill${c.skill ? ` /${c.skill}` : ''}, que puedes cambiar a tu gusto en cards.json`}
                   onClick={(e) => (e.stopPropagation(), acciones.duplicar(c))}
                 >
@@ -1100,7 +1101,7 @@ const Carteles = memo(function Carteles({ cards, activa, previas, sessions, acci
                 </span>
               )}
               {c.tuya && (
-                <span role="button" title="Compartir: en la comunidad o como archivo" onClick={(e) => (e.stopPropagation(), acciones.compartir(c))}>
+                <span role="button" className="compartir" title="Compartir: en la comunidad o como archivo" onClick={(e) => (e.stopPropagation(), acciones.compartir(c))}>
                   <Icono de="compartir" className="icon-trazo" />
                 </span>
               )}

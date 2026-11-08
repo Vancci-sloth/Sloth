@@ -125,13 +125,15 @@ input, textarea, select { font: inherit; color: inherit; }
 .card-uso { font-size: 11.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .card-uso.vivo { color: var(--amber); }
 /* La versión del estilo (Card.version), arriba a la izquierda; con fondo, que encima de una previa se lea. */
-.card-version { position: absolute; top: 8px; left: 8px; z-index: 1; padding: 2px 7px; border-radius: 6px; background: rgba(15, 14, 12, 0.72); color: var(--text); font-size: 11px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.card-version { position: absolute; top: 8px; left: 8px; z-index: 1; padding: 2px 7px; border-radius: 6px; background: var(--amber); color: var(--sobre-ambar); font-size: 11px; font-weight: 600; font-variant-numeric: tabular-nums; }
 .card:has(.card-version) .card-fondo { padding-top: 38px; }
 .card-actions { position: absolute; top: 8px; right: 8px; display: flex; gap: 2px; opacity: 0; transition: opacity 0.15s; }
 .card:hover .card-actions, .card:focus-visible .card-actions { opacity: 1; }
-.card-actions span { width: 24px; height: 24px; display: grid; place-items: center; border-radius: 6px; background: rgba(15, 14, 12, 0.8); color: var(--text); font-size: 12px; }
-.card-actions span:hover { background: var(--panel); }
-.card-actions span.danger:hover { color: var(--bad); }
+/* Cada botón de su color, y distintos de la versión (ámbar): duplicar, compartir y quitar no se confunden. */
+.card-actions span { width: 24px; height: 24px; display: grid; place-items: center; border-radius: 6px; background: var(--text); color: var(--sobre-ambar); font-size: 12px; font-weight: 700; }
+.card-actions span.compartir { background: var(--ok); }
+.card-actions span.danger { background: var(--bad); }
+.card-actions span:hover { filter: brightness(1.12); }
 /* Un estilo elegido: sus videos en el sitio de las cards. */
 .estilo { min-height: 0; display: flex; flex-direction: column; gap: 10px; }
 .estilo-volver { align-self: flex-start; color: var(--muted); font-size: 12.5px; padding: 3px 10px; border-radius: 999px; border: 1px solid var(--line); transition: color 0.15s, border-color 0.15s; }
