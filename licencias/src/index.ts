@@ -434,9 +434,14 @@ interface Ultima {
   publicado: string
   /** Desde cuándo la recibe todo el mundo; antes, solo quien apoya. Sin él (las de antes), ya es de todos. */
   todos?: string
-  /** La de Mac, firmada y notarizada por Apple: abre a la primera, sin «Abrir de todos modos». */
+  /** La de Mac, firmada con el certificado de Apple: se actualiza sola, y solo se le pone encima otra firmada. */
   firmada?: boolean
+  /** Firmada, pero Apple no la había notarizado al publicarla (scripts/notarizar.mjs): aún pide «Abrir de todos modos». */
+  sinTicket?: boolean
 }
+
+/** La de Mac que abre a la primera, sin «Abrir de todos modos». */
+const abreALaPrimera = (u: Ultima) => !!u.firmada && !u.sinTicket
 
 export class Rechazo extends Error {
   status: number
@@ -489,7 +494,7 @@ async function atender(req: Request, env: Env, ctx: ExecutionContext, url: URL):
       if ((so === 'mac' || so === 'mac-arm64' || so === 'mac12') && !url.searchParams.has('visto')) {
         const otra = (cual: Sistema) => (so === cual ? u : so === 'mac' ? ultimaPara(req, env, cual).catch(() => undefined) : undefined)
         const [intel, arm, viejo] = await Promise.all([so === 'mac' ? u : undefined, otra('mac-arm64'), otra('mac12')])
-        if ([intel, arm, viejo].some((m) => m && !m.firmada) || (intel && (arm || viejo))) return avisoMac(intel, arm, viejo)
+        if ([intel, arm, viejo].some((m) => m && !abreALaPrimera(m)) || (intel && (arm || viejo))) return avisoMac(intel, arm, viejo)
       }
       return servir(req, env, u.archivo, u.bytes, { 'content-disposition': `attachment; filename="${u.archivo}"` })
     }
@@ -682,7 +687,7 @@ async function publicar(req: Request, env: Env, url: URL): Promise<Response> {
     return json(await subida.uploadPart(n, req.body))
   }
   if (req.method === 'POST' && url.pathname === '/publicar/fin') {
-    const { partes, version, paraTodos, firmada, vozMensual } = (await cuerpo(req)) as { partes: R2UploadedPart[]; version: string; paraTodos?: boolean; firmada?: boolean; vozMensual?: boolean }
+    const { partes, version, paraTodos, firmada, sinTicket, vozMensual } = (await cuerpo(req)) as { partes: R2UploadedPart[]; version: string; paraTodos?: boolean; firmada?: boolean; sinTicket?: boolean; vozMensual?: boolean }
     // Una versión nueva: la que había pasa a `anterior/` (su ultima.json y su latest.yml, que aún no se reemplaza: va al
     // final), salvo que aún fuera solo de quien apoya; entonces la anterior sigue siendo la de antes. Si esa ya no tiene
     // instalador, a quien no apoya se le estaba dando la que había: pasa a ser la anterior, o la nueva le llegaría ya.
@@ -716,7 +721,7 @@ async function publicar(req: Request, env: Env, url: URL): Promise<Response> {
     const misma = previa?.version === String(version)
     const publicado = misma ? previa.publicado : new Date().toISOString()
     const todos = paraTodos ? undefined : misma ? previa.todos : new Date(Date.parse(publicado) + ANTICIPO).toISOString()
-    const u: Ultima = { archivo, version: String(version), bytes: obj.size, publicado, ...(todos ? { todos } : {}), ...(firmada ? { firmada: true } : {}) }
+    const u: Ultima = { archivo, version: String(version), bytes: obj.size, publicado, ...(todos ? { todos } : {}), ...(firmada ? { firmada: true, ...(sinTicket ? { sinTicket: true } : {}) } : {}) }
     await env.DESCARGAS.put(ULTIMAS[so], JSON.stringify(u), { httpMetadata: { contentType: 'application/json' } })
     return json(u)
   }
@@ -2033,11 +2038,11 @@ function avisoMac(intel: Ultima | undefined, arm: Ultima | undefined, viejo?: Ul
   const boton = (u: Ultima, so: Sistema, cual: string, principal: boolean) =>
     `<a class="${principal ? 'boton' : 'boton otro'}" href="/descargar?so=${so}&amp;visto">Descargar Sloth ${u.version} para ${cual}</a>`
   const elegir = intel && arm
-  const sinFirma = [intel, arm, viejo].some((u) => u && !u.firmada)
+  const sinFirma = [intel, arm, viejo].some((u) => u && !abreALaPrimera(u))
   // Las que se enseñan y no van firmadas; si son todas, se dice de «Sloth para Mac».
   const macs: [string, Ultima | undefined][] = [['La de Apple Silicon', arm], ['La de Intel', intel], ['La de macOS 12', viejo]]
   const vistas = macs.filter(([, u]) => u)
-  const sinFirmaDe = vistas.filter(([, u]) => !u?.firmada).map(([n]) => n)
+  const sinFirmaDe = vistas.filter(([, u]) => u && !abreALaPrimera(u)).map(([n]) => n)
   const quien = sinFirmaDe.length === vistas.length ? 'Sloth para Mac' : sinFirmaDe.join(' y ').replace(' y La', ' y la')
   const deMac12 = viejo
     ? intel || arm

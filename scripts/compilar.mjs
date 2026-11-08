@@ -17,6 +17,7 @@ import { build as esbuild } from 'esbuild'
 import { build as vite } from 'vite'
 import { Arch, build as empaquetar, Platform } from 'electron-builder'
 import { armarVentana } from './electron.mjs'
+import { notarizar } from './notarizar.mjs'
 import { compresionInstalador } from './instalador-config.ts'
 
 const REPO = join(dirname(fileURLToPath(import.meta.url)), '..')
@@ -32,7 +33,7 @@ const WINDOWS = process.platform === 'win32'
 const MAC = process.platform === 'darwin'
 // GitHub pasa vacío un secreto que no existe, y electron-builder tomaría ese vacío por un certificado.
 for (const v of ['CSC_LINK', 'CSC_KEY_PASSWORD', 'APPLE_ID', 'APPLE_APP_SPECIFIC_PASSWORD', 'APPLE_TEAM_ID']) if (!process.env[v]) delete process.env[v]
-/** Con el certificado de Apple (CSC_LINK, ver docs/adr/0006), la de Mac va firmada y notarizada, y se actualiza sola. */
+/** Con el certificado de Apple (CSC_LINK, ver docs/adr/0006), la de Mac va firmada y notarizada (scripts/notarizar.mjs), y se actualiza sola. */
 const MAC_FIRMADA = MAC && !!process.env.CSC_LINK
 /**
  * La de Mac con macOS 12 (Monterey), aparte, con SLOTH_MAC12=1 (docs/adr/0006): Electron dejó macOS 12 en su 44 y Node
@@ -326,7 +327,8 @@ const hechos = await empaquetar({
       // abre una vez desde Configuración → Privacidad y seguridad → «Abrir de todos modos».
       identity: MAC_FIRMADA ? undefined : '-',
       hardenedRuntime: MAC_FIRMADA,
-      notarize: MAC_FIRMADA,
+      // electron-builder esperaría a Apple sin límite: lo hace scripts/notarizar.mjs, con tiempo máximo.
+      notarize: false,
       entitlements: join(REPO, 'scripts', 'mac.entitlements'),
       entitlementsInherit: join(REPO, 'scripts', 'mac.entitlements'),
       // La voz se graba en la interfaz: sin esto, macOS ni siquiera pregunta por el micrófono.
@@ -343,6 +345,7 @@ const hechos = await empaquetar({
     // La app va en español: de los 55 idiomas de Chromium solo hacen falta el suyo y el inglés, al que recurre.
     electronLanguages: ['es', 'es-419', 'en-US'],
     afterPack: linuxSinAislamiento,
+    afterSign: notarizar,
     // Las actualizaciones (electron-updater): el cobro sirve un pedazo por petición, no varios. La de Mac con Apple
     // Silicon sale en otra máquina y lee su propio latest-arm64-mac.yml, y la de macOS 12, latest-mac12-mac.yml (la de
     // Intel no abriría ahí); el canal va aquí y no en electron/main.ts, que le dejaría instalar una versión más vieja.

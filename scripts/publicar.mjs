@@ -7,7 +7,8 @@
 // %APPDATA%\sloth\licencias\publicar.txt (es el secreto PUBLICAR del Worker); en GitHub, la rama `venta` la pasa en la
 // variable PUBLICAR (.github/workflows/venta.yml). Una versión nueva la recibe primero quien apoya (7 días antes, en el
 // cobro); con PARA_TODOS=1 (un arreglo urgente) es de todos desde ya. FIRMADA=1: la de Mac va firmada por Apple, y el
-// cobro deja de explicar cómo abrirla la primera vez.
+// cobro deja de explicar cómo abrirla la primera vez, salvo que Apple aún no la notarizara (`sin-ticket`,
+// scripts/notarizar.mjs).
 import { closeSync, existsSync, openSync, readFileSync, readSync, statSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -63,7 +64,7 @@ async function subir(archivo) {
   } finally {
     closeSync(fd)
   }
-  return cobro(`fin?${q(`&upload=${encodeURIComponent(upload)}`)}`, 'POST', JSON.stringify({ partes, version: VERSION, paraTodos: process.env.PARA_TODOS === '1', firmada: process.platform === 'darwin' && process.env.FIRMADA === '1', vozMensual: true }))
+  return cobro(`fin?${q(`&upload=${encodeURIComponent(upload)}`)}`, 'POST', JSON.stringify({ partes, version: VERSION, paraTodos: process.env.PARA_TODOS === '1', firmada: process.platform === 'darwin' && process.env.FIRMADA === '1', sinTicket: process.platform === 'darwin' && existsSync(enDist('sin-ticket')), vozMensual: true }))
 }
 
 const u = await subir(instalador)

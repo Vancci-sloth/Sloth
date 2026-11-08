@@ -55,12 +55,16 @@ ramas ni bloquea por sí solo un push a `venta`.
 
 ## App instalada: este repo, rama venta
 
-Las Mac salen con firma local, como la 0.3.61. Tener `CSC_LINK` en secretos no activa la validación de Apple: para usar
-el certificado y notarizar se elige `firmar_mac` al lanzar `Publicar Sloth` a mano. El 7 de noviembre de 2026 la 0.4.0
-quedó esperando más de media hora en `notarytool`; el creador pidió volver al método anterior. Si Windows ya salió,
-`Completar Mac de Sloth` (`recuperar-mac.yml`, desde `main`) publica solo las tres Mac con el número indicado, sin
-repetir Windows o Linux. Antes comprueba que esa versión de Mac no estuviera ya firmada con certificado: el cobro
-rechaza sustituir una firmada por una de firma local. La firma local conserva el paso «Abrir de todos modos» de macOS.
+Las Mac salen firmadas con el certificado de Apple (equipo de Moises Laska) y notarizadas, en cada push. El 7 de
+noviembre de 2026 la 0.4.0 se quedó más de media hora en `notarytool` y salió con firma local: eran los primeros envíos
+del equipo, que Apple revisa a mano (dos seguían «In Progress» 18 horas después; uno se aceptó). Por eso la
+notarización (`scripts/notarizar.mjs`) espera a Apple 10 min como máximo: si acepta, la app lleva su ticket; si no
+contesta, sale firmada sin ticket y abre a la primera en cuanto Apple acepte ese envío (el id queda en el resumen del
+job), y mientras tanto el cobro sigue explicando «Abrir de todos modos» (`sinTicket`); si la rechaza, el job falla con
+el motivo. Ver un envío: `xcrun notarytool info <id>` o `history`, en un Mac con
+los secretos. Si `Completar Mac de Sloth` (`recuperar-mac.yml`, desde `main`) hace falta porque Windows ya salió,
+publica solo las tres Mac con el número indicado, firmadas igual, sin repetir Windows o Linux. El cobro rechaza poner una
+de firma local encima de una firmada: desde la primera firmada, todas deben serlo.
 
 1. Actualiza `novedad.txt`: un renglón corto con lo que trae la versión, que se ve al pasar el cursor sobre «Actualizar».
    Una versión grande puede llevar además su guía animada (`web/src/Novedades.tsx`, la 0.4.0 en
