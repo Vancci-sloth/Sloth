@@ -177,8 +177,14 @@ export const ARQUITECTURA = (() => {
 const SIN_TORCH = process.platform === 'darwin' && ARQUITECTURA === 'x64'
 const PYTHON_STANDALONE = `https://github.com/astral-sh/python-build-standalone/releases/download/20261013/cpython-3.12.15%2B20261013-${SISTEMA[`${process.platform}-${ARQUITECTURA}`] ?? SISTEMA['win32-x64']}-install_only.tar.gz`
 const TORCH = ['torch==2.8.0', 'torchaudio==2.8.0', 'torchvision==0.23.0']
+/**
+ * torch pide `msvcp140.dll`, que python-build-standalone no trae (solo `vcruntime140.dll`) y un Windows sin el
+ * Visual C++ Redistributable tampoco: `import torch` fallaba con «[WinError 126] … c10.dll». `msvc-runtime` deja esas
+ * DLL junto a `python.exe`, sin pedir permisos de administrador.
+ */
+const PIP_WINDOWS = WINDOWS ? ['msvc-runtime'] : []
 // `hf_xet` baja los modelos de Hugging Face más rápido; `deno` resuelve los retos de JavaScript de YouTube en yt-dlp.
-const PIP_SLOTH = ['whisperx==3.8.6', 'transformers==4.57.6', 'hf_xet', 'yt-dlp[default]', 'deno', 'scikit-learn']
+const PIP_SLOTH = ['whisperx==3.8.6', 'transformers==4.57.6', 'hf_xet', 'yt-dlp[default]', 'deno', 'scikit-learn', ...PIP_WINDOWS]
 const PARAKEET = 'onnx-asr[cpu]==0.12.0'
 const PIP_SIN_TORCH = [PARAKEET, 'huggingface_hub', 'hf_xet', 'yt-dlp[default]', 'deno']
 /** Baja lo que falte de los modelos del motor (`sys.argv[2]`): el suyo, el alineador de la voz y el de vectores (huellas.py), que pide torch. */
