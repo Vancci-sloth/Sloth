@@ -11,8 +11,11 @@ import './Rifa.css'
 
 /**
  * La rifa, en Administrador (`licencias/src/rifa.ts`): «Abrir la rifa» (la comunidad solo ve «llévate créditos de
- * Sloth»), quién participa y, al rifar, qué se rifa (cuántos ganan y los créditos de cada uno, o un premio que das a
- * mano) y lo que pasó con cada premio. «Rifar» abre la ruleta a toda la pantalla; «Girar» sortea en el cobro y la ruleta cae en quien ganó, uno por uno. El aviso y el correo salen al sortear.
+ * Sloth»), quién participa y la ruleta, cuando quieras y cuantas veces quieras mientras esté abierta: cada «Rifar» es un
+ * sorteo con su premio (cuántos ganan y los créditos de cada uno, o uno que das a mano), entre quienes aún no ganan.
+ * «Rifar» abre la ruleta a toda la pantalla; «Girar» sortea en el cobro y la ruleta cae en quien ganó, uno por uno. El
+ * aviso y el correo salen al sortear. «Cerrar la rifa» la termina: la comunidad ve quién ganó qué. Abajo, cada ganador y
+ * cómo va su premio.
  */
 const ESTADOS: Record<GanadorRifa['estado'], string> = {
   pendiente: 'Por sumar',
@@ -32,7 +35,7 @@ export function RifaAdmin() {
   const [panel, setPanel] = useState<Panel>()
   const [error, setError] = useState('')
   const [ruleta, setRuleta] = useState(false)
-  const [cancelar, setCancelar] = useState(false)
+  const [cerrar, setCerrar] = useState(false)
   const [abriendo, setAbriendo] = useState(false)
   // Lo que se rifa: se elige al rifar, no al abrir (la comunidad solo ve «llévate créditos de Sloth»).
   const [ganadores, setGanadores] = useState('1')
@@ -59,7 +62,8 @@ export function RifaAdmin() {
   }
 
   const a = panel?.abierta
-  const entran = a?.lista.filter((p) => !p.fuera) ?? []
+  // En la ruleta, quienes aún pueden ganar: ni fuera ni con premio ya en esta rifa.
+  const entran = a?.lista.filter((p) => !p.fuera && !p.gano) ?? []
   const n = Math.floor(Number(ganadores))
   const c = Math.max(0, Math.floor(Number(creditos) || 0))
   const nombre = premio.trim() || (c > 0 && n >= 1 ? premioDe(n, c) : '')
@@ -69,7 +73,7 @@ export function RifaAdmin() {
     <section className="admin-seccion admin-rifa">
       <h2>Rifa</h2>
       <p className="muted small">
-        Entre quienes no tienen los créditos de cada mes: cuentas gratis y apoyos de menos de $15 USD. Quien paga $15 o más y los Fundadores no participan. Mientras está abierta sale hasta arriba de la comunidad como «Participa en la rifa · Llévate créditos de Sloth», sin decir cuántos: eso lo eliges al rifar. Cada ganador recibe sus créditos en su cuenta de voz, el aviso en su Sloth y un correo.
+        Entre quienes no tienen los créditos de cada mes: cuentas gratis y apoyos de menos de $15 USD. Quien paga $15 o más y los Fundadores no participan. Mientras está abierta sale hasta arriba de la comunidad como «Participa en la rifa · Llévate créditos de Sloth», sin decir cuántos. Rifa cuando quieras y cuantas veces quieras, cada vez con su premio: nadie gana dos veces en la misma rifa. Cada ganador recibe sus créditos en su cuenta de voz, el aviso en su Sloth y un correo.
       </p>
       {error && <p className="bad small">{error}</p>}
       {panel && !a && (
@@ -86,11 +90,13 @@ export function RifaAdmin() {
             <div>
               <span className="admin-antetitulo">Abierta desde {fecha(a.creada)}</span>
               <h3>
-                {num(entran.length)} {entran.length === 1 ? 'persona participa' : 'personas participan'}
+                {num(a.lista.length)} {a.lista.length === 1 ? 'persona participa' : 'personas participan'}
+                {a.ganadores.length > 0 && <span className="muted"> · ya {a.ganadores.length === 1 ? 'ganó 1' : `ganaron ${a.ganadores.length}`}</span>}
               </h3>
+              <p className="muted small">{num(entran.length)} pueden ganar en el siguiente sorteo.</p>
             </div>
-            <button className="admin-boton peligro" onClick={() => setCancelar(true)}>
-              Cancelar la rifa
+            <button className="admin-boton peligro" onClick={() => setCerrar(true)}>
+              Cerrar la rifa
             </button>
           </div>
           <form
@@ -119,7 +125,7 @@ export function RifaAdmin() {
             </p>
             {cerrada && <p className="bad small ancho">Las voces de Sloth aún son solo para ti: los créditos se rifan cuando se publique la actualización que las abre. Puedes rifar algo sin créditos (0).</p>}
             <div className="admin-rifa-botones ancho">
-              <button className="ruleta-girar" disabled={!entran.length || !valido || cerrada} title={entran.length ? undefined : 'Aún no participa nadie'}>
+              <button className="ruleta-girar" disabled={!entran.length || !valido || cerrada} title={entran.length ? undefined : 'Nadie más puede ganar todavía'}>
                 Rifar
               </button>
               <button type="button" className="admin-boton" onClick={() => avisarGanasteRifa({ rifa: 'prueba', premio: nombre || premioDe(1, 10_000), creditos: c, entregados: true }, true)}>
@@ -130,14 +136,19 @@ export function RifaAdmin() {
           {a.lista.length ? (
             <Tabla
               cabeza={['Participa', 'Correo', 'Desde', '']}
-              filas={a.lista.map((p) => [p.nombre || '—', p.email, fecha(p.desde), p.fuera ? <span className="bad small">Fuera: {p.fuera}</span> : ''])}
+              filas={a.lista.map((p) => [
+                p.nombre || '—',
+                p.email,
+                fecha(p.desde),
+                p.gano ? <span className="ok small">Ganó: {p.gano}</span> : p.fuera ? <span className="bad small">Fuera: {p.fuera}</span> : ''
+              ])}
             />
           ) : (
             <p className="muted small admin-vacio">Aún no participa nadie. Ya se ve en la comunidad.</p>
           )}
         </div>
       )}
-      {panel && panel.rifas.length > 0 && <Historial rifas={panel.rifas} onCambio={cambio} />}
+      {panel && panel.ganadores.length > 0 && <Ganadores ganadores={panel.ganadores} onCambio={cambio} />}
       {ruleta && a && (
         <Ruleta
           sorteo={{ rifa: a.id, ganadores: n, creditos: c, premio: nombre }}
@@ -145,55 +156,54 @@ export function RifaAdmin() {
           onCerrar={() => (setRuleta(false), cargar(), dispatchEvent(new Event(RIFA_CAMBIO)))}
         />
       )}
-      {cancelar && a && (
-        <Confirm title="¿Cancelar la rifa?" action="Cancelar la rifa" danger onConfirm={() => api<Panel>('/api/comunidad/rifa/cancelar', { rifa: a.id }).then(cambio)} onClose={() => setCancelar(false)}>
-          Deja de salir en la comunidad y nadie gana. Quienes participaban no reciben aviso.
+      {cerrar && a && (
+        <Confirm title="¿Cerrar la rifa?" action="Cerrar la rifa" danger onConfirm={() => api<Panel>('/api/comunidad/rifa/cerrar', { rifa: a.id }).then(cambio)} onClose={() => setCerrar(false)}>
+          {a.ganadores.length
+            ? 'Ya no se puede sortear en ella. En la comunidad sale unos días quién ganó qué. Quienes ganaron conservan su premio.'
+            : 'Nadie ha ganado: deja de salir en la comunidad y se cancela. Quienes participaban no reciben aviso.'}
         </Confirm>
       )}
     </section>
   )
 }
 
-function Historial({ rifas, onCambio }: { rifas: Panel['rifas']; onCambio(p: Panel): void }) {
+/** Cada ganador, del más nuevo al más viejo, con cómo va su premio. */
+function Ganadores({ ganadores, onCambio }: { ganadores: GanadorRifa[]; onCambio(p: Panel): void }) {
   const [error, setError] = useState('')
   const hacer = (rifa: string, externo: string, accion: 'reintentar' | 'entregado') =>
     api<Panel>('/api/comunidad/rifa/ganador', { rifa, externo, accion }).then(onCambio, (e: Error) => setError(e.message))
   return (
     <>
+      <h2 className="admin-rifa-subtitulo">Ganadores</h2>
       {error && <p className="bad small">{error}</p>}
       <Tabla
-        cabeza={['Rifa', 'Sorteada', 'Participaron', 'Ganó', 'Premio', 'Correo', 'Lo vio en Sloth', '']}
-        filas={rifas.flatMap((r) =>
-          r.estado === 'cancelada'
-            ? [[r.premio || '—', <span className="muted">Cancelada</span>, num(r.participantes), '—', '—', '—', '—', '']]
-            : r.lista.map((g, i) => [
-                i ? '' : r.premio,
-                i ? '' : fecha(r.sorteada),
-                i ? '' : num(r.participantes),
-                <span title={g.externo}>
-                  {g.nombre || '—'} <span className="muted small">{g.email}</span>
-                </span>,
-                <span className={g.estado === 'revisar' || g.estado === 'enviando' ? 'bad' : g.estado === 'entregado' ? 'ok' : ''} title={g.error ?? undefined}>
-                  {ESTADOS[g.estado]}
-                  {g.creditos ? ` · ${num(g.creditos)}` : ''}
-                  {g.error ? ` · ${g.error}` : ''}
-                </span>,
-                g.correo ? fecha(g.correo) : 'Por enviar',
-                g.visto ? fecha(g.visto) : 'Aún no',
-                g.estado === 'revisar' || g.estado === 'enviando' || g.estado === 'pendiente' ? (
-                  <div className="admin-acciones">
-                    <button className="admin-boton" title="Míralo antes en Usuarios: si no le llegaron, vuelve a sumarlos" onClick={() => void hacer(r.id, g.externo, 'reintentar')}>
-                      Volver a sumar
-                    </button>
-                    <button className="admin-boton" title="Ya le llegaron: se le manda el correo" onClick={() => void hacer(r.id, g.externo, 'entregado')}>
-                      Ya le llegaron
-                    </button>
-                  </div>
-                ) : (
-                  ''
-                )
-              ])
-        )}
+        cabeza={['Cuándo', 'Premio', 'Ganó', 'Entrega', 'Correo', 'Lo vio en Sloth', '']}
+        filas={ganadores.map((g) => [
+          fecha(g.cuando),
+          g.premio,
+          <span title={g.externo}>
+            {g.nombre || '—'} <span className="muted small">{g.email}</span>
+          </span>,
+          <span className={g.estado === 'revisar' || g.estado === 'enviando' ? 'bad' : g.estado === 'entregado' ? 'ok' : ''} title={g.error ?? undefined}>
+            {ESTADOS[g.estado]}
+            {g.creditos ? ` · ${num(g.creditos)}` : ''}
+            {g.error ? ` · ${g.error}` : ''}
+          </span>,
+          g.correo ? fecha(g.correo) : 'Por enviar',
+          g.visto ? fecha(g.visto) : 'Aún no',
+          g.estado === 'revisar' || g.estado === 'enviando' || g.estado === 'pendiente' ? (
+            <div className="admin-acciones">
+              <button className="admin-boton" title="Míralo antes en Usuarios: si no le llegaron, vuelve a sumarlos" onClick={() => void hacer(g.rifa, g.externo, 'reintentar')}>
+                Volver a sumar
+              </button>
+              <button className="admin-boton" title="Ya le llegaron: se le manda el correo" onClick={() => void hacer(g.rifa, g.externo, 'entregado')}>
+                Ya le llegaron
+              </button>
+            </div>
+          ) : (
+            ''
+          )
+        ])}
       />
     </>
   )
@@ -349,7 +359,7 @@ function Ruleta({ sorteo: pedido, nombres, onCerrar }: { sorteo: { rifa: string;
           {error && <p className="bad small">{error}</p>}
           {acabo ? (
             <>
-              <p className="muted small">Su aviso en Sloth y su correo ya van en camino.</p>
+              <p className="muted small">Su aviso en Sloth y su correo ya van en camino. La rifa sigue abierta: puedes volver a rifar cuando quieras.</p>
               <button className="ruleta-girar" onClick={onCerrar}>
                 Listo
               </button>

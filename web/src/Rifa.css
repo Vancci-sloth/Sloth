@@ -18,7 +18,7 @@
 .rifa-boton .ico { width: 20px; height: 20px; }
 .rifa-fuera { margin: 4px 0 0; padding: 10px 14px; border-radius: 12px; background: rgba(27, 20, 8, 0.14); font-size: 14px; font-weight: 600; }
 .rifa-error { margin: 0; padding: 8px 12px; border-radius: 10px; background: var(--sobre-ambar); color: var(--bad); font-size: 13.5px; }
-.rifa-cuenta { display: flex; align-items: center; gap: 6px; margin: 2px 0 0; font-size: 13px; font-weight: 650; opacity: 0.8; }
+.rifa-cuenta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 2px 0 0; font-size: 13px; font-weight: 650; opacity: 0.8; }
 .rifa-cuenta .ico { width: 15px; height: 15px; }
 
 /* Ya participas: lo de abajo se vuelve una caja oscura con su sello verde, que entra una vez al pulsar. */
@@ -119,3 +119,4 @@
 .ruleta-focos.girando circle { animation: ruleta-foco 0.5s steps(2) infinite; }
 .ruleta-focos.girando circle.on { animation-delay: -0.25s; }
 @keyframes ruleta-foco { 0% { fill: var(--amber-2); } 100% { fill: var(--sobre-ambar); } }
+.admin-rifa-subtitulo { margin: 8px 0 0; }

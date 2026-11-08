@@ -6,9 +6,10 @@ import './Rifa.css'
 
 /**
  * «Participa en la rifa», hasta arriba de la comunidad mientras el creador tiene una abierta (`licencias/src/rifa.ts`):
- * «Llévate créditos de Sloth» (cuántos y para cuántos lo decide el creador al sortear), cuántos participan y un solo botón. Al pulsarlo queda claro que ya estás dentro y adónde llega el aviso
- * si ganas. Quien ya tiene los créditos de cada mes (paga $15 USD o más) o es Fundador la ve, con por qué no participa. Sin rifa abierta, durante unos días, quién ganó
- * la última. Al creador le lleva a Administrador, donde se sortea (`RifaAdmin.tsx`).
+ * «Llévate créditos de Sloth» (qué y para cuántos lo decide el creador en cada sorteo), cuántos participan, quién ya
+ * ganó y un solo botón. La rifa sigue abierta entre sorteos: quien participa entra en todos hasta que gana una vez. Al pulsarlo queda claro que ya estás dentro y adónde llega el aviso
+ * si ganas. Quien ya tiene los créditos de cada mes (paga $15 USD o más) o es Fundador la ve, con por qué no participa.
+ * Cerrada, durante unos días, quién ganó qué. Al creador le lleva a Administrador, donde se sortea (`RifaAdmin.tsx`).
  */
 export const RIFA_CAMBIO = 'sloth-rifa'
 
@@ -48,8 +49,14 @@ export function Rifa({ creador, conNombre }: { creador: boolean; conNombre(accio
       <section className="rifa-ultima">
         <Icono de="regalo" />
         <p>
-          <strong>Ya se sorteó la rifa:</strong> {u.premio}. {u.ganadores.length > 1 ? 'Ganaron' : 'Ganó'} <strong>{u.ganadores.join(', ')}</strong>.
-          {rifa.gane && <span className="rifa-tu"> ¡Ganaste tú!</span>}
+          <strong>Terminó la rifa.</strong> {u.ganadores.length > 1 ? 'Ganaron' : 'Ganó'}{' '}
+          {u.ganadores.map((g, i) => (
+            <span key={i}>
+              {i ? (i === u.ganadores.length - 1 ? ' y ' : ', ') : ''}
+              <strong>{g.nombre}</strong> ({g.premio})
+            </span>
+          ))}
+          .{rifa.gane && <span className="rifa-tu"> ¡Ganaste tú!</span>}
         </p>
       </section>
     )
@@ -67,7 +74,20 @@ export function Rifa({ creador, conNombre }: { creador: boolean; conNombre(accio
         <p className="rifa-premio">Llévate créditos de Sloth</p>
         <p className="rifa-texto">Completamente gratis: solo pulsa el botón y ya estás participando.</p>
 
-        {rifa.participo ? (
+        {rifa.ganaste ? (
+          <div className="rifa-dentro" role="status">
+            <span className="rifa-sello">
+              <Icono de="regalo" />
+            </span>
+            <div>
+              <strong>¡Ganaste en esta rifa!</strong>
+              <p>
+                Te llevaste <b>{rifa.ganaste}</b>. Te llegó el aviso aquí y un correo. En esta rifa ya no vuelves a entrar a los
+                siguientes sorteos: le toca a alguien más.
+              </p>
+            </div>
+          </div>
+        ) : rifa.participo ? (
           <div className={`rifa-dentro${recien ? ' recien' : ''}`} role="status">
             <span className="rifa-sello">
               <Icono de="palomita" />
@@ -75,7 +95,7 @@ export function Rifa({ creador, conNombre }: { creador: boolean; conNombre(accio
             <div>
               <strong>¡Ya estás participando!</strong>
               <p>
-                Tu boleto ya está adentro y no tienes que hacer nada más. Si ganas, te sale el aviso aquí en tu Sloth y te llega un correo
+                Tu boleto ya está adentro y no tienes que hacer nada más: entras en todos los sorteos de esta rifa. Si ganas, te sale el aviso aquí en tu Sloth y te llega un correo
                 {rifa.correo ? (
                   <>
                     {' '}
@@ -104,6 +124,12 @@ export function Rifa({ creador, conNombre }: { creador: boolean; conNombre(accio
         {error && <p className="rifa-error">{error}</p>}
         <p className="rifa-cuenta">
           <Icono de="personas" /> {personas}
+          {a.ganadores.length > 0 && (
+            <>
+              {' · '}
+              <Icono de="regalo" /> Ya {a.ganadores.length > 1 ? 'ganaron' : 'ganó'} {a.ganadores.join(', ')}
+            </>
+          )}
         </p>
       </div>
     </section>

@@ -1231,25 +1231,34 @@ export interface RifaGanada {
 
 /** La rifa de la comunidad (`licencias/src/rifa.ts`), como la ve cada quien: `GET /api/comunidad/rifa`. */
 export interface RifaComunidad {
-  /** La abierta: sin qué se rifa, que el creador elige al sortear. */
-  abierta?: { id: string; creada: string; participantes: number }
+  /**
+   * La abierta: sin qué se rifa, que el creador elige en cada sorteo. Sigue abierta entre sorteos hasta que la cierra;
+   * `ganadores`, los nombres de quienes ya ganaron en ella.
+   */
+  abierta?: { id: string; creada: string; participantes: number; ganadores: string[] }
   /** Ya participas en la abierta. */
   participo: boolean
-  /** Por qué no puedes participar (quien apoya o es Fundador ya tiene sus créditos); sin él, puedes. */
+  /** Ya ganaste en la abierta: lo que te llevaste (nadie gana dos veces en una rifa). */
+  ganaste?: string
+  /** Por qué no puedes participar (quien ya recibe los créditos de cada mes o es Fundador); sin él, puedes. */
   fuera?: string
   /** Tu correo, adonde llega el aviso si ganas. */
   correo?: string
-  /** La última que se sorteó, mientras es reciente: qué se rifó y los nombres de quienes ganaron. */
-  ultima?: { premio: string; ganadores: string[]; sorteada: string }
+  /** La última que se cerró con ganadores, mientras es reciente: quién ganó qué. */
+  ultima?: { ganadores: { nombre: string; premio: string }[]; terminada: string }
   gane?: RifaGanada
 }
 
 /** Un ganador, como lo ve el creador en Administrador. */
 export interface GanadorRifa {
+  rifa: string
   externo: string
   nombre: string
   email: string
+  premio: string
   creditos: number
+  /** Cuándo ganó. */
+  cuando: string
   estado: 'pendiente' | 'preparando' | 'enviando' | 'entregado' | 'revisar' | 'a-mano'
   correo: string | null
   visto: string | null
@@ -1260,11 +1269,13 @@ export interface GanadorRifa {
 export interface RifaAdmin {
   /** Si las voces de Sloth ya se abrieron a todos: sin eso no se rifan créditos. */
   vozAbierta: boolean
-  abierta?: RifaComunidad['abierta'] & { lista: { externo: string; nombre: string; email: string; desde: string; fuera?: string }[] }
-  rifas: { id: string; premio: string; creditos: number; ganadores: number; estado: 'sorteada' | 'cancelada'; creada: string; sorteada: string | null; participantes: number; lista: GanadorRifa[] }[]
+  /** La abierta, con quién participa y, de quien ya ganó en ella, qué (`gano`). */
+  abierta?: RifaComunidad['abierta'] & { lista: { externo: string; nombre: string; email: string; desde: string; fuera?: string; gano?: string }[] }
+  /** Los ganadores de las últimas rifas, del más nuevo al más viejo. */
+  ganadores: GanadorRifa[]
 }
 
-/** `POST /api/comunidad/rifa/sortear`: quiénes entraron al sorteo (para la ruleta) y quiénes ganaron, en orden. */
+/** `POST /api/comunidad/rifa/sortear`: quiénes entraron a este sorteo (para la ruleta: los que aún no ganan) y quiénes ganaron, en orden. */
 export interface SorteoRifa {
   participantes: { externo: string; nombre: string }[]
   ganadores: { externo: string; nombre: string }[]
