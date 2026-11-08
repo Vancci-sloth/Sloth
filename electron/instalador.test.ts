@@ -5,9 +5,9 @@ import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import test from 'node:test'
-import { getPath7za } from 'app-builder-lib/out/toolsets/7zip.js'
+import { Arch } from 'app-builder-lib'
 import { getMakeNsisPath, getNsisPluginsPath } from 'app-builder-lib/out/toolsets/windows.js'
-import { compute7zCompressArgs } from 'app-builder-lib/out/targets/archive.js'
+import { NsisTarget } from 'app-builder-lib/out/targets/nsis/NsisTarget.js'
 import { compresionInstalador } from '../scripts/instalador-config.ts'
 
 const require = createRequire(import.meta.url)
@@ -21,10 +21,19 @@ test('el instalador escribe en Sloth aunque Nsis7z no se pueda cargar, y actuali
   // En electron-builder 26.15 useZip solo cambia el archivo si differentialPackage es false (NsisTarget).
   assert.equal(compresionInstalador.differentialPackage, false)
   const formato = compresionInstalador.useZip ? 'zip' : '7z'
-  const archivo = join(base, `app-64.${formato}`)
-  const [nsis, plugins, siete] = await Promise.all([getMakeNsisPath(undefined), getNsisPluginsPath(undefined), getPath7za()])
+  const [nsis, plugins] = await Promise.all([getMakeNsisPath(undefined), getNsisPluginsPath(undefined)])
   copyFileSync(nsis.path, join(payload, 'Sloth.exe'))
-  execFileSync(siete, [...compute7zCompressArgs(formato), archivo, '.'], { cwd: payload, stdio: 'pipe' })
+  const videos = ['app/web/novedades/baile.webm', 'app/web/cambios/antes.mp4']
+  for (const video of videos) {
+    mkdirSync(dirname(join(payload, video)), { recursive: true })
+    writeFileSync(join(payload, video), `Contenido de ${video}`)
+  }
+  // Usa el empaquetado real de NSIS: sus exclusiones no se aplicaban al ZIP armado a mano de esta prueba.
+  const target = Reflect.construct(NsisTarget, [{
+    config: { nsis: compresionInstalador }, info: { metadata: {} },
+    appInfo: { sanitizedName: 'sloth', version: '1.0.0' }, compression: 'normal'
+  }, base, 'nsis', { refCount: 0 }])
+  const { path: archivo } = await target.buildAppPackage(payload, Arch.x64)
   const plantillas = join(dirname(require.resolve('app-builder-lib/package.json')), 'templates', 'nsis', 'include')
   const salida = join(base, 'Sloth')
   const registro = join(base, 'destino.txt')
@@ -76,6 +85,7 @@ SectionEnd
     assert.equal(readFileSync(join(salida, 'prueba.txt'), 'utf8'), 'Sloth')
     assert.deepEqual(readFileSync(join(salida, 'Sloth.exe')), readFileSync(join(payload, 'Sloth.exe')))
     assert.equal(readFileSync(join(salida, 'Uninstall Sloth.exe'), 'utf8'), 'Sloth')
+    for (const video of videos) assert.equal(readFileSync(join(salida, video), 'utf8'), `Contenido de ${video}`)
     for (const carpeta of personales) assert.equal(readFileSync(join(salida, 'app', carpeta, 'del-cliente.txt'), 'utf8'), carpeta)
   }
 })

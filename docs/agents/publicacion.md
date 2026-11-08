@@ -38,6 +38,9 @@ bloqueó el DLL en la computadora del cliente. No atribuirlo al antivirus o a lo
 activar solo `useZip` crea un 7z que luego se intenta abrir como ZIP. Windows descarga el instalador completo; Mac y
 Linux conservan las descargas por diferencias. `electron/instalador.test.ts` compila y ejecuta el extractor real,
 simula el DLL incompatible y comprueba que se escriba en Sloth y se conserven los datos al actualizar.
+También desactiva `preCompressedFileExtensions`: el builder excluye esos videos del ZIP y solo los repone desde
+`resources`, pero en Windows los de Sloth van en `app/web`. La prueba usa ahora el empaquetado real de NSIS y comprueba
+que lleguen los `.mp4` y `.webm`; armando el ZIP a mano no reproducía esa exclusión.
 
 Para un cliente afectado: cancelar con «Anular», cerrar Sloth y el instalador, reiniciar y probar una descarga nueva
 desde la página oficial. Es un intento de recuperación si fue transitorio, no un arreglo garantizado del instalador
