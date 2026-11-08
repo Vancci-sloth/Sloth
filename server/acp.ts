@@ -22,8 +22,13 @@ export interface SaborAcp {
   nombre: string
   /** El prefijo de sus modelos (`grok:`). */
   prefijo: string
-  /** El programa con sus argumentos y su entorno. Puede fallar (falta la cuenta). */
-  lanzar(opts: AgentOptions): { command: string; args: string[]; env: NodeJS.ProcessEnv; alCerrar?(): void }
+  /** El programa con sus argumentos y su entorno, para la cuenta `cuenta` (la de `cuenta()`). Puede fallar (falta la cuenta). */
+  lanzar(opts: AgentOptions, cuenta?: string): { command: string; args: string[]; env: NodeJS.ProcessEnv; alCerrar?(): void }
+  /**
+   * Con varias cuentas (Antigravity), con cuál trabaja un hilo: cada una tiene su proceso compartido, y el de una que se
+   * quedó sin cuota sigue con los hilos que ya llevaba.
+   */
+  cuenta?(opts: AgentOptions): string
   /** Cómo se presenta Sloth: Antigravity solo ofrece los modelos que no son de Gemini a clientes que conoce (Zed). */
   clientInfo?: { name: string; version: string }
   /** Lee él mismo los archivos que le piden (Antigravity). */
@@ -55,8 +60,11 @@ export interface SaborAcp {
   esperaInicio?(): number
   /** Una línea que no es del protocolo. */
   alTexto?(linea: string): void
-  /** Un error que llega como si fuera su respuesta (Antigravity: un texto y `end_turn`). `relevo`: esa sesión ya no sirve. */
-  errorDe?(texto: string): { error: string; relevo?: boolean } | undefined
+  /**
+   * Un error que llega como si fuera su respuesta (Antigravity: un texto y `end_turn`), con el modelo y la cuenta del
+   * proceso. `relevo`: esa sesión ya no sirve (o su cuenta, y sigue en otra).
+   */
+  errorDe?(texto: string, de: { modelo: string; cuenta?: string }): { error: string; relevo?: boolean } | undefined
   /** Cuánto se le aguanta callado en un turno, en ms, sin herramientas abiertas y con ellas. Sin esto, se le espera siempre. */
   mudo?: { sin: number; con: number }
   /** Ni compacta ni dice de verdad cuánto lleva (Antigravity): sin anillo, y `/compact` lo pasa a otra sesión con un resumen. */
@@ -87,26 +95,34 @@ export interface Conexion {
   cierres: Set<(error?: Error) => void>
   usos: number
   reloj?: ReturnType<typeof setTimeout>
+  /** Con qué cuenta (`SaborAcp.cuenta`), y su sitio en `compartidas`. */
+  cuenta?: string
+  clave: string
 }
 
-/** Las de los sabores `compartido`, por su prefijo, mientras vivan. */
+/** Las de los sabores `compartido`, por su prefijo (y su cuenta, `prefijo:cuenta`), mientras vivan. */
 const compartidas = new Map<string, Conexion>()
 const SIN_HILOS = 10 * 60_000
 process.once('exit', () => compartidas.forEach((c) => c.rpc.close(true)))
 
-/** Cierra el proceso compartido, con los hilos que lleve: al cambiar la cuenta ya no vale. */
-export const cerrarCompartida = (sabor: SaborAcp) => compartidas.get(sabor.prefijo)?.rpc.close()
+/** Cierra el proceso compartido de una cuenta (o los de todas), con los hilos que lleve: al quitar la cuenta ya no vale. */
+export function cerrarCompartida(sabor: SaborAcp, cuenta?: string) {
+  for (const [clave, c] of [...compartidas]) {
+    if (cuenta === undefined ? clave === sabor.prefijo || clave.startsWith(`${sabor.prefijo}:`) : clave === `${sabor.prefijo}:${cuenta}`) c.rpc.close()
+  }
+}
 
 /** La conexión para un hilo: la compartida si la hay y sigue viva, o un proceso nuevo. `lanzar` puede fallar. */
-export function conectar(sabor: SaborAcp, opts: AgentOptions): Conexion {
-  const viva = sabor.compartido ? compartidas.get(sabor.prefijo) : undefined
+export function conectar(sabor: SaborAcp, opts: AgentOptions, cuenta = sabor.cuenta?.(opts)): Conexion {
+  const clave = cuenta === undefined ? sabor.prefijo : `${sabor.prefijo}:${cuenta}`
+  const viva = sabor.compartido ? compartidas.get(clave) : undefined
   if (viva && !viva.rpc.terminado) {
     clearTimeout(viva.reloj)
     viva.usos++
     return viva
   }
-  const l = sabor.lanzar(opts)
-  const c = { desde: Date.now(), sesiones: new Map(), cierres: new Set(), usos: 1 } as unknown as Conexion
+  const l = sabor.lanzar(opts, cuenta)
+  const c = { desde: Date.now(), sesiones: new Map(), cierres: new Set(), usos: 1, cuenta, clave } as unknown as Conexion
   // El compartido no es de la carpeta de ningún hilo: cada sesión lleva la suya.
   c.rpc = new RpcLineas(sabor.nombre, l.command, l.args, { cwd: sabor.compartido ? tmpdir() : opts.cwd, env: l.env }, {
     alAvisar: (method, params) => c.sesiones.get(params?.sessionId)?.(method, params),
@@ -114,7 +130,7 @@ export function conectar(sabor: SaborAcp, opts: AgentOptions): Conexion {
     alTexto: sabor.alTexto,
     alCerrar(error) {
       l.alCerrar?.()
-      if (compartidas.get(sabor.prefijo) === c) compartidas.delete(sabor.prefijo)
+      if (compartidas.get(clave) === c) compartidas.delete(clave)
       for (const f of [...c.cierres]) f(error)
     }
   })
@@ -129,8 +145,8 @@ export function conectar(sabor: SaborAcp, opts: AgentOptions): Conexion {
     return ini
   })()
   // Si no arranca (sin cuenta), el siguiente hilo prueba con otro proceso.
-  c.ini.catch(() => compartidas.get(sabor.prefijo) === c && compartidas.delete(sabor.prefijo))
-  if (sabor.compartido) compartidas.set(sabor.prefijo, c)
+  c.ini.catch(() => compartidas.get(clave) === c && compartidas.delete(clave))
+  if (sabor.compartido) compartidas.set(clave, c)
   return c
 }
 
@@ -138,7 +154,7 @@ export function conectar(sabor: SaborAcp, opts: AgentOptions): Conexion {
 export function soltar(sabor: SaborAcp, c: Conexion) {
   if (--c.usos > 0) return
   // La que no arrancó ya no es la compartida: se cierra ya.
-  if (!sabor.compartido || compartidas.get(sabor.prefijo) !== c) return c.rpc.close()
+  if (!sabor.compartido || compartidas.get(c.clave) !== c) return c.rpc.close()
   c.reloj = setTimeout(() => c.rpc.close(), SIN_HILOS)
   c.reloj.unref()
 }
@@ -233,7 +249,7 @@ export function startAcp(sabor: SaborAcp, opts: AgentOptions): AgentRun {
 
   /** Cierra el turno con lo que diga `errorDe`, si su último mensaje es un error. */
   function cerrarConError() {
-    const malo = sabor.errorDe?.(ultimo)
+    const malo = sabor.errorDe?.(ultimo, { modelo, cuenta: con?.cuenta })
     if (!malo) return false
     pendiente = []
     terminar(false, malo.error, malo.relevo ? { caida: true, relevo: 'sigue' } : undefined)

@@ -411,14 +411,24 @@ async function api(req: IncomingMessage, res: ServerResponse, url: URL): Promise
   }
 
   // La cuenta de los demás agentes (`server/proveedores.ts`): mirarla (`?fresco` vuelve a mirar), conectarla, dejar de
-  // esperarla, quitarla o darle las llaves de Sloth (`{usar}`). Sus modelos dependen de la cuenta: cada cambio los vuelve a pedir.
-  const otro = /^\/api\/(\w+)\/(cuenta|conectar|cancelar|salir|llaves)$/.exec(path)
+  // esperarla, quitarla, darle las llaves de Sloth (`{usar}`) o, con varias cuentas, usar o quitar una (`{id}`). Sus
+  // modelos dependen de la cuenta: cada cambio los vuelve a pedir.
+  const otro = /^\/api\/(\w+)\/(cuenta|conectar|cancelar|salir|llaves|usar|quitar)$/.exec(path)
   const o = otro && OTROS[otro[1] as Proveedor]
   if (otro && o && method === (otro[2] === 'cuenta' ? 'GET' : 'POST')) {
     try {
-      const usar = otro[2] === 'llaves' && !!(await body<{ usar?: boolean }>(req)).usar
-      const llaves = o.llaves
-      const hacer = { cuenta: () => o.cuenta(url.searchParams.has('fresco')), conectar: o.conectar, cancelar: o.cancelar, salir: o.salir, llaves: llaves && (() => llaves(usar)) }[otro[2] as 'cuenta']
+      const datos = otro[2] === 'llaves' || otro[2] === 'usar' || otro[2] === 'quitar' ? await body<{ usar?: boolean; id?: string }>(req) : {}
+      const { llaves, usar, quitar } = o
+      const id = String(datos.id ?? '')
+      const hacer = {
+        cuenta: () => o.cuenta(url.searchParams.has('fresco')),
+        conectar: o.conectar,
+        cancelar: o.cancelar,
+        salir: o.salir,
+        llaves: llaves && (() => llaves(!!datos.usar)),
+        usar: usar && (() => usar(id)),
+        quitar: quitar && (() => quitar(id))
+      }[otro[2] as 'cuenta']
       if (!hacer) throw new Error('Este agente no admite eso.')
       send(res, 200, await hacer())
       if (otro[2] !== 'cuenta' || url.searchParams.has('fresco')) pedirModelos()

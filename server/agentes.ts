@@ -186,7 +186,9 @@ const AGENTES: Record<Programa, Agente> = {
       rmSync(archivo, { force: true })
       if (!WINDOWS) for (const f of readdirSync(dir)) chmodSync(join(dir, f), 0o755)
     },
-    exe: (r) => join(r, WINDOWS ? 'agy_acp_server.exe' : 'agy_acp_server.par'),
+    // Sin el arnés (`localharness_external`, que el antivirus a veces se lleva) no trabaja: cuenta como no bajado, y se
+    // baja otra vez.
+    exe: (r) => (existsSync(join(r, WINDOWS ? 'localharness_external.exe' : 'localharness_external')) ? join(r, WINDOWS ? 'agy_acp_server.exe' : 'agy_acp_server.par') : null),
     pesa: '230 MB'
   }
 }
