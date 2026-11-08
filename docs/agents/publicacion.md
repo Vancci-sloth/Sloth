@@ -87,7 +87,11 @@ rechaza sustituir una firmada por una de firma local. La firma local conserva el
    descarga de cada sistema.
    Para esperar el flujo, `gh run watch <id> --exit-status` de fondo.
 5. Cuando los cinco salieron bien, cuéntalo en Anuncios de la comunidad, sin preguntar: escribe el anuncio como lo
-   escribe Vancci ([anuncios.md](anuncios.md)) y publícalo con `node scripts/anuncio.mjs <archivo>`.
+   escribe Vancci ([anuncios.md](anuncios.md)) y publícalo con `node scripts/anuncio.mjs <archivo>`. Luego, también
+   sin preguntar, avisa a quien pidió en la comunidad lo que trae la versión: `node scripts/mejoras.mjs` enseña las
+   mejoras que faltan; a cada una que resuelvan los commits del paso 2, un comentario en el mismo tono (que ya quedó, dónde
+   se usa, que lo pruebe y le diga qué tal; sin `[para todos]`, que sin apoyo le llega en 7 días) con
+   `node scripts/mejoras.mjs <id> <archivo>`, que también la marca hecha.
 
 La llave `PUBLICAR` del workflow autoriza la subida, y solo vive en los secretos de GitHub: con ella se reparte una
 versión a todos. En la computadora del creador va otra, `ADMIN` (`%APPDATA%\sloth\licencias\admin.txt`), que administra
