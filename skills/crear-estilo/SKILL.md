@@ -79,7 +79,9 @@ Sloth la enseña en el inicio en cuanto ese archivo cambia, y enlaza la skill do
    - El selector de formato (Vertical u Horizontal) sale solo en toda card con `etapas`: no lleva nada para eso. El de
      la voz (mandarla tú o una de AI Studio), también; si la voz es la grabación a cámara del usuario, `"voz": false`,
      y si el estilo hace la suya (edge-tts), `"voz": { "propia": "Voz de edge-tts" }`. Si hace sus clips con
-     `generar_video` (Google Flow), `"clips": true`: el compositor deja elegir el modelo (`video-base/FLOW.md`).
+     `generar_video` (Google Flow), `"clips": true`: el compositor deja elegir el modelo (`video-base/FLOW.md`). Si su
+     final corre `musica.py --poner` de video-base con la línea `Música: de fondo`, `"musica": true`: el menú de la voz
+     deja encenderla.
 
    Listo cuando el archivo es JSON válido, la card sale en el inicio de Sloth y sus `etapas` son las del estilo nuevo.
 5. **Probar.** Haz dos videos de prueba cortos (de 10 a 15 s) siguiendo la skill nueva, uno vertical y uno horizontal,

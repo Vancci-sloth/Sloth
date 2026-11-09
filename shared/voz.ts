@@ -36,6 +36,14 @@ export function lineaVoz(card: Pick<Card, 'voz'>, voz: string, nombre?: string):
 }
 
 /**
+ * La línea de la música de fondo, encendida en el menú «Voz»: solo en las cards cuyo estilo la sabe poner (`musica`).
+ * Apagada, no lleva línea y el video sale sin música.
+ */
+export function lineaMusica(card: Pick<Card, 'musica'>, encendida: boolean): string {
+  return card.musica && encendida ? 'Música: de fondo, sintetizada y libre de derechos, bajo la voz.' : ''
+}
+
+/**
  * Parte lo que se narra en trozos de hasta `max` letras, por párrafos (y, si uno no cabe, por frases), para las API
  * que no aceptan un guion entero en un pedido.
  */

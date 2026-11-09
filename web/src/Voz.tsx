@@ -3,7 +3,7 @@ import type { Card, EstadoVoz, ProveedorVoz, VozApi } from '../../shared/types'
 import { lineaVoz, MOTORES, motorDe } from '../../shared/voz'
 import { api } from './api'
 import { Picker } from './Composer'
-import { ElegirVoz, itemsDeVoz } from './ElegirVoz'
+import { ElegirVoz, itemsDeVoz, type Musica } from './ElegirVoz'
 import { Logo } from './Logos'
 
 /**
@@ -187,14 +187,16 @@ const etiqueta = (e: EstadoVoz | undefined, voz: string) => {
 /**
  * El menú «Voz» del compositor de un video: mandarla tú (o la que hace el estilo, `propia`) o una voz de AI Studio,
  * Fish Audio o ElevenLabs. Sin cuenta de Google, ofrece conectarla. `valor`: la voz elegida, vacía si la mandas tú.
+ * `musica`: el interruptor de la música de fondo, solo si el estilo la sabe poner (`card.musica`).
  */
-export function SelectorVoz({ card, voz, valor, onCambio }: { card: Card; voz: UsoVoz; valor: string; onCambio(voz: string): void }) {
+export function SelectorVoz({ card, voz, valor, musica, onCambio }: { card: Card; voz: UsoVoz; valor: string; musica?: Musica; onCambio(voz: string): void }) {
   if (card.voz === false) return null
   const e = voz.estado
   const propia = card.voz?.propia ?? 'La mando yo'
   const posible = vozPosible(e, valor)
   const label = e?.conectando ? `Voz: entra con Google en ${e.navegador}…` : voz.errorVc ? `Voz: ${voz.errorVc}` : posible ? `Voz: ${etiqueta(e, valor)}` : `Voz: ${propia.toLowerCase()}`
-  return <ElegirVoz voz={voz} etiqueta={label} valor={posible ? valor : ''} propia={propia} deshabilitado={!e || e.conectando} onCambio={onCambio} />
+  const conMusica = card.musica ? musica : undefined
+  return <ElegirVoz voz={voz} etiqueta={conMusica?.encendida ? `${label} · con música` : label} valor={posible ? valor : ''} propia={propia} deshabilitado={!e || e.conectando} musica={conMusica} onCambio={onCambio} />
 }
 
 /** La última voz que se eligió para generar desde un hilo ya empezado. */

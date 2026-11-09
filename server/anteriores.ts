@@ -40,7 +40,7 @@ interface Guardado {
 }
 
 /** Lo que va de la card de Sloth a la del de antes. `modelos` no: el de antes iba con lo que eligiera el usuario. */
-const CAMPOS = ['title', 'description', 'icon', 'version', 'etapas', 'lote', 'editor', 'voz', 'clips'] as const
+const CAMPOS = ['title', 'description', 'icon', 'version', 'etapas', 'lote', 'editor', 'voz', 'clips', 'musica'] as const
 
 /** «7 nov 2026», de `2026-11-07`. */
 export function fechaCorta(fecha: string): string {

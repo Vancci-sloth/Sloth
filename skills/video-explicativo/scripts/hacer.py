@@ -18,7 +18,7 @@ Desde la raíz del proyecto. En orden, y para en el primer ✗ diciendo qué arr
 3. Los subtítulos (subtitulos.py, con las palabras de cada momento en negrita) y la voz (voz.py), solo si el guion
    cambió desde la última: arreglar un momento no paga otra voz.
 4. Comprueba cada palabra contra lo que la voz dijo de verdad, y los tipos.
-5. final.py (render, comprobar, medir, huella), la portada de su primer cuadro y revision/hoja.png: un cuadro cada
+5. final.py (render, la música si la pidió, comprobar, medir, huella), la portada de su primer cuadro y revision/hoja.png: un cuadro cada
    1.5 s con lo que se dice, para mirarlo de un vistazo.
 Si nuevo.py todavía empaqueta, lo espera.
 """

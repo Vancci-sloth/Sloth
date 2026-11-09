@@ -91,7 +91,8 @@ Este es el mapa:
   Cloning, el proveedor de Sloth (voces `vc:<id>`, `server/voz/voices-cloning.ts`, ADR 0018), va por el cobro
   (`licencias/src/voz.ts`), que guarda la llave del socio y los créditos de cada quien; su catálogo sale en el menú «Voz» con el pase del cobro. El menú
   «Voz» es `web/src/ElegirVoz.tsx`: buscar en español, oír la muestra (`server/voz/muestras.ts` la guarda) o tu frase
-  (`/api/voz/probar`) y clonar grabando ahí. Su eval contra ElevenLabs, Fish Audio, AI Studio y Suno:
+  (`/api/voz/probar`) y clonar grabando ahí. En los estilos con `musica` en su card (el explicativo), su pie enciende la
+  música de fondo: la línea `Música: de fondo` (`lineaMusica`), que pone `skills/video-base/scripts/musica.py`. Su eval contra ElevenLabs, Fish Audio, AI Studio y Suno:
   `docs/agents/eval-voz.md` (`node scripts/eval-voz.mjs <puerto>`).
 - Administrador (`web/src/Admin.tsx`, `/api/admin*`): solo en la computadora del creador, la que tiene su `admin.txt` (o `publicar.txt`).
   Saldo, usuarios, consumo y registro de Voices Cloning; dar, quitar y suspender.

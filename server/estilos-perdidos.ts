@@ -21,7 +21,7 @@ import { nombreCopia } from './originales.ts'
 const NUEVO_ESTILO = 'nuevo-estilo'
 const ID = /^[a-z0-9]+(-[a-z0-9]+)*$/
 /** Lo de la card del estilo de Sloth que hereda uno tuyo rehecho. `lote` no: su prefijo es de ese estilo. */
-const HEREDA = ['icon', 'etapas', 'voz', 'clips', 'editor'] as const
+const HEREDA = ['icon', 'etapas', 'voz', 'clips', 'musica', 'editor'] as const
 
 interface Rutas {
   app: string

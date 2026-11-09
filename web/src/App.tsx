@@ -44,7 +44,7 @@ import { avisarTanda, AvisoRedes, ConNavegadorRedes, usePublicar } from './Redes
 import { NombreDelHilo, Renombrar } from './Renombrar'
 import { Segmento } from './Segmento'
 import { nombreDeVoz, SelectorVoz, useVoz, vozPosible } from './Voz' // voz de AI Studio, Fish Audio o ElevenLabs
-import { lineaVoz } from '../../shared/voz'
+import { lineaMusica, lineaVoz } from '../../shared/voz'
 import { SelectorClips, SelectorImagenes, useChatGPT, useFlow } from './Flow' // Google Flow
 import { imagenPosible, lineaClips, lineaImagenes, MODELOS_VIDEO, OPCIONES_CLIPS } from '../../shared/flow'
 import { Timeline } from './Timeline'
@@ -871,6 +871,10 @@ function NewSession(props: {
   const voz = useVoz()
   const [voces, setVoces] = useStored<Record<string, string>>('voz', {})
   const vozElegida = vozPosible(voz.estado, voces[card.id] ?? '') ? voces[card.id] : ''
+  // La música de fondo, en el menú «Voz» de los estilos que la saben poner (`card.musica`): apagada hasta que la
+  // enciendas, y la card recuerda la última elección.
+  const [musicas, setMusicas] = useStored<Record<string, boolean>>('musica', {})
+  const musica = !!card.musica && !!musicas[card.id]
   // Las imágenes: con ChatGPT o con un modelo de Google Flow (`Flow.tsx`), según lo que tengas conectado.
   const hayChatGPT = useChatGPT()
   const [imagenes, setImagenes] = useStored<string>('imagenes', '')
@@ -949,7 +953,15 @@ function NewSession(props: {
                 onCambio={(f) => setFormatos({ ...formatos, [card.id]: f })}
               />
             )}
-            {conFormato && <SelectorVoz card={card} voz={voz} valor={vozElegida} onCambio={(v) => setVoces({ ...voces, [card.id]: v })} />}
+            {conFormato && (
+              <SelectorVoz
+                card={card}
+                voz={voz}
+                valor={vozElegida}
+                musica={{ encendida: musica, onCambio: (m) => setMusicas({ ...musicas, [card.id]: m }) }}
+                onCambio={(v) => setVoces({ ...voces, [card.id]: v })}
+              />
+            )}
             {conFormato && <SelectorImagenes valor={imagenElegida} hayChatGPT={hayChatGPT} voz={voz} flow={flow} onCambio={setImagenes} />}
             {conFormato && card.clips && <SelectorClips valor={clipsElegidos} onCambio={setClips} />}
             {card.lote && enlaces.length > 1 && (
@@ -982,6 +994,7 @@ function NewSession(props: {
             laMarca && `Marca: ${laMarca}`,
             conFormato && !formatoEscrito && `Formato: ${formato}`,
             conFormato && lineaVoz(card, vozElegida, nombreDeVoz(voz.estado, vozElegida)),
+            conFormato && lineaMusica(card, musica),
             conFormato && lineaImagenes(imagenElegida),
             conFormato && card.clips && lineaClips(clipsElegidos),
             // El modelo de cada subagente: lo medido, o lo que elegiste en «Avanzado». La skill lo lee aquí.

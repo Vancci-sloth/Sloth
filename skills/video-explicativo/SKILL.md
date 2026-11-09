@@ -189,7 +189,8 @@ objeto), y nada de etiquetas de cambio sueltas («−94 %»): el número ya lo d
 ## Los pasos
 
 1. **En un solo mensaje**: `python -B -X utf8 <skill>/scripts/nuevo.py <carpeta>` (con `--formato horizontal` si
-   toca, y `--marca <nombre>` si el mensaje trae la línea `Marca:`) en segundo plano (con `run_in_background`);
+   toca, `--marca <nombre>` si el mensaje trae la línea `Marca:` y `--musica` si trae `Música: de fondo`: `final.py`
+   le pone entonces música sintetizada bajo la voz, que baja sola al hablar) en segundo plano (con `run_in_background`);
    `python -B -X utf8 <skill>/scripts/marca.py ver` (con la misma `--marca`);
    `python -B -X utf8 <skill>/../modelos-3d/scripts/modelos.py lista`; y de dos a cuatro búsquedas web a la vez. Si a
    la marca le falta algo, pregúntalo ([`MARCA.md`](MARCA.md)).

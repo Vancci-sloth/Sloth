@@ -7,7 +7,7 @@ de skills/modelos-3d/plantilla, el ícono 3D (`Icono3D`, con `comun.tsx`): el pr
 el proyecto una vez (render.cjs --empaqueta): el primer empaquetado de un proyecto tarda ~40 s y los siguientes ~10,
 así el render de hacer.py no los paga. Al terminar deja `.listo`, que hacer.py espera.
 
-    python -B nuevo.py <nombre> [--formato vertical|horizontal] [--marca <nombre>]
+    python -B nuevo.py <nombre> [--formato vertical|horizontal] [--marca <nombre>] [--musica]
 
 Va en el directorio actual (Sloth lanza la card en `trabajo/video-explicativo`, y su panel de etapas busca ahí la
 carpeta del video); dentro de un proyecto, junto a él. Deja también una voz muda, para que la plantilla se vea en Remotion Studio antes de que llegue la del
@@ -16,6 +16,7 @@ usuario.
 `--formato` es el de la línea `Formato:` del mensaje (sin ella, vertical): queda en src/datos/formato.json, del que
 leen la plantilla (el tamaño y dónde va cada cosa, `ZONA` en src/tema.ts) y final.py. Un video nace en un formato y
 no cambia: el otro es otro video. `--marca` es la de la línea `Marca:` (sin ella, la de siempre; ver marca.py).
+`--musica`, si el mensaje trae `Música: de fondo`: deja src/datos/musica.json, y final.py le pone música bajo la voz.
 """
 
 import json
@@ -37,6 +38,9 @@ def main() -> None:
         i = args.index("--formato")
         formato = args[i + 1] if i + 1 < len(args) else ""
         del args[i:i + 2]
+    musica = "--musica" in args
+    if musica:
+        args.remove("--musica")
     marca = None
     if "--marca" in args:
         i = args.index("--marca")
@@ -62,6 +66,8 @@ def main() -> None:
     shutil.copytree(SKILL / "plantilla", destino, ignore=shutil.ignore_patterns("__pycache__"))
     calentar_vectores()
     (destino / "src" / "datos" / "formato.json").write_text(json.dumps({"formato": formato}) + "\n", encoding="utf-8", newline="\n")
+    if musica:
+        (destino / "src" / "datos" / "musica.json").write_text("{}\n", encoding="utf-8", newline="\n")
     aplicar(destino, marca)
     for d in ("fuentes/voz", "fuentes/datos", "fuentes/logos", "public/logos", "perro/bocas", "revision", "out"):
         (destino / d).mkdir(parents=True, exist_ok=True)

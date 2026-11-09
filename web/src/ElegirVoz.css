@@ -79,6 +79,13 @@
 .voz-acciones .ico { width: 18px; height: 18px; padding: 1px; color: var(--suave); }
 
 .voz-pie { flex: none; display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 4px 10px; padding: 8px 10px 10px; border-top: 1px solid var(--line); background: var(--panel); }
+.voz-musica { grid-column: 1 / -1; display: flex; align-items: center; gap: 10px; min-height: 42px; padding: 5px 8px; margin-bottom: 4px; border-radius: 9px; color: var(--text); }
+.voz-musica:hover { background: var(--panel-2); }
+.voz-musica > .ico { flex: none; width: 18px; height: 18px; color: var(--suave); }
+.voz-musica.on > .ico { color: var(--amber); }
+.voz-casilla { flex: none; display: grid; place-items: center; width: 20px; height: 20px; border-radius: 6px; box-shadow: inset 0 0 0 1.5px var(--line); }
+.voz-musica.on .voz-casilla { background: var(--amber); color: var(--sobre-ambar); box-shadow: none; }
+.voz-casilla .ico { width: 14px; height: 14px; }
 .voz-frase { grid-column: 1 / -1; display: flex; align-items: center; gap: 8px; height: 34px; padding: 0 10px; border-radius: 9px; background: var(--bg); border: 1px solid var(--line); }
 .voz-frase:focus-within { border-color: color-mix(in srgb, var(--amber) 55%, var(--line)); }
 .voz-frase span { flex: none; font-size: 14.5px; font-weight: 600; letter-spacing: 0.01em; text-transform: uppercase; color: var(--suave); }

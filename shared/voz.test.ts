@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { comoSuena, encaja, grupoEnEspanol, juntarVoces, lineaVoz, motorDe, muestraDeStudio, pcmDeWav, segundosWav, textoParaVoz, trozosParaVoz, vocesDeLista, vocesDelPanel, wavDePcm } from './voz.ts'
+import { comoSuena, encaja, grupoEnEspanol, juntarVoces, lineaMusica, lineaVoz, motorDe, muestraDeStudio, pcmDeWav, segundosWav, textoParaVoz, trozosParaVoz, vocesDeLista, vocesDelPanel, wavDePcm } from './voz.ts'
 
 // El principio del panel de voces de AI Studio, como lo dio su `innerText` el 29 de octubre de 2026.
 const PANEL = `Speaker settings
@@ -54,6 +54,12 @@ test('la línea Voz: según lo elegido y el estilo', () => {
   assert.equal(lineaVoz({ voz: { propia: 'Voz de edge-tts' } }, ''), '')
   assert.match(lineaVoz({ voz: { propia: 'Voz de edge-tts' } }, 'Kore'), /voz Kore/)
   assert.equal(lineaVoz({ voz: false }, 'Fola'), '')
+})
+
+test('la línea Música: solo encendida y en un estilo que la sabe poner', () => {
+  assert.match(lineaMusica({ musica: true }, true), /^Música: de fondo/)
+  assert.equal(lineaMusica({ musica: true }, false), '')
+  assert.equal(lineaMusica({}, true), '')
 })
 
 /**

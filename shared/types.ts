@@ -36,6 +36,11 @@ export interface Card {
   /** Hace sus clips con `generar_video` en Google Flow: el compositor deja elegir el modelo (menú «Clips», `lineaClips`). */
   clips?: true
   /**
+   * Sabe ponerle música de fondo bajo la voz (`video-base/scripts/musica.py`): el menú «Voz» deja encenderla y manda la
+   * línea `Música: de fondo` (`lineaMusica`). Apagada si no la eliges; la card recuerda la última elección.
+   */
+  musica?: true
+  /**
    * El estilo de Sloth del que partió uno tuyo (lo copió «Nuevo estilo»): pide los paquetes de Python de ese
    * (`server/requisitos.ts`) y es con el que se compara al compartirlo (`server/estilos.ts`).
    */
