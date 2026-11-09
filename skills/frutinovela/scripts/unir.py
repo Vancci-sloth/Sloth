@@ -21,6 +21,8 @@ sys.stdout.reconfigure(encoding="utf-8")
 SKILL = Path(__file__).resolve().parent.parent
 BASE = SKILL.parent / "video-base" / "scripts"
 sys.path.insert(0, str(BASE))
+from sloth import ffmpeg_h264  # noqa: E402  la NVIDIA si hay, o x264 (video-base)
+
 PROYECTO = Path.cwd()
 FORMATOS = {"vertical": (1080, 1920), "horizontal": (1920, 1080)}
 FPS = 30
@@ -28,11 +30,6 @@ PALABRAS = 3
 # Lo que queda del clip tras su última palabra, y lo menos que dura un clip cortado.
 MARGEN = 0.35
 MINIMO = 2.0
-
-
-def ffmpeg(*args: str) -> None:
-    # -nostdin: dentro de un ciclo de la shell, ffmpeg se come la entrada del ciclo.
-    subprocess.run(["ffmpeg", "-nostdin", "-y", "-v", "error", *args], check=True)
 
 
 def con_audio(clip: Path) -> bool:
@@ -75,7 +72,7 @@ def unir(clips: list[Path], cortes: list[float], ancho: int, alto: int, salida: 
             filtros.append(f"[{entradas.count('-i')}:a]anull[a{i}]")
             entradas += ["-f", "lavfi", "-t", f"{fin:.3f}", "-i", "anullsrc=r=48000:cl=stereo"]
     filtros.append("".join(f"[v{i}][a{i}]" for i in range(n)) + f"concat=n={n}:v=1:a=1[v][a]")
-    ffmpeg(*entradas, "-filter_complex", ";".join(filtros), "-map", "[v]", "-map", "[a]", "-c:v", "libx264", "-crf", "16", "-preset", "medium", "-c:a", "pcm_s16le", str(salida))
+    ffmpeg_h264(lambda h264: [*entradas, "-filter_complex", ";".join(filtros), "-map", "[v]", "-map", "[a]", *h264, "-c:a", "pcm_s16le", str(salida)], crf=16)
 
 
 def tiempo(s: float) -> str:
@@ -171,11 +168,11 @@ def main() -> None:
     if video:
         (revision / "subtitulos.ass").write_text(ass(bloques(segmentos), ancho, alto), encoding="utf-8", newline="\n")
     # Desde revision/: la ruta del filtro `subtitles` en Windows (C:\…) rompe su sintaxis.
-    subprocess.run(
-        ["ffmpeg", "-nostdin", "-y", "-v", "error", "-i", crudo.name, "-i", audio.name, "-map", "0:v", "-map", "1:a", *video,
-         "-c:v", "libx264", "-crf", "18", "-preset", "medium", "-pix_fmt", "yuv420p", "-color_primaries", "bt709", "-color_trc", "bt709", "-colorspace", "bt709",
-         "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart", str(final)],
-        cwd=revision, check=True,
+    ffmpeg_h264(
+        lambda h264: ["-i", crudo.name, "-i", audio.name, "-map", "0:v", "-map", "1:a", *video,
+                      *h264, "-pix_fmt", "yuv420p", "-color_primaries", "bt709", "-color_trc", "bt709", "-colorspace", "bt709",
+                      "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart", str(final)],
+        crf=18, cwd=revision,
     )
     print(f"Listo: {final}")
     print(f"Transcripción, para compararla con el guion: {revision / 'transcripcion.txt'}")

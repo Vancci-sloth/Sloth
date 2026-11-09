@@ -20,9 +20,10 @@ import sys
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
-from comun import ffmpeg
+from comun import ffmpeg_h264
 
-RECODIFICAR = ["-c:v", "libx264", "-crf", "18", "-bf", "0", "-g", "15", "-r", "30", "-pix_fmt", "yuv420p", "-an"]
+# Lo que pide public/; el codificador lo pone ffmpeg_h264 (la NVIDIA si hay, o x264 a crf 18).
+RECODIFICAR = ["-bf", "0", "-g", "15", "-r", "30", "-pix_fmt", "yuv420p", "-an"]
 
 
 def al_dia(origen: Path, destino: Path) -> bool:
@@ -32,7 +33,7 @@ def al_dia(origen: Path, destino: Path) -> bool:
 def recodificar(origen: Path, destino: Path) -> None:
     destino.parent.mkdir(parents=True, exist_ok=True)
     parcial = destino.with_name(destino.stem + ".parcial.mp4")
-    ffmpeg("-i", str(origen), *RECODIFICAR, str(parcial))
+    ffmpeg_h264(lambda h264: ["-i", str(origen), *h264, *RECODIFICAR, str(parcial)], crf=18)
     parcial.replace(destino)
 
 

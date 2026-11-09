@@ -24,7 +24,7 @@ import sys
 import tempfile
 from pathlib import Path
 
-from comun import sloth, turno_youtube
+from comun import ffmpeg_h264, sloth, turno_youtube
 
 FONDO = "0x0d0d10"  # COLOR.fondo de la plantilla
 
@@ -85,8 +85,8 @@ def bajar(url: str, desde: float, hasta: float, salida: Path, tal_cual: bool, ll
         else:
             vf = (f"scale=1920:1080:force_original_aspect_ratio=decrease,"
                   f"pad=1920:1080:(ow-iw)/2:(oh-ih)/2:color={FONDO},setsar=1,fps=30")
-        subprocess.run(["ffmpeg", "-nostdin", "-y", "-v", "error", "-i", str(crudo), "-vf", vf, "-c:v", "libx264",
-                        "-crf", "18", "-bf", "0", "-g", "15", "-pix_fmt", "yuv420p", "-an", str(salida)], check=True)
+        ffmpeg_h264(lambda h264: ["-i", str(crudo), "-vf", vf, *h264, "-bf", "0", "-g", "15", "-pix_fmt", "yuv420p",
+                                   "-an", str(salida)], crf=18)
     dura = float(subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0",
                                  str(salida)], capture_output=True, text=True).stdout.strip())
     hoja = salida.with_name(salida.stem + "-hoja.png")

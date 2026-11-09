@@ -16,8 +16,8 @@ sys.stdout.reconfigure(encoding="utf-8")
 # El Python de Sloth, sus modelos, sus procesos, los turnos y FFmpeg son los de video-base (`sloth.py`), que sabe dónde
 # los deja la app en cada computadora. Al final de la ruta: los scripts de esta skill ganan a los de igual nombre de la base.
 sys.path.append(str(Path(__file__).resolve().parents[2] / "video-base" / "scripts"))
-from sloth import (BANDERAS, MODELOS, PROCESOS, ffmpeg, proceso, python_sloth, sloth, turno,  # noqa: E402,F401
-                   turno_gpu, turno_youtube, wav16k)
+from sloth import (BANDERAS, MODELOS, PROCESOS, ffmpeg, ffmpeg_h264, proceso, python_sloth, sloth,  # noqa: E402,F401
+                   turno, turno_gpu, turno_youtube, wav16k)
 
 
 def turno_render():

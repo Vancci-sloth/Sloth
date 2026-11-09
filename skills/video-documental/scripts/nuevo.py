@@ -31,6 +31,7 @@ from pathlib import Path
 SKILL = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(SKILL.parent / "video-base" / "scripts"))
 from espacio import enlazar_modulos  # noqa: E402
+from sloth import ffmpeg_h264  # noqa: E402  la NVIDIA si hay, o x264
 
 
 def modulos(destino: Path) -> None:
@@ -71,11 +72,12 @@ def grabacion(destino: Path, origen: Path, vertical: bool = False) -> None:
         shutil.copy(origen, src)
     w, h = (1080, 1920) if vertical else (1920, 1080)
     print(f"cámara -> public/assets/media/cam_raw.mp4 (cruda, {w}x{h}, 30 fps constantes)")
-    ffmpeg("-i", str(src), "-map", "0:v:0", "-vf",
-           f"fps=30,scale={w}:{h}:force_original_aspect_ratio=decrease,pad={w}:{h}:(ow-iw)/2:(oh-ih)/2",
-           "-c:v", "libx264", "-crf", "14", "-preset", "medium", "-g", "30", "-keyint_min", "30", "-pix_fmt", "yuv420p",
-           "-color_range", "tv", "-colorspace", "bt709", "-color_primaries", "bt709", "-color_trc", "bt709", "-an",
-           str(media / "cam_raw.mp4"))
+    ffmpeg_h264(lambda h264: [
+        "-i", str(src), "-map", "0:v:0", "-vf",
+        f"fps=30,scale={w}:{h}:force_original_aspect_ratio=decrease,pad={w}:{h}:(ow-iw)/2:(oh-ih)/2",
+        *h264, "-g", "30", "-keyint_min", "30", "-pix_fmt", "yuv420p",
+        "-color_range", "tv", "-colorspace", "bt709", "-color_primaries", "bt709", "-color_trc", "bt709", "-an",
+        str(media / "cam_raw.mp4")], crf=14)
     print("voz -> public/assets/media/vo.wav")
     ffmpeg("-i", str(src), "-map", "0:a:0", "-ac", "2", "-ar", "48000", "-c:a", "pcm_s24le", str(media / "vo.wav"))
 

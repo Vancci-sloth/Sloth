@@ -8,8 +8,8 @@ Lo que comparten los estilos de vídeo: el lote, los errores ya vistos y los scr
   (`FLOW.md`, `sloth.py`, la hoja, masterizar, comprobar y la portada), los estilos que hace
   cada quien con `crear-estilo` y los procesos de Python de Sloth (`sloth.py`).
 - **`video-el-diff`** es un estilo propio que el usuario afina a mano: ni lo toques desde aquí ni le muevas nada. Solo
-  toma prestados `chrome.mjs`, `recorte.py` y la portada (`PORTADA.md`, `portada.mjs`), así que un cambio en ellos
-  también le llega.
+  toma prestados `chrome.mjs`, `recorte.py`, la portada (`PORTADA.md`, `portada.mjs`) y `sloth.py` (con su
+  `ffmpeg_h264`), así que un cambio en ellos también le llega.
 
 | Archivo | Qué es |
 |---|---|
@@ -38,6 +38,9 @@ en el script.
 - FFmpeg dentro de un ciclo de la shell, con `-nostdin` (se come la entrada del ciclo).
 - En `drawtext`, la ruta de la fuente en Windows se escapa: `C\:/Windows/Fonts/arial.ttf`.
 - H.264 en `yuv420p` pide ancho y alto pares.
+- Para recodificar un vídeo en H.264, `ffmpeg_h264` (`sloth.py`) o `ffmpegH264` (`ffmpeg.mjs`), no `libx264` a mano:
+  usan la NVIDIA si de verdad codifica (varias veces más rápido) y vuelven a x264 si no hay o falla. Les das el crf de
+  x264. En clips de menos de un segundo no gana: arrancar NVENC cuesta más que lo que ahorra.
 - Remotion saca `yuvj420p` (rango completo) aunque se le pida `--pixel-format=yuv420p`; hay reproductores que lo ven
   lavado. Hace falta además `--color-space=bt709`. `comprobar.mjs` lo marca.
 - `loudnorm` solo no limita el true peak: un episodio salió a +0,7 dBTP. `masterizar.mjs` limita con sobremuestreo.
