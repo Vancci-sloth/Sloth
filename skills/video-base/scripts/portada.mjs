@@ -12,7 +12,7 @@ import { mkdtempSync, openSync, readSync, closeSync, renameSync, rmSync, writeFi
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { spawnSync } from 'node:child_process'
-import { ffmpeg, opciones, probar, uso } from './ffmpeg.mjs'
+import { ffmpeg, ffmpegH264, opciones, probar, uso } from './ffmpeg.mjs'
 
 const MARCA = 'sloth-portada'
 // Los presets de x264, del más usado al menos: el que da las mismas cabeceras que el vídeo es el suyo.
@@ -76,11 +76,16 @@ function sinRecodificar(salida, dir) {
   const color = [['-color_range', v.color_range], ['-colorspace', v.color_space], ['-color_primaries', v.color_primaries],
     ['-color_trc', v.color_transfer], ['-chroma_sample_location', v.chroma_location]].filter(([, x]) => sabido(x)).flat()
   const objetivo = extradata(video)
+  // Dónde va el color en el vídeo (`chroma_location`): el PNG trae el suyo y gana a -chroma_sample_location, así que se
+  // le dice a x264 directo. Sin esto las cabeceras no salían iguales con ningún preset (el render de Remotion lo marca
+  // `center`) y el vídeo se recodificaba entero.
+  const chromaloc = { left: 0, center: 1, topleft: 2, top: 3, bottomleft: 4, bottom: 5 }[v.chroma_location]
+  const x264 = chromaloc === undefined ? [] : ['-x264-params', `chromaloc=${chromaloc}`]
   const preset = PRESETS.find((p) => {
     ffmpeg(['-v', 'error', '-framerate', fps, '-i', imagen,
       '-vf', `${escalar},crop=${W}:${H},setsar=${(v.sample_aspect_ratio ?? '1:1').replace(':', '/')},format=${v.pix_fmt}` +
         (etiquetas ? `,setparams=${etiquetas}` : ''),
-      '-frames:v', '1', '-c:v', 'libx264', '-preset', p, '-crf', crf, '-pix_fmt', v.pix_fmt, ...color, '-r', fps,
+      '-frames:v', '1', '-c:v', 'libx264', '-preset', p, '-crf', crf, ...x264, '-pix_fmt', v.pix_fmt, ...color, '-r', fps,
       '-video_track_timescale', v.time_base.split('/')[1], portada])
     return extradata(portada) === objetivo
   })
@@ -99,7 +104,10 @@ function sinRecodificar(salida, dir) {
   return Number(hecho.nb_frames) === Number(v.nb_frames) + (yaTenia ? 0 : 1)
 }
 
-/** Recodifica el vídeo entero con la portada delante (x264 crf 16): lo de siempre, cuando no se puede sin recodificar. */
+/**
+ * Recodifica el vídeo entero con la portada delante, cuando no se puede sin recodificar: con NVENC si hay NVIDIA (cq 19,
+ * `ffmpegH264`), si no o si falla, x264 crf 16 medium, como antes. Devuelve el codificador.
+ */
 function recodificar(salida) {
   // La portada, en bt709 de rango limitado como el vídeo: con la matriz por defecto (bt601) los colores salen corridos.
   const filtros = [
@@ -108,13 +116,13 @@ function recodificar(salida) {
     `[p][v]concat=n=2:v=1:a=0[vo]`
   ]
   if (a) filtros.push(`[0:a]${yaTenia ? `atrim=start_sample=${muestras},asetpts=PTS-STARTPTS,` : ''}adelay=delays=${muestras}S:all=1[ao]`)
-  ffmpeg([
+  return ffmpegH264((h264) => [
     '-v', 'error',
     '-i', video,
     '-framerate', fps, '-i', imagen,
     '-filter_complex', filtros.join(';'),
     '-map', '[vo]', ...(a ? ['-map', '[ao]'] : []),
-    '-c:v', 'libx264', '-crf', '16', '-preset', 'medium', '-pix_fmt', 'yuv420p', '-r', fps,
+    ...h264, '-pix_fmt', 'yuv420p', '-r', fps,
     '-colorspace', 'bt709', '-color_primaries', 'bt709', '-color_trc', 'bt709', '-color_range', 'tv',
     ...(a ? ['-c:a', 'aac', '-b:a', '320k', '-ar', a.sample_rate, '-ac', String(a.channels)] : []),
     '-metadata', `comment=${MARCA}`,
@@ -134,8 +142,7 @@ try {
     console.error(`Sin recodificar no salió (${String(e.message).split('\n')[0]}): recodifico.`)
   }
   if (!ok) {
-    como = 'recodificando el vídeo'
-    recodificar(tmp)
+    como = `recodificando el vídeo (${recodificar(tmp)})`
   }
   try {
     renameSync(tmp, video)
