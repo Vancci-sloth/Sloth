@@ -120,6 +120,28 @@ def texto_del_guion() -> str:
     return " ".join(l for l in lineas if not l.startswith("#") and not l.lower().startswith("corte de datos"))
 
 
+def gancho() -> str:
+    """La primera frase del guion, hasta su punto."""
+    return re.split(r"(?<=[.!?])\s+", texto_del_guion().strip(), maxsplit=1)[0]
+
+
+def sin_titular(m: dict) -> list[str]:
+    """
+    Sin `titular`, el gancho enorme del primer segundo y la portada son la primera frase del guion (main la pone de
+    `titular`), si tiene diez palabras o menos. Antes salían de la primera frase de la voz, y la voz no siempre para
+    donde el guion: «La T de ChatGPT nació en Google.» lo leyó de corrido con «no en una startup de moda» (8 nov 2026),
+    12 palabras, y el video se quedó sin titular y con la portada de respaldo, un cuadro con su subtítulo detrás.
+    """
+    if (m.get("titular") or "").strip():
+        return []
+    n = len(palabras_de(gancho()))
+    if n <= 10:
+        return []
+    return [f"el gancho («{gancho()}») tiene {n} palabras: así no sale enorme en el primer segundo ni en la portada. "
+            "Pon `titular`, de 2 a 5 palabras, la frase que detiene («Tu laptop no puede minar bitcoin»), o corta el gancho "
+            "a diez palabras o menos."]
+
+
 def titulo() -> str:
     for l in (RAIZ / "guion.md").read_text(encoding="utf-8").splitlines():
         if l.startswith("# "):
@@ -542,8 +564,10 @@ def main() -> None:
         m = json.loads((RAIZ / "momentos.json").read_text(encoding="utf-8"))
     except json.JSONDecodeError as e:
         sys.exit(f"✗ momentos.json no es JSON: {e}")
-    if errores := comprobar(m, palabras_de(texto_del_guion()), "el guion"):
+    if errores := comprobar(m, palabras_de(texto_del_guion()), "el guion") + sin_titular(m):
         sys.exit("✗ momentos.json:\n  " + "\n  ".join(errores))
+    # El titular sale del guion, no de dónde haga la pausa la voz (sin_titular).
+    m["titular"] = (m.get("titular") or "").strip() or gancho()
     mc = marca()
     if mc.get("cierre", {}).get("red", "ninguna") != "ninguna":
         frase = mc["cierre"].get("frase", "")
@@ -599,17 +623,19 @@ def main() -> None:
     horizontal = json.loads((RAIZ / "src" / "datos" / "formato.json").read_text(encoding="utf-8")).get("formato") == "horizontal"
     # En horizontal es la miniatura de YouTube (1280×720) y no entra en el video; en vertical, su primer cuadro.
     palabras = json.loads((RAIZ / "src" / "datos" / "voz.json").read_text(encoding="utf-8"))["palabras"]
-    propio = [w for w in (json.loads((RAIZ / "momentos.json").read_text(encoding="utf-8")).get("titular") or "").split() if normal(w)]
+    propio = [w for w in (m.get("titular") or "").split() if normal(w)]
     n = len(propio) or next((k + 1 for k, p in enumerate(palabras) if re.search(r"[.!?]$", p["w"])), 0)
     hay_titular = 0 < n <= max(10, len(propio))
-    if hay_titular and not horizontal:
-        # En vertical la portada es el cuadro del gancho con su titular ya entero (Titular.tsx lo deja completo en
-        # 3 cuadros por palabra): el protagonista 3D, la frase que detiene y nada más. Con un cuadro cualquiera y el
-        # título de guion.md encima salían los subtítulos de fondo con su recuadro y un título que delataba todo («El
-        # falso premio»): el revisor a ciegas le dio 4 de «lo vería».
+    if hay_titular:
+        # La portada es el cuadro del gancho con su titular ya entero (Titular.tsx lo deja completo en 3 cuadros por
+        # palabra): el protagonista 3D, la frase que detiene y nada más. Con un cuadro cualquiera y el título de guion.md
+        # encima salían los subtítulos de fondo con su recuadro y un título que delataba todo («El falso premio»): el
+        # revisor a ciegas le dio 4 de «lo vería». En horizontal es igual, a 1280×720: la de respaldo traía detrás el
+        # subtítulo de ese momento («Sí, esas», «Se llama Cavendish», 7 y 8 nov 2026).
         hasta = palabras[min(n, len(palabras)) - 1]["e"] + 10 / 30
         t = min(hasta - 0.15, (3 * n + 16) / 30)
-        subprocess.run(["ffmpeg", "-nostdin", "-v", "error", "-y", "-ss", f"{t:.2f}", "-i", str(video), "-frames:v", "1", str(portada)],
+        subprocess.run(["ffmpeg", "-nostdin", "-v", "error", "-y", "-ss", f"{t:.2f}", "-i", str(video), "-frames:v", "1",
+                        *(["-vf", "scale=1280:720:flags=lanczos"] if horizontal else []), str(portada)],
                        cwd=RAIZ, check=True, capture_output=True)
     else:
         # El fondo, cuando el titular ya se fue: a medias salía una palabra entrando encima de otra.

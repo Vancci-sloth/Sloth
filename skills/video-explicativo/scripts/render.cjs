@@ -30,10 +30,13 @@ if ((!salida && !empaqueta) || !fs.existsSync(path.join(raiz, "remotion.config.t
 }
 const op = Object.fromEntries(resto.map((a) => a.replace(/^--/, "").split("=")));
 
-// Por su ruta: el paquete no lo exporta, y así es el mismo módulo que usa renderMedia.
-const memoria = desde(path.join(path.dirname(desde.resolve("@remotion/renderer")), "prestitcher-memory-usage.js"));
+// Por su ruta: el paquete no lo exporta, y así es el mismo módulo que usa renderMedia. Hasta Remotion 4.0.532 no
+// codificaba en paralelo si creía que faltaba memoria; desde la 4.0.540 ya no lo mira y el archivo no existe: pedirlo a
+// secas tumbaba todo render con la plantilla nueva (MODULE_NOT_FOUND, 9 nov 2026).
+const PRESTITCHER = path.join(path.dirname(desde.resolve("@remotion/renderer")), "prestitcher-memory-usage.js");
 const LIBRE = 2e9;
-if (os.freemem() >= LIBRE) {
+if (os.freemem() >= LIBRE && fs.existsSync(PRESTITCHER)) {
+  const memoria = desde(PRESTITCHER);
   const original = memoria.shouldUseParallelEncoding;
   memoria.shouldUseParallelEncoding = (a) => ({ ...original(a), hasEnoughMemory: true });
 }

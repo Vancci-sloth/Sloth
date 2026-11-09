@@ -26,7 +26,8 @@ código ni abras la plantilla**: todo lo que el video necesita se dice en `momen
 - El proyecto va en la carpeta de la línea `Carpeta: <nombre>` (sin ella, `explicado-<tema>`), y en el formato de
   `Formato:` (sin ella, vertical). Con `Formato: horizontal` (1920×1080, para YouTube) es `nuevo.py <carpeta> --formato
   horizontal` y nada más: el director acomoda el texto abajo, el personaje a la derecha y el mundo a todo el ancho, y
-  `hacer.py` deja `portada.png` como miniatura de YouTube (no entra en el video). Si piden el otro formato, es otro video.
+  `hacer.py` deja `portada.png` como miniatura de YouTube (el cuadro del titular a 1280×720; no entra en el video). Si
+  piden el otro formato, es otro video.
 
 ## Para que lo vean
 
@@ -159,9 +160,10 @@ después del gancho, como prueba (quién lo dice, la cosa real): sin ellas, todo
   `ladra` un remate fuerte · `acostado` ya no tiene remedio · `lupa` se investiga · `llave` se desbloquea · `billetes`
   dinero que se paga. Una por idea, ni muy seguido ni de más. Un personaje propio tiene las suyas (las dice `hacer.py`
   si una no está).
-- **`titular`** (arriba, junto a `paleta`): el gancho, enorme y palabra por palabra en el primer segundo. Sin él va
-  la primera frase de la voz si tiene diez palabras o menos, entera en el primer medio segundo (por eso el gancho es una frase corta y sola), con la
-  última palabra del color de la luz: que sea la que sorprende («Tu tamal lleva **cal**»).
+- **`titular`** (arriba, junto a `paleta`): el gancho, enorme y palabra por palabra en el primer segundo, y la portada
+  (en vertical su primer cuadro; en horizontal, la miniatura). Sin él va la primera frase del guion, entera en el primer
+  medio segundo (por eso el gancho es una frase corta y sola), con la última palabra del color de la luz: que sea la que
+  sorprende («Tu tamal lleva **cal**»). Si esa frase pasa de diez palabras, `hacer.py` para y pide `titular`.
 - **`tema`**: `claro` u `oscuro`, el fondo desde ahí (en el giro). `paleta`: los dos fondos y la luz, sacados del
   lugar del tema (la oficina de correos en madera y kraft; el laboratorio en blanco y azul).
 - **Dirígelo como un set: lee [`CINE.md`](CINE.md) antes de escribir los momentos.** `escenas` (dos a cuatro lugares,

@@ -3,7 +3,7 @@
 // cada paso que trae `cuenta`, y entra con el primero.
 import React from "react";
 import { Easing, interpolate, useCurrentFrame } from "remotion";
-import { LETRA, MONO, PALETA, SIGNIFICA, ZONA } from "../tema";
+import { ANCHO, LETRA, MONO, PALETA, SIGNIFICA, ZONA } from "../tema";
 import { CUENTAS, DESDE_CIERRE, enTramos, GUION, TRAMOS_CIFRA } from "./guion";
 import { TITULAR } from "./Titular";
 
@@ -24,7 +24,7 @@ export const ContadorVivo: React.FC = () => {
   const color = c.color ? ((SIGNIFICA as Record<string, string>)[c.color] ?? c.color) : PALETA.luz;
   const texto = valor.toLocaleString("es-MX", { minimumFractionDigits: c.decimales ?? 0, maximumFractionDigits: c.decimales ?? 0 });
   return (
-    <div style={{ position: "absolute", left: 0, right: 0, top: ZONA.escena.arriba + 6, textAlign: "center", opacity: entra, marginLeft: ZONA.texto.x - 540 }}>
+    <div style={{ position: "absolute", left: 0, right: 0, top: ZONA.escena.arriba + 6, textAlign: "center", opacity: entra, marginLeft: 2 * ZONA.texto.x - ANCHO }}>
       <div style={{ fontFamily: LETRA, fontWeight: 800, fontSize: 30, letterSpacing: "0.18em", color: "#ffffff", opacity: 0.7, textTransform: "uppercase" }}>{c.nota}</div>
       <div style={{ fontFamily: MONO, fontWeight: 700, fontSize: 120, lineHeight: 1, color, fontVariantNumeric: "tabular-nums", textShadow: `0 0 30px ${color}66` }}>
         {(c.prefijo ?? "") + texto + (c.sufijo ?? "")}
