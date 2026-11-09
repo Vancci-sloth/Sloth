@@ -46,5 +46,8 @@
     "esbuild": "^0.28.2",
     "koffi": "^3.3.3",
     "typescript": "^7.0.2"
+  },
+  "overrides": {
+    "minimatch@>=7 <11.0.1": "^11.0.5"
   }
 }
