@@ -2,6 +2,7 @@ import { memo, type ReactNode, useEffect, useRef, useState } from 'react'
 import type { Biblioteca3D, Modelo3D } from '../../shared/types'
 import { api } from './api'
 import { useDesplazando } from './desplazando'
+import { Acciones3D } from './Modelos3DAcciones'
 import './Modelos3D.css'
 
 /**
@@ -10,7 +11,8 @@ import './Modelos3D.css'
  * abajo, para qué sirve, qué puede hacer y su tipo (los de `categorias.json`). Se filtran por tipo, se buscan por cualquier palabra
  * y se ordenan por tipo, por fecha o por nombre. Desde el cartel se copia su nombre, que es lo que se le pide al agente. Al
  * abrirlo, su ficha: qué es, qué hace, sus etiquetas (buscan al tocarlas), qué da en el código, qué otros modelos
- * necesita y de qué video salió; con ← y → se pasa al de al lado. La tecla / lleva al buscador.
+ * necesita y de qué video salió; con ← y → se pasa al de al lado. La tecla / lleva al buscador. Arriba, «Importar .glb»
+ * y «Nuevo modelo» (`Modelos3DAcciones.tsx`).
  *
  * Para que el scroll vaya fluido: mientras se desplaza, la rejilla no responde al ratón (los carteles que pasan bajo el
  * cursor no se levantan ni cargan su giro, que era casi todo el trabajo de cada cuadro), cada giro existe solo mientras
@@ -39,9 +41,8 @@ export const Modelos3D = memo(function Modelos3D() {
   const [abierto, setAbierto] = useState<string | null>(null)
   const campo = useRef<HTMLInputElement>(null)
   const raiz = useRef<HTMLDivElement>(null)
-  useEffect(() => {
-    api<Biblioteca3D>('/api/modelos3d').then(setBiblioteca, (e) => setError(e.message))
-  }, [])
+  const cargar = () => api<Biblioteca3D>('/api/modelos3d').then(setBiblioteca, (e) => setError(e.message))
+  useEffect(() => void cargar(), [])
   // `desplazando` mientras se mueve y hasta 200 ms después (el CSS quita el ratón a la rejilla).
   useDesplazando(raiz)
   // «/» lleva al buscador, salvo escribiendo en otro campo o con una ficha abierta.
@@ -100,6 +101,7 @@ export const Modelos3D = memo(function Modelos3D() {
             <kbd>/</kbd>
           )}
         </label>
+        <Acciones3D tipos={nombres} onImportado={(id) => void cargar().then(() => setAbierto(id))} />
       </header>
 
       {biblioteca && modelos.length > 0 && (

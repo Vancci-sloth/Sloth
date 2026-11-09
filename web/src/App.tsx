@@ -1,5 +1,6 @@
 import { memo, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { CANAL_CARD, IDEAS_CARD } from '../../shared/ideas' // ideas
+import { MODELO3D_CARD } from '../../shared/modelos3d' // modelos 3D
 import type { AvanceCorto, AvisoComunidad, Card, Marcas, RifaGanada, Model, Previa, Serie, ServerPush, SessionMeta, VideoHecho } from '../../shared/types'
 import { NOMBRE_AGENTE, PROVEEDORES, proveedorDe } from '../../shared/providers'
 import { AvisoVideos } from './AvisoVideos'
@@ -323,8 +324,8 @@ export function App() {
     if (view.kind === 'draft' && view.id === id) go({ kind: 'new' })
   }
 
-  // Los hilos de Ideas son de una card que no sale en el inicio: les da su icono.
-  const cardOf = (id: string) => cards.find((c) => c.id === id) ?? [IDEAS_CARD, CANAL_CARD].find((c) => c.id === id)
+  // Los hilos de Ideas y los de «Nuevo modelo» son de una card que no sale en el inicio: les da su icono.
+  const cardOf = (id: string) => cards.find((c) => c.id === id) ?? [IDEAS_CARD, CANAL_CARD, MODELO3D_CARD].find((c) => c.id === id)
   // Antes de dibujar: las etiquetas de hilo del compositor y de las burbujas lo leen al pintarse.
   threadIcons.clear()
   for (const s of sessions) {

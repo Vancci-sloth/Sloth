@@ -112,3 +112,18 @@ La biblioteca es de cada quien y empieza vacía: la moneda y el ícono 3D que tr
 en `plantilla/`, que `usar` encuentra y `buscar` no enseña (si mejoras uno y lo guardas, pasa a la biblioteca). Lo
 guardado queda en la biblioteca de esta computadora (`modelos/` de esta skill), que se ve en «Modelos 3D» de Sloth: al
 entregar el video, dile al usuario qué modelos sumaste o mejoraste.
+
+## 6. Un modelo sin video («Nuevo modelo» en Sloth)
+
+Desde «Modelos 3D», el usuario describe un objeto (a veces con una imagen de referencia, que llega en su mensaje: **mírala**
+antes de modelar) y se abre un hilo en una carpeta propia, vacía. Ahí:
+
+1. `buscar` (1): si ya hay uno que sirve o casi, dilo y mejora ese (3) en vez de hacer otro.
+2. `python -B -X utf8 <esta skill>/scripts/modelos.py nuevo <id> --nombre "…" --descripcion "…"` hace de la carpeta un
+   proyecto de prueba (Remotion y three, con el `node_modules` que comparten los videos explicativos) y deja el andamio en
+   `src/modelos/<id>.tsx`.
+3. Escribe el modelo con las reglas de (4), `vista <id>`, **mírala**, corrige, y `guardar` (5) con su ficha entera.
+4. Dile al usuario que ya está en «Modelos 3D» y qué puede hacer.
+
+`importar` es de Sloth («Importar .glb», sin agente): mete un `.glb` hecho fuera con un componente que lo carga, lo centra
+y lo escala, y abre los comprimidos con Draco o Meshopt.

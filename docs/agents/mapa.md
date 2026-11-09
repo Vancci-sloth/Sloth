@@ -121,8 +121,11 @@ Este es el mapa:
   solo quien usa Sloth gratis), en Administrador se arma y se sortea con la ruleta (`RifaAdmin.tsx`); el ganador recibe
   sus créditos de voz, un correo y el aviso a pantalla completa (`GanasteRifa.tsx`).
 - `server/modelos3d.ts` y `web/src/Modelos3D.tsx`: «Modelos 3D» enseña la biblioteca `skills/modelos-3d` que usan los
-  agentes (la de `SKILLS`), que llenan los videos (solo se mira). Empieza vacía; la moneda de la plantilla
-  va en `modelos-3d/plantilla`, sin enseñarse.
+  agentes (la de `SKILLS`), que llenan los videos. Empieza vacía; la moneda de la plantilla
+  va en `modelos-3d/plantilla`, sin enseñarse. Sus botones (`server/modelos3d-acciones.ts`, `web/src/Modelos3DAcciones.tsx`):
+  «Importar .glb» corre `modelos.py importar` sin agente, en una carpeta temporal que se borra (Draco y Meshopt se
+  abren; el decodificador de Draco va con el modelo); «Nuevo modelo» abre un hilo de `MODELO3D_CARD` (`shared/modelos3d.ts`,
+  no sale en el inicio) en su propia carpeta, `<trabajo>/modelos-3d/<nombre>` (skill `modelos-3d`, §6).
 - `server/originales.ts` y `web/src/TusCambios.tsx`: en la app que se vende, «Con tus cambios (N)» bajo la card dice qué
   archivos de su skill (y de video-base) ya no son como los trae la versión, y vuelve a la original, entera o uno a uno.
   Lo que se pisa, también al actualizar (`prepararSkills`), se copia antes a `data/skills-tuyas`.

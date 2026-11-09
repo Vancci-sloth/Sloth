@@ -1,0 +1,20 @@
+/* «Importar .glb» y «Nuevo modelo» en la cabecera de «Modelos 3D», y sus ventanas (Modelos3DAcciones.tsx). */
+.m3d-acciones { flex-shrink: 0; display: flex; gap: 8px; }
+.m3d-accion { display: inline-flex; align-items: center; gap: 7px; height: 38px; padding: 0 14px; border-radius: 12px; border: 1px solid var(--line); background: var(--panel); color: var(--text); font-size: 13px; font-weight: 600; transition: border-color 0.15s, color 0.15s, background 0.15s; }
+.m3d-accion .ico { width: 15px; height: 15px; flex: none; }
+.m3d-accion:hover:not(:disabled) { border-color: var(--amber); color: var(--amber); background: var(--amber-tinte); }
+.m3d-accion.principal { border-color: transparent; background: var(--amber); color: var(--sobre-ambar); }
+.m3d-accion.principal:hover:not(:disabled) { color: var(--sobre-ambar); background: var(--amber-2); }
+
+.m3d-modal { width: min(500px, 100%); max-height: 100%; overflow-y: auto; display: flex; flex-direction: column; gap: 14px; padding: 24px 26px 20px; border-radius: 16px; border: 1px solid var(--line); background: var(--panel); box-shadow: 0 30px 80px rgba(0, 0, 0, 0.6); animation: m3d-sube 0.22s ease-out; }
+.m3d-modal h2 { margin: 0; font-size: 19px; font-weight: 700; letter-spacing: -0.01em; }
+.m3d-modal-texto { margin: -6px 0 0; color: var(--muted); font-size: 13px; line-height: 1.5; }
+.m3d-campo { display: flex; flex-direction: column; gap: 5px; font-size: 12.5px; color: var(--muted); }
+.m3d-campo > span { font-weight: 600; }
+.m3d-campo input:not([type='file']), .m3d-campo textarea, .m3d-campo select { padding: 8px 11px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); color: var(--text); font-size: 13.5px; outline: none; resize: vertical; }
+.m3d-campo input:focus, .m3d-campo textarea:focus, .m3d-campo select:focus { border-color: var(--amber); }
+.m3d-modal-pie { display: flex; justify-content: flex-end; gap: 8px; padding-top: 4px; }
+
+@media (max-width: 760px) {
+  .m3d-acciones { flex-wrap: wrap; }
+}
