@@ -154,6 +154,26 @@ async function escribir(model: string | undefined, prompt: string, carpeta: stri
  * corrido, TikTok abre sus sugerencias al teclear «#» y se come letras: el texto no quedaba igual, se reescribía tres
  * veces y fallaba. Así se eligen de las sugerencias, como los demás, y van al final.
  */
+/**
+ * Lo que dice de qué trata un video, de los archivos de su carpeta, para escribir su texto: primero lo que mejor lo
+ * cuenta y luego lo demás, de lo más corto a lo más largo, hasta ~30.000 caracteres. El guion de El Diff es `guion.py`;
+ * sin leerlo, a sus episodios no les llegaba nada. Vacío si no hay ninguno.
+ */
+export function textosDelVideo(carpeta: string) {
+  const primero = ['short.json', 'shorts.json', 'redes.json', 'guion.md', 'guion.py', 'shorts.md']
+  const rango = (f: string) => (primero.includes(f) ? primero.indexOf(f) : primero.length)
+  const textos = readdirSync(carpeta)
+    .filter((f) => (/\.(md|json|txt)$/.test(f) || f === 'guion.py') && !/^(package|package-lock|tsconfig|sloth)\.json$/.test(f))
+    .map((f) => ({ f, n: tamano(join(carpeta, f)) }))
+    .sort((x, y) => rango(x.f) - rango(y.f) || x.n - y.n)
+  let contexto = ''
+  for (const { f } of textos) {
+    if (contexto.length > 30000) break
+    contexto += `\n\n===== ${f} =====\n${readFileSync(join(carpeta, f), 'utf8').slice(0, 15000)}`
+  }
+  return contexto
+}
+
 export function sinTagsEnTexto(texto: string, tags: string[]) {
   const sueltos: string[] = []
   const limpio = texto
@@ -430,18 +450,10 @@ export function redes(app: string, sessions: Sessions, cards: () => Card[], avis
     if (otra) return { ruta, texto: otra.texto, tags: unirTags(a.tags, otra.tags), infantil: otra.infantil, sintetico: otra.sintetico }
     const partes = ruta.split(`${sep}out${sep}`)
     const carpeta = partes.length > 1 ? partes[0] : dirname(ruta)
-    // Primero lo que mejor dice de qué trata el video; luego lo demás, de lo más corto a lo más largo.
-    const primero = ['short.json', 'shorts.json', 'redes.json', 'guion.md', 'shorts.md']
-    const rango = (f: string) => (primero.includes(f) ? primero.indexOf(f) : primero.length)
-    const textos = readdirSync(carpeta)
-      .filter((f) => /\.(md|json|txt)$/.test(f) && !/^(package|package-lock|tsconfig|sloth)\.json$/.test(f))
-      .map((f) => ({ f, n: tamano(join(carpeta, f)) }))
-      .sort((x, y) => rango(x.f) - rango(y.f) || x.n - y.n)
-    let contexto = ''
-    for (const { f } of textos) {
-      if (contexto.length > 30000) break
-      contexto += `\n\n===== ${f} =====\n${readFileSync(join(carpeta, f), 'utf8').slice(0, 15000)}`
-    }
+    const contexto = textosDelVideo(carpeta)
+    // Sin nada que leer, el agente no tiene de qué escribir: su «no puedo sin inventar» se publicó como texto de tres
+    // episodios de El Diff (5 nov 2026). Va vacío, para escribirlo a mano.
+    if (!contexto) return { ruta, texto: '', tags: unirTags(a.tags, []), aviso: 'En la carpeta del video no quedó el guion ni sus notas: escribe el texto a mano.' }
     const prompt = [
       `Escribe la descripción de un video vertical para redes (TikTok, Shorts, Reels), en español de México, para el canal del usuario.`,
       `El video es \`${relative(carpeta, ruta).replaceAll('\\', '/')}\`, del estilo «${card.title}». Abajo van los archivos de su carpeta.`,
@@ -449,6 +461,7 @@ export function redes(app: string, sessions: Sessions, cards: () => Card[], avis
       ``,
       `- Una o dos frases cortas (menos de 200 caracteres) con el planteamiento y su giro completos, sin guardarte el giro para el video (en una noticia: quién prometió o hizo qué, y cómo le salió al revés). No inventes nada que no esté en los archivos.`,
       `- Que lo entienda alguien que no sigue la tecnología: nombra lo que la gente conoce (Photoshop, Call of Duty, ElevenLabs) y nada de jerga («DNS», «throughput», «prefijo»). Lo que mejor funcionó: «Pidió frenar a los hackers de IA que metieron patinetas en Call of Duty. El hacker era él.»`,
+      `- Termina, en la misma línea, con una pregunta corta o un «Mándaselo a…» que sea del tema y le hable a alguien concreto, para que comenten o lo compartan («¿Tú le perdonarías los diez años de mentira?», «Mándaselo a tu primo, el que sabe de bitcoin.»). Nada genérico como «¿Qué opinas?» o «Síguenos».`,
       `- Sin hashtags en el texto, sin emojis de relleno y sin «en este video».`,
       `- Aparte, de 2 a 4 hashtags del tema, sin # ni espacios (por ejemplo: IA, Claude, Photoshop).`,
       ``,
