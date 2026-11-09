@@ -12,7 +12,7 @@ import './Novedades.css'
  * «Ver novedades» en Opciones la abre de nuevo, también en el navegador de desarrollo.
  * Para la guía de otra versión: su página en `web/public/novedades/` y su número aquí.
  */
-const VERSION = '0.4.0'
+const VERSION = '0.4.1'
 const VISTA = 'sloth-novedades-vistas'
 const ABRIR = 'sloth-novedades-abrir'
 export const NOVEDADES_CERRADAS = 'sloth-novedades-cerradas'

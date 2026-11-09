@@ -70,9 +70,10 @@ antes de la primera publicación con esto hay que desplegar el cobro, o ignora `
 los envíos a Apple.
 
 1. Actualiza `novedad.txt`: un renglón corto con lo que trae la versión, que se ve al pasar el cursor sobre «Actualizar».
-   Una versión grande puede llevar además su guía animada (`web/src/Novedades.tsx`, la 0.4.0 en
-   `web/public/novedades/0.4.0.html`), que sale una vez al abrirla a quien actualizó. Su número va en `package.json`:
-   `version-venta.mjs` solo sube la última cifra.
+   Una versión puede llevar además su guía animada (`web/src/Novedades.tsx`, la 0.4.1 en
+   `web/public/novedades/0.4.1.html`, que reemplaza a la de antes), que sale una vez al abrirla a quien actualizó. Su
+   número en `Novedades.tsx` debe ser el que saldrá: `version-venta.mjs` sube solo la última cifra de la publicada, y un
+   salto (0.5.0) se pone a mano en `package.json`.
 2. Comprueba el diff completo entre `origin/venta` y `main`: se publicará todo lo que haya entrado a `main`. Guarda la
    lista de sus commits (`git log --no-merges --format="%s%n%b" origin/venta..main`): de ahí sale el anuncio del paso 5,
    y después del push ya no se puede sacar así. Si en ese diff hay cambios de `licencias/` que esperan esta versión
