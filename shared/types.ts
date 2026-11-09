@@ -210,6 +210,17 @@ export interface Serie {
   archivo: string
 }
 
+/**
+ * Las marcas guardadas en la carpeta de trabajo de una card (una por canal): `marca.json`, la de siempre, y cada
+ * `marcas/<nombre>.json`. `GET /api/cards/<id>/marcas`; el compositor deja elegir una si hay dos o más.
+ */
+export interface Marcas {
+  /** Si existe `marca.json`: su nombre (el del noticiero o la cuenta del cierre), o '' si no trae. */
+  base?: string
+  /** Los nombres de `marcas/*.json`, que el compositor manda en la línea `Marca:`. */
+  otras: string[]
+}
+
 /** Un archivo de una skill que ya no es como lo trae Sloth (`server/originales.ts`): cambiado o, con `borrado`, quitado. */
 export interface CambioSkill {
   skill: string

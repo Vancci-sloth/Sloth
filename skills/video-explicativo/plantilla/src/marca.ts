@@ -13,6 +13,8 @@ export const MARCA = datos as {
   avatar?: string;
   /** `perro`, uno propio o `ninguno` (sin narrador abajo). */
   personaje: string;
+  /** La de `marcas/<marca>.json` si el video lleva otra que la de siempre (la línea `Marca:`). */
+  marca?: string;
 };
 
 /** Si abajo hay narrador. */

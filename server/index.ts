@@ -49,7 +49,7 @@ import { eventosEnVivo } from './eventos-en-vivo.ts'
 import { enviarCliente } from './enviar-cliente.ts'
 import { anteriorDe, conservarAnterior, olvidarAnterior } from './anteriores.ts'
 import { cuidarEstilos, mudarTuyas } from './estilos-perdidos.ts'
-import { cambiosDeCard, carpetaSkill, configClaudeDev, duplicateCard, enlazarSkills, enlazarSkillsCodex, guardarSkillTuya, readCards, removeCard, seriesDe, SKILLS, skillRef, volverAOriginal } from './skills.ts'
+import { cambiosDeCard, carpetaSkill, configClaudeDev, duplicateCard, enlazarSkills, enlazarSkillsCodex, guardarSkillTuya, marcasDe, readCards, removeCard, seriesDe, SKILLS, skillRef, volverAOriginal } from './skills.ts'
 import { estaticos } from './estaticos.ts'
 import { type Agente, version } from './version.ts'
 import { cargarPreciosCodex } from './precios.ts'
@@ -531,6 +531,12 @@ async function api(req: IncomingMessage, res: ServerResponse, url: URL): Promise
   if (ser && method === 'GET') {
     const card = cards().find((c) => c.id === ser[1])
     return send(res, 200, card?.skill ? seriesDe(card.skill, !!card.etapas) : []), true
+  }
+  // Sus marcas (una por canal), para elegir cuál lleva el video: el compositor manda la línea `Marca:`.
+  const mar = /^\/api\/cards\/([\w-]+)\/marcas$/.exec(path)
+  if (mar && method === 'GET') {
+    const card = cards().find((c) => c.id === mar[1])
+    return send(res, 200, card ? marcasDe(card.cwd) : { otras: [] }), true
   }
 
   // «Con tus cambios»: lo que el usuario (o su agente) cambió en la skill de una card, y volver a la original, entera o un

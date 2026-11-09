@@ -2,7 +2,7 @@ import { existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, realpathSy
 import { homedir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import type { Card, CambiosCard, Serie } from '../shared/types.ts'
+import type { Card, CambiosCard, Marcas, Serie } from '../shared/types.ts'
 import { VENTA } from '../shared/venta.ts'
 import type { SkillRef } from './agent.ts'
 import { guardar } from './disco.ts'
@@ -195,6 +195,21 @@ export function seriesDe(skill: string, estilo: boolean): Serie[] {
     }
   }
   return [...series.values()].sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'))
+}
+
+/**
+ * Las marcas de la carpeta de trabajo de una card: `marca.json` (la de siempre) y `marcas/<nombre>.json`, una por canal
+ * (`MARCA.md` del explicativo, «La marca» de El Diff). Se leen cada vez: las escribe el agente.
+ */
+export function marcasDe(cwd: string): Marcas {
+  const dir = join(cwd, 'marcas')
+  const otras = existsSync(dir) ? readdirSync(dir).filter((f) => f.endsWith('.json')).map((f) => f.slice(0, -5)) : []
+  let base: string | undefined
+  try {
+    const m = JSON.parse(readFileSync(join(cwd, 'marca.json'), 'utf8'))
+    base = (typeof m.nombre === 'string' && m.nombre) || (typeof m.cierre?.nombre === 'string' && m.cierre.nombre) || ''
+  } catch {}
+  return { base, otras: otras.sort((a, b) => a.localeCompare(b, 'es')) }
 }
 
 export function readCards(file: string, appDir: string): Card[] {

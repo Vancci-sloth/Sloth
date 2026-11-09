@@ -36,6 +36,10 @@ eso, escríbelo y sigue. Si ya existe pero le falta un dato que vas a usar, preg
 si el usuario pide cambiar algo de su marca, cambia `marca.json` (y `src/marca.json` del episodio abierto). En un lote no
 preguntes: sin `marca.json`, el episodio lleva la de la plantilla, y al entregar dile cómo poner la suya.
 
+Con varios noticieros, cada uno más es `marcas/<nombre>.json` (mismo formato) junto a `marca.json`. Si el mensaje trae
+`Marca: <nombre>`, esa es la marca de este episodio: `nuevo.py --marca <nombre>`, y lo de arriba vale para ese archivo.
+Si pide un noticiero nuevo, hazle las mismas preguntas y escribe `marcas/<nombre>.json`.
+
 ## Lo que el usuario pidió y no se negocia
 
 - **Personalidad**: un noticiero seco y burlón, en español. Cómo escribirlo: [`ESTILO.md`](ESTILO.md).
@@ -116,7 +120,7 @@ la carpeta de las skills.
 ## Fase 1: el guion
 
 1. **Proyecto.** `python <skill>/scripts/nuevo.py <nombre> --formato <vertical|horizontal>` (el de la línea
-   `Formato:`, ver [Formato](#formato)) desde la carpeta donde trabajas (en Sloth,
+   `Formato:`, ver [Formato](#formato); con `--marca <nombre>` si hay línea `Marca:`) desde la carpeta donde trabajas (en Sloth,
    `trabajo/video-el-diff`). Si el mensaje trae `Carpeta: <nombre>` (la pone Sloth, sola o en la línea `Lote:`), es ese
    nombre, exacto: el panel de Sloth lo busca así. Sin esa línea, `el-diff-N`, con N el siguiente número libre en
    esa carpeta. Copia la plantilla y la marca, y su `node_modules` es una unión a la carpeta que comparten todos los

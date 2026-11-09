@@ -66,6 +66,10 @@ Este es el mapa:
   `Carpeta: <nombre>`, que leen las skills. Con `lote`, varios enlaces pueden ser un video cada uno
   (`lote-MMDD-HHMM-NN`, ver `skills/video-base/LOTE.md`). Cambiar la carpeta desde el estudio usa una que ya existe.
   Todo estilo de video hace vertical y horizontal: el compositor manda la línea `Formato:` (`skills/video-base/FORMATO.md`).
+  La marca del canal (tono, nicho, cierre) vive en la carpeta de trabajo de la card: `marca.json`, la de siempre, y una
+  más por canal en `marcas/<nombre>.json`, con el mismo formato. Con dos o más, el compositor deja elegir en «Marca»
+  (`marcasDe` en `server/skills.ts`) y manda la línea `Marca: <nombre>`; la leen `marca.py` del explicativo y `nuevo.py`
+  de El Diff. Nada recuerda la última: sin elegir, va la de siempre.
 - `modelos` (`web/src/Modelos.tsx`): en «Optimizado», el modelo y el esfuerzo medidos para el hilo. Una card sin medir
   usa lo último que eligió el usuario a mano. En «Avanzado» se eligen. Los subagentes van siempre en el modelo y el
   esfuerzo del hilo: en Claude, Sloth los manda en la línea `Subagentes: todos = <alias> <esfuerzo>.` (las `tareas`

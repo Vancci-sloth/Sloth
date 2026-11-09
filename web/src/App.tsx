@@ -1,6 +1,6 @@
 import { memo, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { CANAL_CARD, IDEAS_CARD } from '../../shared/ideas' // ideas
-import type { AvanceCorto, AvisoComunidad, Card, RifaGanada, Model, Previa, Serie, ServerPush, SessionMeta, VideoHecho } from '../../shared/types'
+import type { AvanceCorto, AvisoComunidad, Card, Marcas, RifaGanada, Model, Previa, Serie, ServerPush, SessionMeta, VideoHecho } from '../../shared/types'
 import { NOMBRE_AGENTE, PROVEEDORES, proveedorDe } from '../../shared/providers'
 import { AvisoVideos } from './AvisoVideos'
 import { VENTA } from '../../shared/venta'
@@ -851,6 +851,13 @@ function NewSession(props: {
   const [serie, setSerie] = useState('')
   useEffect(() => setSerie(''), [card.id])
   const laSerie = series.find((s) => s.id === serie)
+  // La marca (una por canal, en la carpeta de trabajo de la card): el selector sale con dos o más. Sin elegir, la de
+  // siempre; se elige en cada video, nada se queda «activo».
+  const marcas = useMarcas(card)
+  const [marca, setMarca] = useState('')
+  useEffect(() => setMarca(''), [card.id])
+  const conMarcas = (marcas.base !== undefined ? 1 : 0) + marcas.otras.length > 1
+  const laMarca = conMarcas && marcas.otras.includes(marca) ? marca : ''
   const lote = !!card.lote && enlaces.length > 1 && !!porEnlace[card.id]
   // Todo estilo de video hace los dos formatos (skills/video-base/FORMATO.md): la skill hace solo el elegido. La card
   // recuerda el último; una idea de YouTube ya lo trae escrito en el mensaje (`Formato: horizontal`), y ese manda.
@@ -914,6 +921,22 @@ function NewSession(props: {
                 onChange={setSerie}
               />
             )}
+            {conMarcas && (
+              <Picker
+                label={`Marca: ${laMarca || (marcas.base !== undefined ? 'la de siempre' : 'sin elegir')}`}
+                value={laMarca}
+                groups={[
+                  {
+                    label: 'El tono, el nicho y el cierre del canal',
+                    options: [
+                      { value: '', label: marcas.base === undefined ? 'Sin elegir' : marcas.base ? `La de siempre (${marcas.base})` : 'La de siempre' },
+                      ...marcas.otras.map((m) => ({ value: m, label: m }))
+                    ]
+                  }
+                ]}
+                onChange={setMarca}
+              />
+            )}
             {conFormato && (
               <Segmento
                 label="Formato"
@@ -955,6 +978,7 @@ function NewSession(props: {
           // La skill lo lee en el mensaje, debajo de lo que escribió el usuario.
           const pide = [
             laSerie && `Serie: ${laSerie.nombre} (${laSerie.archivo}; cómo se usa, en video-base/SERIES.md)${text ? '' : '. Elige tú el tema.'}`,
+            laMarca && `Marca: ${laMarca}`,
             conFormato && !formatoEscrito && `Formato: ${formato}`,
             conFormato && lineaVoz(card, vozElegida, nombreDeVoz(voz.estado, vozElegida)),
             conFormato && lineaImagenes(imagenElegida),
@@ -1179,6 +1203,20 @@ function useSeries(card: Card) {
     }
   }, [card.id])
   return series
+}
+
+/** Las marcas de la carpeta de trabajo de una card (`GET /api/cards/<id>/marcas`). Si falla, ninguna. */
+function useMarcas(card: Card) {
+  const [marcas, setMarcas] = useState<Marcas>({ otras: [] })
+  useEffect(() => {
+    if (!card.etapas) return setMarcas({ otras: [] })
+    let vivo = true
+    api<Marcas>(`/api/cards/${card.id}/marcas`).then((m) => vivo && setMarcas(m), () => vivo && setMarcas({ otras: [] }))
+    return () => {
+      vivo = false
+    }
+  }, [card.id])
+  return marcas
 }
 
 /**

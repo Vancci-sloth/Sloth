@@ -17,8 +17,8 @@ código ni abras la plantilla**: todo lo que el video necesita se dice en `momen
 - **Cada dato es verdadero**, de su fuente primaria, con fecha de corte. Al video solo van cifras primarias o de medios
   serios; una dudosa no se dice.
 - **La voz la graba el usuario**, o la generas en AI Studio si el mensaje trae `Voz:`. Ninguna otra voz sintética.
-- **El cierre es el de la marca**: la última frase del guion es `cierre.frase` de `marca.json`, tal cual (si su red no
-  es `ninguna`). La tarjeta del canal la pone el director.
+- **El cierre es el de la marca**: la última frase del guion es `cierre.frase` de `marca.json` (o de la marca de la
+  línea `Marca:`), tal cual (si su red no es `ninguna`). La tarjeta del canal la pone el director.
 - **El video informa, no aconseja.** Si el tema es de dinero, nada de «compra» o «vende».
 - **Nada de emojis**, tampoco en los subtítulos: íconos de Phosphor o imágenes.
 - **Ningún modelo 3D se hace dos veces**: los objetos salen de la biblioteca (`modelos.py lista`) o son íconos de
@@ -189,7 +189,8 @@ objeto), y nada de etiquetas de cambio sueltas («−94 %»): el número ya lo d
 ## Los pasos
 
 1. **En un solo mensaje**: `python -B -X utf8 <skill>/scripts/nuevo.py <carpeta>` (con `--formato horizontal` si
-   toca) en segundo plano (con `run_in_background`); `python -B -X utf8 <skill>/scripts/marca.py ver`;
+   toca, y `--marca <nombre>` si el mensaje trae la línea `Marca:`) en segundo plano (con `run_in_background`);
+   `python -B -X utf8 <skill>/scripts/marca.py ver` (con la misma `--marca`);
    `python -B -X utf8 <skill>/../modelos-3d/scripts/modelos.py lista`; y de dos a cuatro búsquedas web a la vez. Si a
    la marca le falta algo, pregúntalo ([`MARCA.md`](MARCA.md)).
    **La pieza central**: si la biblioteca no tiene el objeto que sostiene la historia (la olla del tamal, el aparato del

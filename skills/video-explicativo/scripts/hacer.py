@@ -128,9 +128,12 @@ def titulo() -> str:
 
 
 def marca() -> dict:
+    """La marca del video: la que `marca.py aplicar` dejó anotada en el proyecto (`--marca`) o la de siempre."""
+    from marca import archivo, del_proyecto
+    nombre = del_proyecto(RAIZ)
     for d in (RAIZ.parent, RAIZ.parent.parent):
-        if (d / "marca.json").exists():
-            return json.loads((d / "marca.json").read_text(encoding="utf-8"))
+        if archivo(d, nombre).exists():
+            return json.loads(archivo(d, nombre).read_text(encoding="utf-8"))
     return {}
 
 

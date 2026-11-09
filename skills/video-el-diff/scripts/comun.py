@@ -63,9 +63,13 @@ PLANTILLA = Path(__file__).resolve().parent.parent / "plantilla"
 def marca(raiz: Path) -> dict:
     """
     La marca del noticiero (ver «La marca» en el SKILL): la de la carpeta de trabajo, que es la que el usuario cambia; si
-    no hay, la que el episodio copió al crearse; si tampoco, la de la plantilla.
+    no hay, la que el episodio copió al crearse; si tampoco, la de la plantilla. Si el episodio nació con `--marca`, su
+    copia lo dice en `marca` y manda `marcas/<marca>.json` de la carpeta de trabajo.
     """
-    for f in (raiz.parent / "marca.json", raiz / "src" / "marca.json", PLANTILLA / "src" / "marca.json"):
+    copia = raiz / "src" / "marca.json"
+    elegida = json.loads(copia.read_text(encoding="utf8")).get("marca") if copia.exists() else None
+    propia = raiz.parent / "marcas" / f"{elegida}.json" if elegida else raiz.parent / "marca.json"
+    for f in (propia, copia, PLANTILLA / "src" / "marca.json"):
         if f.exists():
             return json.loads(f.read_text(encoding="utf8"))
     return {}
