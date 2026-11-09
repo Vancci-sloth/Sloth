@@ -71,11 +71,13 @@ jobs:
         env:
           SLOTH_MAC12: ${{ matrix.mac12 }}
           SLOTH_TUYO: ${{ secrets.SLOTH_TUYO }}
-          CSC_LINK: ${{ secrets.CSC_LINK }}
-          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          # Solo a las de Mac: con el certificado de Apple, electron-builder también firmaba el de Windows, que no confía
+          # en él, y la 0.4.0 y la 0.4.1 de Windows se quedaron sin poder actualizarse solas (scripts/compilar.mjs).
+          CSC_LINK: ${{ runner.os == 'macOS' && secrets.CSC_LINK || '' }}
+          CSC_KEY_PASSWORD: ${{ runner.os == 'macOS' && secrets.CSC_KEY_PASSWORD || '' }}
+          APPLE_ID: ${{ runner.os == 'macOS' && secrets.APPLE_ID || '' }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ runner.os == 'macOS' && secrets.APPLE_APP_SPECIFIC_PASSWORD || '' }}
+          APPLE_TEAM_ID: ${{ runner.os == 'macOS' && secrets.APPLE_TEAM_ID || '' }}
       - name: Comprobar instalación y actualización antes de publicar Windows
         if: runner.os == 'Windows'
         run: node scripts/comprobar-instalacion.mjs

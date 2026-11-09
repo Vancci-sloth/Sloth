@@ -9,7 +9,7 @@
 // cards. No lleva lo que solo sirve aquí: tus datos (`data/`, `trabajo/`, y tus huellas, tus poses y tus modelos 3D en
 // las skills) ni Ideas. Lo que se esconde en el código depende de `VENTA` (`shared/venta.ts`).
 import { execFileSync, execSync } from 'node:child_process'
-import { cpSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
+import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { basename, dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import react from '@vitejs/plugin-react'
@@ -31,8 +31,12 @@ const ICONO = join(REPO, 'assets', 'icon.ico')
 const ICONO_PNG = join(REPO, 'assets', 'icon.png')
 const WINDOWS = process.platform === 'win32'
 const MAC = process.platform === 'darwin'
-// GitHub pasa vacío un secreto que no existe, y electron-builder tomaría ese vacío por un certificado.
-for (const v of ['CSC_LINK', 'CSC_KEY_PASSWORD', 'APPLE_ID', 'APPLE_APP_SPECIFIC_PASSWORD', 'APPLE_TEAM_ID']) if (!process.env[v]) delete process.env[v]
+// GitHub pasa vacío un secreto que no existe, y electron-builder tomaría ese vacío por un certificado. Y el certificado
+// de Apple es solo para Mac: con él, electron-builder también firma el de Windows, que no confía en Apple (la firma sale
+// «UnknownError»), y apunta al firmante en app-update.yml. Esa versión ya no acepta ninguna otra: electron-updater pide
+// una firma válida de ese firmante, baja el instalador entero, lo rechaza y vuelve a empezar. Les pasó a la 0.4.0 y la
+// 0.4.1 de Windows, que solo se arreglan instalando a mano. Al final se comprueba que no vuelva a pasar.
+for (const v of ['CSC_LINK', 'CSC_KEY_PASSWORD', 'APPLE_ID', 'APPLE_APP_SPECIFIC_PASSWORD', 'APPLE_TEAM_ID']) if (!process.env[v] || process.platform !== 'darwin') delete process.env[v]
 /** Con el certificado de Apple (CSC_LINK, ver docs/adr/0006), la de Mac va firmada y notarizada (scripts/notarizar.mjs), y se actualiza sola. */
 const MAC_FIRMADA = MAC && !!process.env.CSC_LINK
 /**
@@ -363,4 +367,9 @@ const hechos = await empaquetar({
     npmRebuild: false
   }
 })
+// Una de Windows con firmante en app-update.yml no se actualiza sola con una firma en que Windows no confíe (arriba).
+const configUpdater = join(DIST, 'instalador', 'win-unpacked', 'resources', 'app-update.yml')
+if (WINDOWS && existsSync(configUpdater) && /publisherName/.test(readFileSync(configUpdater, 'utf8'))) {
+  throw new Error(`La de Windows salió firmada (publisherName en ${configUpdater}): no podría actualizarse sola. Quita el certificado.`)
+}
 console.log(`\nListo:\n${hechos.filter((f) => !/\.(blockmap|yml)$/.test(f)).join('\n') || join(DIST, 'instalador')}`)

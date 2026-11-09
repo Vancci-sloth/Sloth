@@ -49,6 +49,16 @@ desinstalar ni borrar `app/data`, `app/trabajo` o `app/skills`. No pulsar «Omit
 Si Sloth ya no abre, se usa directamente ese instalador corregido. Para soporte, conservar la captura, la versión del
 instalador, si fue desde «Actualizar» o manualmente y la versión de Windows (`winver`).
 
+### Windows: la actualización llega a 100 % y vuelve a empezar
+
+La 0.4.0 y la 0.4.1 de Windows salieron firmadas con el certificado de Apple, que `venta.yml` les pasaba a todos los
+sistemas. Windows no confía en él, y electron-updater, que apunta al firmante en `resources\app-update.yml`, rechaza
+cualquier versión nueva («not signed by the application owner» en `app\data\sloth.log`): la baja entera y vuelve a
+empezar. Desde la 0.4.2 el certificado solo llega a Mac, `compilar` falla si la de Windows sale con firmante, y la app
+deja de reintentar y dice que se instale a mano. Quien sigue en la 0.4.0 o la 0.4.1 de Windows solo sale de ahí bajando
+el instalador de la página e instalándolo encima: conserva sus datos. Una firma de Windows de verdad (otro certificado)
+debe dar estado `Valid`, o pasa lo mismo.
+
 Cada sistema se comprueba en el suyo. Antes de publicar, comprueba que los tres resultados de `Comprobar Sloth`
 corresponden al commit de `main` que vas a subir y terminaron bien. Este workflow informa; no configura protección de
 ramas ni bloquea por sí solo un push a `venta`.
@@ -70,8 +80,8 @@ antes de la primera publicación con esto hay que desplegar el cobro, o ignora `
 los envíos a Apple.
 
 1. Actualiza `novedad.txt`: un renglón corto con lo que trae la versión, que se ve al pasar el cursor sobre «Actualizar».
-   Una versión puede llevar además su guía animada (`web/src/Novedades.tsx`, la 0.4.1 en
-   `web/public/novedades/0.4.1.html`, que reemplaza a la de antes), que sale una vez al abrirla a quien actualizó. Su
+   Una versión puede llevar además su guía animada (`web/src/Novedades.tsx`, la 0.4.2 en
+   `web/public/novedades/0.4.2.html`, que reemplaza a la de antes), que sale una vez al abrirla a quien actualizó. Su
    número en `Novedades.tsx` debe ser el que saldrá: `version-venta.mjs` sube solo la última cifra de la publicada, y un
    salto (0.5.0) se pone a mano en `package.json`.
 2. Comprueba el diff completo entre `origin/venta` y `main`: se publicará todo lo que haya entrado a `main`. Guarda la
