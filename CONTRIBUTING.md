@@ -19,7 +19,7 @@ Gracias por querer mejorar Sloth. Antes de abrir un PR:
 
 ## Tu aporte y la licencia
 
-Sloth se publica con la [Apache 2.0 con Commons Clause](LICENSE). Al enviar un aporte (código, skills, textos o
+Sloth se publica con la [licencia MIT](LICENSE). Al enviar un aporte (código, skills, textos o
 imágenes):
 
 - Confirmas que es tuyo o que tienes derecho a aportarlo.

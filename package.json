@@ -2,7 +2,7 @@
   "name": "sloth-2",
   "version": "0.4.0",
   "private": true,
-  "license": "SEE LICENSE IN LICENSE",
+  "license": "MIT",
   "type": "module",
   "description": "Sloth 2.0: cada skill es una card; el agente trabaja a la vista, como en T3 Code",
   "scripts": {
