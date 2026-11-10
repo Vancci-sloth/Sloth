@@ -36,6 +36,8 @@
  * - `POST /voz/admin/creditos` `{externo, amount}`: suma (o, negativo, quita) créditos, en su llave.
  * - `POST /voz/admin/estado` `{externo, status}`: `active` o `suspended`.
  * - `POST /voz/admin/alta` `{email, creditos}`: da de alta a una cuenta de Sloth por su correo, con créditos.
+ * - `POST /voz/admin/regalo` `{email, creditos, motivo, asunto, parrafos}`: créditos de una sola vez por `motivo` y un
+ *   correo con su clave (`{clave}` en los párrafos); sin cuenta, se le hace una gratis.
  *
  * Cada llamada queda en `voz_registro` (migración 0020), con su llave: quién, qué, cuántas letras y créditos, y si
  * falló, por qué. El cron borra lo de más de `GUARDAR_DIAS`.
@@ -45,7 +47,7 @@
  * `vozMensual` (marca `voz-mensual.json` en R2). Desde ahí `voz-mensual.ts` refresca a 100.000 (sin acumular) por correo y mes, SOLO
  * a quien paga activamente $15 USD o más (`daCreditos`): ni cuentas gratis, ni apoyos de menos, ni lugares gratis de Fundador. El cron también los entrega y manda la clave personal de Sloth por correo.
  */
-import { BLOQUEADA, CLAVE, EQUIPO, type Env, Rechazo, cuerpo, delCreador, json, vigencia, vigilar } from './index.ts'
+import { BLOQUEADA, CLAVE, EMAIL, EQUIPO, type Env, Rechazo, correo, cuerpo, delCreador, json, nuevaClave, vigencia, vigilar } from './index.ts'
 import { DE_LA_APP } from './comunidad.ts'
 import { beneficiarioVoz, beneficiariosVoz, CREDITOS_MENSUALES, cuentaDeReparto, desdeTexto, entregarVozMensual, periodoVoz, repartirVozMensual, vocesPublicadas, type RepartidorVoz } from './voz-mensual.ts'
 
@@ -355,7 +357,50 @@ async function admin(req: Request, env: Env, ctx: ExecutionContext, url: URL, ll
     }
     return json({ externo: fila.id, creado: donde.creado, llave: donde.llave.fin })
   }
+  if (ruta === '/voz/admin/regalo') return regalo(env, ctx, llaves, c)
   return json({ error: 'No existe' }, 404)
+}
+
+/**
+ * Un regalo de créditos de una sola vez, con su correo (`/voz/admin/regalo`). A quien no tiene cuenta de Sloth se le hace
+ * una gratis (no Fundador), para que tenga clave. La marca `regalos/<motivo>/<externo>.json` en R2 se toma antes de sumar:
+ * con el mismo motivo no se suma dos veces, y esa lista dice a quién quitarle lo que le quede cuando se acabe.
+ */
+async function regalo(env: Env, ctx: ExecutionContext, llaves: Llave[], c: Record<string, unknown>): Promise<Response> {
+  if (await soloCreador(env)) throw new Rechazo(409, 'Las voces de Sloth aún son solo del creador.')
+  const email = String(c.email ?? '').trim().toLowerCase()
+  const creditos = Math.floor(Number(c.creditos) || 0)
+  const motivo = String(c.motivo ?? '')
+  const asunto = String(c.asunto ?? '').trim()
+  const parrafos = Array.isArray(c.parrafos) ? c.parrafos.map(String) : []
+  if (!EMAIL.test(email)) throw new Rechazo(400, 'Escribe un correo válido.')
+  if (creditos < 1 || creditos > 1_000_000) throw new Rechazo(400, 'Los créditos van de 1 a 1,000,000.')
+  if (!/^[a-z0-9-]{3,40}$/.test(motivo)) throw new Rechazo(400, 'El motivo va en minúsculas, números y guiones.')
+  if (!asunto || !parrafos.some((p) => p.includes('{clave}'))) throw new Rechazo(400, 'Falta el asunto o un párrafo con {clave}.')
+  let fila = await env.DB.prepare('SELECT id, clave FROM licencias WHERE email = ? ORDER BY creada, id LIMIT 1').bind(email).first<{ id: string; clave: string }>()
+  if (!fila) {
+    fila = { id: crypto.randomUUID(), clave: nuevaClave() }
+    const ahora = new Date().toISOString()
+    await env.DB.prepare("INSERT INTO licencias (id, clave, email, plan, monto, fundador, estado, autorizada, creada, modo) VALUES (?, ?, ?, 'cuenta', 0, 0, 'gratis', ?, ?, ?)")
+      .bind(fila.id, fila.clave, email, ahora, ahora, env.PAYPAL_MODO)
+      .run()
+  }
+  const marca = `regalos/${motivo}/${fila.id}.json`
+  const tomada = await env.DESCARGAS.put(marca, JSON.stringify({ email, creditos, cuando: new Date().toISOString() }), { onlyIf: { etagDoesNotMatch: '*' } })
+  let sumado = false
+  if (tomada) {
+    const donde = await cuentaDe(env, ctx, llaves, fila.id, creditos)
+    if (!donde.creado) {
+      const t = Date.now()
+      const s = await vc(donde.llave, 'POST', `/api/partner/v1/users/${encodeURIComponent(fila.id)}/credits`, { cuerpo: { amount: creditos } })
+      anotar(env, ctx, { externo: fila.id, accion: 'creditos', llave: donde.llave, creditos, ms: Date.now() - t, r: s })
+      // La marca queda: puede que sí se sumaran. Se revisa en Administrador antes de repetir.
+      if (s.status >= 400) return responder(s)
+    }
+    sumado = true
+  }
+  const enviado = await correo(env, email, asunto, parrafos.map((p) => p.replaceAll('{clave}', fila.clave)), `regalo/${motivo}/${fila.id}`)
+  return json({ externo: fila.id, clave: fila.clave, sumado, yaTenia: !tomada, enviado })
 }
 
 /**

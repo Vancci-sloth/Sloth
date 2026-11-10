@@ -67,3 +67,72 @@ test('cada error de las voces se dice en español y con qué hacer', () => {
   assert.match(de(403), /suspendido/)
   assert.match(de(500), /respondieron 500/)
 })
+
+test('un regalo de créditos da una cuenta gratis a quien no tiene, suma una sola vez por motivo y manda su clave', async () => {
+  const { DatabaseSync } = await import('node:sqlite')
+  const { readdirSync, readFileSync } = await import('node:fs')
+  const { default: worker } = await import('./index.ts')
+  const db = new DatabaseSync(':memory:')
+  const carpeta = new URL('../migrations/', import.meta.url)
+  for (const m of readdirSync(carpeta).sort()) db.exec(readFileSync(new URL(m, carpeta), 'utf8'))
+  const consulta = (sql: string, args: unknown[]) => ({
+    bind: (...mas: unknown[]) => consulta(sql, [...args, ...mas]),
+    all: async () => ({ results: db.prepare(sql).all(...(args as never[])) }),
+    first: async () => db.prepare(sql).get(...(args as never[])) ?? null,
+    run: async () => ({ meta: { changes: Number(db.prepare(sql).run(...(args as never[])).changes) } })
+  })
+  const r2 = new Map<string, string>()
+  const DESCARGAS = {
+    get: async () => null,
+    put: async (k: string, v: string, o?: { onlyIf?: { etagDoesNotMatch?: string } }) => (o?.onlyIf && r2.has(k) ? null : (r2.set(k, v), {}))
+  }
+  const env = {
+    DB: { prepare: (sql: string) => consulta(sql, []) },
+    DESCARGAS,
+    ADMIN: 'admin',
+    VOICES_PK_LIVE: 'pk_live_a',
+    PAYPAL_MODO: 'prueba',
+    CORREO_DE: 'Sloth <a@x.com>',
+    CORREO_RESPUESTA: 'soporte@x.com',
+    RESEND_API_KEY: 're_x'
+  }
+  const sumas: number[] = []
+  const correos: { to: string[]; subject: string; text: string }[] = []
+  const antes = globalThis.fetch
+  globalThis.fetch = (async (url: string, init?: RequestInit) => {
+    const u = String(url)
+    if (u.includes('resend')) return correos.push(JSON.parse(String(init?.body))), new Response('{"id":"1"}')
+    if (u.endsWith('/balance')) return new Response('{"balance":1000000}')
+    if (u.endsWith('/credits')) return sumas.push(JSON.parse(String(init?.body)).amount), new Response('{"credits":1}')
+    if (init?.method === 'POST') return sumas.push(JSON.parse(String(init?.body)).credits), new Response('{}', { status: 201 })
+    return new Response('{"error":"no"}', { status: 404 })
+  }) as typeof fetch
+  try {
+    const ctx = { waitUntil: () => {}, passThroughOnException: () => {} } as never
+    const regalar = (email: string) =>
+      worker
+        .fetch(
+          new Request('https://cobro.x/voz/admin/regalo', {
+            method: 'POST',
+            headers: { authorization: 'Bearer admin', 'content-type': 'application/json' },
+            body: JSON.stringify({ email, creditos: 50000, motivo: 'testers', asunto: 'Perdon', parrafos: ['Hola', 'Tu clave: {clave}'] })
+          }),
+          env as never,
+          ctx
+        )
+        .then(async (r) => ({ status: r.status, ...((await r.json()) as { clave: string; sumado: boolean; yaTenia: boolean; enviado: boolean }) }))
+    const r = await regalar('Nuevo@x.com')
+    assert.equal(r.status, 200)
+    assert.deepEqual([r.sumado, r.yaTenia, r.enviado], [true, false, true])
+    const fila = db.prepare("SELECT plan, estado, fundador FROM licencias WHERE email = 'nuevo@x.com'").get()
+    assert.deepEqual({ ...fila }, { plan: 'cuenta', estado: 'gratis', fundador: 0 })
+    assert.match(correos[0].text, new RegExp(`Tu clave: ${r.clave}`))
+    // Otra vez con el mismo motivo: no suma, no crea otra cuenta y el correo va con la misma clave.
+    const otra = await regalar('nuevo@x.com')
+    assert.deepEqual([otra.sumado, otra.yaTenia, otra.clave], [false, true, r.clave])
+    assert.deepEqual(sumas, [50000])
+    assert.equal((db.prepare('SELECT COUNT(*) AS n FROM licencias').get() as { n: number }).n, 1)
+  } finally {
+    globalThis.fetch = antes
+  }
+})

@@ -349,7 +349,7 @@ const PAGOS_AL_DIA = 20
 const ALFABETO = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ'
 export const CLAVE = /^SLOTH(-[2-9A-HJ-NP-Z]{4}){4}$/
 export const EQUIPO = /^[\w-]{8,64}$/
-const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+export const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 /**
  * Lo que sube `npm run publicar` de cada sistema: el instalador (el .exe de Windows, el .dmg de Mac, el AppImage de Linux),
  * el .zip con que se actualiza la de Mac, sus mapas de bloques y `latest.yml` (`latest-mac.yml`, `latest-linux.yml`), el
@@ -1714,7 +1714,7 @@ function equipoDe(c: Record<string, unknown>): string {
 }
 
 /** `SLOTH-XXXX-XXXX-XXXX-XXXX`: 80 bits al azar. */
-function nuevaClave(): string {
+export function nuevaClave(): string {
   return `SLOTH-${letras(16).match(/.{4}/g)!.join('-')}`
 }
 
