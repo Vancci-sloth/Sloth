@@ -190,7 +190,7 @@
     "title": "Video explicativo",
     "description": "Un video que explica cualquier tema en el tiempo que necesite: un solo mundo 3D que la cámara recorre sin cortes, el texto palabra por palabra y tu personaje (el perro salchicha, uno tuyo o ninguno). Tú grabas la voz y el cierre lleva a donde quieras.",
     "skill": "video-explicativo",
-    "version": "2.3",
+    "version": "2.4",
     "icon": "pizarra",
     "musica": true,
     "modelos": {

@@ -7,7 +7,7 @@ de skills/modelos-3d/plantilla, el ícono 3D (`Icono3D`, con `comun.tsx`): el pr
 el proyecto una vez (render.cjs --empaqueta): el primer empaquetado de un proyecto tarda ~40 s y los siguientes ~10,
 así el render de hacer.py no los paga. Al terminar deja `.listo`, que hacer.py espera.
 
-    python -B nuevo.py <nombre> [--formato vertical|horizontal] [--marca <nombre>] [--musica]
+    python -B nuevo.py <nombre> [--formato vertical|horizontal] [--marca <nombre>] [--musica] [--imagenes <con>] [--adjunta <imagen>]…
 
 Va en el directorio actual (Sloth lanza la card en `trabajo/video-explicativo`, y su panel de etapas busca ahí la
 carpeta del video); dentro de un proyecto, junto a él. Deja también una voz muda, para que la plantilla se vea en Remotion Studio antes de que llegue la del
@@ -17,6 +17,9 @@ usuario.
 leen la plantilla (el tamaño y dónde va cada cosa, `ZONA` en src/tema.ts) y final.py. Un video nace en un formato y
 no cambia: el otro es otro video. `--marca` es la de la línea `Marca:` (sin ella, la de siempre; ver marca.py).
 `--musica`, si el mensaje trae `Música: de fondo`: deja src/datos/musica.json, y final.py le pone música bajo la voz.
+`--imagenes`, lo de la línea `Imágenes:`: `chatgpt` o el modelo de Flow («Nano Banana 2.1»). Deja src/datos/imagenes.json,
+y hacer.py genera con eso la portada, de fondo mientras hace la voz y el render (portada_ia.py de video-base). Cada
+`--adjunta` (las `Imagen adjunta:` del mensaje) se copia a fuentes/adjuntas/: la portada las toma de referencia.
 """
 
 import json
@@ -41,6 +44,20 @@ def main() -> None:
     musica = "--musica" in args
     if musica:
         args.remove("--musica")
+    imagenes = ""
+    if "--imagenes" in args:
+        i = args.index("--imagenes")
+        imagenes = args[i + 1].strip() if i + 1 < len(args) else ""
+        del args[i:i + 2]
+        if not imagenes:
+            sys.exit(__doc__)
+    adjuntas = []
+    while "--adjunta" in args:
+        i = args.index("--adjunta")
+        if i + 1 >= len(args):
+            sys.exit(__doc__)
+        adjuntas.append(Path(args[i + 1]))
+        del args[i:i + 2]
     marca = None
     if "--marca" in args:
         i = args.index("--marca")
@@ -68,6 +85,12 @@ def main() -> None:
     (destino / "src" / "datos" / "formato.json").write_text(json.dumps({"formato": formato}) + "\n", encoding="utf-8", newline="\n")
     if musica:
         (destino / "src" / "datos" / "musica.json").write_text("{}\n", encoding="utf-8", newline="\n")
+    if imagenes:
+        con = "chatgpt" if imagenes.lower() in ("chatgpt", "codex") else imagenes
+        (destino / "src" / "datos" / "imagenes.json").write_text(json.dumps({"con": con}, ensure_ascii=False) + "\n", encoding="utf-8", newline="\n")
+    for k, a in enumerate(a for a in adjuntas if a.is_file()):
+        (destino / "fuentes" / "adjuntas").mkdir(parents=True, exist_ok=True)
+        shutil.copy(a, destino / "fuentes" / "adjuntas" / f"{k + 1}-{a.name}")
     aplicar(destino, marca)
     for d in ("fuentes/voz", "fuentes/datos", "fuentes/logos", "public/logos", "perro/bocas", "revision", "out"):
         (destino / d).mkdir(parents=True, exist_ok=True)

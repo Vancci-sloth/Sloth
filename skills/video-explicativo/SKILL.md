@@ -26,7 +26,7 @@ código ni abras la plantilla**: todo lo que el video necesita se dice en `momen
 - El proyecto va en la carpeta de la línea `Carpeta: <nombre>` (sin ella, `explicado-<tema>`), y en el formato de
   `Formato:` (sin ella, vertical). Con `Formato: horizontal` (1920×1080, para YouTube) es `nuevo.py <carpeta> --formato
   horizontal` y nada más: el director acomoda el texto abajo, el personaje a la derecha y el mundo a todo el ancho, y
-  `hacer.py` deja `portada.png` como miniatura de YouTube (el cuadro del titular a 1280×720; no entra en el video). Si
+  `hacer.py` deja `portada.png` como miniatura de YouTube (la generada con IA o el cuadro del titular a 1280×720; no entra en el video). Si
   piden el otro formato, es otro video.
 
 ## Para que lo vean
@@ -192,7 +192,10 @@ objeto), y nada de etiquetas de cambio sueltas («−94 %»): el número ya lo d
 
 1. **En un solo mensaje**: `python -B -X utf8 <skill>/scripts/nuevo.py <carpeta>` (con `--formato horizontal` si
    toca, `--marca <nombre>` si el mensaje trae la línea `Marca:` y `--musica` si trae `Música: de fondo`: `final.py`
-   le pone entonces música sintetizada bajo la voz, que baja sola al hablar) en segundo plano (con `run_in_background`);
+   le pone entonces música sintetizada bajo la voz, que baja sola al hablar; `--imagenes chatgpt` o `--imagenes "<modelo>"`
+   si trae `Imágenes: con ChatGPT…` o `Imágenes: genéralas en Google Flow con <modelo>…`, y un `--adjunta <ruta>` por
+   cada `Imagen adjunta:`: `hacer.py` genera entonces la portada con eso, de fondo mientras renderiza; no la hagas tú)
+   en segundo plano (con `run_in_background`);
    `python -B -X utf8 <skill>/scripts/marca.py ver` (con la misma `--marca`);
    `python -B -X utf8 <skill>/../modelos-3d/scripts/modelos.py lista`; y de dos a cuatro búsquedas web a la vez. Si a
    la marca le falta algo, pregúntalo ([`MARCA.md`](MARCA.md)).

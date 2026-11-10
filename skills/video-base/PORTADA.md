@@ -23,6 +23,11 @@ renderizado, y no se pregunta: va siempre. El vídeo horizontal no la lleva dent
 En la raíz del proyecto, `portada.png` (si el proyecto entrega varios vídeos, uno por vídeo en
 `portada/<nombre del vídeo>.png`).
 
+Para no sumar tiempo, se puede pedir de fondo desde el principio, sin cuadros del vídeo, con
+`scripts/portada_ia.py` (el título, el estilo, las referencias y la elección de `Imágenes:`; ver su cabecera): la deja
+a 1080×1920 o 1280×720 y, si no hay cuenta o falla, dice por qué y el estilo usa su respaldo. Así la hace el
+explicativo (`hacer.py`).
+
 Si el mensaje trae `Imágenes: genéralas en Google Flow…`, la imagen va con `generar_imagen` y formato `9:16`
 ([FLOW.md](FLOW.md)): los pasos de abajo, con los tres cuadros en `referencias` y el pedido sin su primer párrafo,
 diciendo `vertical 9:16` en vez de `vertical 2:3 (1024x1536)`, a `portada.jpg`. Pásala a `portada.png` y sigue en el
