@@ -80,6 +80,8 @@ const PANEL = {
   ).map((g) => ({ status: g[0].status, codigo: g[0].codigo, veces: g.length, ultima: g.map((x) => x.cuando).sort().at(-1), error: g[0].error }))
 }
 const RIFA = { abierta: null, ganadores: [], vozAbierta: true }
+/** Alguien sin llamadas recientes cuya ficha el servidor aún no ha leído nunca (el caso en frío). */
+const FRIA = personas[80].externo
 
 // ── El navegador ───────────────────────────────────────────────────────────────────────────────────────────────────
 
@@ -120,7 +122,8 @@ await p.route('**/api/admin/voz/**', async (x) => {
     const alta = per && { id: 100 + personas.indexOf(per), cuando: per.usuario.created_at, externo, accion: 'alta', voz: null, letras: null, creditos: null, restantes: null, tarea: null, status: 200, codigo: null, error: null, ms: 900 }
     return { usuario: per ? { status: 200, datos: per.usuario } : { status: 404, datos: { error: 'No existe' } }, llave: { nombre: 'VOICES_PK_LIVE', fin: 'cf1f' }, registro: [...registro.filter((y) => y.externo === externo), ...(alta ? [alta] : [])], cuenta: per ? { email: per.email, licencias: per.licencias } : null }
   }
-  if (ruta.endsWith('/ficha')) return x.fulfill({ json: { datos: ficha(), leido: Date.now() - 3600_000 } })
+  // La de FRIA nunca se ha leído: no hay nada guardado de ella.
+  if (ruta.endsWith('/ficha')) return x.fulfill({ json: externo === FRIA ? null : { datos: ficha(), leido: Date.now() - 3600_000 } })
   if (ruta.endsWith('/usuario')) return await new Promise((ok) => setTimeout(ok, 1000)), x.fulfill({ json: ficha() })
   return x.fallback()
 })
@@ -247,6 +250,40 @@ for (const k of [4, 7, 45, 70]) {
   await p.waitForTimeout(300)
 }
 r.historial.raton.klmS = KLM({ clics: 1 })
+
+/** Un clic de persona en la fila de `externo` (se busca por su correo en la lista) hasta ver su historial. */
+const historialDe = async (correo) => {
+  const i = await p.evaluate((c) => [...document.querySelectorAll('.admin:not([hidden]) .admin-usuarios tbody tr')].findIndex((f) => f.querySelector('td')?.textContent.trim() === c), correo)
+  if (i < 0) return null
+  const f = `.admin:not([hidden]) .admin-usuarios tbody tr:nth-child(${i + 1})`
+  // Al centro, y sin el aviso de abajo encima (le quitaría el clic).
+  await p.evaluate((f) => (document.querySelector('.admin-hecho .admin-icono-boton')?.click(), document.querySelector(f).scrollIntoView({ block: 'center' })), f)
+  await p.waitForTimeout(300)
+  // Su historial, o el aviso de que no tiene nada (sin esperar al cobro: «Leyendo…» no cuenta).
+  const ms = await abrirConRaton(p, f, '.admin-ficha :is(.admin-historial-cobro li, .admin-historial-vacio)')
+  await p.keyboard.press('Escape')
+  await p.waitForFunction(() => !document.querySelector('.admin-ficha'))
+  await p.mouse.move(5, 5)
+  await p.waitForTimeout(300)
+  return ms
+}
+if (REAL) {
+  // Con tus datos: de quienes NO salen en las últimas llamadas del panel, en cuántos el servidor ya guardó su ficha, y
+  // el historial de hasta 5 de ellos (los de más abajo de la lista).
+  const real = await (await fetch(`http://localhost:${PUERTO}/api/admin/voz/guardado`)).json()
+  const enLlamadas = new Set(real.registro.map((x) => x.externo))
+  const todos = real.llaves.flatMap((l) => l.usuarios.datos.users ?? []).map((u) => u.external_id)
+  const sinLlamadas = todos.filter((e) => !enLlamadas.has(e))
+  let guardadas = 0
+  for (const e of sinLlamadas) if ((await (await fetch(`http://localhost:${PUERTO}/api/admin/voz/ficha?externo=${encodeURIComponent(e)}`)).json()) !== null) guardadas++
+  r.historial.sinLlamadasRecientes = { personas: sinLlamadas.length, conFichaGuardada: guardadas, ms: [] }
+  // Como lo nombra la lista: «Tú (creador)», su correo, su nombre o su id.
+  const nombre = (e) => (e === 'creador' ? 'Tú (creador)' : (real.cuentas[e]?.email ?? real.llaves.flatMap((l) => l.usuarios.datos.users ?? []).find((u) => u.external_id === e)?.name ?? e))
+  for (const e of sinLlamadas.slice(-5)) r.historial.sinLlamadasRecientes.ms.push(await historialDe(nombre(e)))
+} else {
+  // En frío: sin llamadas recientes y sin ficha guardada, su historial espera al cobro (1 s aquí).
+  r.historial.enFrio = await historialDe(personas[80].email)
+}
 await p.evaluate(() => document.querySelector('.admin:not([hidden]) .admin-principal').scrollTo(0, 0))
 await p.waitForTimeout(200)
 

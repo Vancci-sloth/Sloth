@@ -45,7 +45,7 @@ cada quien tarda 1 s en llegar del cobro, como en el de verdad.
 | **2. Encontrar a alguien por su correo** (KLM) | clic en el buscador + 4 letras = 2,42 s | abrir el embudo, su campo, 4 letras y «Filter» = 5,02 s | clic en la columna de correo + 4 = 2,42 s | clic + 5 letras + Enter = 2,98 s | no había buscador | **el buscador ya tiene el cursor: 2 letras con tus datos (0,56 s), 7 con el inventado (1,96 s)**; filtra en 3–28 ms | 10 |
 | **3. Darle créditos** (KLM, de su fila a guardado) | 3 clics + 6 teclas = 5,58 s | no se edita | 5,58 s | 5,58 s | 2 clics + 4 teclas = 3,72 s | **Enter, 5000, Enter = 1,68 s** (con el ratón: clic, 5000, Enter = 2,70 s); la ficha cuenta lo sumado al momento | 10 |
 | **4. Ver por qué falló la última llamada** (KLM) | no tiene registro | no tiene | no tiene | 1 clic en Logs = 1,3 s | bajar toda la página | **0 s**: la cifra de errores trae la fecha y el mensaje de la llamada fallida más reciente («No hubo conexión con las voces de Sloth.»); el script comprueba que es esa | 10 |
-| **5. Todo lo de esa persona** (de su fila a su historial) | 1 clic; 171–291 ms hasta verlo | 1 clic (el ojo); 174–302 ms | 2 clics = 2,6 s | no tiene historial | 1 clic | **con el ratón, 1 clic y 19–58 ms** (22–43 con tus datos), también de quien no salió en las últimas llamadas: el servidor guarda la ficha de cada quien y se abre con ella; con el teclado, Enter = 0,28 s. Créditos, plan, historial y acciones en la misma ficha. Sumándole los 100 ms de soltar seguiría ganando (119–158 contra 171) | 10 |
+| **5. Todo lo de esa persona** (de su fila a su historial) | 1 clic; 171–291 ms hasta verlo | 1 clic (el ojo); 174–302 ms | 2 clics = 2,6 s | no tiene historial | 1 clic | **con el ratón, 1 clic y 18–62 ms**. Con tus datos, las 33 personas que no salen en las últimas llamadas ya tenían su ficha guardada (33 de 33), y las 5 medidas enseñaron su historial en 27–45 ms; con el teclado, Enter = 0,28 s. Créditos, plan, historial y acciones en la misma ficha. Sumándole los 100 ms de soltar seguiría ganando (119–158 contra 171) | 10 |
 | **6. Teclado** (teclas de la lista al campo del valor) | 135 | imposible | 79 | 34 | imposible (sin buscador) | **3 con tus datos, 8 con el inventado** (letras + Enter) | 10 |
 | **7. Legibilidad** (contraste mínimo; letra más chica) | 1,83; 12 px | 3,33; 14 px | 4,62 (una corrida, 1,0); 12 px | 2,38; 13 px | letra de 11 px (el contraste no se midió) | **7,89; 14,5 px** | 10 |
 | **8. En tu idioma** (palabras de interfaz en inglés a la vista) | 44–46 (sin español) | 21 (sin español) | 51 | 22 | `external_id`, `GET /api/…`, `VOZ_CREDITOS` | **0**, también contando toda la página | 10 |
@@ -58,9 +58,13 @@ Notas:
 - **Darle créditos**: ninguna de las cuatro tiene un campo de saldo; se midió el campo más parecido de su ficha. Sin
   contarles Ctrl+A y con Enter en vez del clic en guardar, quedarían en 4,56 s.
 - **Historial**: la ficha se abre con lo que ya hay (sus llamadas entre las últimas del panel y su ficha guardada en
-  `data/voz/admin-fichas.json`) y luego se pone al día con el cobro (~1 s). Tras cada lectura del panel, el servidor va
-  leyendo de fondo, una cada 300 ms, las fichas que falten o tengan más de 12 h; solo la de alguien que aún no se ha
-  leído nunca espera al cobro.
+  `data/voz/admin-fichas.json`) y luego se pone al día con el cobro (~1 s). Al abrir Sloth y tras cada lectura del
+  panel, el servidor lee de fondo las fichas que nunca se han leído (de tres en tres) y luego las de más de 12 h (una
+  cada 300 ms). Quien se da de alta después sale en las últimas llamadas con su alta.
+- **En frío** (la ficha de alguien sin llamadas recientes que el servidor aún no ha leído nunca), su historial espera al
+  cobro: 909–927 ms, y ahí sí pierde contra React-admin y Refine. Solo pasa en una instalación nueva: en la copia de
+  prueba, sin ninguna ficha guardada, las 86 estaban listas 26 s después de abrir Sloth. Bajarlo de ese segundo pide
+  que el cobro (`licencias/`) dé el registro sin esperar a Voices Cloning, y eso no se ha publicado.
 - **Abrir una fila al apretar** (como la entrada de la barra) hace que no se pueda arrastrar para seleccionar un correo
   en la lista; el correo se copia de la cabecera de su ficha.
 - **Deshacer «sin límite»** es aplicar el cambio al revés (quitar lo que se sumó, reactivar a quien se suspendió), no

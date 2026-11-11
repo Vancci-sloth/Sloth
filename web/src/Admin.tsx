@@ -894,7 +894,8 @@ function Ficha({
             ))}
           </ol>
         ) : (
-          <p className="admin-suave">{d ? 'Nada todavía.' : 'Leyendo…'}</p>
+          // Su ficha guardada ya sabe si no hay nada: no hace falta esperar al cobro para decirlo.
+          <p className={d || guardada ? 'admin-suave admin-historial-vacio' : 'admin-suave'}>{d || guardada ? 'Nada todavía.' : 'Leyendo…'}</p>
         )}
 
       <p className="admin-suave admin-ficha-id">

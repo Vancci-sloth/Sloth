@@ -193,22 +193,39 @@ export function voicesCloning(carpeta: string, o: { credencial(): Credencial | u
   }
   let leyendoFichas = false
   /**
-   * Tras leer el panel, las fichas que falten o tengan más de 12 h, de una en una y sin prisa (una cada 300 ms): así la
-   * de cualquiera se abre al momento, también la de quien no salió en las últimas llamadas.
+   * Las fichas que falten o tengan más de 12 h, tras leer el panel y al abrir Sloth (con el panel guardado): así la de
+   * cualquiera se abre al momento, también la de quien no salió en las últimas llamadas. Las que nunca se han leído
+   * van primero, de tres en tres; las viejas (que ya se enseñan mientras tanto), de una en una cada 300 ms.
    */
   async function leerFichasDeFondo(llave: { llave: string }, panel: { llaves?: { usuarios?: { datos?: { users?: { external_id?: string }[] } } }[] }) {
     if (leyendoFichas) return
     leyendoFichas = true
+    const leer = async (externo: string) => {
+      const r = await pedir<unknown>(`/voz/admin/usuario?externo=${encodeURIComponent(externo)}`, { con: llave, espera: 30_000 }).catch(() => undefined)
+      if (r && r.status < 400) guardarFicha(externo, r.datos)
+    }
     try {
       const viejas = Date.now() - 12 * 3600_000
-      const todos = (panel.llaves ?? []).flatMap((l) => l.usuarios?.datos?.users ?? []).map((u) => String(u.external_id ?? ''))
-      for (const externo of todos.filter((e) => e && !((fichasAdmin()[e]?.leido ?? 0) > viejas))) {
-        const r = await pedir<unknown>(`/voz/admin/usuario?externo=${encodeURIComponent(externo)}`, { con: llave, espera: 30_000 }).catch(() => undefined)
-        if (r && r.status < 400) guardarFicha(externo, r.datos)
+      const todos = [...new Set((panel.llaves ?? []).flatMap((l) => l.usuarios?.datos?.users ?? []).map((u) => String(u.external_id ?? '')))].filter(Boolean)
+      const nunca = todos.filter((e) => !fichasAdmin()[e])
+      for (let i = 0; i < nunca.length; i += 3) await Promise.all(nunca.slice(i, i + 3).map(leer))
+      for (const externo of todos.filter((e) => fichasAdmin()[e] && fichasAdmin()[e].leido <= viejas)) {
+        await leer(externo)
         await new Promise((ok) => setTimeout(ok, 300))
       }
     } finally {
       leyendoFichas = false
+    }
+  }
+  /** Al abrir Sloth en la computadora del creador, con la lista del panel guardado (si ya se leyó alguna vez). */
+  let fichasAlAbrir = false
+  function leerFichasAlAbrir(llave: { llave: string }) {
+    if (fichasAlAbrir) return
+    fichasAlAbrir = true
+    try {
+      void leerFichasDeFondo(llave, JSON.parse(readFileSync(join(carpeta, 'admin.json'), 'utf8')))
+    } catch {
+      // Aún no se ha leído el panel: las fichas se leen tras la primera lectura.
     }
   }
 
@@ -343,7 +360,11 @@ export function voicesCloning(carpeta: string, o: { credencial(): Credencial | u
     async apiAdmin(req: IncomingMessage, res: ServerResponse, url: URL): Promise<boolean> {
       if (url.pathname !== '/api/admin' && !url.pathname.startsWith('/api/admin/')) return false
       const llave = o.creador()
-      if (url.pathname === '/api/admin' && req.method === 'GET') return enviar(res, 200, { creador: !!llave })
+      if (url.pathname === '/api/admin' && req.method === 'GET') {
+        // La barra lo pregunta al abrir Sloth: es cuando se ponen al día las fichas, de fondo.
+        if (llave) leerFichasAlAbrir(llave)
+        return enviar(res, 200, { creador: !!llave })
+      }
       if (!llave) return enviar(res, 404, { error: 'No existe' })
       const panel = join(carpeta, 'admin.json')
       if (url.pathname === '/api/admin/voz/guardado' && req.method === 'GET') {
