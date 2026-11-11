@@ -18,7 +18,7 @@ import { llaveYoutube } from './opciones.ts'
 import { modeloYoutube } from './youtube-modelo.ts'
 
 /**
- * YouTube para videos largos, separado del calendario de verticales: autorización OAuth de escritorio con PKCE,
+ * YouTube para videos terminados verticales y horizontales, separado del calendario de TikTok e Instagram: autorización OAuth de escritorio con PKCE,
  * elección explícita de privacidad y subida reanudable. Las credenciales viven en el entorno del usuario, como las
  * llaves de Opciones; el avance y las sesiones de subida, en data/youtube.json. Solo acepta videos terminados de Sloth.
  */
@@ -175,7 +175,7 @@ export function youtube(app: string, sessions: Sessions, cards: () => Card[], re
     for (let i = 0; i < lista.length; i += 3) {
       const tanda = await Promise.all(lista.slice(i, i + 3).map(async (v) => {
         const forma = await formaYoutube(v)
-        if (forma.formato === 'vertical') { verticales++; return null }
+        if (forma.formato === 'vertical') verticales++
         const h = huella(v.ruta)
         const subida = datos.cuenta ? datos.subidas[`${datos.cuenta.id}:${h}`] : undefined
         const propuesta = propuestaYoutube(v, await entregas(v))
@@ -189,7 +189,7 @@ export function youtube(app: string, sessions: Sessions, cards: () => Card[], re
           tituloPropuesto: propuesta.tituloPropuesto,
           recomendacion: recomendar.estado(h), subida: subida ? publico(subida) : undefined, eliminable: puedeEliminar(v, h) } satisfies VideoParaYoutube
       }))
-      videos.push(...tanda.filter((v) => v !== null))
+      videos.push(...tanda)
     }
     return { conexion: estado(), videos, verticales, ritmo: ritmo(), ocupadas: conFecha().map(([k, s]) => ({ huella: k.slice(k.indexOf(':') + 1), cuando: s.datos.cuando! })) }
   }
@@ -244,7 +244,7 @@ export function youtube(app: string, sessions: Sessions, cards: () => Card[], re
       if (!peso || peso > 256 * 1024 ** 3) throw new Error('El video está vacío o supera los 256 GB que acepta YouTube.')
       datosYoutube(b as unknown as Record<string, unknown>)
       if (!b.revisado || !b.miniatura) throw new Error('Marca «Título y miniatura revisados» en cada video seleccionado.')
-      if ((await formaYoutube(v)).formato !== 'horizontal') throw new Error('Este video no se pudo identificar como horizontal. Revisa su archivo antes de programar.')
+      if ((await formaYoutube(v)).formato === 'desconocido') throw new Error('No se pudo leer el formato del video. Revisa su archivo antes de programar.')
       if (!b.cuando || !/(Z|[+-]\d{2}:\d{2})$/.test(b.cuando) || !Number.isFinite(Date.parse(b.cuando)) || Date.parse(b.cuando) < Date.now() + 120_000) throw new Error('Elige una fecha futura, al menos dos minutos después de ahora, para cada video seleccionado.')
       b.cuando = new Date(b.cuando).toISOString()
       if (enUso(v)) throw new Error('Un agente todavía trabaja en uno de los videos seleccionados. Reintenta cuando termine.')

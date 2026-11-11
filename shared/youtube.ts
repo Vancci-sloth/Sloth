@@ -1,6 +1,6 @@
 import type { Ritmo } from './types.ts'
 
-/** La conexión del canal y la subida de un video largo. Nunca se mandan tokens al navegador. */
+/** La conexión del canal y la subida de un video terminado. Nunca se mandan tokens al navegador. */
 export interface CuentaYoutube {
   id: string
   nombre: string
@@ -113,6 +113,7 @@ export interface EstadoRecomendacionYoutube {
 export interface CatalogoYoutube {
   conexion: ConexionYoutube
   videos: VideoParaYoutube[]
+  /** Cantidad de verticales incluidos en videos; no son descartados. */
   verticales: number
   /** Tu ritmo de YouTube, y las fechas que ya tiene el canal (también de videos que ya no están en el disco). */
   ritmo: Ritmo

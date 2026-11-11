@@ -41,7 +41,7 @@ export function YoutubeLote({ videos, cardId }: { videos: VideoHecho[]; cardId?:
   const programados = datos?.videos.filter((v) => v.subida?.estado === 'programado') ?? []
   return <>
     <section className="youtube-lote-barra">
-      <div><strong>YouTube</strong><span className="muted small">{datos ? `Horizontales · ${pendientes.length} por revisar · ${programados.length} programados${trabajando ? ' · Subiendo el lote…' : ''}` : error || 'Buscando videos largos…'}</span></div>
+      <div><strong>YouTube</strong><span className="muted small">{datos ? `Verticales y horizontales · ${pendientes.length} por revisar · ${programados.length} programados${trabajando ? ' · Subiendo el lote…' : ''}` : error || 'Buscando videos terminados…'}</span></div>
       <div className="youtube-lote-acciones"><YoutubeEliminar videos={datos?.videos ?? []} onEliminar={async (r) => { await leer(); setAviso(r.quedan ? `${r.quedan} no se pudieron eliminar: siguen pendientes, en uso o Windows no los dejó mover.` : '') }} /><button className="primary" onClick={() => setAbierto(true)}>Revisar y programar{pendientes.length ? ` (${pendientes.length})` : ''}</button></div>
     </section>
     {aviso && <p className="bad small" role="status">{aviso}</p>}
@@ -98,7 +98,7 @@ export function RevisionYoutube({ cardId, ruta, cerrar, onCambio }: { cardId?: s
       const fechas = fechasYoutube(inicio, ritmo, r.videos.length, ocupadas, r.ritmo)
       let n = 0
       setBorradores(Object.fromEntries(r.videos.map((v) => [v.huella, { ...v.borrador, cuando: v.borrador.cuando ?? fechas[n++] }])))
-      setElegidos(new Set(r.videos.filter((v) => !bloqueado(v) && v.formato === 'horizontal').map((v) => v.huella)))
+      setElegidos(new Set(r.videos.filter((v) => !bloqueado(v) && v.formato !== 'desconocido').map((v) => v.huella)))
     } else setBorradores((bs) => Object.fromEntries(r.videos.map((v) => [v.huella, bloqueado(v) ? v.borrador : bs[v.huella] ?? v.borrador])))
     return r
   }
@@ -115,7 +115,7 @@ export function RevisionYoutube({ cardId, ruta, cerrar, onCambio }: { cardId?: s
     setAviso('')
   }
   function seleccionar(h: string, si: boolean) { setElegidos((s) => { const nuevo = new Set(s); if (si) nuevo.add(h); else nuevo.delete(h); return nuevo }) }
-  const pendientes = catalogo?.videos.filter((v) => !bloqueado(v) && v.formato === 'horizontal') ?? []
+  const pendientes = catalogo?.videos.filter((v) => !bloqueado(v) && v.formato !== 'desconocido') ?? []
   const seleccionados = pendientes.filter((v) => elegidos.has(v.huella))
   const problema = (v: VideoParaYoutube) => {
     const b = borradores[v.huella]
@@ -219,14 +219,14 @@ export function RevisionYoutube({ cardId, ruta, cerrar, onCambio }: { cardId?: s
       </div>
       <div className="youtube-revision-lista">
         {!catalogo && <p className="muted">{error || 'Leyendo los videos y sus propuestas…'}</p>}
-        {catalogo && !visibles.length && <p className="muted">{catalogo.videos.length ? 'No hay videos con este filtro.' : 'No hay videos largos terminados en esta selección.'}</p>}
+        {catalogo && !visibles.length && <p className="muted">{catalogo.videos.length ? 'No hay videos con este filtro.' : 'No hay videos terminados en esta selección.'}</p>}
         {visibles.map((v) => {
           const b = borradores[v.huella] ?? v.borrador
           const m = v.miniaturas.find((m) => m.ruta === b.miniatura && m.huella === b.huellaMiniatura)
           const cerrado = bloqueado(v) || ocupado
           const s = v.subida
           return <article className={`youtube-publicacion${elegidos.has(v.huella) && !bloqueado(v) ? ' seleccionada' : ''}`} key={v.huella}>
-            <label className="youtube-seleccion"><input type="checkbox" aria-label={`Seleccionar ${b.titulo}`} checked={elegidos.has(v.huella) && !bloqueado(v)} disabled={cerrado || v.formato !== 'horizontal'} onChange={(e) => seleccionar(v.huella, e.target.checked)} /></label>
+            <label className="youtube-seleccion"><input type="checkbox" aria-label={`Seleccionar ${b.titulo}`} checked={elegidos.has(v.huella) && !bloqueado(v)} disabled={cerrado || v.formato === 'desconocido'} onChange={(e) => seleccionar(v.huella, e.target.checked)} /></label>
             <div className="youtube-portada">
               {m ? <button className="youtube-portada-imagen" onClick={() => setPrevia({ src: m.src })} title="Ver la miniatura en grande"><img src={m.src} alt={`Miniatura de ${b.titulo}`} loading="lazy" /></button> : <div className="youtube-sin-miniatura">Sin miniatura elegida</div>}
               <strong className="youtube-titulo-previa">{b.titulo || 'Título pendiente'}</strong>
