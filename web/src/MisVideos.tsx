@@ -250,8 +250,7 @@ export function VideoDe({ video, onVer, insignia, estilo }: { video: VideoHecho;
         <span className="video-archivo">{video.archivo.split('/').pop()}</span>
         {insignia}
       </button>
-      {/* YouTube solo programa horizontales: un vertical no lleva el botón. */}
-      {!video.vertical && <YoutubeBoton video={{ cardId: video.cardId, ruta: video.ruta, titulo: video.titulo }} chico />}
+      <YoutubeBoton video={{ cardId: video.cardId, ruta: video.ruta, titulo: video.titulo }} chico />
     </div>
   )
 }

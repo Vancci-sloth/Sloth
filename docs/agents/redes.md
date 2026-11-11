@@ -13,6 +13,15 @@ necesita para mirarla o moverla sin escribir scripts nuevos.
 - «Borrar los que ya subí» se refiere a los archivos del disco (a la Papelera), no a las publicaciones. Si no está claro,
   pregunta en una línea.
 
+## YouTube: revisar un video terminado
+
+«Revisar y programar YouTube», desde Entrega o Mis videos, admite finales verticales y horizontales.
+El catálogo conserva ambos formatos; `verticales` cuenta los incluidos, no videos descartados.
+Los borradores (`_prueba.mp4`, otros nombres que empiezan por `_`) no se ofrecen para publicar.
+Un formato que no se puede leer permanece visible con aviso, pero no se puede seleccionar ni programar.
+Selecciona el video, revisa título y miniatura, elige una fecha futura con al menos dos minutos de margen y confirma «Programar».
+Abrir la revisión no sube ni agenda nada; corregir esta pantalla tampoco autoriza una publicación de prueba.
+
 ## Mirar y mover
 
 `npm run redes` enseña la cola de cada red, de hoy en adelante, y lo que falló, con la `ref` de cada una. Las órdenes

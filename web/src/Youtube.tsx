@@ -65,7 +65,7 @@ export function YoutubeOpciones() {
         <Logo de="youtube" nombre="YouTube" />
         <div className="fila-nombre">
           <strong>YouTube</strong>
-          <span>Revisar y programar videos largos en tu canal</span>
+          <span>Revisar y programar videos verticales y horizontales en tu canal</span>
           <button className={`resumen ${abierto ? 'on' : ''}`} onClick={() => setAbierto(!abierto)}>Conexión y ayuda</button>
         </div>
         <span className={`estado ${conexion?.conectando ? 'moviendo' : conexion?.cuenta ? '' : 'apagado'}`}>

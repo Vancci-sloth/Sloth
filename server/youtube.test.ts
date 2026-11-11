@@ -25,7 +25,7 @@ test('OAuth comprueba el estado y el canal; solo sube finales y evita repetir un
   const ruta = join(cwd, 'episodio', 'video.mp4')
   writeFileSync(ruta, 'video de prueba')
   utimesSync(ruta, new Date(Date.now() - 60_000), new Date(Date.now() - 60_000))
-  const cards: Card[] = [{ id: 'prueba', title: 'Prueba', description: '', cwd, etapas: [{ nombre: 'Video', listo: 'video.mp4', muestra: 'video.mp4' }] }]
+  const cards: Card[] = [{ id: 'prueba', title: 'Prueba', description: '', cwd, etapas: [{ nombre: 'Video', listo: 'video.mp4', muestra: '*.mp4' }] }]
   const sessions = new Sessions(join(dir, 'sesiones'), () => {}, () => {}, () => {}, () => {})
   let trabajandoRuta = ''
   t.mock.method(sessions, 'list', () => trabajandoRuta ? [{ id: 'agente-ocupado', cardId: 'prueba', title: 'Trabajo en el video', model: 'sonnet', cwd: resolve(trabajandoRuta, '..'), createdAt: 0, updatedAt: 0, running: true }] : [])
@@ -248,4 +248,57 @@ test('OAuth comprueba el estado y el canal; solo sube finales y evita repetir un
   renameSync(join(dir, 'papelera-simulada.mp4'), subidos[0].ruta)
   assert.equal((await pedir('/subida', { ...datos, ruta: subidos[0].ruta })).status, 200)
   assert.equal(insertados, 3)
+
+  await t.test('los finales verticales se revisan y programan sin admitir borradores ni formatos desconocidos', async () => {
+    const verticalRuta = join(cwd, 'vertical', 'video.mp4')
+    const privada = join(cwd, 'vertical', '_prueba.mp4')
+    writeFileSync(privada, Buffer.concat([readFileSync(verticalRuta), Buffer.from('borrador privado')]))
+    utimesSync(privada, new Date(Date.now() - 60_000), new Date(Date.now() - 60_000))
+    writeFileSync(join(cwd, 'episodio', 'miniatura.png'), readFileSync(join(cwd, 'vertical', 'miniatura.png')))
+    const calendarioAntes = JSON.parse((await pedir('/calendario')).texto)
+    const remotosAntes = structuredClone(remotos)
+    const respuesta = await pedir('/catalogo?cardId=prueba')
+    assert.equal(respuesta.status, 200)
+    const antes = JSON.parse(respuesta.texto)
+    assert.equal(antes.verticales, 1)
+    assert.equal(antes.videos.filter((v: { formato: string }) => v.formato === 'horizontal').length, 2)
+    assert.equal(antes.videos.some((v: { ruta: string }) => v.ruta === privada), false)
+    const vertical = antes.videos.find((v: { ruta: string }) => v.ruta === verticalRuta)
+    assert.ok(vertical, 'el final vertical debe aparecer también en la revisión individual por ruta')
+    assert.equal(vertical.formato, 'vertical')
+    const desconocido = antes.videos.find((v: { ruta: string }) => v.ruta === ruta)
+    assert.equal(desconocido.formato, 'desconocido')
+    const cuando = new Date(Date.now() + 7 * 86_400_000).toISOString()
+    assert.deepEqual(JSON.parse((await pedir('/calendario')).texto), calendarioAntes)
+    assert.deepEqual(remotos, remotosAntes)
+    assert.equal(insertados, 3)
+    for (const [borrador, mensaje] of [
+      [{ ...vertical.borrador, cuando, revisado: false }, 'Marca «Título y miniatura revisados» en cada video seleccionado.'],
+      [{ ...desconocido.borrador, cuando, revisado: true }, 'No se pudo leer el formato del video. Revisa su archivo antes de programar.'],
+      [{ ...vertical.borrador, ruta: privada, cuando, revisado: true }, 'Este archivo no es un video terminado de Sloth.'],
+    ] as const) {
+      const rechazado = await pedir('/programar', { borradores: [borrador] })
+      assert.equal(rechazado.status, 400)
+      assert.deepEqual(JSON.parse(rechazado.texto), { error: mensaje })
+      assert.deepEqual(JSON.parse((await pedir('/catalogo?cardId=prueba')).texto), antes)
+      assert.deepEqual(JSON.parse((await pedir('/calendario')).texto), calendarioAntes)
+      assert.deepEqual(remotos, remotosAntes)
+      assert.equal(insertados, 3)
+    }
+    const aprobado = { ...vertical.borrador, cuando, revisado: true }
+    const programado = await pedir('/programar', { borradores: [aprobado] })
+    assert.equal(programado.status, 200)
+    assert.deepEqual(JSON.parse(programado.texto), { guardados: 1, encolados: 1 })
+    await esperarCola()
+    const despues = JSON.parse((await pedir('/catalogo?cardId=prueba')).texto)
+    const final = despues.videos.find((v: { ruta: string }) => v.ruta === verticalRuta)
+    assert.equal(final.subida.estado, 'programado')
+    assert.equal(final.subida.datos.cuando, cuando)
+    assert.equal(remotos[final.subida.id].privacyStatus, 'private')
+    assert.equal(remotos[final.subida.id].publishAt, cuando)
+    assert.equal(insertados, 4)
+    assert.equal(JSON.parse((await pedir('/calendario')).texto).publicaciones.length, 3)
+    assert.equal((await pedir('/subida', { ...datos, ruta: verticalRuta })).status, 200)
+    assert.equal(insertados, 4)
+  })
 })
