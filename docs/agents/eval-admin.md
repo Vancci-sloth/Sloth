@@ -140,3 +140,11 @@ Notas:
 - **Refine** no deja editar a sus clientes ni tiene su correo: se buscó por nombre.
 - **En tu disco**, fuera de git como el resto de `data/`: `data/voz/admin.json` (lo último leído: correos, planes y las
   últimas 300 llamadas), `admin-fichas.json` (la ficha de cada quien) y `admin-cambios.json` (lo que cambiaste aquí).
+
+## Lo que queda para cuando crezca
+
+- **Más de 90 personas por página**: el cobro (`cuentasDe` en `licencias/src/voz.ts`) da el correo de 90 por lectura del
+  panel. Hoy entran todos (86); con más, los que sobren saldrían sin correo y no se encontrarían buscándolo.
+- **Muchas páginas**: juntarlas pide al cobro el panel entero una vez por página extra (hasta 19 a la vez). Hoy hay una.
+- **Si Voices Cloning dejara de dar `credits` al sumar**, la ficha volvería a sumar lo leído más lo cambiado, y una
+  lectura que llegue tarde con el cambio lo contaría dos veces unos segundos.
