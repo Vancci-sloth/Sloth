@@ -413,7 +413,8 @@ def usar(ids: list[str], pisa: bool = False, callado: bool = False) -> None:
             for a in archivos.rglob("*"):
                 if a.is_file():
                     copia(a, raiz_ / "public" / "modelos" / id_ / a.relative_to(archivos), pisa)
-        iconos(m["iconos"])
+        if m["iconos"]:
+            iconos(m["iconos"])
         if not callado:
             print(f'{id_}: import {{ {", ".join(m["exporta"])} }} from "../modelos/{id_}";')
             # Su cabecera (qué es, cuánto mide, dónde está su origen y sus props): así no hay que abrir el archivo.

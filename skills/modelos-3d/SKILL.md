@@ -31,6 +31,10 @@ si nada se le parece, se hace uno nuevo (4).
 `public/modelos/<id>/` y sus íconos a `public/iconos/`. Imprime el `import` (`from "../modelos/<id>"`). Lee su
 comentario de cabecera y sus props: los colores con significado, las imágenes y los tiempos se le pasan desde el video.
 Si el proyecto ya tiene una copia distinta, no la pisa (con `--pisa`, sí).
+Los modelos sin íconos no requieren `@phosphor-icons/core`; solo se exige cuando hay íconos que copiar.
+La regresión de esta CLI (`scripts/modelos.test.py`) corre desde la raíz con
+`node --import tsx --test server/modelos3d-script.test.ts`, también en `npm test` y en CI; necesita Python en el PATH.
+`comprobar-skills` solo comprueba la sintaxis de los `.py`, no ejecuta sus pruebas.
 
 ## 3. Mejorar uno que casi sirve
 
