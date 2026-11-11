@@ -34,7 +34,9 @@
 .admin-rifa .admin-tabla td { white-space: normal; }
 .admin-rifa .admin-acciones .admin-boton { white-space: nowrap; }
 .admin-rifa > p { margin: 0; max-width: 860px; line-height: 1.5; }
-.admin .mono { font-family: var(--mono); font-size: 14px; }
+.admin .mono { font-family: var(--mono); font-size: 14.5px; }
+.admin .ghost { color: var(--suave); }
+.admin .ghost:hover:not(:disabled) { color: var(--text); }
 
 .admin-cabeza { display: flex; align-items: center; gap: 16px; }
 .admin-cabeza h1 { margin: 0; font-size: 22px; font-weight: 700; letter-spacing: -0.02em; white-space: nowrap; }
@@ -169,7 +171,7 @@
 .admin-crudo + .admin-crudo { margin-top: 8px; }
 .admin-crudo summary { padding: 9px 12px; cursor: pointer; color: var(--suave); }
 .admin-crudo summary:hover { color: var(--text); }
-.admin-crudo pre { margin: 0; padding: 0 12px 12px; max-height: 420px; overflow: auto; font-family: var(--mono); font-size: 14px; color: var(--text); }
+.admin-crudo pre { margin: 0; padding: 0 12px 12px; max-height: 420px; overflow: auto; font-family: var(--mono); font-size: 14.5px; color: var(--text); }
 
 /* El aviso tras un cambio, abajo al centro, con «Deshacer». */
 .admin-hecho { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); z-index: 50; display: flex; align-items: center; gap: 14px; max-width: min(640px, calc(100vw - 32px)); padding: 8px 8px 8px 16px; border: 1px solid var(--line); border-radius: var(--radio); background: var(--panel-2); box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45); }

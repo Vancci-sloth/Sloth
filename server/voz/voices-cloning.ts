@@ -95,6 +95,8 @@ export interface CambioAdmin {
   deshace?: string
   /** Cuándo se deshizo este. */
   deshecho?: string
+  /** Los créditos que le quedaron, según Voices Cloning al hacerlo. */
+  saldo?: number
 }
 
 /** `carpeta`: `data/voz`. `credencial`: con qué se habla al cobro; `creador`: la llave del creador, si esta es su computadora. */
@@ -229,13 +231,37 @@ export function voicesCloning(carpeta: string, o: { credencial(): Credencial | u
     }
   }
 
-  function anotarCambio(tipo: CambioAdmin['tipo'], c: Record<string, unknown>) {
+  /** Los cambios que se están deshaciendo ahora mismo (`apiAdmin`). */
+  const deshaciendo = new Set<string>()
+
+  type PanelCobro = { llaves?: { id: string; usuarios: { status: number; datos: { users?: unknown[]; total?: number; per_page?: number } } }[]; cuentas?: Record<string, unknown> }
+  /** El panel de la página 1 con los usuarios de las demás páginas de cada llave (hasta 20), y sus cuentas de Sloth. */
+  async function conTodasLasPaginas(llave: { llave: string }, datos: unknown, url: URL): Promise<unknown> {
+    const panel = datos as PanelCobro
+    const paginas = Math.min(20, Math.max(1, ...(panel.llaves ?? []).map((l) => Math.ceil((Number(l.usuarios.datos.total) || 0) / (Number(l.usuarios.datos.per_page) || 100)))))
+    if (paginas <= 1) return datos
+    const consumo = url.searchParams.get('consumo') ?? '1'
+    const otras = await Promise.all(
+      Array.from({ length: paginas - 1 }, (_, i) =>
+        pedir<PanelCobro>(`/voz/admin?pagina=${i + 2}&consumo=${consumo}`, { con: llave, espera: 60_000 }).then((x) => (x.status < 400 ? x.datos : undefined), () => undefined)
+      )
+    )
+    const llaves = (panel.llaves ?? []).map((l) => {
+      const mas = otras.flatMap((o) => o?.llaves?.find((x) => x.id === l.id)?.usuarios.datos.users ?? [])
+      return mas.length ? { ...l, usuarios: { ...l.usuarios, datos: { ...l.usuarios.datos, users: [...(l.usuarios.datos.users ?? []), ...mas] } } } : l
+    })
+    return { ...panel, llaves, cuentas: Object.assign({}, ...otras.map((o) => o?.cuentas ?? {}), panel.cuentas), todasLasPaginas: true }
+  }
+
+  function anotarCambio(tipo: CambioAdmin['tipo'], c: Record<string, unknown>, respuesta?: unknown) {
     const externo = String(c.externo ?? '')
     const valor = tipo === 'creditos' ? Number(c.amount) : String(c.status)
     const todos = cambiosAdmin()
     const deshace = typeof c.deshace === 'string' ? c.deshace : undefined
     if (deshace) for (const x of todos) if (x.id === deshace) x.deshecho = new Date().toISOString()
-    const nuevo: CambioAdmin = { id: randomBytes(6).toString('hex'), externo, tipo, valor, cuando: new Date().toISOString(), ...(deshace ? { deshace } : {}) }
+    // Tras sumar o quitar, Voices Cloning da `credits`: los que le quedan.
+    const saldo = tipo === 'creditos' ? Number((respuesta as { credits?: unknown } | undefined)?.credits) : NaN
+    const nuevo: CambioAdmin = { id: randomBytes(6).toString('hex'), externo, tipo, valor, cuando: new Date().toISOString(), ...(deshace ? { deshace } : {}), ...(Number.isFinite(saldo) ? { saldo } : {}) }
     todos.push(nuevo)
     mkdirSync(carpeta, { recursive: true })
     guardar(archivoCambios, JSON.stringify({ cambios: todos.slice(-2000) }))
@@ -385,17 +411,30 @@ export function voicesCloning(carpeta: string, o: { credencial(): Credencial | u
       try {
         const metodo = req.method ?? 'GET'
         const json = metodo === 'GET' ? undefined : await cuerpo<Record<string, unknown>>(req)
-        // Un cambio se deshace una sola vez (el aviso y la ficha lo ofrecen los dos).
-        if (typeof json?.deshace === 'string') {
-          const viejo = cambiosAdmin().find((c) => c.id === json.deshace)
+        // Un cambio se deshace una sola vez (el aviso y la ficha lo ofrecen los dos), y solo con su contrario: a la misma
+        // persona, lo mismo al revés. Mientras uno va al cobro, otro igual espera su turno y ya lo ve deshecho.
+        const deshace = typeof json?.deshace === 'string' ? json.deshace : undefined
+        if (deshace) {
+          const viejo = cambiosAdmin().find((c) => c.id === deshace)
           if (!viejo) return enviar(res, 404, { error: 'Ese cambio no está anotado en esta computadora.' })
-          if (viejo.deshecho) return enviar(res, 409, { error: 'Ese cambio ya se deshizo.' })
+          if (viejo.deshecho || deshaciendo.has(deshace)) return enviar(res, 409, { error: 'Ese cambio ya se deshizo.' })
+          const contrario = viejo.tipo === 'creditos' ? m[1] === '/creditos' && Number(json?.amount) === -Number(viejo.valor) : m[1] === '/estado' && json?.status === (viejo.valor === 'suspended' ? 'active' : 'suspended')
+          if (viejo.externo !== json?.externo || !contrario) return enviar(res, 400, { error: 'Eso no deshace ese cambio.' })
+          deshaciendo.add(deshace)
         }
-        const r = await pedir<unknown>(`/voz/admin${m[1] ?? ''}${url.search}`, { con: llave, metodo, json, espera: 60_000 })
+        let r: Awaited<ReturnType<typeof pedir<unknown>>>
+        try {
+          r = await pedir<unknown>(`/voz/admin${m[1] ?? ''}${url.search}`, { con: llave, metodo, json, espera: 60_000 })
+          // El panel trae 100 por llave y página: las demás páginas se piden a la vez y se juntan, así el buscador, la
+          // lista y las fichas de fondo ven a todos.
+          if (metodo === 'GET' && !m[1] && r.status < 400 && (url.searchParams.get('pagina') ?? '1') === '1') r = { ...r, datos: (await conTodasLasPaginas(llave, r.datos, url)) as typeof r.datos }
+        } finally {
+          if (deshace) deshaciendo.delete(deshace)
+        }
         if (metodo === 'GET' && m[1] === '/usuario' && r.status < 400) guardarFicha(url.searchParams.get('externo') ?? '', r.datos)
         if (metodo !== 'GET' && r.status < 400) void refrescar()
         // El cambio anotado vuelve con la respuesta: con su id se deshace.
-        const cambio = json && r.status < 400 && (m[1] === '/creditos' || m[1] === '/estado') ? anotarCambio(m[1] === '/creditos' ? 'creditos' : 'estado', json) : undefined
+        const cambio = json && r.status < 400 && (m[1] === '/creditos' || m[1] === '/estado') ? anotarCambio(m[1] === '/creditos' ? 'creditos' : 'estado', json, r.datos) : undefined
         const primera = (k: string) => (url.searchParams.get(k) ?? '1') === '1'
         if (metodo === 'GET' && !m[1] && r.status < 400 && primera('pagina') && primera('consumo') && r.datos && typeof r.datos === 'object') {
           mkdirSync(carpeta, { recursive: true })

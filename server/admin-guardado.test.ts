@@ -108,3 +108,41 @@ test('la ficha de cada quien se guarda al leerla y se da sin preguntar al cobro'
   // Se escribe al disco medio segundo después: que acabe antes de borrar la carpeta.
   await new Promise((ok) => setTimeout(ok, 700))
 })
+
+test('deshacer pide el contrario exacto, y dos a la vez no pasan las dos', async (t) => {
+  const carpeta = mkdtempSync(join(tmpdir(), 'sloth-admin-'))
+  t.after(() => rmSync(carpeta, { recursive: true, force: true }))
+  let llegaron = 0
+  const fetchDeVerdad = globalThis.fetch
+  globalThis.fetch = (async () => {
+    llegaron++
+    await new Promise((ok) => setTimeout(ok, 50))
+    return new Response(JSON.stringify({ ok: true }), { status: 200, headers: { 'content-type': 'application/json' } })
+  }) as typeof fetch
+  t.after(() => void (globalThis.fetch = fetchDeVerdad))
+  const vc = voicesCloning(carpeta, { credencial: () => undefined, creador: () => ({ llave: 'llave-del-creador' }) })
+  const { id } = (await pedir(vc, '/api/admin/voz/creditos', { externo: 'ana', amount: 700 })).datos.cambio as { id: string }
+  // A otra persona, o no lo contrario: no.
+  assert.equal((await pedir(vc, '/api/admin/voz/creditos', { externo: 'beto', amount: -700, deshace: id })).status, 400)
+  assert.equal((await pedir(vc, '/api/admin/voz/creditos', { externo: 'ana', amount: -1400, deshace: id })).status, 400)
+  const antes = llegaron
+  const [a, b] = await Promise.all([pedir(vc, '/api/admin/voz/creditos', { externo: 'ana', amount: -700, deshace: id }), pedir(vc, '/api/admin/voz/creditos', { externo: 'ana', amount: -700, deshace: id })])
+  assert.deepEqual([a.status, b.status].sort(), [200, 409])
+  assert.equal(llegaron - antes, 1, 'solo uno llegó al cobro')
+})
+
+test('el panel junta a los usuarios de todas las páginas de cada llave', async (t) => {
+  const carpeta = mkdtempSync(join(tmpdir(), 'sloth-admin-'))
+  t.after(() => rmSync(carpeta, { recursive: true, force: true }))
+  const pagina = (n: number) => ({ llaves: [{ id: 'L1', usuarios: { status: 200, datos: { total: 150, per_page: 100, users: n === 1 ? [{ external_id: 'a' }] : [{ external_id: 'b' }] } } }], cuentas: n === 1 ? { a: { email: 'a@x.mx' } } : { b: { email: 'b@x.mx' } } })
+  const fetchDeVerdad = globalThis.fetch
+  globalThis.fetch = (async (url: string) => new Response(JSON.stringify(pagina(/pagina=2/.test(String(url)) ? 2 : 1)), { status: 200, headers: { 'content-type': 'application/json' } })) as typeof fetch
+  t.after(() => void (globalThis.fetch = fetchDeVerdad))
+  const vc = voicesCloning(carpeta, { credencial: () => undefined, creador: () => ({ llave: 'llave-del-creador' }) })
+  const r = (await pedir(vc, '/api/admin/voz?pagina=1&consumo=1')).datos as { llaves: { usuarios: { datos: { users: { external_id: string }[] } } }[]; cuentas: Record<string, unknown>; todasLasPaginas: boolean }
+  assert.deepEqual(r.llaves[0].usuarios.datos.users.map((u) => u.external_id), ['a', 'b'])
+  assert.deepEqual(Object.keys(r.cuentas).sort(), ['a', 'b'])
+  assert.equal(r.todasLasPaginas, true)
+  // Las fichas de fondo (también b) se leen después: que acaben antes de borrar la carpeta.
+  await new Promise((ok) => setTimeout(ok, 900))
+})

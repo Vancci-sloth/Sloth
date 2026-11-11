@@ -34,18 +34,18 @@ se puntúa como el eval de la voz (`eval-voz.md`):
 
 ## Resultados
 
-Medido el 11 de noviembre de 2026. Las otras, 3 corridas cada una más 2 de dos revisiones independientes (y 3 más del
+Medido el 11 de noviembre de 2026. Las otras, 3 corridas cada una más 3 de tres revisiones independientes (y 3 más del
 historial); Sloth, 3 con el panel inventado y una con el real tras el último cambio, más 5 de las revisiones. En el
 panel inventado, las últimas 300 llamadas son de 40 de las 85 personas, sus errores salen de esas llamadas y la ficha de
 cada quien tarda 1 s en llegar del cobro, como en el de verdad.
 
 | Categoría (medida) | React-admin | Refine | Filament | PocketBase | Sloth antes | **Sloth** | |
 |---|---|---|---|---|---|---|---|
-| **1. Abrir** (ms del clic de persona a la lista pintada) | 186–525; la primera, 602–897 | 204–438; 400–630 | 394–1.399; 496–974 | 308–709; 340–748 | 4.000–6.000 (esperaba al cobro) | **10–64; la primera, 20–84**: armado y oculto con lo último leído, entra al apretar. Sumándole los 100 ms de soltar seguiría ganando (110–184 contra 186) | 10 |
+| **1. Abrir** (ms del clic de persona a la lista pintada) | 183–525; la primera, 563–897 | 173–438; 400–630 | 318–1.399; 476–974 | 299–709; 340–748 | 4.000–6.000 (esperaba al cobro) | **10–64; la primera, 20–84**: armado y oculto con lo último leído, entra al apretar. Sumándole los 100 ms de soltar seguiría ganando (110–184 contra 173) | 10 |
 | **2. Encontrar a alguien por su correo** (KLM) | clic en el buscador + 4 letras = 2,42 s | abrir el embudo, su campo, 4 letras y «Filter» = 5,02 s | clic en la columna de correo + 4 = 2,42 s | clic + 5 letras + Enter = 2,98 s | no había buscador | **el buscador ya tiene el cursor: 2 letras con tus datos (0,56 s), 7 con el inventado (1,96 s)**; filtra en 3–28 ms | 10 |
-| **3. Darle créditos** (KLM, de su fila a guardado) | 3 clics + 6 teclas = 5,58 s | no se edita | 5,58 s | 5,58 s | 2 clics + 4 teclas = 3,72 s | **Enter, 5000, Enter = 1,68 s** (con el ratón: clic, 5000, Enter = 2,70 s); la ficha cuenta lo sumado al momento | 10 |
+| **3. Darle créditos** (KLM, de su fila a guardado) | 3 clics + 6 teclas = 5,58 s | no se edita | 5,58 s | 5,58 s | 2 clics + 4 teclas = 3,72 s | **Enter, 5000, Enter = 1,68 s**; con el ratón, clic en su fila (deja el cursor en «créditos»), 5000 y Enter = 2,70 s. La ficha enseña al momento con cuánto quedó, según Voices Cloning | 10 |
 | **4. Ver por qué falló la última llamada** (KLM) | no tiene registro | no tiene | no tiene | 1 clic en Logs = 1,3 s | bajar toda la página | **0 s**: la cifra de errores trae la fecha y el mensaje de la llamada fallida más reciente («No hubo conexión con las voces de Sloth.»); el script comprueba que es esa | 10 |
-| **5. Todo lo de esa persona** (de su fila a su historial) | 1 clic; 171–291 ms hasta verlo | 1 clic (el ojo); 174–302 ms | 2 clics = 2,6 s | no tiene historial | 1 clic | **con el ratón, 1 clic y 18–62 ms**. Con tus datos, las 33 personas que no salen en las últimas llamadas ya tenían su ficha guardada (33 de 33), y las 5 medidas enseñaron su historial en 27–45 ms; con el teclado, Enter = 0,28 s. Créditos, plan, historial y acciones en la misma ficha. Sumándole los 100 ms de soltar seguiría ganando (119–158 contra 171) | 10 |
+| **5. Todo lo de esa persona** (de su fila a su historial) | 1 clic; 171–291 ms hasta verlo | 1 clic (el ojo); 174–302 ms | 2 clics = 2,6 s | no tiene historial | 1 clic | **con el ratón, 1 clic y 18–62 ms**. Con tus datos, las 33 personas que no salen en las últimas llamadas ya tenían su ficha guardada (33 de 33), y las 5 medidas enseñaron su historial en 23–45 ms; con el teclado, Enter = 0,28 s. Créditos, plan, historial y acciones en la misma ficha. Sumándole los 100 ms de soltar seguiría ganando (118–162 contra 171) | 10 |
 | **6. Teclado** (teclas de la lista al campo del valor) | 135 | imposible | 79 | 34 | imposible (sin buscador) | **3 con tus datos, 8 con el inventado** (letras + Enter) | 10 |
 | **7. Legibilidad** (contraste mínimo; letra más chica) | 1,83; 12 px | 3,33; 14 px | 4,62 (una corrida, 1,0); 12 px | 2,38; 13 px | letra de 11 px (el contraste no se midió) | **7,89; 14,5 px** | 10 |
 | **8. En tu idioma** (palabras de interfaz en inglés a la vista) | 44–46 (sin español) | 21 (sin español) | 51 | 22 | `external_id`, `GET /api/…`, `VOZ_CREDITOS` | **0**, también contando toda la página | 10 |
@@ -57,6 +57,10 @@ Notas:
   primera, que en el panel inventado (17 nombres repetidos en 85 correos) son 7. Aun así gana.
 - **Darle créditos**: ninguna de las cuatro tiene un campo de saldo; se midió el campo más parecido de su ficha. Sin
   contarles Ctrl+A y con Enter en vez del clic en guardar, quedarían en 4,56 s.
+- **Legibilidad**: la medida es la de la lista, como en las otras. En el resto del Administrador (la ficha, Llaves) la
+  letra tampoco baja de 14,5 px.
+- **Todas las páginas**: el panel trae 100 personas por llave y página; el servidor de Sloth pide las demás a la vez y
+  las junta (`todasLasPaginas`), así que el buscador, la lista y las fichas de fondo ven a todos.
 - **Historial**: la ficha se abre con lo que ya hay (sus llamadas entre las últimas del panel y su ficha guardada en
   `data/voz/admin-fichas.json`) y luego se pone al día con el cobro (~1 s). Al abrir Sloth y tras cada lectura del
   panel, el servidor lee de fondo las fichas que nunca se han leído (de tres en tres) y luego las de más de 12 h (una
@@ -103,6 +107,16 @@ Notas:
   solo se bloquea, y el cursor sigue en él para el siguiente.
 - **La ficha volvía a los créditos de antes** cuando llegaba tarde la lectura pedida antes de sumar: lo sumado cuenta
   hasta que llega una lectura pedida después.
+- **La ficha contaba dos veces lo sumado** al volver a abrirla, o si la lectura pedida antes de sumar contestaba ya con
+  el cambio: ahora enseña con cuánto quedó según Voices Cloning (que lo dice al sumar), hasta que llega una lectura
+  pedida después.
+- **El buscador y la lista solo veían la página 1** (100 por llave): dar de alta a alguien de la página 2 le sumaba
+  créditos. Ahora se juntan todas.
+- **Abrir una ficha con el ratón dejaba el cursor en la página**: el clic en la fila ya no se lo quita al campo.
+- **El «Deshacer» de un aviso nuevo salía bloqueado** si se había pulsado el del anterior.
+- **Dos «Deshacer» a la vez pasaban los dos**, y el servidor no miraba que fueran el contrario exacto (misma persona, lo
+  mismo al revés): ahora hay cerrojo y responde 400 si no lo es.
+- **«Dar de alta» truncaba «2.5» a 2**, como la ficha antes: solo enteros.
 - **Con la ficha abierta, a 1024 px tapaba Créditos y Usados, el buscador se aplastaba a su icono y Llamadas se
   desplazaba de lado**: la lista se corre a cualquier ancho desde 900 px, «Leído hace…» se queda en su botón y Llamadas
   esconde las columnas menos útiles.
@@ -115,7 +129,8 @@ Notas:
 - **En los scripts**: `pintado` no veía la «o» (está en todos los correos y no cambia la lista); el panel inventado no
   devolvía el id del cambio; el historial de las otras se medía solo en clics, sin cuánto tardan en enseñarlo; y el
   panel inventado favorecía a Sloth: todos salían en las últimas llamadas, sus errores no cuadraban con ellas y la
-  ficha llegaba al instante.
+  ficha llegaba al instante; el panel inventado tampoco aplicaba los cambios, y no se veía cuando la ficha los contaba
+  dos veces. `enIngles` contaba el texto de un `<details>` cerrado.
 
 ## Lo que no se pudo medir
 

@@ -69,6 +69,8 @@ interface Panel {
   errores: { status: number; codigo: string | null; veces: number; ultima: string; error: string | null }[]
   /** Cuándo lo leyó el servidor (ms), en lo guardado. */
   leido?: number
+  /** El servidor de Sloth ya juntó los usuarios de todas las páginas de cada llave. */
+  todasLasPaginas?: boolean
 }
 
 interface Reparto {
@@ -99,6 +101,8 @@ interface CambioAdmin {
   cuando: string
   deshace?: string
   deshecho?: string
+  /** Los créditos que le quedaron, según Voices Cloning al hacerlo. */
+  saldo?: number
 }
 
 interface Usuario {
@@ -184,6 +188,8 @@ export function useArmarAdmin(esCreador: boolean): boolean {
 
 /** Un cambio hecho, con cómo deshacerlo, en el aviso de abajo. */
 interface Hecho {
+  /** Para que cada aviso nuevo empiece de cero. */
+  vez?: number
   texto: string
   deshacer?: () => Promise<unknown>
   error?: boolean
@@ -282,10 +288,11 @@ export const Admin = memo(function Admin({ activa, pestana = 'usuarios', onPesta
   const ajustar = useCallback(
     async (externo: string, amount: number, deshace?: string): Promise<CambioAdmin | undefined> => {
       const r = await api<{ cambio?: CambioAdmin }>('/api/admin/voz/creditos', { externo, amount, ...(deshace ? { deshace } : {}) })
+      fichas.delete(externo)
       const texto = `${deshace ? 'Deshecho: ' : ''}${amount > 0 ? 'sumaste' : 'quitaste'} ${num(Math.abs(amount))} créditos a ${quien(externo)}.`
       const id = r.cambio?.id
       if (r.cambio) setUltimoCambio(r.cambio)
-      setHecho({ texto: texto[0].toUpperCase() + texto.slice(1), deshacer: deshace || !id ? undefined : () => ajustar(externo, -amount, id) })
+      setHecho({ vez: Date.now(), texto: texto[0].toUpperCase() + texto.slice(1), deshacer: deshace || !id ? undefined : () => ajustar(externo, -amount, id) })
       cargar()
       return r.cambio
     },
@@ -294,9 +301,11 @@ export const Admin = memo(function Admin({ activa, pestana = 'usuarios', onPesta
   const cambiarEstado = useCallback(
     async (externo: string, status: 'active' | 'suspended', deshace?: string): Promise<CambioAdmin | undefined> => {
       const r = await api<{ cambio?: CambioAdmin }>('/api/admin/voz/estado', { externo, status, ...(deshace ? { deshace } : {}) })
+      fichas.delete(externo)
       const id = r.cambio?.id
       if (r.cambio) setUltimoCambio(r.cambio)
       setHecho({
+        vez: Date.now(),
         texto: `${deshace ? 'Deshecho: ' : ''}${quien(externo)} ${status === 'suspended' ? 'quedó suspendido' : 'puede volver a usar las voces'}.`,
         deshacer: deshace || !id ? undefined : () => cambiarEstado(externo, status === 'suspended' ? 'active' : 'suspended', id)
       })
@@ -314,7 +323,7 @@ export const Admin = memo(function Admin({ activa, pestana = 'usuarios', onPesta
     const id = setInterval(() => setReloj((n) => n + 1), 30_000)
     return () => clearInterval(id)
   }, [activa])
-  const alDarDeAlta = useCallback((texto: string) => (setHecho({ texto }), cargar()), [cargar])
+  const alDarDeAlta = useCallback((texto: string) => (setHecho({ texto, vez: Date.now() }), cargar()), [cargar])
 
   const pestanaActual = PESTANAS.find((p) => p.id === pestana) ?? PESTANAS[0]
   const cuantos: Partial<Record<PestanaAdmin, number>> = panel
@@ -382,7 +391,7 @@ export const Admin = memo(function Admin({ activa, pestana = 'usuarios', onPesta
               <>
                 {llaves.find((l) => l.usuarios.status >= 400) && <Fallo r={llaves.find((l) => l.usuarios.status >= 400)!.usuarios} />}
                 <Usuarios filas={filas} buscar={buscar} abierto={abierto} onAbrir={setAbierto} soloCreador={panel.soloCreador} onAlta={alDarDeAlta} />
-                <Paginas r={mayor('usuarios')} pagina={panel.pagina} cargando={cargando} onPagina={setPagina} />
+                {!panel.todasLasPaginas && <Paginas r={mayor('usuarios')} pagina={panel.pagina} cargando={cargando} onPagina={setPagina} />}
               </>
             )}
             {pestanaActual.id === 'llamadas' && (
@@ -412,7 +421,7 @@ export const Admin = memo(function Admin({ activa, pestana = 'usuarios', onPesta
         />
       )}
 
-      {hecho && <Aviso hecho={hecho} onCerrar={cerrarAviso} onError={(texto) => setHecho({ texto, error: true })} />}
+      {hecho && <Aviso key={hecho.vez} hecho={hecho} onCerrar={cerrarAviso} onError={(texto) => setHecho({ texto, error: true, vez: Date.now() })} />}
     </div>
   )
 })
@@ -597,7 +606,12 @@ const Usuarios = memo(function Usuarios({ filas, buscar, abierto, onAbrir, soloC
                   // Con el ratón, su ficha se lee al pasar por la fila y se abre al apretar; con el dedo, al soltar.
                   onPointerEnter={() => preleer(f.u.external_id)}
                   onPointerLeave={dejarDePreleer}
-                  onPointerDown={(e) => e.pointerType === 'mouse' && e.button === 0 && (setActiva(j), onAbrir(f.u.external_id))}
+                  onPointerDown={(e) => {
+                    if (e.pointerType !== 'mouse' || e.button !== 0) return
+                    e.preventDefault()
+                    setActiva(j)
+                    onAbrir(f.u.external_id)
+                  }}
                   onClick={() => (setActiva(j), onAbrir(f.u.external_id))}
                 >
                   <td className="admin-quien" title={f.u.external_id}>
@@ -627,7 +641,8 @@ function Alta({ email, onHecho }: { email: string; onHecho(texto: string): void 
   const [creditos, setCreditos] = useState('')
   const [ocupado, setOcupado] = useState(false)
   const [error, setError] = useState('')
-  const n = Math.max(0, Math.floor(Number(creditos) || 0))
+  const n = /^\d+$/.test(creditos.trim()) ? Number(creditos.trim()) : 0
+  const malo = creditos.trim() !== '' && !/^\d+$/.test(creditos.trim())
   return (
     <form
       className="admin-alta"
@@ -646,10 +661,11 @@ function Alta({ email, onHecho }: { email: string; onHecho(texto: string): void 
       <span>
         Darle créditos a <strong>{email}</strong> (su cuenta de Sloth)
       </span>
-      <input type="number" min={0} step={1} placeholder="Créditos" aria-label="Créditos para la alta" value={creditos} onChange={(e) => setCreditos(e.target.value)} disabled={ocupado} />
-      <button className="primary" disabled={ocupado}>
+      <input type="text" inputMode="numeric" placeholder="Créditos" aria-label="Créditos para la alta" aria-invalid={malo} value={creditos} onChange={(e) => setCreditos(e.target.value)} disabled={ocupado} />
+      <button className="primary" disabled={ocupado || malo}>
         {ocupado ? 'Dando…' : 'Dar de alta'}
       </button>
+      {malo && <span className="bad">Solo números enteros.</span>}
       {error && <span className="bad">{error}</span>}
     </form>
   )
@@ -712,7 +728,7 @@ function Ficha({
    * Lo sumado o quitado aquí, con cuándo: cuenta en los créditos hasta que llega una lectura pedida después (una pedida
    * antes, aunque llegue tarde, no lo trae).
    */
-  const [pendientes, setPendientes] = useState<{ cuando: number; delta: number }[]>([])
+  const [pendientes, setPendientes] = useState<{ cuando: number; delta: number; saldo?: number }[]>([])
   /** Cuándo se pidió lo que se ve en `d`. */
   const [dDesde, setDDesde] = useState(0)
   const dDesdeVisto = useRef(0)
@@ -744,8 +760,13 @@ function Ficha({
   // Los créditos salen de lo más nuevo que haya: lo leído de ella, si no lo de la lista (del panel, de `version`).
   const base = d ? (d.usuario.status === 200 ? (d.usuario.datos as Usuario) : undefined) : inicial
   const baseDesde = d ? dDesde : (version ?? 0)
-  const sumado = pendientes.filter((x) => x.cuando > baseDesde).reduce((t, x) => t + x.delta, 0)
-  const u = base && sumado ? { ...base, credits: (base.credits ?? 0) + sumado } : base
+  // Lo cambiado después de lo leído: si Voices Cloning dijo con cuánto quedó, eso (más lo cambiado luego sin saberlo);
+  // si no, lo leído más lo sumado. Así una lectura pedida antes que conteste ya con el cambio no lo cuenta dos veces.
+  const despues = pendientes.filter((x) => x.cuando > baseDesde)
+  const conSaldo = despues.findLastIndex((x) => typeof x.saldo === 'number')
+  const creditos =
+    conSaldo >= 0 ? despues[conSaldo].saldo! + despues.slice(conSaldo + 1).reduce((t, x) => t + x.delta, 0) : despues.length ? (base?.credits ?? 0) + despues.reduce((t, x) => t + x.delta, 0) : undefined
+  const u = base && creditos !== undefined ? { ...base, credits: creditos } : base
   // Solo enteros: «2.5» no se trunca a 2 sin decirlo.
   const n = /^-?\d+$/.test(cuanto.trim()) ? Number(cuanto.trim()) : 0
   const malo = cuanto.trim() !== '' && !n
@@ -762,7 +783,7 @@ function Ficha({
     const c = ultimoCambio
     if (!c || c.externo !== externo) return
     setCambios((xs) => (xs.some((x) => x.id === c.id) ? xs : [...xs.map((x) => (x.id === c.deshace ? { ...x, deshecho: c.cuando } : x)), c]))
-    if (c.tipo === 'creditos') setPendientes((xs) => [...xs, { cuando: Date.now(), delta: Number(c.valor) }])
+    if (c.tipo === 'creditos') setPendientes((xs) => [...xs, { cuando: Date.parse(c.cuando), delta: Number(c.valor), saldo: c.saldo }])
   }, [ultimoCambio, externo])
   const suspendido = u?.status === 'suspended'
   const hechos = [...cambios].reverse()

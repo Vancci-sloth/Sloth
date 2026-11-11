@@ -108,8 +108,14 @@ await p.route('**/api/admin/voz/**', async (x) => {
     // Como el servidor de Sloth (`anotarCambio`): el cambio anotado, con su id para deshacerlo.
     const cambio = { id: `c${anotados.length + 1}`, externo: cuerpo.externo, tipo: ruta.endsWith('/estado') ? 'estado' : 'creditos', valor: cuerpo.amount ?? cuerpo.status, cuando: new Date().toISOString(), ...(cuerpo.deshace ? { deshace: cuerpo.deshace } : {}) }
     for (const y of anotados) if (y.id === cuerpo.deshace) y.deshecho = cambio.cuando
+    // El cobro inventado aplica el cambio: lo que se lea después ya lo trae.
+    const per = personas.find((y) => y.externo === cuerpo.externo)
+    if (per && cambio.tipo === 'creditos') per.usuario.credits += Number(cuerpo.amount)
+    if (per && cambio.tipo === 'estado') per.usuario.status = cuerpo.status
+    // Como Voices Cloning: tras sumar o quitar, con cuánto quedó (y el servidor de Sloth lo anota en el cambio).
+    if (per && cambio.tipo === 'creditos') cambio.saldo = per.usuario.credits
     anotados.push(cambio)
-    return x.fulfill({ json: { ok: true, cambio } })
+    return x.fulfill({ json: { ok: true, ...(cambio.saldo !== undefined ? { credits: cambio.saldo } : {}), cambio } })
   }
   if (ruta.endsWith('/cambios')) return x.fulfill({ json: { cambios: anotados.filter((y) => y.externo === new URL(q.url()).searchParams.get('externo')) } })
   if (REAL) return x.continue()
@@ -202,12 +208,12 @@ r.teclado.hastaGuardar = r.teclado.hastaElCampo + 4 + 1
 // Los créditos de la ficha ya cuentan lo sumado, sin esperar a leer otra vez.
 const persona = personas.find((y) => y.externo === cambios[antes]?.cuerpo.externo)
 await p.waitForTimeout(150)
-r.darCreditos.fichaAlMomento = { antes: persona?.usuario.credits, ahora: await p.evaluate(() => document.querySelector('.admin-ficha-cifras .grande')?.textContent) }
+r.darCreditos.fichaAlMomento = { cobro: persona?.usuario.credits.toLocaleString('es-MX'), ahora: await p.evaluate(() => document.querySelector('.admin-ficha-cifras .grande')?.textContent) }
 // El cursor sigue en el campo para el siguiente, y a los 2,5 s (cuando ya contestó la lectura pedida antes de sumar) los
 // créditos no vuelven a los de antes.
 r.darCreditos.focoTrasSumar = await p.evaluate(() => document.activeElement?.id)
 await p.waitForTimeout(2400)
-r.darCreditos.fichaA2500ms = await p.evaluate(() => document.querySelector('.admin-ficha-cifras .grande')?.textContent)
+r.darCreditos.fichaA2500ms = { cobro: persona?.usuario.credits.toLocaleString('es-MX'), ficha: await p.evaluate(() => document.querySelector('.admin-ficha-cifras .grande')?.textContent) }
 await captura('ficha')
 
 // 10. Deshacer: en el aviso, y cuando sea en «Lo que le cambiaste aquí» (créditos y suspender). Lo que el cobro anotó
@@ -215,7 +221,16 @@ await captura('ficha')
 const antesDeshacer = cambios.length
 await p.click('.admin-hecho .admin-deshacer')
 await p.waitForFunction(() => /Deshiciste/.test(document.querySelector('.admin-ficha .admin-historial')?.textContent ?? ''))
+// Otro cambio enseguida: su aviso trae su «Deshacer» listo (no el del aviso anterior, que se pulsó).
+await p.focus('#admin-cuanto')
+await p.keyboard.type('3000')
+await p.keyboard.press('Enter')
+await p.waitForFunction(() => /3,000/.test(document.querySelector('.admin-hecho')?.textContent ?? ''))
+const avisoNuevoListo = await p.evaluate(() => !document.querySelector('.admin-hecho .admin-deshacer')?.disabled)
+await p.click('.admin-hecho .admin-deshacer')
+await p.waitForTimeout(300)
 r.deshacer = {
+  avisoNuevoListo,
   delAviso: cambios.slice(antesDeshacer),
   // Tras deshacer, el cambio y su deshacer ya no ofrecen deshacer otra vez.
   botonesTrasDeshacer: await p.locator('.admin-ficha .admin-historial .admin-deshacer').count(),
@@ -250,6 +265,40 @@ for (const k of [4, 7, 45, 70]) {
   await p.waitForTimeout(300)
 }
 r.historial.raton.klmS = KLM({ clics: 1 })
+
+// Al cerrar su ficha y volver a abrirla (ya leído lo nuevo), sus créditos son los del cobro: lo sumado no cuenta dos veces.
+// Solo con el panel inventado: con `--real` los cambios no llegan al cobro y no hay saldo nuevo con que comparar.
+if (!REAL) {
+  const f = '.admin:not([hidden]) .admin-usuarios tbody tr:nth-child(5)'
+  await p.evaluate((f) => (document.querySelector('.admin-hecho .admin-icono-boton')?.click(), document.querySelector(f).scrollIntoView({ block: 'center' })), f)
+  await abrirConRaton(p, f, '.admin-ficha')
+  await p.keyboard.type('700')
+  await p.keyboard.press('Enter')
+  await p.waitForTimeout(5500) // el panel inventado tarda 4 s en volver a leerse
+  const externo = cambios.at(-1).cuerpo.externo
+  await p.keyboard.press('Escape')
+  await p.waitForFunction(() => !document.querySelector('.admin-ficha'))
+  await abrirConRaton(p, f, '.admin-ficha')
+  await p.waitForTimeout(1500)
+  r.darCreditos.alReabrir = { cobro: personas.find((y) => y.externo === externo).usuario.credits.toLocaleString('es-MX'), ficha: await p.evaluate(() => document.querySelector('.admin-ficha-cifras .grande')?.textContent) }
+  await p.keyboard.press('Escape')
+  await p.waitForFunction(() => !document.querySelector('.admin-ficha'))
+}
+
+// 3 con el ratón: un clic de persona en su fila deja el cursor en «créditos»; 5000 y Enter.
+{
+  const antes = cambios.length
+  const f = '.admin:not([hidden]) .admin-usuarios tbody tr:nth-child(5)'
+  await p.evaluate((f) => (document.querySelector('.admin-hecho .admin-icono-boton')?.click(), document.querySelector(f).scrollIntoView({ block: 'center' })), f)
+  await abrirConRaton(p, f, '.admin-ficha')
+  const foco = await p.evaluate(() => document.activeElement?.id)
+  await p.keyboard.type('5000')
+  await p.keyboard.press('Enter')
+  await p.waitForTimeout(500)
+  r.darCreditos.conElRaton = { focoTrasElClic: foco, mandado: cambios.slice(antes).map((c) => c.cuerpo.amount), entradas: { clics: 1, teclas: 5 }, klmS: KLM({ clics: 1, teclas: 5 }) }
+  await p.keyboard.press('Escape')
+  await p.waitForFunction(() => !document.querySelector('.admin-ficha'))
+}
 
 /** Un clic de persona en la fila de `externo` (se busca por su correo en la lista) hasta ver su historial. */
 const historialDe = async (correo) => {

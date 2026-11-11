@@ -50,6 +50,8 @@ export const enIngles = (p, sel) =>
         const el = n.parentElement
         const t = n.textContent.replace(/\S+@\S+/g, ' ').trim()
         if (!t || !el) continue
+        // Lo de dentro de un <details> cerrado no se ve (salvo su <summary>), aunque tenga caja.
+        if (el.closest('details:not([open])') && !el.closest('summary')) continue
         const caja = el.getBoundingClientRect()
         const s = getComputedStyle(el)
         if (!caja.width || caja.bottom < 0 || caja.top > innerHeight || caja.right < 0 || caja.left > innerWidth || s.visibility === 'hidden') continue
