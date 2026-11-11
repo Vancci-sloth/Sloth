@@ -95,7 +95,11 @@ Este es el mapa:
   música de fondo: la línea `Música: de fondo` (`lineaMusica`), que pone `skills/video-base/scripts/musica.py`. Su eval contra ElevenLabs, Fish Audio, AI Studio y Suno:
   `docs/agents/eval-voz.md` (`node scripts/eval-voz.mjs <puerto>`).
 - Administrador (`web/src/Admin.tsx`, `/api/admin*`): solo en la computadora del creador, la que tiene su `admin.txt` (o `publicar.txt`).
-  Saldo, usuarios, consumo y registro de Voices Cloning; dar, quitar y suspender.
+  Saldo, usuarios, consumo y registro de Voices Cloning; dar, quitar y suspender, con deshacer. Se arma oculto con lo
+  último leído (`data/voz/admin.json`, `/api/admin/voz/guardado`) y lee lo nuevo al entrar; la ficha de cada quien,
+  de `admin-fichas.json`; solo se deshace lo cambiado aquí (`admin-cambios.json`). Pestañas en
+  `#/admin/<pestaña>`, buscador con «/» y la ficha de cada quien con el teclado. Sus textos: `web/src/admin-formato.ts`.
+  Su eval contra React-admin, Refine, Filament y PocketBase: `docs/agents/eval-admin.md` (`node scripts/eval-admin.mjs <puerto>`).
 - `server/flow/` y `web/src/Flow.tsx`: imágenes (Nano Banana) y videos (Veo) de Google Flow, con la cuenta de la voz (en
   su Edge y su turno, `voz().google`) y las que se agregan en Opciones (`cuentas.ts`, cada una en su Edge), hasta dos a la
   vez y con ritmo. `elegirCuenta`, el ritmo y los descansos están en `shared/flow.ts`. `pagina.ts` maneja la página, por sus iconos: texto,

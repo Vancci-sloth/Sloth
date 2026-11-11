@@ -1,77 +1,202 @@
 /*
- * Administrador (solo en la computadora del creador): una columna ancha de secciones. Arriba las cifras de la cuenta en
- * cuadros; luego tablas que se desplazan de lado si no caben, con sus acciones en la última columna.
+ * Administrador (solo en la computadora del creador): arriba, en una línea, el título, el buscador y cuándo se leyó;
+ * luego las cifras en una fila, las pestañas (texto con icono, subrayadas) y la pestaña abierta. La ficha de una persona
+ * va a la derecha, con su propio desplazamiento. Nada baja de 14,5 px y el texto secundario es `--suave` (el gris
+ * mezclado con el texto), para leerse bien sobre el fondo oscuro.
  */
-.admin { height: 100%; width: 100%; overflow-y: auto; background: var(--bg); padding: 36px 48px 72px; display: flex; flex-direction: column; gap: 28px; }
-.admin > * { width: 100%; max-width: 1200px; margin-left: auto; margin-right: auto; }
+.admin {
+  --suave: color-mix(in srgb, var(--muted) 55%, var(--text));
+  height: 100%;
+  width: 100%;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  background: var(--bg);
+  font-size: 14.5px;
+  overflow: hidden;
+}
+.admin { position: relative; }
+.admin[hidden] { display: none; }
+.admin-principal { min-width: 0; overflow-y: auto; padding: 16px 32px 64px; display: flex; flex-direction: column; gap: 12px; }
+.admin-principal > * { flex-shrink: 0; width: 100%; max-width: 1240px; margin-left: auto; margin-right: auto; }
 .admin .ok { color: var(--ok); }
-
-.admin-cabeza { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; }
-.admin-cabeza h1 { margin: 2px 0 6px; font-size: 28px; font-weight: 700; letter-spacing: -0.02em; }
-.admin-cabeza p { margin: 0; max-width: 620px; color: var(--muted); font-size: 13.5px; line-height: 1.5; }
-.admin-antetitulo { font-size: 11px; font-weight: 650; letter-spacing: 0.08em; text-transform: uppercase; color: var(--amber); }
-.admin-recargar { display: inline-flex; align-items: center; gap: 6px; flex-shrink: 0; }
-.admin-recargar .ico { width: 14px; height: 14px; }
-.admin-aviso { margin: 0; padding: 10px 14px; border: 1px solid var(--line); border-radius: var(--radio); background: var(--panel); font-size: 13px; }
-
-.admin-seccion { display: flex; flex-direction: column; gap: 10px; }
-.admin-seccion h2 { margin: 0; color: var(--muted); font-size: 11.5px; font-weight: 650; letter-spacing: 0.07em; text-transform: uppercase; }
+/* El rojo de siempre, aclarado con el texto: sobre el fondo oscuro se lee como lo demás (contraste ≥ 7). */
+.admin .bad { color: color-mix(in srgb, var(--bad) 60%, var(--text)); }
+.admin-suave { color: var(--suave); }
+/* Lo de otras partes que vive aquí (la rifa): ni gris de más ni letra chica. */
+.admin .muted { color: var(--suave); }
+.admin .small { font-size: 14.5px; }
+.admin-seccion { display: flex; flex-direction: column; gap: 12px; }
 .admin-seccion > p { margin: 0; }
-.admin-vacio { padding: 4px 0; }
-.admin-llave { display: flex; flex-direction: column; gap: 8px; }
-.admin-llave + .admin-llave { margin-top: 8px; }
-.admin-llave h3 { margin: 0; font-size: 14px; font-weight: 650; }
+.admin-antetitulo { font-size: 14.5px; font-weight: 650; color: var(--amber-2); }
+.admin-acciones { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
+.admin-rifa h2 { margin: 6px 0 0; font-size: 15px; font-weight: 650; }
+/* En la rifa, el premio y quién ganó parten línea: así los botones de las entregas caben a la vista. */
+.admin-rifa .admin-tabla td { white-space: normal; }
+.admin-rifa .admin-acciones .admin-boton { white-space: nowrap; }
+.admin-rifa > p { margin: 0; max-width: 860px; line-height: 1.5; }
+.admin .mono { font-family: var(--mono); font-size: 14px; }
 
-.admin-cifras { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 10px; }
-.admin-cifra { display: flex; flex-direction: column; gap: 4px; padding: 12px 14px; border: 1px solid var(--line); border-radius: var(--radio); background: var(--panel-2); }
-.admin-cifra strong { font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: -0.01em; }
-.admin-cifra-titulo { color: var(--muted); font-size: 11.5px; font-weight: 600; }
+.admin-cabeza { display: flex; align-items: center; gap: 16px; }
+.admin-cabeza h1 { margin: 0; font-size: 22px; font-weight: 700; letter-spacing: -0.02em; white-space: nowrap; }
+.admin-buscar { flex: 1; min-width: 200px; max-width: 560px; display: flex; align-items: center; gap: 8px; height: 40px; padding: 0 10px 0 12px; border: 1px solid var(--line); border-radius: var(--radio); background: var(--panel); color: var(--suave); cursor: text; }
+.admin-buscar:focus-within { border-color: color-mix(in srgb, var(--amber) 60%, var(--line)); }
+.admin-buscar .ico { width: 16px; height: 16px; flex: none; }
+.admin-buscar input { flex: 1; min-width: 0; height: 100%; border: 0; outline: 0; background: none; color: var(--text); font-size: 14.5px; }
+.admin-buscar input::placeholder { color: var(--suave); }
+.admin-buscar input::-webkit-search-cancel-button { display: none; }
+.admin-tecla { display: grid; place-items: center; min-width: 22px; height: 22px; padding: 0 5px; border: 1px solid var(--line); border-radius: 6px; font-family: var(--mono); font-size: 14px; color: var(--suave); }
+.admin-buscar:focus-within .admin-tecla { visibility: hidden; }
+.admin-leido { margin-left: auto; display: flex; align-items: center; gap: 6px; flex: none; color: var(--suave); white-space: nowrap; }
+.admin-icono-boton { display: grid; place-items: center; width: 32px; height: 32px; border-radius: 8px; color: var(--suave); flex: none; }
+.admin-icono-boton:hover:not(:disabled) { background: var(--panel-2); color: var(--text); }
+.admin-icono-boton .ico { width: 16px; height: 16px; }
+.admin-icono-boton .girando { animation: admin-girar 0.8s steps(8) infinite; }
+@keyframes admin-girar { to { transform: rotate(360deg); } }
+
+.admin-aviso { margin: 0; padding: 10px 14px; border: 1px solid var(--line); border-radius: var(--radio); background: var(--panel); }
+.admin-cargando, .admin-vacio, .admin-nota { margin: 0; color: var(--suave); line-height: 1.5; }
+.admin-nota { max-width: 860px; }
+
+.admin-cifras { display: flex; flex-wrap: wrap; gap: 8px; }
+.admin-cifras > * { flex: 1 1 118px; }
+/* Los errores, más anchos: el número y el último, con su porqué. */
+.admin-cifras > .admin-cifra-boton { flex: 2.4 1 250px; }
+.admin-cifra-linea { display: flex; align-items: baseline; gap: 10px; min-width: 0; }
+.admin-ultimo { min-width: 0; color: var(--text); line-height: 1.35; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
+.admin-cifra { display: flex; flex-direction: column; gap: 0; padding: 7px 12px; line-height: 1.35; border: 1px solid var(--line); border-radius: var(--radio); background: var(--panel); text-align: left; min-width: 0; }
+.admin-cifra strong { font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: -0.01em; white-space: nowrap; }
+.admin-cifra-titulo { color: var(--suave); font-size: 14.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.admin-cifras.chicas { display: grid; grid-template-columns: repeat(auto-fit, minmax(118px, 1fr)); }
+.admin-cifras.chicas strong { font-size: 18px; }
+.admin-libres { border-color: color-mix(in srgb, var(--amber) 55%, var(--line)); background: var(--amber-tinte); }
+.admin-libres strong { color: var(--amber-2); }
+.admin-libres.corto { border-color: var(--bad); background: rgba(224, 108, 85, 0.1); }
+.admin-libres.corto strong { color: color-mix(in srgb, var(--bad) 60%, var(--text)); }
+.admin-cifra-boton { cursor: pointer; }
+.admin-cifra-boton:hover { border-color: color-mix(in srgb, var(--amber) 55%, var(--line)); }
+.admin-cifra-boton.con-errores strong { color: color-mix(in srgb, var(--bad) 60%, var(--text)); }
+
+.admin-pestanas { display: flex; gap: 4px; border-bottom: 1px solid var(--line); overflow-x: auto; scrollbar-width: none; }
+.admin-pestanas button { display: inline-flex; align-items: center; gap: 7px; height: 38px; padding: 0 10px; color: var(--suave); white-space: nowrap; box-shadow: inset 0 -2px 0 transparent; }
+.admin-pestanas button:hover { color: var(--text); }
+.admin-pestanas button.activa { color: var(--text); box-shadow: inset 0 -2px 0 var(--amber); }
+.admin-pestanas .ico { width: 15px; height: 15px; }
+.admin-cuenta { color: var(--suave); font-variant-numeric: tabular-nums; }
+.admin-cuerpo { display: flex; flex-direction: column; gap: 12px; }
+.admin-cuerpo > * { flex-shrink: 0; }
+.admin-subtitulo, .admin-cuerpo h3 { margin: 6px 0 0; font-size: 15px; font-weight: 650; }
 
 .admin-tabla-caja { overflow-x: auto; border: 1px solid var(--line); border-radius: var(--radio); background: var(--panel); }
-.admin-tabla { width: 100%; border-collapse: collapse; font-size: 12.5px; }
-.admin-tabla th { position: sticky; top: 0; text-align: left; white-space: nowrap; font-size: 11px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); padding: 8px 10px; border-bottom: 1px solid var(--line); background: var(--panel); }
-.admin-tabla td { padding: 7px 10px; border-bottom: 1px solid var(--line); vertical-align: middle; font-variant-numeric: tabular-nums; }
+.admin-tabla { width: 100%; border-collapse: collapse; }
+.admin-tabla th { position: sticky; top: 0; text-align: left; white-space: nowrap; font-weight: 600; color: var(--suave); padding: 0 12px; height: 34px; border-bottom: 1px solid var(--line); background: var(--panel); }
+.admin-tabla th button { display: inline-flex; align-items: center; gap: 4px; color: inherit; font-weight: 600; }
+.admin-tabla th button:hover { color: var(--text); }
+.admin-tabla th .ico { width: 12px; height: 12px; }
+.admin-tabla td { padding: 6px 12px; border-bottom: 1px solid var(--line); vertical-align: middle; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.admin-tabla .num { text-align: right; }
+.admin-tabla th.num button { flex-direction: row-reverse; }
 .admin-tabla tr:last-child td { border-bottom: 0; }
-.admin-tabla tr:hover td { background: var(--panel-2); }
-.admin-quien { color: var(--text); text-align: left; text-decoration: underline; text-decoration-color: var(--line); text-underline-offset: 3px; }
-.admin-quien:hover { color: var(--amber-2); text-decoration-color: currentColor; }
-.admin-planes { white-space: pre-line; color: var(--muted); font-size: 11.5px; }
-.admin-planes-detalle { margin: 0; white-space: pre-line; color: var(--muted); font: inherit; font-size: 12px; }
-.admin-id { font-size: 11px; color: var(--muted); overflow-wrap: anywhere; }
-.admin-error { display: inline-block; max-width: 420px; overflow-wrap: anywhere; }
+.admin-tabla tbody tr:hover td { background: var(--panel-2); }
+.admin-usuarios tbody tr { cursor: pointer; }
+.admin-usuarios tbody tr.activa td { background: var(--panel-2); }
+.admin-usuarios tbody tr.activa td:first-child { box-shadow: inset 2px 0 0 var(--amber); }
+.admin-usuarios tbody tr.abierta td { background: var(--amber-tinte); }
+.admin-quien { max-width: 380px; overflow: hidden; text-overflow: ellipsis; }
+.admin-plan { max-width: 260px; overflow: hidden; text-overflow: ellipsis; }
+.admin-corta { display: inline-block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; vertical-align: bottom; }
+.admin-tabla td.admin-corta { display: table-cell; max-width: 240px; }
+.admin-enlace { max-width: 300px; color: var(--text); text-align: left; text-decoration: underline; text-decoration-color: var(--line); text-underline-offset: 3px; }
+.admin-enlace:hover { color: var(--amber-2); text-decoration-color: currentColor; }
+.admin-id { color: var(--suave); overflow-wrap: anywhere; }
+.admin-error { overflow-wrap: anywhere; white-space: normal; }
 
-.admin-acciones { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
-.admin-acciones input, .admin-alta input { padding: 5px 9px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); font-size: 12.5px; }
-.admin-acciones input { width: 92px; }
-.admin-acciones input:focus, .admin-alta input:focus { outline: 1px solid var(--amber); outline-offset: -1px; }
-.admin-boton { padding: 5px 10px; border: 1px solid var(--line); border-radius: 8px; color: var(--text); font-size: 12px; font-weight: 600; }
+.admin-boton { padding: 7px 12px; border: 1px solid var(--line); border-radius: 8px; color: var(--text); font-weight: 600; }
 .admin-boton:hover:not(:disabled) { border-color: var(--amber); color: var(--amber-2); }
 .admin-boton.peligro:hover:not(:disabled) { border-color: var(--bad); color: var(--bad); }
+.admin-deshacer { color: var(--amber-2); font-weight: 600; text-decoration: underline; text-underline-offset: 3px; }
+.admin-deshacer:hover:not(:disabled) { color: var(--text); }
 
-.admin-alta { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
-.admin-alta input[type='email'] { width: 280px; }
-.admin-alta input[type='number'] { width: 120px; }
-.admin-alta .primary { padding: 6px 14px; }
+.admin-alta { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; padding: 12px 14px; border: 1px solid color-mix(in srgb, var(--amber) 45%, var(--line)); border-radius: var(--radio); background: var(--amber-tinte); }
+.admin-alta input, .admin-ajustar input { height: 36px; padding: 0 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--text); font-size: 14.5px; }
+.admin-alta input { width: 140px; }
+.admin input[type='number'] { appearance: textfield; }
+.admin input[type='number']::-webkit-inner-spin-button, .admin input[type='number']::-webkit-outer-spin-button { appearance: none; margin: 0; }
+.admin-alta input:focus, .admin-ajustar input:focus { outline: 1px solid var(--amber); outline-offset: -1px; }
+.admin-alta .primary, .admin-ajustar .primary { padding: 0 16px; height: 36px; }
 
+.admin-filtros { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
+.admin-filtro { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; }
+.admin-errores { padding: 12px 14px; border: 1px solid color-mix(in srgb, var(--bad) 45%, var(--line)); border-radius: var(--radio); background: var(--panel); }
+.admin-errores h3 { margin: 0 0 6px; }
+.admin-errores ul { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 4px; }
+.admin-llave { display: flex; flex-direction: column; gap: 8px; }
 .admin-paginas { display: flex; align-items: center; justify-content: flex-end; gap: 14px; }
-.admin-filtro { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); align-self: flex-start; cursor: pointer; }
 
-.admin-detalle { padding: 16px; border: 1px solid var(--amber); border-radius: var(--radio); background: var(--panel); }
-.admin-detalle-cabeza { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.admin-detalle-cabeza h2 { color: var(--text); font-size: 14px; letter-spacing: 0; text-transform: none; }
+/* Con la ficha abierta, la lista se corre a su izquierda y deja el plan y la fecha: no queda nada debajo. */
+.admin.con-ficha .admin-principal { padding-right: 432px; }
+.admin.con-ficha .admin-usuarios :is(th, td):is(:nth-child(2), :nth-child(5)) { display: none; }
+.admin.con-ficha .admin-llamadas :is(th, td):is(:nth-child(4), :nth-child(6), :nth-child(8)) { display: none; }
+.admin.con-ficha .admin-llamadas .admin-enlace { max-width: 170px; }
+.admin.con-ficha .admin-llamadas td { white-space: normal; }
+/* El buscador no se deja aplastar: con la ficha abierta, «Leído hace…» se queda solo en su botón. */
+.admin.con-ficha .admin-leido-texto { display: none; }
+.admin-historial li.deshecho > span:nth-child(2) { color: var(--suave); }
+
+/* La ficha de una persona, a la derecha. */
+.admin-ficha { position: absolute; top: 0; right: 0; bottom: 0; width: 400px; z-index: 5; overflow-y: auto; padding: 20px 20px 48px; border-left: 1px solid var(--line); background: var(--panel); box-shadow: -12px 0 32px rgba(0, 0, 0, 0.35); display: flex; flex-direction: column; gap: 14px; }
+.admin-ficha > * { flex-shrink: 0; }
+.admin-ficha-cabeza { display: flex; align-items: flex-start; gap: 8px; }
+.admin-ficha-cabeza h2 { flex: 1; min-width: 0; margin: 4px 0 0; font-size: 17px; font-weight: 700; overflow-wrap: anywhere; }
+.admin-ficha-planes { margin: -6px 0 0; padding: 0; list-style: none; color: var(--suave); }
+.admin-ficha-cifras { display: grid; grid-template-columns: 1.4fr 1fr 1fr 1fr; gap: 6px; }
+.admin-ficha-cifras div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.admin-ficha-cifras span { color: var(--suave); }
+.admin-ficha-cifras strong { font-size: 17px; font-variant-numeric: tabular-nums; }
+.admin-ficha-cifras strong.grande { font-size: 24px; color: var(--amber-2); }
+.admin-ajustar { display: flex; flex-direction: column; gap: 6px; padding: 12px; border: 1px solid var(--line); border-radius: var(--radio); background: var(--bg); }
+.admin-ajustar label { font-weight: 650; }
+.admin-ajustar > div { display: flex; gap: 6px; }
+.admin-ajustar input { flex: 1; min-width: 0; }
+.admin-ajustar small { color: var(--suave); font-size: 14.5px; }
+.admin-suspender { align-self: flex-start; }
+.admin-ficha h3 { margin: 4px 0 0; font-size: 15px; font-weight: 650; }
+.admin-historial { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; }
+.admin-historial li { display: grid; grid-template-columns: 96px minmax(0, 1fr) auto; gap: 8px; align-items: baseline; padding: 6px 0; border-bottom: 1px solid var(--line); }
+.admin-historial li:last-child { border-bottom: 0; }
+.admin-ficha-id { overflow-wrap: anywhere; }
 
 .admin-crudo { border: 1px solid var(--line); border-radius: var(--radio); background: var(--panel); }
-.admin-crudo summary { padding: 8px 12px; cursor: pointer; color: var(--muted); font-size: 12.5px; }
+.admin-crudo + .admin-crudo { margin-top: 8px; }
+.admin-crudo summary { padding: 9px 12px; cursor: pointer; color: var(--suave); }
 .admin-crudo summary:hover { color: var(--text); }
-.admin-crudo pre { margin: 0; padding: 0 12px 12px; max-height: 420px; overflow: auto; font-family: var(--mono); font-size: 11.5px; color: var(--text); }
+.admin-crudo pre { margin: 0; padding: 0 12px 12px; max-height: 420px; overflow: auto; font-family: var(--mono); font-size: 14px; color: var(--text); }
 
-@media (max-width: 720px) {
-  .admin { padding: 24px 16px 56px; }
-  .admin-cabeza { flex-direction: column; align-items: flex-start; }
+/* El aviso tras un cambio, abajo al centro, con «Deshacer». */
+.admin-hecho { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); z-index: 50; display: flex; align-items: center; gap: 14px; max-width: min(640px, calc(100vw - 32px)); padding: 8px 8px 8px 16px; border: 1px solid var(--line); border-radius: var(--radio); background: var(--panel-2); box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45); }
+.admin-hecho.error { border-color: var(--bad); }
+
+@media (max-width: 1100px) {
+  .admin-ficha { width: 360px; }
+  .admin.con-ficha .admin-principal { padding-right: 384px; }
+  .admin.con-ficha .admin-usuarios :is(th, td):nth-child(4) { display: none; }
+  .admin.con-ficha .admin-quien { max-width: 220px; }
 }
-
-/* «Créditos para repartir»: lo libre, en grande y en ámbar; en rojo si falta saldo. */
-.admin-libres { border-color: var(--amber); background: var(--amber-tinte); }
-.admin-libres strong { color: var(--amber-2); font-size: 28px; }
-.admin-libres.corto { border-color: var(--bad); background: rgba(224, 108, 85, 0.1); }
-.admin-libres.corto strong { color: var(--bad); }
+@media (max-width: 900px) {
+  .admin.con-ficha .admin-principal { padding-right: 16px; }
+}
+@media (max-width: 700px) {
+  .admin-usuarios :is(th, td):is(:nth-child(2), :nth-child(5)) { display: none; }
+  .admin-usuarios .admin-quien { max-width: 46vw; }
+}
+@media (max-width: 500px) {
+  .admin-usuarios :is(th, td):nth-child(4) { display: none; }
+  .admin-usuarios .admin-quien { max-width: 52vw; }
+  .admin-tabla :is(th, td) { padding-left: 8px; padding-right: 8px; }
+  .admin-cifras > .admin-cifra:not(.admin-libres):not(.admin-cifra-boton) { display: none; }
+}
+@media (max-width: 900px) {
+  .admin-ficha { width: min(400px, 100%); }
+  .admin-principal { padding: 16px 16px 56px; }
+  .admin-cabeza { flex-wrap: wrap; }
+  .admin-buscar { order: 3; flex-basis: 100%; max-width: none; }
+}

@@ -80,7 +80,6 @@ export function RifaAdmin() {
   const cambiarFila = (i: number, cambio: Partial<Fila>) => setPremios((ps) => ps.map((x, j) => (j === i ? { ...x, ...cambio } : x)))
   return (
     <section className="admin-seccion admin-rifa">
-      <h2>Rifa</h2>
       <p className="muted small">
         Entre quienes no tienen los créditos de cada mes: cuentas gratis y apoyos de menos de $15 USD. Quien paga $15 o más y los Fundadores no participan. Mientras está abierta sale hasta arriba de la comunidad como «Participa en la rifa · Llévate créditos de Sloth», sin decir cuántos. Rifa cuando quieras y cuantas veces quieras, cada vez con su premio: nadie gana dos veces en la misma rifa. Cada ganador recibe sus créditos en su cuenta de voz, el aviso en su Sloth y un correo.
       </p>

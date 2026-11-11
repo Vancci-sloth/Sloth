@@ -84,6 +84,19 @@ interface Respuesta<T> {
   espera?: number
 }
 
+/** Un cambio hecho desde Administrador: créditos (`valor`, + o −) o estado (`active` o `suspended`). */
+export interface CambioAdmin {
+  id: string
+  externo: string
+  tipo: 'creditos' | 'estado'
+  valor: number | string
+  cuando: string
+  /** El cambio que este deshace. */
+  deshace?: string
+  /** Cuándo se deshizo este. */
+  deshecho?: string
+}
+
 /** `carpeta`: `data/voz`. `credencial`: con qué se habla al cobro; `creador`: la llave del creador, si esta es su computadora. */
 export function voicesCloning(carpeta: string, o: { credencial(): Credencial | undefined | Promise<Credencial | undefined>; creador(): { llave: string } | undefined }) {
   const archivo = join(carpeta, 'voices-cloning.json')
@@ -147,6 +160,69 @@ export function voicesCloning(carpeta: string, o: { credencial(): Credencial | u
       if (!r.ok) throw new Fallo(r.status, datos.error ?? `Las voces de Sloth respondieron ${r.status}.`)
       return datos
     }
+  }
+
+  /** Lo que el creador cambió desde Administrador (`apiAdmin`): los últimos 2.000. */
+  const archivoCambios = join(carpeta, 'admin-cambios.json')
+  function cambiosAdmin(): CambioAdmin[] {
+    try {
+      return (JSON.parse(readFileSync(archivoCambios, 'utf8')) as { cambios?: CambioAdmin[] }).cambios ?? []
+    } catch {
+      return []
+    }
+  }
+  /** La ficha de cada persona como la dio el cobro la última vez (`/voz/admin/usuario`), con cuándo: se abre con ella. */
+  const archivoFichas = join(carpeta, 'admin-fichas.json')
+  let fichas: Record<string, { datos: unknown; leido: number }> | undefined
+  function fichasAdmin() {
+    if (fichas) return fichas
+    try {
+      fichas = JSON.parse(readFileSync(archivoFichas, 'utf8')) as Record<string, { datos: unknown; leido: number }>
+    } catch {
+      fichas = {}
+    }
+    return fichas
+  }
+  let guardandoFichas: ReturnType<typeof setTimeout> | undefined
+  function guardarFicha(externo: string, datos: unknown) {
+    if (!externo) return
+    fichasAdmin()[externo] = { datos, leido: Date.now() }
+    // Varias seguidas (la lectura de fondo) se escriben juntas.
+    clearTimeout(guardandoFichas)
+    guardandoFichas = setTimeout(() => (mkdirSync(carpeta, { recursive: true }), guardar(archivoFichas, JSON.stringify(fichasAdmin()))), 500)
+  }
+  let leyendoFichas = false
+  /**
+   * Tras leer el panel, las fichas que falten o tengan más de 12 h, de una en una y sin prisa (una cada 300 ms): así la
+   * de cualquiera se abre al momento, también la de quien no salió en las últimas llamadas.
+   */
+  async function leerFichasDeFondo(llave: { llave: string }, panel: { llaves?: { usuarios?: { datos?: { users?: { external_id?: string }[] } } }[] }) {
+    if (leyendoFichas) return
+    leyendoFichas = true
+    try {
+      const viejas = Date.now() - 12 * 3600_000
+      const todos = (panel.llaves ?? []).flatMap((l) => l.usuarios?.datos?.users ?? []).map((u) => String(u.external_id ?? ''))
+      for (const externo of todos.filter((e) => e && !((fichasAdmin()[e]?.leido ?? 0) > viejas))) {
+        const r = await pedir<unknown>(`/voz/admin/usuario?externo=${encodeURIComponent(externo)}`, { con: llave, espera: 30_000 }).catch(() => undefined)
+        if (r && r.status < 400) guardarFicha(externo, r.datos)
+        await new Promise((ok) => setTimeout(ok, 300))
+      }
+    } finally {
+      leyendoFichas = false
+    }
+  }
+
+  function anotarCambio(tipo: CambioAdmin['tipo'], c: Record<string, unknown>) {
+    const externo = String(c.externo ?? '')
+    const valor = tipo === 'creditos' ? Number(c.amount) : String(c.status)
+    const todos = cambiosAdmin()
+    const deshace = typeof c.deshace === 'string' ? c.deshace : undefined
+    if (deshace) for (const x of todos) if (x.id === deshace) x.deshecho = new Date().toISOString()
+    const nuevo: CambioAdmin = { id: randomBytes(6).toString('hex'), externo, tipo, valor, cuando: new Date().toISOString(), ...(deshace ? { deshace } : {}) }
+    todos.push(nuevo)
+    mkdirSync(carpeta, { recursive: true })
+    guardar(archivoCambios, JSON.stringify({ cambios: todos.slice(-2000) }))
+    return nuevo
   }
 
   async function pedirBien<T>(ruta: string, init?: Parameters<typeof pedir>[1]): Promise<T> {
@@ -256,20 +332,56 @@ export function voicesCloning(carpeta: string, o: { credencial(): Credencial | u
 
     /**
      * `/api/admin*`, solo en la computadora del creador. `GET /api/admin`: si lo es. Lo demás (`/api/admin/voz…`) va al
-     * cobro (`/voz/admin…`) con su llave, tal cual.
+     * cobro (`/voz/admin…`) con su llave, tal cual. El panel de la primera página se guarda en `data/voz/admin.json`
+     * (con `leido`), y `GET /api/admin/voz/guardado` lo da sin preguntar al cobro: el Administrador se abre con él al
+     * instante mientras el cobro tarda sus segundos.
+     *
+     * Lo que el creador cambia desde aquí (créditos y estado) se anota en `data/voz/admin-cambios.json`: el registro del
+     * cobro anota igual el reparto mensual, la rifa o un regalo, y solo lo hecho aquí se puede deshacer. Un cambio con
+     * `deshace: <id>` lo marca deshecho. `GET /api/admin/voz/cambios?externo=` da los de una persona.
      */
     async apiAdmin(req: IncomingMessage, res: ServerResponse, url: URL): Promise<boolean> {
       if (url.pathname !== '/api/admin' && !url.pathname.startsWith('/api/admin/')) return false
       const llave = o.creador()
       if (url.pathname === '/api/admin' && req.method === 'GET') return enviar(res, 200, { creador: !!llave })
       if (!llave) return enviar(res, 404, { error: 'No existe' })
+      const panel = join(carpeta, 'admin.json')
+      if (url.pathname === '/api/admin/voz/guardado' && req.method === 'GET') {
+        try {
+          return enviar(res, 200, JSON.parse(readFileSync(panel, 'utf8')))
+        } catch {
+          return enviar(res, 404, { error: 'Aún no se ha leído' })
+        }
+      }
+      if (url.pathname === '/api/admin/voz/cambios' && req.method === 'GET') {
+        const externo = url.searchParams.get('externo')
+        return enviar(res, 200, { cambios: cambiosAdmin().filter((c) => c.externo === externo) })
+      }
+      // La ficha guardada de alguien (sin preguntar al cobro); `null` si aún no se ha leído.
+      if (url.pathname === '/api/admin/voz/ficha' && req.method === 'GET') return enviar(res, 200, fichasAdmin()[url.searchParams.get('externo') ?? ''] ?? null)
       const m = /^\/api\/admin\/voz(\/[a-z]+)?$/.exec(url.pathname)
       if (!m) return enviar(res, 404, { error: 'No existe' })
       try {
         const metodo = req.method ?? 'GET'
-        const r = await pedir<unknown>(`/voz/admin${m[1] ?? ''}${url.search}`, { con: llave, metodo, json: metodo === 'GET' ? undefined : await cuerpo(req), espera: 60_000 })
+        const json = metodo === 'GET' ? undefined : await cuerpo<Record<string, unknown>>(req)
+        // Un cambio se deshace una sola vez (el aviso y la ficha lo ofrecen los dos).
+        if (typeof json?.deshace === 'string') {
+          const viejo = cambiosAdmin().find((c) => c.id === json.deshace)
+          if (!viejo) return enviar(res, 404, { error: 'Ese cambio no está anotado en esta computadora.' })
+          if (viejo.deshecho) return enviar(res, 409, { error: 'Ese cambio ya se deshizo.' })
+        }
+        const r = await pedir<unknown>(`/voz/admin${m[1] ?? ''}${url.search}`, { con: llave, metodo, json, espera: 60_000 })
+        if (metodo === 'GET' && m[1] === '/usuario' && r.status < 400) guardarFicha(url.searchParams.get('externo') ?? '', r.datos)
         if (metodo !== 'GET' && r.status < 400) void refrescar()
-        return enviar(res, r.status, r.datos)
+        // El cambio anotado vuelve con la respuesta: con su id se deshace.
+        const cambio = json && r.status < 400 && (m[1] === '/creditos' || m[1] === '/estado') ? anotarCambio(m[1] === '/creditos' ? 'creditos' : 'estado', json) : undefined
+        const primera = (k: string) => (url.searchParams.get(k) ?? '1') === '1'
+        if (metodo === 'GET' && !m[1] && r.status < 400 && primera('pagina') && primera('consumo') && r.datos && typeof r.datos === 'object') {
+          mkdirSync(carpeta, { recursive: true })
+          guardar(panel, JSON.stringify({ ...r.datos, leido: Date.now() }))
+          void leerFichasDeFondo(llave, r.datos as { llaves?: { usuarios?: { datos?: { users?: { external_id?: string }[] } } }[] })
+        }
+        return enviar(res, r.status, cambio ? { ...r.datos, cambio } : r.datos)
       } catch (e) {
         return enviar(res, e instanceof Fallo ? e.status : 500, { error: mensaje(e) })
       }

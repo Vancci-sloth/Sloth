@@ -105,7 +105,7 @@
 
 /* La rifa en Administrador (RifaAdmin.tsx). */
 .admin-rifa-nueva { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; align-items: end; padding: 16px; border: 1px solid var(--line); border-radius: var(--radio); background: var(--panel); }
-.admin-rifa-nueva label { display: flex; flex-direction: column; gap: 6px; font-size: 12px; font-weight: 600; color: var(--muted); }
+.admin-rifa-nueva label { display: flex; flex-direction: column; gap: 6px; font-size: 14.5px; font-weight: 600; color: var(--muted); }
 .admin-rifa-nueva .ancho { grid-column: 1 / -1; margin: 0; }
 .admin-rifa-nueva input { padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--text); font-size: 14px; }
 .admin-rifa-nueva input:focus { outline: 1px solid var(--amber); outline-offset: -1px; }
@@ -122,8 +122,8 @@
 .admin-rifa-subtitulo { margin: 8px 0 0; }
 /* La lista de premios: número, cuántos ganan, créditos de cada uno, nombre y quitar. */
 .admin-rifa-premios { display: flex; flex-direction: column; gap: 8px; }
-.admin-rifa-fila { display: grid; grid-template-columns: 34px 90px 140px minmax(0, 1fr) 36px; gap: 8px; align-items: center; }
-.admin-rifa-fila.cabeza span { color: var(--muted); font-size: 11.5px; font-weight: 600; }
+.admin-rifa-fila { display: grid; grid-template-columns: 64px 90px 140px minmax(0, 1fr) 36px; gap: 8px; align-items: center; }
+.admin-rifa-fila.cabeza span { color: var(--muted); font-size: 14.5px; font-weight: 600; }
 .admin-rifa-fila input { width: 100%; min-width: 0; }
 .admin-rifa-fila .admin-boton { display: grid; place-items: center; height: 34px; padding: 0; }
 .admin-rifa-fila .admin-boton .ico { width: 14px; height: 14px; }

@@ -48,7 +48,7 @@ import { lineaMusica, lineaVoz } from '../../shared/voz'
 import { SelectorClips, SelectorImagenes, useChatGPT, useFlow } from './Flow' // Google Flow
 import { imagenPosible, lineaClips, lineaImagenes, MODELOS_VIDEO, OPCIONES_CLIPS } from '../../shared/flow'
 import { Timeline } from './Timeline'
-import { Admin, useEsCreador } from './Admin' // Administrador, solo en la computadora del creador
+import { Admin, esPestanaAdmin, type PestanaAdmin, useArmarAdmin, useEsCreador } from './Admin' // Administrador, solo en la computadora del creador
 import { compact, duration } from './items'
 import './Barra.css'
 
@@ -62,7 +62,7 @@ type View =
   | { kind: 'videos'; estilo?: string }
   | { kind: 'modelos3d' } // modelos 3D
   | { kind: 'comunidad' } // comunidad
-  | { kind: 'admin' } // Administrador, solo en la computadora del creador
+  | { kind: 'admin'; pestana?: PestanaAdmin } // Administrador, solo en la computadora del creador
 
 /** Lo que se escribió en un hilo nuevo sin mandarlo. Vive en localStorage hasta que se manda o se borra. */
 type Saved = Draft & { cardId: string; at: number }
@@ -82,9 +82,12 @@ function readHash(): View {
   if (kind === 'mis-videos') return { kind: 'videos', estilo: id || undefined }
   if (kind === 'modelos-3d') return { kind: 'modelos3d' } // modelos 3D
   if (kind === 'comunidad' || kind === 'mejoras') return { kind: 'comunidad' } // comunidad (antes, Mejoras)
-  if (kind === 'admin') return { kind: 'admin' }
+  if (kind === 'admin') return { kind: 'admin', pestana: esPestanaAdmin(id) ? id : undefined }
   return { kind: 'new', cardId: kind === 'new' ? id : undefined }
 }
+
+/** Fuera del componente: la misma función siempre, para que el Administrador memorizado no se vuelva a pintar. */
+const irAPestanaAdmin = (pestana: PestanaAdmin) => go({ kind: 'admin', pestana })
 
 function go(view: View) {
   location.hash =
@@ -103,7 +106,7 @@ function go(view: View) {
                 : view.kind === 'comunidad' // comunidad
                 ? '/comunidad'
                 : view.kind === 'admin'
-                ? '/admin'
+                ? `/admin${view.pestana ? `/${view.pestana}` : ''}`
                 : view.cardId
                 ? `/new/${view.cardId}`
                 : '/'
@@ -370,6 +373,7 @@ export function App() {
   // Con ellos llega lo que ganaste en la rifa, que sale a toda la pantalla (`GanasteRifa`).
   const [avisosComunidad, setAvisosComunidad] = useState(0)
   const esCreador = useEsCreador()
+  const adminArmado = useArmarAdmin(esCreador)
   useEffect(() => {
     let sabidos = 0
     let pedida = 0
@@ -532,7 +536,14 @@ export function App() {
         </button>
         {/* Administrador: solo en la computadora del creador (la que tiene su llave de publicar.txt). */}
         {esCreador && (
-          <button className={`new-chat${view.kind === 'admin' ? ' active' : ''}`} onClick={() => go({ kind: 'admin' })} title={plegada ? 'Administrador' : undefined}>
+          // Con el ratón entra al apretar (ya está armado y oculto), como un menú del sistema; con el dedo o el teclado,
+          // al soltar o pulsar (así desplazar la barra con el dedo no entra).
+          <button
+            className={`new-chat${view.kind === 'admin' ? ' active' : ''}`}
+            onPointerDown={(e) => e.pointerType === 'mouse' && e.button === 0 && go({ kind: 'admin' })}
+            onClick={() => go({ kind: 'admin' })}
+            title={plegada ? 'Administrador' : undefined}
+          >
             <span className="new-chat-icon">
               <Icono de="escudo" />
             </span>{' '}
@@ -660,7 +671,10 @@ export function App() {
         )}
         {view.kind === 'modelos3d' && <Modelos3D />} {/* modelos 3D */}
         {view.kind === 'comunidad' && <Comunidad />}
-        {view.kind === 'admin' && esCreador && <Admin />}
+        {/* Se arma oculto en cuanto Sloth queda quieto (o al entrar): abrirlo después es solo enseñarlo. */}
+        {esCreador && (view.kind === 'admin' || adminArmado) && (
+          <Admin activa={view.kind === 'admin'} pestana={view.kind === 'admin' ? view.pestana : undefined} onPestana={irAPestanaAdmin} />
+        )}
         {/* comunidad: «Pedir una mejora», que abre el símbolo del agente de cualquier hilo y la publica en Mejoras. */}
         <PedirMejora sessions={sessions} />
         {view.kind === 'videos' && (

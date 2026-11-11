@@ -1,0 +1,110 @@
+import assert from 'node:assert/strict'
+import { mkdtempSync, rmSync } from 'node:fs'
+import type { IncomingMessage, ServerResponse } from 'node:http'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { Readable } from 'node:stream'
+import test from 'node:test'
+import { voicesCloning } from './voz/voices-cloning.ts'
+
+/** Pide `ruta` al `apiAdmin` de Sloth (con `json`, un POST) y da lo que respondió. */
+async function pedir(vc: ReturnType<typeof voicesCloning>, ruta: string, json?: unknown) {
+  let status = 0
+  let cuerpo = ''
+  const res = { writeHead: (s: number) => void (status = s), end: (c: string) => void (cuerpo = c) } as unknown as ServerResponse
+  const trozos = json === undefined ? [] : [Buffer.from(JSON.stringify(json))]
+  const req = Object.assign(Readable.from(trozos), { method: json === undefined ? 'GET' : 'POST', headers: {} }) as unknown as IncomingMessage
+  await vc.apiAdmin(req, res, new URL(ruta, 'http://localhost'))
+  return { status, datos: JSON.parse(cuerpo) as Record<string, unknown> }
+}
+
+test('el Administrador guarda el panel de la primera página y lo da sin preguntar al cobro', async (t) => {
+  const carpeta = mkdtempSync(join(tmpdir(), 'sloth-admin-'))
+  t.after(() => rmSync(carpeta, { recursive: true, force: true }))
+  const pedidos: string[] = []
+  const fetchDeVerdad = globalThis.fetch
+  globalThis.fetch = (async (url: string) => {
+    pedidos.push(String(url))
+    return new Response(JSON.stringify({ configurado: true, llaves: [], pagina: 1 }), { status: 200, headers: { 'content-type': 'application/json' } })
+  }) as typeof fetch
+  t.after(() => void (globalThis.fetch = fetchDeVerdad))
+  const vc = voicesCloning(carpeta, { credencial: () => undefined, creador: () => ({ llave: 'llave-del-creador' }) })
+
+  // Antes de leer nada, no hay nada guardado.
+  assert.equal((await pedir(vc, '/api/admin/voz/guardado')).status, 404)
+  // Otra página no se guarda: lo guardado es lo que se ve al abrir.
+  await pedir(vc, '/api/admin/voz?pagina=2&consumo=1')
+  assert.equal((await pedir(vc, '/api/admin/voz/guardado')).status, 404)
+
+  const leido = await pedir(vc, '/api/admin/voz?pagina=1&consumo=1')
+  assert.equal(leido.status, 200)
+  const antes = pedidos.length
+  const guardado = await pedir(vc, '/api/admin/voz/guardado')
+  assert.equal(guardado.status, 200)
+  assert.equal(guardado.datos.configurado, true)
+  assert.equal(typeof guardado.datos.leido, 'number')
+  assert.equal(pedidos.length, antes, 'lo guardado no pregunta al cobro')
+})
+
+test('en una computadora que no es la del creador, no hay nada guardado que dar', async (t) => {
+  const carpeta = mkdtempSync(join(tmpdir(), 'sloth-admin-'))
+  t.after(() => rmSync(carpeta, { recursive: true, force: true }))
+  const vc = voicesCloning(carpeta, { credencial: () => undefined, creador: () => undefined })
+  assert.equal((await pedir(vc, '/api/admin/voz/guardado')).status, 404)
+  assert.deepEqual((await pedir(vc, '/api/admin')).datos, { creador: false })
+})
+
+test('solo lo cambiado desde Administrador se puede deshacer: se anota con su id, y deshacerlo lo marca', async (t) => {
+  const carpeta = mkdtempSync(join(tmpdir(), 'sloth-admin-'))
+  t.after(() => rmSync(carpeta, { recursive: true, force: true }))
+  const mandado: unknown[] = []
+  const fetchDeVerdad = globalThis.fetch
+  globalThis.fetch = (async (_url: string, init?: RequestInit) => {
+    mandado.push(init?.body ? JSON.parse(String(init.body)) : undefined)
+    return new Response(JSON.stringify({ ok: true }), { status: 200, headers: { 'content-type': 'application/json' } })
+  }) as typeof fetch
+  t.after(() => void (globalThis.fetch = fetchDeVerdad))
+  const vc = voicesCloning(carpeta, { credencial: () => undefined, creador: () => ({ llave: 'llave-del-creador' }) })
+
+  const suma = await pedir(vc, '/api/admin/voz/creditos', { externo: 'ana', amount: 5000 })
+  const cambio = suma.datos.cambio as { id: string; tipo: string; valor: number }
+  assert.equal(cambio.tipo, 'creditos')
+  assert.equal(cambio.valor, 5000)
+  await pedir(vc, '/api/admin/voz/creditos', { externo: 'ana', amount: -5000, deshace: cambio.id })
+  await pedir(vc, '/api/admin/voz/estado', { externo: 'beto', status: 'suspended' })
+  // Al cobro le llega lo de siempre (el `deshace` no le estorba).
+  assert.deepEqual(mandado[0], { externo: 'ana', amount: 5000 })
+
+  const deAna = (await pedir(vc, '/api/admin/voz/cambios?externo=ana')).datos.cambios as { id: string; deshace?: string; deshecho?: string }[]
+  assert.equal(deAna.length, 2)
+  assert.ok(deAna[0].deshecho, 'el primero quedó deshecho')
+  assert.equal(deAna[1].deshace, cambio.id)
+  const deBeto = (await pedir(vc, '/api/admin/voz/cambios?externo=beto')).datos.cambios as { tipo: string; valor: string }[]
+  assert.deepEqual(deBeto.map((c) => [c.tipo, c.valor]), [['estado', 'suspended']])
+
+  // Deshacer otra vez lo ya deshecho (desde el aviso y desde la ficha) no llega al cobro.
+  const antes = mandado.length
+  const otraVez = await pedir(vc, '/api/admin/voz/creditos', { externo: 'ana', amount: -5000, deshace: cambio.id })
+  assert.equal(otraVez.status, 409)
+  assert.equal(mandado.length, antes)
+  assert.equal((await pedir(vc, '/api/admin/voz/creditos', { externo: 'ana', amount: 1, deshace: 'no-existe' })).status, 404)
+})
+
+test('la ficha de cada quien se guarda al leerla y se da sin preguntar al cobro', async (t) => {
+  const carpeta = mkdtempSync(join(tmpdir(), 'sloth-admin-'))
+  t.after(() => rmSync(carpeta, { recursive: true, force: true }))
+  const fetchDeVerdad = globalThis.fetch
+  globalThis.fetch = (async () => new Response(JSON.stringify({ usuario: { status: 200, datos: { credits: 7 } }, registro: [] }), { status: 200, headers: { 'content-type': 'application/json' } })) as typeof fetch
+  t.after(() => void (globalThis.fetch = fetchDeVerdad))
+  const vc = voicesCloning(carpeta, { credencial: () => undefined, creador: () => ({ llave: 'llave-del-creador' }) })
+  assert.equal((await pedir(vc, '/api/admin/voz/ficha?externo=ana')).datos, null)
+  await pedir(vc, '/api/admin/voz/usuario?externo=ana')
+  globalThis.fetch = (async () => {
+    throw new Error('no debía preguntar al cobro')
+  }) as typeof fetch
+  const g = (await pedir(vc, '/api/admin/voz/ficha?externo=ana')).datos as { datos: { usuario: { datos: { credits: number } } }; leido: number }
+  assert.equal(g.datos.usuario.datos.credits, 7)
+  assert.equal(typeof g.leido, 'number')
+  // Se escribe al disco medio segundo después: que acabe antes de borrar la carpeta.
+  await new Promise((ok) => setTimeout(ok, 700))
+})
