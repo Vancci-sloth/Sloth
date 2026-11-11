@@ -271,7 +271,12 @@ const sobreDe = (p: Paso) => {
 /** El centro de una cosa en un hueco (para la cámara y para poner su tarjeta encima). */
 export const centroDe = (id: string, [x, y, z]: V3): V3 => {
   const c = GUION.cosas[id];
-  return [x, y + alzaDe(c) + tamDe(c) / 2, z];
+  // Un escenario (5 m o más) apunta a lo alto de verdad, si su caja lo dice: el autódromo plano (70 m de largo y 6 de
+  // alto) se apuntaba a la mitad de su `tam` (8 m en el aire) y la cámara veía cielo con la pista al borde de abajo.
+  // Lo chico sigue apuntando a la mitad de su `tam`, como siempre.
+  const caja = c.modelo && tamDe(c) >= 5 ? CAJAS[c.modelo] : undefined;
+  const alto = caja ? (tamDe(c) * caja[1]) / Math.max(...caja) : tamDe(c);
+  return [x, y + alzaDe(c) + alto / 2, z];
 };
 
 /**
