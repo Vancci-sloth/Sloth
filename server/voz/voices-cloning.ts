@@ -191,7 +191,13 @@ export function voicesCloning(carpeta: string, o: { credencial(): Credencial | u
     fichasAdmin()[externo] = { datos, leido: Date.now() }
     // Varias seguidas (la lectura de fondo) se escriben juntas.
     clearTimeout(guardandoFichas)
-    guardandoFichas = setTimeout(() => (mkdirSync(carpeta, { recursive: true }), guardar(archivoFichas, JSON.stringify(fichasAdmin()))), 500)
+    guardandoFichas = setTimeout(escribirFichas, 500)
+  }
+  function escribirFichas() {
+    clearTimeout(guardandoFichas)
+    if (!fichas) return
+    mkdirSync(carpeta, { recursive: true })
+    guardar(archivoFichas, JSON.stringify(fichas))
   }
   let leyendoFichas = false
   /**
@@ -450,6 +456,8 @@ export function voicesCloning(carpeta: string, o: { credencial(): Credencial | u
           // en cuatro, 45 s como mucho). Solo se nota la primera vez de todas; después son las de quien se dio de alta.
           await leerFichasNuevas(llave, r.datos as PanelConUsuarios, 45_000)
           mkdirSync(carpeta, { recursive: true })
+          // Las fichas al disco antes que el panel: si Sloth se cierra entre los dos, nadie queda listado sin la suya.
+          escribirFichas()
           guardar(panel, JSON.stringify({ ...r.datos, leido: Date.now() }))
           void leerFichasDeFondo(llave, r.datos as PanelConUsuarios)
         }

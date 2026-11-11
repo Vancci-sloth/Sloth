@@ -149,3 +149,8 @@ Notas:
   unos segundos.
 - **Más de 45 s leyendo fichas nuevas** (cientos de altas a la vez): el panel se da con las que alcanzaron, y las demás
   siguen de fondo; quien quede sin la suya espera al cobro (~1 s) al abrirla.
+- **Si el cobro falla al leer la ficha de alguien nuevo**, el panel se da igual y esa ficha se vuelve a pedir de fondo;
+  mientras, la suya espera al cobro (~1 s) al abrirla. La revisión final midió 700–950 ms para ese caso.
+- **Deshacer guarda los últimos 2.000 cambios** (`admin-cambios.json`): uno más viejo ya no se puede deshacer (404).
+- **Cada alta nueva suma ~1 s a la siguiente lectura del panel** (se lee su ficha antes de darlo); la primera de una
+  instalación, ~21 s. Esas lecturas van de fondo: la pantalla enseña lo último leído mientras tanto.
