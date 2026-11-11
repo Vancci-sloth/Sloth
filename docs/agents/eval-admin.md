@@ -14,7 +14,7 @@ se puntúa como el eval de la voz (`eval-voz.md`):
 
 - **Los dos scripts** comparten navegador, ventana (1280×800), clic de persona y legibilidad (`eval-voz-comun.mjs`),
   y el modelo de tiempo, el detector de inglés y la medida de pintado (`eval-admin-comun.mjs`):
-  - **Sloth**: `node scripts/eval-admin.mjs <puerto>`, sobre la copia del repo que corre. Sin `--real`, con un panel
+  - **Sloth**: `node scripts/eval-admin.mjs <puerto>`, sobre la copia del repo que corre (con `--real --deshacer-de-verdad`, además suma 1 crédito a la cuenta del creador y lo deshace, de verdad). Sin `--real`, con un panel
     inventado (85 personas en dos llaves, 300 llamadas, 14 errores) que tarda 4 s en llegar, como el cobro; con
     `--real`, el de tu cobro. En los dos, lo que cambiaría algo (sumar, quitar, suspender, dar de alta) lo contesta el
     script y no sale: no toca ninguna cuenta. Capturas en `data/navegador-capturas/admin-*.png`.
@@ -45,12 +45,12 @@ cada quien tarda 1 s en llegar del cobro, como en el de verdad.
 | **2. Encontrar a alguien por su correo** (KLM) | clic en el buscador + 4 letras = 2,42 s | abrir el embudo, su campo, 4 letras y «Filter» = 5,02 s | clic en la columna de correo + 4 = 2,42 s | clic + 5 letras + Enter = 2,98 s | no había buscador | **el buscador ya tiene el cursor: 2 letras con tus datos (0,56 s), 7 con el inventado (1,96 s)**; filtra en 3–28 ms | 10 |
 | **3. Darle créditos** (KLM, de su fila a guardado) | 3 clics + 6 teclas = 5,58 s | no se edita | 5,58 s | 5,58 s | 2 clics + 4 teclas = 3,72 s | **Enter, 5000, Enter = 1,68 s**; con el ratón, clic en su fila (deja el cursor en «créditos»), 5000 y Enter = 2,70 s. La ficha enseña al momento con cuánto quedó, según Voices Cloning | 10 |
 | **4. Ver por qué falló la última llamada** (KLM) | no tiene registro | no tiene | no tiene | 1 clic en Logs = 1,3 s | bajar toda la página | **0 s**: la cifra de errores trae la fecha y el mensaje de la llamada fallida más reciente («No hubo conexión con las voces de Sloth.»); el script comprueba que es esa | 10 |
-| **5. Todo lo de esa persona** (de su fila a su historial) | 1 clic; 171–291 ms hasta verlo | 1 clic (el ojo); 174–302 ms | 2 clics = 2,6 s | no tiene historial | 1 clic | **con el ratón, 1 clic y 18–62 ms**. Con tus datos, las 33 personas que no salen en las últimas llamadas ya tenían su ficha guardada (33 de 33), y las 5 medidas enseñaron su historial en 23–45 ms; con el teclado, Enter = 0,28 s. Créditos, plan, historial y acciones en la misma ficha. Sumándole los 100 ms de soltar seguiría ganando (118–162 contra 171) | 10 |
+| **5. Todo lo de esa persona** (de su fila a su historial) | 1 clic; 171–291 ms hasta verlo | 1 clic (el ojo); 174–302 ms | 2 clics = 2,6 s | no tiene historial | 1 clic | **con el ratón, 1 clic y 18–62 ms**. Con tus datos, toda la lista tiene su ficha guardada (86 de 86), y 5 de las 33 personas que no salen en las últimas llamadas enseñaron su historial en 23–45 ms; con el teclado, Enter = 0,28 s. Créditos, plan, historial y acciones en la misma ficha. Sumándole los 100 ms de soltar seguiría ganando (118–162 contra 171) | 10 |
 | **6. Teclado** (teclas de la lista al campo del valor) | 135 | imposible | 79 | 34 | imposible (sin buscador) | **3 con tus datos, 8 con el inventado** (letras + Enter) | 10 |
 | **7. Legibilidad** (contraste mínimo; letra más chica) | 1,83; 12 px | 3,33; 14 px | 4,62 (una corrida, 1,0); 12 px | 2,38; 13 px | letra de 11 px (el contraste no se midió) | **7,89; 14,5 px** | 10 |
 | **8. En tu idioma** (palabras de interfaz en inglés a la vista) | 44–46 (sin español) | 21 (sin español) | 51 | 22 | `external_id`, `GET /api/…`, `VOZ_CREDITOS` | **0**, también contando toda la página | 10 |
 | **9. Filas a la vista** (1280×800; alto de fila) | 10–12; 52,8 px | 9; 64,8 px | 8; 56,8 px | 3 (solo hay 3); 59 px | ~5; 118 px | **15 (16 con tus datos); 35,3 px**; la página no se desplaza de lado a 1280, 1024 ni 390 | 10 |
-| **10. Deshacer** (tiempo para deshacer un cambio) | 4,4–4,7 s (sus ediciones se mandan a los 4,5 s) | 0 | 0 | 0 | 0 (suspender pedía confirmar) | **sin límite**: el aviso trae «Deshacer» y la ficha guarda «Lo que le cambiaste aquí», créditos y suspender, con su «Deshacer» cuando sea | 10 |
+| **10. Deshacer** (tiempo para deshacer un cambio) | 4,4–4,7 s (sus ediciones se mandan a los 4,5 s) | 0 | 0 | 0 | 0 (suspender pedía confirmar) | **sin límite**: el aviso trae «Deshacer» y la ficha guarda «Lo que le cambiaste aquí», créditos y suspender, con su «Deshacer» cuando sea. Probado de verdad en la cuenta del creador (`--real --deshacer-de-verdad`): 0 → 1 → 0 créditos en el cobro | 10 |
 
 Notas:
 - **Encontrar**: las demás se midieron con las 4 primeras letras; Sloth escribe letras hasta que la persona sale
@@ -62,13 +62,11 @@ Notas:
 - **Todas las páginas**: el panel trae 100 personas por llave y página; el servidor de Sloth pide las demás a la vez y
   las junta (`todasLasPaginas`), así que el buscador, la lista y las fichas de fondo ven a todos.
 - **Historial**: la ficha se abre con lo que ya hay (sus llamadas entre las últimas del panel y su ficha guardada en
-  `data/voz/admin-fichas.json`) y luego se pone al día con el cobro (~1 s). Al abrir Sloth y tras cada lectura del
-  panel, el servidor lee de fondo las fichas que nunca se han leído (de tres en tres) y luego las de más de 12 h (una
-  cada 300 ms). Quien se da de alta después sale en las últimas llamadas con su alta.
-- **En frío** (la ficha de alguien sin llamadas recientes que el servidor aún no ha leído nunca), su historial espera al
-  cobro: 909–927 ms, y ahí sí pierde contra React-admin y Refine. Solo pasa en una instalación nueva: en la copia de
-  prueba, sin ninguna ficha guardada, las 86 estaban listas 26 s después de abrir Sloth. Bajarlo de ese segundo pide
-  que el cobro (`licencias/`) dé el registro sin esperar a Voices Cloning, y eso no se ha publicado.
+  `data/voz/admin-fichas.json`) y luego se pone al día con el cobro (~1 s). No hay caso en frío: el servidor no da el
+  panel hasta tener la ficha de cada persona de la lista que nunca se ha leído (`leerFichasNuevas`, de cuatro en cuatro,
+  45 s como mucho), así que nadie sale en la lista sin la suya. Comprobado con tu cobro y sin ninguna ficha guardada: la
+  primera lectura de todas tardó 21 s (la pantalla dice «Leyendo de Voices Cloning por primera vez…») y al recibirla
+  las 86 tenían su ficha; la siguiente, 2,5 s. Las de más de 12 h se ponen al día de fondo (una cada 300 ms).
 - **Abrir una fila al apretar** (como la entrada de la barra) hace que no se pueda arrastrar para seleccionar un correo
   en la lista; el correo se copia de la cabecera de su ficha.
 - **Deshacer «sin límite»** es aplicar el cambio al revés (quitar lo que se sumó, reactivar a quien se suspendió), no
@@ -146,5 +144,8 @@ Notas:
 - **Más de 90 personas por página**: el cobro (`cuentasDe` en `licencias/src/voz.ts`) da el correo de 90 por lectura del
   panel. Hoy entran todos (86); con más, los que sobren saldrían sin correo y no se encontrarían buscándolo.
 - **Muchas páginas**: juntarlas pide al cobro el panel entero una vez por página extra (hasta 19 a la vez). Hoy hay una.
-- **Si Voices Cloning dejara de dar `credits` al sumar**, la ficha volvería a sumar lo leído más lo cambiado, y una
-  lectura que llegue tarde con el cambio lo contaría dos veces unos segundos.
+- **Si Voices Cloning dejara de dar `credits` al sumar** (hoy lo da: en la prueba de verdad dijo 1 y luego 0), la
+  ficha volvería a sumar lo leído más lo cambiado, y una lectura que llegue tarde con el cambio lo contaría dos veces
+  unos segundos.
+- **Más de 45 s leyendo fichas nuevas** (cientos de altas a la vez): el panel se da con las que alcanzaron, y las demás
+  siguen de fondo; quien quede sin la suya espera al cobro (~1 s) al abrirla.

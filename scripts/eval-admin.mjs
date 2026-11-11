@@ -1,7 +1,7 @@
 // El eval del Administrador (docs/agents/eval-admin.md): abre Sloth en Edge, hace las mismas tareas que se midieron en
 // React-admin, Refine, Filament y PocketBase (eval-admin-ajenas.mjs) y da lo medido, con capturas en
 // data/navegador-capturas/admin-*.png.
-// Uso: node scripts/eval-admin.mjs [puerto] [--real]
+// Uso: node scripts/eval-admin.mjs [puerto] [--real [--deshacer-de-verdad]]
 // Sin `--real`, el panel es uno inventado (85 personas en dos llaves, 300 llamadas, 14 errores) y lo que cambia algo se
 // contesta aquí: no toca ninguna cuenta. El cobro de verdad tarda unos 4 s en armar el panel, y el inventado tarda lo
 // mismo. Con `--real`, lo que lee es lo de tu cobro (solo en la computadora del creador) y lo que cambiaría algo
@@ -16,6 +16,9 @@ import { enIngles, KLM, pintado } from './eval-admin-comun.mjs'
 const APP = join(dirname(fileURLToPath(import.meta.url)), '..')
 const PUERTO = process.argv.slice(2).find((a) => /^\d+$/.test(a)) ?? process.env.PORT ?? '4848'
 const REAL = process.argv.includes('--real')
+// Con `--real --deshacer-de-verdad`: suma 1 crédito a tu propia cuenta de voz («Tú (creador)») y lo deshace, de verdad.
+// Asignar créditos no gasta saldo, y queda como estaba.
+const DE_VERDAD = REAL && process.argv.includes('--deshacer-de-verdad')
 const CAPTURAS = join(APP, 'data', 'navegador-capturas')
 mkdirSync(CAPTURAS, { recursive: true })
 
@@ -80,8 +83,6 @@ const PANEL = {
   ).map((g) => ({ status: g[0].status, codigo: g[0].codigo, veces: g.length, ultima: g.map((x) => x.cuando).sort().at(-1), error: g[0].error }))
 }
 const RIFA = { abierta: null, ganadores: [], vozAbierta: true }
-/** Alguien sin llamadas recientes cuya ficha el servidor aún no ha leído nunca (el caso en frío). */
-const FRIA = personas[80].externo
 
 // ── El navegador ───────────────────────────────────────────────────────────────────────────────────────────────────
 
@@ -101,6 +102,11 @@ const anotados = []
 await p.route('**/api/admin/voz/**', async (x) => {
   const q = x.request()
   const ruta = new URL(q.url()).pathname
+  // Lo único que sale de verdad: ±1 crédito a la cuenta del creador, con `--deshacer-de-verdad`.
+  if (DE_VERDAD && q.method() === 'POST' && ruta.endsWith('/creditos')) {
+    const b = q.postDataJSON()
+    if (b.externo === 'creador' && Math.abs(b.amount) === 1) return cambios.push({ ruta, cuerpo: b, deVerdad: true }), x.continue()
+  }
   if (q.method() === 'POST') {
     const cuerpo = q.postDataJSON()
     cambios.push({ ruta, cuerpo })
@@ -128,8 +134,8 @@ await p.route('**/api/admin/voz/**', async (x) => {
     const alta = per && { id: 100 + personas.indexOf(per), cuando: per.usuario.created_at, externo, accion: 'alta', voz: null, letras: null, creditos: null, restantes: null, tarea: null, status: 200, codigo: null, error: null, ms: 900 }
     return { usuario: per ? { status: 200, datos: per.usuario } : { status: 404, datos: { error: 'No existe' } }, llave: { nombre: 'VOICES_PK_LIVE', fin: 'cf1f' }, registro: [...registro.filter((y) => y.externo === externo), ...(alta ? [alta] : [])], cuenta: per ? { email: per.email, licencias: per.licencias } : null }
   }
-  // La de FRIA nunca se ha leído: no hay nada guardado de ella.
-  if (ruta.endsWith('/ficha')) return x.fulfill({ json: externo === FRIA ? null : { datos: ficha(), leido: Date.now() - 3600_000 } })
+  // Como el servidor de Sloth: nadie sale en el panel sin su ficha guardada (`leerFichasNuevas`).
+  if (ruta.endsWith('/ficha')) return x.fulfill({ json: { datos: ficha(), leido: Date.now() - 3600_000 } })
   if (ruta.endsWith('/usuario')) return await new Promise((ok) => setTimeout(ok, 1000)), x.fulfill({ json: ficha() })
   return x.fallback()
 })
@@ -329,9 +335,10 @@ if (REAL) {
   // Como lo nombra la lista: «Tú (creador)», su correo, su nombre o su id.
   const nombre = (e) => (e === 'creador' ? 'Tú (creador)' : (real.cuentas[e]?.email ?? real.llaves.flatMap((l) => l.usuarios.datos.users ?? []).find((u) => u.external_id === e)?.name ?? e))
   for (const e of sinLlamadas.slice(-5)) r.historial.sinLlamadasRecientes.ms.push(await historialDe(nombre(e)))
-} else {
-  // En frío: sin llamadas recientes y sin ficha guardada, su historial espera al cobro (1 s aquí).
-  r.historial.enFrio = await historialDe(personas[80].email)
+  // Y de toda la lista: cuántos tienen ya su ficha guardada (el servidor no da el panel sin ellas).
+  let todas = 0
+  for (const e of todos) if ((await (await fetch(`http://localhost:${PUERTO}/api/admin/voz/ficha?externo=${encodeURIComponent(e)}`)).json()) !== null) todas++
+  r.historial.listaConFicha = { personas: todos.length, conFichaGuardada: todas }
 }
 await p.evaluate(() => document.querySelector('.admin:not([hidden]) .admin-principal').scrollTo(0, 0))
 await p.waitForTimeout(200)
@@ -358,6 +365,29 @@ await p.mouse.click(caja.x + caja.width / 2, caja.y + caja.height / 2)
 await p.waitForSelector('.admin-errores')
 r.verError.alAbrirlos = await p.evaluate(() => document.querySelector('.admin-errores li')?.textContent.trim())
 await captura('errores')
+
+if (DE_VERDAD) {
+  // De la lista, la cuenta del creador; Enter, 1, Enter; el cobro lo trae; «Deshacer» del aviso; el cobro vuelve a lo de antes.
+  const enElCobro = async () => (await (await fetch(`http://localhost:${PUERTO}/api/admin/voz/usuario?externo=creador`)).json()).usuario.datos.credits
+  await p.evaluate(() => document.querySelector('.admin:not([hidden]) .admin-principal').scrollTo(0, 0))
+  await p.locator('.admin-pestanas button', { hasText: 'Usuarios' }).click()
+  await p.focus('.admin-buscar input')
+  await p.keyboard.press('Control+A')
+  await p.keyboard.type('creador')
+  await p.keyboard.press('Enter')
+  await p.waitForSelector('.admin-ficha')
+  const antes = await enElCobro()
+  await p.focus('#admin-cuanto')
+  await p.keyboard.type('1')
+  await p.keyboard.press('Enter')
+  await p.waitForFunction(() => /sumaste 1 crédito/i.test(document.querySelector('.admin-hecho')?.textContent ?? ''))
+  const trasSumar = await enElCobro()
+  await p.click('.admin-hecho .admin-deshacer')
+  await p.waitForFunction(() => /Deshecho/.test(document.querySelector('.admin-hecho')?.textContent ?? ''), null, { timeout: 30_000 })
+  const trasDeshacer = await enElCobro()
+  const anotados = (await (await fetch(`http://localhost:${PUERTO}/api/admin/voz/cambios?externo=creador`)).json()).cambios.slice(-2)
+  r.deshacerDeVerdad = { antes, trasSumar, trasDeshacer, quedoIgual: trasDeshacer === antes && trasSumar === antes + 1, anotados: anotados.map((x) => ({ valor: x.valor, deshecho: !!x.deshecho, deshace: !!x.deshace, saldo: x.saldo })) }
+}
 
 r.erroresDeConsola = errores
 console.log(JSON.stringify(r, null, 1))

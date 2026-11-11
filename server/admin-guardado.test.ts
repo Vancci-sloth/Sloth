@@ -146,3 +146,22 @@ test('el panel junta a los usuarios de todas las páginas de cada llave', async 
   // Las fichas de fondo (también b) se leen después: que acaben antes de borrar la carpeta.
   await new Promise((ok) => setTimeout(ok, 900))
 })
+
+test('nadie sale en el panel sin su ficha: las de quien nunca se ha leído se leen antes de darlo', async (t) => {
+  const carpeta = mkdtempSync(join(tmpdir(), 'sloth-admin-'))
+  t.after(() => rmSync(carpeta, { recursive: true, force: true }))
+  const panel = { llaves: [{ id: 'L1', usuarios: { status: 200, datos: { total: 2, per_page: 100, users: [{ external_id: 'a' }, { external_id: 'b' }] } } }], cuentas: {} }
+  const fetchDeVerdad = globalThis.fetch
+  globalThis.fetch = (async (url: string) => {
+    const u = String(url)
+    const datos = /\/voz\/admin\/usuario/.test(u) ? { usuario: { status: 200, datos: { credits: 1 } }, registro: [{ id: 1, accion: 'alta' }] } : panel
+    await new Promise((ok) => setTimeout(ok, 20))
+    return new Response(JSON.stringify(datos), { status: 200, headers: { 'content-type': 'application/json' } })
+  }) as typeof fetch
+  t.after(() => void (globalThis.fetch = fetchDeVerdad))
+  const vc = voicesCloning(carpeta, { credencial: () => undefined, creador: () => ({ llave: 'llave-del-creador' }) })
+  assert.equal((await pedir(vc, '/api/admin/voz?pagina=1&consumo=1')).status, 200)
+  // Justo al recibir el panel, las dos ya están.
+  for (const e of ['a', 'b']) assert.notEqual((await pedir(vc, `/api/admin/voz/ficha?externo=${e}`)).datos, null, `la ficha de ${e}`)
+  await new Promise((ok) => setTimeout(ok, 700))
+})

@@ -199,16 +199,25 @@ export function voicesCloning(carpeta: string, o: { credencial(): Credencial | u
    * cualquiera se abre al momento, también la de quien no salió en las últimas llamadas. Las que nunca se han leído
    * van primero, de tres en tres; las viejas (que ya se enseñan mientras tanto), de una en una cada 300 ms.
    */
-  async function leerFichasDeFondo(llave: { llave: string }, panel: { llaves?: { usuarios?: { datos?: { users?: { external_id?: string }[] } } }[] }) {
+  type PanelConUsuarios = { llaves?: { usuarios?: { datos?: { users?: { external_id?: string }[] } } }[] }
+  const usuariosDe = (panel: PanelConUsuarios) => [...new Set((panel.llaves ?? []).flatMap((l) => l.usuarios?.datos?.users ?? []).map((u) => String(u.external_id ?? '')))].filter(Boolean)
+  async function leerFicha(llave: { llave: string }, externo: string) {
+    const r = await pedir<unknown>(`/voz/admin/usuario?externo=${encodeURIComponent(externo)}`, { con: llave, espera: 30_000 }).catch(() => undefined)
+    if (r && r.status < 400) guardarFicha(externo, r.datos)
+  }
+  /** Las fichas de quien nunca se ha leído, de cuatro en cuatro, hasta `tope` ms (las que falten siguen de fondo). */
+  async function leerFichasNuevas(llave: { llave: string }, panel: PanelConUsuarios, tope: number) {
+    const hasta = Date.now() + tope
+    const nunca = usuariosDe(panel).filter((e) => !fichasAdmin()[e])
+    for (let i = 0; i < nunca.length && Date.now() < hasta; i += 4) await Promise.all(nunca.slice(i, i + 4).map((e) => leerFicha(llave, e)))
+  }
+  async function leerFichasDeFondo(llave: { llave: string }, panel: PanelConUsuarios) {
     if (leyendoFichas) return
     leyendoFichas = true
-    const leer = async (externo: string) => {
-      const r = await pedir<unknown>(`/voz/admin/usuario?externo=${encodeURIComponent(externo)}`, { con: llave, espera: 30_000 }).catch(() => undefined)
-      if (r && r.status < 400) guardarFicha(externo, r.datos)
-    }
+    const leer = (externo: string) => leerFicha(llave, externo)
     try {
       const viejas = Date.now() - 12 * 3600_000
-      const todos = [...new Set((panel.llaves ?? []).flatMap((l) => l.usuarios?.datos?.users ?? []).map((u) => String(u.external_id ?? '')))].filter(Boolean)
+      const todos = usuariosDe(panel)
       const nunca = todos.filter((e) => !fichasAdmin()[e])
       for (let i = 0; i < nunca.length; i += 3) await Promise.all(nunca.slice(i, i + 3).map(leer))
       for (const externo of todos.filter((e) => fichasAdmin()[e] && fichasAdmin()[e].leido <= viejas)) {
@@ -437,9 +446,12 @@ export function voicesCloning(carpeta: string, o: { credencial(): Credencial | u
         const cambio = json && r.status < 400 && (m[1] === '/creditos' || m[1] === '/estado') ? anotarCambio(m[1] === '/creditos' ? 'creditos' : 'estado', json, r.datos) : undefined
         const primera = (k: string) => (url.searchParams.get(k) ?? '1') === '1'
         if (metodo === 'GET' && !m[1] && r.status < 400 && primera('pagina') && primera('consumo') && r.datos && typeof r.datos === 'object') {
+          // Nadie sale en la lista sin su ficha: las de quien nunca se ha leído se leen antes de dar el panel (de cuatro
+          // en cuatro, 45 s como mucho). Solo se nota la primera vez de todas; después son las de quien se dio de alta.
+          await leerFichasNuevas(llave, r.datos as PanelConUsuarios, 45_000)
           mkdirSync(carpeta, { recursive: true })
           guardar(panel, JSON.stringify({ ...r.datos, leido: Date.now() }))
-          void leerFichasDeFondo(llave, r.datos as { llaves?: { usuarios?: { datos?: { users?: { external_id?: string }[] } } }[] })
+          void leerFichasDeFondo(llave, r.datos as PanelConUsuarios)
         }
         return enviar(res, r.status, cambio ? { ...r.datos, cambio } : r.datos)
       } catch (e) {

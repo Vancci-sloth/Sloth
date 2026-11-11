@@ -289,7 +289,7 @@ export const Admin = memo(function Admin({ activa, pestana = 'usuarios', onPesta
     async (externo: string, amount: number, deshace?: string): Promise<CambioAdmin | undefined> => {
       const r = await api<{ cambio?: CambioAdmin }>('/api/admin/voz/creditos', { externo, amount, ...(deshace ? { deshace } : {}) })
       fichas.delete(externo)
-      const texto = `${deshace ? 'Deshecho: ' : ''}${amount > 0 ? 'sumaste' : 'quitaste'} ${num(Math.abs(amount))} créditos a ${quien(externo)}.`
+      const texto = `${deshace ? 'Deshecho: ' : ''}${amount > 0 ? 'sumaste' : 'quitaste'} ${num(Math.abs(amount))} ${Math.abs(amount) === 1 ? 'crédito' : 'créditos'} a ${quien(externo)}.`
       const id = r.cambio?.id
       if (r.cambio) setUltimoCambio(r.cambio)
       setHecho({ vez: Date.now(), texto: texto[0].toUpperCase() + texto.slice(1), deshacer: deshace || !id ? undefined : () => ajustar(externo, -amount, id) })
