@@ -107,7 +107,8 @@ async function escribir(page: Page, texto: string, tags: string[]) {
 async function escribirUnaVez(page: Page, texto: string, tags: string[]) {
   const editor = page.locator('[data-e2e=caption_container] [contenteditable=true]')
   await editor.click()
-  await page.keyboard.press('Control+A')
+  // Cmd+A en Mac: ahí Control+A solo va al principio del renglón y Delete borra una letra del nombre del archivo.
+  await page.keyboard.press('ControlOrMeta+A')
   await page.keyboard.press('Delete')
   await page.keyboard.type(texto.trim() + ' ', { delay: 20 })
   for (const tag of tags) {
