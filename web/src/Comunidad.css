@@ -67,6 +67,14 @@
 .com-secciones button.on { background: var(--amber); border-color: var(--amber); color: var(--sobre-ambar); }
 .com-secciones .com-ico { width: 14px; height: 14px; }
 
+/* El orden del feed: texto con su icono, a la derecha bajo las secciones. */
+.com-orden-fila { display: flex; justify-content: flex-end; margin-top: 10px; }
+.com-orden { display: inline-flex; align-items: center; gap: 6px; padding: 4px 8px; border-radius: 10px; color: var(--muted); font-size: 13px; font-weight: 600; cursor: pointer; transition: color 0.15s, background 0.15s; }
+.com-orden:hover { color: var(--text); background: var(--panel); }
+.com-orden .com-ico { width: 14px; height: 14px; }
+.com-orden select { appearance: none; padding: 0; border: 0; outline: none; background: none; color: inherit; font: inherit; cursor: pointer; }
+.com-orden select option { background: var(--panel); color: var(--text); }
+
 /* Comienza aquí: un anillo con lo que llevas y los pasos. */
 .com-bienvenida { margin-top: 18px; border-radius: 14px; border: 1px solid var(--line); background: var(--panel); overflow: hidden; }
 .com-bienvenida header { display: flex; align-items: center; gap: 12px; padding: 13px 14px 13px 16px; border-bottom: 1px solid var(--line); }

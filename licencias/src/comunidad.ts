@@ -20,8 +20,9 @@
  * corre en la computadora de quien lo instala: uno nuevo, o uno al que le cambian el paquete, queda `aprobada = 0` y solo
  * lo ven quien lo compartió y el creador (le llega un aviso) hasta que lo aprueba (migración 0019).
  *
- * - `GET /comunidad?categoria=&antes=`: quién eres, los números de la comunidad y una página del feed: las fijadas y luego
- *   lo que tuvo actividad más reciente. `antes` es la `actividad` de la última que ya tienes.
+ * - `GET /comunidad?categoria=&orden=&antes=`: quién eres, los números de la comunidad y una página del feed: las fijadas
+ *   y luego lo que tuvo actividad más reciente, lo último publicado o, para el creador, lo que no ha contestado
+ *   (`consultaFeed`).
  * - `POST /comunidad/publicar` `{categoria, titulo, texto, adjuntos}`.
  * - `GET /comunidad/p/<id>`: una, con sus comentarios. `POST /comunidad/p/<id>` `{categoria?, titulo?, texto?,
  *   adjuntos?, fijada?, estado?, aprobada?}` la cambia (`aprobada`, solo el creador); `/borrar`, `/megusta`, `/comentar` `{texto, responde?, adjuntos?}` (sus
@@ -37,11 +38,12 @@
  * - `GET /comunidad/liberar`, solo el creador: la última versión de cada sistema y si aún es solo de quien apoya.
  *   `POST` la da a todos ya (`liberar` en `index.ts`), cuando el chat de un live cumple su meta.
  */
-import type { AdjuntoComunidad, Autor, AvisoComunidad, CategoriaComunidad, ComentarioComunidad, FeedComunidad, PublicacionComunidad, RifaGanada, RoadmapComunidad } from '../../shared/types.ts'
+import type { AdjuntoComunidad, Autor, AvisoComunidad, CategoriaComunidad, ComentarioComunidad, FeedComunidad, OrdenComunidad, PublicacionComunidad, RifaGanada, RoadmapComunidad } from '../../shared/types.ts'
 import { ganada, rifa } from './rifa.ts'
 import { BLOQUEADA, CLAVE, EQUIPO, cupo, delCreador, esFundador, type Env, type Fila, Rechazo, cuerpo, json, letras, liberar, servir, vigencia, vigilar } from './index.ts'
 
 export const CATEGORIAS: CategoriaComunidad[] = ['general', 'hice', 'ayuda', 'mejoras', 'estilos', 'anuncios']
+const ORDENES = ['actividad', 'recientes', 'sin-contestar'] as const satisfies readonly OrdenComunidad[]
 
 /** Las metas del roadmap que se votan: las mismas de sloth.vancci.org («Lo que viene»). Si cambian allá, cambian aquí. */
 export const METAS = [
@@ -297,21 +299,40 @@ function aviso(env: Env, para: string, de: Miembro, tipo: AvisoComunidad['tipo']
   ]
 }
 
-/** La página del feed, con quién eres y los números de la comunidad. */
-async function feed(env: Env, yo: Miembro, url: URL): Promise<FeedComunidad> {
-  const categoria = url.searchParams.get('categoria') ?? ''
-  const antes = url.searchParams.get('antes') ?? ''
+/**
+ * La consulta de una página del feed. `orden`: `actividad` (las fijadas y luego lo último comentado), `recientes` (lo
+ * último publicado, sin fijadas arriba) o `sin-contestar`, solo del creador: donde la última palabra (el último
+ * comentario o, sin comentarios, la publicación) no es suya, por actividad. `antes` es la `actividad` (o la `creada`,
+ * en `recientes`) de la última que ya tienes.
+ */
+export function consultaFeed(yo: { id: string; creador: boolean }, p: { categoria: string; antes: string; orden: string }): { sql: string; valores: (string | number)[] } {
+  const orden = (ORDENES as readonly string[]).includes(p.orden) ? (p.orden as OrdenComunidad) : p.orden ? null : 'actividad'
+  if (!orden) throw new Rechazo(400, 'Ese orden no existe.')
+  if (orden === 'sin-contestar' && !yo.creador) throw new Rechazo(403, 'Eso solo lo ve el creador de Sloth.')
   const donde: string[] = []
   const valores: (string | number)[] = []
-  if (categoria) {
-    if (!CATEGORIAS.includes(categoria as CategoriaComunidad)) throw new Rechazo(400, 'Esa sección no existe.')
+  if (p.categoria) {
+    if (!CATEGORIAS.includes(p.categoria as CategoriaComunidad)) throw new Rechazo(400, 'Esa sección no existe.')
     donde.push('categoria = ?')
-    valores.push(categoria)
+    valores.push(p.categoria)
   }
-  if (!esCreador(yo)) donde.push('((reportes < ? AND aprobada = 1) OR autor = ?)'), valores.push(OCULTAR, yo.id)
-  // Las fijadas van solo en la primera página; las siguientes siguen por actividad.
-  if (antes) donde.push('fijada = 0 AND actividad < ?'), valores.push(antes)
-  const sql = `SELECT * FROM publicaciones${donde.length ? ` WHERE ${donde.join(' AND ')}` : ''} ORDER BY ${antes ? '' : 'fijada DESC, '}actividad DESC LIMIT ${PAGINA + 1}`
+  if (!yo.creador) donde.push('((reportes < ? AND aprobada = 1) OR autor = ?)'), valores.push(OCULTAR, yo.id)
+  if (orden === 'sin-contestar')
+    donde.push('COALESCE((SELECT c.autor FROM comentarios c WHERE c.publicacion = publicaciones.id ORDER BY c.creada DESC LIMIT 1), autor) != ?'), valores.push(yo.id)
+  const columna = orden === 'recientes' ? 'creada' : 'actividad'
+  // En `actividad`, las fijadas van solo en la primera página; las siguientes siguen por actividad.
+  const fijadas = orden === 'actividad'
+  if (p.antes) donde.push(`${fijadas ? 'fijada = 0 AND ' : ''}${columna} < ?`), valores.push(p.antes)
+  const sql = `SELECT * FROM publicaciones${donde.length ? ` WHERE ${donde.join(' AND ')}` : ''} ORDER BY ${fijadas && !p.antes ? 'fijada DESC, ' : ''}${columna} DESC LIMIT ${PAGINA + 1}`
+  return { sql, valores }
+}
+
+/** La página del feed, con quién eres y los números de la comunidad. */
+async function feed(env: Env, yo: Miembro, url: URL): Promise<FeedComunidad> {
+  const { sql, valores } = consultaFeed(
+    { id: yo.id, creador: esCreador(yo) },
+    { categoria: url.searchParams.get('categoria') ?? '', antes: url.searchParams.get('antes') ?? '', orden: url.searchParams.get('orden') ?? '' }
+  )
   const ahora = Date.now()
   const contar = !numeros || numeros.hasta < ahora
   const [pubs, cuentas, totales] = await env.DB.batch([

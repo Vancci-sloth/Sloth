@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import test from 'node:test'
-import { adjuntosDe, estiloEnSuSitio, fotosDeComentario } from './comunidad.ts'
+import { DatabaseSync } from 'node:sqlite'
+import { adjuntosDe, consultaFeed, estiloEnSuSitio, fotosDeComentario } from './comunidad.ts'
 
 const imagen = (n: number) => ({ tipo: 'imagen', llave: `${String(n).padStart(20, 'a')}.png` })
 const video = { tipo: 'video', llave: 'bbbbbbbbbbbbbbbbbbbb.mp4', poster: 'cccccccccccccccccccc.webp', vertical: true }
@@ -38,4 +40,36 @@ test('un comentario lleva solo imágenes de la comunidad, a lo más cuatro', () 
   assert.equal(fotosDeComentario(Array.from({ length: 7 }, (_, i) => imagen(i))).length, 4)
   assert.deepEqual(fotosDeComentario(undefined), [])
   assert.deepEqual(fotosDeComentario([{ tipo: 'imagen', llave: 'https://otro.com/x.png' }]), [])
+})
+
+test('el feed por actividad, por lo más reciente y, para el creador, lo que no ha contestado', () => {
+  const db = new DatabaseSync(':memory:')
+  for (const m of ['0004_comunidad', '0009_comentarios_adjuntos', '0019_estilos', '0026_comunidad_recientes']) db.exec(readFileSync(new URL(`../migrations/${m}.sql`, import.meta.url), 'utf8'))
+  const pub = db.prepare("INSERT INTO publicaciones (id, autor, categoria, titulo, texto, creada, actividad, fijada) VALUES (?, ?, 'general', '', '', ?, ?, ?)")
+  const com = db.prepare("INSERT INTO comentarios (id, publicacion, autor, texto, creada) VALUES (?, ?, ?, '', ?)")
+  // a: de Ana, sin comentarios. b: de Beto, ya le contestó el creador. c: de Ana, le contestó y luego Beto volvió a
+  // escribir. d: un anuncio del creador, comentado por Ana. e: un anuncio del creador, sin comentarios, fijado.
+  pub.run('a', 'ana', '2026-11-05', '2026-11-05', 0)
+  pub.run('b', 'beto', '2026-11-04', '2026-11-08', 0)
+  com.run('b1', 'b', 'yo', '2026-11-08')
+  pub.run('c', 'ana', '2026-11-03', '2026-11-09', 0)
+  com.run('c1', 'c', 'yo', '2026-11-06')
+  com.run('c2', 'c', 'beto', '2026-11-09')
+  pub.run('d', 'yo', '2026-11-02', '2026-11-07', 0)
+  com.run('d1', 'd', 'ana', '2026-11-07')
+  pub.run('e', 'yo', '2026-11-01', '2026-11-01', 1)
+  const creador = { id: 'yo', creador: true }
+  const ids = (orden: string, antes = '', yo = creador) => {
+    const { sql, valores } = consultaFeed(yo, { categoria: '', antes, orden })
+    return db.prepare(sql).all(...valores).map((f) => f.id)
+  }
+  assert.deepEqual(ids(''), ['e', 'c', 'b', 'd', 'a'])
+  assert.deepEqual(ids('actividad', '2026-11-08'), ['d', 'a'])
+  assert.deepEqual(ids('recientes'), ['a', 'b', 'c', 'd', 'e'])
+  assert.deepEqual(ids('recientes', '2026-11-04'), ['c', 'd', 'e'])
+  assert.deepEqual(ids('sin-contestar'), ['c', 'd', 'a'])
+  assert.deepEqual(ids('sin-contestar', '2026-11-09'), ['d', 'a'])
+  assert.deepEqual(ids('recientes', '', { id: 'ana', creador: false }), ['a', 'b', 'c', 'd', 'e'])
+  assert.throws(() => ids('sin-contestar', '', { id: 'ana', creador: false }), /solo lo ve el creador/)
+  assert.throws(() => ids('popular'), /no existe/)
 })

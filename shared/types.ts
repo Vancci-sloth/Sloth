@@ -1131,6 +1131,8 @@ export interface AyudaMejora {
 
 /** Las secciones de la comunidad (`licencias/src/comunidad.ts`). En Anuncios solo publica el creador. */
 export type CategoriaComunidad = 'general' | 'hice' | 'ayuda' | 'mejoras' | 'estilos' | 'anuncios'
+/** Cómo se ordena el feed: por actividad, lo último publicado o, solo el creador, lo que no ha contestado. */
+export type OrdenComunidad = 'actividad' | 'recientes' | 'sin-contestar'
 
 /** Lo que los demás ven de un miembro de la comunidad. */
 export interface Autor {

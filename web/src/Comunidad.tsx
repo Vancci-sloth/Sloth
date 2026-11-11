@@ -1,5 +1,5 @@
 import { type CSSProperties, type DragEvent, useEffect, useLayoutEffect, useRef, useState } from 'react'
-import type { AdjuntoComunidad, Autor, AvisoComunidad, CategoriaComunidad, ComentarioComunidad, FeedComunidad, PublicacionComunidad, RoadmapComunidad } from '../../shared/types'
+import type { AdjuntoComunidad, Autor, AvisoComunidad, CategoriaComunidad, ComentarioComunidad, FeedComunidad, OrdenComunidad, PublicacionComunidad, RoadmapComunidad } from '../../shared/types'
 import { api, ErrorApi } from './api'
 import { Confirm } from './Confirm'
 import { Escribir, type Escrito, subirImagen } from './Escribir'
@@ -14,7 +14,7 @@ import './Comunidad.css'
 /**
  * «Comunidad»: lo que la gente hace con Sloth y cómo lo hace, como la comunidad de Skool y en la paleta de Sloth. Arriba
  * se escribe; luego, las secciones y el feed: lo fijado y después lo que tuvo actividad más reciente (un comentario la
- * sube). Cada publicación se abre en grande, con sus comentarios. A la derecha, la comunidad con sus números y tu perfil.
+ * sube), o lo último publicado y, para el creador, lo que aún no contesta (`ORDENES`). Cada publicación se abre en grande, con sus comentarios. A la derecha, la comunidad con sus números y tu perfil.
  * Vive en el Worker del cobro (`licencias/src/comunidad.ts`), por `server/comunidad.ts`, y se vuelve a pedir cada minuto
  * mientras se ve. Quién comentó algo que aún no abres lo recuerda esta computadora (`comunidad:vistas`).
  *
@@ -43,12 +43,19 @@ export const SECCIONES: { id: CategoriaComunidad; nombre: string; icono: NombreI
   { id: 'anuncios', nombre: 'Anuncios', icono: 'megafono', escribe: '¿Qué hay de nuevo en Sloth?' },
 ]
 const seccionDe = (id: CategoriaComunidad) => SECCIONES.find((s) => s.id === id) ?? SECCIONES[0]
+/** Cómo se ordena el feed. «Sin contestar» es del creador: donde la última palabra no es suya. */
+const ORDENES: { id: OrdenComunidad; nombre: string; icono: NombreIcono }[] = [
+  { id: 'actividad', nombre: 'Actividad reciente', icono: 'hilo' },
+  { id: 'recientes', nombre: 'Más recientes', icono: 'calendario' },
+  { id: 'sin-contestar', nombre: 'Sin contestar', icono: 'responder' },
+]
 
 type Yo = FeedComunidad['yo']
 
 const COMPARTIR = 'comunidad:compartir'
 const ABRIR = 'comunidad:abrir'
 const VISTAS = 'comunidad:vistas'
+const ORDEN = 'comunidad:orden'
 
 /** Lleva a la comunidad con uno de «Mis videos» listo para publicarlo en Lo que hice. */
 export function compartirVideo(v: { ruta: string; titulo: string; src: string }) {
@@ -91,6 +98,10 @@ export function Comunidad() {
     const guardada = localStorage.getItem('comunidad:seccion')
     return SECCIONES.some((s) => s.id === guardada) ? (guardada as CategoriaComunidad) : ''
   })
+  const [orden, setOrden] = useState<OrdenComunidad>(() => {
+    const guardado = localStorage.getItem(ORDEN)
+    return ORDENES.some((o) => o.id === guardado) ? (guardado as OrdenComunidad) : 'actividad'
+  })
   const [feed, setFeed] = useState<FeedComunidad | null>(null)
   const [lista, setLista] = useState<PublicacionComunidad[] | null>(null)
   const [mas, setMas] = useState(false)
@@ -121,20 +132,28 @@ export function Comunidad() {
   ahora.current = { lista, mas }
 
   const yo = feed?.yo
+  // Solo por actividad van las fijadas arriba; las páginas siguen por la fecha de su orden.
+  const conFijadas = orden === 'actividad'
+  const fechaDe = (p: PublicacionComunidad) => (orden === 'recientes' ? p.creada : p.actividad)
+  const ultimaDe = (l: PublicacionComunidad[]) => l.filter((p) => !conFijadas || !p.fijada).at(-1)
+  const consulta = (extra: Record<string, string> = {}) =>
+    new URLSearchParams({ ...(seccion ? { categoria: seccion } : {}), ...(orden !== 'actividad' ? { orden } : {}), ...extra }).toString()
 
-  async function cargar(s: CategoriaComunidad | '' = seccion) {
+  async function cargar() {
     const n = ++pedido.current
     try {
-      const f = await api<FeedComunidad>(`/api/comunidad${s ? `?categoria=${s}` : ''}`)
+      const q = consulta()
+      const f = await api<FeedComunidad>(`/api/comunidad${q ? `?${q}` : ''}`)
       if (n !== pedido.current) return
       setFeed(f)
       setError('')
       setSinCuenta(false)
-      // Al volver a pedir, lo de las páginas siguientes se queda, si aún va después de la primera.
+      // Al volver a pedir, lo de las páginas siguientes se queda, si aún va después de la primera. En «Sin contestar»
+      // no: lo que ya contestaste se va.
       const l = ahora.current.lista
       const ids = new Set(f.publicaciones.map((p) => p.id))
-      const ultima = f.publicaciones.filter((p) => !p.fijada).at(-1)?.actividad
-      const resto = l && f.mas && ultima ? l.filter((p) => !ids.has(p.id) && !p.fijada && p.actividad < ultima) : []
+      const ultima = ultimaDe(f.publicaciones)
+      const resto = l && f.mas && ultima && orden !== 'sin-contestar' ? l.filter((p) => !ids.has(p.id) && (!conFijadas || !p.fijada) && fechaDe(p) < fechaDe(ultima)) : []
       setLista([...f.publicaciones, ...resto])
       setMas(resto.length ? ahora.current.mas : f.mas)
     } catch (e) {
@@ -145,11 +164,11 @@ export function Comunidad() {
   }
 
   async function verMas() {
-    const ultima = lista?.filter((p) => !p.fijada).at(-1)?.actividad
+    const ultima = lista && ultimaDe(lista)
     if (!ultima || cargandoMas) return
     setCargandoMas(true)
     try {
-      const f = await api<FeedComunidad>(`/api/comunidad?${new URLSearchParams({ ...(seccion ? { categoria: seccion } : {}), antes: ultima })}`)
+      const f = await api<FeedComunidad>(`/api/comunidad?${consulta({ antes: fechaDe(ultima) })}`)
       setLista((l) => [...(l ?? []), ...f.publicaciones.filter((p) => !l?.some((x) => x.id === p.id))])
       setMas(f.mas)
     } catch (e) {
@@ -163,14 +182,15 @@ export function Comunidad() {
   useEffect(() => {
     void cargar()
     localStorage.setItem('comunidad:seccion', seccion)
-  }, [seccion])
+    localStorage.setItem(ORDEN, orden)
+  }, [seccion, orden])
   useEffect(() => {
     const t = setInterval(() => document.visibilityState === 'visible' && void cargar(), 60_000)
     const reloj = setInterval(() => setReloj((n) => n + 1), 60_000)
     const oir = () => void cargar()
     addEventListener('sloth-comunidad', oir)
     return () => (clearInterval(t), clearInterval(reloj), removeEventListener('sloth-comunidad', oir))
-  }, [seccion])
+  }, [seccion, orden])
 
   // Lo que llega de fuera: un video para compartir o una publicación para abrir.
   useEffect(() => {
@@ -211,9 +231,11 @@ export function Comunidad() {
     setFeed((f) => f && { ...f, yo: { ...f.yo, publicaciones: f.yo.publicaciones + 1 } })
     // Entra después de lo fijado, si es de la sección que ves; si no, cambia a la suya.
     if (seccion && seccion !== s) return setSeccion(s), setLista(null), setNueva(p.id)
+    // En «Sin contestar» no entra: la última palabra es tuya.
+    if (orden === 'sin-contestar') return
     setLista((l) => {
-      const fijadas = (l ?? []).filter((x) => x.fijada)
-      return [...fijadas, p, ...(l ?? []).filter((x) => !x.fijada)]
+      const fijadas = conFijadas ? (l ?? []).filter((x) => x.fijada) : []
+      return [...fijadas, p, ...(l ?? []).filter((x) => !fijadas.includes(x))]
     })
     setNueva(p.id)
   }
@@ -336,6 +358,21 @@ export function Comunidad() {
               </button>
             ))}
           </nav>
+          <div className="com-orden-fila">
+            <label className="com-orden" title="Cómo se ordena lo que ves">
+              <Icono de={ORDENES.find((o) => o.id === orden)?.icono ?? 'hilo'} />
+              <select
+                value={orden}
+                onChange={(e) => (setLista(null), setOrden(e.target.value as OrdenComunidad))}
+              >
+                {ORDENES.filter((o) => o.id !== 'sin-contestar' || yo?.creador || orden === o.id).map((o) => (
+                  <option key={o.id} value={o.id}>
+                    {o.nombre}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
 
           {yo && (
             <Bienvenida
@@ -360,9 +397,11 @@ export function Comunidad() {
               <div className="com-vacio-logo">
                 <img src="/icon.svg" alt="" />
               </div>
-              <strong>{seccion ? `Aún no hay nada en ${seccionDe(seccion).nombre}` : 'Aún no hay nada aquí'}</strong>
+              <strong>{orden === 'sin-contestar' ? 'Ya contestaste todo' : seccion ? `Aún no hay nada en ${seccionDe(seccion).nombre}` : 'Aún no hay nada aquí'}</strong>
               <p>
-                {seccion === 'anuncios'
+                {orden === 'sin-contestar'
+                  ? 'Aquí sale lo que alguien escribió y aún no le respondes.'
+                  : seccion === 'anuncios'
                   ? 'Lo nuevo de Sloth saldrá aquí.'
                   : seccion === 'estilos'
                     ? 'Comparte uno tuyo con «Compartir un estilo tuyo», aquí arriba: sale aquí cuando el creador lo aprueba.'
@@ -442,7 +481,8 @@ export function Comunidad() {
           onComento={() => setFeed((f) => f && { ...f, yo: { ...f.yo, comentarios: f.yo.comentarios + 1 } })}
           onBorrada={() => (setLista((l) => l?.filter((x) => x.id !== abierta) ?? l), setAbierta(null))}
           conNombre={conNombre}
-          onCerrar={() => (visto(abierta), setAbierta(null))}
+          // En «Sin contestar», lo que acabas de contestar se va al cerrar.
+          onCerrar={() => (visto(abierta), setAbierta(null), orden === 'sin-contestar' && void cargar())}
         />
       )}
       {perfil && yo && (
