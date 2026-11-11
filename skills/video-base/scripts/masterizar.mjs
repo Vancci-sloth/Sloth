@@ -6,7 +6,9 @@ Uso:
 La entrada puede ser cualquier archivo con audio (WAV crudo, MP3, un MP4). Ajusta la ganancia y limita el pico con
 sobremuestreo (el true peak es entre muestras), mide y repite hasta clavar las dos cifras. Si no las clava, falla.
 Quita lo de debajo de 30 Hz: retumbe que el móvil no reproduce y que se come el margen.
+Remuestrea con soxr si FFmpeg lo trae; si no, usa su remuestreador de serie.
 `
+import { spawnSync } from 'node:child_process'
 import { copyFileSync, renameSync, rmSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { ffmpeg, opciones, sonoridad, uso } from './ffmpeg.mjs'
@@ -42,6 +44,11 @@ if (!Number.isFinite(antes.lufs)) {
   process.exit(1)
 }
 
+// Algunas compilaciones de FFmpeg (como las de Homebrew en macOS) no traen soxr. Se prueba antes de usarlo;
+// si no está disponible, la vuelta a 48 kHz usa el remuestreador de serie y se comprueban las mismas medidas.
+const conSoxr = spawnSync('ffmpeg', ['-hide_banner', '-nostdin', '-v', 'error', '-f', 'lavfi', '-i', 'anullsrc=r=44100:cl=mono', '-t', '0.05',
+  '-af', 'aresample=48000:resampler=soxr', '-f', 'null', '-']).status === 0
+
 // El limitador va a 192 kHz para ver los picos entre muestras; deja 0,3 dB de margen a la vuelta a 48 kHz.
 let ganancia = objetivo - antes.lufs
 let limite = techo - 0.3
@@ -50,7 +57,7 @@ const tmp = salida + '.tmp.wav'
 for (let i = 0; i < 6; i++) {
   const lin = Math.min(1, Math.max(0.0625, 10 ** (limite / 20)))
   ffmpeg(['-v', 'error', '-i', entrada, '-vn', '-af',
-    `highpass=f=30,volume=${ganancia.toFixed(2)}dB,aresample=192000,alimiter=limit=${lin.toFixed(4)}:attack=1:release=60:level=false,aresample=48000:resampler=soxr`,
+    `highpass=f=30,volume=${ganancia.toFixed(2)}dB,aresample=192000,alimiter=limit=${lin.toFixed(4)}:attack=1:release=60:level=false,aresample=48000${conSoxr ? ':resampler=soxr' : ''}`,
     '-ar', '48000', '-ac', '2', '-c:a', 'pcm_s24le', tmp])
   medida = sonoridad(tmp)
   const faltan = objetivo - medida.lufs
