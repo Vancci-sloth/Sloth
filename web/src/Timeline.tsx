@@ -17,9 +17,33 @@ import { BarraSubagente, FilaSubagente, GrupoSubagentes } from './Subagentes'
 /** Una ruta del disco: `C:\…` en Windows; en Mac y Linux, de las carpetas de la gente (no `/api/…` y parecidas). */
 const RUTA = /^([A-Za-z]:[\\/]|\/(Users|home|Volumes|media|mnt|tmp)\/)/
 
-/** Clic en «Copiar» copia su bloque; clic en una ruta del disco (en `código`) la abre en el Explorador o el Finder. */
-function onMarkdownClick(e: React.MouseEvent) {
+const abrirEnDisco = (path: string, sessionId?: string) =>
+  fetch('/api/open', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ path, sessionId }) })
+
+/**
+ * Un enlace del agente: la web y el correo, fuera (en la app, al navegador); un archivo, señalado en el Explorador o el
+ * Finder: `C:\…`, `file:///…` o relativo a la carpeta del hilo (`out/video.mp4`). Nunca cambia la página de Sloth.
+ */
+function onEnlace(e: React.MouseEvent, a: HTMLAnchorElement, sessionId?: string) {
+  const href = a.getAttribute('href') ?? ''
+  if (href.startsWith('#')) return
+  e.preventDefault()
+  if (/^(https?|mailto):/i.test(href)) return void window.open(href, '_blank', 'noopener')
+  let ruta = href
+  try {
+    ruta = decodeURI(href)
+  } catch {
+    // Un `%` suelto: se queda como venía.
+  }
+  ruta = ruta.replace(/^file:\/\/\/?(?=[a-z]:)|^file:\/\//i, '')
+  if (RUTA.test(ruta) || sessionId) void abrirEnDisco(ruta, sessionId)
+}
+
+/** Clic en «Copiar» copia su bloque; clic en una ruta del disco (en `código` o enlace) la abre en el Explorador o el Finder. */
+function onMarkdownClick(e: React.MouseEvent, sessionId?: string) {
   const el = e.target as HTMLElement
+  const a = el.closest('a')
+  if (a) return onEnlace(e, a, sessionId)
   if (el.classList.contains('copy')) {
     const code = el.parentElement?.querySelector('code')?.textContent ?? ''
     navigator.clipboard.writeText(code.replace(/\n$/, '')).then(() => {
@@ -31,7 +55,7 @@ function onMarkdownClick(e: React.MouseEvent) {
   if (el.tagName !== 'CODE') return
   const text = el.textContent?.trim() ?? ''
   if (!RUTA.test(text) || text.includes('\n')) return
-  fetch('/api/open', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ path: text }) })
+  void abrirEnDisco(text)
 }
 
 /**
@@ -70,7 +94,7 @@ const Markdown = memo(function Markdown({ text, sessionId }: { text: string; ses
   }, [bloques])
   return (
     <>
-      <div className="md" ref={caja} onClick={(e) => (e.target instanceof HTMLImageElement ? setGrande(e.target.src) : onMarkdownClick(e))} />
+      <div className="md" ref={caja} onClick={(e) => (e.target instanceof HTMLImageElement ? setGrande(e.target.src) : onMarkdownClick(e, sessionId))} />
       {grande && (
         <div className="lightbox" onClick={() => setGrande(undefined)}>
           <img src={grande} alt="" />

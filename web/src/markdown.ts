@@ -7,10 +7,10 @@ import { marked, type Tokens } from 'marked'
  */
 const escapar = (t: string) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
 const INOFENSIVAS = /&lt;(\/?)(br|kbd|sub|sup|b|i|em|strong|u|s|mark|details|summary)\s*\/?&gt;/gi
-/** Sin esquema (relativa, `#ancla`), una letra de unidad (`C:\…`), o web y correo. */
+/** Sin esquema (relativa, `#ancla`), una letra de unidad (`C:\…`), web, correo o un archivo (el chat lo abre en su carpeta). */
 const segura = (href: string) => {
   const limpia = href.replace(/[\u0000-\u0020]/g, '').toLowerCase()
-  return !/^[a-z][a-z0-9+.-]+:/.test(limpia) || /^(https?|mailto):/.test(limpia)
+  return !/^[a-z][a-z0-9+.-]+:/.test(limpia) || /^(https?|mailto|file):/.test(limpia)
 }
 /** La ruta del disco de una imagen (`C:\…`, `/Users/…` o `file:///…`); si no es del disco, vacía. */
 const deDisco = (href: string) => {

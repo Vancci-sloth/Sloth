@@ -773,7 +773,11 @@ async function api(req: IncomingMessage, res: ServerResponse, url: URL): Promise
   }
 
   if (path === '/api/open' && method === 'POST') {
-    const { path: target } = await body<{ path: string }>(req)
+    const pedido = await body<{ path: string; sessionId?: string }>(req)
+    // Una ruta relativa (un enlace del agente: `out/video.mp4`) es de donde trabaja su hilo, o de la carpeta de su video.
+    const meta = pedido.sessionId ? sessions.meta(pedido.sessionId) : undefined
+    const bases = meta ? [meta.cwd, folderOf(meta)] : []
+    const target = bases.map((b) => resolve(b, pedido.path)).find((r) => existsSync(r)) ?? (bases[0] ? resolve(bases[0], pedido.path) : pedido.path)
     // Señalado en su carpeta: el Explorador y el Finder saben; en Linux se abre la carpeta que lo tiene.
     const [programa, ...args] =
       process.platform === 'win32' ? ['explorer.exe', `/select,${target}`] : process.platform === 'darwin' ? ['open', '-R', target] : ['xdg-open', existsSync(target) && statSync(target).isDirectory() ? target : dirname(target)]
