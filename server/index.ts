@@ -190,7 +190,7 @@ const publicar = redes(APP, sessions, cards, broadcast, subirLargos.lectura) // 
 // Cada card de estilo enseña su último video terminado, en pequeño.
 const previa = previas(join(APP, 'data', 'previas'), cards) // previas de las cards
 // Las imágenes que el panel de etapas enseña en rejilla, en pequeño.
-const { miniatura, cuadro } = miniaturas(join(APP, 'data', 'miniaturas')) // panel de etapas
+const { miniatura, cuadro, previa: previaChica, previaLista } = miniaturas(join(APP, 'data', 'miniaturas')) // panel de etapas
 // Ideas para YouTube: investigar el nicho de un canal y que Claude proponga videos con evidencia.
 const idear = VENTA ? undefined : ideas(APP, sessions, broadcast, subirLargos?.lectura) // ideas
 // La biblioteca de modelos 3D que llenan los videos, para verla: la de la skill que usan los agentes, que es donde guardan.
@@ -675,7 +675,7 @@ async function api(req: IncomingMessage, res: ServerResponse, url: URL): Promise
     if (meta && sessions.sumaVideo(meta) && pideConfirmar(res, masDeDos)) return true
   }
   if (await etapasApi(req, res, url, sessions, cards(), broadcast, miniatura)) return true // panel de etapas
-  if (await videosApi(req, res, url, sessions, cards(), publicar?.marcas, cuadro)) return true // panel de etapas; `publicar.marcas`, de redes
+  if (await videosApi(req, res, url, sessions, cards(), publicar?.marcas, cuadro, { hacer: previaChica, lista: previaLista })) return true // panel de etapas; `publicar.marcas`, de redes
   if (publicar && (await publicar.api(req, res, url))) return true // redes
   if (subirLargos && (await subirLargos.api(req, res, url))) return true // videos largos de YouTube
   if (await previa.api(req, res, url)) return true // previas de las cards

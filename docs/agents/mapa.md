@@ -75,7 +75,8 @@ Este es el mapa:
   esfuerzo del hilo: en Claude, Sloth los manda en la línea `Subagentes: todos = <alias> <esfuerzo>.` (las `tareas`
   medidas de la card ya no se usan). La excepción es el `guionista` del explicativo (`server/claude.ts`), que va en Opus.
 - La galería: al elegir un estilo, sus videos terminados ocupan el sitio de las cards (`videosApi` en `etapas.ts`);
-  «Mis videos» (`MisVideos.tsx`) los junta todos. Cada card enseña de fondo el más nuevo (`server/previas.ts`).
+  «Mis videos» (`MisVideos.tsx`) los junta todos, con buscador, filtros, teclado y acciones con varios. Cada card enseña de
+  fondo el más nuevo (`server/previas.ts`).
 - `server/redes/` y `web/src/Redes.tsx`: los verticales terminados se programan al ritmo que eliges en «Mis videos» (`web/src/Ritmos.tsx`, las cuentas en `shared/ritmo.ts`; YouTube lleva el suyo).
   TikTok va por su página (ADR 0002), en la página `redes` del navegador integrado, con su propio perfil (sin la ventana
   de Sloth, en un Edge con `data/redes/perfil`);
@@ -92,8 +93,7 @@ Este es el mapa:
   (`licencias/src/voz.ts`), que guarda la llave del socio y los créditos de cada quien; su catálogo sale en el menú «Voz» con el pase del cobro. El menú
   «Voz» es `web/src/ElegirVoz.tsx`: buscar en español, oír la muestra (`server/voz/muestras.ts` la guarda) o tu frase
   (`/api/voz/probar`) y clonar grabando ahí. En los estilos con `musica` en su card (el explicativo), su pie enciende la
-  música de fondo: la línea `Música: de fondo` (`lineaMusica`), que pone `skills/video-base/scripts/musica.py`. Su eval contra ElevenLabs, Fish Audio, AI Studio y Suno:
-  `docs/agents/eval-voz.md` (`node scripts/eval-voz.mjs <puerto>`).
+  música de fondo: la línea `Música: de fondo` (`lineaMusica`), que pone `skills/video-base/scripts/musica.py`.
 - Administrador (`web/src/Admin.tsx`, `/api/admin*`): solo en la computadora del creador, la que tiene su `admin.txt` (o `publicar.txt`).
   Saldo, usuarios, consumo y registro de Voices Cloning; dar, quitar y suspender.
 - `server/flow/` y `web/src/Flow.tsx`: imágenes (Nano Banana) y videos (Veo) de Google Flow, con la cuenta de la voz (en

@@ -29,7 +29,7 @@ import { conReferencia, ReferenciaVideo } from './Referencia'
 import { useSoltar } from './Soltar'
 import { CON_CHATGPT, conOpenCode, conPrimero, elegirModelos, lineaSubagentes, Modelos, type Avanzado } from './Modelos'
 import { AvisoEquipo } from './Equipo' // tu equipo
-import { MisVideos, Rejilla, VideoDe } from './MisVideos'
+import { MisVideos, precargarVideos, Rejilla, VideoDe } from './MisVideos'
 import { Modelos3D } from './Modelos3D' // modelos 3D
 import { abrirPublicacion, Comunidad } from './Comunidad' // comunidad
 import { CompartirEstilo, ImportarEstilo } from './Estilos' // estilos compartidos
@@ -165,6 +165,12 @@ export function App() {
     const onHash = () => setView(readHash())
     addEventListener('hashchange', onHash)
     return () => removeEventListener('hashchange', onHash)
+  }, [])
+
+  // «Mis videos» se pide de antemano, con la app ya quieta: al entrar, la lista y sus primeras portadas ya están.
+  useEffect(() => {
+    const t = setTimeout(() => void precargarVideos().catch(() => {}), 2500)
+    return () => clearTimeout(t)
   }, [])
 
   useEffect(() => {
@@ -502,7 +508,7 @@ export function App() {
             Ideas
           </button>
         )}
-        <button className={`new-chat${view.kind === 'videos' ? ' active' : ''}`} onClick={() => go({ kind: 'videos' })} title={plegada ? 'Mis videos' : undefined}>
+        <button className={`new-chat${view.kind === 'videos' ? ' active' : ''}`} onClick={() => go({ kind: 'videos' })} onPointerEnter={() => void precargarVideos({ reciente: 15_000 }).catch(() => {})} onPointerDown={(e) => e.button === 0 && go({ kind: 'videos' })} title={plegada ? 'Mis videos' : undefined}>
           <span className="new-chat-icon">
             <Icono de="video" />
           </span>{' '}

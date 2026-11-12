@@ -141,28 +141,44 @@ input, textarea, select { font: inherit; color: inherit; }
 .estilo-vacio { color: var(--muted); text-align: center; margin: 24px 0; }
 /* Mientras se desplaza una rejilla (`useDesplazando`), lo de dentro no responde al ratón. */
 .desplazando > * { pointer-events: none; }
-.videos { display: flex; flex-wrap: wrap; align-content: flex-start; gap: 12px; min-height: 0; overflow-y: auto; margin: 0 -6px; padding: 6px; }
-.video-tile { display: flex; flex-direction: column; gap: 6px; text-align: left; }
-/* Todos a la misma altura: el ancho sale de cada video, así caben juntos los verticales y los horizontales. */
-.video-tile video { display: block; height: 200px; width: auto; max-width: 100%; border-radius: var(--radio); background: var(--panel-2); border: 1px solid var(--line); transition: border-color 0.15s; }
-.video-tile:hover video { border-color: var(--amber); }
-/* Su forma, ya antes de cargar, y escrita abajo a la izquierda: un hilo puede tener el mismo episodio en las dos. */
-.video-marco { position: relative; display: block; align-self: flex-start; max-width: 100%; }
-.video-marco.vertical video { aspect-ratio: 9 / 16; object-fit: contain; }
-.video-marco.horizontal video { aspect-ratio: 16 / 9; object-fit: contain; }
-.video-forma { position: absolute; left: 7px; bottom: 7px; padding: 2px 7px; border-radius: 999px; background: rgba(15, 14, 12, 0.8); color: var(--text); font-size: 11px; font-weight: 600; pointer-events: none; }
-.video-titulo, .video-archivo { width: 0; min-width: 100%; font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.video-archivo { margin-top: -6px; font-size: 11.5px; font-family: var(--mono); color: var(--muted); }
-/* El ✕ de cada video, como el de las cards: arriba a la izquierda (a la derecha va la palomita de redes), al pasar por encima. */
-.video-con-subida { position: relative; }
-.video-borrar { position: absolute; top: 7px; left: 7px; z-index: 1; width: 24px; height: 24px; display: grid; place-items: center; border-radius: 6px; background: rgba(15, 14, 12, 0.8); color: var(--text); font-size: 12px; opacity: 0; transition: opacity 0.15s; }
-.video-con-subida:hover .video-borrar, .video-borrar:focus-visible { opacity: 1; }
-.video-borrar:hover { background: var(--panel); color: var(--bad); }
-/* comunidad: compartir el video, junto al ✕. */
-.video-compartir { position: absolute; top: 7px; left: 35px; z-index: 1; width: 24px; height: 24px; display: grid; place-items: center; border-radius: 6px; background: rgba(15, 14, 12, 0.8); color: var(--text); opacity: 0; transition: opacity 0.15s; }
-.video-con-subida:hover .video-compartir, .video-compartir:focus-visible { opacity: 1; }
-.video-compartir:hover { background: var(--panel); color: var(--amber); }
-.video-compartir-ico { width: 13px; height: 13px; }
+.videos { --alto: 200px; display: flex; flex-wrap: wrap; align-content: flex-start; gap: 18px 14px; min-height: 0; overflow-y: auto; margin: 0 -6px; padding: 6px; }
+/* Cada video: su portada, lo que dura, su título y de dónde es. El ancho sale de su forma, a la misma altura (--alto): así
+   caben juntos los verticales y los horizontales. */
+.video-con-subida { position: relative; display: flex; flex-direction: column; }
+.video-tile { display: flex; flex-direction: column; gap: 5px; text-align: left; border-radius: 12px; outline: none; }
+.video-marco { position: relative; display: block; align-self: flex-start; height: var(--alto); aspect-ratio: 9 / 16; overflow: hidden; border-radius: 12px; background: var(--panel-2); box-shadow: inset 0 0 0 1px var(--line); }
+.video-marco.horizontal { aspect-ratio: 16 / 9; }
+.video-marco img, .video-marco video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+/* El video tapa la portada solo cuando ya se mueve: antes, un cuadro negro. */
+.video-marco video { opacity: 0; }
+.video-marco.moviendo video { opacity: 1; }
+.video-marco::after { content: ''; position: absolute; inset: 0; border-radius: inherit; box-shadow: inset 0 0 0 1px var(--line); pointer-events: none; transition: box-shadow 0.15s; }
+.video-tile:hover .video-marco::after { box-shadow: inset 0 0 0 2px var(--amber); }
+.video-tile:focus-visible .video-marco::after { box-shadow: inset 0 0 0 2px var(--amber), 0 0 0 3px var(--amber-tinte); }
+.video-dura { position: absolute; right: 6px; bottom: 6px; padding: 0 5px; border-radius: 6px; background: rgba(15, 14, 12, 0.85); color: var(--text); font-size: 14.5px; font-weight: 600; font-variant-numeric: tabular-nums; pointer-events: none; }
+/* Siempre de dos líneas de alto: la fecha y las marcas de una fila quedan a la misma altura. */
+.video-titulo { width: 0; min-width: 100%; min-height: 2.6em; font-size: 15px; font-weight: 600; line-height: 1.3; color: var(--text); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
+.video-meta { width: 0; min-width: 100%; display: flex; align-items: center; gap: 4px; margin-top: -2px; font-size: 14.5px; color: color-mix(in srgb, var(--muted) 60%, var(--text)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.video-meta .ico, .video-meta svg { width: 13px; height: 13px; flex: none; }
+/* Al pasar o con el foco, encima de la portada: elegir a la izquierda; bajar, compartir y borrar en columna a la derecha. */
+.video-acciones { position: absolute; top: 6px; left: 6px; right: 6px; display: flex; justify-content: space-between; align-items: flex-start; pointer-events: none; }
+.video-acciones button { pointer-events: auto; flex: none; width: 28px; height: 28px; display: grid; place-items: center; border-radius: 8px; background: rgba(15, 14, 12, 0.85); color: var(--text); opacity: 0; transition: opacity 0.12s, color 0.12s; }
+.video-acciones button svg { width: 15px; height: 15px; }
+.video-acciones-der { display: flex; flex-direction: column; gap: 4px; }
+.video-con-subida:hover .video-acciones button, .video-con-subida:focus-within .video-acciones button, .videos.eligiendo .video-elegir, .video-con-subida.elegido .video-elegir { opacity: 1; }
+.video-acciones button:hover { color: var(--amber); }
+.video-acciones .video-borrar:hover { color: var(--bad); }
+.video-elegir { box-shadow: inset 0 0 0 1.5px var(--text); }
+.video-elegir svg { opacity: 0; }
+.video-con-subida.elegido .video-elegir { background: var(--amber); color: var(--sobre-ambar); box-shadow: none; }
+.video-con-subida.elegido .video-elegir svg { opacity: 1; }
+.video-con-subida.elegido .video-marco::after { box-shadow: inset 0 0 0 3px var(--amber); }
+/* Las marcas de redes, del ancho de la portada: no la ensanchan. */
+.video-tile .insignia { display: block; width: 0; min-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+.video-tile .insignia::before { display: inline-block; margin: 0 6px 1px 0; vertical-align: middle; }
+/* Las que llevan acciones (reintentar, descartar) se parten en líneas: ninguna queda cortada. */
+.video-tile .insignia:has([role="button"]) { white-space: normal; }
+.video-con-subida:hover .video-listo, .video-con-subida:focus-within .video-listo { opacity: 0; }
 
 /* El compositor */
 .composer { background: var(--panel-2); border: 1px solid var(--line); border-radius: 16px; padding: 12px 12px 10px 16px; transition: border-color 0.15s; }

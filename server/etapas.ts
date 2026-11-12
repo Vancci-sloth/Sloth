@@ -1,5 +1,7 @@
-import { closeSync, createReadStream, existsSync, fstatSync, globSync, mkdirSync, openSync, readdirSync, readSync, type Stats, statSync, watch } from 'node:fs'
+import { closeSync, constants, createReadStream, existsSync, fstatSync, globSync, mkdirSync, openSync, readdirSync, readSync, type Stats, statSync, watch } from 'node:fs'
+import { copyFile, rm } from 'node:fs/promises'
 import type { IncomingMessage, ServerResponse } from 'node:http'
+import { homedir } from 'node:os'
 import { pipeline } from 'node:stream'
 import { basename, extname, isAbsolute, join, matchesGlob, relative, resolve, sep } from 'node:path'
 import { enCurso } from '../shared/etapas.ts'
@@ -146,18 +148,27 @@ export function carpetasDe(card: Card): string[] {
  * ni llamar a ffprobe. `undefined` si no se pudo leer. Se guarda por archivo y fecha.
  */
 export function esVertical(file: string, t: number): boolean | undefined {
+  return formaDe(file, t).vertical
+}
+
+/** Lo mismo, y cuántos segundos dura (del `mvhd`), para la tarjeta de «Mis videos». */
+export function formaDe(file: string, t: number): Forma {
   const clave = `${file}|${t}`
   if (!formas.has(clave)) formas.set(clave, leerForma(file))
-  return formas.get(clave)
+  return formas.get(clave)!
 }
-const formas = new Map<string, boolean | undefined>()
+interface Forma {
+  vertical?: boolean
+  segundos?: number
+}
+const formas = new Map<string, Forma>()
 
-function leerForma(file: string): boolean | undefined {
+export function leerForma(file: string): Forma {
   let fd: number
   try {
     fd = openSync(file, 'r')
   } catch {
-    return undefined
+    return {}
   }
   try {
     const size = fstatSync(fd).size
@@ -169,20 +180,31 @@ function leerForma(file: string): boolean | undefined {
       let salto = 8
       if (largo === 1) (largo = Number(cab.readBigUInt64BE(8))), (salto = 16)
       else if (largo === 0) largo = size - pos
-      if (largo < salto) return undefined
+      if (largo < salto) return {}
       if (cab.toString('latin1', 4, 8) === 'moov') {
         const moov = Buffer.alloc(largo - salto)
         readSync(fd, moov, 0, moov.length, pos + salto)
-        for (const [tipo, trak] of cajas(moov)) {
-          if (tipo !== 'trak') continue
-          const tkhd = [...cajas(trak)].find(([t]) => t === 'tkhd')?.[1]
+        const forma: Forma = {}
+        for (const [tipo, caja] of cajas(moov)) {
+          // `mvhd`: versión 0 con escala y duración de 32 bits en 12 y 16; versión 1, de 32 y 64 bits en 20 y 24.
+          const v1 = caja[0] === 1
+          if (tipo === 'mvhd' && caja.length >= (v1 ? 32 : 20)) {
+            const escala = caja.readUInt32BE(v1 ? 20 : 12)
+            const dura = v1 ? Number(caja.readBigUInt64BE(24)) : caja.readUInt32BE(16)
+            // Todo unos es «no se sabe»: entonces no se dice.
+            const desconocida = v1 ? caja.readBigUInt64BE(24) === 0xffffffffffffffffn : dura === 0xffffffff
+            // Cero en un MP4 fragmentado (la duración va en sus fragmentos): tampoco se dice.
+            if (escala && dura && !desconocida) forma.segundos = Math.round((dura / escala) * 10) / 10
+          }
+          if (tipo !== 'trak' || forma.vertical !== undefined) continue
+          const tkhd = [...cajas(caja)].find(([t]) => t === 'tkhd')?.[1]
           if (!tkhd || tkhd.length < 8) continue
           // El ancho y el alto (16.16) son lo último del `tkhd`; una pista de audio los tiene en cero.
           const ancho = tkhd.readUInt32BE(tkhd.length - 8)
           const alto = tkhd.readUInt32BE(tkhd.length - 4)
-          if (ancho && alto) return alto > ancho
+          if (ancho && alto) forma.vertical = alto > ancho
         }
-        return undefined
+        return forma
       }
       pos += largo
     }
@@ -190,7 +212,7 @@ function leerForma(file: string): boolean | undefined {
   } finally {
     closeSync(fd)
   }
-  return undefined
+  return {}
 }
 
 /** Las cajas de un trozo de MP4: su tipo y su contenido. */
@@ -251,11 +273,16 @@ function otraVersion(meta: SessionMeta, sessions: Sessions): { antes: string; nu
  * recorre una vez. Un video que sale en dos estilos (una card duplicada mira las mismas carpetas) va una vez, con el
  * primero. `POST /api/videos/borrar` manda uno a la Papelera. Devuelve si atendió la petición.
  */
-export async function videosApi(req: IncomingMessage, res: ServerResponse, url: URL, sessions: Sessions, cards: Card[], marcas?: (videos: VideoHecho[]) => Promise<MarcasDeRedes | undefined>, cuadro?: (video: string) => Promise<string>): Promise<boolean> {
+export async function videosApi(req: IncomingMessage, res: ServerResponse, url: URL, sessions: Sessions, cards: Card[], marcas?: (videos: VideoHecho[]) => Promise<MarcasDeRedes | undefined>, cuadro?: (video: string) => Promise<string>, previa?: { hacer(video: string): Promise<string>; lista(video: string): string | null }): Promise<boolean> {
   if (url.pathname === '/api/videos' && req.method === 'GET') {
     const porRuta = new Map<string, VideoHecho>()
     for (const c of cards) if (c.etapas?.length) for (const v of videosDe(c, sessions)) if (!porRuta.has(v.ruta)) porRuta.set(v.ruta, v)
     const videos = [...porRuta.values()].sort((a, b) => b.t - a.t)
+    // Las portadas de los más nuevos se hacen ya, de fondo y en orden: cuando la rejilla las pida, están en el disco.
+    for (const v of videos.slice(0, PORTADAS_DE_ANTEMANO)) void cuadro?.(v.ruta).catch(() => {})
+    // Y, si la pide «Mis videos» abierta (`?previas`, no la precarga al arrancar), sus vistas previas: van a la cola de
+    // FFmpeg detrás de las portadas.
+    if (url.searchParams.has('previas')) for (const v of videos.slice(0, PREVIAS_DE_ANTEMANO)) void previa?.hacer(v.ruta).catch(() => {})
     return json(res, 200, { videos, redes: await marcas?.(videos) } satisfies VideosDeTodos)
   }
   // El ✕ de un video terminado: su archivo va a la Papelera; lo demás de su carpeta se queda. No si un agente trabaja en
@@ -277,6 +304,36 @@ export async function videosApi(req: IncomingMessage, res: ServerResponse, url: 
     if ((await aLaPapelera([ruta])).length) return json(res, 409, { error: 'Windows no lo dejó mover a la Papelera: puede que otro programa lo tenga abierto.' })
     return json(res, 200, { ok: true })
   }
+  // Bajar uno o varios: se copian a la carpeta Descargas con el nombre de su carpeta delante. Así no sale un diálogo de
+  // guardar por cada uno, y lo de varios a la vez queda junto.
+  if (url.pathname === '/api/videos/descargar' && req.method === 'POST') {
+    let texto = ''
+    for await (const trozo of req) texto += trozo
+    let rutas: unknown
+    try {
+      rutas = JSON.parse(texto || '{}')?.rutas
+    } catch {
+      return json(res, 400, { error: 'El pedido no es JSON.' })
+    }
+    if (!Array.isArray(rutas) || !rutas.length || rutas.some((r) => typeof r !== 'string')) return json(res, 400, { error: 'Falta qué videos bajar.' })
+    const conocidos = new Map(cards.flatMap((c) => (c.etapas?.length ? videosDe(c, sessions) : [])).map((v) => [v.ruta, v]))
+    // La misma ruta dos veces se copia una.
+    const videos = [...new Set(rutas as string[])].map((r) => conocidos.get(r))
+    if (videos.some((v) => !v)) return json(res, 404, { error: 'Alguno ya no está.' })
+    const carpeta = join(homedir(), 'Downloads')
+    mkdirSync(carpeta, { recursive: true })
+    const copias: string[] = []
+    for (const v of videos as VideoHecho[]) {
+      try {
+        copias.push(await copiarSinPisar(v.ruta, carpeta, nombreDeDescarga(v)))
+      } catch (e) {
+        // Si falla a la mitad (disco lleno), se dice cuáles sí quedaron.
+        const listos = copias.length ? ` Sí quedaron ${copias.length} de ${videos.length}.` : ''
+        return json(res, 500, { error: `No se pudo copiar «${basename(v.ruta)}»: ${e instanceof Error ? e.message : e}.${listos}`, copias })
+      }
+    }
+    return json(res, 200, { carpeta, copias })
+  }
   const m =/^\/api\/cards\/([\w-]+)\/(videos|video)$/.exec(url.pathname)
   if (!m || req.method !== 'GET') return false
   const card = cards.find((c) => c.id === m[1])
@@ -290,11 +347,54 @@ export async function videosApi(req: IncomingMessage, res: ServerResponse, url: 
     // `&cuadro`: su primer cuadro, en pequeño, para su tarjeta (`server/miniaturas.ts`). Si FFmpeg falla, no hay imagen y la
     // tarjeta se ve al reproducirlo.
     if (url.searchParams.has('cuadro') && cuadro) return servir(req, res, await cuadro(file).catch(() => ''))
+    // `&previa`: la vista previa chica de la tarjeta. Si aún no está hecha, va el original y se pide (no se espera a FFmpeg).
+    if (url.searchParams.has('previa') && previa) {
+      const lista = previa.lista(file)
+      if (lista) return servir(req, res, lista)
+      void previa.hacer(file).catch(() => {})
+    }
     return servir(req, res, file)
   }
 
   return json(res, 200, videosDe(card, sessions))
 }
+
+/**
+ * El nombre de un video al bajarlo: su carpeta y su archivo (`pica-chile - vertical.mp4`), o solo el archivo si ya se
+ * llama como la carpeta (`pica-chile.mp4`).
+ */
+export function nombreDeDescarga(v: Pick<VideoHecho, 'ruta' | 'archivo'>): string {
+  const partes = v.ruta.split(/[\\/]/)
+  const carpeta = partes[partes.length - 1 - v.archivo.split('/').length] ?? ''
+  const solo = basename(v.archivo)
+  const nombre = solo.replace(/\.\w+$/, '').toLowerCase() === carpeta.toLowerCase() || !carpeta ? solo : `${carpeta} - ${solo}`
+  return nombre.replace(/[<>:"/\\|?*]/g, '-')
+}
+
+/**
+ * Copia `origen` a `carpeta` con `nombre`, o con « (2)», « (3)»… si ya hay uno así. Sin pisar nunca: si otra copia toma
+ * el nombre a la vez, esta prueba el siguiente (`COPYFILE_EXCL`). Una copia a medias no se queda.
+ */
+async function copiarSinPisar(origen: string, carpeta: string, nombre: string): Promise<string> {
+  const ext = extname(nombre)
+  const base = nombre.slice(0, nombre.length - ext.length)
+  for (let k = 1; ; k++) {
+    const destino = join(carpeta, k === 1 ? nombre : `${base} (${k})${ext}`)
+    try {
+      await copyFile(origen, destino, constants.COPYFILE_EXCL)
+      return destino
+    } catch (e) {
+      if ((e as NodeJS.ErrnoException).code === 'EEXIST') continue
+      await rm(destino, { force: true }).catch(() => {})
+      throw e
+    }
+  }
+}
+
+/** Cuántas portadas de «Mis videos» se hacen al pedir la lista: las de las primeras pantallas. */
+const PORTADAS_DE_ANTEMANO = 40
+/** Y de cuántos su vista previa chica (`server/miniaturas.ts`): las de la primera tanda de la rejilla. */
+const PREVIAS_DE_ANTEMANO = 30
 
 /** Los videos terminados de un estilo, del más nuevo al más viejo. También los usan las redes (`server/redes/`). */
 export function videosDe(card: Card, sessions: Sessions): VideoHecho[] {
@@ -324,7 +424,7 @@ export function videosDe(card: Card, sessions: Sessions): VideoHecho[] {
         t: a.t,
         sessionId: hilo?.id,
         cardId: card.id,
-        vertical: esVertical(file, a.t)
+        ...formaDe(file, a.t)
       })
     }
   }

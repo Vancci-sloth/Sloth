@@ -151,6 +151,8 @@ export interface VideoHecho {
   cardId: string
   /** Si es vertical (TikTok, Instagram) u horizontal (YouTube); sin él, no se pudo leer. */
   vertical?: boolean
+  /** Cuánto dura, leído de su cabecera; sin él, no se pudo leer. */
+  segundos?: number
 }
 
 /**

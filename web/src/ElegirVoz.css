@@ -117,7 +117,7 @@
   .voz-ecualizador i, .voz-girando, .voz-avance { animation: none; }
 }
 
-/* Lo que no es la lista también se lee: el texto del menú no baja de 14,5 px (medido en docs/agents/eval-voz.md). */
+/* Lo que no es la lista también se lee: el texto del menú no baja de 14,5 px. */
 .voz-panel p, .voz-panel .small, .voz-panel .bad { font-size: 14.5px; }
 .voz-panel .bad { color: color-mix(in srgb, var(--bad) 60%, var(--text)); }
 .voz-panel .muted { color: var(--suave); }
