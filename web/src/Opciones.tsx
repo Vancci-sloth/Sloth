@@ -499,15 +499,35 @@ export function useConAgente(models: Model[] = []) {
   return cuentas && (cuentas !== 'ninguna' || !!otro)
 }
 
+type Cuentas = 'claude' | 'codex' | 'opencode' | 'ninguna'
+/**
+ * Lo último que se supo de las cuentas, en memoria y en esta computadora: cada «Nuevo chat» monta el inicio otra vez, y
+ * sin esto se dibujaba con «Optimizado» hasta que respondía el servidor, y la barra del compositor saltaba.
+ */
+let cuentasSabidas: Cuentas | undefined = (() => {
+  try {
+    return (localStorage.getItem('sloth-cuentas') as Cuentas | null) ?? undefined
+  } catch {
+    return undefined
+  }
+})()
+
 /** Qué cuenta hay de Claude, ChatGPT u OpenCode, por ese orden, y el primero de los demás agentes que tenga modelos. */
 function useCuentas(models: Model[]) {
-  const [cuentas, setCuentas] = useState<'claude' | 'codex' | 'opencode' | 'ninguna'>()
+  const [cuentas, setCuentas] = useState<Cuentas | undefined>(cuentasSabidas)
   const otro = OTROS_AGENTES.find((p) => models.some((m) => proveedorDe(m.id) === p))
   useEffect(() => {
     let vivo = true
+    const saber = (c: Cuentas) => {
+      cuentasSabidas = c
+      try {
+        localStorage.setItem('sloth-cuentas', c)
+      } catch {}
+      if (vivo) setCuentas(c)
+    }
     const leer = () =>
       Promise.all([api<Cuenta>('/api/claude/cuenta'), api<Cuenta>('/api/codex/cuenta'), api<Cuenta>('/api/opencode/cuenta')]).then(
-        ([claude, codex, opencode]) => vivo && setCuentas(claude.conectada ? 'claude' : codex.conectada ? 'codex' : opencode.conectada ? 'opencode' : 'ninguna'),
+        ([claude, codex, opencode]) => saber(claude.conectada ? 'claude' : codex.conectada ? 'codex' : opencode.conectada ? 'opencode' : 'ninguna'),
         () => vivo && setCuentas('claude')
       )
     void leer()

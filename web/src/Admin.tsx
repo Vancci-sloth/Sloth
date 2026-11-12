@@ -101,10 +101,28 @@ interface Usuario {
 const CREADOR = 'creador'
 const ACCIONES: Record<string, string> = { alta: 'Alta', sesion: 'Abrió la ventana', tts: 'Generó voz', tarea: 'Tarea que tardó', creditos: 'Créditos', estado: 'Estado' }
 
-/** Si esta Sloth es la del creador: la barra enseña Administrador solo entonces. */
+/**
+ * Si esta Sloth es la del creador: la barra enseña Administrador solo entonces. Arranca con lo último que se supo en
+ * esta computadora (si no, «Administrador» salía un momento después y empujaba la lista de hilos) y el servidor lo
+ * confirma.
+ */
 export function useEsCreador(): boolean {
-  const [si, setSi] = useState(false)
-  useEffect(() => void api<{ creador: boolean }>('/api/admin').then((r) => setSi(!!r.creador), () => setSi(false)), [])
+  const [si, setSi] = useState(() => {
+    try {
+      return localStorage.getItem('sloth-creador') === '1'
+    } catch {
+      return false
+    }
+  })
+  useEffect(() => {
+    const saber = (s: boolean) => {
+      setSi(s)
+      try {
+        localStorage.setItem('sloth-creador', s ? '1' : '0')
+      } catch {}
+    }
+    void api<{ creador: boolean }>('/api/admin').then((r) => saber(!!r.creador), () => setSi(false))
+  }, [])
   return si
 }
 

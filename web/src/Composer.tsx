@@ -1,4 +1,5 @@
-import { type ReactNode, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { type ReactNode, useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
+import { consultaBarra, filtrarBarra, type OpcionBarra } from './menu-estilos'
 import type { GastoFlow, Model } from '../../shared/types'
 import { proveedorDe, type Proveedor } from '../../shared/providers'
 import { imageUrl, Thumbs, type Attached } from './Images'
@@ -465,6 +466,9 @@ export function Composer(props: {
   draft?: Draft
   /** Cada cambio del campo, para guardarlo como borrador. */
   onDraft?(draft: Draft): void
+  /** En el inicio: `/` y unas letras al principio del campo abren el menú para cambiar de estilo (`menu-estilos.ts`). */
+  estilos?: OpcionBarra[]
+  onEstilo?(id: string): void
   /** Con el agente trabajando, le llega ya, en mitad del turno. */
   onSend(text: string, choice: Choice, images: string[]): Promise<unknown>
   /** Si falla, el modelo vuelve al de antes y el error sale en la barra, como los de mandar. Lo mismo al detener. */
@@ -578,6 +582,25 @@ export function Composer(props: {
   const empty = !props.vacio && !text.trim() && !images.length
   const trabajando = props.running || props.background
 
+  // El menú de «/»: sale mientras el campo es solo `/` y unas letras. Escape lo cierra hasta que cambie lo escrito.
+  const idMenu = useId()
+  const consulta = props.estilos && !images.length ? consultaBarra(text) : undefined
+  const [menuCerrado, setMenuCerrado] = useState(false)
+  const [activa, setActiva] = useState(0)
+  const enMenu = consulta === undefined || menuCerrado ? [] : filtrarBarra(props.estilos!, consulta)
+  const opcionActiva = enMenu[Math.min(activa, enMenu.length - 1)]
+  useEffect(() => {
+    setActiva(0)
+    setMenuCerrado(false)
+  }, [consulta])
+  /** Cambia de estilo y deja el campo vacío, con el cursor: para escribir el pedido ya. */
+  function elegirEstilo(o: OpcionBarra) {
+    box.current!.replaceChildren()
+    sync()
+    props.onEstilo?.(o.id)
+    box.current!.focus()
+  }
+
   async function submit() {
     if (empty || !choice || busy || uploading || props.bloqueo) return
     setBusy(true)
@@ -670,6 +693,39 @@ export function Composer(props: {
           sync()
         }}
       />
+      {opcionActiva && (
+        <div className="barra-menu">
+          <span className="barra-titulo">Cambiar de estilo</span>
+          <div role="listbox" id={idMenu} aria-label="Estilos">
+            {enMenu.map((o) => (
+              <div
+                key={o.id}
+                id={`${idMenu}-${o.id}`}
+                role="option"
+                aria-selected={o === opcionActiva}
+                className={`barra-opcion${o === opcionActiva ? ' activa' : ''}`}
+                // Se elige con el clic (al soltar, y con el dedo sin elegir al desplazar); al apretar, el campo no
+                // pierde el foco.
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => elegirEstilo(o)}
+                onPointerMove={() => o !== opcionActiva && setActiva(enMenu.indexOf(o))}
+                ref={o === opcionActiva ? (el) => el?.scrollIntoView({ block: 'nearest' }) : undefined}
+              >
+                {o.icono && (
+                  <span className="barra-icono">
+                    <Icon icon={o.icono} />
+                  </span>
+                )}
+                <span className="barra-nombre">{o.titulo}</span>
+                {o.detalle && <span className="barra-detalle">{o.detalle}</span>}
+              </div>
+            ))}
+          </div>
+          <span className="barra-pie">
+            <kbd>↑</kbd> <kbd>↓</kbd> para moverte, <kbd>Enter</kbd> para elegir, <kbd>Esc</kbd> para cerrar
+          </span>
+        </div>
+      )}
       <div className="editor">
         {!text && !images.some((i) => i.chip) && (
           <span className="placeholder">{props.running ? 'Enter le llega ya, en mitad del turno' : props.placeholder}</span>
@@ -680,6 +736,9 @@ export function Composer(props: {
           contentEditable="plaintext-only"
           role="textbox"
           aria-multiline
+          aria-label={props.placeholder.replace(/…$/, '').replace(/… /g, ', ')}
+          aria-controls={opcionActiva ? idMenu : undefined}
+          aria-activedescendant={opcionActiva ? `${idMenu}-${opcionActiva.id}` : undefined}
           onInput={sync}
           onPaste={(e) => {
             const files = Array.from(e.clipboardData.files)
@@ -694,6 +753,15 @@ export function Composer(props: {
             insert(...nodes)
           }}
           onKeyDown={(e) => {
+            if (opcionActiva) {
+              if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+                e.preventDefault()
+                const n = enMenu.length
+                return setActiva((enMenu.indexOf(opcionActiva) + (e.key === 'ArrowDown' ? 1 : n - 1)) % n)
+              }
+              if ((e.key === 'Enter' && !e.shiftKey) || e.key === 'Tab') return e.preventDefault(), elegirEstilo(opcionActiva)
+              if (e.key === 'Escape') return e.preventDefault(), e.stopPropagation(), setMenuCerrado(true)
+            }
             if (e.key === 'Enter' && !e.shiftKey) {
               e.preventDefault()
               submit()

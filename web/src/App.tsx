@@ -11,6 +11,8 @@ import { CuentaClaude, Opciones, Requisitos, useSinClaude } from './Opciones'
 import { api } from './api'
 import { eventos, useFallo, useResumen } from './eventos'
 import { useDesplazando } from './desplazando'
+import { useEncajar } from './encajar'
+import { useRecordado } from './recordado'
 import { avisarAnuncio, useAvisos } from './avisos'
 import { TituloDeFila, useBarraPlegada, vistaDeLote, vistaDeVideo, type Plegado, type Vista } from './Barra'
 import { Composer, Icon, Picker, type Choice, type Draft } from './Composer'
@@ -156,9 +158,10 @@ export function App() {
     }
   })
   useEffect(() => localStorage.setItem('drafts', JSON.stringify(drafts)), [drafts])
-  // El hilo nuevo en blanco también escribe en un borrador, que solo sale en la lista cuando lo dejas a medias.
-  const [freshId, setFreshId] = useState(() => sessionStorage.getItem('fresh') ?? newId())
-  useEffect(() => sessionStorage.setItem('fresh', freshId), [freshId])
+  // El hilo nuevo en blanco también escribe en un borrador, que solo sale en la lista cuando lo dejas a medias. Se
+  // recuerda también al cerrar Sloth: al volver, lo que escribías sigue en el campo, no en «Borradores».
+  const [freshId, setFreshId] = useState(() => sessionStorage.getItem('fresh') || localStorage.getItem('fresh') || newId())
+  useEffect(() => (sessionStorage.setItem('fresh', freshId), localStorage.setItem('fresh', freshId)), [freshId])
   const draftId = view.kind === 'draft' ? view.id : view.kind === 'new' ? freshId : null
 
   useEffect(() => {
@@ -398,9 +401,25 @@ export function App() {
     return () => (clearInterval(t), removeEventListener('sloth-comunidad-avisos', pedir))
   }, [])
   const buscar = () => (plegar(false), setTimeout(() => campoBusca.current?.focus()))
+  // Un chat nuevo desde cualquier parte, con el cursor ya en su campo: Alt+N en Windows y Linux (también en un navegador,
+  // que no lo usa); en Mac, Cmd+N (en la ventana de Sloth: Opción+N escribe la ñ). Y Ctrl+Mayús+O, el de ChatGPT y
+  // Gemini. Ctrl+N también, en la ventana de Sloth (un navegador lo guarda para abrir otra ventana).
+  const alNuevo = useRef(newChat)
+  alNuevo.current = newChat
+  /** «Nuevo chat» ya se abrió al apretar el ratón: el clic de cuando suelta no abre otro. */
+  const abrioAlApretar = useRef(false)
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') e.preventDefault(), buscar()
+      const tecla = e.key.toLowerCase()
+      if ((e.ctrlKey || e.metaKey) && tecla === 'k') e.preventDefault(), buscar()
+      if (e.repeat || e.defaultPrevented) return
+      // En Mac, Cmd: Ctrl+N es «bajar una línea» en un campo de texto.
+      const mando = MAC ? e.metaKey && !e.ctrlKey : e.ctrlKey && !e.metaKey
+      // Por la tecla o por su sitio: algunos teclados (y lo que teclea un programa) no traen `code`.
+      const altN = !MAC && e.altKey && !e.ctrlKey && !e.metaKey && !e.shiftKey && (e.code === 'KeyN' || tecla === 'n')
+      const ctrlN = mando && !e.altKey && !e.shiftKey && tecla === 'n'
+      const ctrlMayusO = mando && !e.altKey && e.shiftKey && tecla === 'o'
+      if (altN || ctrlN || ctrlMayusO) e.preventDefault(), alNuevo.current()
     }
     addEventListener('keydown', onKey)
     return () => removeEventListener('keydown', onKey)
@@ -494,7 +513,22 @@ export function App() {
             </svg>
           </button>
         </div>
-        <button className={`new-chat${view.kind === 'new' ? ' active' : ''}`} onClick={newChat} title={plegada ? 'Nuevo chat' : undefined}>
+        {/* Abre al apretar, como los menús del sistema; con el teclado (Enter, espacio), al soltar. */}
+        <button
+          className={`new-chat${view.kind === 'new' ? ' active' : ''}`}
+          onPointerDown={(e) => {
+            // Con el dedo o el lápiz, abre al soltar (el clic); con el ratón, ya.
+            abrioAlApretar.current = e.button === 0 && e.pointerType === 'mouse'
+            if (abrioAlApretar.current) newChat()
+          }}
+          onClick={(e) => {
+            // Con el teclado (detail 0) o con el dedo, abre aquí.
+            if (e.detail === 0 || !abrioAlApretar.current) newChat()
+            abrioAlApretar.current = false
+          }}
+          title={`${plegada ? 'Nuevo chat · ' : ''}${MAC ? 'Cmd N' : 'Alt N'}`}
+          aria-keyshortcuts={MAC ? 'Meta+N Meta+Shift+O' : 'Alt+N Control+Shift+O'}
+        >
           <span className="new-chat-icon">
             <Icono de="mas" />
           </span>{' '}
@@ -909,6 +943,7 @@ function NewSession(props: {
     []
   )
 
+  const opcionesBarra = useMemo(() => props.cards.map((c) => ({ id: c.id, titulo: c.title, skill: c.skill, icono: c.icon, detalle: c.description })), [props.cards])
   const composer = (
       <Composer
         models={models}
@@ -917,7 +952,12 @@ function NewSession(props: {
         draft={props.draft}
         onDraft={props.onDraft}
         bloqueo={sinCuenta ? 'Primero conecta tu cuenta (arriba)' : undefined}
-        placeholder={card.skill ? `Qué quieres de /${card.skill}…` : 'Qué cambio quieres en Sloth…'}
+        placeholder={card.skill ? `Qué quieres de ${card.title}… o escribe / para cambiar de estilo` : 'Qué cambio quieres en Sloth…'}
+        estilos={opcionesBarra}
+        onEstilo={(id) => {
+          const c = props.cards.find((x) => x.id === id)
+          if (c) props.onPick(c)
+        }}
         modelos={<Modelos conf={card.modelos} models={models} avanzado={avanzado} choice={choice} tareas={tareas} sinClaude={sinClaude} onAvanzado={cambiarModelos} />}
         extra={
           <>
@@ -1055,11 +1095,20 @@ function NewSession(props: {
         )}
       </div>
       <div className="new-bottom">
+        {/* En una línea el icono, el nombre y la versión: le deja el alto a los carteles. */}
         <div className="new-head">
-          <span className="card-icon big"><Icon icon={card.icon ?? '✦'} /></span>
-          <h1>{card.title}</h1>
+          <h1>
+            <span className="card-icon big" aria-hidden>
+              <Icon icon={card.icon ?? '✦'} />
+            </span>
+            {card.title}{' '}
+            {card.version && (
+              <span className="estilo-version" title={`Versión ${card.version} de este estilo`}>
+                v{card.version}
+              </span>
+            )}
+          </h1>
           <p>{card.description}</p>
-          {card.version && <p className="estilo-version">Versión {card.version}</p>}
           {card.tuya && (
             <button className="compartir-boton" onClick={() => setCompartiendo(card)}>
               <Icono de="compartir" className="icon-trazo" /> Compartir en la comunidad
@@ -1110,6 +1159,7 @@ const Carteles = memo(function Carteles({ cards, activa, previas, sessions, acci
   // Al desplazarlas, las que pasan bajo el cursor no arrancan su video.
   const rejilla = useRef<HTMLDivElement>(null)
   useDesplazando(rejilla)
+  useEncajar(rejilla, cards.length)
   return (
     <div className="cards" ref={rejilla}>
       {cards.map((c) => (
@@ -1213,30 +1263,12 @@ function useTerminados(card: Card | null, hilos: SessionMeta[]) {
 
 /** Las series de la skill de una card (`GET /api/cards/<id>/series`). Si falla, no hay ninguna y no sale el selector. */
 function useSeries(card: Card) {
-  const [series, setSeries] = useState<Serie[]>([])
-  useEffect(() => {
-    if (!card.skill) return setSeries([])
-    let vivo = true
-    api<Serie[]>(`/api/cards/${card.id}/series`).then((s) => vivo && setSeries(s), () => vivo && setSeries([]))
-    return () => {
-      vivo = false
-    }
-  }, [card.id])
-  return series
+  return useRecordado<Serie[]>(`series:${card.id}`, [], () => (card.skill ? api<Serie[]>(`/api/cards/${card.id}/series`) : Promise.resolve([])), [card.id])
 }
 
 /** Las marcas de la carpeta de trabajo de una card (`GET /api/cards/<id>/marcas`). Si falla, ninguna. */
 function useMarcas(card: Card) {
-  const [marcas, setMarcas] = useState<Marcas>({ otras: [] })
-  useEffect(() => {
-    if (!card.etapas) return setMarcas({ otras: [] })
-    let vivo = true
-    api<Marcas>(`/api/cards/${card.id}/marcas`).then((m) => vivo && setMarcas(m), () => vivo && setMarcas({ otras: [] }))
-    return () => {
-      vivo = false
-    }
-  }, [card.id])
-  return marcas
+  return useRecordado<Marcas>(`marcas:${card.id}`, { otras: [] }, () => (card.etapas ? api<Marcas>(`/api/cards/${card.id}/marcas`) : Promise.resolve({ otras: [] })), [card.id])
 }
 
 /**
@@ -1590,6 +1622,8 @@ function cuando(t: number) {
 
 /** Para buscar sin que importen mayúsculas ni tildes. */
 const sinTildes = (t: string) => t.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase()
+/** En Mac, Opción+letra escribe (Opción+N, la ñ): el atajo de «Nuevo chat» es Cmd+N. */
+const MAC = /Mac|iPhone|iPad/.test(navigator.userAgent)
 
 /**
  * Abajo de la barra lateral: Opciones y Reiniciar backend, que aplica los cambios del servidor. Mientras el servidor
@@ -1597,6 +1631,10 @@ const sinTildes = (t: string) => t.normalize('NFD').replace(/\p{Diacritic}/gu, '
  */
 function Pie({ running, connected, enOpciones, fallo, plegada }: { running: boolean; connected: boolean; enOpciones: boolean; fallo: string; plegada: boolean }) {
   const [error, setError] = useState('')
+  // «Reconectando…» solo si se perdió una conexión que ya hubo: al abrir, mientras conecta la primera vez, salía y se
+  // iba, y movía la barra.
+  const yaConecto = useRef(false)
+  if (connected) yaConecto.current = true
   return (
     <div className="pie">
       <AvisoRedes connected={connected} /> {/* redes */}
@@ -1612,7 +1650,7 @@ function Pie({ running, connected, enOpciones, fallo, plegada }: { running: bool
       {VENTA ? (
         <>
           <ActualizarSloth />
-          {!connected && <span className="muted small pie-nota">Reconectando…</span>}
+          {!connected && yaConecto.current && <span className="muted small pie-nota">Reconectando…</span>}
         </>
       ) : (
         <button
