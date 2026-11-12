@@ -60,6 +60,7 @@ export function gruposModelos(models: Model[]) {
     { id: 'muse', label: 'Muse Code (Meta)' },
     { id: 'pi', label: 'Pi · beta · gratis' },
     { id: 'pi', label: 'Pi · beta · de pago (por millón de tokens)', pago: true },
+    { id: 'omp', label: 'omp · beta · con tu cuenta' },
   ].map((p) => ({
     label: p.label,
     options: models
