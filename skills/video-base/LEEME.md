@@ -7,13 +7,14 @@ Lo que comparten los estilos de vídeo: el lote, los errores ya vistos y los scr
   las huellas), `video-documental` (el motor, `sloth.py`, `chrome.mjs`, el render, masterizar y comprobar), `frutinovela`
   (`FLOW.md`, `sloth.py`, la hoja, masterizar, comprobar y la portada), los estilos que hace
   cada quien con `crear-estilo` y los procesos de Python de Sloth (`sloth.py`).
-- **`video-el-diff`** es un estilo propio que el usuario afina a mano: ni lo toques desde aquí ni le muevas nada. Solo
-  toma prestados `chrome.mjs`, `recorte.py`, la portada (`PORTADA.md`, `portada.mjs`) y `sloth.py` (con su
-  `ffmpeg_h264`), así que un cambio en ellos también le llega.
+- **`video-el-diff`** se hace con el motor común ([`MOTOR.md`](MOTOR.md), `scripts/momentos.py`), pero su plantilla y
+  su director son suyos: el usuario los afina a mano, y desde aquí no se les mueve nada. Además toma prestados
+  `chrome.mjs`, `recorte.py`, la portada (`PORTADA.md`, `portada_sin_ia.mjs`) y `sloth.py` (con su `ffmpeg_h264`), así
+  que un cambio en ellos también le llega.
 
 | Archivo | Qué es |
 |---|---|
-| [MOTOR.md](MOTOR.md) | El motor: un video desde `momentos.json` (qué se ve en cada palabra) y un `hacer.py` que hace lo demás. El contrato que siguen el explicativo y el documental, y con el que nace un estilo nuevo |
+| [MOTOR.md](MOTOR.md) | El motor: un video desde `momentos.json` (qué se ve en cada palabra) y un `hacer.py` que hace lo demás. El contrato que siguen el explicativo, el documental y El Diff, y con el que nace un estilo nuevo |
 | [FORMATO.md](FORMATO.md) | Vertical u horizontal: todo estilo hace los dos, y qué cambia de uno a otro (`Formato:` del mensaje) |
 | [LOTE.md](LOTE.md) | Lo que cambia cuando el vídeo es uno de un lote; solo se lee si el mensaje trae `Lote:` |
 | [PORTADA.md](PORTADA.md) | La portada que todo vídeo vertical lleva de primer fotograma, en el estilo de su vídeo, y la miniatura de YouTube del horizontal |

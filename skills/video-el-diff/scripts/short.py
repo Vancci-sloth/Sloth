@@ -44,8 +44,8 @@ def main() -> None:
         sys.exit("uso: python short.py <ruta del plan> <id>")
     plan, sid = Path(sys.argv[1]).resolve(), sys.argv[2]
     raiz = Path.cwd()
-    if not (raiz / "guion.py").exists():
-        sys.exit("córrelo en la raíz del proyecto del short (donde está guion.py), después de nuevo.py")
+    if not (raiz / "src" / "Video.tsx").exists():
+        sys.exit("córrelo en la raíz del proyecto del short (la carpeta que creó nuevo.py)")
     shorts = json.loads((plan / "shorts.json").read_text(encoding="utf8"))["shorts"]
     mio = next((s for s in shorts if s["id"] == sid), None)
     if not mio:

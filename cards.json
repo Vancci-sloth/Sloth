@@ -2,21 +2,20 @@
   {
     "id": "video-el-diff",
     "title": "El Diff",
-    "description": "Tu noticiero para TikTok o YouTube, con tu nombre, tu sello y tu despedida: le das un enlace o un tema, te escribe el guion, grabas tu voz y arma el episodio, o un short.",
+    "description": "Tu noticiero para TikTok o YouTube, con tu nombre, tu sello y tu despedida: le das un enlace o un tema y arma el episodio con la prueba de cada dato a la vista, sus logos, sus memes y el diagrama de cómo funciona. O un short.",
     "skill": "video-el-diff",
-    "version": "1.1",
+    "version": "2.0",
     "icon": "noticiero",
     "etapas": [
       {
         "nombre": "Fuentes",
-        "listo": "fuentes/tema/transcripcion.txt",
+        "listo": "{fuentes/tema/transcripcion.txt,fuentes/textos/indice.json}",
         "muestra": "fuentes/tema/video.mp4",
         "fase": "idea"
       },
       {
-        "nombre": "Material",
-        "listo": "material.md",
-        "muestra": "{material.md,fuentes/material/**/*.{png,jpg,jpeg,webp}}",
+        "nombre": "Datos",
+        "listo": "fuentes/fichas/citas.json",
         "fase": "idea"
       },
       {
@@ -32,13 +31,19 @@
         "fase": "sonido"
       },
       {
+        "nombre": "Material",
+        "listo": "material.md",
+        "muestra": "{material.md,fuentes/material/**/*.{png,jpg,jpeg,webp}}",
+        "fase": "video"
+      },
+      {
         "nombre": "Escenas",
         "listo": "guion.json",
         "fase": "video"
       },
       {
         "nombre": "Revisión",
-        "listo": "revision/hoja_95_*.png",
+        "listo": "revision/hoja.png",
         "fase": "video"
       },
       {
@@ -60,45 +65,17 @@
       "vivo": "vivo/index.html",
       "entradas": [
         "guion.json",
+        "momentos.json",
         "src/**",
         "public/**"
       ]
     },
     "modelos": {
       "principal": {
-        "model": "claude-opus-5-5",
-        "effort": "high"
-      },
-      "tareas": [
-        {
-          "nombre": "captura",
-          "para": "Capturas de las páginas y tuits",
-          "model": "sonnet",
-          "effort": "medium",
-          "medido": "Pasada 3: lo mismo que high por un 40-45 % menos; low capturó el canal equivocado"
-        },
-        {
-          "nombre": "pantalla",
-          "para": "Mapa de lo que se ve en el video del tema",
-          "model": "sonnet",
-          "effort": "high",
-          "medido": "Pasada 3: el único que no se salta lo que dura poco ni lo que solo se lee con OCR"
-        },
-        {
-          "nombre": "revisión",
-          "para": "Revisión de las hojas de cada escena",
-          "model": "sonnet",
-          "effort": "high",
-          "medido": "Pasada 3: medium falló un defecto en una de tres corridas"
-        },
-        {
-          "nombre": "escenas",
-          "para": "Armar el video: escenas, revisión y render (fase 2)",
-          "model": "opus",
-          "effort": "medium",
-          "medido": "Sin medir en esta skill: elegido el 19 de octubre para bajar el tiempo (Opus 5.5 en medium rinde como Opus 5 en high, según Anthropic)"
-        }
-      ]
+        "model": "claude-sonnet-5-5",
+        "effort": "medium",
+        "medido": "12 nov 2026, con el director: un episodio de 6 min en 8,6 a 10,3 min y $1,53 a $2,08, y uno de 1 min en 4,0 min y $1,17, sin subagentes. Antes iba en Opus high con unos 28 subagentes: de 36 a 84 min y de $32 a $50 por episodio de 6 min."
+      }
     },
     "sinHerramientas": [
       "mcp__21st__add_to_list",
@@ -183,7 +160,116 @@
       "NotebookEdit",
       "PushNotification",
       "RemoteTrigger"
-    ]
+    ],
+    "cambio": {
+      "fecha": "2026-11-12",
+      "titulo": "El episodio sale siete veces más rápido y cuesta 28 veces menos",
+      "texto": "El agente ya no arma cada escena a mano: escribe qué se ve en cada palabra y Sloth captura cada cita, la resalta, la traduce y acomoda lo demás. Y ahora pone lo que tienen los noticieros que más te gustan: el logo de cada marca que se nombra, óvalos y flechas sobre la cifra, sellos, memes, el diagrama de cómo funciona la cosa, la cifra que corre y la captura que cae como un papel sobre la anterior.",
+      "comparacion": {
+        "resumen": [
+          {
+            "valor": "7×",
+            "texto": "más rápido"
+          },
+          {
+            "valor": "28×",
+            "texto": "más barato"
+          },
+          {
+            "valor": "4×",
+            "texto": "menos pasos"
+          }
+        ],
+        "nota": "Los dos videos son el mismo guion y la misma voz, armados con el de antes y con el de ahora. Las cifras son de pedir un episodio de 6 minutos: la mediana de 19 de octubre con el de antes y uno del 12 de noviembre con el de ahora. El costo es a precio de la API: con tu plan no lo pagas aparte, pero gasta de él en la misma proporción.",
+        "antes": {
+          "video": "/cambios/video-el-diff/antes.mp4",
+          "portada": "/cambios/video-el-diff/antes.jpg",
+          "detalle": "Opus alto y 28 subagentes",
+          "cifras": [
+            {
+              "nombre": "Tardó",
+              "valor": "58 min"
+            },
+            {
+              "nombre": "Costó",
+              "valor": "$42,91"
+            },
+            {
+              "nombre": "Pasos",
+              "valor": "140"
+            }
+          ]
+        },
+        "ahora": {
+          "video": "/cambios/video-el-diff/ahora.mp4",
+          "portada": "/cambios/video-el-diff/ahora.jpg",
+          "detalle": "Sonnet medio, Opus en el guion",
+          "cifras": [
+            {
+              "nombre": "Tardó",
+              "valor": "8,6 min"
+            },
+            {
+              "nombre": "Costó",
+              "valor": "$1,53"
+            },
+            {
+              "nombre": "Pasos",
+              "valor": "32"
+            }
+          ]
+        }
+      },
+      "antes": {
+        "version": "1.1",
+        "etapas": [
+          {
+            "nombre": "Fuentes",
+            "listo": "fuentes/tema/transcripcion.txt",
+            "muestra": "fuentes/tema/video.mp4",
+            "fase": "idea"
+          },
+          {
+            "nombre": "Material",
+            "listo": "material.md",
+            "muestra": "{material.md,fuentes/material/**/*.{png,jpg,jpeg,webp}}",
+            "fase": "idea"
+          },
+          {
+            "nombre": "Guion",
+            "listo": "guion.md",
+            "copiar": true,
+            "fase": "guion"
+          },
+          {
+            "nombre": "Tu voz",
+            "listo": "public/voz/narracion.wav",
+            "espera": "Graba el guion (con el celular basta) y súbelo aquí o mándalo por el chat.",
+            "fase": "sonido"
+          },
+          {
+            "nombre": "Escenas",
+            "listo": "guion.json",
+            "fase": "video"
+          },
+          {
+            "nombre": "Revisión",
+            "listo": "revision/hoja_95_*.png",
+            "fase": "video"
+          },
+          {
+            "nombre": "Video",
+            "listo": "out/el-diff-final.mp4",
+            "fase": "video"
+          },
+          {
+            "nombre": "Portada",
+            "listo": "portada.png",
+            "fase": "entrega"
+          }
+        ]
+      }
+    }
   },
   {
     "id": "video-explicativo",

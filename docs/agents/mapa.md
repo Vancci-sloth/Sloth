@@ -74,6 +74,9 @@ Este es el mapa:
   más por canal en `marcas/<nombre>.json`, con el mismo formato. Con dos o más, el compositor deja elegir en «Marca»
   (`marcasDe` en `server/skills.ts`) y manda la línea `Marca: <nombre>`; la leen `marca.py` del explicativo y `nuevo.py`
   de El Diff. Nada recuerda la última: sin elegir, va la de siempre.
+- El Diff (`skills/video-el-diff`) se hace con el motor común (`skills/video-base/MOTOR.md`): el agente escribe
+  `momentos.json` y `scripts/hacer.py` hace lo demás; `scripts/director.py` arma las escenas (`guion.json`) para su
+  plantilla. Su vara son diez Code Report (`REFERENCIAS.md`).
 - `modelos` (`web/src/Modelos.tsx`): en «Optimizado», el modelo y el esfuerzo medidos para el hilo. Una card sin medir
   usa lo último que eligió el usuario a mano. En «Avanzado» se eligen. Los subagentes van siempre en el modelo y el
   esfuerzo del hilo: en Claude, Sloth los manda en la línea `Subagentes: todos = <alias> <esfuerzo>.` (las `tareas`

@@ -1,5 +1,5 @@
 """
-Renderiza el episodio en su formato (el de `FORMATO` en guion.py: 1080x1920 o 1920x1080) y lo deja listo para subir. Se
+Renderiza el episodio en su formato (el de src/formato.json: 1080x1920 o 1920x1080) y lo deja listo para subir. Se
 corre en la raíz del proyecto, en segundo plano. Si otro episodio está renderizando, espera su turno (`turno_render` en
 comun.py).
 
@@ -169,7 +169,7 @@ def antes_de_renderizar(raiz: Path, vertical: bool) -> None:
         for m in b["v"].get("marcas") or []:
             if m.get("ingles"):
                 faltan.append(f'{b["id"]} «{b["say"][:40]}»: "{m["ingles"]}" está resaltado en inglés. Tradúcelo con '
-                              'es="…" (la oración entera) o ponle es=False si es un nombre o código, y corre guion.py')
+                              '`es` (la oración entera) en su momento de momentos.json, y corre hacer.py')
     if faltan:
         raise SystemExit("Antes del final falta:\n- " + "\n- ".join(faltan))
 

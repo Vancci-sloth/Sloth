@@ -100,7 +100,7 @@ def main() -> None:
     parte = emparejadas / max(1, len(lista))
     print(f"{emparejadas}/{len(lista)} palabras del guion ({parte:.0%}) encontradas en la voz ({len(oidas)} oídas)")
     if parte < MINIMO:
-        print(f"AVISO: menos del {MINIMO:.0%}: el `say` de guion.py no coincide con lo que se grabó (o faltan escenas).")
+        print(f"AVISO: menos del {MINIMO:.0%}: la voz no es la de este guion.md (o faltan momentos).")
 
     beats = []
     k = 0

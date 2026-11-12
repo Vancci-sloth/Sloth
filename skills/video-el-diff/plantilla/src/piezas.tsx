@@ -243,6 +243,66 @@ export const Caja: React.FC<{ x: number; y: number; w: number; h: number; desde?
   );
 };
 
+/**
+ * Las anotaciones a mano de los Code Report (REFERENCIAS.md): lo que más se repite sobre una captura después del
+ * resaltador. Las dos se trazan en un tercio de segundo, como si alguien las dibujara mientras explica.
+ */
+
+/** Un óvalo rojo trazado alrededor de algo: el nombre, la cifra, el botón. */
+export const Ovalo: React.FC<{ x: number; y: number; w: number; h: number; desde?: number; color?: string; grosor?: number }> = ({
+  x,
+  y,
+  w,
+  h,
+  desde = 0,
+  color = COLOR.rojo,
+  grosor = 7,
+}) => {
+  const frame = useCurrentFrame();
+  const p = interpolate(frame, [desde, desde + 9], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp", easing: Easing.out(Easing.quad) });
+  if (frame < desde) return null;
+  // Se pasa un poco de la vuelta, como un óvalo hecho de un trazo.
+  return (
+    <svg style={{ position: "absolute", left: x - 40, top: y - 40, overflow: "visible", transform: "rotate(-3deg)" }} width={w + 80} height={h + 80}>
+      <ellipse cx={w / 2 + 40} cy={h / 2 + 40} rx={w / 2 + 22} ry={h / 2 + 16} fill="none" stroke={color} strokeWidth={grosor} strokeLinecap="round" pathLength={1} strokeDasharray={1.07} strokeDashoffset={1.07 * (1 - p)} />
+    </svg>
+  );
+};
+
+/** Una flecha curva, crema con contorno negro, que se dibuja hasta el punto (x, y) viniendo de su `lado`. */
+export const Flecha: React.FC<{ x: number; y: number; lado?: "izquierda" | "derecha"; desde?: number; largo?: number }> = ({
+  x,
+  y,
+  lado = "izquierda",
+  desde = 0,
+  largo = 190,
+}) => {
+  const frame = useCurrentFrame();
+  const p = interpolate(frame, [desde, desde + 8], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp", easing: Easing.out(Easing.cubic) });
+  if (frame < desde) return null;
+  const s = lado === "izquierda" ? -1 : 1;
+  // Sale de arriba, a un lado, y cae en curva sobre el punto.
+  const [sx, sy] = [x + s * largo, y - largo * 0.62];
+  const [cx, cy] = [x + s * largo * 0.95, y + largo * 0.12];
+  const cuerpo = `M ${sx} ${sy} Q ${cx} ${cy} ${x + s * 14} ${y}`;
+  // La punta: dos trazos abiertos hacia donde viene la curva.
+  const ang = Math.atan2(y - cy, x + s * 14 - cx);
+  const ala = (d: number) => `${x + s * 14 - Math.cos(ang + d) * 46} ${y - Math.sin(ang + d) * 46}`;
+  const punta = `M ${ala(0.5)} L ${x + s * 14} ${y} L ${ala(-0.5)}`;
+  const trazo = (ancho: number, color: string) => (
+    <>
+      <path d={cuerpo} fill="none" stroke={color} strokeWidth={ancho} strokeLinecap="round" pathLength={1} strokeDasharray={1} strokeDashoffset={1 - p} />
+      {p > 0.85 && <path d={punta} fill="none" stroke={color} strokeWidth={ancho} strokeLinecap="round" strokeLinejoin="round" />}
+    </>
+  );
+  return (
+    <svg style={{ position: "absolute", left: 0, top: 0, overflow: "visible", filter: "drop-shadow(0 6px 10px rgba(0,0,0,0.5))" }} width={1} height={1}>
+      {trazo(22, "#0d0d10")}
+      {trazo(11, COLOR.crema)}
+    </svg>
+  );
+};
+
 /** Sello de goma que cae girado y rebota. */
 export const Sello: React.FC<{ texto: string; desde?: number; color?: string; tam?: number; rot?: number; style?: React.CSSProperties }> = ({
   texto,

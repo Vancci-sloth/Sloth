@@ -16,7 +16,7 @@ Prepara la narración que grabó el usuario. Se corre en la raíz del proyecto d
 4. Avisa si la voz leyó los títulos de sección de guion.md (quitar_titulos.py los corta).
 5. Lista, como cifras.py, las oraciones cuyo inicio quedó corrido (no empiezan después de una pausa).
 
-Después: `python voz/adaptar.py` empareja las palabras con guion.json y escribe src/timeline.json.
+Después: `python voz/adaptar.py` empareja las palabras con guion.json y escribe src/timeline.json (lo hace hacer.py).
 """
 
 import json
@@ -59,8 +59,8 @@ def main() -> None:
     if not args:
         sys.exit("uso: python voz.py <audio> [terminos,separados,por,comas] [--forzar]")
     raiz = Path.cwd()
-    if not (raiz / "guion.py").exists():
-        sys.exit("córrelo en la raíz del proyecto del episodio (donde está guion.py)")
+    if not (raiz / "src" / "Video.tsx").exists():
+        sys.exit("córrelo en la raíz del proyecto del episodio (la carpeta que creó nuevo.py)")
     audio = Path(args[0])
     if not audio.is_file():
         sys.exit(f"no encuentro el audio {audio}")

@@ -1,10 +1,9 @@
 # Cómo se escribe un guion de El Diff
 
 Un noticiero seco y burlón, en español de México. Antes de escribir, lee completos los `guion.md` de los dos episodios
-más recientes de la carpeta donde trabajas, para tener la voz en el oído; si aún no hay, el de
-[`ejemplos/deepseek-guion.md`](ejemplos/deepseek-guion.md) (su nombre y su despedida son los de El Diff: los tuyos
-salen de la marca). Lo de abajo es el estilo, medido plano por plano en diez episodios de referencia. Lo que se ve está
-en [La imagen](ESCENAS.md#la-imagen).
+más recientes de la carpeta donde trabajas, para tener la voz en el oído (si aún no hay, basta lo de abajo; el nombre
+y la despedida salen de la marca). Lo de abajo es el estilo, medido plano por plano en diez episodios de referencia. Lo que se ve está
+en «momentos.json» de [`SKILL.md`](SKILL.md#momentosjson) y, medido, en [`REFERENCIAS.md`](REFERENCIAS.md).
 
 ## La esencia
 
@@ -24,7 +23,7 @@ en orden, como un resumen, es lo que el usuario rechazó como plano.
 Lo pide Sloth en la línea `Duración: <n> minutos por video.` (en un plan de shorts es lo de cada short; si no, lo del
 episodio, en vertical o en horizontal).
 El usuario lee a unas 3 palabras por segundo, 180 por minuto: un short de 1 minuto son unas 180 palabras, uno de 3
-unas 540, y un episodio de 10 minutos unas 1,800. Sin esa línea, el episodio es de unas 1,100 palabras (6 minutos). `python <skill>/scripts/largo.py <minutos>` cuenta lo que se narra y para si te pasas o te quedas corto más de
+unas 540, y un episodio de 10 minutos unas 1,800. Sin esa línea, el episodio es de unas 1,100 palabras (6 minutos). `hacer.py --revisa --dura <minutos>` cuenta lo que se narra y para si te pasas o te quedas corto más de
 un 10 %: en el lote del 7 de octubre los guiones pedían 1,100 palabras y salieron de 1,225 a 1,379 sin que nada avisara.
 
 ## Estructura
@@ -54,15 +53,16 @@ un 10 %: en el lote del 7 de octubre los guiones pedían 1,100 palabras y salier
    castró al de 200 dólares»). Cada promesa se paga en el cuerpo.
 3. **Logo**, siempre igual: «Es <día> de <mes> de <año>, y estás viendo <nombre>.», con el `nombre` de la marca. Usa la
    fecha en que se publicará; si no la sabes, la de hoy, y avisa al usuario para que la cambie al grabar.
-4. **Cuerpo**: de cuatro a siete bloques, cada uno con su encabezado `## Nombre` en `guion.md` (se vuelve un párrafo de
-   `guion.py` y una transición). Se entra a cada bloque con una **bisagra** de voz, una frase corta: «Lo que nos lleva
+4. **Cuerpo**: de cuatro a siete bloques, cada uno con su encabezado `## Nombre` en `guion.md` (se vuelve una sección del
+   video, con su transición). Se entra a cada bloque con una **bisagra** de voz, una frase corta: «Lo que nos lleva
    a…», «Pero lo primero que hay que saber es…», «Entonces, al día siguiente…», «Ahora, ya sé lo que estás pensando.».
    - **Un hilo** recorre los bloques y se acerca al espectador en cada uno («OpenAI copia lo que funciona»: copió a
      un desarrollador, luego a una startup, luego a Notion… y tu app es la siguiente).
    - **El orden escala**: de la promesa a la sospecha, o del que más promete y menos tiene al que ya lo tiene. Cada
      bloque cierra en un anticlímax o en una frase seca.
    - **La técnica va en serio.** El mecanismo se explica en limpio, en orden, después de un «Básicamente,», con un solo
-     ejemplo absurdo pero exacto, y sin chistes en la voz: de 10 a 45 s en que la imagen sigue bromeando sola.
+     ejemplo absurdo pero exacto, y sin chistes en la voz: de 10 a 45 s sobre un `diagrama` que se arma con cada pieza que
+     nombras (quién le manda qué a quién, y dónde falla). Nombra las piezas con sustantivos: cada una es una caja.
 5. **Cierre**, sin resumen ni moraleja. Antes, concede el matiz que juega en contra de tu burla («Ahora, para ser
    justos, eso pasa con todos los avances de matemáticas de este año.»). Luego, una de dos:
    - un veredicto práctico por perfil del espectador, con el último perfil de chiste: «Si solo tienes una PC gamer,
@@ -106,7 +106,7 @@ con el adjetivo torcido:
   «Zuck nos asegura que los humanos ya fueron reemplazados», sobre cuatro titulares de un call center.
 
 Una analogía inventada («con el entusiasmo de alguien que recibe calcetines en Navidad») va solo donde la fuente no
-da nada, y entonces con una imagen famosa detrás ([La imagen](ESCENAS.md#el-chiste-visual)).
+da nada, y entonces con una imagen famosa detrás (un `meme` o un `clip`).
 
 ### Mecanismos
 
@@ -184,7 +184,7 @@ Si el usuario trae su guion, o te pide El Diff con su propia manera de hablar, l
 sus chistes se quedan, aunque no suenen a este estilo. El estilo entra por dos lados:
 
 1. **La imagen, completa.** La prueba de cada dato, los rótulos, los recortes y el chiste visual no dependen de la voz
-   ([La imagen](ESCENAS.md#la-imagen)). Con un guion serio, la imagen pone casi la mitad del humor del episodio.
+   (`momentos.json`). Con un guion serio, la imagen pone casi la mitad del humor del episodio.
 2. **Cambios mínimos al guion, propuestos y aprobados.** Son de orden y de concreción, no de tono. Preséntalos como
    lista numerada, cada uno con la frase antes y después, y aplica solo los que apruebe:
    - lo vago por lo concreto: «hace poco» → «el martes»; «una empresa» → su nombre; «muchos» → la cifra;
@@ -241,18 +241,18 @@ fecha ni la despedida del episodio. Cada short se entiende solo, aunque el usuar
 ## Exactitud
 
 - Las opiniones y estimaciones del youtuber del tema van atribuidas: "según el youtuber". Lo que él probó y se ve en pantalla
-  se cuenta como hecho, con el segundo del clip anotado en `material.md`.
+  se cuenta como hecho, con su segundo (`"clip": "tema@<segundo>"`).
 - Si una cifra no se puede comprobar en una fuente que se pueda mostrar, se redondea a lo que sí se ve ("casi cien mil
   en tres días", que se lee en la gráfica, en vez de "95,386 en dos días", que solo decía un blog).
 - Revisa que el youtuber no contradiga lo que crees: en DeepSeek, el youtuber ya conocía la versión web, y "nunca lo había
   usado" era falso.
 - Escribe con ortografía normal: el usuario graba leyendo, no hace falta escribir la pronunciación. Los números pueden ir
-  en cifras o en letra; `voz/adaptar.py` resuelve los dos.
+  en cifras o en letra: la línea de tiempo resuelve los dos.
 - Lo inventado para el chiste se nota inventado: el ejemplo absurdo («imagina una app de citas para burros») y su
   maqueta en pantalla. Ningún dato real se apoya en algo fabricado.
 
 ## El gancho
 
-El `GANCHO` de `guion.py` es el rótulo fijo de arriba durante todo el episodio vertical (el horizontal no lo lleva):
+El `gancho` de `momentos.json` es el rótulo fijo de arriba durante todo el episodio vertical (el horizontal no lo lleva):
 dos renglones, seis palabras como mucho, en mayúsculas, con el dato que hace parar el dedo. No repite la primera frase
 de la voz; la contradice o la adelanta.

@@ -17,15 +17,16 @@ import { proveedorDe } from '../shared/providers.ts'
 const AGENTE = 'Agent|Task'
 /**
  * El subagente `guionista`: escribe un archivo (un guion, un texto corto) con Opus, de lo que le pase quien lo llama. No
- * investiga ni lee: todo lo que necesita va en el pedido. Con solo Write arranca con poco contexto; el general cargaba
- * todas las herramientas y los MCP (38 mil tokens) para escribir 100 palabras.
+ * investiga: todo lo que necesita va en el pedido, o en los archivos que el pedido le nombra (las reglas de estilo y los
+ * datos ya verificados de un episodio de El Diff, que no caben en doce líneas). Con solo Read y Write arranca con poco
+ * contexto; el general cargaba todas las herramientas y los MCP (38 mil tokens) para escribir 100 palabras.
  */
 const GUIONISTA: AgentDefinition = {
-  description: 'Escribe un solo archivo de texto (un guion corto, un texto) con Opus, de un resumen que le pasas con todo lo que necesita: datos, tono y reglas. No investiga ni lee archivos.',
-  prompt: 'Eres guionista. Escribe el archivo que te piden, en la ruta que te dan, con Write, siguiendo al pie de la letra las reglas del pedido (largo, tono, estructura). No investigues ni inventes datos: usa solo los que te dan. Al terminar, responde en una línea qué archivo escribiste y cuántas palabras tiene.',
-  tools: ['Write'],
+  description: 'Escribe un solo archivo de texto (un guion, un texto) con Opus, de un resumen que le pasas con todo lo que necesita: datos, tono y reglas, o las rutas de los archivos donde están. No investiga.',
+  prompt: 'Eres guionista. Escribe el archivo que te piden, en la ruta que te dan, con Write, siguiendo al pie de la letra las reglas del pedido (largo, tono, estructura). Si el pedido nombra archivos (las reglas de estilo, los datos), léelos todos de una vez con Read antes de escribir, y nada más. No investigues ni inventes datos: usa solo los que te dan. Al terminar, responde en una línea qué archivo escribiste y cuántas palabras tiene.',
+  tools: ['Read', 'Write'],
   model: 'opus',
-  maxTurns: 3,
+  maxTurns: 4,
 }
 /** La que vuelve a poner a trabajar a un subagente que ya acabó. */
 const DESPIERTA = 'SendMessage'
