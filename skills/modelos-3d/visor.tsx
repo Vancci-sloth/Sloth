@@ -14,7 +14,7 @@
 // rejilla, nada de fondo). A Sloth
 // (con `visor3d: true`): `hola` cuando ya oye, `listo` (con el id) cuando el modelo ya se ve, `falta`, `toca` al primer arrastre, `tecla` con
 // Esc, las flechas y Tab (la ficha las usa) y `rueda` en angosto, donde la rueda desplaza la ficha y no acerca (salvo con
-// Ctrl). En `window.__visor`, lo que miden los evals: los ángulos de la cámara, su distancia y cuándo respondió.
+// Ctrl). En `window.__visor`, para medirlo desde fuera: los ángulos de la cámara, su distancia y cuándo respondió.
 import { Player, type PlayerRef } from "@remotion/player";
 import { useFrame, useThree } from "@react-three/fiber";
 import { ThreeCanvas } from "@remotion/three";
@@ -136,7 +136,7 @@ const Estudio: React.FC<{ id: string }> = ({ id }) => {
     });
     c.addEventListener("change", () => {
       invalidate();
-      // La primera vez que la cámara se mueve por la mano de alguien, ya pintado: lo que mide el eval.
+      // La primera vez que la cámara se mueve por la mano de alguien, ya pintado (cuánto tarda en responder).
       if (arrastrando.current && !medidas.respondio) requestAnimationFrame(() => (medidas.respondio = performance.timeOrigin + performance.now()));
     });
     controles.current = c;

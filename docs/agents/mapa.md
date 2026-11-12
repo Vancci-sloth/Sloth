@@ -127,8 +127,7 @@ Este es el mapa:
   va en `modelos-3d/plantilla`, sin enseñarse. Sus botones (`server/modelos3d-acciones.ts`, `web/src/Modelos3DAcciones.tsx`):
   «Importar .glb» corre `modelos.py importar` sin agente, en una carpeta temporal que se borra (Draco y Meshopt se
   abren; el decodificador de Draco va con el modelo); «Nuevo modelo» abre un hilo de `MODELO3D_CARD` (`shared/modelos3d.ts`,
-  no sale en el inicio) en su propia carpeta, `<trabajo>/modelos-3d/<nombre>` (skill `modelos-3d`, §6). Su eval contra
-  Sketchfab, Poly Pizza, Poly Haven y Fab: `docs/agents/eval-modelos3d.md`.
+  no sale en el inicio) en su propia carpeta, `<trabajo>/modelos-3d/<nombre>` (skill `modelos-3d`, §6).
 - `server/originales.ts` y `web/src/TusCambios.tsx`: en la app que se vende, «Con tus cambios (N)» bajo la card dice qué
   archivos de su skill (y de video-base) ya no son como los trae la versión, y vuelve a la original, entera o uno a uno.
   Lo que se pisa, también al actualizar (`prepararSkills`), se copia antes a `data/skills-tuyas`.
