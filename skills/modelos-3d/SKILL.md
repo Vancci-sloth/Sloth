@@ -7,8 +7,11 @@ description: La biblioteca de modelos 3D de los videos (three.js en Remotion), p
 
 El usuario va a hacer muchos videos con 3D y no quiere que se desperdicie ninguno: **antes de hacer un modelo se busca
 aquí, y lo que se hace se guarda aquí.** Cada modelo es un componente de React Three Fiber con su miniatura
-(`modelos/<id>/vista.webp`, y `vista.webm` con la cámara que se mece) y su ficha (`modelo.json`: qué es, para qué sirve, sus etiquetas y de qué video salió). Sloth
-los enseña en «Modelos 3D», en la barra de la izquierda.
+(`modelos/<id>/vista.webp`, `vista.webm` con la cámara que se mece y `vuelta.webm` con la vuelta entera, que se gira
+arrastrando en su ficha) y su ficha (`modelo.json`: qué es, para qué sirve, sus etiquetas y de qué video salió). Sloth
+los enseña en «Modelos 3D», en la barra de la izquierda, y en la ficha de cada uno lo gira de verdad con el visor 3D de
+toda la biblioteca (`visor.tsx`, que `modelos.py visor` arma en `visor/`; `vista` lo vuelve a armar, y Sloth también
+solo si le falta un modelo).
 
 Todo se hace con `scripts/modelos.py` (sin dependencias). Salvo `buscar`, se corre en la carpeta del proyecto del video:
 

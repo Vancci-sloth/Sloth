@@ -1,5 +1,6 @@
 import { closeSync, createReadStream, existsSync, fstatSync, globSync, mkdirSync, openSync, readdirSync, readSync, type Stats, statSync, watch } from 'node:fs'
 import type { IncomingMessage, ServerResponse } from 'node:http'
+import { pipeline } from 'node:stream'
 import { basename, extname, isAbsolute, join, matchesGlob, relative, resolve, sep } from 'node:path'
 import { enCurso } from '../shared/etapas.ts'
 import type { Archivo, Avance, AvanceCorto, Card, CarpetaDeVideo, MarcasDeRedes, Render, ServerPush, SessionMeta, VideoFinal, VideoHecho, VideosDeTodos } from '../shared/types.ts'
@@ -652,6 +653,8 @@ export function servir(req: IncomingMessage, res: ServerResponse, file: string, 
   } catch {
     return json(res, 404, { error: 'No existe' })
   }
+  // Una carpeta leída como archivo tumba el servidor (EISDIR sin quien lo atienda).
+  if (!st.isFile()) return json(res, 404, { error: 'No existe' })
   const { size } = st
   const etag = `"${size.toString(36)}-${Math.floor(st.mtimeMs).toString(36)}"`
   const fecha = st.mtime.toUTCString()
@@ -674,7 +677,9 @@ export function servir(req: IncomingMessage, res: ServerResponse, file: string, 
   const otro = req.headers['if-range'] && req.headers['if-range'] !== etag && req.headers['if-range'] !== fecha
   if (!range || (!range[1] && !range[2]) || otro) {
     res.writeHead(200, { ...head, 'content-length': size })
-    createReadStream(file).pipe(res)
+    // Con pipeline, si el navegador corta a medias (pasa al saltar en un video), el archivo se cierra: con .pipe se
+    // quedaba abierto, y en Windows ya no se podía renombrar ni borrar.
+    pipeline(createReadStream(file), res, () => {})
     return true
   }
   const start = range[1] ? Number(range[1]) : Math.max(0, size - Number(range[2]))
@@ -685,7 +690,7 @@ export function servir(req: IncomingMessage, res: ServerResponse, file: string, 
     return true
   }
   res.writeHead(206, { ...head, 'content-length': end - start + 1, 'content-range': `bytes ${start}-${end}/${size}` })
-  createReadStream(file, { start, end }).pipe(res)
+  pipeline(createReadStream(file, { start, end }), res, () => {})
   return true
 }
 

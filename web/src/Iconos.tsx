@@ -49,6 +49,12 @@ const TRAZOS = {
   // Modelos 3D: un hilo de «Nuevo modelo» e «Importar .glb».
   cubo: ['M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z', 'm3.3 7 8.7 5 8.7-5', 'M12 22V12'],
   importar: ['M12 3v12', 'm8 11 4 4 4-4', 'M8 5H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-4'],
+  // La biblioteca: copiar su nombre, el orden, pasar al de al lado y girarlo arrastrando.
+  copiar: ['M10 8h10a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H10a2 2 0 0 1-2-2V10a2 2 0 0 1 2-2z', 'M4 16a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2'],
+  ordenar: ['m21 16-4 4-4-4', 'M17 20V4', 'm3 8 4-4 4 4', 'M7 4v16'],
+  anterior: ['m15 18-6-6 6-6'],
+  siguiente: ['m9 18 6-6-6-6'],
+  girar: ['M3 12a9 3 0 0 0 18 0', 'M3 12a9 3 0 0 1 15.5-2.1', 'm16 7 2.5 2.9-3.3 1.6'],
   // Los de las cards de estilo (`icon` en cards.json): un televisor con antena, una pizarra, una claqueta y una cara que ríe.
   risa: ['M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20z', 'M18 13a6 6 0 0 1-6 5 6 6 0 0 1-6-5h12Z', 'M9 9h.01', 'M15 9h.01'],
   noticiero:['M4 7h16a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2z', 'm17 2-5 5-5-5'],

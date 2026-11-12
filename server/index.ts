@@ -1,6 +1,7 @@
 import { spawn } from 'node:child_process'
 import { createReadStream, createWriteStream, existsSync, mkdirSync, readdirSync, statSync, watch } from 'node:fs'
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http'
+import { pipeline } from 'node:stream'
 import { createServer as servidorTcp } from 'node:net'
 import { basename, dirname, extname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -193,7 +194,9 @@ const { miniatura, cuadro } = miniaturas(join(APP, 'data', 'miniaturas')) // pan
 // Ideas para YouTube: investigar el nicho de un canal y que Claude proponga videos con evidencia.
 const idear = VENTA ? undefined : ideas(APP, sessions, broadcast, subirLargos?.lectura) // ideas
 // La biblioteca de modelos 3D que llenan los videos, para verla: la de la skill que usan los agentes, que es donde guardan.
-const biblioteca3d = modelos3d(carpetaSkill('modelos-3d') ?? join(APP, 'skills', 'modelos-3d')) // modelos 3D
+const biblioteca3d = modelos3d(carpetaSkill('modelos-3d') ?? join(APP, 'skills', 'modelos-3d'), {
+  python: () => rutaPythonSloth() ?? (process.platform === 'win32' ? 'python' : 'python3')
+}) // modelos 3D
 // «Importar .glb» y «Nuevo modelo», en la misma biblioteca.
 const acciones3d = modelos3dAcciones({
   sessions,
@@ -768,7 +771,7 @@ async function api(req: IncomingMessage, res: ServerResponse, url: URL): Promise
     const file = join(ATTACHMENTS, basename(decodeURIComponent(a[1])))
     if (!existsSync(file)) return send(res, 404, { error: 'No existe' }), true
     res.writeHead(200, { 'content-type': ATTACHMENT_TYPES[extname(file).toLowerCase()] ?? 'application/octet-stream', 'content-length': statSync(file).size, 'cache-control': 'max-age=31536000, immutable' })
-    createReadStream(file).pipe(res)
+    pipeline(createReadStream(file), res, () => {})
     return true
   }
 

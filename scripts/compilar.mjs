@@ -78,7 +78,9 @@ const esBanco = (ruta) => basename(ruta) === 'banco' && basename(dirname(ruta)) 
  * versiones de antes los quita la app al actualizarse (electron/modelos-viejos.ts).
  */
 const MODELOS = join(REPO, 'skills', 'modelos-3d', 'modelos')
-const limpio = (ruta) => !BASURA.has(basename(ruta)) && !TUYO.includes(ruta) && !esBanco(ruta) && dirname(ruta) !== MODELOS
+/** Su visor 3D también (y lo que deja un armado a medias): se arma de la biblioteca de cada quien (`modelos.py visor`). */
+const esVisor = (ruta) => dirname(ruta) === join(REPO, 'skills', 'modelos-3d') && /^visor($|\.nuevo-|\.viejo-)/.test(basename(ruta))
+const limpio = (ruta) => !BASURA.has(basename(ruta)) && !TUYO.includes(ruta) && !esBanco(ruta) && dirname(ruta) !== MODELOS && !esVisor(ruta)
 
 /** Ideas no se vende: `VENTA` nunca la abre, y aquí su código se cambia por nada para que no viaje en la app. */
 const IDEAS = /[\\/](server[\\/]ideas[\\/](index|mcp)\.ts|web[\\/]src[\\/]Ideas\.tsx)$/

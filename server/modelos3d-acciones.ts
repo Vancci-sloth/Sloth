@@ -44,11 +44,11 @@ export interface Ejecucion {
   salida: string
 }
 
-/** Corre un programa y junta lo que dice. */
-export function ejecutar(programa: string, args: string[], cwd: string, env: NodeJS.ProcessEnv): Promise<Ejecucion> {
+/** Corre un programa y junta lo que dice; con `limite` (ms), si tarda más, se le termina. */
+export function ejecutar(programa: string, args: string[], cwd: string, env: NodeJS.ProcessEnv, limite?: number): Promise<Ejecucion> {
   return new Promise((ok) => {
     let salida = ''
-    const p = spawn(programa, args, { cwd, env: { ...process.env, ...env, PYTHONUTF8: '1' }, windowsHide: true })
+    const p = spawn(programa, args, { cwd, env: { ...process.env, ...env, PYTHONUTF8: '1' }, windowsHide: true, ...(limite ? { timeout: limite } : {}) })
     p.stdout.on('data', (d) => (salida += d))
     p.stderr.on('data', (d) => (salida += d))
     p.on('error', (e) => ok({ codigo: -1, salida: e.message }))
