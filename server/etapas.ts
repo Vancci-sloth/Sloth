@@ -8,7 +8,7 @@ import { enCurso } from '../shared/etapas.ts'
 import type { Archivo, Avance, AvanceCorto, Card, CarpetaDeVideo, MarcasDeRedes, Render, ServerPush, SessionMeta, VideoFinal, VideoHecho, VideosDeTodos } from '../shared/types.ts'
 import { cuerpo, json } from './http.ts'
 import { IMAGE_TYPES } from './agent.ts'
-import { aLaPapelera, huella } from './disco.ts'
+import { aLaPapelera, huella, largo } from './disco.ts'
 import { motorDe, servirMotor, servirOnda } from './motor.ts'
 import type { Sessions } from './sessions.ts'
 
@@ -585,7 +585,7 @@ function vigilar(cwd: string, card: Card, sessions: Sessions, avisar: Avisar) {
   }
   let w: ReturnType<typeof watch>
   try {
-    w = watch(cwd, { recursive: true }, (_evento, nombre) => {
+    w = watch(largo(cwd), { recursive: true }, (_evento, nombre) => {
       const ruta = nombre?.replaceAll('\\', '/')
       if (ruta && /(^|\/)(node_modules|\.git)(\/|$)/.test(ruta)) return
       const [primera, ...resto] = ruta?.split('/') ?? ['*']

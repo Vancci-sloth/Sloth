@@ -2,6 +2,7 @@ import { existsSync, type FSWatcher, readdirSync, readFileSync, statSync, watch 
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { dirname, join, normalize, sep } from 'node:path'
 import type { Biblioteca3D, Modelo3D } from '../shared/types.ts'
+import { largo } from './disco.ts'
 import { servir } from './etapas.ts'
 import { ejecutar } from './modelos3d-acciones.ts'
 
@@ -93,7 +94,7 @@ export function modelos3d(raiz: string, opciones: { python?: () => string } = {}
   function respuesta() {
     if (!vigilante) {
       try {
-        vigilante = watch(raiz, { recursive: true, persistent: false }, () => (armada = null)).on('error', () => {
+        vigilante = watch(largo(raiz), { recursive: true, persistent: false }, () => (armada = null)).on('error', () => {
           armada = null
           vigilante?.close()
           vigilante = null

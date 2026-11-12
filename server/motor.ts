@@ -3,6 +3,7 @@ import { existsSync, readFileSync, statSync, watch } from 'node:fs'
 import type { ServerResponse } from 'node:http'
 import { join, matchesGlob, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
+import { largo } from './disco.ts'
 
 /**
  * El motor en vivo: el video de un hilo reproducido en el navegador tal cual saldrá, sin renderizarlo, sea cual sea su
@@ -89,7 +90,7 @@ function abrir(folder: string, entrada: string): Motor {
   // archivo: lo que no cambió desde la versión que se ve no cuenta.
   let w: ReturnType<typeof watch> | undefined
   try {
-    w = watch(folder, { recursive: true }, (_e, nombre) => {
+    w = watch(largo(folder), { recursive: true }, (_e, nombre) => {
       const ruta = clave(nombre ?? '')
       if (!ruta || /(^|\/)(node_modules|\.git)(\/|$)/.test(ruta)) return
       const entra = m.entradas.has(ruta) || ruta.startsWith('src/')
