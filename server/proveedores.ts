@@ -8,6 +8,7 @@ import { cuentaDeepSeek, deepseekModels } from './deepseek.ts'
 import { cuentaGemini, modelosGemini, startGemini } from './gemini.ts'
 import { cuentaGrok, modelosGrok, startGrok } from './grok.ts'
 import { cuentaMuse, modelosMuse, startMuse } from './muse.ts'
+import { cuentaOmp, modelosOmp, startOmp } from './omp.ts'
 import { cuentaPi, llavesPi, modelosPi, salirPi, startPi } from './pi.ts'
 
 /**
@@ -42,7 +43,8 @@ export const OTROS: Partial<Record<Proveedor, Otro>> = {
   gemini: { como: 'llave', start: startGemini, cuenta: cuentaGemini, modelos: modelosGemini },
   cursor: { como: 'navegador', start: startCursor, cuenta: cuentaCursor, conectar: conectarCursor, cancelar: cancelarCursor, salir: salirCursor, conectando: conectandoCursor, modelos: modelosCursor },
   muse: { como: 'ventana', start: startMuse, ...cuentaMuse, modelos: modelosMuse },
-  pi: { como: 'ventana', start: startPi, ...cuentaPi, salir: salirPi, llaves: llavesPi, modelos: modelosPi }
+  pi: { como: 'ventana', start: startPi, ...cuentaPi, salir: salirPi, llaves: llavesPi, modelos: modelosPi },
+  omp: { como: 'ventana', start: startOmp, ...cuentaOmp, modelos: modelosOmp }
 }
 
 /** Ninguno de estos informa los límites de un plan a Sloth: se paga por uso o se ve en su página. */

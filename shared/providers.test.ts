@@ -8,6 +8,8 @@ test('proveedorDe: el prefijo dice el agente; sin prefijo, o con uno que no es d
   assert.equal(proveedorDe('deepseek:deepseek-flash'), 'deepseek')
   // Los modelos de Pi llevan su proveedor y pueden llevar `/` y `:` dentro.
   assert.equal(proveedorDe('pi:openrouter/deepseek/deepseek-v4-flash:free'), 'pi')
+  // Los de omp, el proveedor y el modelo con sus `/` (`commandcode/deepseek/...`).
+  assert.equal(proveedorDe('omp:commandcode/deepseek/deepseek-v4.1-flash'), 'omp')
   assert.equal(proveedorDe('otro:modelo'), 'claude')
 })
 

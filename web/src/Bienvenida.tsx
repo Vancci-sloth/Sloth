@@ -19,7 +19,8 @@ const OPCIONES = [
       ['gemini', 'Gemini'],
       ['cursor', 'Cursor'],
       ['muse', 'Muse Code'],
-      ['pi', 'Pi']
+      ['pi', 'Pi'],
+      ['omp', 'omp']
     ]
   },
   {
