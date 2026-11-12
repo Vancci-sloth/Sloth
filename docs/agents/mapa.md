@@ -62,6 +62,10 @@ Este es el mapa:
   cambio; un clic en el cuadro, una escena o un tramo va al chat como referencia (`Referencia.tsx`).
   Los motores y los vigilantes de carpetas se liberan tras cinco minutos sin uso; los hilos a la vista conservan ambos, y
   los que trabajan, sus vigilantes. Las ondas de audio se calculan de una en una y se guardan en bytes, 32 archivos como máximo.
+- El motor de los estilos (`skills/video-base/MOTOR.md`): el agente escribe `momentos.json` (qué se ve en cada
+  palabra) y el `hacer.py` del estilo hace lo demás; lo que comparten está en `video-base/scripts/momentos.py` y
+  `render.cjs`. El Documental (`skills/video-documental`) lo sigue desde la 2.0: `components/director.py` arma la edición
+  con los dispositivos medidos, `scripts/material.py` baja y trata lo que pide cada momento y `buscar.py` lo busca.
 - La carpeta del video: un hilo de video nace con su carpeta nombrada por Sloth, y el mensaje lleva la línea
   `Carpeta: <nombre>`, que leen las skills. Con `lote`, varios enlaces pueden ser un video cada uno
   (`lote-MMDD-HHMM-NN`, ver `skills/video-base/LOTE.md`). Cambiar la carpeta desde el estudio usa una que ya existe.

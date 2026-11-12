@@ -391,9 +391,16 @@
     "title": "Documental",
     "description": "Tu grabación hablando a cámara, convertida en un documental para YouTube, TikTok o Reels: cada frase con material real encontrado en internet, recoloreado y animado a golpe de corte, tú recortado delante de un mundo que cambia y un clic en cada imagen.",
     "skill": "video-documental",
-    "version": "1.0",
+    "version": "2.0",
     "icon": "claqueta",
     "voz": false,
+    "modelos": {
+      "principal": {
+        "model": "claude-sonnet-5-5",
+        "effort": "medium",
+        "medido": "11 nov 2026, la misma grabación de 53 s con el director: Sonnet medio 3,6 min y $0,40 en 7 pasos (2,6 min y $0,38 con una de 40 s); Haiku medio 6,2 min y $0,40 en 28 pasos, con peor material. Sin esto iba en Opus alto."
+      }
+    },
     "etapas": [
       {
         "nombre": "Tu grabación",
@@ -409,27 +416,82 @@
         "fase": "sonido"
       },
       {
-        "nombre": "Plan y fuentes",
-        "listo": "PLAN.md",
+        "nombre": "Qué se ve en cada frase",
+        "listo": "momentos.json",
         "fase": "guion"
       },
       {
         "nombre": "Material",
-        "listo": "work/assets.json",
-        "muestra": "public/assets/{img,clips,captures}/**/*.{jpg,jpeg,png,webp,mp4}",
+        "listo": "work/material.json",
+        "muestra": "revision/material.jpg",
+        "fase": "guion"
+      },
+      {
+        "nombre": "Fuentes y derechos",
+        "listo": "FUENTES.md",
         "fase": "guion"
       },
       {
         "nombre": "Revisión",
-        "listo": "revision/hoja-*.png",
+        "listo": "revision/hoja.png",
         "fase": "video"
       },
       {
         "nombre": "Video",
         "listo": "out/final.mp4",
         "fase": "video"
+      },
+      {
+        "nombre": "Portada",
+        "listo": "portada.png",
+        "fase": "entrega"
       }
-    ]
+    ],
+    "cambio": {
+      "fecha": "2026-11-11",
+      "titulo": "Sale en menos de 4 minutos y gasta 25 veces menos",
+      "texto": "El agente ya no arma cada video a mano: dice qué se ve en cada palabra de tu grabación y Sloth baja el material, lo recolorea, corta en las palabras y pone los subtítulos, los clics, la palabra roja detrás de tu cabeza y la portada. Ya no se detiene a pedirte el visto bueno del plan: te entrega el video con la lista de lo que hay que revisar de derechos. Medido con la misma grabación de 53 segundos: antes, 24,6 minutos y $9,93 (Opus, esfuerzo alto, 95 pasos); ahora, 3,6 minutos y $0,40 (Sonnet medio, 7 pasos). El costo es a precio de la API: con tu plan no lo pagas aparte, pero gasta de él en la misma proporción.",
+      "antes": {
+        "version": "1.0",
+        "modelos": null,
+        "etapas": [
+          {
+            "nombre": "Tu grabación",
+            "listo": "public/assets/media/cam_raw.*",
+            "muestra": "public/assets/media/cam_raw.mp4",
+            "espera": "Grábate hablando a cámara, en el formato que elegiste (horizontal: el celular de lado; vertical: de pie), y súbelo aquí o mándalo por el chat.",
+            "fase": "sonido"
+          },
+          {
+            "nombre": "Transcripción",
+            "listo": "work/tx/words.json",
+            "muestra": "work/tx/transcript.txt",
+            "fase": "sonido"
+          },
+          {
+            "nombre": "Plan y fuentes",
+            "listo": "PLAN.md",
+            "fase": "guion"
+          },
+          {
+            "nombre": "Material",
+            "listo": "work/assets.json",
+            "muestra": "public/assets/{img,clips,captures}/**/*.{jpg,jpeg,png,webp,mp4}",
+            "fase": "guion"
+          },
+          {
+            "nombre": "Revisión",
+            "listo": "revision/hoja-*.png",
+            "fase": "video"
+          },
+          {
+            "nombre": "Video",
+            "listo": "out/final.mp4",
+            "fase": "video"
+          }
+        ]
+      }
+    }
   },
   {
     "id": "frutinovela",

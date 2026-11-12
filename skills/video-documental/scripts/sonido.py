@@ -2,7 +2,7 @@
 
     python -I -B -X utf8 <skill>/scripts/sonido.py <base.wav> <sfx-cues.txt> <salida.wav> [--dur 46.4]
 
-Lo llama `build.py` al final de cada armado (`mezclar()`), así el monitor en vivo de Sloth suena igual que el render:
+Lo llama el director al final de cada armado (`mezclar()`), así el monitor en vivo de Sloth suena igual que el render:
 `public/sonido.wav` es la única pista de audio del proyecto de Remotion.
 
 sfx-cues.txt lo escriben los dispositivos (Comp.write_cues); una pista por línea:

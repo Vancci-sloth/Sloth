@@ -4,7 +4,7 @@ Lo que comparten los estilos de vídeo: el lote, los errores ya vistos y los scr
 `SKILL.md` ni card): la leen y la usan las skills de cada estilo, que se quedan solo con lo suyo.
 
 - **La usan:** `reel-collage` y `video-explicativo` (sus scripts, `LOTE.md` y este archivo; `video-explicativo`, también
-  las huellas), `video-documental` (`sloth.py`, `chrome.mjs`, la hoja, masterizar y comprobar), `frutinovela`
+  las huellas), `video-documental` (el motor, `sloth.py`, `chrome.mjs`, el render, masterizar y comprobar), `frutinovela`
   (`FLOW.md`, `sloth.py`, la hoja, masterizar, comprobar y la portada), los estilos que hace
   cada quien con `crear-estilo` y los procesos de Python de Sloth (`sloth.py`).
 - **`video-el-diff`** es un estilo propio que el usuario afina a mano: ni lo toques desde aquí ni le muevas nada. Solo
@@ -13,6 +13,7 @@ Lo que comparten los estilos de vídeo: el lote, los errores ya vistos y los scr
 
 | Archivo | Qué es |
 |---|---|
+| [MOTOR.md](MOTOR.md) | El motor: un video desde `momentos.json` (qué se ve en cada palabra) y un `hacer.py` que hace lo demás. El contrato que siguen el explicativo y el documental, y con el que nace un estilo nuevo |
 | [FORMATO.md](FORMATO.md) | Vertical u horizontal: todo estilo hace los dos, y qué cambia de uno a otro (`Formato:` del mensaje) |
 | [LOTE.md](LOTE.md) | Lo que cambia cuando el vídeo es uno de un lote; solo se lee si el mensaje trae `Lote:` |
 | [PORTADA.md](PORTADA.md) | La portada que todo vídeo vertical lleva de primer fotograma, en el estilo de su vídeo, y la miniatura de YouTube del horizontal |
@@ -114,6 +115,8 @@ Todos dicen cómo se usan si los corres sin argumentos. Node sin dependencias y 
 | `banco.py ver\|tomar\|guardar <skill> <serie>` | El banco de historias de una serie, en `<skill>/series/banco/`: las candidatas ya leídas y comprobadas que no se usaron ([SERIES.md](SERIES.md)) |
 | `espacio.py` (librería) | El disco: `enlazar_modulos` (un solo `node_modules` por plantilla, en %LOCALAPPDATA%/sloth-modulos, enlazado desde cada video: antes cada uno copiaba ~1 GB), `limpiar_temporales` (las `remotion-*` de %TEMP% que dejan los renders cortados) y `comprobar_disco` (para antes de renderizar sin espacio). Sloth hace lo mismo en Opciones → Espacio en disco |
 | `equipo.cjs` (librería) | El render según este equipo: `tarjeta3D()` (avisa si Chrome dibuja el 3D por software), `estimado(cuadros)` y `falta(parte, desde)` para decir cuánto tardará, y `anotarRender()` del final, que Sloth enseña en Opciones → Tu equipo |
+| `momentos.py` (librería) | Lo común de los `hacer.py` del motor ([MOTOR.md](MOTOR.md)): anclar cada momento a su palabra, decir todos los ✗ de una vez, los pasos con su segundo (`revision/tiempos.json`, `✓ listo`) y lo que mira quien juzga (`hoja`, `tiras`, `pares`) |
+| `render.cjs <salida.mp4> --id=<composición>` | El render de un proyecto de Remotion con un solo Chrome, diciendo cuánto falta, y puesto en su sitio aunque el estudio tenga abierto el de antes. `--antes=<módulo>` prepara algo en el paquete antes de dibujar (el documental saca ahí los cuadros de sus clips: 6 veces más rápido) |
 | `remotion.cjs` (librería) | `empaquetar(raiz)`: el `bundle()` de Remotion en una carpeta de %TEMP% que se borra al terminar (la de Remotion se quedaba, con una copia de `public/`). Todo script que empaquete usa este |
 | `recorte.py foto.jpg salida.png [--borde]` | Quita el fondo con rembg (o respeta el alfa que traiga) y corta al contenido; con `--borde`, un borde blanco de tijera. También una carpeta entera |
 

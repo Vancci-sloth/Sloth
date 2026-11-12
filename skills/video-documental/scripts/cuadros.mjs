@@ -41,7 +41,7 @@ else if (op('cada')) {
 } else cuadros = datos.escenas.map((e) => Math.min(e.f1 - 1, Math.round(e.f0 + (e.f1 - e.f0) * 0.9)))
 cuadros = [...new Set(cuadros.filter((f) => f >= 0 && f < datos.duracion))].sort((a, b) => a - b)
 if (!cuadros.length) {
-  console.error('No hay cuadros que sacar: sin escenas en la edición (c.escena en build.py), pide --t o --cada.')
+  console.error('No hay cuadros que sacar: sin escenas en la edición (las pone el director), pide --t o --cada.')
   process.exit(1)
 }
 

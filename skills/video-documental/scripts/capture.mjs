@@ -12,6 +12,8 @@
 //                "clip": [x,y,w,h],          optional: page-coord clip instead of selector
 //                "wait": 2500,               ms after load, default 2500
 //                "hide": ["header", …],      selectors to display:none before the shot
+//                "baja": 600,                px que se baja antes de capturar lo que se ve
+//                "marca": "20 dólares",      el texto que se resalta: se baja hasta él y sus cajas van a <name>.marcas.json
 //                "full": true }]             full-page capture (tall), default false
 //
 // Why each step exists (all of them failed silently on earlier videos):
@@ -70,9 +72,28 @@ const CLEAN = `(() => {
   for (const i of document.querySelectorAll('img[src*="emoji"], img.Emoji, img[alt*="emoji" i]')) i.style.display='none';
   return true; })()`;
 
+// Las cajas de un texto en la página (coordenadas de página): la primera vez que se ve, renglón por renglón.
+const MARCA = `(q) => {
+  const w = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+  while (w.nextNode()) {
+    const n = w.currentNode, i = n.nodeValue.toLowerCase().indexOf(q.toLowerCase());
+    if (i < 0) continue;
+    const s = getComputedStyle(n.parentElement);
+    if (s.visibility === 'hidden' || s.display === 'none' || +s.opacity === 0) continue;
+    const r = document.createRange(); r.setStart(n, i); r.setEnd(n, i + q.length);
+    const out = [...r.getClientRects()].filter((b) => b.width > 4 && b.height > 4).map((b) => [b.x + scrollX, b.y + scrollY, b.width, b.height]);
+    if (out.length) return out;
+  }
+  return [];
+}`;
+
 for (const j of jobs) {
   const w = j.w || 1280, h = j.h || 900, dsf = j.dsf || 2;
   await send('Emulation.setDeviceMetricsOverride', { width: w, height: h, deviceScaleFactor: dsf, mobile: !!j.mobile });
+  // De teléfono también se presenta como teléfono: con solo el tamaño, muchos sitios mandan su página de escritorio, encogida.
+  await send('Emulation.setUserAgentOverride', { userAgent: j.mobile
+    ? 'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Mobile Safari/537.36'
+    : 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36' });
   await send('Page.navigate', { url: j.url });
   await sleep(j.wait ?? 2500);
   await evalJs(CLEAN); await sleep(400);
@@ -87,11 +108,25 @@ for (const j of jobs) {
     const p = j.pad ?? 16; clip = { x: Math.max(0, r[0] - p), y: Math.max(0, r[1] - p), width: r[2] + 2 * p, height: r[3] + 2 * p, scale: 1 };
   } else if (j.clip) clip = { x: j.clip[0], y: j.clip[1], width: j.clip[2], height: j.clip[3], scale: 1 };
   else if (j.full) { const H = await evalJs('document.documentElement.scrollHeight'); clip = { x: 0, y: 0, width: w, height: Math.min(H, 12000), scale: 1 }; }
+  // `baja`: los px que se baja antes de capturar lo que se ve. `marca`: el texto que el video resalta; se baja hasta
+  // dejarlo a un tercio del alto y sus cajas (medidas del DOM, en px de la captura) van a <name>.marcas.json.
+  if (j.baja && !clip) { await evalJs(`scrollTo(0, ${Number(j.baja) || 0})`); await sleep(300); }
+  let marcas = [];
+  if (j.marca) {
+    const cajas = () => evalJs(`(${MARCA})(${JSON.stringify(j.marca)})`);
+    let r = await cajas();
+    if (r?.length && !clip) { await evalJs(`scrollTo(0, Math.max(0, ${r[0][1]} - innerHeight * 0.33))`); await sleep(350); r = await cajas(); }
+    const [ox, oy] = clip ? [clip.x, clip.y] : await evalJs('[scrollX, scrollY]');
+    marcas = (r || []).map(([x, y, bw, bh]) => [Math.round((x - ox) * dsf), Math.round((y - oy) * dsf), Math.round(bw * dsf), Math.round(bh * dsf)])
+      .filter(([x, y]) => x >= 0 && y >= 0);
+    if (!marcas.length) console.log('MISS marca', j.name, j.marca);
+  }
   await sleep(300);
   const shot = await send('Page.captureScreenshot', { format: 'png', ...(clip ? { clip, captureBeyondViewport: true } : {}) });
   const data = shot.result?.data;
   if (!data) { console.log('FAIL', j.name); continue; }
   const buf = Buffer.from(data, 'base64'); writeFileSync(join(outDir, `${j.name}.png`), buf);
+  if (j.marca) writeFileSync(join(outDir, `${j.name}.marcas.json`), JSON.stringify(marcas));
   console.log('OK', j.name, buf.length, 'bytes', clip ? `${Math.round(clip.width)}x${Math.round(clip.height)}@${dsf}x` : `${w}x${h}@${dsf}x`);
 }
 ws.close(); chrome.kill('SIGKILL');

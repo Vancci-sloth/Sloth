@@ -119,7 +119,7 @@ class Comp:
 
 def _pieza():
     """El dispositivo que dibuja esto, el de más afuera (cutout_world, no el tile_reveal al que llama), para que el
-    estudio diga qué es lo que se elige en el cuadro. Si lo pone build.py a mano, su función (face, ph) o «capa»."""
+    estudio diga qué es lo que se elige en el cuadro. Si lo pone el director a mano, su función o «capa»."""
     f, nombre = sys._getframe(2), None
     while f:
         if f.f_code.co_filename.lower().endswith(('ev1_devices.py', 'ev1_more.py')):

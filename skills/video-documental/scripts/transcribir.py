@@ -67,17 +67,28 @@ def normal(w: str) -> str:
 
 def comparar(video: Path, final: Path) -> None:
     toma = json.loads((video / "work" / "tx" / "words.json").read_text(encoding="utf-8"))
-    wav = video / "work" / "tx" / "final.wav"
-    subprocess.run(["ffmpeg", "-nostdin", "-y", "-v", "error", "-i", str(final), "-map", "0:a:0", str(wav)], check=True)
-    try:
-        oido = palabras(wav, video)
-    finally:
-        wav.unlink(missing_ok=True)
-    a, b = [normal(p["w"]) for p in toma], [normal(p["w"]) for p in oido]
-    faltan = []
-    for op, i1, i2, j1, j2 in difflib.SequenceMatcher(None, a, b, autojunk=False).get_opcodes():
-        if op in ("delete", "replace"):
-            faltan.append((toma[i1]["s"], " ".join(p["w"] for p in toma[i1:i2]), " ".join(p["w"] for p in oido[j1:j2])))
+    a = [normal(p["w"]) for p in toma]
+
+    def faltan_en(filtro: list[str]) -> list[tuple[int, int, str]]:
+        """Los tramos de la toma (de qué palabra a cuál) que no se oyen en el final, y lo que se oye en su lugar."""
+        wav = video / "work" / "tx" / "final.wav"
+        subprocess.run(["ffmpeg", "-nostdin", "-y", "-v", "error", "-i", str(final), "-map", "0:a:0", *filtro, str(wav)], check=True)
+        try:
+            oido = palabras(wav, video)
+        finally:
+            wav.unlink(missing_ok=True)
+        b = [normal(p["w"]) for p in oido]
+        return [(i1, i2, " ".join(p["w"] for p in oido[j1:j2]))
+                for op, i1, i2, j1, j2 in difflib.SequenceMatcher(None, a, b, autojunk=False).get_opcodes() if op in ("delete", "replace")]
+
+    tramos = faltan_en([])
+    if tramos:
+        # El transcriptor a veces se come la primera o la última frase de un archivo según dónde corte (la última de un
+        # testimonio no «se oía» y, con 33 ms de más al principio, sí): se oye otra vez con medio segundo de silencio
+        # delante y uno detrás, y solo falta lo que falta las dos veces.
+        otra = {i for i1, i2, _ in faltan_en(["-af", "adelay=500:all=1,apad=pad_dur=1"]) for i in range(i1, i2)}
+        tramos = [(i1, i2, oye) for i1, i2, oye in tramos if any(i in otra for i in range(i1, i2))]
+    faltan = [(toma[i1]["s"], " ".join(p["w"] for p in toma[i1:i2]), oye) for i1, i2, oye in tramos]
     if not faltan:
         print("comparar: se oye todo lo que se dijo.")
     for t, dicho, oye in faltan:
