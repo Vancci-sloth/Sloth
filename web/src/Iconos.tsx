@@ -71,6 +71,8 @@ const TRAZOS = {
   buscar: ['M11 3a8 8 0 1 0 0 16 8 8 0 0 0 0-16z', 'm21 21-4.3-4.3'],
   microfono: ['M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z', 'M19 10v2a7 7 0 0 1-14 0v-2', 'M12 19v3'],
   estrella: ['M11.53 2.3a.53.53 0 0 1 .95 0l2.31 4.68a2.12 2.12 0 0 0 1.6 1.16l5.16.76a.53.53 0 0 1 .3.9l-3.74 3.64a2.12 2.12 0 0 0-.61 1.88l.88 5.14a.53.53 0 0 1-.77.56l-4.62-2.43a2.12 2.12 0 0 0-1.97 0L6.4 21.01a.53.53 0 0 1-.77-.56l.88-5.14a2.12 2.12 0 0 0-.61-1.88L2.16 9.8a.53.53 0 0 1 .29-.9l5.17-.76a2.12 2.12 0 0 0 1.6-1.16z'],
+  // La insignia de los Fundadores en la comunidad.
+  corona: ['M11.56 3.27a.5.5 0 0 1 .88 0l2.95 5.6a1 1 0 0 0 1.52.3l4.27-3.67a.5.5 0 0 1 .8.52l-2.83 10.25a1 1 0 0 1-.96.73H5.81a1 1 0 0 1-.96-.73L2.02 6.02a.5.5 0 0 1 .8-.52l4.27 3.67a1 1 0 0 0 1.52-.3z', 'M5 21h14'],
   calendario: ['M8 2v4', 'M16 2v4', 'M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z', 'M3 10h18'],
   // La rifa de la comunidad.
   boleto: ['M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z', 'M13 5v2', 'M13 17v2', 'M13 11v2'],
@@ -78,7 +80,9 @@ const TRAZOS = {
 }
 
 export type NombreIcono = keyof typeof TRAZOS
-export const esIcono = (nombre: string): nombre is NombreIcono => Object.hasOwn(TRAZOS, nombre)
+/** Los trazos de un icono, para quien lo dibuja con otro color (la corona de los Fundadores). */
+export const trazosDe = (nombre: NombreIcono): readonly string[] => TRAZOS[nombre]
+export const esIcono =(nombre: string): nombre is NombreIcono => Object.hasOwn(TRAZOS, nombre)
 
 export function Icono({ de, className = 'ico' }: { de: NombreIcono; className?: string }) {
   return (

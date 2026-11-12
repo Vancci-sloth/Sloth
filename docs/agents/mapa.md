@@ -117,7 +117,9 @@ Este es el mapa:
 - `server/radar/`: buscador propio de noticias tech, cada 5 minutos (`POST /api/radar/buscar`).
 - La comunidad (`web/src/Comunidad.tsx`, `server/comunidad.ts`): un feed como el de Skool que vive en el Worker del cobro
   (`licencias/src/comunidad.ts`); cada quien entra con su cuenta gratis (o la clave de su apoyo) y tú, como creador, con la llave de `admin.txt`.
-  El feed se ordena por actividad, por lo más reciente o, solo el creador, por «Sin contestar» (`consultaFeed`).
+  El feed se ordena por actividad, por lo más reciente o, solo el creador, por «Sin contestar» (`consultaFeed`). Lo ya
+  pedido y lo que se adelanta (secciones, comentarios, la página siguiente) vive en `web/src/comunidadDatos.ts`; el
+  buscador, en `/comunidad/buscar` (`consultaBuscar`).
   Publicar una mejora (la ven todos): `POST /api/mejoras {texto}`. Un anuncio a nombre del creador, en su tono:
   `docs/agents/anuncios.md`. La rifa (`licencias/src/rifa.ts`): arriba de la comunidad «Participa en la rifa» (`Rifa.tsx`,
   solo quien usa Sloth gratis), en Administrador se arma y se sortea con la ruleta (`RifaAdmin.tsx`); el ganador recibe

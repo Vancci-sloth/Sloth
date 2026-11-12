@@ -1,12 +1,13 @@
-import { type CSSProperties, type DragEvent, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { type CSSProperties, type DragEvent, useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
 import type { AdjuntoComunidad, Autor, AvisoComunidad, CategoriaComunidad, ComentarioComunidad, FeedComunidad, OrdenComunidad, PublicacionComunidad, RoadmapComunidad } from '../../shared/types'
 import { api, ErrorApi } from './api'
+import { abiertaGuardada, BORRADA, buscarAqui, conocidas, consulta as consultaDe, guardado, guardar as guardarVista, guardarAbierta, indiceListo, olvidar, olvidarTodo, palabrasDe, pedir, pedirIndice, pedirPublicacion, precargarPublicacion, precargarVista, recordar, ultimoFeed } from './comunidadDatos'
 import { Confirm } from './Confirm'
 import { Escribir, type Escrito, subirImagen } from './Escribir'
 import { abrirBorrador, CompartirTuyo, type Instalado, TrasInstalar } from './Estilos'
 import { LINK } from './etiquetas'
 import { Unirse } from './Licencia'
-import { Icono as IconoBase, type NombreIcono } from './Iconos'
+import { Icono as IconoBase, type NombreIcono, trazosDe } from './Iconos'
 import { Liberar } from './Liberar'
 import { Rifa } from './Rifa'
 import './Comunidad.css'
@@ -26,6 +27,12 @@ import './Comunidad.css'
  * solo paso (`CompartirEstilo` en `Estilos.tsx`), que aquí abre «Compartir un estilo tuyo» o elegir Estilos al escribir.
  * Nadie más lo ve hasta que el creador lo aprueba («En revisión»); antes lo revisa: «Revisar» lo abre en una carpeta y le
  * pide a «Nuevo estilo» que lo lea.
+ *
+ * Todo sale al instante de lo que ya se pidió (`comunidadDatos.ts`) y se pone al día por detrás: la comunidad al abrirla,
+ * cada sección (se adelanta al pasar por su pestaña), una publicación con sus comentarios (al detenerte en ella) y la
+ * página siguiente, que entra sola al bajar. Lo que se adelanta es poco y una vez por sesión: D1 tiene tope. El buscador de arriba (`/`) busca mientras escribes en lo que ya se tiene y
+ * en el Worker (`/comunidad/buscar`). Con el teclado, j y k van de una publicación a otra (el cursor empieza en la
+ * primera, como en Gmail), Enter u o la abre y Esc la cierra.
  *
  * Los comentarios llevan imágenes, como el chat (se pegan, se sueltan o se eligen), se responden (un nivel) y se les da
  * me gusta. Lo de los demás se reporta, y lo reportado por 3 deja de
@@ -102,10 +109,14 @@ export function Comunidad() {
     const guardado = localStorage.getItem(ORDEN)
     return ORDENES.some((o) => o.id === guardado) ? (guardado as OrdenComunidad) : 'actividad'
   })
-  const [feed, setFeed] = useState<FeedComunidad | null>(null)
-  const [lista, setLista] = useState<PublicacionComunidad[] | null>(null)
-  const [mas, setMas] = useState(false)
+  // Lo que ya se tenía de esta vista sale de inmediato; `cargar` lo pone al día. Quién eres, tus avisos y el roadmap, de
+  // lo último que llegó en esta sesión.
+  const [feed, setFeed] = useState<FeedComunidad | null>(ultimoFeed)
+  const [lista, setLista] = useState<PublicacionComunidad[] | null>(() => guardado({ seccion, orden })?.lista ?? null)
+  const [mas, setMas] = useState(() => guardado({ seccion, orden })?.mas ?? false)
   const [cargandoMas, setCargandoMas] = useState(false)
+  // Si falló la página siguiente, no se vuelve a pedir sola: espera a «Reintentar».
+  const [falloMas, setFalloMas] = useState(false)
   const [error, setError] = useState('')
   // La app que se vende sin cuenta gratis todavía (401): la crea aquí.
   const [sinCuenta, setSinCuenta] = useState(false)
@@ -136,46 +147,102 @@ export function Comunidad() {
   const conFijadas = orden === 'actividad'
   const fechaDe = (p: PublicacionComunidad) => (orden === 'recientes' ? p.creada : p.actividad)
   const ultimaDe = (l: PublicacionComunidad[]) => l.filter((p) => !conFijadas || !p.fijada).at(-1)
-  const consulta = (extra: Record<string, string> = {}) =>
-    new URLSearchParams({ ...(seccion ? { categoria: seccion } : {}), ...(orden !== 'actividad' ? { orden } : {}), ...extra }).toString()
+  const consulta = (extra: Record<string, string> = {}) => consultaDe({ seccion, orden }, extra)
+  // La página siguiente, pedida antes de que llegues al final: al bajar, entra sin esperar.
+  const siguiente = useRef<{ antes: string; pagina: Promise<FeedComunidad> } | null>(null)
+  // Cambia con cada vista: lo que llega tarde de otra (una página siguiente) no se mezcla.
+  const vistaN = useRef(0)
+  // La vista que ya se puso al día con el Worker: hasta entonces no se adelanta su página siguiente (sería de la copia vieja).
+  const alDia = useRef('')
 
-  async function cargar() {
+  /** Pide la primera página de esta vista. `fresco`: tras escribir algo, sin reusar un pedido que ya iba. */
+  async function cargar(fresco = false) {
     const n = ++pedido.current
+    const v = { seccion, orden }
     try {
-      const q = consulta()
-      const f = await api<FeedComunidad>(`/api/comunidad${q ? `?${q}` : ''}`)
+      const f = await pedir(v, fresco)
       if (n !== pedido.current) return
       setFeed(f)
       setError('')
       setSinCuenta(false)
+      // Con la red de vuelta, la página siguiente se vuelve a pedir sola. En «Sin contestar», la ya pedida puede traer lo
+      // que acabas de contestar: se pide otra.
+      setFalloMas(false)
+      if (orden === 'sin-contestar') siguiente.current = null
+      alDia.current = `${seccion}|${orden}`
       // Al volver a pedir, lo de las páginas siguientes se queda, si aún va después de la primera. En «Sin contestar»
       // no: lo que ya contestaste se va.
       const l = ahora.current.lista
       const ids = new Set(f.publicaciones.map((p) => p.id))
       const ultima = ultimaDe(f.publicaciones)
       const resto = l && f.mas && ultima && orden !== 'sin-contestar' ? l.filter((p) => !ids.has(p.id) && (!conFijadas || !p.fijada) && fechaDe(p) < fechaDe(ultima)) : []
-      setLista([...f.publicaciones, ...resto])
-      setMas(resto.length ? ahora.current.mas : f.mas)
+      const nueva = [...f.publicaciones, ...resto]
+      const conMas = resto.length ? ahora.current.mas : f.mas
+      setLista(nueva)
+      setMas(conMas)
     } catch (e) {
       if (n !== pedido.current) return
-      setSinCuenta(e instanceof ErrorApi && e.status === 401)
+      const sin = e instanceof ErrorApi && e.status === 401
+      setSinCuenta(sin)
+      // Sin cuenta, lo guardado de otra vez no se enseña, ni ahora ni la próxima.
+      if (sin) (setLista(null), olvidarTodo())
       setError(e instanceof Error ? e.message : String(e))
     }
   }
 
+  /** Pide (o toma la ya pedida) la página que sigue a lo que hay. */
+  function paginaSiguiente(l: PublicacionComunidad[]) {
+    const ultima = ultimaDe(l)
+    if (!ultima) return null
+    const antes = fechaDe(ultima)
+    if (siguiente.current?.antes !== antes) {
+      const pagina = api<FeedComunidad>(`/api/comunidad?${consulta({ antes })}`)
+      pagina.catch(() => {})
+      siguiente.current = { antes, pagina }
+    }
+    return siguiente.current.pagina
+  }
+
   async function verMas() {
-    const ultima = lista && ultimaDe(lista)
-    if (!ultima || cargandoMas) return
+    if (!lista || !mas || cargandoMas || falloMas) return
+    const pagina = paginaSiguiente(lista)
+    if (!pagina) return
+    const n = vistaN.current
     setCargandoMas(true)
     try {
-      const f = await api<FeedComunidad>(`/api/comunidad?${consulta({ antes: fechaDe(ultima) })}`)
-      setLista((l) => [...(l ?? []), ...f.publicaciones.filter((p) => !l?.some((x) => x.id === p.id))])
+      const f = await pagina
+      if (n !== vistaN.current) return
+      setLista((l) => (l ? [...l, ...f.publicaciones.filter((p) => !l.some((x) => x.id === p.id))] : l))
       setMas(f.mas)
     } catch (e) {
+      if (n !== vistaN.current) return
+      siguiente.current = null
+      setFalloMas(true)
       setError(e instanceof Error ? e.message : String(e))
     } finally {
-      setCargandoMas(false)
+      if (n === vistaN.current) setCargandoMas(false)
     }
+  }
+
+  // Una sección se adelanta si te detienes 120 ms en su pestaña (pasar de largo por la barra no pide nada).
+  const esperaVista = useRef<ReturnType<typeof setTimeout>>(undefined)
+  const adelantarVista = (s: CategoriaComunidad | '') => (clearTimeout(esperaVista.current), (esperaVista.current = setTimeout(() => precargarVista({ seccion: s, orden }), 120)))
+  const soltarVista = () => clearTimeout(esperaVista.current)
+  useEffect(() => () => clearTimeout(esperaVista.current), [])
+
+  /** Cambia de sección o de orden: lo que ya se tenía de allá sale de inmediato, y se pone al día. */
+  function irA(s: CategoriaComunidad | '', o: OrdenComunidad = orden) {
+    if (s === seccion && o === orden) return
+    const g = guardado({ seccion: s, orden: o })
+    vistaN.current++
+    siguiente.current = null
+    cursor.current = 0
+    setCargandoMas(false)
+    setFalloMas(false)
+    setLista(g?.lista ?? null)
+    setMas(g?.mas ?? false)
+    setSeccion(s)
+    setOrden(o)
   }
 
   // Al abrir, al cambiar de sección y cada minuto mientras se ve; también cuando algo se publica desde un hilo.
@@ -184,10 +251,17 @@ export function Comunidad() {
     localStorage.setItem('comunidad:seccion', seccion)
     localStorage.setItem(ORDEN, orden)
   }, [seccion, orden])
+  // La página que sigue, en cuanto se ve la anterior; y lo que se ve (con tus me gusta y comentarios) queda guardado para
+  // volver a esta vista sin esperar.
+  useEffect(() => {
+    if (lista?.length && mas && alDia.current === `${seccion}|${orden}`) paginaSiguiente(lista)
+    if (lista && !sinCuenta) guardarVista({ seccion, orden }, { lista, mas })
+    if (feed) recordar(feed)
+  }, [feed, lista, mas, sinCuenta])
   useEffect(() => {
     const t = setInterval(() => document.visibilityState === 'visible' && void cargar(), 60_000)
     const reloj = setInterval(() => setReloj((n) => n + 1), 60_000)
-    const oir = () => void cargar()
+    const oir = () => void cargar(true)
     addEventListener('sloth-comunidad', oir)
     return () => (clearInterval(t), clearInterval(reloj), removeEventListener('sloth-comunidad', oir))
   }, [seccion, orden])
@@ -228,9 +302,10 @@ export function Comunidad() {
   async function publicar(e: Escrito, s: CategoriaComunidad) {
     const p = await api<PublicacionComunidad>('/api/comunidad/publicar', { categoria: s, ...e })
     setEscribiendo(null)
+    olvidar({ seccion, orden })
     setFeed((f) => f && { ...f, yo: { ...f.yo, publicaciones: f.yo.publicaciones + 1 } })
     // Entra después de lo fijado, si es de la sección que ves; si no, cambia a la suya.
-    if (seccion && seccion !== s) return setSeccion(s), setLista(null), setNueva(p.id)
+    if (seccion && seccion !== s) return irA(s), setNueva(p.id)
     // En «Sin contestar» no entra: la última palabra es tuya.
     if (orden === 'sin-contestar') return
     setLista((l) => {
@@ -285,11 +360,53 @@ export function Comunidad() {
     },
   }
 
+  // El teclado: j y k mueven el cursor por el feed (empieza en la primera, como en Gmail) y Enter u o abre la del cursor.
+  const cursor = useRef(0)
+  const raiz = useRef<HTMLDivElement>(null)
+  const fin = useRef<HTMLDivElement>(null)
+  const ocupada = !!(abierta || perfil || escribiendo || compartiendo)
+  useEffect(() => {
+    const tecla = (e: KeyboardEvent) => {
+      // Con cualquier diálogo abierto (de aquí o de Sloth: confirmar, la rifa, los avisos), las teclas son suyas.
+      if (ocupada || e.ctrlKey || e.metaKey || e.altKey || escribeEn(e.target) || !lista?.length || hayDialogo()) return
+      const botones = [...(raiz.current?.querySelectorAll<HTMLButtonElement>('.com-feed .com-post-abrir') ?? [])]
+      if (e.key === 'j' || e.key === 'k') {
+        e.preventDefault()
+        cursor.current = Math.max(0, Math.min(botones.length - 1, cursor.current + (e.key === 'j' ? 1 : -1)))
+        const b = botones[cursor.current]
+        b?.focus({ preventScroll: true })
+        b?.closest('.com-post')?.scrollIntoView({ block: 'nearest' })
+        const p = lista[cursor.current]
+        if (p && !e.repeat) precargarPublicacion(p.id)
+        if (cursor.current >= botones.length - 3) void verMas()
+      } else if (
+        (e.key === 'o' && (e.target === document.body || (e.target instanceof HTMLElement && !!e.target.closest('.com-feed')))) ||
+        // Enter en un botón ya lo pulsa él.
+        (e.key === 'Enter' && (e.target === document.body || (e.target instanceof HTMLElement && !!e.target.closest('.com-feed') && !(e.target instanceof HTMLButtonElement || e.target instanceof HTMLAnchorElement))))
+      ) {
+        const p = lista[cursor.current]
+        if (p) (e.preventDefault(), setAbierta(p.id))
+      }
+    }
+    addEventListener('keydown', tecla)
+    return () => removeEventListener('keydown', tecla)
+  })
+  // Al bajar, la página siguiente (ya pedida) entra antes de que llegues al final. Si falló, espera a «Reintentar».
+  const verMasAhora = useRef(verMas)
+  verMasAhora.current = verMas
+  useEffect(() => {
+    const el = fin.current
+    if (!el || !mas || falloMas) return
+    const o = new IntersectionObserver((e) => e[0]?.isIntersecting && void verMasAhora.current(), { root: raiz.current, rootMargin: '0px 0px 1200px 0px' })
+    o.observe(el)
+    return () => o.disconnect()
+  }, [mas, falloMas, lista?.length, seccion, orden])
+
   const caras = [...new Map((lista ?? []).flatMap((p) => [p.autor, ...p.comentaron]).filter((a) => a.nombre).map((a) => [a.id, a])).values()].slice(0, 8)
   const escribe = escribiendo && seccionDe(escribiendo.seccion)
 
   return (
-    <div className="com" {...soltar}>
+    <div className="com" ref={raiz} {...soltar}>
       <div className="com-rejilla">
         <main className="com-centro">
           <header className="com-cabeza">
@@ -297,6 +414,7 @@ export function Comunidad() {
               <div className="com-antetitulo">Sloth</div>
               <h1>Comunidad</h1>
             </div>
+            {feed && <Buscador onAbrir={setAbierta} />}
             {feed && <Avisos sinLeer={feed.avisos} onAbrir={setAbierta} onLeidos={() => setFeed((f) => f && { ...f, avisos: 0 })} />}
           </header>
 
@@ -347,23 +465,25 @@ export function Comunidad() {
           )}
           {compartiendo && <CompartirTuyo onCerrar={() => setCompartiendo(false)} />}
 
-          <nav className="com-secciones" aria-label="Secciones">
-            <button className={seccion === '' ? 'on' : ''} onClick={() => seccion !== '' && (setLista(null), setSeccion(''))}>
-              Todo
-            </button>
-            {SECCIONES.map((s) => (
-              <button key={s.id} className={seccion === s.id ? 'on' : ''} onClick={() => seccion !== s.id && (setLista(null), setSeccion(s.id))}>
-                <Icono de={s.icono} />
-                {s.nombre}
+          <div className="com-barra">
+            <nav className="com-secciones" aria-label="Secciones">
+              {/* Al apretar, no al soltar: como una pestaña del sistema, y lo de esa sección ya está guardado. */}
+              <button className={seccion === '' ? 'on' : ''} aria-pressed={seccion === ''} onPointerEnter={() => adelantarVista('')} onPointerLeave={soltarVista} onPointerDown={(e) => e.pointerType === 'mouse' && e.button === 0 && irA('')} onClick={() => irA('')}>
+                Todo
               </button>
-            ))}
-          </nav>
-          <div className="com-orden-fila">
+              {SECCIONES.map((s) => (
+                <button key={s.id} className={seccion === s.id ? 'on' : ''} aria-pressed={seccion === s.id} onPointerEnter={() => adelantarVista(s.id)} onPointerLeave={soltarVista} onFocus={() => adelantarVista(s.id)} onPointerDown={(e) => e.pointerType === 'mouse' && e.button === 0 && irA(s.id)} onClick={() => irA(s.id)}>
+                  <Icono de={s.icono} />
+                  {s.nombre}
+                </button>
+              ))}
+            </nav>
             <label className="com-orden" title="Cómo se ordena lo que ves">
               <Icono de={ORDENES.find((o) => o.id === orden)?.icono ?? 'hilo'} />
               <select
+                aria-label="Orden"
                 value={orden}
-                onChange={(e) => (setLista(null), setOrden(e.target.value as OrdenComunidad))}
+                onChange={(e) => irA(seccion, e.target.value as OrdenComunidad)}
               >
                 {ORDENES.filter((o) => o.id !== 'sin-contestar' || yo?.creador || orden === o.id).map((o) => (
                   <option key={o.id} value={o.id}>
@@ -379,12 +499,12 @@ export function Comunidad() {
               yo={yo}
               onNombre={() => setPerfil({})}
               onPresentarse={() => abrirCompositor('general', '¡Hola! Soy…')}
-              onComentar={() => (setLista(null), setSeccion('hice'))}
+              onComentar={() => irA('hice')}
             />
           )}
 
           {sinCuenta && <Unirse onListo={() => void cargar()} />}
-          {error && !sinCuenta && (
+          {error && !sinCuenta && !falloMas && (
             <div className="com-error">
               {/* Con enlaces: cuando D1 llega a su tope, el aviso del Worker manda al grupo de WhatsApp. */}
               <Texto texto={error} className="com-error-texto" />
@@ -420,13 +540,19 @@ export function Comunidad() {
                   nueva={nueva === p.id}
                   visto={vistas[p.id]}
                   onAbrir={() => setAbierta(p.id)}
+                  onFoco={() => (cursor.current = lista.indexOf(p))}
                   onMegusta={() => conNombre(() => void megusta(p))}
                 />
               ))}
-              {mas && (
-                <button className="com-mas" disabled={cargandoMas} onClick={() => void verMas()}>
-                  {cargandoMas ? 'Cargando…' : 'Ver más'}
-                </button>
+              {/* Al acercarse aquí entra la página siguiente, que ya se pidió. */}
+              <div ref={fin} className="com-fin" aria-hidden />
+              {mas && cargandoMas && <div className="com-cargando chico">Cargando más…</div>}
+              {/* Si falló la página siguiente, aquí abajo, donde estás: no se vuelve a pedir sola hasta que la pidas. */}
+              {falloMas && (
+                <div className="com-error">
+                  <Texto texto={error || 'No se pudieron cargar más.'} className="com-error-texto" />
+                  <button onClick={() => (setFalloMas(false), setError(''))}>Reintentar</button>
+                </div>
               )}
             </div>
           )}
@@ -474,15 +600,15 @@ export function Comunidad() {
       {abierta && yo && (
         <Abierta
           id={abierta}
-          previa={lista?.find((p) => p.id === abierta)}
+          previa={lista?.find((p) => p.id === abierta) ?? conocidas().find((p) => p.id === abierta)}
           yo={yo}
           onCambio={actualizar}
           onMegusta={megusta}
           onComento={() => setFeed((f) => f && { ...f, yo: { ...f.yo, comentarios: f.yo.comentarios + 1 } })}
-          onBorrada={() => (setLista((l) => l?.filter((x) => x.id !== abierta) ?? l), setAbierta(null))}
+          onBorrada={() => (olvidar({ seccion, orden }, abierta), setLista((l) => l?.filter((x) => x.id !== abierta) ?? l), setAbierta(null))}
           conNombre={conNombre}
           // En «Sin contestar», lo que acabas de contestar se va al cerrar.
-          onCerrar={() => (visto(abierta), setAbierta(null), orden === 'sin-contestar' && void cargar())}
+          onCerrar={() => (visto(abierta), setAbierta(null), orden === 'sin-contestar' && void cargar(true))}
         />
       )}
       {perfil && yo && (
@@ -505,23 +631,77 @@ export function Comunidad() {
 
 /** La cara de alguien: su foto, el logo de Sloth si es el creador sin foto, o su inicial. */
 function Cara({ autor, tam = '' }: { autor?: Autor; tam?: '' | 'chica' | 'grande' }) {
-  if (autor?.foto) return <img className={`com-cara ${tam}`} src={autor.foto} alt="" />
+  // La de un Fundador o un Donador PRO lleva su aro: se distingue también donde solo sale su cara.
+  // (`aro-`, porque `grande` ya es un tamaño de cara.)
+  const clase = `com-cara ${tam}${autor?.insignia === 'fundador' || autor?.insignia === 'grande' ? ` aro-${autor.insignia}` : ''}`
+  if (autor?.foto) return <img className={clase} src={autor.foto} alt="" />
   if (autor?.creador)
     return (
-      <span className={`com-cara sloth ${tam}`}>
+      <span className={`${clase} sloth`}>
         <img src="/icon.svg" alt="" />
       </span>
     )
-  return <span className={`com-cara ${tam}`}>{(autor?.nombre.trim() || '·').charAt(0).toUpperCase()}</span>
+  return <span className={clase}>{(autor?.nombre.trim() || '·').charAt(0).toUpperCase()}</span>
 }
 
+/**
+ * Las insignias, de más a menos. Fundador: corona con joyas y los tres colores de Sloth (coral, ámbar y verde). Donador
+ * PRO: lo mismo en oro y crema, con una estrella. Apoya: solo el texto.
+ */
+const INSIGNIAS = {
+  fundador: { texto: 'Fundador', icono: 'corona', colores: ['var(--bad)', 'var(--amber-2)', 'var(--ok)'] },
+  grande: { texto: 'Donador PRO', icono: 'estrella', colores: ['var(--amber)', 'color-mix(in srgb, var(--amber-2) 20%, var(--text))', 'var(--amber)'] },
+  apoya: { texto: 'Apoya', icono: null, colores: null }
+} as const
+
 function Nombre({ autor }: { autor: Autor }) {
+  const insignia = autor.insignia && INSIGNIAS[autor.insignia]
   return (
     <span className="com-nombre">
       {autor.nombre || 'Sin nombre'}
       {autor.creador && <span className="com-creador">Creador</span>}
-      {autor.insignia && <span className="com-creador">{autor.insignia === 'fundador' ? 'Fundador' : autor.insignia === 'grande' ? 'Donador PRO' : 'Apoya'}</span>}
+      {insignia && (
+        <span className={`com-insignia ${autor.insignia}`}>
+          {insignia.icono && <IconoInsignia de={insignia.icono} colores={insignia.colores} />}
+          <span className="com-insignia-texto">{insignia.texto}</span>
+        </span>
+      )}
     </span>
+  )
+}
+
+/**
+ * El icono de una insignia: su trazo (Iconos.tsx) en degradado con sus `colores`, relleno de un tinte y con sus joyas:
+ * la corona, una en cada punta (roja la de en medio, verdes las de los lados); la estrella, una crema al centro.
+ */
+function IconoInsignia({ de, colores }: { de: 'corona' | 'estrella'; colores: readonly string[] }) {
+  // Solo letras y números: el id va dentro de `url(#…)`.
+  const id = 'insignia' + useId().replace(/[^A-Za-z0-9]/g, '')
+  const [cuerpo, ...resto] = trazosDe(de)
+  return (
+    <svg className={`com-insignia-ico com-insignia-${de}`} viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <defs>
+        <linearGradient id={id} x1="0" y1="0" x2="1" y2="1">
+          {/* Las variables de la paleta solo valen en `style`, no en los atributos del SVG. */}
+          {colores.map((c, i) => (
+            <stop key={i} offset={i / (colores.length - 1)} style={{ stopColor: c }} />
+          ))}
+        </linearGradient>
+      </defs>
+      <path d={cuerpo} stroke={`url(#${id})`} className="com-insignia-cuerpo" />
+      {resto.map((d) => (
+        <path key={d} d={d} stroke={`url(#${id})`} />
+      ))}
+      {de === 'corona' ? (
+        <>
+          <circle cx="12" cy="3.4" r="1.7" className="com-joya roja" />
+          <circle cx="2.6" cy="5.7" r="1.5" className="com-joya verde" />
+          <circle cx="21.4" cy="5.7" r="1.5" className="com-joya verde" />
+        </>
+      ) : (
+        <circle cx="12" cy="12.6" r="2" className="com-joya crema" />
+      )}
+    </svg>
   )
 }
 
@@ -589,21 +769,27 @@ function Bienvenida({ yo, onNombre, onPresentarse, onComentar }: { yo: Yo; onNom
 }
 
 /** Una publicación en el feed: quién, cuándo y dónde; su título y el principio del texto; su portada; y lo que generó. */
-function Tarjeta({ p, yo, nueva, visto, onAbrir, onMegusta }: { p: PublicacionComunidad; yo?: Yo; nueva: boolean; visto?: string; onAbrir(): void; onMegusta(): void }) {
+function Tarjeta({ p, yo, nueva, visto, onAbrir, onFoco, onMegusta }: { p: PublicacionComunidad; yo?: Yo; nueva: boolean; visto?: string; onAbrir(): void; onFoco(): void; onMegusta(): void }) {
   const portada = p.adjuntos.find((a) => a.tipo === 'video') ?? p.adjuntos.find((a) => a.tipo === 'imagen')
   const imagen = portada && (portada.tipo === 'imagen' ? portada.url : portada.posterUrl)
   const estilo = p.adjuntos.find((a) => a.tipo === 'estilo')
   const fotos = p.adjuntos.filter((a) => a.tipo !== 'estilo').length
   // Nuevo: llegó después de la última vez que la abriste, y no lo escribiste tú.
   const nuevoComentario = !!p.ultimoComentario && (!visto || p.ultimoComentario > visto) && p.comentaron[0]?.id !== yo?.id
+  // Se abre con su título, un botón que cubre toda la tarjeta (`.com-post-abrir::after`); me gusta va encima. Al pasar
+  // por ella, sus comentarios se piden: al abrirla ya están.
+  // Al detenerse en ella (no al pasar de largo con la rueda): 120 ms encima.
+  const espera = useRef<ReturnType<typeof setTimeout>>(undefined)
+  const adelantar = () => precargarPublicacion(p.id)
+  const detenerse = () => (clearTimeout(espera.current), (espera.current = setTimeout(adelantar, 120)))
+  useEffect(() => () => clearTimeout(espera.current), [])
+  const abrir = (
+    <button className="com-post-abrir" onClick={onAbrir} onFocus={() => (onFoco(), adelantar())} onPointerDown={(e) => e.button === 0 && adelantar()}>
+      {p.titulo || p.texto || (estilo ? estilo.nombre : 'Una imagen')}
+    </button>
+  )
   return (
-    <article
-      className={`com-post${p.fijada ? ' fijada' : ''}${nueva ? ' nueva' : ''}`}
-      role="button"
-      tabIndex={0}
-      onClick={onAbrir}
-      onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && e.target === e.currentTarget && (e.preventDefault(), onAbrir())}
-    >
+    <article className={`com-post${p.fijada ? ' fijada' : ''}${nueva ? ' nueva' : ''}`} onPointerEnter={detenerse} onPointerLeave={() => clearTimeout(espera.current)}>
       <header className="com-post-cabeza">
         <Cara autor={p.autor} />
         <div className="com-post-quien">
@@ -627,8 +813,8 @@ function Tarjeta({ p, yo, nueva, visto, onAbrir, onMegusta }: { p: PublicacionCo
       </header>
       <div className="com-post-cuerpo">
         <div className="com-post-textos">
-          {p.titulo && <h3>{p.titulo}</h3>}
-          {p.texto && <p className={p.titulo ? '' : 'solo'}>{p.texto}</p>}
+          {p.titulo ? <h3>{abrir}</h3> : <div className="com-post-solo">{abrir}</div>}
+          {p.titulo && p.texto && <p>{p.texto}</p>}
           {estilo && (
             <span className="com-estilo-linea">
               <Icono de="claqueta" /> Estilo para instalar · {estilo.nombre}
@@ -648,8 +834,9 @@ function Tarjeta({ p, yo, nueva, visto, onAbrir, onMegusta }: { p: PublicacionCo
         )}
       </div>
       <footer className="com-post-pie">
-        <button className={`com-gusta${p.megusta ? ' on' : ''}`} title={p.megusta ? 'Ya no me gusta' : 'Me gusta'} onClick={(e) => (e.stopPropagation(), onMegusta())}>
+        <button className={`com-gusta${p.megusta ? ' on' : ''}`} title={p.megusta ? 'Ya no me gusta' : 'Me gusta'} aria-pressed={!!p.megusta} onClick={(e) => (e.stopPropagation(), onMegusta())}>
           <Icono de="pulgar" /> {p.likes}
+          <span className="com-oculto"> me gusta</span>
         </button>
         <span className="com-cuenta" title="Comentarios">
           <Icono de="hilo" /> {p.comentarios}
@@ -705,11 +892,13 @@ function Abierta(props: {
   onCerrar(): void
 }) {
   const { yo } = props
-  const [p, setP] = useState(props.previa)
-  const [comentarios, setComentarios] = useState<ComentarioComunidad[] | null>(null)
+  // Lo que ya se tenía de ella (se adelanta al pasar por la tarjeta) sale de inmediato, con sus comentarios.
+  const ya = abiertaGuardada(props.id)
+  const [p, setP] = useState(ya?.publicacion ?? props.previa)
+  const [comentarios, setComentarios] = useState<ComentarioComunidad[] | null>(ya?.comentarios ?? null)
   const [error, setError] = useState('')
   const [editando, setEditando] = useState(false)
-  const [seccion, setSeccion] = useState<CategoriaComunidad>(props.previa?.categoria ?? 'general')
+  const [seccion, setSeccion] = useState<CategoriaComunidad>(ya?.publicacion.categoria ?? props.previa?.categoria ?? 'general')
   const [borrando, setBorrando] = useState(false)
   const [ampliada, setAmpliada] = useState<string | null>(null)
   // El comentario de primer nivel al que respondes, y lo que reportas.
@@ -718,16 +907,30 @@ function Abierta(props: {
   const [reportada, setReportada] = useState(false)
 
   useEffect(() => {
-    api<{ publicacion: PublicacionComunidad; comentarios: ComentarioComunidad[] }>(`/api/comunidad/p/${props.id}`).then(
+    // El pedido que ya iba (al pasar por ella) se aprovecha; si ya había llegado, se pide otra vez para ponerla al día.
+    // Si mientras tanto comentaste o diste me gusta aquí, lo tuyo es más nuevo: la respuesta no lo pisa.
+    let vivo = true
+    pedirPublicacion(props.id).then(
       (r) => {
+        if (!vivo || tocada.current) return
+        deLaRed.current = true
         setP(r.publicacion)
         setSeccion(r.publicacion.categoria)
         setComentarios(r.comentarios)
         props.onCambio(r.publicacion)
       },
-      (e: Error) => setError(e.message)
+      (e: Error) => vivo && setError(e.message)
     )
+    return () => void (vivo = false)
   }, [props.id])
+  // Lo que cambia aquí (un comentario, un me gusta) se queda para la próxima vez que la abras, y marca que ya la tocaste.
+  const deLaRed = useRef(true)
+  const tocada = useRef(false)
+  useEffect(() => {
+    if (deLaRed.current) deLaRed.current = false
+    else tocada.current = true
+    if (p && comentarios) guardarAbierta(p.id, { publicacion: p, comentarios })
+  }, [p, comentarios])
   useEffect(() => {
     const tecla = (e: KeyboardEvent) => {
       if (e.key !== 'Escape' || borrando || reportando) return
@@ -1344,6 +1547,166 @@ function Reportar({ que, onListo, onCerrar }: { que: 'publicación' | 'comentari
           </>
         )}
       </div>
+    </div>
+  )
+}
+
+/** Si hay un diálogo abierto en Sloth (confirmar, la rifa ganada, los avisos): los atajos de la comunidad no van. */
+const hayDialogo = () => !!document.querySelector('[aria-modal="true"], .modal, .com-avisos-panel')
+
+/** Si la tecla va a algo donde se escribe (entonces no es un atajo). */
+const escribeEn = (t: EventTarget | null) => t instanceof HTMLElement && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))
+
+/** Lo que más enseña el buscador. */
+const RESULTADOS = 8
+
+/**
+ * El buscador: `/` lo enfoca desde cualquier parte de la comunidad. Mientras escribes busca al instante en lo que ya se
+ * tiene y en el índice de títulos (`pedirIndice`, que se pide al enfocarlo), y con 3 letras o más también en el Worker
+ * (`/comunidad/buscar`: el texto entero y los comentarios), sin importar acentos. La primera queda elegida y no se mueve
+ * cuando llega lo del Worker: Enter la abre; ↑↓ eligen otra; Esc borra lo escrito y, otra vez, sale.
+ */
+type Resultado = { id: string; titulo: string; texto: string; categoria: CategoriaComunidad; creada: string; actividad: string; autor: string }
+const comoResultado = (p: PublicacionComunidad): Resultado => ({ ...p, autor: p.autor.nombre })
+
+function Buscador({ onAbrir }: { onAbrir(id: string): void }) {
+  const [q, setQ] = useState('')
+  const [delWorker, setDelWorker] = useState<{ palabras: string; lista: Resultado[]; fallo?: boolean } | null>(null)
+  const [activaId, setActivaId] = useState<string | null>(null)
+  const [abierto, setAbierto] = useState(false)
+  const [, setConIndice] = useState(false)
+  const campo = useRef<HTMLInputElement>(null)
+  const caja = useRef<HTMLDivElement>(null)
+
+  /** Al enfocarlo: el índice de títulos, una vez por sesión. */
+  const enfocado = () => (setAbierto(true), void pedirIndice().then(() => setConIndice(true)))
+  useEffect(() => {
+    const tecla = (e: KeyboardEvent) => {
+      if (e.key !== '/' || e.ctrlKey || e.metaKey || e.altKey || escribeEn(e.target) || document.querySelector('.com-velo') || hayDialogo()) return
+      e.preventDefault()
+      campo.current?.focus()
+    }
+    const fuera = (e: MouseEvent) => !caja.current?.contains(e.target as Node) && setAbierto(false)
+    // Si se borró algo, lo que trajo el Worker ya no vale.
+    const borrada = () => setDelWorker(null)
+    addEventListener('keydown', tecla)
+    addEventListener('mousedown', fuera)
+    addEventListener(BORRADA, borrada)
+    return () => (removeEventListener('keydown', tecla), removeEventListener('mousedown', fuera), removeEventListener(BORRADA, borrada))
+  }, [])
+  // Lo del Worker, 250 ms después de la última tecla, con 3 letras o más y sin repetir las mismas palabras: D1 tiene tope.
+  const palabras = palabrasDe(q).join(' ')
+  const letras = palabras.replace(/ /g, '').length
+  useEffect(() => {
+    if (letras < 3) return setDelWorker(null)
+    if (delWorker?.palabras === palabras) return
+    let vivo = true
+    const t = setTimeout(
+      () =>
+        void api<{ publicaciones: PublicacionComunidad[] }>(`/api/comunidad/buscar?q=${encodeURIComponent(palabras)}`).then(
+          (r) => vivo && setDelWorker({ palabras, lista: r.publicaciones.map(comoResultado) }),
+          () => vivo && setDelWorker({ palabras, lista: [], fallo: true })
+        ),
+      250
+    )
+    return () => ((vivo = false), clearTimeout(t))
+  }, [palabras])
+
+  // Lo de aquí: lo ya cargado y el índice, sin repetir. Con la respuesta del Worker para esto mismo, primero su orden (que
+  // también encuentra en los comentarios) y luego lo de aquí que no traiga.
+  const aqui = (() => {
+    if (!palabras) return []
+    const vistos = new Map<string, Resultado>()
+    for (const p of conocidas()) vistos.set(p.id, comoResultado(p))
+    for (const p of indiceListo() ?? []) if (!vistos.has(p.id)) vistos.set(p.id, p)
+    return buscarAqui(q, [...vistos.values()])
+  })()
+  const delWorkerAhora = delWorker?.palabras === palabras ? delWorker : null
+  const resultados = (delWorkerAhora ? [...delWorkerAhora.lista, ...aqui.filter((p) => !delWorkerAhora.lista.some((x) => x.id === p.id))] : aqui).slice(0, RESULTADOS)
+  // La elegida se sigue por su id: si llega lo del Worker y la lista se reordena, sigue siendo la misma.
+  const elegida = resultados.find((p) => p.id === activaId) ?? resultados[0]
+  useEffect(() => setActivaId(null), [palabras])
+  // Sus comentarios, si se queda elegida un momento.
+  useEffect(() => {
+    if (!elegida || letras < 3) return
+    const t = setTimeout(() => precargarPublicacion(elegida.id), 250)
+    return () => clearTimeout(t)
+  }, [elegida?.id])
+
+  function abrir(id: string) {
+    setAbierto(false)
+    campo.current?.blur()
+    onAbrir(id)
+  }
+
+  const mostrar = abierto && !!palabras
+  return (
+    <div className="com-buscar" ref={caja}>
+      <Icono de="buscar" />
+      <input
+        ref={campo}
+        type="search"
+        role="combobox"
+        aria-label="Buscar en la comunidad"
+        aria-expanded={mostrar}
+        aria-controls={mostrar && resultados.length ? 'com-buscar-lista' : undefined}
+        aria-autocomplete="list"
+        aria-activedescendant={mostrar && elegida ? `com-buscar-${elegida.id}` : undefined}
+        placeholder="Buscar"
+        value={q}
+        onChange={(e) => (setQ(e.target.value), setAbierto(true))}
+        onFocus={enfocado}
+        onKeyDown={(e) => {
+          if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+            e.preventDefault()
+            const i = elegida ? resultados.indexOf(elegida) : 0
+            const otra = resultados[Math.max(0, Math.min(resultados.length - 1, i + (e.key === 'ArrowDown' ? 1 : -1)))]
+            if (otra) setActivaId(otra.id)
+          } else if (e.key === 'Enter' && elegida) {
+            e.preventDefault()
+            abrir(elegida.id)
+          } else if (e.key === 'Escape') {
+            e.preventDefault()
+            if (q) setQ('')
+            else (setAbierto(false), campo.current?.blur())
+          }
+        }}
+      />
+      {!q && <kbd className="com-buscar-tecla" aria-hidden>/</kbd>}
+      {mostrar && (
+        <div className="com-buscar-panel">
+          {resultados.length ? (
+            <ul id="com-buscar-lista" role="listbox" aria-label="Resultados">
+              {resultados.map((p) => (
+                <li
+                  key={p.id}
+                  id={`com-buscar-${p.id}`}
+                  role="option"
+                  aria-selected={p === elegida}
+                  className={p === elegida ? 'on' : ''}
+                  onMouseEnter={() => setActivaId(p.id)}
+                  // Sin perder el foco del campo al apretar; abre al soltar, como un clic (también el de un lector de pantalla).
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => abrir(p.id)}
+                >
+                  <span className="com-buscar-titulo">{p.titulo || p.texto}</span>
+                  <span className="com-buscar-meta">
+                    {seccionDe(p.categoria).nombre} · {p.autor || 'Sin nombre'} · {hace(p.creada)}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="com-buscar-nada">
+              {delWorkerAhora?.fallo
+                ? 'No se pudo buscar en la comunidad. Revisa tu internet.'
+                : delWorkerAhora || letras < 3
+                  ? `Nada con «${q.trim()}».`
+                  : 'Buscando…'}
+            </p>
+          )}
+        </div>
+      )}
     </div>
   )
 }
