@@ -151,6 +151,8 @@ export interface VideoHecho {
   cardId: string
   /** Si es vertical (TikTok, Instagram) u horizontal (YouTube); sin él, no se pudo leer. */
   vertical?: boolean
+  /** Cuánto dura, leído de su cabecera; sin él, no se pudo leer. */
+  segundos?: number
 }
 
 /**
@@ -666,6 +668,10 @@ export interface Modelo3D {
   actualizado?: string
   vista?: string
   giro?: string
+  /** La vuelta entera de la cámara (`vuelta.webm`), si ya se sacó: se recorre arrastrando sobre la ficha. */
+  vuelta?: string
+  /** Su visor 3D (`visor/`, `modelos.py visor`), si ya está armado con él: la ficha lo gira de verdad. */
+  visor?: string
 }
 
 /**

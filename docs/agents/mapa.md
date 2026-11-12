@@ -75,7 +75,8 @@ Este es el mapa:
   esfuerzo del hilo: en Claude, Sloth los manda en la línea `Subagentes: todos = <alias> <esfuerzo>.` (las `tareas`
   medidas de la card ya no se usan). La excepción es el `guionista` del explicativo (`server/claude.ts`), que va en Opus.
 - La galería: al elegir un estilo, sus videos terminados ocupan el sitio de las cards (`videosApi` en `etapas.ts`);
-  «Mis videos» (`MisVideos.tsx`) los junta todos. Cada card enseña de fondo el más nuevo (`server/previas.ts`).
+  «Mis videos» (`MisVideos.tsx`) los junta todos, con buscador, filtros, teclado y acciones con varios. Cada card enseña de
+  fondo el más nuevo (`server/previas.ts`).
 - `server/redes/` y `web/src/Redes.tsx`: los verticales terminados se programan al ritmo que eliges en «Mis videos» (`web/src/Ritmos.tsx`, las cuentas en `shared/ritmo.ts`; YouTube lleva el suyo).
   TikTok va por su página (ADR 0002), en la página `redes` del navegador integrado, con su propio perfil (sin la ventana
   de Sloth, en un Edge con `data/redes/perfil`);
@@ -92,14 +93,12 @@ Este es el mapa:
   (`licencias/src/voz.ts`), que guarda la llave del socio y los créditos de cada quien; su catálogo sale en el menú «Voz» con el pase del cobro. El menú
   «Voz» es `web/src/ElegirVoz.tsx`: buscar en español, oír la muestra (`server/voz/muestras.ts` la guarda) o tu frase
   (`/api/voz/probar`) y clonar grabando ahí. En los estilos con `musica` en su card (el explicativo), su pie enciende la
-  música de fondo: la línea `Música: de fondo` (`lineaMusica`), que pone `skills/video-base/scripts/musica.py`. Su eval contra ElevenLabs, Fish Audio, AI Studio y Suno:
-  `docs/agents/eval-voz.md` (`node scripts/eval-voz.mjs <puerto>`).
+  música de fondo: la línea `Música: de fondo` (`lineaMusica`), que pone `skills/video-base/scripts/musica.py`.
 - Administrador (`web/src/Admin.tsx`, `/api/admin*`): solo en la computadora del creador, la que tiene su `admin.txt` (o `publicar.txt`).
   Saldo, usuarios, consumo y registro de Voices Cloning; dar, quitar y suspender, con deshacer. Se arma oculto con lo
   último leído (`data/voz/admin.json`, `/api/admin/voz/guardado`) y lee lo nuevo al entrar; la ficha de cada quien,
   de `admin-fichas.json`; solo se deshace lo cambiado aquí (`admin-cambios.json`). Pestañas en
   `#/admin/<pestaña>`, buscador con «/» y la ficha de cada quien con el teclado. Sus textos: `web/src/admin-formato.ts`.
-  Su eval contra React-admin, Refine, Filament y PocketBase: `docs/agents/eval-admin.md` (`node scripts/eval-admin.mjs <puerto>`).
 - `server/flow/` y `web/src/Flow.tsx`: imágenes (Nano Banana) y videos (Veo) de Google Flow, con la cuenta de la voz (en
   su Edge y su turno, `voz().google`) y las que se agregan en Opciones (`cuentas.ts`, cada una en su Edge), hasta dos a la
   vez y con ritmo. `elegirCuenta`, el ritmo y los descansos están en `shared/flow.ts`. `pagina.ts` maneja la página, por sus iconos: texto,
@@ -121,7 +120,9 @@ Este es el mapa:
 - `server/radar/`: buscador propio de noticias tech, cada 5 minutos (`POST /api/radar/buscar`).
 - La comunidad (`web/src/Comunidad.tsx`, `server/comunidad.ts`): un feed como el de Skool que vive en el Worker del cobro
   (`licencias/src/comunidad.ts`); cada quien entra con su cuenta gratis (o la clave de su apoyo) y tú, como creador, con la llave de `admin.txt`.
-  El feed se ordena por actividad, por lo más reciente o, solo el creador, por «Sin contestar» (`consultaFeed`).
+  El feed se ordena por actividad, por lo más reciente o, solo el creador, por «Sin contestar» (`consultaFeed`). Lo ya
+  pedido y lo que se adelanta (secciones, comentarios, la página siguiente) vive en `web/src/comunidadDatos.ts`; el
+  buscador, en `/comunidad/buscar` (`consultaBuscar`).
   Publicar una mejora (la ven todos): `POST /api/mejoras {texto}`. Un anuncio a nombre del creador, en su tono:
   `docs/agents/anuncios.md`. La rifa (`licencias/src/rifa.ts`): arriba de la comunidad «Participa en la rifa» (`Rifa.tsx`,
   solo quien usa Sloth gratis), en Administrador se arma y se sortea con la ruleta (`RifaAdmin.tsx`); el ganador recibe
@@ -166,3 +167,6 @@ Este es el mapa:
   `data/agentes.json`.
 - `web/src`: React. `api.ts` habla con el servidor; `eventos.ts` guarda los eventos fuera de `App`, `items.ts` los junta
   en bloques y `Timeline.tsx` los dibuja; `Composer.tsx` es el campo de texto.
+- «Nuevo chat» (`NewSession` en `App.tsx`): los carteles de los estilos caben enteros en cualquier ventana
+  (`encajar.ts`), `/` en el campo cambia de estilo (`menu-estilos.ts`), Alt+N (Cmd+N en Mac) o Ctrl+Mayús+O abren uno
+  desde cualquier parte, y lo que llega del servidor arranca con lo último sabido (`recordado.ts`) para que nada salte.

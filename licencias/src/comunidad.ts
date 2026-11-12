@@ -166,6 +166,15 @@ export async function comunidad(req: Request, env: Env, url: URL, ctx: Execution
 
   const yo = await quien(req, env)
   if (ruta === '/comunidad' && req.method === 'GET') return json(await feed(env, yo, url))
+  if (ruta === '/comunidad/indice' && req.method === 'GET') {
+    const { sql, valores } = consultaIndice({ id: yo.id, creador: esCreador(yo) })
+    return json({ publicaciones: (await env.DB.prepare(sql).bind(...valores).all()).results })
+  }
+  if (ruta === '/comunidad/buscar' && req.method === 'GET') {
+    const { sql, valores } = consultaBuscar({ id: yo.id, creador: esCreador(yo) }, url.searchParams.get('q') ?? '')
+    const filas = sql ? ((await env.DB.prepare(sql).bind(...valores).all()).results as unknown as Guardada[]) : []
+    return json({ publicaciones: await armar(env, yo, filas) })
+  }
   if (ruta === '/comunidad/publicar' && req.method === 'POST') return json(await publicar(env, yo, await cuerpo(req)))
   if (ruta === '/comunidad/perfil' && req.method === 'POST') return json(await perfil(env, yo, await cuerpo(req)))
   if (ruta === '/comunidad/roadmap' && req.method === 'POST') {
@@ -325,6 +334,76 @@ export function consultaFeed(yo: { id: string; creador: boolean }, p: { categori
   if (p.antes) donde.push(`${fijadas ? 'fijada = 0 AND ' : ''}${columna} < ?`), valores.push(p.antes)
   const sql = `SELECT * FROM publicaciones${donde.length ? ` WHERE ${donde.join(' AND ')}` : ''} ORDER BY ${fijadas && !p.antes ? 'fijada DESC, ' : ''}${columna} DESC LIMIT ${PAGINA + 1}`
   return { sql, valores }
+}
+
+/** `col` en minúsculas y sin acentos, en SQL: así «robotica» encuentra «Robótica». */
+const sinAcentos = (col: string) =>
+  [
+    ...[...'áàâäãÁÀÂÄÃ'].map((c) => [c, 'a']),
+    ...[...'éèêëÉÈÊË'].map((c) => [c, 'e']),
+    ...[...'íìîïÍÌÎÏ'].map((c) => [c, 'i']),
+    ...[...'óòôöõÓÒÔÖÕ'].map((c) => [c, 'o']),
+    ...[...'úùûüÚÙÛÜ'].map((c) => [c, 'u']),
+    ['ç', 'c'],
+    ['Ç', 'c'],
+    ['Ñ', 'ñ']
+  ].reduce((e, [de, a]) => `REPLACE(${e}, '${de}', '${a}')`, `LOWER(${col})`)
+/** Lo que se escribe en el buscador, como lo compara `sinAcentos`: sus palabras, sin acentos y en minúsculas. */
+export const palabrasDe = (q: string) =>
+  q
+    .toLowerCase()
+    .normalize('NFD')
+    // Fuera los acentos y la diéresis; la tilde de la ñ (U+0303) se queda.
+    .replace(/[\u0300-\u0302\u0304-\u036f]/g, '')
+    .normalize('NFC')
+    // La ã y la õ (portugués) llevan la misma marca que la ñ: van aparte.
+    .replace(/ã/g, 'a')
+    .replace(/õ/g, 'o')
+    .split(/[^\p{L}\p{N}]+/u)
+    .filter(Boolean)
+    .slice(0, 6)
+/** Lo que más sale en una búsqueda. */
+const RESULTADOS = 20
+
+/**
+ * La consulta del buscador: las publicaciones donde está cada palabra (en el título, el texto o algún comentario), lo
+ * que `yo` puede ver; primero las que la tienen en el título y luego por actividad. Sin palabras, ninguna (`sql` vacío).
+ */
+export function consultaBuscar(yo: { id: string; creador: boolean }, q: string): { sql: string; valores: (string | number)[] } {
+  const palabras = palabrasDe(q)
+  if (!palabras.length) return { sql: '', valores: [] }
+  const donde: string[] = []
+  const valores: (string | number)[] = []
+  // Las palabras solo llevan letras y números (`palabrasDe`): ni `%` ni `_` llegan al LIKE.
+  const comoTexto = (p: string) => `%${p}%`
+  // Un comentario oculto (reportado por `OCULTAR`) no cuenta, salvo el tuyo o para el creador: así no se adivina su texto.
+  const comentarioVisible = yo.creador ? '' : ' AND (comentarios.reportes < ? OR comentarios.autor = ?)'
+  for (const p of palabras) {
+    donde.push(
+      `(${sinAcentos('titulo')} LIKE ? OR ${sinAcentos('texto')} LIKE ? OR id IN (SELECT publicacion FROM comentarios WHERE ${sinAcentos('comentarios.texto')} LIKE ?${comentarioVisible}))`
+    )
+    valores.push(comoTexto(p), comoTexto(p), comoTexto(p), ...(yo.creador ? [] : [OCULTAR, yo.id]))
+  }
+  if (!yo.creador) donde.push('((reportes < ? AND aprobada = 1) OR autor = ?)'), valores.push(OCULTAR, yo.id)
+  const enTitulo = palabras.map(() => `${sinAcentos('titulo')} LIKE ?`).join(' AND ')
+  valores.push(...palabras.map(comoTexto))
+  return { sql: `SELECT * FROM publicaciones WHERE ${donde.join(' AND ')} ORDER BY (${enTitulo}) DESC, actividad DESC LIMIT ${RESULTADOS}`, valores }
+}
+
+/** Lo que más trae el índice del buscador. */
+const EN_INDICE = 2000
+
+/**
+ * El índice del buscador de la app: de cada publicación que `yo` puede ver (las `EN_INDICE` más activas), su título, el
+ * principio del texto, la sección, el nombre de quien la escribió y sus fechas. Con él, la app encuentra al instante lo
+ * que está en un título; lo demás (el texto entero, los comentarios) lo busca `consultaBuscar`.
+ */
+export function consultaIndice(yo: { id: string; creador: boolean }): { sql: string; valores: (string | number)[] } {
+  const visible = yo.creador ? '' : ' WHERE ((p.reportes < ? AND p.aprobada = 1) OR p.autor = ?)'
+  return {
+    sql: `SELECT p.id, p.titulo, substr(p.texto, 1, 300) AS texto, p.categoria, p.creada, p.actividad, COALESCE(m.nombre, '') AS autor FROM publicaciones p LEFT JOIN miembros m ON m.id = p.autor${visible} ORDER BY p.actividad DESC LIMIT ${EN_INDICE}`,
+    valores: yo.creador ? [] : [OCULTAR, yo.id]
+  }
 }
 
 /** La página del feed, con quién eres y los números de la comunidad. */

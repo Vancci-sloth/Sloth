@@ -1,8 +1,11 @@
 // La vitrina de la biblioteca: la miniatura de cada modelo (su `Muestra`, quieta en su `cuadro`) con la luz de estudio
 // de los videos, sobre fondo transparente (Sloth le pone detrás su foco) y con su sombra. La cámara, a tres cuartos, se
 // mece de un lado a otro en un ciclo que se repite sin salto: el cuadro 0 es la foto (vista.webp) y el ciclo entero, el
-// video que se ve al pasar el ratón (vista.webm). `modelos.py vista` la copia al proyecto como src/modelos/_vitrina_<pid>.tsx,
-// con _muestras_<pid>.ts (una composición por modelo), saca las dos y la borra.
+// video que se ve al pasar el ratón (vista.webm). Aparte, la vuelta entera (vuelta.webm, la composición `<id>--vuelta`): la
+// cámara da toda la vuelta, un cuadro cada 10°, a cuatro alturas seguidas (de frente, 25°, 50° y casi desde arriba), y
+// las luces giran con ella, para que ningún lado quede a oscuras; Sloth la recorre al arrastrar sobre la ficha del modelo
+// (de lado gira, de arriba abajo cambia de altura). `modelos.py vista` la copia al proyecto como src/modelos/_vitrina_<pid>.tsx,
+// con _muestras_<pid>.ts (una composición por modelo), saca las tres y la borra.
 import { useThree } from "@react-three/fiber";
 import { ThreeCanvas } from "@remotion/three";
 import React, { useLayoutEffect, useMemo, useRef } from "react";
@@ -14,6 +17,10 @@ import { MUESTRAS } from "./_muestras";
 export const LADO = 640;
 /** Cuadros de un vaivén completo de la cámara. */
 export const CICLO = 120;
+/** La vuelta entera: un cuadro cada 10° (36 por vuelta) a cada una de las alturas de la cámara, una tras otra. */
+export const PASOS = 36;
+export const ALTURAS = [0, 25, 50, 75].map((g) => THREE.MathUtils.degToRad(g));
+export const VUELTA = PASOS * ALTURAS.length;
 const MIEL = "#f5a524";
 const AZIMUT = THREE.MathUtils.degToRad(28);
 /** Cuánto se mece la cámara a cada lado. */
@@ -22,8 +29,8 @@ const ELEVACION = THREE.MathUtils.degToRad(18);
 /** Cuánto del cuadro ocupa lo más ancho del modelo, en el peor punto del vaivén. */
 const OCUPA = 0.9;
 
-const direccion = (azimut: number) =>
-  new THREE.Vector3(Math.sin(azimut) * Math.cos(ELEVACION), Math.sin(ELEVACION), Math.cos(azimut) * Math.cos(ELEVACION));
+const direccion = (azimut: number, elevacion = ELEVACION) =>
+  new THREE.Vector3(Math.sin(azimut) * Math.cos(elevacion), Math.sin(elevacion), Math.cos(azimut) * Math.cos(elevacion));
 
 /** Cuánto se sale del cuadro (1 = justo al borde) lo más ancho de la caja, mirada desde `dir` a distancia `d`. */
 const ancho = (cam: THREE.PerspectiveCamera, centro: THREE.Vector3, esquinas: THREE.Vector3[], dir: THREE.Vector3, d: number) => {
@@ -39,7 +46,7 @@ const ancho = (cam: THREE.PerspectiveCamera, centro: THREE.Vector3, esquinas: TH
 };
 
 /** La cámara, la luz y la sombra, puestas sobre el modelo: a la distancia en que cabe entero en todo el vaivén. */
-const Estudio: React.FC<{ modelo: React.RefObject<THREE.Group | null> }> = ({ modelo }) => {
+const Estudio: React.FC<{ modelo: React.RefObject<THREE.Group | null>; vuelta?: boolean }> = ({ modelo, vuelta }) => {
   const f = useCurrentFrame();
   const { camera, scene, gl } = useThree();
   const entorno = useMemo(() => {
@@ -69,15 +76,21 @@ const Estudio: React.FC<{ modelo: React.RefObject<THREE.Group | null> }> = ({ mo
     const cam = camera as THREE.PerspectiveCamera;
     cam.aspect = 1;
     cam.updateProjectionMatrix();
-    // La distancia a la que cabe en el peor punto del vaivén: así no se acerca ni se aleja mientras se mece.
+    // La distancia a la que cabe en el peor punto del vaivén (o de la vuelta): así no se acerca ni se aleja mientras gira.
     let d = radio / Math.sin(THREE.MathUtils.degToRad(cam.fov / 2));
     for (let i = 0; i < 4; i++) {
       let peor = 0;
-      for (let k = 0; k <= 8; k++) peor = Math.max(peor, ancho(cam, centro, esquinas, direccion(AZIMUT + VAIVEN * (k / 4 - 1)), d));
+      if (vuelta) for (const el of ALTURAS) for (let k = 0; k < 24; k++) peor = Math.max(peor, ancho(cam, centro, esquinas, direccion((k / 24) * Math.PI * 2, el), d));
+      else for (let k = 0; k <= 8; k++) peor = Math.max(peor, ancho(cam, centro, esquinas, direccion(AZIMUT + VAIVEN * (k / 4 - 1)), d));
       d *= peor / OCUPA;
     }
-    const azimut = AZIMUT + VAIVEN * Math.sin((f / CICLO) * Math.PI * 2);
-    cam.position.copy(centro).addScaledVector(direccion(azimut), d);
+    const azimut = vuelta ? AZIMUT + ((f % PASOS) / PASOS) * Math.PI * 2 : AZIMUT + VAIVEN * Math.sin((f / CICLO) * Math.PI * 2);
+    const elevacion = vuelta ? ALTURAS[Math.min(ALTURAS.length - 1, Math.floor(f / PASOS))] : ELEVACION;
+    // En la vuelta, las luces van con la cámara: giran lo mismo que ella alrededor del modelo.
+    const giro = vuelta ? azimut - AZIMUT : 0;
+    const alrededor = (x: number, y: number, z: number) =>
+      new THREE.Vector3(x - centro.x, y, z - centro.z).applyAxisAngle(new THREE.Vector3(0, 1, 0), giro).add(new THREE.Vector3(centro.x, 0, centro.z));
+    cam.position.copy(centro).addScaledVector(direccion(azimut, elevacion), d);
     cam.lookAt(centro);
     cam.updateMatrixWorld();
     // La luz principal casi encima, un poco a la izquierda (su sombra cae al pie, donde se ve), un relleno frío a la
@@ -86,15 +99,15 @@ const Estudio: React.FC<{ modelo: React.RefObject<THREE.Group | null> }> = ({ mo
     blanco.position.copy(centro);
     blanco.updateMatrixWorld();
     if (luz.current) {
-      luz.current.position.set(centro.x - 2.5 * k, centro.y + 10 * k, centro.z + 3 * k);
+      luz.current.position.copy(alrededor(centro.x - 2.5 * k, centro.y + 10 * k, centro.z + 3 * k));
       const s = luz.current.shadow.camera;
       s.left = s.bottom = -2.5 * k;
       s.right = s.top = 2.5 * k;
       s.far = 30 * k;
       s.updateProjectionMatrix();
     }
-    relleno.current?.position.set(centro.x - 7 * k, centro.y + 2 * k, centro.z + 4 * k);
-    contra.current?.position.set(centro.x - 4 * k, centro.y + 4 * k, centro.z - 7 * k);
+    relleno.current?.position.copy(alrededor(centro.x - 7 * k, centro.y + 2 * k, centro.z + 4 * k));
+    contra.current?.position.copy(alrededor(centro.x - 4 * k, centro.y + 4 * k, centro.z - 7 * k));
   });
   return (
     <>
@@ -115,7 +128,7 @@ const Sombra: React.FC = () => (
   </mesh>
 );
 
-const Vitrina: React.FC<{ id: string; cuadro: number }> = ({ id, cuadro }) => {
+const Vitrina: React.FC<{ id: string; cuadro: number; vuelta?: boolean }> = ({ id, cuadro, vuelta }) => {
   const Muestra = MUESTRAS[id];
   const modelo = useRef<THREE.Group>(null);
   return (
@@ -126,7 +139,7 @@ const Vitrina: React.FC<{ id: string; cuadro: number }> = ({ id, cuadro }) => {
           <Muestra />
         </Freeze>
       </group>
-      <Estudio modelo={modelo} />
+      <Estudio modelo={modelo} vuelta={vuelta} />
     </ThreeCanvas>
   );
 };
@@ -134,7 +147,10 @@ const Vitrina: React.FC<{ id: string; cuadro: number }> = ({ id, cuadro }) => {
 const Raiz: React.FC = () => (
   <>
     {Object.keys(MUESTRAS).map((id) => (
-      <Composition key={id} id={id} component={Vitrina} defaultProps={{ id, cuadro: 0 }} width={LADO} height={LADO} fps={30} durationInFrames={CICLO} />
+      <React.Fragment key={id}>
+        <Composition id={id} component={Vitrina} defaultProps={{ id, cuadro: 0 }} width={LADO} height={LADO} fps={30} durationInFrames={CICLO} />
+        <Composition id={`${id}--vuelta`} component={Vitrina} defaultProps={{ id, cuadro: 0, vuelta: true }} width={LADO} height={LADO} fps={30} durationInFrames={VUELTA} />
+      </React.Fragment>
     ))}
   </>
 );

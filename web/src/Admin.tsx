@@ -154,17 +154,31 @@ function guardado(): Promise<Panel | undefined> {
   return pidiendoGuardado
 }
 
-/** Si esta Sloth es la del creador: la barra enseña Administrador solo entonces, y ya trae lo último leído. */
+/**
+ * Si esta Sloth es la del creador: la barra enseña Administrador solo entonces, y ya trae lo último leído. Arranca con
+ * lo último que se supo en esta computadora (si no, «Administrador» salía un momento después y empujaba la lista de
+ * hilos) y el servidor lo confirma.
+ */
 export function useEsCreador(): boolean {
-  const [si, setSi] = useState(false)
-  useEffect(
-    () =>
-      void api<{ creador: boolean }>('/api/admin').then(
-        (r) => (setSi(!!r.creador), r.creador && void guardado()),
-        () => setSi(false)
-      ),
-    []
-  )
+  const [si, setSi] = useState(() => {
+    try {
+      return localStorage.getItem('sloth-creador') === '1'
+    } catch {
+      return false
+    }
+  })
+  useEffect(() => {
+    const saber = (s: boolean) => {
+      setSi(s)
+      try {
+        localStorage.setItem('sloth-creador', s ? '1' : '0')
+      } catch {}
+    }
+    void api<{ creador: boolean }>('/api/admin').then(
+      (r) => (saber(!!r.creador), r.creador && void guardado()),
+      () => setSi(false)
+    )
+  }, [])
   return si
 }
 

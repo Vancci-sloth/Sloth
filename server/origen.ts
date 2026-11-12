@@ -15,11 +15,12 @@ export function peticionDeConfianza(req: Pick<IncomingMessage, 'headers' | 'meth
     && req.headers['sec-fetch-mode'] === 'navigate'
     && req.headers['sec-fetch-dest'] === 'document'
   if (retornoYoutube && (propio || origen === 'https://accounts.google.com')) return true
-  // La vista en vivo del estudio (el motor o la de la skill) se abre desde la otra dirección de esta computadora
-  // (`127.0.0.1` si la ventana es `localhost`): para el navegador es otro sitio y la carga en su propio proceso, sin
-  // frenar la interfaz (web/src/Monitor.tsx). Solo como marco de la ventana de Sloth: lo dice su `Referer`.
+  // La vista en vivo del estudio (el motor o la de la skill) y el visor 3D de «Modelos 3D» se abren desde la otra
+  // dirección de esta computadora (`127.0.0.1` si la ventana es `localhost`): para el navegador es otro sitio y los carga
+  // en su propio proceso, sin frenar la interfaz (web/src/Monitor.tsx, web/src/Modelos3D.tsx). Solo como marco de la
+  // ventana de Sloth: lo dice su `Referer`.
   const marcoPropio = req.method === 'GET'
-    && /^\/api\/sessions\/[\w-]+\/(motor|vivo)(\/|\?|$)/.test(req.url ?? '')
+    && /^\/api\/(sessions\/[\w-]+\/(motor|vivo)|modelos3d\/visor)(\/|\?|$)/.test(req.url ?? '')
     && req.headers['sec-fetch-dest'] === 'iframe'
     && propios.some((p) => (req.headers.referer ?? '').startsWith(`http://${p}/`))
   if (marcoPropio) return true

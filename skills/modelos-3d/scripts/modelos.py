@@ -7,7 +7,8 @@ La biblioteca de modelos 3D: buscar uno antes de hacerlo, traerlo al proyecto y 
     python -B -X utf8 modelos.py iconos <nombre> […]       íconos de Phosphor a public/iconos (para Icono3D)
     python -B -X utf8 modelos.py guardar <id> --nombre "…" --resumen "…" --categoria "…" --descripcion "…"
                                           --hace "a; b" --etiquetas "a, b" [--cuadro N]
-    python -B -X utf8 modelos.py vista <id> [<id>…]        vuelve a sacar su miniatura
+    python -B -X utf8 modelos.py vista <id> [<id>…]        vuelve a sacar su miniatura (y arma el visor)
+    python -B -X utf8 modelos.py visor                     arma el visor 3D de toda la biblioteca (lo que Sloth gira)
     python -B -X utf8 modelos.py nuevo <id> [--nombre "…"] [--descripcion "…"]
                                           un modelo sin video: arma aquí un proyecto de prueba y el andamio
     python -B -X utf8 modelos.py importar <archivo.glb> --nombre "…" --proyecto <carpeta nueva> [--categoria "…"]
@@ -15,18 +16,21 @@ La biblioteca de modelos 3D: buscar uno antes de hacerlo, traerlo al proyecto y 
 
 Todo menos `buscar` e `importar` se corre en la carpeta del proyecto (la que tiene package.json). Un modelo vive en el proyecto en
 src/modelos/<id>.tsx (con src/modelos/comun.tsx) y sus archivos en public/modelos/<id>/; en la biblioteca, en
-modelos/<id>/ con su modelo.json y su vista (vista.webp, la foto, y vista.webm, la cámara que se mece). Cada proyecto lleva su copia: guardar una versión nueva no rompe
+modelos/<id>/ con su modelo.json y su vista (vista.webp, la foto; vista.webm, la cámara que se mece; y vuelta.webm, la vuelta entera). Cada proyecto lleva su copia: guardar una versión nueva no rompe
 los videos ya hechos. La biblioteca de cada quien empieza vacía: los que trae la plantilla del explicativo (la moneda, con
 lo que usa) están en plantilla/<id>/, que `usar` encuentra y `buscar` y Sloth no enseñan.
 """
 
 import argparse
+import contextlib
+import io
 import json
 import os
 import re
 import shutil
 import subprocess
 import sys
+import tempfile
 import unicodedata
 from datetime import date
 from pathlib import Path
@@ -467,6 +471,47 @@ def vista(ids: list[str]) -> None:
     finally:
         for temporal in (muestras, vitrina, corre):
             temporal.unlink(missing_ok=True)
+    visor()
+
+
+def visor() -> None:
+    """
+    Arma el visor 3D de toda la biblioteca (`visor.tsx`, `scripts/visor.mjs`) en <biblioteca>/visor: el que Sloth abre en
+    la ficha de cada modelo para girarlo, acercarlo y moverlo, con el mismo código de los videos. Se arma en un proyecto
+    de prueba aparte (en la carpeta temporal) con todos los modelos, que se borra al terminar: así no llena de modelos el
+    proyecto del video. Lo llama `vista` al final; si no sale, la ficha sigue con la vuelta en video.
+    """
+    ids = todos()
+    if not ids:
+        return
+    # Solo con los módulos de los videos ya bajados: armar el visor no baja ~1 GB por su cuenta (lo pide Sloth al abrir la
+    # sección, sin avisar). Los baja el primer video explicativo.
+    sys.path.insert(0, str(BIBLIOTECA.parent / "video-base" / "scripts"))
+    from espacio import casa_de  # noqa: PLC0415
+
+    compartidos = casa_de("video-explicativo", EXPLICATIVO) / "node_modules"
+    # Las mismas que mira `enlazar_modulos` para no bajarlos (remotion y @remotion/cli), y las que usa el visor.
+    if not all((compartidos / p).is_dir() for p in ("remotion", "@remotion/cli", "@remotion/player", "esbuild")):
+        print("visor: faltan los módulos de los videos (los baja el primer video explicativo); la ficha seguirá con la vuelta en video.")
+        return
+    aqui = Path.cwd()
+    tmp = Path(tempfile.mkdtemp(prefix="visor3d-"))
+    try:
+        proyecto_prueba(tmp)
+        os.chdir(tmp)
+        with contextlib.redirect_stdout(io.StringIO()):
+            usar(ids, callado=True)
+        (tmp / "src" / "modelos" / "_visor.tsx").write_text((BIBLIOTECA / "visor.tsx").read_text("utf-8"), "utf-8", newline="\n")
+        corre = tmp / "out" / "_visor.mjs"
+        corre.parent.mkdir(exist_ok=True)
+        shutil.copyfile(BIBLIOTECA / "scripts" / "visor.mjs", corre)
+        pares = [f"{i}:{ficha(i).get('cuadro', 0)}" for i in ids]
+        r = subprocess.run(["node", str(corre), str(BIBLIOTECA / "visor"), *pares], cwd=tmp, **de_fondo())
+        if r.returncode:
+            print("visor: no se armó (mira el error de arriba); la ficha seguirá con la vuelta en video.")
+    finally:
+        os.chdir(aqui)
+        quitar_proyecto(tmp)
 
 
 def guardar(id_: str, dados: dict[str, str | None], cuadro: int | None, sin_vista: bool, caja: str | None = None, frente: bool = False, actua: str | None = None) -> None:
@@ -559,6 +604,7 @@ def main() -> None:
     g.add_argument("--frente", action="store_true", help="tiene cara (un reloj, un celular, una persona): el video no lo enseña de lado")
     g.add_argument("--caja", help="ancho,alto,fondo: solo si es mucho más alto que ancho (un celular, una botella)")
     sub.add_parser("vista").add_argument("ids", nargs="+")
+    sub.add_parser("visor")
     n = sub.add_parser("nuevo")
     n.add_argument("id")
     n.add_argument("--nombre")
@@ -587,6 +633,8 @@ def main() -> None:
         nuevo(a.id, a.nombre, a.descripcion)
     elif a.orden == "importar":
         importar(a.ruta, a.nombre, a.categoria, a.licencia, a.proyecto, a.sin_modulos, a.sin_modulos)
+    elif a.orden == "visor":
+        visor()
     else:
         vista(a.ids)
 
