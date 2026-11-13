@@ -768,7 +768,7 @@
         MG = fiel ? MG_REF : MG0
         const q = encuadre(L.cam.pos, L.cam.aim, caben, fiel ? 0 : d0 * (p.cerca ? 0.6 : 0.9), d0 * (todo ? 4.5 : VERTICAL ? 3.4 : 2.4), todo && VERTICAL ? 0.55 : 0, fiel)
         MG = MG0
-        return { pos: q.pos, aim: q.aim, foco, ap: (L.ap || 0.06) * (VERTICAL ? 1.2 : 1), pts, flags, todo }
+        return { pos: q.pos, aim: q.aim, foco, ap: L.ap || 0.06, pts, flags, todo }
       }
       // La grúa, como en la referencia: un solo movimiento que fluye por sus puntos con K.path (posición y mira), el foco
       // con K.track. Llega a cada lugar poco después de que empieza lo suyo; si se queda más de un par de segundos, sus
