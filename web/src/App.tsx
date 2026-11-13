@@ -1395,6 +1395,7 @@ const SessionView = memo(function SessionView({ id, session, card, models }: { i
           lockModel={!!session.background?.length}
           context={totals.context}
           flow={{ videos: totals.flowVideos, creditos: totals.flowCreditos }}
+          gasto={totals}
           onCompactar={() => api(`/api/sessions/${session.id}/compactar`, {})}
           placeholder="Responde, pide un cambio, pega una imagen o suelta un archivo…"
           draft={leerRespuesta(session.id)}

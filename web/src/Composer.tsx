@@ -5,6 +5,8 @@ import { proveedorDe, type Proveedor } from '../../shared/providers'
 import { imageUrl, Thumbs, type Attached } from './Images'
 import { esIcono, Icono } from './Iconos'
 import { FlowEnUso, LimitesContexto } from './LimitesContexto'
+import type { Resumen } from './eventos'
+import { compact } from './items'
 import { invocacion, LINK, LINK_ICON, linkParts, QUOTE_EVENT, QUOTE_ICON, quoteRef, THREAD, THREAD_ICON, threadIconOf } from './etiquetas'
 
 /**
@@ -255,9 +257,10 @@ function withLinks(text: string): Node[] {
  * «Uso»: cuánto le queda al agente para recordar este chat y cuánto queda de tu plan, a un clic. Antes era un círculo con
  * un % junto a Enviar, y se leía como el avance del video. Todo se mide en lo que queda. Con el chat casi lleno sale un
  * punto ámbar y se puede resumir ya (lo mismo que escribir /compact); si no, el agente lo resume solo al llenarse. El plan
- * se consulta solo con la tarjeta abierta: pedirlo abre Claude Code o Codex.
+ * se consulta solo con la tarjeta abierta: pedirlo abre Claude Code o Codex. Debajo, los tokens que lleva el chat
+ * (`TokensDelChat`).
  */
-function Uso({ used, max, proveedor, flow, onCompactar }: { used: number; max: number; proveedor: Proveedor; flow?: GastoFlow; onCompactar?(): Promise<unknown> }) {
+function Uso({ used, max, proveedor, flow, gasto, onCompactar }: { used: number; max: number; proveedor: Proveedor; flow?: GastoFlow; gasto?: Resumen; onCompactar?(): Promise<unknown> }) {
   const [open, setOpen] = useState(false)
   const [error, setError] = useState('')
   const root = useRef<HTMLSpanElement>(null)
@@ -301,10 +304,63 @@ function Uso({ used, max, proveedor, flow, onCompactar }: { used: number; max: n
             </button>
           )}
           {error && <span className="bad small">{error}</span>}
+          {gasto && <TokensDelChat g={gasto} />}
           <LimitesContexto proveedor={proveedor} />
           <FlowEnUso delChat={flow} />
         </span>
       )}
+    </span>
+  )
+}
+
+const dolares = (usd: number) => `$${usd < 0.01 && usd > 0 ? usd.toFixed(3) : usd.toFixed(2)}`
+
+/**
+ * Los tokens del chat, en «Uso»: cuánto se leyó de la caché, cuánto nuevo y cuánto escribió el agente, en una barra y en
+ * cifras, con los turnos y el último. Lo de la caché va aparte porque es casi todo lo leído y cuesta mucho menos: sin
+ * eso, «12 M leídos» asusta más de lo que cobra. Sin ningún turno acabado, nada.
+ */
+function TokensDelChat({ g }: { g: Resumen }) {
+  if (!g.turnos) return null
+  const total = g.read + g.out
+  const partes = [
+    { clase: 'cache', nombre: 'Leídos de la caché', n: g.cache },
+    { clase: 'nuevos', nombre: 'Leídos nuevos', n: g.nuevos },
+    { clase: 'escritos', nombre: 'Escritos', n: g.out },
+  ]
+  const pctCache = g.read ? Math.round((g.cache / g.read) * 100) : 0
+  const costo = g.cost > 0 ? `${g.sinCosto ? '≥ ' : ''}${dolares(g.cost)}` : ''
+  return (
+    <span className="context-limits">
+      <span className="picker-label">Tokens de este chat</span>
+      <span className="context-figure">
+        {compact(total)} tokens{costo && ` · ${costo}`}
+      </span>
+      {total > 0 && (
+        <span className="context-tokens" aria-hidden>
+          {partes.map((p) => p.n > 0 && <span key={p.clase} className={p.clase} style={{ flexGrow: p.n }} />)}
+        </span>
+      )}
+      {partes.map((p) => (
+        <span className="context-limit-heading" key={p.clase}>
+          <span><i className={`context-muestra ${p.clase}`} />{p.nombre}</span>
+          <b>{compact(p.n)}{p.clase === 'cache' && g.read ? ` · ${pctCache} %` : ''}</b>
+        </span>
+      ))}
+      <span className="context-limit-heading">
+        <span>Turnos</span>
+        <b>{g.turnos}</b>
+      </span>
+      {g.ultimo && (
+        <span className="context-limit-heading">
+          <span>Último turno</span>
+          <b>{compact(g.ultimo.tokens)} tokens{g.ultimo.usd ? ` · ${dolares(g.ultimo.usd)}` : ''}</b>
+        </span>
+      )}
+      <span className="context-nota">
+        En cada turno el agente vuelve a leer la conversación entera. Lo que ya había leído sale de la caché, que cuesta una fracción (en Claude, la décima parte); lo que escribe es lo más caro por token.
+        {g.sinCosto ? ` El costo no cuenta ${g.sinCosto === 1 ? 'un turno' : `${g.sinCosto} turnos`} que no lo informaron.` : ''}
+      </span>
     </span>
   )
 }
@@ -453,6 +509,8 @@ export function Composer(props: {
   context?: { used: number; max: number }
   /** Los videos de Google Flow de este chat y sus créditos, para «Uso». */
   flow?: GastoFlow
+  /** Lo que lleva gastado el chat (tokens, turnos, costo), para «Uso». */
+  gasto?: Resumen
   /** «Resumir ahora» en «Uso», con el chat casi lleno: lo mismo que escribir /compact. */
   onCompactar?(): Promise<unknown>
   /** Lo que la card añade a la barra, junto al modelo (la serie, la carpeta, el lote…). */
@@ -812,7 +870,7 @@ export function Composer(props: {
         )}
         {props.extra}
         <span className="spacer" />
-        {props.context && <Uso {...props.context} proveedor={proveedorDe(choice?.model ?? '')} flow={props.flow} onCompactar={props.onCompactar} />}
+        {props.context && <Uso {...props.context} proveedor={proveedorDe(choice?.model ?? '')} flow={props.flow} gasto={props.gasto} onCompactar={props.onCompactar} />}
         {uploading > 0 && <span className="muted small">Subiendo…</span>}
         {error && <span className="bad small">{error}</span>}
         {(!trabajando || !empty) && (
