@@ -5,6 +5,7 @@ import { api } from './api'
 import { Picker } from './Composer'
 import { Confirm } from './Confirm'
 import { Logo } from './Logos'
+import { useRecordado } from './recordado'
 import type { UsoVoz } from './Voz'
 
 /**
@@ -81,14 +82,16 @@ let chatgpt: { cuando: number; lectura: Promise<boolean> } | undefined
 
 /** Si hay una cuenta de ChatGPT conectada, de donde sale `codex exec`. */
 export function useChatGPT(): boolean {
-  const [hay, setHay] = useState(false)
-  useEffect(() => {
-    if (!chatgpt || Date.now() - chatgpt.cuando > 60_000) chatgpt = { cuando: Date.now(), lectura: api<CuentaClaude>('/api/codex/cuenta').then((c) => c.conectada, () => false) }
-    let vivo = true
-    void chatgpt.lectura.then((si) => vivo && setHay(si))
-    return () => void (vivo = false)
-  }, [])
-  return hay
+  // Mientras responde, lo último que se supo (`recordado.ts`): si no, «Imágenes» cambiaba de texto al abrir el inicio.
+  return useRecordado(
+    'chatgpt',
+    false,
+    () => {
+      if (!chatgpt || Date.now() - chatgpt.cuando > 60_000) chatgpt = { cuando: Date.now(), lectura: api<CuentaClaude>('/api/codex/cuenta').then((c) => c.conectada, () => false) }
+      return chatgpt.lectura
+    },
+    []
+  )
 }
 
 /** La opción del menú que conecta la cuenta de Google, que no es ningún modelo. */

@@ -22,6 +22,8 @@ test('la vista en vivo del estudio se abre desde la otra dirección, solo como m
   } }
   assert.equal(peticionDeConfianza(req, 4848), true)
   assert.equal(peticionDeConfianza({ ...req, url: '/api/sessions/abc123/vivo/out/index.html?t=3' }, 4848), true)
+  assert.equal(peticionDeConfianza({ ...req, url: '/api/modelos3d/visor/index.html?id=caja&v=1' }, 4848), true)
+  assert.equal(peticionDeConfianza({ ...req, url: '/api/modelos3d/caja/vista.webp' }, 4848), false)
   // Otra página no puede enmarcarla, ni pedir otra cosa así, ni como documento.
   assert.equal(peticionDeConfianza({ ...req, headers: { ...req.headers, referer: 'https://otro.example/' } }, 4848), false)
   assert.equal(peticionDeConfianza({ ...req, headers: { ...req.headers, referer: 'http://localhost:4848.otro.example/' } }, 4848), false)

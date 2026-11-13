@@ -29,8 +29,9 @@ if (!archivo) {
 }
 const lista = JSON.parse(readFileSync(archivo, 'utf8'))
 const EDGES = Math.max(1, Math.min(Number(opcion('--edges', 6)), lista.length))
-// Una página que no termina en 2 minutos no va a terminar: se da por fallida y ese Edge se cambia por otro.
-const TOPE = 120000
+// Una página que no termina en 2 minutos no va a terminar: se da por fallida y ese Edge se cambia por otro. hacer.py
+// lo baja a 40 s (`CAPTURA_TOPE`, en segundos): la que no sale la saca de su texto ya leído.
+const TOPE = (Number(process.env.CAPTURA_TOPE) || 120) * 1000
 // Más angosta, la letra sale más grande y el texto baja en más renglones (Capturas para el celular).
 const ANGOSTA = { ancho: 300, escala: 3.6 }
 

@@ -16,6 +16,7 @@ import { montarNube, nubeAlDia } from './cloudflare.ts'
 import { hayNube, instagram } from './instagram.ts'
 import { abierto, conGoogle, contextoDeGoogle, deGoogle, deLaApp, desconectar, enGoogle, navegador, pasarDeEdge, pestana, SinSesion, sinAviso, soltar } from './navegador.ts'
 import { tiktok } from './tiktok.ts'
+import { type CanalYoutube, youtubeShorts } from './youtube.ts'
 import { redactar } from '../redactar.ts'
 import { NOMBRE_AGENTE, proveedorDe } from '../../shared/providers.ts'
 
@@ -38,12 +39,17 @@ export interface Sesion {
 }
 
 /**
- * Lo que sabe hacer cada red. Para sumar YouTube: otro archivo como `tiktok.ts` (por su página) o `instagram.ts` (por la
- * nube de Sloth), y añadirlo a `REDES`.
+ * Lo que sabe hacer cada red: `tiktok.ts` (por su página), `instagram.ts` (por la nube de Sloth) y `youtube.ts` (por su
+ * API, con el canal de Opciones → YouTube). Una red nueva es otro archivo así, añadido a `REDES`.
  */
 export interface ModuloRed {
   id: RedId
   nombre: string
+  /**
+   * Va con una cuenta que ya conectaste en otro lado (YouTube, con el canal de los largos): no pide token ni sesión, solo
+   * se enciende (`token('si')`) o se apaga (`token(null)`).
+   */
+  interruptor?: boolean
   /** La página donde se inicia sesión, en el navegador de las redes. Sin ella, la red va por su API y se conecta con `token`. */
   login?: string
   /** Hasta cuántos días antes deja programar la red. Lo que cae más lejos espera en la cola, sin error, hasta que entre. */
@@ -66,7 +72,7 @@ export interface ModuloRed {
    * error con `captura` (un PNG) guarda lo que se veía en la página al fallar. Si en un reintento ve que ya estaba (en
    * TikTok, con otra hora), devuelve la hora con la que quedó.
    */
-  programar(nav: Navegador, p: { ruta: string; huella: string; texto: string; tags: string[]; cuando: string; ref: string; reintento: boolean }): Promise<void | { cuando: string }>
+  programar(nav: Navegador, p: { ruta: string; huella: string; texto: string; tags: string[]; cuando: string; ref: string; reintento: boolean; infantil?: boolean; sintetico?: boolean }): Promise<void | { cuando: string }>
   /** Quita de la red lo que se dejó con esa `ref`. Si falla, Sloth no la olvida: se puede volver a intentar. */
   quitar?(ref: string): Promise<void>
   /**
@@ -81,7 +87,6 @@ export interface ModuloRed {
   estados?(): Promise<Record<string, { estado: 'publicado' } | { estado: 'error'; error: string }>>
 }
 
-const REDES: ModuloRed[] = [tiktok, instagram]
 /** Lo más pronto que se programa: las redes piden un margen. */
 const MARGEN = 20 * 60000
 const DIA = 24 * 3600000
@@ -149,6 +154,26 @@ async function escribir(model: string | undefined, prompt: string, carpeta: stri
  * corrido, TikTok abre sus sugerencias al teclear «#» y se come letras: el texto no quedaba igual, se reescribía tres
  * veces y fallaba. Así se eligen de las sugerencias, como los demás, y van al final.
  */
+/**
+ * Lo que dice de qué trata un video, de los archivos de su carpeta, para escribir su texto: primero lo que mejor lo
+ * cuenta y luego lo demás, de lo más corto a lo más largo, hasta ~30.000 caracteres. El guion de El Diff es `guion.py`;
+ * sin leerlo, a sus episodios no les llegaba nada. Vacío si no hay ninguno.
+ */
+export function textosDelVideo(carpeta: string) {
+  const primero = ['short.json', 'shorts.json', 'redes.json', 'guion.md', 'guion.py', 'shorts.md']
+  const rango = (f: string) => (primero.includes(f) ? primero.indexOf(f) : primero.length)
+  const textos = readdirSync(carpeta)
+    .filter((f) => (/\.(md|json|txt)$/.test(f) || f === 'guion.py') && !/^(package|package-lock|tsconfig|sloth)\.json$/.test(f))
+    .map((f) => ({ f, n: tamano(join(carpeta, f)) }))
+    .sort((x, y) => rango(x.f) - rango(y.f) || x.n - y.n)
+  let contexto = ''
+  for (const { f } of textos) {
+    if (contexto.length > 30000) break
+    contexto += `\n\n===== ${f} =====\n${readFileSync(join(carpeta, f), 'utf8').slice(0, 15000)}`
+  }
+  return contexto
+}
+
 export function sinTagsEnTexto(texto: string, tags: string[]) {
   const sueltos: string[] = []
   const limpio = texto
@@ -159,7 +184,8 @@ export function sinTagsEnTexto(texto: string, tags: string[]) {
   return { texto: limpio, tags: unirTags(tags, sueltos) }
 }
 
-export function redes(app: string, sessions: Sessions, cards: () => Card[], avisar: (msg: ServerPush) => void) {
+export function redes(app: string, sessions: Sessions, cards: () => Card[], avisar: (msg: ServerPush) => void, canal?: CanalYoutube) {
+  const REDES: ModuloRed[] = [tiktok, instagram, ...(canal ? [youtubeShorts(app, canal)] : [])]
   const archivo = join(app, 'data', 'redes', 'redes.json')
   const fallos = join(app, 'data', 'redes', 'fallos')
   let datos: Datos = { ritmo: RITMO_VERTICAL, cuentas: {}, estilos: {}, publicaciones: [] }
@@ -421,21 +447,13 @@ export function redes(app: string, sessions: Sessions, cards: () => Card[], avis
     const a = ajustes(card.id)
     // Si ya va a otra red, va el mismo texto: el video es el mismo.
     const otra = REDES.map((r) => publicacion(r.id, ruta)).find((p) => p?.texto)
-    if (otra) return { ruta, texto: otra.texto, tags: unirTags(a.tags, otra.tags) }
+    if (otra) return { ruta, texto: otra.texto, tags: unirTags(a.tags, otra.tags), infantil: otra.infantil, sintetico: otra.sintetico }
     const partes = ruta.split(`${sep}out${sep}`)
     const carpeta = partes.length > 1 ? partes[0] : dirname(ruta)
-    // Primero lo que mejor dice de qué trata el video; luego lo demás, de lo más corto a lo más largo.
-    const primero = ['short.json', 'shorts.json', 'redes.json', 'guion.md', 'shorts.md']
-    const rango = (f: string) => (primero.includes(f) ? primero.indexOf(f) : primero.length)
-    const textos = readdirSync(carpeta)
-      .filter((f) => /\.(md|json|txt)$/.test(f) && !/^(package|package-lock|tsconfig|sloth)\.json$/.test(f))
-      .map((f) => ({ f, n: tamano(join(carpeta, f)) }))
-      .sort((x, y) => rango(x.f) - rango(y.f) || x.n - y.n)
-    let contexto = ''
-    for (const { f } of textos) {
-      if (contexto.length > 30000) break
-      contexto += `\n\n===== ${f} =====\n${readFileSync(join(carpeta, f), 'utf8').slice(0, 15000)}`
-    }
+    const contexto = textosDelVideo(carpeta)
+    // Sin nada que leer, el agente no tiene de qué escribir: su «no puedo sin inventar» se publicó como texto de tres
+    // episodios de El Diff (5 nov 2026). Va vacío, para escribirlo a mano.
+    if (!contexto) return { ruta, texto: '', tags: unirTags(a.tags, []), aviso: 'En la carpeta del video no quedó el guion ni sus notas: escribe el texto a mano.' }
     const prompt = [
       `Escribe la descripción de un video vertical para redes (TikTok, Shorts, Reels), en español de México, para el canal del usuario.`,
       `El video es \`${relative(carpeta, ruta).replaceAll('\\', '/')}\`, del estilo «${card.title}». Abajo van los archivos de su carpeta.`,
@@ -443,6 +461,7 @@ export function redes(app: string, sessions: Sessions, cards: () => Card[], avis
       ``,
       `- Una o dos frases cortas (menos de 200 caracteres) con el planteamiento y su giro completos, sin guardarte el giro para el video (en una noticia: quién prometió o hizo qué, y cómo le salió al revés). No inventes nada que no esté en los archivos.`,
       `- Que lo entienda alguien que no sigue la tecnología: nombra lo que la gente conoce (Photoshop, Call of Duty, ElevenLabs) y nada de jerga («DNS», «throughput», «prefijo»). Lo que mejor funcionó: «Pidió frenar a los hackers de IA que metieron patinetas en Call of Duty. El hacker era él.»`,
+      `- Termina, en la misma línea, con una pregunta corta o un «Mándaselo a…» que sea del tema y le hable a alguien concreto, para que comenten o lo compartan («¿Tú le perdonarías los diez años de mentira?», «Mándaselo a tu primo, el que sabe de bitcoin.»). Nada genérico como «¿Qué opinas?» o «Síguenos».`,
       `- Sin hashtags en el texto, sin emojis de relleno y sin «en este video».`,
       `- Aparte, de 2 a 4 hashtags del tema, sin # ni espacios (por ejemplo: IA, Claude, Photoshop).`,
       ``,
@@ -474,7 +493,7 @@ export function redes(app: string, sessions: Sessions, cards: () => Card[], avis
     const { texto, tags } = sinTagsEnTexto(b.texto, b.tags)
     const h = huella(b.ruta)
     // Con la `ref` del intento que falló: si había llegado a la red, el reintento lo encuentra en vez de duplicarlo.
-    datos.publicaciones.push({ red, cardId: card.id, ruta: b.ruta, huella: h, texto, tags, cuando, estado: 'cola', t: Date.now(), ...(previa?.ref ? { ref: previa.ref } : {}) })
+    datos.publicaciones.push({ red, cardId: card.id, ruta: b.ruta, huella: h, texto, tags, cuando, estado: 'cola', t: Date.now(), infantil: b.infantil === true, sintetico: b.sintetico === true, ...(previa?.ref ? { ref: previa.ref } : {}) })
     ;(tanda ??= new Set()).add(h)
   }
 
@@ -542,7 +561,7 @@ export function redes(app: string, sessions: Sessions, cards: () => Card[], avis
         subidos++
         guardar()
         try {
-          const ya = await red.programar(nav, { ruta: p.ruta, huella: p.huella, texto: p.texto, tags: p.tags, cuando: p.cuando!, ref: p.ref, reintento })
+          const ya = await red.programar(nav, { ruta: p.ruta, huella: p.huella, texto: p.texto, tags: p.tags, cuando: p.cuando!, ref: p.ref, reintento, infantil: p.infantil, sintetico: p.sintetico })
           if (ya) p.cuando = ya.cuando
           p.estado = 'programado'
           delete p.error
@@ -741,6 +760,7 @@ export function redes(app: string, sessions: Sessions, cards: () => Card[], avis
           cuenta: datos.cuentas[r.id] ?? null,
           ritmo: datos.ritmo,
           token: !!r.token,
+          interruptor: r.interruptor,
           sinSesion: sinSesion.has(r.id),
           enEdge: (enGoogle() && redDeLaApp() === r) || undefined,
           sinNube: (r.enLaNube && !hayNube()) || undefined,

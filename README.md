@@ -6,7 +6,7 @@
   <a href="https://sloth.vancci.org"><img alt="Versión" src="https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fapi.sloth.vancci.org%2Fversion&query=%24.version&label=versi%C3%B3n&color=e8a33d&labelColor=171512"></a>
   <img alt="Windows, Mac y Linux" src="https://img.shields.io/badge/Windows%20%C2%B7%20Mac%20%C2%B7%20Linux-171512?logo=electron&logoColor=ede6d6">
   <img alt="Con Claude" src="https://img.shields.io/badge/con-Claude-e8a33d?labelColor=171512">
-  <a href="LICENSE"><img alt="Licencia" src="https://img.shields.io/badge/licencia-Apache%202.0%20%2B%20Commons%20Clause-ede6d6?labelColor=171512"></a>
+  <a href="LICENSE"><img alt="Licencia" src="https://img.shields.io/badge/licencia-MIT-ede6d6?labelColor=171512"></a>
 </p>
 
 <p align="center">
@@ -153,10 +153,10 @@ venía para HyperFrames; en Sloth se dibuja con Remotion.
 
 ## Licencia
 
-**Código abierto para uso libre, sin reventa.** Puedes usar Sloth para lo que quieras (también para trabajos de
-paga), modificarla y compartirla. Lo que no puedes es venderla, ni una versión modificada, ni un servicio cuyo valor
-venga de ella. Los videos que hagas son tuyos y los puedes vender. Es la [Apache 2.0 con Commons Clause](LICENSE), a
-nombre de [Vancci](https://vancci.org); por esa condición no es «open source» según la definición de la OSI.
+**Código abierto, con la [licencia MIT](LICENSE)**, a nombre de [Vancci](https://vancci.org). Puedes usar Sloth para
+lo que quieras, modificarla y compartirla; solo conserva el aviso de la licencia. Los videos que hagas son tuyos.
+Sloth es gratis y se sostiene con quien [la apoya](https://sloth.vancci.org/#apoyar). El nombre y el logo de Sloth no
+entran en la licencia: si publicas una versión modificada, ponle otro nombre.
 
 Remotion, que arma los videos, tiene su [propia licencia](https://www.remotion.dev/license): gratis para personas y
 equipos pequeños; las empresas más grandes pagan la suya. Sloth no está afiliada, patrocinada ni respaldada por

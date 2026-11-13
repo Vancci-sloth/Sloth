@@ -12,11 +12,13 @@
 .tags input:focus { border-color: var(--amber); }
 
 /* El estado de cada video: en verde lo que ya está, en ámbar lo que falta, en rojo lo que falló. */
-.insignia { display: inline-flex; align-items: center; gap: 6px; align-self: flex-start; max-width: 100%; margin-top: -2px; padding: 1px 8px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); font-size: 11px; white-space: nowrap; }
-.insignia.hecho { border-color: transparent; background: rgba(143, 193, 119, 0.13); color: var(--ok); }
-.insignia.falta { color: var(--amber); border-color: rgba(232, 163, 61, 0.45); }
+.insignia { display: inline-flex; align-items: center; gap: 6px; align-self: flex-start; max-width: 100%; color: color-mix(in srgb, var(--muted) 60%, var(--text)); font-size: 14.5px; font-weight: 600; white-space: nowrap; }
+/* Sin cápsula: un punto del color de su estado delante del texto. */
+.insignia::before { content: ''; flex: none; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.insignia.hecho { color: var(--ok); }
+.insignia.falta { color: var(--amber); }
 .insignia.moviendo { color: var(--text); }
-.insignia.mal { color: var(--bad); border-color: var(--bad); }
+.insignia.mal { color: var(--bad); }
 /* Listo en todas las redes: una palomita en la esquina del video, para verlo de lejos. */
 .video-tile { position: relative; }
 .video-listo { position: absolute; top: 7px; right: 7px; display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: var(--ok); color: var(--sobre-ambar); font-size: 12px; font-weight: 800; box-shadow: 0 1px 6px rgba(0, 0, 0, 0.5); pointer-events: none; }
@@ -26,15 +28,16 @@
 .resumen-redes.todo-bien { gap: 10px; padding: 9px 14px; border-radius: var(--radio); border: 1px solid rgba(143, 193, 119, 0.35); background: rgba(143, 193, 119, 0.08); }
 .resumen-redes.todo-bien strong { color: var(--ok); }
 .resumen-check { display: grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; background: var(--ok); color: var(--sobre-ambar); font-size: 12px; font-weight: 800; flex: none; }
-.resumen-estado { display: inline-flex; align-items: center; gap: 7px; padding: 4px 12px; border-radius: 999px; border: 1px solid var(--line); font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; transition: border-color 0.15s, background 0.15s; }
+.resumen-estado { display: inline-flex; align-items: center; gap: 7px; height: 32px; padding: 0 10px; border-radius: 8px; font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; transition: background 0.15s; }
 .resumen-estado::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
 .resumen-estado.listos { color: var(--ok); }
 .resumen-estado.faltan { color: var(--amber); }
 .resumen-estado.fallaron { color: var(--bad); }
 .resumen-estado.enCola { color: var(--text); }
 .resumen-estado.enCola::before { animation: pulse 1.2s steps(5) infinite; }
-.resumen-estado:hover, .resumen-estado.on { border-color: currentColor; }
-.resumen-estado.on { background: var(--panel-2); }
+.resumen-estado:hover { background: var(--panel-2); }
+/* El elegido filtra la rejilla: subrayado, como las pestañas. */
+.resumen-estado.on { background: var(--panel-2); text-decoration: underline 2px; text-underline-offset: 5px; }
 /* La barra de los verticales en «Mis videos», como la de YouTube: su resumen y «Revisar y programar». */
 .resumen-redes.lote { flex: none; padding: 12px 16px; border: 1px solid var(--line); border-radius: var(--radio); background: var(--panel-2); gap: 10px 12px; }
 .resumen-redes.lote > strong { margin-right: 4px; }
@@ -60,6 +63,9 @@
 .programar-nombre .muted { font-family: var(--mono); font-size: 11px; font-weight: 400; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .programar-texto textarea { width: 100%; resize: vertical; padding: 8px 10px; border-radius: 8px; background: var(--panel); border: 1px solid var(--line); outline: none; font: inherit; font-size: 13px; line-height: 1.45; color: var(--text); }
 .programar-texto textarea:focus { border-color: var(--amber); }
+.programar-audiencia { display: flex; flex-wrap: wrap; gap: 8px 14px; font-size: 12px; color: var(--muted); }
+.programar-audiencia label { display: inline-flex; align-items: center; gap: 4px; cursor: pointer; }
+.programar-audiencia input { accent-color: var(--amber); }
 
 /* En la barra lateral, junto a Opciones: lo que falló en redes, con un punto rojo. Un clic lleva a donde se arregla. */
 .pie .aviso-redes { display: flex; align-items: center; gap: 9px; height: 32px; padding: 0 8px; border-radius: 8px; color: var(--bad); font-size: 13px; text-align: left; }

@@ -1,6 +1,49 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { MAX_LETRAS, mensajeDe, pedidoTts } from './voz.ts'
+import type { Env } from './index.ts'
+import { MAX_LETRAS, idDe, juntas, laDeMasSaldo, llavesDe, mensajeDe, pedidoTts } from './voz.ts'
+
+test('la Administrador de antes ve todas las llaves como una sola cuenta', () => {
+  const r = (datos: Record<string, unknown>, status = 200) => ({ status, datos })
+  const j = juntas([
+    { saldo: r({ balance: 3_000_000, users: 0, daily_limit: null }), usuarios: r({ users: [], total: 0, per_page: 100 }), uso: r({ items: [{ credits: 1 }] }) },
+    { saldo: r({ balance: 499_954, users: 1 }), usuarios: r({ users: [{ external_id: 'creador' }], total: 1 }), uso: r({ items: [{ credits: 2 }] }) },
+    { saldo: r({ error: 'x' }, 401), usuarios: r({}, 401), uso: r({}, 401) }
+  ])
+  assert.deepEqual(j.saldo, { status: 200, datos: { balance: 3_499_954, users: 1, daily_limit: null } })
+  assert.deepEqual(j.usuarios?.datos, { users: [{ external_id: 'creador' }], total: 1, per_page: 100 })
+  assert.deepEqual(j.uso?.datos.items, [{ credits: 1 }, { credits: 2 }])
+  assert.equal(juntas([{ saldo: r({ error: 'no' }, 401), usuarios: r({}, 401), uso: r({}, 401) }]).saldo?.status, 401)
+  assert.deepEqual(juntas([]), {})
+})
+
+test('las llaves del socio se leen de cada VOICES_PK_LIVE_n, en orden, sin vacías ni repetidas', async () => {
+  const env = { VOICES_PK_LIVE_10: 'pk_live_diez', VOICES_PK_LIVE_2: 'pk_live_dos', VOICES_PK_LIVE: ' pk_live_uno ', VOICES_PK_LIVE_3: '', VOICES_PK_LIVE_4: 'pk_live_dos', OTRA: 'pk_live_x', VOICES_PK_LIVE_X: 'pk_live_y' } as unknown as Env
+  const llaves = await llavesDe(env)
+  assert.deepEqual(
+    llaves.map((l) => [l.nombre, l.valor, l.fin]),
+    [
+      ['VOICES_PK_LIVE', 'pk_live_uno', '_uno'],
+      ['VOICES_PK_LIVE_2', 'pk_live_dos', '_dos'],
+      ['VOICES_PK_LIVE_10', 'pk_live_diez', 'diez']
+    ]
+  )
+  // El id es de la llave, no del secreto: la misma llave con otro nombre es la misma cuenta.
+  assert.equal(llaves[1].id, await idDe('pk_live_dos'))
+  assert.match(llaves[0].id, /^[0-9a-f]{12}$/)
+  assert.ok(!llaves[0].id.includes('uno'))
+  assert.deepEqual(await llavesDe({} as Env), [])
+})
+
+test('los nuevos y los que se mudan van a la llave con más saldo, nunca a una vacía', async () => {
+  const [a, b, c] = await llavesDe({ VOICES_PK_LIVE: 'pk_live_a', VOICES_PK_LIVE_2: 'pk_live_b', VOICES_PK_LIVE_3: 'pk_live_c' } as unknown as Env)
+  const saldo = (balance: unknown, status = 200) => ({ status, datos: { balance } })
+  assert.equal(laDeMasSaldo([{ llave: a, r: saldo(500_000) }, { llave: b, r: saldo(3_000_000) }, { llave: c, r: saldo(10) }]), b)
+  // Una que no se pudo leer no cuenta, aunque diga mucho.
+  assert.equal(laDeMasSaldo([{ llave: a, r: saldo(5) }, { llave: b, r: saldo(9_000_000, 401) }]), a)
+  assert.equal(laDeMasSaldo([{ llave: a, r: saldo(0) }, { llave: b, r: saldo('mucho') }]), undefined)
+  assert.equal(laDeMasSaldo([]), undefined)
+})
 
 test('a Voices Cloning solo va un trozo con texto, voz y una velocidad que acepta', () => {
   assert.deepEqual(pedidoTts({ text: '  Hola.  ', voice_id: 'v1' }), { text: 'Hola.', voice_id: 'v1' })
@@ -13,14 +56,83 @@ test('a Voices Cloning solo va un trozo con texto, voz y una velocidad que acept
   assert.throws(() => pedidoTts({ text: 'Hola.', voice_id: 'v1', speed: 2 }), /0.5 a 1.5/)
 })
 
-test('cada error de Voices Cloning se dice en español y con qué hacer', () => {
+test('cada error de las voces se dice en español y con qué hacer', () => {
   const de = (status: number, code?: string, espera?: string) => mensajeDe({ status, datos: code ? { code, error: 'x' } : {}, espera })
   assert.match(de(402, 'insufficient_credits'), /acabaron los créditos/)
-  assert.match(de(402, 'partner_balance_empty'), /saldo de Sloth/)
+  assert.match(de(402, 'partner_balance_empty'), /se acabó su saldo/)
   assert.match(de(402, 'partner_daily_limit'), /medianoche, hora de Lima/)
   assert.match(de(429, 'queue_full', '12'), /en 12 segundos/)
   assert.match(de(504), /no se cobró/)
-  assert.match(de(401), /llave de Sloth/)
+  assert.match(de(401), /no aceptaron su llave/)
   assert.match(de(403), /suspendido/)
-  assert.match(de(500), /respondió 500/)
+  assert.match(de(500), /respondieron 500/)
+})
+
+test('un regalo de créditos da una cuenta gratis a quien no tiene, suma una sola vez por motivo y manda su clave', async () => {
+  const { DatabaseSync } = await import('node:sqlite')
+  const { readdirSync, readFileSync } = await import('node:fs')
+  const { default: worker } = await import('./index.ts')
+  const db = new DatabaseSync(':memory:')
+  const carpeta = new URL('../migrations/', import.meta.url)
+  for (const m of readdirSync(carpeta).sort()) db.exec(readFileSync(new URL(m, carpeta), 'utf8'))
+  const consulta = (sql: string, args: unknown[]) => ({
+    bind: (...mas: unknown[]) => consulta(sql, [...args, ...mas]),
+    all: async () => ({ results: db.prepare(sql).all(...(args as never[])) }),
+    first: async () => db.prepare(sql).get(...(args as never[])) ?? null,
+    run: async () => ({ meta: { changes: Number(db.prepare(sql).run(...(args as never[])).changes) } })
+  })
+  const r2 = new Map<string, string>()
+  const DESCARGAS = {
+    get: async () => null,
+    put: async (k: string, v: string, o?: { onlyIf?: { etagDoesNotMatch?: string } }) => (o?.onlyIf && r2.has(k) ? null : (r2.set(k, v), {}))
+  }
+  const env = {
+    DB: { prepare: (sql: string) => consulta(sql, []) },
+    DESCARGAS,
+    ADMIN: 'admin',
+    VOICES_PK_LIVE: 'pk_live_a',
+    PAYPAL_MODO: 'prueba',
+    CORREO_DE: 'Sloth <a@x.com>',
+    CORREO_RESPUESTA: 'soporte@x.com',
+    RESEND_API_KEY: 're_x'
+  }
+  const sumas: number[] = []
+  const correos: { to: string[]; subject: string; text: string }[] = []
+  const antes = globalThis.fetch
+  globalThis.fetch = (async (url: string, init?: RequestInit) => {
+    const u = String(url)
+    if (u.includes('resend')) return correos.push(JSON.parse(String(init?.body))), new Response('{"id":"1"}')
+    if (u.endsWith('/balance')) return new Response('{"balance":1000000}')
+    if (u.endsWith('/credits')) return sumas.push(JSON.parse(String(init?.body)).amount), new Response('{"credits":1}')
+    if (init?.method === 'POST') return sumas.push(JSON.parse(String(init?.body)).credits), new Response('{}', { status: 201 })
+    return new Response('{"error":"no"}', { status: 404 })
+  }) as typeof fetch
+  try {
+    const ctx = { waitUntil: () => {}, passThroughOnException: () => {} } as never
+    const regalar = (email: string) =>
+      worker
+        .fetch(
+          new Request('https://cobro.x/voz/admin/regalo', {
+            method: 'POST',
+            headers: { authorization: 'Bearer admin', 'content-type': 'application/json' },
+            body: JSON.stringify({ email, creditos: 50000, motivo: 'testers', asunto: 'Perdon', parrafos: ['Hola', 'Tu clave: {clave}'] })
+          }),
+          env as never,
+          ctx
+        )
+        .then(async (r) => ({ status: r.status, ...((await r.json()) as { clave: string; sumado: boolean; yaTenia: boolean; enviado: boolean }) }))
+    const r = await regalar('Nuevo@x.com')
+    assert.equal(r.status, 200)
+    assert.deepEqual([r.sumado, r.yaTenia, r.enviado], [true, false, true])
+    const fila = db.prepare("SELECT plan, estado, fundador FROM licencias WHERE email = 'nuevo@x.com'").get()
+    assert.deepEqual({ ...fila }, { plan: 'cuenta', estado: 'gratis', fundador: 0 })
+    assert.match(correos[0].text, new RegExp(`Tu clave: ${r.clave}`))
+    // Otra vez con el mismo motivo: no suma, no crea otra cuenta y el correo va con la misma clave.
+    const otra = await regalar('nuevo@x.com')
+    assert.deepEqual([otra.sumado, otra.yaTenia, otra.clave], [false, true, r.clave])
+    assert.deepEqual(sumas, [50000])
+    assert.equal((db.prepare('SELECT COUNT(*) AS n FROM licencias').get() as { n: number }).n, 1)
+  } finally {
+    globalThis.fetch = antes
+  }
 })

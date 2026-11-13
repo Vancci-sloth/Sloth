@@ -3,10 +3,10 @@ import { createPortal } from 'react-dom'
 
 /**
  * Un modal que pide confirmación. Escape o un clic fuera lo cierran; Enter pulsa el botón que tiene el foco, que al abrir
- * es el de la acción. Si `onConfirm` falla, el error se queda a la vista y el modal sigue abierto. Se pinta en `body`:
+ * es el de la acción (con `enfocarCancelar`, el de cancelar: para lo que se abre con una tecla). Si `onConfirm` falla, el error se queda a la vista y el modal sigue abierto. Se pinta en `body`:
  * dentro de otro bloque heredaría sus estilos (en `.pie`, los botones salían grises).
  */
-export function Confirm(props: { title: string; children: ReactNode; action: string; danger?: boolean; onConfirm(): Promise<unknown>; onClose(): void }) {
+export function Confirm(props: { title: string; children: ReactNode; action: string; danger?: boolean; enfocarCancelar?: boolean; onConfirm(): Promise<unknown>; onClose(): void }) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
 
@@ -38,10 +38,10 @@ export function Confirm(props: { title: string; children: ReactNode; action: str
         <div className="modal-body">{props.children}</div>
         {error && <p className="bad small">{error}</p>}
         <div className="modal-actions">
-          <button className="ghost" onClick={props.onClose}>
+          <button className="ghost" onClick={props.onClose} autoFocus={props.enfocarCancelar}>
             Cancelar
           </button>
-          <button className={props.danger ? 'primary danger' : 'primary'} disabled={busy} onClick={confirm} autoFocus>
+          <button className={props.danger ? 'primary danger' : 'primary'} disabled={busy} onClick={confirm} autoFocus={!props.enfocarCancelar}>
             {props.action}
           </button>
         </div>

@@ -7,12 +7,12 @@
     "render": "remotion render src/index.ts Reel out/reel.mp4"
   },
   "dependencies": {
-    "@remotion/cli": "^4.0.532",
-    "@remotion/google-fonts": "^4.0.532",
-    "@remotion/media-utils": "^4.0.532",
+    "@remotion/cli": "4.0.540",
+    "@remotion/google-fonts": "4.0.540",
+    "@remotion/media-utils": "4.0.540",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
-    "remotion": "^4.0.532"
+    "remotion": "4.0.540"
   },
   "devDependencies": {
     "@types/react": "^19.3.0",

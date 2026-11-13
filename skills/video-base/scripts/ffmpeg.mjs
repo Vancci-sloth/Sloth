@@ -1,7 +1,9 @@
 // Lo que comparten los scripts de la base: correr FFmpeg y FFprobe, leer la sonoridad y las opciones de la línea de
 // comandos. Sin dependencias: solo Node y FFmpeg en el PATH.
 import { spawn, spawnSync } from 'node:child_process'
-import { existsSync } from 'node:fs'
+import { existsSync, readFileSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 
 /** Corre FFmpeg y devuelve su salida de errores (ahí escribe sus medidas). Falla si FFmpeg falla. */
 export function ffmpeg(args) {
@@ -13,6 +15,56 @@ export function ffmpeg(args) {
   if (r.error) throw new Error(`No pude lanzar FFmpeg: ${r.error.message}. ¿Está en el PATH?`)
   if (r.status !== 0) throw new Error(`FFmpeg falló:\n${r.stderr.slice(-3000)}`)
   return r.stderr
+}
+
+/**
+ * El codificador de H.264 para recodificar un vídeo entero: `h264_nvenc` (la NVIDIA, varias veces más rápido que x264
+ * en el procesador) si FFmpeg lo trae y de verdad codifica, o `libx264`. Que FFmpeg lo liste no basta (sin la tarjeta o
+ * su driver falla): se prueba con un cuadro, una vez, y se recuerda un día en %TEMP%/sloth-h264.json.
+ * `SLOTH_SIN_NVENC=1` lo apaga.
+ */
+export function codificadorH264() {
+  if (process.env.SLOTH_SIN_NVENC) return 'libx264'
+  const cache = join(tmpdir(), 'sloth-h264.json')
+  try {
+    const c = JSON.parse(readFileSync(cache, 'utf8'))
+    if (Date.now() - c.t < 86_400_000 && ['h264_nvenc', 'libx264'].includes(c.cod)) return c.cod
+  } catch {}
+  const r = spawnSync('ffmpeg', ['-hide_banner', '-nostdin', '-v', 'error', '-f', 'lavfi', '-i', 'color=c=black:s=256x256:r=30:d=0.2',
+    '-c:v', 'h264_nvenc', '-preset', 'p5', '-f', 'null', '-'], { encoding: 'utf8', timeout: 20_000, windowsHide: true })
+  const cod = r.status === 0 ? 'h264_nvenc' : 'libx264'
+  try {
+    writeFileSync(cache, JSON.stringify({ cod, t: Date.now() }))
+  } catch {}
+  return cod
+}
+
+/**
+ * Los ajustes de vídeo para `cod`, con la calidad de x264 `crf`: en NVENC, calidad constante (`-rc vbr -cq` con
+ * `-b:v 0`) con cq = crf + 3, que se ve como x264 a ese crf, en el preset p5 (lento y bueno de NVENC).
+ */
+export function ajustesH264(cod, crf = 16) {
+  return cod === 'h264_nvenc'
+    ? ['-c:v', 'h264_nvenc', '-preset', 'p5', '-rc', 'vbr', '-cq', String(crf + 3), '-b:v', '0']
+    : ['-c:v', 'libx264', '-crf', String(crf), '-preset', 'medium']
+}
+
+/**
+ * FFmpeg con H.264: `args(ajustes)` arma la línea con los ajustes de `ajustesH264`. Con NVENC y si falla (la tarjeta
+ * ocupada por otro render, sin memoria), se repite con libx264. Devuelve el codificador que lo hizo.
+ */
+export function ffmpegH264(args, crf = 16) {
+  const cod = codificadorH264()
+  if (cod === 'h264_nvenc') {
+    try {
+      ffmpeg(args(ajustesH264(cod, crf)))
+      return cod
+    } catch (e) {
+      console.error(`NVENC no pudo (${String(e.message).split('\n').slice(-1)[0].slice(0, 200)}): sigo con libx264.`)
+    }
+  }
+  ffmpeg(args(ajustesH264('libx264', crf)))
+  return 'libx264'
 }
 
 /** Un FFmpeg que recibe por la entrada (imágenes por tubería). Devuelve el proceso y una promesa de su fin. */

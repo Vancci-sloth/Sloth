@@ -497,6 +497,12 @@ function bajar() {
   avanzo = Date.now()
   autoUpdater.downloadUpdate(t).catch((e: Error) => {
     if (bajada !== t) return
+    // Bajó entera y su firma no pasa: volver a bajarla daría lo mismo. Se pone a mano, encima, sin perder nada.
+    if (/not signed by the application owner/.test(e.message)) {
+      bajada = undefined
+      actualizacion = { ...actualizacion, avance: undefined, sinRed: undefined, error: 'Esta versión no se puede poner sola. Bájala de sloth.vancci.org e instálala encima de la que tienes: tus cosas se quedan.' }
+      return
+    }
     const enLinea = net.isOnline()
     if (enLinea && !t.cancelled && ++fallos >= INTENTOS) {
       bajada = undefined

@@ -59,7 +59,7 @@ function estimado(cuadros) {
 async function tarjeta3D(navegador, desde) {
   try {
     const dist = path.dirname(desde.resolve("@remotion/renderer"));
-    // Por su ruta, como prestitcher-memory-usage en render.cjs: no lo exporta.
+    // Por su ruta: no lo exporta. Si una versión de Remotion los mueve, el catch de abajo lo deja pasar sin aviso.
     const { getPageAndCleanupFn } = desde(path.join(dist, "get-browser-instance.js"));
     const { puppeteerEvaluateWithCatch } = desde(path.join(dist, "puppeteer-evaluate.js"));
     const { page, cleanupPage } = await getPageAndCleanupFn({

@@ -272,6 +272,32 @@ const LogoCaja: React.FC<{ color: string }> = ({ color }) => {
   );
 };
 
+/**
+ * Cómo entra una escena cuando no es un corte seco (`entra`, lo pone el director): `flash`, el parpadeo de una décima
+ * que golpea en un remate; `barrido`, una franja que cruza al cambiar de idea; `glitch`, la interferencia corta para
+ * algo que irrumpe. Las tres duran menos de un cuarto de segundo: marcan el cambio sin tapar lo que entra.
+ */
+export const Entrada: React.FC<{ como: string }> = ({ como }) => {
+  const frame = useCurrentFrame();
+  const { W } = useFormato();
+  if (como === "glitch") return <Interferencia dura={5} />;
+  if (como === "flash") {
+    if (frame >= 4) return null;
+    return <AbsoluteFill style={{ pointerEvents: "none", background: "white", opacity: [0.7, 0.4, 0.18, 0.06][frame] }} />;
+  }
+  if (como === "barrido") {
+    if (frame >= 7) return null;
+    const x = interpolate(frame, [0, 6], [-W * 0.7, W * 1.1]);
+    return (
+      <AbsoluteFill style={{ pointerEvents: "none", overflow: "hidden" }}>
+        <div style={{ position: "absolute", top: -40, bottom: -40, left: x, width: W * 0.6, transform: "skewX(-14deg)", background: `linear-gradient(90deg, transparent, ${COLOR.fondo} 35%, ${COLOR.fondo} 65%, transparent)` }} />
+        <div style={{ position: "absolute", top: -40, bottom: -40, left: x + W * 0.52, width: 10, transform: "skewX(-14deg)", background: COLOR.rojo }} />
+      </AbsoluteFill>
+    );
+  }
+  return null;
+};
+
 /** Interferencia de transición: franjas desplazadas y ruido de color durante unos fotogramas. */
 export const Interferencia: React.FC<{ dura?: number }> = ({ dura = 8 }) => {
   const frame = useCurrentFrame();

@@ -3,7 +3,8 @@
 Fecha: 2026-10-23
 
 Actualizado: 2026-10-24 (diálogo de carpetas, instalación de Python y OCR ya implementados); 2026-10-27 (la de Mac
-pasa a Intel); 2026-11-02 (vuelve la de Apple Silicon, aparte de la de Intel, y la firma de Apple).
+pasa a Intel); 2026-11-02 (vuelve la de Apple Silicon, aparte de la de Intel, y la firma de Apple); 2026-11-08 (firma en cada
+publicación, con la notarización sin esperar a Apple más de 10 min).
 
 ## Contexto
 
@@ -40,8 +41,12 @@ con macOS 12 (cada uno con su `.zip`, con el que se actualiza) y un AppImage par
 - **Firma de Apple.** Sin cuenta de desarrollador, la de Mac sale con firma ad hoc: se abre la primera vez desde
   Configuración → Privacidad y seguridad → «Abrir de todos modos», y «Actualizar» abre la descarga en el navegador
   (electron-updater solo pone versiones nuevas en una app firmada). Con los secretos de Apple en GitHub (`CSC_LINK`,
-  `CSC_KEY_PASSWORD`, `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD`, `APPLE_TEAM_ID`), las dos salen firmadas y notarizadas
-  y se actualizan solas, sin tocar nada más; el cobro lo sabe (`firmada`) y deja de explicar el paso de la primera vez.
+  `CSC_KEY_PASSWORD`, `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD`, `APPLE_TEAM_ID`) salen firmadas y notarizadas. La
+  notarización espera a Apple 10 min como máximo (`scripts/notarizar.mjs`): los primeros envíos de un equipo nuevo
+  tardan días, y el 7 de noviembre de 2026 eso dejó la 0.4.0 con firma local. Sin respuesta a tiempo sale firmada sin
+  ticket (el cobro la marca `sinTicket` y sigue explicando el paso de la primera vez), y abre a la primera cuando
+  Apple acepte el envío. Con certificado se actualizan
+  solas, sin tocar nada más; el cobro lo sabe (`firmada`) y deja de explicar el paso de la primera vez.
   macOS solo pone una versión nueva si la firma el mismo equipo de Apple que la instalada: cambiar de certificado deja
   sin actualizar a quien ya tiene una firmada, y una sin firma no se publica encima de una firmada (el cobro la
   rechaza). La 0.3.43 de Apple Silicon, que se armó a mano, la firmó una sola vez un colaborador (Developer ID

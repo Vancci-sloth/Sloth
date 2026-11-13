@@ -14,7 +14,7 @@ import './Redes.css'
  * videos», con su resumen); en la barra lateral, lo que falló; y una notificación cuando acaba lo que mandaste a programar.
  */
 
-const NOMBRE: Record<RedId, string> = { tiktok: 'TikTok', instagram: 'Instagram' }
+const NOMBRE: Record<RedId, string> = { tiktok: 'TikTok', instagram: 'Instagram', youtube: 'YouTube' }
 const DIA = 86400000
 const enFecha = (s: string) => new Date(s.replace(' ', 'T')).getTime()
 /** `['tiktok', 'instagram']` → `TikTok e Instagram`. */
@@ -141,6 +141,8 @@ export function RedesOpciones({ onIniciando }: { onIniciando?(si: boolean): void
 const PERFIL: Record<RedId, (usuario: string) => string> = {
   tiktok: (u) => `https://www.tiktok.com/@${u}`,
   instagram: (u) => `https://www.instagram.com/${u}/`,
+  // El canal se abre en YouTube Studio, con la sesión de tu navegador.
+  youtube: () => 'https://studio.youtube.com/',
 }
 
 /**
@@ -165,7 +167,7 @@ function RedFila(props: { red: Red; conectando: 'abriendo' | 'app' | 'edge' | nu
       .finally(() => setOcupado(false))
   }
 
-  const conectar = () => (red.token ? setPegando(true) : props.onConectar())
+  const conectar = () => (red.interruptor ? guardar('si') : red.token ? setPegando(true) : props.onConectar())
   // Un token que caduca: se avisa una semana antes, o si no se sabe cuándo y la renovación está fallando.
   const caduca = red.caduca && new Date(red.caduca).toLocaleDateString('es-MX', { day: 'numeric', month: 'long' })
   const vence =
@@ -176,8 +178,9 @@ function RedFila(props: { red: Red; conectando: 'abriendo' | 'app' | 'edge' | nu
         : ''
   const opciones = [
     { value: 'perfil', label: 'Ver perfil ↗' },
-    { value: 'cambiar', label: 'Cambiar de cuenta' },
-    ...(red.token ? [{ value: 'quitar', label: 'Quitar' }] : []),
+    // YouTube cambia de canal en su fila, la de los largos.
+    ...(red.interruptor ? [] : [{ value: 'cambiar', label: 'Cambiar de cuenta' }]),
+    ...(red.interruptor ? [{ value: 'quitar', label: 'Dejar de publicar aquí' }] : red.token ? [{ value: 'quitar', label: 'Quitar' }] : []),
   ]
   function elegir(que: string) {
     if (que === 'perfil' && red.cuenta) window.open(PERFIL[red.id](red.cuenta.replace(/^@/, '')), '_blank', 'noreferrer')
@@ -199,8 +202,8 @@ function RedFila(props: { red: Red; conectando: 'abriendo' | 'app' | 'edge' | nu
           <Picker className="acciones" label={<span className="estado">{red.cuenta}</span>} value="" disabled={ocupado} groups={[{ label: 'Cuenta', options: opciones }]} onChange={elegir} />
         ) : (
           !pegando && (
-            <button className="primary" onClick={conectar}>
-              Conectar
+            <button className="primary" disabled={ocupado} onClick={conectar}>
+              {red.interruptor ? 'Activar' : 'Conectar'}
             </button>
           )
         )}
@@ -873,6 +876,19 @@ function Programar({ videos, redes, fijos = [], onClose, onHecho }: { videos: Vi
                     {f.borrador.aviso && <p className="muted small">No se pudo escribir solo ({f.borrador.aviso}). Escríbelo tú:</p>}
                     <textarea rows={3} value={f.borrador.texto} placeholder="El texto del video" onChange={(e) => cambiar(f.video.ruta, { texto: e.target.value })} />
                     <Tags tags={f.borrador.tags} onCambio={(tags) => cambiar(f.video.ruta, { tags })} placeholder="Añadir hashtag…" />
+                    {/* Lo que YouTube pide declarar, como en los largos. */}
+                    {redes.includes('youtube') && (
+                      <div className="programar-audiencia" title="Para YouTube Shorts">
+                        <label>
+                          <input type="checkbox" checked={!!f.borrador.infantil} onChange={(e) => cambiar(f.video.ruta, { infantil: e.target.checked })} />
+                          Creado para niños
+                        </label>
+                        <label>
+                          <input type="checkbox" checked={!!f.borrador.sintetico} onChange={(e) => cambiar(f.video.ruta, { sintetico: e.target.checked })} />
+                          Material sintético que parece real
+                        </label>
+                      </div>
+                    )}
                   </>
                 )}
               </div>

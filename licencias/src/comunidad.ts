@@ -1,7 +1,7 @@
 /**
  * La comunidad de Sloth: lo que la gente hace con Sloth y cómo lo hace, en un feed como el de Skool
  * (`web/src/Comunidad.tsx`). Entra quien tiene una clave activa (una cuenta gratis o un apoyo) en una computadora que ya la usa (las cabeceras
- * `x-sloth-clave` y `x-sloth-equipo`, que pone `server/comunidad.ts`), y el creador, con la llave `PUBLICAR`: él fija,
+ * `x-sloth-clave` y `x-sloth-equipo`, que pone `server/comunidad.ts`), y el creador, con su llave (`delCreador`): él fija,
  * borra lo de cualquiera, publica en Anuncios, dice cómo va cada mejora y revisa lo reportado. De cada miembro se ve su
  * `id`, su nombre y su foto, nunca su clave.
  *
@@ -12,22 +12,25 @@
  * de cada una (`likes`, `likes_comentarios`), los `reportes` y los `avisos` de cada miembro: te comentaron, te
  * respondieron, te dieron me gusta, cambió tu mejora, hay un anuncio. Lo que reportan `OCULTAR` personas deja de verse
  * (salvo para quien lo escribió y el creador) hasta que el creador lo revisa. Las imágenes y los videos van a R2
- * (`DESCARGAS`, bajo `comunidad/`) con un nombre al azar, y `GET /comunidad/archivo/<llave>` los sirve sin preguntar quién
- * eres, para que `<img>` y `<video>` los carguen directo.
+ * (`DESCARGAS`, bajo `comunidad/`) con un nombre al azar y quién los subió, y `GET /comunidad/archivo/<llave>` los sirve
+ * sin preguntar quién eres, para que `<img>` y `<video>` los carguen directo. Solo se adjunta (y así se borra) lo que uno
+ * subió (`soloSuyos`); lo que nada usa se borra a los dos días (`olvidarSueltos`).
  *
  * En Estilos, cada publicación lleva un estilo empaquetado (`server/estilos.ts`), que se instala desde ahí. Es código que
  * corre en la computadora de quien lo instala: uno nuevo, o uno al que le cambian el paquete, queda `aprobada = 0` y solo
  * lo ven quien lo compartió y el creador (le llega un aviso) hasta que lo aprueba (migración 0019).
  *
- * - `GET /comunidad?categoria=&antes=`: quién eres, los números de la comunidad y una página del feed: las fijadas y luego
- *   lo que tuvo actividad más reciente. `antes` es la `actividad` de la última que ya tienes.
+ * - `GET /comunidad?categoria=&orden=&antes=`: quién eres, los números de la comunidad y una página del feed: las fijadas
+ *   y luego lo que tuvo actividad más reciente, lo último publicado o, para el creador, lo que no ha contestado
+ *   (`consultaFeed`).
  * - `POST /comunidad/publicar` `{categoria, titulo, texto, adjuntos}`.
  * - `GET /comunidad/p/<id>`: una, con sus comentarios. `POST /comunidad/p/<id>` `{categoria?, titulo?, texto?,
  *   adjuntos?, fijada?, estado?, aprobada?}` la cambia (`aprobada`, solo el creador); `/borrar`, `/megusta`, `/comentar` `{texto, responde?, adjuntos?}` (sus
  *   imágenes, migración 0009), `/reportar`
  *   `{motivo}` y `/revisada` (el creador quita sus reportes).
  * - `POST /comunidad/c/<id>/borrar`, `/megusta`, `/reportar` y `/revisada`: lo mismo para un comentario.
- * - `GET /comunidad/avisos` (`?cuenta`: solo cuántos sin leer) y `POST /comunidad/avisos/leidos`.
+ * - `GET /comunidad/avisos` (`?cuenta`: solo cuántos sin leer, y lo que ganaste en la rifa) y `POST /comunidad/avisos/leidos`.
+ * - `/comunidad/rifa*`: la rifa del creador (`rifa.ts`).
  * - `POST /comunidad/roadmap` `{meta}`: tu voto de qué sigue (uno por miembro; el de un Fundador vale dos). Da la votación.
  * - `POST /comunidad/perfil` `{nombre?, foto?, creditos?}`: `creditos`, solo un Fundador (sale en `GET /creditos`).
  * - `PUT /comunidad/archivo`, con el archivo de cuerpo y su `content-type`: una imagen o un video (sus primeros
@@ -35,10 +38,12 @@
  * - `GET /comunidad/liberar`, solo el creador: la última versión de cada sistema y si aún es solo de quien apoya.
  *   `POST` la da a todos ya (`liberar` en `index.ts`), cuando el chat de un live cumple su meta.
  */
-import type { AdjuntoComunidad, Autor, AvisoComunidad, CategoriaComunidad, ComentarioComunidad, FeedComunidad, PublicacionComunidad, RoadmapComunidad } from '../../shared/types.ts'
-import { BLOQUEADA, CLAVE, EQUIPO, cupo, esFundador, type Env, type Fila, Rechazo, cuerpo, iguales, json, letras, liberar, servir, vigencia, vigilar } from './index.ts'
+import type { AdjuntoComunidad, Autor, AvisoComunidad, CategoriaComunidad, ComentarioComunidad, FeedComunidad, OrdenComunidad, PublicacionComunidad, RifaGanada, RoadmapComunidad } from '../../shared/types.ts'
+import { ganada, rifa } from './rifa.ts'
+import { BLOQUEADA, CLAVE, EQUIPO, cupo, delCreador, esFundador, type Env, type Fila, Rechazo, cuerpo, json, letras, liberar, servir, vigencia, vigilar } from './index.ts'
 
 export const CATEGORIAS: CategoriaComunidad[] = ['general', 'hice', 'ayuda', 'mejoras', 'estilos', 'anuncios']
+const ORDENES = ['actividad', 'recientes', 'sin-contestar'] as const satisfies readonly OrdenComunidad[]
 
 /** Las metas del roadmap que se votan: las mismas de sloth.vancci.org («Lo que viene»). Si cambian allá, cambian aquí. */
 export const METAS = [
@@ -70,8 +75,13 @@ const LLAVE = /^[a-z0-9]{20}\.(png|jpg|webp|gif|mp4|webm|mov|estilo)$/
 const IMAGEN = /\.(png|jpg|webp|gif)$/
 const ESTILO = /\.estilo$/
 const ID = /^[a-z0-9]+$/
-/** Lo más que publica, comenta o reporta cada miembro en un día (`cupo`): que un error o un abuso no llene la comunidad. */
-const AL_DIA = { publicaciones: 10, comentarios: 100, reportes: 20 }
+/**
+ * Lo más que publica, comenta, reporta o sube cada miembro en un día (`cupo`): que un error o un abuso no llene la
+ * comunidad ni la cuenta de R2. Un video pesa hasta 50 MB: van aparte, menos.
+ */
+const AL_DIA = { publicaciones: 10, comentarios: 100, reportes: 20, archivos: 60, videos: 10 }
+/** Lo subido con dueño que nada usa (una publicación que no se hizo, o un abuso) se borra pasado esto. */
+const SUELTO = 2 * 24 * 3600_000
 /** El identificador que manda la app (`server/licencia.ts`): el de la computadora resumido, o un UUID. Otro lo inventó alguien. */
 export const DE_LA_APP = /^(?:[0-9a-f]{32}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/
 
@@ -89,6 +99,16 @@ const VISTO = 10 * 60_000
 const DIA = 24 * 3600_000
 /** Cuánto se guardan los avisos. */
 const AVISOS = 60 * DIA
+
+/**
+ * Lo que es igual para todos y cuesta leer (D1 cobra por fila leída y el plan gratis corta a los 5 millones al día):
+ * cada copia del Worker lo guarda `GUARDADO` en vez de recorrer las tablas en cada visita. Los miembros y activos de
+ * hoy recorren `licencias` y `equipos` enteras; el roadmap y los créditos calculan la insignia de cada uno.
+ */
+const GUARDADO = 10 * 60_000
+let numeros: { miembros: number; activos: number; hasta: number } | undefined
+let votosGuardados: { votos: Map<string, number>; hasta: number } | undefined
+let creditosGuardados: { nombres: string[]; hasta: number } | undefined
 
 interface Miembro {
   id: string
@@ -138,7 +158,7 @@ interface ComentarioGuardado {
 /** Un adjunto como se guarda: sin URLs, que dependen de `ORIGEN`. */
 type Adjunto = Pick<AdjuntoComunidad, 'tipo' | 'llave' | 'poster' | 'vertical' | 'nombre'>
 
-export async function comunidad(req: Request, env: Env, url: URL): Promise<Response> {
+export async function comunidad(req: Request, env: Env, url: URL, ctx: ExecutionContext): Promise<Response> {
   const ruta = url.pathname
   // Lo único libre: los archivos, que se piden por un nombre que no se adivina.
   const archivo = /^\/comunidad\/archivo\/([^/]+)$/.exec(ruta)
@@ -146,6 +166,15 @@ export async function comunidad(req: Request, env: Env, url: URL): Promise<Respo
 
   const yo = await quien(req, env)
   if (ruta === '/comunidad' && req.method === 'GET') return json(await feed(env, yo, url))
+  if (ruta === '/comunidad/indice' && req.method === 'GET') {
+    const { sql, valores } = consultaIndice({ id: yo.id, creador: esCreador(yo) })
+    return json({ publicaciones: (await env.DB.prepare(sql).bind(...valores).all()).results })
+  }
+  if (ruta === '/comunidad/buscar' && req.method === 'GET') {
+    const { sql, valores } = consultaBuscar({ id: yo.id, creador: esCreador(yo) }, url.searchParams.get('q') ?? '')
+    const filas = sql ? ((await env.DB.prepare(sql).bind(...valores).all()).results as unknown as Guardada[]) : []
+    return json({ publicaciones: await armar(env, yo, filas) })
+  }
   if (ruta === '/comunidad/publicar' && req.method === 'POST') return json(await publicar(env, yo, await cuerpo(req)))
   if (ruta === '/comunidad/perfil' && req.method === 'POST') return json(await perfil(env, yo, await cuerpo(req)))
   if (ruta === '/comunidad/roadmap' && req.method === 'POST') {
@@ -154,14 +183,16 @@ export async function comunidad(req: Request, env: Env, url: URL): Promise<Respo
     await env.DB.prepare('INSERT INTO votos (miembro, meta, creado) VALUES (?, ?, ?) ON CONFLICT (miembro) DO UPDATE SET meta = excluded.meta, creado = excluded.creado')
       .bind(yo.id, meta, new Date().toISOString())
       .run()
-    return json(await roadmap(env, yo))
+    // Quien vota ve su voto contado al momento.
+    return json(await roadmap(env, yo, true))
   }
   if (ruta === '/comunidad/avisos' && req.method === 'GET') return json(await avisos(env, yo, url.searchParams.has('cuenta')))
   if (ruta === '/comunidad/avisos/leidos' && req.method === 'POST') {
     await env.DB.prepare('UPDATE avisos SET leido = 1 WHERE para = ? AND leido = 0').bind(yo.id).run()
     return json({ ok: true })
   }
-  if (ruta === '/comunidad/archivo' && req.method === 'PUT') return json(await subir(req, env))
+  if (ruta === '/comunidad/archivo' && req.method === 'PUT') return json(await subir(req, env, yo))
+  if (ruta === '/comunidad/rifa' || ruta.startsWith('/comunidad/rifa/')) return json(await rifa(req, env, ctx, { id: yo.id, clave: yo.clave, nombre: yo.nombre, creador: esCreador(yo) }, ruta))
   if (ruta === '/comunidad/liberar' && (req.method === 'GET' || req.method === 'POST')) {
     if (!esCreador(yo)) throw new Rechazo(403, 'Eso solo lo hace el creador de Sloth.')
     return json(await liberar(env, req.method === 'POST'))
@@ -192,14 +223,14 @@ export async function comunidad(req: Request, env: Env, url: URL): Promise<Respo
 }
 
 /**
- * Quién pide: el creador, con la llave `PUBLICAR`, o una clave activa en una computadora que la usa. Quien entra por
+ * Quién pide: el creador, con su llave (`delCreador`), o una clave activa en una computadora que la usa. Quien entra por
  * primera vez queda como miembro, sin nombre: lo pone al publicar o comentar. Las claves de un mismo correo (su cuenta
  * gratis y la de su apoyo) son el mismo miembro.
  */
 async function quien(req: Request, env: Env): Promise<Miembro> {
   const ahora = Date.now()
   let clave = CREADOR
-  if (!env.PUBLICAR || !iguales(req.headers.get('authorization') ?? '', `Bearer ${env.PUBLICAR}`)) {
+  if (!delCreador(req, env)) {
     clave = (req.headers.get('x-sloth-clave') ?? '').replace(/\s+/g, '').toUpperCase()
     const equipo = req.headers.get('x-sloth-equipo') ?? ''
     const fila =
@@ -277,40 +308,137 @@ function aviso(env: Env, para: string, de: Miembro, tipo: AvisoComunidad['tipo']
   ]
 }
 
-/** La página del feed, con quién eres y los números de la comunidad. */
-async function feed(env: Env, yo: Miembro, url: URL): Promise<FeedComunidad> {
-  const categoria = url.searchParams.get('categoria') ?? ''
-  const antes = url.searchParams.get('antes') ?? ''
+/**
+ * La consulta de una página del feed. `orden`: `actividad` (las fijadas y luego lo último comentado), `recientes` (lo
+ * último publicado, sin fijadas arriba) o `sin-contestar`, solo del creador: donde la última palabra (el último
+ * comentario o, sin comentarios, la publicación) no es suya, por actividad. `antes` es la `actividad` (o la `creada`,
+ * en `recientes`) de la última que ya tienes.
+ */
+export function consultaFeed(yo: { id: string; creador: boolean }, p: { categoria: string; antes: string; orden: string }): { sql: string; valores: (string | number)[] } {
+  const orden = (ORDENES as readonly string[]).includes(p.orden) ? (p.orden as OrdenComunidad) : p.orden ? null : 'actividad'
+  if (!orden) throw new Rechazo(400, 'Ese orden no existe.')
+  if (orden === 'sin-contestar' && !yo.creador) throw new Rechazo(403, 'Eso solo lo ve el creador de Sloth.')
   const donde: string[] = []
   const valores: (string | number)[] = []
-  if (categoria) {
-    if (!CATEGORIAS.includes(categoria as CategoriaComunidad)) throw new Rechazo(400, 'Esa sección no existe.')
+  if (p.categoria) {
+    if (!CATEGORIAS.includes(p.categoria as CategoriaComunidad)) throw new Rechazo(400, 'Esa sección no existe.')
     donde.push('categoria = ?')
-    valores.push(categoria)
+    valores.push(p.categoria)
   }
-  if (!esCreador(yo)) donde.push('((reportes < ? AND aprobada = 1) OR autor = ?)'), valores.push(OCULTAR, yo.id)
-  // Las fijadas van solo en la primera página; las siguientes siguen por actividad.
-  if (antes) donde.push('fijada = 0 AND actividad < ?'), valores.push(antes)
-  const sql = `SELECT * FROM publicaciones${donde.length ? ` WHERE ${donde.join(' AND ')}` : ''} ORDER BY ${antes ? '' : 'fijada DESC, '}actividad DESC LIMIT ${PAGINA + 1}`
-  const haceUnDia = new Date(Date.now() - DIA).toISOString()
-  const ahora = new Date().toISOString()
-  const [pubs, cuentas] = await env.DB.batch([
+  if (!yo.creador) donde.push('((reportes < ? AND aprobada = 1) OR autor = ?)'), valores.push(OCULTAR, yo.id)
+  if (orden === 'sin-contestar')
+    donde.push('COALESCE((SELECT c.autor FROM comentarios c WHERE c.publicacion = publicaciones.id ORDER BY c.creada DESC LIMIT 1), autor) != ?'), valores.push(yo.id)
+  const columna = orden === 'recientes' ? 'creada' : 'actividad'
+  // En `actividad`, las fijadas van solo en la primera página; las siguientes siguen por actividad.
+  const fijadas = orden === 'actividad'
+  if (p.antes) donde.push(`${fijadas ? 'fijada = 0 AND ' : ''}${columna} < ?`), valores.push(p.antes)
+  const sql = `SELECT * FROM publicaciones${donde.length ? ` WHERE ${donde.join(' AND ')}` : ''} ORDER BY ${fijadas && !p.antes ? 'fijada DESC, ' : ''}${columna} DESC LIMIT ${PAGINA + 1}`
+  return { sql, valores }
+}
+
+/** `col` en minúsculas y sin acentos, en SQL: así «robotica» encuentra «Robótica». */
+const sinAcentos = (col: string) =>
+  [
+    ...[...'áàâäãÁÀÂÄÃ'].map((c) => [c, 'a']),
+    ...[...'éèêëÉÈÊË'].map((c) => [c, 'e']),
+    ...[...'íìîïÍÌÎÏ'].map((c) => [c, 'i']),
+    ...[...'óòôöõÓÒÔÖÕ'].map((c) => [c, 'o']),
+    ...[...'úùûüÚÙÛÜ'].map((c) => [c, 'u']),
+    ['ç', 'c'],
+    ['Ç', 'c'],
+    ['Ñ', 'ñ']
+  ].reduce((e, [de, a]) => `REPLACE(${e}, '${de}', '${a}')`, `LOWER(${col})`)
+/** Lo que se escribe en el buscador, como lo compara `sinAcentos`: sus palabras, sin acentos y en minúsculas. */
+export const palabrasDe = (q: string) =>
+  q
+    .toLowerCase()
+    .normalize('NFD')
+    // Fuera los acentos y la diéresis; la tilde de la ñ (U+0303) se queda.
+    .replace(/[\u0300-\u0302\u0304-\u036f]/g, '')
+    .normalize('NFC')
+    // La ã y la õ (portugués) llevan la misma marca que la ñ: van aparte.
+    .replace(/ã/g, 'a')
+    .replace(/õ/g, 'o')
+    .split(/[^\p{L}\p{N}]+/u)
+    .filter(Boolean)
+    .slice(0, 6)
+/** Lo que más sale en una búsqueda. */
+const RESULTADOS = 20
+
+/**
+ * La consulta del buscador: las publicaciones donde está cada palabra (en el título, el texto o algún comentario), lo
+ * que `yo` puede ver; primero las que la tienen en el título y luego por actividad. Sin palabras, ninguna (`sql` vacío).
+ */
+export function consultaBuscar(yo: { id: string; creador: boolean }, q: string): { sql: string; valores: (string | number)[] } {
+  const palabras = palabrasDe(q)
+  if (!palabras.length) return { sql: '', valores: [] }
+  const donde: string[] = []
+  const valores: (string | number)[] = []
+  // Las palabras solo llevan letras y números (`palabrasDe`): ni `%` ni `_` llegan al LIKE.
+  const comoTexto = (p: string) => `%${p}%`
+  // Un comentario oculto (reportado por `OCULTAR`) no cuenta, salvo el tuyo o para el creador: así no se adivina su texto.
+  const comentarioVisible = yo.creador ? '' : ' AND (comentarios.reportes < ? OR comentarios.autor = ?)'
+  for (const p of palabras) {
+    donde.push(
+      `(${sinAcentos('titulo')} LIKE ? OR ${sinAcentos('texto')} LIKE ? OR id IN (SELECT publicacion FROM comentarios WHERE ${sinAcentos('comentarios.texto')} LIKE ?${comentarioVisible}))`
+    )
+    valores.push(comoTexto(p), comoTexto(p), comoTexto(p), ...(yo.creador ? [] : [OCULTAR, yo.id]))
+  }
+  if (!yo.creador) donde.push('((reportes < ? AND aprobada = 1) OR autor = ?)'), valores.push(OCULTAR, yo.id)
+  const enTitulo = palabras.map(() => `${sinAcentos('titulo')} LIKE ?`).join(' AND ')
+  valores.push(...palabras.map(comoTexto))
+  return { sql: `SELECT * FROM publicaciones WHERE ${donde.join(' AND ')} ORDER BY (${enTitulo}) DESC, actividad DESC LIMIT ${RESULTADOS}`, valores }
+}
+
+/** Lo que más trae el índice del buscador. */
+const EN_INDICE = 2000
+
+/**
+ * El índice del buscador de la app: de cada publicación que `yo` puede ver (las `EN_INDICE` más activas), su título, el
+ * principio del texto, la sección, el nombre de quien la escribió y sus fechas. Con él, la app encuentra al instante lo
+ * que está en un título; lo demás (el texto entero, los comentarios) lo busca `consultaBuscar`.
+ */
+export function consultaIndice(yo: { id: string; creador: boolean }): { sql: string; valores: (string | number)[] } {
+  const visible = yo.creador ? '' : ' WHERE ((p.reportes < ? AND p.aprobada = 1) OR p.autor = ?)'
+  return {
+    sql: `SELECT p.id, p.titulo, substr(p.texto, 1, 300) AS texto, p.categoria, p.creada, p.actividad, COALESCE(m.nombre, '') AS autor FROM publicaciones p LEFT JOIN miembros m ON m.id = p.autor${visible} ORDER BY p.actividad DESC LIMIT ${EN_INDICE}`,
+    valores: yo.creador ? [] : [OCULTAR, yo.id]
+  }
+}
+
+/** La página del feed, con quién eres y los números de la comunidad. */
+async function feed(env: Env, yo: Miembro, url: URL): Promise<FeedComunidad> {
+  const { sql, valores } = consultaFeed(
+    { id: yo.id, creador: esCreador(yo) },
+    { categoria: url.searchParams.get('categoria') ?? '', antes: url.searchParams.get('antes') ?? '', orden: url.searchParams.get('orden') ?? '' }
+  )
+  const ahora = Date.now()
+  const contar = !numeros || numeros.hasta < ahora
+  const [pubs, cuentas, totales] = await env.DB.batch([
     env.DB.prepare(sql).bind(...valores),
     env.DB.prepare(
       `SELECT
-        (SELECT COUNT(*) FROM licencias WHERE estado IN ('authorized', 'gratis') OR pagado_hasta > ?) AS miembros,
-        (SELECT COUNT(DISTINCT clave) FROM equipos WHERE visto > ?) AS activos,
         (SELECT COUNT(*) FROM publicaciones WHERE autor = ?) AS publicaciones,
         (SELECT COUNT(*) FROM comentarios WHERE autor = ?) AS comentarios,
         (SELECT COUNT(*) FROM avisos WHERE para = ? AND leido = 0) AS avisos`
-    ).bind(ahora, haceUnDia, yo.id, yo.id, yo.id)
+    ).bind(yo.id, yo.id, yo.id),
+    ...(contar
+      ? [
+          env.DB.prepare(
+            `SELECT
+              (SELECT COUNT(*) FROM licencias WHERE estado IN ('authorized', 'gratis') OR pagado_hasta > ?) AS miembros,
+              (SELECT COUNT(DISTINCT clave) FROM equipos WHERE visto > ?) AS activos`
+          ).bind(new Date(ahora).toISOString(), new Date(ahora - DIA).toISOString())
+        ]
+      : [])
   ])
+  if (totales) numeros = { ...(totales.results[0] as { miembros: number; activos: number }), hasta: ahora + GUARDADO }
   const filas = pubs.results as unknown as Guardada[]
-  const n = cuentas.results[0] as { miembros: number; activos: number; publicaciones: number; comentarios: number; avisos: number }
+  const n = cuentas.results[0] as { publicaciones: number; comentarios: number; avisos: number }
   return {
     yo: { ...autor(env, yo), creditos: !!yo.creditos, publicaciones: n.publicaciones, comentarios: n.comentarios },
-    miembros: n.miembros,
-    activos: n.activos,
+    miembros: numeros!.miembros,
+    activos: numeros!.activos,
     avisos: n.avisos,
     roadmap: await roadmap(env, yo),
     publicaciones: await armar(env, yo, filas.slice(0, PAGINA)),
@@ -475,6 +603,7 @@ async function publicar(env: Env, yo: Miembro, c: Record<string, unknown>): Prom
   const adjuntos = adjuntosDe(c.adjuntos)
   if (!titulo && !cuerpoTexto && !adjuntos.length) throw new Rechazo(400, 'Escribe algo o agrega una imagen.')
   estiloEnSuSitio(categoria, adjuntos)
+  await soloSuyos(env, yo, llavesDe(JSON.stringify(adjuntos)))
   if (!esCreador(yo) && !(await conCupo(env, yo, 'publicaciones')))
     throw new Rechazo(429, `Ya publicaste ${AL_DIA.publicaciones} veces hoy. Mañana sigues.`)
   const ahora = new Date().toISOString()
@@ -523,7 +652,11 @@ async function cambiar(env: Env, yo: Miembro, f: Guardada, c: Record<string, unk
   if (c.categoria !== undefined) nueva.categoria = categoriaDe(c.categoria, yo)
   if (c.titulo !== undefined) nueva.titulo = texto(c.titulo, 140)
   if (c.texto !== undefined) nueva.texto = texto(c.texto, 20_000)
-  if (c.adjuntos !== undefined) nueva.adjuntos = JSON.stringify(adjuntosDe(c.adjuntos))
+  if (c.adjuntos !== undefined) {
+    nueva.adjuntos = JSON.stringify(adjuntosDe(c.adjuntos))
+    // Los que ya llevaba siguen; los nuevos, solo si los subió quien la escribe.
+    await soloSuyos(env, yo, llavesDe(nueva.adjuntos), llavesDe(f.adjuntos))
+  }
   if (contenido && !nueva.titulo && !nueva.texto && nueva.adjuntos === '[]') throw new Rechazo(400, 'No puede quedar vacía: bórrala.')
   if (contenido) nueva.editada = new Date().toISOString()
   if (c.fijada !== undefined) nueva.fijada = c.fijada ? 1 : 0
@@ -600,6 +733,7 @@ async function comentar(env: Env, yo: Miembro, f: Guardada, c: Record<string, un
   const t = texto(c.texto, 5000)
   const fotos = fotosDeComentario(c.adjuntos)
   if (!t && !fotos.length) throw new Rechazo(400, 'Escribe tu comentario o agrega una imagen.')
+  await soloSuyos(env, yo, llavesDe(JSON.stringify(fotos)))
   if (!esCreador(yo) && !(await conCupo(env, yo, 'comentarios'))) throw new Rechazo(429, 'Ya comentaste mucho hoy. Mañana sigues.')
   let padre: ComentarioGuardado | null = null
   if (c.responde) {
@@ -669,9 +803,13 @@ async function revisada(env: Env, yo: Miembro, tabla: 'publicaciones' | 'comenta
 }
 
 /** Tus avisos, del más nuevo al más viejo, y cuántos sin leer. Con `soloCuenta`, solo cuántos (para la barra lateral). */
-async function avisos(env: Env, yo: Miembro, soloCuenta: boolean): Promise<{ avisos?: AvisoComunidad[]; sinLeer: number }> {
+async function avisos(env: Env, yo: Miembro, soloCuenta: boolean): Promise<{ avisos?: AvisoComunidad[]; sinLeer: number; rifa?: RifaGanada }> {
   const cuenta = env.DB.prepare('SELECT COUNT(*) AS n FROM avisos WHERE para = ? AND leido = 0').bind(yo.id)
-  if (soloCuenta) return { sinLeer: (await cuenta.first<{ n: number }>())?.n ?? 0 }
+  // Con la cuenta va lo que ganaste en la rifa y aún no ves: la app lo pide cada dos minutos y saca su aviso.
+  if (soloCuenta) {
+    const [n, gane] = await Promise.all([cuenta.first<{ n: number }>(), ganada(env, yo.id)])
+    return { sinLeer: n?.n ?? 0, ...(gane ? { rifa: gane } : {}) }
+  }
   const [, filas, n] = await env.DB.batch([
     env.DB.prepare('DELETE FROM avisos WHERE para = ? AND creado < ?').bind(yo.id, new Date(Date.now() - AVISOS).toISOString()),
     env.DB.prepare(
@@ -705,6 +843,7 @@ async function perfil(env: Env, yo: Miembro, c: Record<string, unknown>): Promis
   if (c.foto !== undefined) {
     foto = typeof c.foto === 'string' && LLAVE.test(c.foto) && IMAGEN.test(c.foto) ? c.foto : null
     if (c.foto && !foto) throw new Rechazo(400, 'La foto debe ser una imagen.')
+    if (foto) await soloSuyos(env, yo, [foto], yo.foto ? [yo.foto] : [])
   }
   if (c.creditos === true && yo.insignia !== 'fundador') throw new Rechazo(403, 'Los créditos de la página son de los Fundadores.')
   const creditos = c.creditos === undefined ? yo.creditos : c.creditos === true ? 1 : 0
@@ -714,18 +853,29 @@ async function perfil(env: Env, yo: Miembro, c: Record<string, unknown>): Promis
 }
 
 /** La votación del roadmap, como la ve `yo`: los votos de cada meta (el de un Fundador vale dos) y el suyo. */
-async function roadmap(env: Env, yo: Miembro): Promise<RoadmapComunidad> {
-  const { results } = await env.DB.prepare(`SELECT v.miembro, v.meta, ${insignia(env)} FROM votos v JOIN miembros m ON m.id = v.miembro`).all<{ miembro: string; meta: string; insignia: string | null }>()
-  const votos = new Map<string, number>()
-  for (const v of results) votos.set(v.meta, (votos.get(v.meta) ?? 0) + (v.insignia === 'fundador' ? 2 : 1))
-  const mio = results.find((v) => v.miembro === yo.id)?.meta
+async function roadmap(env: Env, yo: Miembro, recontar = false): Promise<RoadmapComunidad> {
+  const ahora = Date.now()
+  const [mio] = await Promise.all([
+    env.DB.prepare('SELECT meta FROM votos WHERE miembro = ?').bind(yo.id).first<string>('meta'),
+    (async () => {
+      if (!recontar && votosGuardados && votosGuardados.hasta > ahora) return
+      const { results } = await env.DB.prepare(`SELECT v.meta, ${insignia(env)} FROM votos v JOIN miembros m ON m.id = v.miembro`).all<{ meta: string; insignia: string | null }>()
+      const votos = new Map<string, number>()
+      for (const v of results) votos.set(v.meta, (votos.get(v.meta) ?? 0) + (v.insignia === 'fundador' ? 2 : 1))
+      votosGuardados = { votos, hasta: ahora + GUARDADO }
+    })()
+  ])
+  const votos = votosGuardados!.votos
   return { metas: METAS.map((m) => ({ ...m, votos: votos.get(m.id) ?? 0 })), ...(mio ? { mio } : {}) }
 }
 
 /** Los nombres de los Fundadores que pidieron salir en los créditos de sloth.vancci.org, del primero al último. */
 export async function creditos(env: Env): Promise<string[]> {
+  if (creditosGuardados && creditosGuardados.hasta > Date.now()) return creditosGuardados.nombres
   const { results } = await env.DB.prepare(`SELECT m.nombre, ${insignia(env)} FROM miembros m WHERE m.creditos = 1 AND m.nombre != '' ORDER BY m.creado`).all<Pick<Miembro, 'nombre' | 'insignia'>>()
-  return results.filter((m) => m.insignia === 'fundador').map((m) => m.nombre)
+  const nombres = results.filter((m) => m.insignia === 'fundador').map((m) => m.nombre)
+  creditosGuardados = { nombres, hasta: Date.now() + GUARDADO }
+  return nombres
 }
 
 /** El tipo de un archivo y su llave nueva, si se acepta y no pesa de más. */
@@ -740,14 +890,63 @@ function aceptar(contentType: string, bytes: number): { tipo: AdjuntoComunidad['
 const pesoLegible = (b: number) => `${b / 1024 ** 2} MB`
 const metadatos = (contentType: string) => ({ httpMetadata: { contentType, cacheControl: 'public, max-age=31536000, immutable' } })
 
-/** Una imagen, un video o un estilo. */
-async function subir(req: Request, env: Env): Promise<{ llave: string; url: string }> {
+/** Una imagen, un video o un estilo, con quién lo subió (`miembro`, ver `soloSuyos`), pocos al día. */
+async function subir(req: Request, env: Env, yo: Miembro): Promise<{ llave: string; url: string }> {
   const bytes = Number(req.headers.get('content-length'))
   const a = aceptar(req.headers.get('content-type') ?? '', bytes)
   if (!req.body) throw new Rechazo(411, 'Falta el archivo.')
-  await env.DESCARGAS.put(`comunidad/${a.llave}`, req.body, metadatos(a.contentType))
+  if (!esCreador(yo) && !(await conCupo(env, yo, a.tipo === 'video' ? 'videos' : 'archivos')))
+    throw new Rechazo(429, `Ya subiste muchos ${a.tipo === 'video' ? 'videos' : 'archivos'} hoy. Mañana sigues.`)
+  await env.DESCARGAS.put(`comunidad/${a.llave}`, req.body, { ...metadatos(a.contentType), customMetadata: { miembro: yo.id } })
   return { llave: a.llave, url: urlDe(env, a.llave) }
 }
+
+/**
+ * Que cada llave nueva (las que no estén en `ya`) la haya subido `yo`: las llaves se ven en el feed, y con la de otro se
+ * podría poner su archivo en lo tuyo y luego borrarlo al editar. El creador usa cualquiera.
+ */
+async function soloSuyos(env: Env, yo: Miembro, llaves: string[], ya: string[] = []) {
+  if (esCreador(yo)) return
+  for (const llave of new Set(llaves.filter((l) => !ya.includes(l)))) {
+    const cabeza = await env.DESCARGAS.head(`comunidad/${llave}`)
+    if (!cabeza) throw new Rechazo(400, 'Ese archivo ya no está: súbelo otra vez.')
+    if (!esDe(cabeza.customMetadata, yo.id)) throw new Rechazo(400, 'Ese archivo no lo subiste tú: súbelo otra vez.')
+  }
+}
+
+/** Si los metadatos de un archivo de R2 dicen que lo subió `miembro`. */
+export const esDe = (metadatos: Record<string, string> | undefined, miembro: string) => metadatos?.miembro === miembro
+
+/**
+ * Cada mañana: lo subido con dueño (desde que se anota, ver `subir`) que pasado `SUELTO` nada usa (ni una publicación,
+ * ni un comentario, ni una foto de perfil) se borra.
+ */
+export async function olvidarSueltos(env: Env, ahora = Date.now()) {
+  const viejos: string[] = []
+  let cursor: string | undefined
+  do {
+    const r = await env.DESCARGAS.list({ prefix: 'comunidad/', cursor, include: ['customMetadata'] })
+    for (const o of r.objects) if (o.customMetadata?.miembro && ahora - o.uploaded.getTime() > SUELTO) viejos.push(o.key.slice('comunidad/'.length))
+    cursor = r.truncated ? r.cursor : undefined
+  } while (cursor)
+  if (!viejos.length) return
+  const usadas = new Set<string>()
+  for (const sql of [
+    "SELECT coalesce(adjuntos, '') || ' ' || coalesce(texto, '') AS t FROM publicaciones",
+    "SELECT coalesce(adjuntos, '') || ' ' || coalesce(texto, '') AS t FROM comentarios",
+    'SELECT foto AS t FROM miembros WHERE foto IS NOT NULL'
+  ]) {
+    const { results } = await env.DB.prepare(sql).all<{ t: string }>()
+    for (const r of results) for (const l of llavesEn(r.t)) usadas.add(l)
+  }
+  await quitarArchivos(env, sueltos(viejos, usadas))
+}
+
+/** Las llaves de la comunidad que aparecen en `texto` (un JSON de adjuntos, un texto con enlaces o una foto). */
+export const llavesEn = (texto: string) => [...texto.matchAll(/[a-z0-9]{20}\.(?:png|jpg|webp|gif|mp4|webm|mov|estilo)/g)].map((m) => m[0])
+
+/** De `viejas`, las que nada usa. */
+export const sueltos = (viejas: string[], usadas: Set<string>) => viejas.filter((l) => !usadas.has(l))
 
 async function servirArchivo(req: Request, env: Env, llave: string): Promise<Response> {
   const cabeza = LLAVE.test(llave) ? await env.DESCARGAS.head(`comunidad/${llave}`) : null

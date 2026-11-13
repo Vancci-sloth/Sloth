@@ -1,7 +1,7 @@
 // Publica un anuncio en la comunidad como el creador: va a Anuncios y a todos les llega su aviso. Lo usa el agente que
 // publica una versión (docs/agents/publicacion.md), con el texto que escribió en el tono de docs/agents/anuncios.md.
-// El archivo lleva el título en el primer renglón y el texto debajo. La llave es la de `npm run publicar`
-// (%APPDATA%\sloth\licencias\publicar.txt). Si ya hay un anuncio tuyo con ese título, no lo repite.
+// El archivo lleva el título en el primer renglón y el texto debajo. La llave es la del creador
+// (%APPDATA%\sloth\licencias\admin.txt; sin ella, publicar.txt). Si ya hay un anuncio tuyo con ese título, no lo repite.
 //   node scripts/anuncio.mjs <archivo> [--probar]   (--probar: dice qué publicaría, sin publicar)
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
@@ -19,7 +19,21 @@ if (!titulo || !texto) {
   console.error('Falta el título (primer renglón) o el texto (debajo).')
   process.exit(1)
 }
-const LLAVE = (process.env.PUBLICAR || readFileSync(join(process.env.APPDATA ?? '', 'sloth', 'licencias', 'publicar.txt'), 'utf8')).trim()
+const LLAVE = llaveDelCreador()
+
+/** La de `admin.txt` (administra, no publica); sin ella, la de `publicar.txt`. */
+function llaveDelCreador() {
+  const env = (process.env.SLOTH_ADMIN || process.env.PUBLICAR || '').trim()
+  if (env) return env
+  for (const a of ['admin.txt', 'publicar.txt'])
+    try {
+      return readFileSync(join(process.env.APPDATA ?? '', 'sloth', 'licencias', a), 'utf8').trim()
+    } catch {
+      // No está: la siguiente.
+    }
+  console.error('Falta la llave del creador: %APPDATA%\\sloth\\licencias\\admin.txt.')
+  process.exit(1)
+}
 
 async function comunidad(ruta, cuerpo) {
   const r = await fetch(`${COBRO}/comunidad${ruta}`, {

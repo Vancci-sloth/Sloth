@@ -419,6 +419,68 @@ def ffmpeg(*args: str) -> None:
     subprocess.run(["ffmpeg", "-nostdin", "-y", "-v", "error", *args], check=True)
 
 
+# El codificador de H.264 que se eligió, compartido con `codificadorH264` de ffmpeg.mjs (mismo archivo, mismo formato).
+CODIFICADOR_H264 = Path(tempfile.gettempdir()) / "sloth-h264.json"
+
+
+def codificador_h264() -> str:
+    """
+    `h264_nvenc` (la NVIDIA, varias veces más rápido que x264 en el procesador) si FFmpeg lo trae y de verdad codifica,
+    o `libx264`. Lo mismo que `codificadorH264` de ffmpeg.mjs: se prueba con un cuadro, una vez, y se recuerda un día.
+    `SLOTH_SIN_NVENC=1` lo apaga.
+    """
+    if os.environ.get("SLOTH_SIN_NVENC"):
+        return "libx264"
+    try:
+        c = json.loads(CODIFICADOR_H264.read_text(encoding="utf-8"))
+        if time.time() * 1000 - c["t"] < 86_400_000 and c["cod"] in ("h264_nvenc", "libx264"):
+            return c["cod"]
+    except (OSError, ValueError, KeyError, TypeError):
+        pass
+    try:
+        r = subprocess.run(["ffmpeg", "-hide_banner", "-nostdin", "-v", "error", "-f", "lavfi", "-i",
+                            "color=c=black:s=256x256:r=30:d=0.2", "-c:v", "h264_nvenc", "-preset", "p5", "-f", "null", "-"],
+                           capture_output=True, timeout=20)
+        cod = "h264_nvenc" if r.returncode == 0 else "libx264"
+    except (OSError, subprocess.TimeoutExpired):
+        cod = "libx264"
+    try:
+        CODIFICADOR_H264.write_text(json.dumps({"cod": cod, "t": int(time.time() * 1000)}), encoding="utf-8")
+    except OSError:
+        pass
+    return cod
+
+
+def ajustes_h264(cod: str, crf: int = 16) -> list[str]:
+    """Los de `ajustesH264` de ffmpeg.mjs: en NVENC, calidad constante con cq = crf + 3 (se ve como x264 a ese crf)."""
+    if cod == "h264_nvenc":
+        return ["-c:v", "h264_nvenc", "-preset", "p5", "-rc", "vbr", "-cq", str(crf + 3), "-b:v", "0"]
+    return ["-c:v", "libx264", "-crf", str(crf), "-preset", "medium"]
+
+
+def ffmpeg_h264(armar, crf: int = 16, cwd: Path | str | None = None) -> str:
+    """
+    FFmpeg con H.264, como `ffmpegH264` de ffmpeg.mjs: `armar(ajustes)` da los argumentos (sin `ffmpeg -y -v error`)
+    con los ajustes de `ajustes_h264` donde van. Si NVENC falla (la tarjeta ocupada por otro render, sin memoria), se
+    repite con libx264. Devuelve el codificador que lo hizo.
+    """
+    def correr(cod: str) -> subprocess.CompletedProcess:
+        return subprocess.run(["ffmpeg", "-nostdin", "-y", "-v", "error", *armar(ajustes_h264(cod, crf))], cwd=cwd,
+                              capture_output=True, text=True, encoding="utf-8", errors="replace")
+
+    if codificador_h264() == "h264_nvenc":
+        r = correr("h264_nvenc")
+        if r.returncode == 0:
+            return "h264_nvenc"
+        ultima = (r.stderr.strip().splitlines() or [""])[-1][:200]
+        print(f"NVENC no pudo ({ultima}): sigo con libx264.", file=sys.stderr)
+    r = correr("libx264")
+    if r.returncode != 0:
+        sys.stderr.write(r.stderr)
+        raise subprocess.CalledProcessError(r.returncode, r.args, r.stdout, r.stderr)
+    return "libx264"
+
+
 def wav16k(origen: Path, destino: Path) -> None:
     ffmpeg("-i", str(origen), "-ac", "1", "-ar", "16000", "-c:a", "pcm_s16le", str(destino))
 

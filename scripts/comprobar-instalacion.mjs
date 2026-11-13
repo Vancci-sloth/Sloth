@@ -47,5 +47,11 @@ try {
   ejecutar(join(destino, 'Uninstall Sloth.exe'), ['/S'])
   console.log('El instalador real instala, actualiza, conserva los datos y se desinstala.')
 } finally {
-  rmSync(base, { recursive: true, force: true })
+  // El desinstalador suelta la carpeta unos segundos después de salir (EPERM): se reintenta, y si sigue tomada se deja,
+  // que el Windows de GitHub se tira al acabar. La prueba ya pasó o falló antes de aquí.
+  try {
+    rmSync(base, { recursive: true, force: true, maxRetries: 10, retryDelay: 1000 })
+  } catch (e) {
+    console.warn(`No se pudo borrar ${base}: ${e.message}`)
+  }
 }

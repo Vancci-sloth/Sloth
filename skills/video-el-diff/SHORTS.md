@@ -30,16 +30,16 @@ todo se quedaba fuera del short.
 1. **Proyecto.** `python <skill>/scripts/nuevo.py <Carpeta>` si el mensaje trae la línea `Carpeta:` (la pone Sloth);
    si no, `python <skill>/scripts/nuevo.py <tema-corto>`. No escribas `shorts.md`: este hilo es el short, y así
    el panel de Sloth enseña sus etapas (Guion, Tu voz, Escenas…). Listo cuando la carpeta existe.
-2. **Fuentes, sin el agente de pantalla.** Del paso 2 de la fase 1 de [`SKILL.md`](SKILL.md), `fuente.py` y la
-   transcripción completa. El agente de pantalla todavía no: aún no sabes qué minutos vas a contar. Listo cuando tienes
-   la transcripción.
+2. **Fuentes.** Del paso 1 de [`SKILL.md`](SKILL.md), `fuente.py` y la transcripción completa
+   (`fuentes/tema/transcripcion.txt`). Listo cuando la tienes.
 3. **El SMP.** Con la transcripción, elige el SMP que más engancha y mejor se entiende solo, y que cabe en la
    `Duración:` (180 palabras por minuto). Escríbelo en `short.json`, con la forma de una entrada de `shorts.json` (ver
    [El plan](#el-plan)), y di en una línea por qué ese y qué otros SMP saldrían, por si quiere más. Listo cuando
    `short.json` existe.
-4. **Material, solo el de tu SMP.** El agente de pantalla solo sobre los minutos que vas a citar, y las capturas de
-   [`MATERIAL.md`](MATERIAL.md#capturas-para-el-celular) solo de lo que piden tus cinco puntos. Recodifica el video del tema como en
-   el paso 3 del plan. Listo cuando cada dato de tus cinco puntos tiene su fuente primaria y su archivo en `material.md`.
+4. **Los datos, solo los de tu SMP.** El paso 2 de [`SKILL.md`](SKILL.md) (`fuentes/datos.json` y `citas.py`) solo con
+   lo que piden tus cinco puntos. Para ver qué hay en pantalla en un minuto del video del tema:
+   `python <skill>/scripts/cuadros.py hoja fuentes/tema/video.mp4 <desde> <hasta> <paso> <png>`. Listo cuando cada dato de
+   tus cinco puntos tiene su cita.
 5. **Guion, voz y video.** Los pasos 2 a 5 de [Un short](#un-short), con tu `short.json` y tu `material.md` en vez de
    los del plan.
 
@@ -49,13 +49,12 @@ todo se quedaba fuera del short.
    <Carpeta>`. Si no, `python <skill>/scripts/nuevo.py <tema-corto>` (por ejemplo `mistral-large-4`). Esa carpeta es el
    plan: la de cada short será `<plan>-s1`, `<plan>-s2`... Escribe ya `shorts.md` con el tema en un renglón: así el
    panel de Sloth sabe que este hilo es un plan y enseña sus etapas. Listo cuando la carpeta y `shorts.md` existen.
-2. **Fuentes.** El paso 2 de la fase 1 de [`SKILL.md`](SKILL.md): `fuente.py`, la transcripción completa y el agente de
-   pantalla. Listo cuando sabes en qué segundo pasa cada cosa que vale la pena contar.
-3. **Investigación y material.** El paso 3 de la fase 1, con las capturas para el celular de
-   [`MATERIAL.md`](MATERIAL.md#capturas-para-el-celular). El material sirve a todos los shorts del plan: captura una vez lo que
-   cualquiera de ellos pueda citar. Recodifica aquí el video del tema (`public/clips/tema.mp4`, la receta del paso 2 de
-   la fase 2): los shorts lo enlazan en vez de recodificarlo cada uno. Listo cuando cada dato tiene su fuente primaria y
-   su archivo en `material.md`.
+2. **Fuentes.** El paso 1 de [`SKILL.md`](SKILL.md): `fuente.py`, la transcripción completa y lo que enlaza el tema.
+   Listo cuando sabes en qué segundo pasa cada cosa que vale la pena contar.
+3. **Los datos.** El paso 2 de [`SKILL.md`](SKILL.md): `fuentes/datos.json` y `citas.py`, con todo lo que cualquiera de
+   los shorts pueda citar. Recodifica aquí el video del tema (`python <skill>/scripts/material.py`, que deja
+   `public/clips/tema.mp4`): los shorts lo enlazan en vez de recodificarlo cada uno. Listo cuando cada dato tiene su cita
+   en `fuentes/fichas/citas.json`.
 4. **Los SMP.** Lista todo lo relevante del tema (los datos, los giros, los chistes que salen solos) y agrúpalo en el
    mínimo de SMP que lo cuenta todo. Dos ideas que se dicen en una frase son un SMP; una idea que pide dos frases son
    dos. El número no lo fija lo que pidió el usuario, sino el material. Cada SMP cabe en la `Duración:` (180 palabras
@@ -65,7 +64,7 @@ todo se quedaba fuera del short.
    - `shorts.json`, para Sloth: `{"shorts": [{"id": "s1", "titulo": "...", "smp": "...", "puntos": ["...", "..."],
      "gancho": "..."}]}`. El `titulo` es como se ve en la lista del panel: seis palabras como mucho.
 
-   Listo cuando cada dato de `material.md` está en un punto de algún SMP o en lo que dejaste fuera.
+   Listo cuando cada dato de `citas.json` está en un punto de algún SMP o en lo que dejaste fuera.
 5. **Entrega.** Di cuántos shorts propones y por qué ese número, y termina. El usuario los aprueba en la etapa «Shorts»
    del panel, todos o los que elija, y Sloth abre un hilo por cada uno. En un lote también terminas aquí: es la única
    vez que el lote espera al usuario.
@@ -80,16 +79,12 @@ de [«En un lote»](SKILL.md#en-un-lote).
    `fuentes/plan/material`, sus copias en `fuentes/plan/paginas`), sin bajar ni capturar nada de nuevo, y deja tu SMP en
    `short.json`. Listo cuando `short.json` existe.
 2. **Guion.** Escribe `guion.md` según «Shorts» en [`ESTILO.md`](ESTILO.md#shorts), a partir de tu SMP: sus cinco
-   puntos y el gancho del plan, que puedes afinar, sin nada que no lo alimente. En `material.md` van las filas del plan
-   que usas, copiadas de `fuentes/plan-material.md` (ya con sus rutas a `fuentes/plan/`). Si un punto pide algo que el
-   plan no capturó, captúralo en tu `fuentes/material`: lo del plan es de todos los shorts. Listo cuando cada afirmación tiene
-   su fila y `python <skill>/scripts/largo.py <minutos>` (los de `Duración:`) no se queja.
-3. **Voz.** Pide el audio y termina: el usuario lo graba leyendo la etapa «Guion» y lo sube en «Tu voz», en
-   cualquier formato de audio.
-4. **Video.** Los pasos 1 a 6 de la fase 2 de [`SKILL.md`](SKILL.md), en esta misma sesión (el contexto de un short es
-   chico y no pide subagente), con su `GANCHO` (el rótulo fijo de arriba) en `guion.py` y lo de [El lienzo
-   vertical](ESCENAS.md#el-lienzo-vertical), y con dos cosas propias: el primer beat es el gancho y se ve desde el primer
-   cuadro (una captura o un titular con lo que dice la voz), y el último es la invitación de la marca, `{"tipo":
-   "logo", "invitacion": True}`, con la frase que invita (sin `invitacion` en la marca, el último es el remate). El paso 6 es `final.py`, que deja `out/el-diff-final.mp4`.
-   Listo cuando revisaste las hojas a tamaño de celular y la lista de problemas quedó vacía.
+   puntos y el gancho del plan, que puedes afinar, sin nada que no lo alimente. Las citas son las del plan
+   (`fuentes/plan/fichas/citas.json`) y lo ya leído está en `fuentes/plan/textos`; si un punto pide un dato que el plan
+   no tiene, búscalo tú (paso 2 de [`SKILL.md`](SKILL.md)).
+3. **`momentos.json` y el video.** Los pasos 4 a 6 de [`SKILL.md`](SKILL.md), con su `gancho`, y dos cosas propias: el
+   primer momento es el gancho y se ve desde el primer cuadro (la prueba o el clip de lo que dice la voz), y el short
+   acaba en la invitación de la marca, dicha tal cual (sin `invitacion`, en su remate). Sin `Voz:`, `hacer.py --sin-voz`,
+   pide el audio y termina: el usuario lo graba leyendo la etapa «Guion» y lo sube en «Tu voz».
+4. **Listo** cuando `hacer.py` dijo ✓ y miraste `revision/hoja.png`.
 5. **Entrega.** La ruta del video, su SMP en una línea y un texto para TikTok con 3 a 5 hashtags.

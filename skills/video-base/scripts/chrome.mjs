@@ -197,7 +197,10 @@ async function abrirUno({ ancho, alto, gpu = false, extra = [] } = {}) {
   ]
   // Se le habla por dos tuberías (las 3 y 4 del proceso), un JSON por mensaje terminado en un byte 0. No por WebSocket:
   // el de Node pide permessage-deflate y Chrome comprimía cada captura (megas en base64) para que Node la descomprimiera.
-  const proc = spawn(exe, args, { stdio: ['ignore', 'ignore', 'pipe', 'pipe', 'pipe'] })
+  // Sin `__COMPAT_LAYER`: con la capa de compatibilidad de Windows heredada de quien lo lanza (`DetectorsAppHealth`, la
+  // de algunas terminales de agentes), Edge sale al instante con código 0 y sin decir nada.
+  const { __COMPAT_LAYER: _, ...entorno } = process.env
+  const proc = spawn(exe, args, { stdio: ['ignore', 'ignore', 'pipe', 'pipe', 'pipe'], env: entorno })
   const [, , errores, aChrome, deChrome] = proc.stdio
   let texto = ''
   errores.on('data', (d) => (texto += d))

@@ -13,6 +13,10 @@ solo el tramo que se usa, listo para `clip(0, src="videos/<nombre>.mp4")`.
         con bandas negras). Con --tal-cual conserva su tamaño (para ponerlo dentro de una captura con `video=`).
         Deja junto a él una hoja de cuadros (<nombre>-hoja.png) para comprobar que es el momento que querías.
 
+    python metraje.py lista
+        El metraje que ya está en la carpeta del noticiero (`metraje/`, junto a los episodios): su id, lo que dura y qué
+        es. Va en momentos.json con su id, sin bajarlo otra vez; lo deja ahí `hacer.py` cada vez que baja uno nuevo.
+
 YouTube va de uno en uno en toda la máquina (`turno_youtube`). Si la descarga normal falla o sale de menos de 720p,
 reintenta una vez con el cliente web_embedded, que en octubre de 2026 sí daba 1080p (como fuente.py), y se queda con la
 mejor de las dos.
@@ -24,7 +28,7 @@ import sys
 import tempfile
 from pathlib import Path
 
-from comun import sloth, turno_youtube
+from comun import ffmpeg_h264, sloth, turno_youtube
 
 FONDO = "0x0d0d10"  # COLOR.fondo de la plantilla
 
@@ -85,8 +89,8 @@ def bajar(url: str, desde: float, hasta: float, salida: Path, tal_cual: bool, ll
         else:
             vf = (f"scale=1920:1080:force_original_aspect_ratio=decrease,"
                   f"pad=1920:1080:(ow-iw)/2:(oh-ih)/2:color={FONDO},setsar=1,fps=30")
-        subprocess.run(["ffmpeg", "-nostdin", "-y", "-v", "error", "-i", str(crudo), "-vf", vf, "-c:v", "libx264",
-                        "-crf", "18", "-bf", "0", "-g", "15", "-pix_fmt", "yuv420p", "-an", str(salida)], check=True)
+        ffmpeg_h264(lambda h264: ["-i", str(crudo), "-vf", vf, *h264, "-bf", "0", "-g", "15", "-pix_fmt", "yuv420p",
+                                   "-an", str(salida)], crf=18)
     dura = float(subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0",
                                  str(salida)], capture_output=True, text=True).stdout.strip())
     hoja = salida.with_name(salida.stem + "-hoja.png")
@@ -96,9 +100,26 @@ def bajar(url: str, desde: float, hasta: float, salida: Path, tal_cual: bool, ll
     print(f"{salida} ({dura:.1f} s) · hoja: {hoja}")
 
 
+def lista() -> None:
+    """Lo que ya hay en la carpeta del noticiero: desde un episodio, la de arriba."""
+    aqui = Path.cwd()
+    carpeta = (aqui.parent if (aqui / "src" / "Video.tsx").exists() else aqui) / "metraje"
+    indice = json.loads((carpeta / "indice.json").read_text(encoding="utf8")) if (carpeta / "indice.json").exists() else {}
+    videos = sorted(carpeta.glob("*.mp4"))
+    if not videos:
+        print("Aún no hay metraje guardado: cada clip nuevo va en `clips` con su url, desde y hasta.")
+    for v in videos:
+        dura = subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", str(v)],
+                              capture_output=True, text=True).stdout.strip()
+        print(f"{v.stem} · {float(dura or 0):.1f} s · {indice.get(v.stem, {}).get('que', '')}")
+
+
 def main() -> None:
+    sys.stdout.reconfigure(encoding="utf-8")
     a = [x for x in sys.argv[1:] if not x.startswith("--")]
-    if len(a) >= 2 and a[0] == "buscar":
+    if a[:1] == ["lista"]:
+        lista()
+    elif len(a) >= 2 and a[0] == "buscar":
         buscar(a[1], int(a[2]) if len(a) > 2 else 8)
     elif len(a) == 5 and a[0] == "bajar":
         bajar(a[1], segundos(a[2]), segundos(a[3]), Path(a[4]), "--tal-cual" in sys.argv, "--llenar" in sys.argv)

@@ -7,8 +7,11 @@ description: La biblioteca de modelos 3D de los videos (three.js en Remotion), p
 
 El usuario va a hacer muchos videos con 3D y no quiere que se desperdicie ninguno: **antes de hacer un modelo se busca
 aquí, y lo que se hace se guarda aquí.** Cada modelo es un componente de React Three Fiber con su miniatura
-(`modelos/<id>/vista.webp`, y `vista.webm` con la cámara que se mece) y su ficha (`modelo.json`: qué es, para qué sirve, sus etiquetas y de qué video salió). Sloth
-los enseña en «Modelos 3D», en la barra de la izquierda.
+(`modelos/<id>/vista.webp`, `vista.webm` con la cámara que se mece y `vuelta.webm` con la vuelta entera, que se gira
+arrastrando en su ficha) y su ficha (`modelo.json`: qué es, para qué sirve, sus etiquetas y de qué video salió). Sloth
+los enseña en «Modelos 3D», en la barra de la izquierda, y en la ficha de cada uno lo gira de verdad con el visor 3D de
+toda la biblioteca (`visor.tsx`, que `modelos.py visor` arma en `visor/`; `vista` lo vuelve a armar, y Sloth también
+solo si le falta un modelo).
 
 Todo se hace con `scripts/modelos.py` (sin dependencias). Salvo `buscar`, se corre en la carpeta del proyecto del video:
 
@@ -112,3 +115,18 @@ La biblioteca es de cada quien y empieza vacía: la moneda y el ícono 3D que tr
 en `plantilla/`, que `usar` encuentra y `buscar` no enseña (si mejoras uno y lo guardas, pasa a la biblioteca). Lo
 guardado queda en la biblioteca de esta computadora (`modelos/` de esta skill), que se ve en «Modelos 3D» de Sloth: al
 entregar el video, dile al usuario qué modelos sumaste o mejoraste.
+
+## 6. Un modelo sin video («Nuevo modelo» en Sloth)
+
+Desde «Modelos 3D», el usuario describe un objeto (a veces con una imagen de referencia, que llega en su mensaje: **mírala**
+antes de modelar) y se abre un hilo en una carpeta propia, vacía. Ahí:
+
+1. `buscar` (1): si ya hay uno que sirve o casi, dilo y mejora ese (3) en vez de hacer otro.
+2. `python -B -X utf8 <esta skill>/scripts/modelos.py nuevo <id> --nombre "…" --descripcion "…"` hace de la carpeta un
+   proyecto de prueba (Remotion y three, con el `node_modules` que comparten los videos explicativos) y deja el andamio en
+   `src/modelos/<id>.tsx`.
+3. Escribe el modelo con las reglas de (4), `vista <id>`, **mírala**, corrige, y `guardar` (5) con su ficha entera.
+4. Dile al usuario que ya está en «Modelos 3D» y qué puede hacer.
+
+`importar` es de Sloth («Importar .glb», sin agente): mete un `.glb` hecho fuera con un componente que lo carga, lo centra
+y lo escala, y abre los comprimidos con Draco o Meshopt.

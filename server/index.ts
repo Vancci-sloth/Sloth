@@ -1,6 +1,7 @@
 import { spawn } from 'node:child_process'
 import { createReadStream, createWriteStream, existsSync, mkdirSync, readdirSync, statSync, watch } from 'node:fs'
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http'
+import { pipeline } from 'node:stream'
 import { createServer as servidorTcp } from 'node:net'
 import { basename, dirname, extname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -26,6 +27,7 @@ import { enlacesApi } from './enlaces.ts' // tarjeta de los enlaces
 import { cerrarVigilantesOciosos, etapasApi, folderOf, mismaCwd, queFalta, videosApi, videosDe } from './etapas.ts' // panel de etapas
 import { cerrarMotoresOciosos } from './motor.ts'
 import { modelos3d } from './modelos3d.ts' // modelos 3D
+import { modelos3dAcciones } from './modelos3d-acciones.ts' // modelos 3D
 import { miniaturas } from './miniaturas.ts' // panel de etapas
 import { guardarMeta, guardarYoutube, opciones } from './opciones.ts'
 import { previas } from './previas.ts' // previas de las cards
@@ -39,7 +41,7 @@ import { voz } from './voz/index.ts' // voz de AI Studio
 import { flow } from './flow/index.ts' // Google Flow
 import { youtube } from './youtube.ts'
 import { peticionDeConfianza } from './origen.ts'
-import { actualizarYtDlp, instalandoAlgo, instalar, pythonSlothEntero, requisitos } from './requisitos.ts'
+import { actualizarYtDlp, instalandoAlgo, instalar, pythonSlothEntero, requisitos, rutaPythonSloth } from './requisitos.ts'
 import { espacio } from './espacio.ts' // espacio en disco
 import { equipo } from './equipo.ts' // tu equipo
 import { licencia } from './licencia.ts' // suscripción
@@ -49,7 +51,8 @@ import { avisoDeVideos } from '../shared/limites.ts'
 import { eventosEnVivo } from './eventos-en-vivo.ts'
 import { enviarCliente } from './enviar-cliente.ts'
 import { anteriorDe, conservarAnterior, olvidarAnterior } from './anteriores.ts'
-import { cambiosDeCard, carpetaSkill, configClaudeDev, duplicateCard, enlazarSkills, enlazarSkillsCodex, guardarSkillTuya, readCards, removeCard, seriesDe, SKILLS, skillRef, volverAOriginal } from './skills.ts'
+import { cuidarEstilos, mudarTuyas } from './estilos-perdidos.ts'
+import { cambiosDeCard, carpetaSkill, configClaudeDev, duplicateCard, enlazarSkills, enlazarSkillsCodex, guardarSkillTuya, marcasDe, readCards, removeCard, seriesDe, SKILLS, skillRef, volverAOriginal } from './skills.ts'
 import { estaticos } from './estaticos.ts'
 import { type Agente, version } from './version.ts'
 import { cargarPreciosCodex } from './precios.ts'
@@ -62,6 +65,17 @@ const CARDS = join(APP, 'cards.json')
  * que ninguna versión nueva toca, y sus skills en `<app>/skills/<id>`, que tampoco.
  */
 const CARDS_TUYAS = join(APP, 'data', 'tus-cards.json')
+/** Con las skills como las trae esta versión, que dicen qué es de Sloth; sin ellas (el repo) no hace nada. */
+function cuidarTuyas(hacer: typeof cuidarEstilos) {
+  const originales = process.env.SLOTH_SKILLS_ORIGINALES
+  if (!originales) return
+  try {
+    const ids = hacer({ app: APP, originales })
+    if (ids.length) console.log(`Estilos tuyos con su card de vuelta en tus-cards.json: ${ids.join(', ')}`)
+  } catch (error) {
+    console.error(`No se pudieron revisar las cards de tus estilos: ${error instanceof Error ? error.message : error}`)
+  }
+}
 const ATTACHMENTS = join(APP, 'data', 'attachments')
 const ATTACHMENT_TYPES: Record<string, string> = { ...IMAGE_TYPES, '.wav': 'audio/wav', '.mp3': 'audio/mpeg', '.mp4': 'video/mp4', '.webm': 'video/webm' }
 /** Código de salida que le pide a `scripts/start.mjs` que vuelva a levantar el servidor. */
@@ -75,6 +89,8 @@ process.env.SLOTH_URL = `http://127.0.0.1:${PORT}`
 if (VENTA) {
   // La app que se vende trae sus skills: las enlaza en ~/.claude/skills, donde las busca Claude, y Codex las lee de esas
   // mismas carpetas, no de copias suyas.
+  // Antes, los estilos tuyos que se quedaron sin card (server/estilos-perdidos.ts): así también se enlazan.
+  cuidarTuyas(cuidarEstilos)
   enlazarSkills(APP)
   enlazarSkillsCodex(APP)
 } else {
@@ -83,7 +99,7 @@ if (VENTA) {
   process.env.CLAUDE_CONFIG_DIR ??= configClaudeDev(APP)
 }
 // Y su clave: la cuenta gratis de la comunidad o el apoyo, que quita el recordatorio. Sloth abre sin ella.
-const suscripcion = VENTA ? licencia(APP) : undefined // suscripción
+const suscripcion = licencia(APP) // La clave de Sloth también conecta las voces en la copia de desarrollo.
 
 const clients = new Set<WebSocket>()
 const suscripciones = new Map<WebSocket, string | null>()
@@ -98,7 +114,12 @@ function broadcast(msg: ServerPush) {
   avance?.oir(msg)
 }
 
-const eventos = eventosEnVivo((sessionId, from, events) => broadcast({ type: 'events', sessionId, from, events }))
+const eventos = eventosEnVivo((sessionId, from, events) => {
+  broadcast({ type: 'events', sessionId, from, events })
+  // Al acabar cada turno de «Nuevo estilo», el estilo que ya está en `skills/` y no tiene card la recibe ahí mismo (la
+  // que escribió el hilo, o una hecha con su SKILL.md), aunque el agente no la haya guardado o la haya puesto en cards.json.
+  if (events.some((e) => e.t === 'turn_end') && sessions.meta(sessionId)?.cardId === 'nuevo-estilo') cuidarTuyas(cuidarEstilos)
+})
 const sessions = new Sessions(
   join(APP, 'data', 'sessions'),
   eventos,
@@ -162,9 +183,10 @@ function cards(): Card[] {
   return leidas?.cards ?? []
 }
 
-// Publicar los videos verticales terminados en TikTok e Instagram (y en las redes que se sumen), y los largos en YouTube.
-// La app que se vende aún no publica.
-const publicar = redes(APP, sessions, cards, broadcast) // redes
+// Publicar los videos verticales terminados en TikTok, Instagram y YouTube Shorts, y los largos en YouTube. Los Shorts
+// van con el canal que conecta YouTube.
+const subirLargos = youtube(APP, sessions, cards, `http://127.0.0.1:${PORT}/api/youtube/oauth`, undefined, () => modelos)
+const publicar = redes(APP, sessions, cards, broadcast, subirLargos.lectura) // redes
 // El piloto automático (`server/piloto.ts`): hace videos solo, en lotes, y los mete a la cola de redes. Apagado por defecto. // piloto
 const pilotoAuto = piloto({
   dir: join(APP, 'data', 'piloto'),
@@ -195,16 +217,30 @@ const pilotoAuto = piloto({
   }
 })
 pilotoAuto.arrancar()
-const subirLargos = youtube(APP, sessions, cards, `http://127.0.0.1:${PORT}/api/youtube/oauth`, undefined, () => modelos)
 
 // Cada card de estilo enseña su último video terminado, en pequeño.
 const previa = previas(join(APP, 'data', 'previas'), cards) // previas de las cards
 // Las imágenes que el panel de etapas enseña en rejilla, en pequeño.
-const { miniatura, cuadro } = miniaturas(join(APP, 'data', 'miniaturas')) // panel de etapas
+const { miniatura, cuadro, previa: previaChica, previaLista } = miniaturas(join(APP, 'data', 'miniaturas')) // panel de etapas
 // Ideas para YouTube: investigar el nicho de un canal y que Claude proponga videos con evidencia.
 const idear = VENTA ? undefined : ideas(APP, sessions, broadcast, subirLargos?.lectura) // ideas
 // La biblioteca de modelos 3D que llenan los videos, para verla: la de la skill que usan los agentes, que es donde guardan.
-const biblioteca3d = modelos3d(carpetaSkill('modelos-3d') ?? join(APP, 'skills', 'modelos-3d')) // modelos 3D
+const biblioteca3d = modelos3d(carpetaSkill('modelos-3d') ?? join(APP, 'skills', 'modelos-3d'), {
+  python: () => rutaPythonSloth() ?? (process.platform === 'win32' ? 'python' : 'python3')
+}) // modelos 3D
+// «Importar .glb» y «Nuevo modelo», en la misma biblioteca.
+const acciones3d = modelos3dAcciones({
+  sessions,
+  skillRef,
+  modelo: (p) => {
+    const m = modelos.find((x) => x.id === p.model) ?? modelos.find((x) => proveedorDe(x.id) === 'claude') ?? modelos[0]
+    return m && { model: m.id, effort: m.id === p.model && p.effort ? p.effort : m.defaultEffort }
+  },
+  adjuntos: ATTACHMENTS,
+  biblioteca: carpetaSkill('modelos-3d') ?? join(APP, 'skills', 'modelos-3d'),
+  trabajo: join(carpetaTrabajo(APP), 'modelos-3d'),
+  python: () => rutaPythonSloth() ?? (process.platform === 'win32' ? 'python' : 'python3')
+}) // modelos 3D
 // El buscador propio de noticias de tecnología: lee sus fuentes en segundo plano y las skills buscan ahí.
 const noticias = radar(APP) // radar
 // Tus estilos en un archivo para compartirlos, y los de otros, instalados entre los tuyos.
@@ -236,8 +272,12 @@ const narrar = voz(APP, { credencial: () => llaveDelCreador() ?? suscripcion?.cr
 // Las imágenes y videos de Google Flow, con esa misma cuenta y en ese mismo Edge.
 const generarFlow = flow(APP, narrar.google) // Google Flow
 
-// Si el agente (o tú) edita cards.json, las cards se actualizan solas.
-watch(CARDS, () => broadcast({ type: 'cards', cards: cards() }))
+// Si el agente (o tú) edita cards.json, las cards se actualizan solas. En la app que se vende, una card tuya que un
+// agente puso ahí pasa a tus-cards.json: la siguiente versión reemplaza cards.json.
+watch(CARDS, () => {
+  if (VENTA) cuidarTuyas(mudarTuyas)
+  broadcast({ type: 'cards', cards: cards() })
+})
 // Y si «Nuevo estilo» hizo uno: su skill se enlaza donde la buscan Claude y Codex antes del primer hilo con su card.
 watch(dirname(CARDS_TUYAS), (_, archivo) => {
   if (archivo !== basename(CARDS_TUYAS)) return
@@ -253,6 +293,7 @@ function ocupado(): string | null {
   if (idear?.ocupado()) return idear.ocupado() // ideas: una investigación en curso
   if (narrar.ocupado()) return narrar.ocupado() // voz de AI Studio: una a medias
   if (generarFlow.ocupado()) return generarFlow.ocupado() // Google Flow: un pedido a medias
+  if (acciones3d.ocupado()) return acciones3d.ocupado() // modelos 3D: una importación a medias
   return maquina.ocupado() ?? instalandoAlgo() ?? bajandoAgente() ?? conectando() ?? conectandoCodex() ?? conectandoOpenCode() ?? conectandoOtro()
 }
 
@@ -424,14 +465,24 @@ async function api(req: IncomingMessage, res: ServerResponse, url: URL): Promise
   }
 
   // La cuenta de los demás agentes (`server/proveedores.ts`): mirarla (`?fresco` vuelve a mirar), conectarla, dejar de
-  // esperarla, quitarla o darle las llaves de Sloth (`{usar}`). Sus modelos dependen de la cuenta: cada cambio los vuelve a pedir.
-  const otro = /^\/api\/(\w+)\/(cuenta|conectar|cancelar|salir|llaves)$/.exec(path)
+  // esperarla, quitarla, darle las llaves de Sloth (`{usar}`) o, con varias cuentas, usar o quitar una (`{id}`). Sus
+  // modelos dependen de la cuenta: cada cambio los vuelve a pedir.
+  const otro = /^\/api\/(\w+)\/(cuenta|conectar|cancelar|salir|llaves|usar|quitar)$/.exec(path)
   const o = otro && OTROS[otro[1] as Proveedor]
   if (otro && o && method === (otro[2] === 'cuenta' ? 'GET' : 'POST')) {
     try {
-      const usar = otro[2] === 'llaves' && !!(await body<{ usar?: boolean }>(req)).usar
-      const llaves = o.llaves
-      const hacer = { cuenta: () => o.cuenta(url.searchParams.has('fresco')), conectar: o.conectar, cancelar: o.cancelar, salir: o.salir, llaves: llaves && (() => llaves(usar)) }[otro[2] as 'cuenta']
+      const datos = otro[2] === 'llaves' || otro[2] === 'usar' || otro[2] === 'quitar' ? await body<{ usar?: boolean; id?: string }>(req) : {}
+      const { llaves, usar, quitar } = o
+      const id = String(datos.id ?? '')
+      const hacer = {
+        cuenta: () => o.cuenta(url.searchParams.has('fresco')),
+        conectar: o.conectar,
+        cancelar: o.cancelar,
+        salir: o.salir,
+        llaves: llaves && (() => llaves(!!datos.usar)),
+        usar: usar && (() => usar(id)),
+        quitar: quitar && (() => quitar(id))
+      }[otro[2] as 'cuenta']
       if (!hacer) throw new Error('Este agente no admite eso.')
       send(res, 200, await hacer())
       if (otro[2] !== 'cuenta' || url.searchParams.has('fresco')) pedirModelos()
@@ -529,6 +580,12 @@ async function api(req: IncomingMessage, res: ServerResponse, url: URL): Promise
   if (ser && method === 'GET') {
     const card = cards().find((c) => c.id === ser[1])
     return send(res, 200, card?.skill ? seriesDe(card.skill, !!card.etapas) : []), true
+  }
+  // Sus marcas (una por canal), para elegir cuál lleva el video: el compositor manda la línea `Marca:`.
+  const mar = /^\/api\/cards\/([\w-]+)\/marcas$/.exec(path)
+  if (mar && method === 'GET') {
+    const card = cards().find((c) => c.id === mar[1])
+    return send(res, 200, card ? marcasDe(card.cwd) : { otras: [] }), true
   }
 
   // «Con tus cambios»: lo que el usuario (o su agente) cambió en la skill de una card, y volver a la original, entera o un
@@ -649,12 +706,13 @@ async function api(req: IncomingMessage, res: ServerResponse, url: URL): Promise
     if (meta && sessions.sumaVideo(meta) && pideConfirmar(res, masDeDos)) return true
   }
   if (await etapasApi(req, res, url, sessions, cards(), broadcast, miniatura)) return true // panel de etapas
-  if (await videosApi(req, res, url, sessions, cards(), publicar?.marcas, cuadro)) return true // panel de etapas; `publicar.marcas`, de redes
+  if (await videosApi(req, res, url, sessions, cards(), publicar?.marcas, cuadro, { hacer: previaChica, lista: previaLista })) return true // panel de etapas; `publicar.marcas`, de redes
   if (publicar && (await publicar.api(req, res, url))) return true // redes
   if (await pilotoAuto.api(req, res, path)) return true // piloto
   if (subirLargos && (await subirLargos.api(req, res, url))) return true // videos largos de YouTube
   if (await previa.api(req, res, url)) return true // previas de las cards
   if (idear && (await idear.api(req, res, url))) return true // ideas
+  if (await acciones3d.api(req, res, url)) return true // modelos 3D
   if (await biblioteca3d.api(req, res, url)) return true // modelos 3D
   if (await noticias.api(req, res, url)) return true // radar
   if (await comunidadApi.api(req, res, url)) return true // comunidad
@@ -745,12 +803,16 @@ async function api(req: IncomingMessage, res: ServerResponse, url: URL): Promise
     const file = join(ATTACHMENTS, basename(decodeURIComponent(a[1])))
     if (!existsSync(file)) return send(res, 404, { error: 'No existe' }), true
     res.writeHead(200, { 'content-type': ATTACHMENT_TYPES[extname(file).toLowerCase()] ?? 'application/octet-stream', 'content-length': statSync(file).size, 'cache-control': 'max-age=31536000, immutable' })
-    createReadStream(file).pipe(res)
+    pipeline(createReadStream(file), res, () => {})
     return true
   }
 
   if (path === '/api/open' && method === 'POST') {
-    const { path: target } = await body<{ path: string }>(req)
+    const pedido = await body<{ path: string; sessionId?: string }>(req)
+    // Una ruta relativa (un enlace del agente: `out/video.mp4`) es de donde trabaja su hilo, o de la carpeta de su video.
+    const meta = pedido.sessionId ? sessions.meta(pedido.sessionId) : undefined
+    const bases = meta ? [meta.cwd, folderOf(meta)] : []
+    const target = bases.map((b) => resolve(b, pedido.path)).find((r) => existsSync(r)) ?? (bases[0] ? resolve(bases[0], pedido.path) : pedido.path)
     // Señalado en su carpeta: el Explorador y el Finder saben; en Linux se abre la carpeta que lo tiene.
     const [programa, ...args] =
       process.platform === 'win32' ? ['explorer.exe', `/select,${target}`] : process.platform === 'darwin' ? ['open', '-R', target] : ['xdg-open', existsSync(target) && statSync(target).isDirectory() ? target : dirname(target)]

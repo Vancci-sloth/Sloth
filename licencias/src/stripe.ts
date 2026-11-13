@@ -21,10 +21,14 @@ export interface SuscripcionStripe {
   customer: string
   status: 'incomplete' | 'incomplete_expired' | 'trialing' | 'active' | 'past_due' | 'canceled' | 'unpaid' | 'paused'
   cancel_at_period_end?: boolean
-  /** En las versiones de su API desde 2025-03-31, el fin del periodo va en cada concepto; antes, aquí. */
+  /** En las versiones de su API desde 2025-03-31, el periodo va en cada concepto; antes, aquí. */
+  current_period_start?: number
   current_period_end?: number
-  items?: { data?: { current_period_end?: number }[] }
+  items?: { data?: { current_period_start?: number; current_period_end?: number }[] }
 }
+
+/** Cuánto sigue abierta una suscripción con el cobro sin pasar (`past_due`) desde que empezó el periodo que no se pagó. */
+export const GRACIA_STRIPE = 21 * 24 * 3600_000
 
 /** Una sesión de Checkout, con lo que se lee de ella. */
 export interface SesionStripe {
@@ -54,11 +58,13 @@ export interface PagoStripe {
 
 /**
  * Una suscripción de Stripe en los estados de Mercado Pago, que son los que entiende Sloth. `past_due` (Stripe reintenta
- * el cobro) sigue abierta, como `authorized` en Mercado Pago, pero no alarga lo pagado. Si se pidió cancelar al final del
- * periodo, ya cuenta como cancelada: no se avisa del cobro y abre hasta ese día.
+ * el cobro) sigue abierta, como `authorized` en Mercado Pago, pero no alarga lo pagado, y solo `GRACIA_STRIPE` desde que
+ * empezó el periodo sin pagar: si el panel de Stripe la deja en `past_due` al acabar los reintentos, se pausa. Si se
+ * pidió cancelar al final del periodo, ya cuenta como cancelada: no se avisa del cobro y abre hasta ese día.
  */
-export function leerStripe(s: Pick<SuscripcionStripe, 'status' | 'cancel_at_period_end' | 'current_period_end' | 'items'>): Lectura {
+export function leerStripe(s: Pick<SuscripcionStripe, 'status' | 'cancel_at_period_end' | 'current_period_start' | 'current_period_end' | 'items'>, ahora = Date.now()): Lectura {
   const fin = s.items?.data?.[0]?.current_period_end ?? s.current_period_end
+  const inicio = s.items?.data?.[0]?.current_period_start ?? s.current_period_start
   const hasta = fin ? new Date(fin * 1000).toISOString() : undefined
   const estado: Estado =
     s.status === 'active' || s.status === 'trialing'
@@ -66,7 +72,9 @@ export function leerStripe(s: Pick<SuscripcionStripe, 'status' | 'cancel_at_peri
         ? 'cancelled'
         : 'authorized'
       : s.status === 'past_due'
-        ? 'authorized'
+        ? inicio && ahora - inicio * 1000 > GRACIA_STRIPE
+          ? 'paused'
+          : 'authorized'
         : s.status === 'incomplete'
           ? 'pending'
           : s.status === 'unpaid' || s.status === 'paused'

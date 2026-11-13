@@ -1,25 +1,109 @@
 /*
- * «Mis videos»: arriba el título y los estilos para filtrar; debajo, las tarjetas de la galería de cada estilo (`.videos`
- * y `.video-tile`, en styles.css), que hacen scroll solas.
+ * «Mis videos»: arriba el título, el buscador y las acciones; debajo los filtros (texto con su icono y una raya, sin
+ * cápsulas), lo de publicar en una franja, y las tarjetas de la galería de cada estilo (`.videos` y `.video-tile`, en
+ * styles.css), que hacen scroll solas. Lo elegido sale en una barra abajo.
  */
-.mis-videos { height: 100%; width: 100%; max-width: 1560px; margin: 0 auto; padding: 32px 48px 0; display: flex; flex-direction: column; gap: 14px; }
-.mis-videos-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; }
-.mis-videos-head h1 { margin: 0 0 4px; font-size: 26px; font-weight: 700; letter-spacing: -0.02em; }
-.mis-videos-head p { margin: 0; font-size: 13.5px; }
-.mis-filtros { display: flex; flex-wrap: wrap; gap: 6px; }
-.mis-filtros button { display: inline-flex; align-items: center; gap: 7px; padding: 5px 13px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); font-size: 13px; font-weight: 600; transition: color 0.15s, border-color 0.15s, background 0.15s; }
-.mis-filtros button:hover { color: var(--text); border-color: #4a4236; }
-.mis-filtros button.on { color: var(--amber); border-color: var(--amber); background: var(--amber-tinte); }
-/* «Eliminar los que ya se programaron»: discreto hasta que pasas por encima. */
-.mis-videos-acciones { display: flex; align-items: center; gap: 10px; }
-.mis-eliminar { flex-shrink: 0; padding: 6px 14px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); font-size: 13px; font-weight: 600; transition: color 0.15s, border-color 0.15s; }
-.mis-eliminar:hover { color: var(--bad); border-color: var(--bad); }
-.mis-filtros .cuantos { font-size: 11px; font-variant-numeric: tabular-nums; opacity: 0.7; }
-.mis-videos .videos { flex: 1; padding-bottom: 24px; }
+.mis-videos { --suave: color-mix(in srgb, var(--muted) 60%, var(--text)); position: relative; height: 100%; width: 100%; max-width: 1560px; margin: 0 auto; padding: 22px 40px 0; display: flex; flex-direction: column; gap: 12px; }
+.mis-videos-head { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+.mis-videos-head h1 { display: flex; align-items: baseline; gap: 10px; margin: 0; font-size: 24px; font-weight: 700; letter-spacing: -0.02em; white-space: nowrap; }
+.mis-total { font-size: 15px; font-weight: 600; color: var(--suave); font-variant-numeric: tabular-nums; letter-spacing: 0; }
+.mis-buscar { flex: 1 1 280px; max-width: 460px; display: flex; align-items: center; gap: 8px; height: 38px; padding: 0 10px 0 12px; border-radius: 10px; background: var(--panel); border: 1px solid var(--line); color: var(--suave); transition: border-color 0.15s; }
+.mis-buscar:focus-within { border-color: var(--amber); }
+.mis-buscar .ico { width: 16px; height: 16px; flex: none; }
+.mis-buscar input { flex: 1; min-width: 0; background: none; border: none; outline: none; color: var(--text); font-size: 14.5px; }
+.mis-buscar input::placeholder { color: var(--suave); }
+.mis-buscar input::-webkit-search-cancel-button { filter: grayscale(1); }
+.mis-buscar kbd { flex: none; min-width: 20px; padding: 1px 6px; border-radius: 5px; border: 1px solid var(--line); color: var(--suave); font: 600 14.5px var(--mono); text-align: center; }
+.mis-buscar:focus-within kbd { visibility: hidden; }
+.mis-videos-acciones { display: flex; align-items: center; gap: 4px; margin-left: auto; }
+/* Acciones de la cabecera: texto con su icono, sin borde; el fondo sale al pasar. */
+.mis-accion { display: inline-flex; align-items: center; gap: 7px; height: 36px; padding: 0 12px; border-radius: 10px; color: var(--suave); font-size: 14.5px; font-weight: 600; white-space: nowrap; transition: color 0.15s, background 0.15s; }
+.mis-accion .ico { width: 16px; height: 16px; }
+.mis-accion:hover, .mis-accion.on { color: var(--amber); background: var(--amber-tinte); }
+.mis-accion.peligro:hover { color: var(--bad); background: rgba(224, 108, 85, 0.1); }
+
+/* Los filtros: estilos a la izquierda y forma a la derecha. El elegido, en ámbar y con su raya. */
+.mis-filtros { display: flex; align-items: flex-end; justify-content: space-between; gap: 8px 24px; flex-wrap: wrap; border-bottom: 1px solid var(--line); }
+.mis-pestanas { display: flex; flex-wrap: wrap; gap: 2px; }
+.mis-pestanas button { position: relative; display: inline-flex; align-items: center; gap: 7px; padding: 6px 10px 9px; color: var(--suave); font-size: 14.5px; font-weight: 600; white-space: nowrap; transition: color 0.15s; }
+.mis-pestanas button:hover { color: var(--text); }
+.mis-pestanas button.on { color: var(--amber); }
+.mis-pestanas button.on::after { content: ''; position: absolute; left: 8px; right: 8px; bottom: -1px; height: 2px; border-radius: 2px; background: var(--amber); }
+.mis-pestanas .cuantos { font-size: 14.5px; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--suave); }
+.mis-pestanas button.on .cuantos { color: var(--amber); }
+.mis-pestanas .ico, .mis-pestanas svg { width: 15px; height: 15px; }
+/* La forma dibujada: un rectángulo alto o ancho. */
+.mis-forma { display: inline-block; border: 1.6px solid currentColor; border-radius: 3px; }
+.mis-forma.vertical { width: 9px; height: 15px; }
+.mis-forma.horizontal { width: 16px; height: 10px; }
+
+/* Lo de publicar, en una franja: el resumen de redes y la barra de YouTube lado a lado, y los calendarios debajo. */
+.mis-publicar { display: flex; flex-wrap: wrap; gap: 8px 10px; }
+.mis-publicar:empty { display: none; }
+/* El resumen de redes, de su ancho (su botón no se encoge); la barra de YouTube toma lo que queda y corta su texto. */
+.mis-publicar > * { flex: 1 1 320px; min-width: 0; }
+.mis-publicar .resumen-redes.lote { flex: 0 1 auto; min-width: min(100%, max-content); }
+.mis-publicar .resumen-redes.lote, .mis-publicar .youtube-lote-barra { flex-wrap: nowrap; gap: 10px; min-height: 48px; padding: 6px 6px 6px 14px; border-radius: 12px; border: 1px solid var(--line); background: var(--panel); font-size: 14.5px; white-space: nowrap; }
+/* Una línea cada barra: lo que explica se corta con «…» antes que partirla; el botón, más chico que el de una página. */
+.mis-publicar .youtube-lote-barra > div { flex-wrap: nowrap; min-width: 0; gap: 10px; }
+.mis-publicar .youtube-lote-acciones { flex: none; }
+.mis-publicar .muted { min-width: 0; overflow: hidden; text-overflow: ellipsis; color: var(--suave); }
+.mis-publicar .primary, .mis-publicar .resumen-redes.lote .primary, .mis-publicar .youtube-lote-barra .primary { flex: none; height: 34px; padding: 0 14px; border-radius: 9px; font-size: 14.5px; }
+.mis-publicar .resumen-redes .primary { margin-left: auto; }
+/* «Verticales ·» es corto: no se recorta; lo que se corta es lo largo. */
+.mis-publicar .resumen-redes > .muted:first-of-type { flex: none; }
+.mis-publicar .calendario-redes { flex-basis: 100%; }
+.mis-publicar .small, .mis-publicar .resumen-estado, .mis-publicar .boton { font-size: 14.5px; }
+/* Los días del calendario, con su número legible: nada de la pantalla baja de 14,5 px. */
+.mis-publicar .calendario-red { font-size: 14.5px; }
+.mis-publicar .calendario-dia { font-size: 14.5px; min-width: 52px; }
+.mis-publicar .calendario-texto { font-size: 14.5px; color: var(--suave); }
+
+.mis-videos .youtube-boton, .mis-videos .estilo-vacio, .mis-videos .ritmo { font-size: 14.5px; }
+/*
+ * El texto de la rejilla, en el crema de Sloth aclarado (--text con un 40 % de blanco): 16,9:1 sobre --bg, más que el
+ * negro sobre blanco de Google Fotos (16,48), el mejor del eval. Todo el texto de las tarjetas va así; lo que distingue
+ * cada cosa es el peso, el tamaño y el color de su punto o su icono, no el del texto.
+ */
+.mis-videos .videos { --claro: color-mix(in srgb, var(--text) 60%, #fff); }
+.mis-videos .videos .video-titulo, .mis-videos .videos .video-meta, .mis-videos .videos .video-dura, .mis-videos .videos .insignia, .mis-videos .videos .youtube-boton { color: var(--claro); }
+.mis-videos .videos .video-meta { font-weight: 450; }
+.mis-videos .videos .insignia.hecho::before { background: var(--ok); }
+.mis-videos .videos .insignia.falta::before { background: var(--amber); }
+.mis-videos .videos .insignia.mal::before { background: var(--bad); }
+.mis-videos .videos { --alto: 212px; flex: 1; padding-bottom: 80px; }
 /* Al final de lo dibujado: cuando se acerca a la vista, entra otra tanda. */
 .mis-videos-fin { width: 100%; height: 1px; }
-.video-estilo { margin-right: 6px; }
-/* «Ritmo de publicación»: abre y cierra el panel de Ritmos.tsx. */
-.mis-ritmo { display: flex; align-items: center; gap: 6px; flex-shrink: 0; padding: 6px 14px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); font-size: 13px; font-weight: 600; transition: color 0.15s, border-color 0.15s; }
-.mis-ritmo .ico { width: 14px; height: 14px; }
-.mis-ritmo:hover, .mis-ritmo.on { color: var(--amber); border-color: var(--amber); }
+
+/* Lo que flota abajo, encima de la rejilla: el aviso y, debajo, la barra de lo elegido, en columna (nunca encimados). */
+.mis-flotan { position: absolute; left: 16px; right: 16px; bottom: 18px; z-index: 5; display: flex; flex-direction: column; align-items: center; gap: 8px; pointer-events: none; }
+.mis-flotan > * { pointer-events: auto; }
+.mis-eleccion, .mis-aviso { display: flex; align-items: center; gap: 4px; max-width: 100%; padding: 6px 6px 6px 16px; border-radius: 14px; background: var(--panel-2); border: 1px solid #4a4236; box-shadow: 0 12px 40px rgba(0, 0, 0, 0.55); font-size: 14.5px; white-space: nowrap; }
+.mis-eleccion strong { margin-right: 8px; color: var(--amber); font-variant-numeric: tabular-nums; }
+.mis-eleccion button { display: inline-flex; align-items: center; gap: 7px; height: 34px; padding: 0 12px; border-radius: 9px; color: var(--text); font-weight: 600; transition: background 0.12s, color 0.12s; }
+.mis-eleccion button .ico { width: 15px; height: 15px; }
+.mis-eleccion button:hover { background: var(--panel); color: var(--amber); }
+.mis-eleccion button.peligro:hover { color: var(--bad); }
+.mis-eleccion-fuera { color: var(--suave) !important; }
+.mis-aviso { gap: 10px; padding-right: 8px; color: var(--text); }
+.mis-aviso > .ico { width: 16px; height: 16px; color: var(--ok); }
+.mis-aviso .link { color: var(--amber); font-weight: 600; }
+.mis-aviso-fuera { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 8px; color: var(--suave); }
+.mis-aviso-fuera:hover { background: var(--panel); color: var(--text); }
+.mis-aviso-fuera .ico { width: 14px; height: 14px; }
+
+@media (max-width: 720px) {
+  .mis-videos { padding: 16px 16px 0; }
+  .mis-videos-acciones { margin-left: 0; flex-wrap: wrap; }
+  .mis-buscar { flex-basis: 100%; max-width: none; order: 1; }
+  .mis-videos .videos { --alto: 200px; }
+  /* Angosta, cada barra de publicar se parte en líneas: el botón baja y nada se sale de lado. */
+  .mis-publicar .resumen-redes.lote, .mis-publicar .youtube-lote-barra, .mis-publicar .youtube-lote-barra > div { flex-wrap: wrap; white-space: normal; }
+  .mis-publicar .youtube-lote-barra { padding: 10px 14px; }
+  .mis-eleccion { flex-wrap: wrap; white-space: normal; }
+  /* Angosta, la página entera hace scroll (no solo la rejilla, que quedaba de 230 px), y lo elegido flota sobre la ventana. */
+  .mis-videos { overflow-y: auto; }
+  .mis-videos .videos { flex: none; overflow: visible; }
+  /* Pegado abajo de lo que se ve de la página, no de la ventana: no tapa la barra lateral. */
+  .mis-flotan { position: sticky; bottom: 12px; left: auto; right: auto; margin-top: auto; padding-bottom: 4px; }
+}

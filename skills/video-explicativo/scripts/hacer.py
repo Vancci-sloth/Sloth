@@ -18,8 +18,10 @@ Desde la raíz del proyecto. En orden, y para en el primer ✗ diciendo qué arr
 3. Los subtítulos (subtitulos.py, con las palabras de cada momento en negrita) y la voz (voz.py), solo si el guion
    cambió desde la última: arreglar un momento no paga otra voz.
 4. Comprueba cada palabra contra lo que la voz dijo de verdad, y los tipos.
-5. final.py (render, comprobar, medir, huella), la portada de su primer cuadro y revision/hoja.png: un cuadro cada
-   1.5 s con lo que se dice, para mirarlo de un vistazo.
+5. final.py (render, la música si la pidió, comprobar, medir, huella), la portada y revision/hoja.png: un cuadro cada
+   1.5 s con lo que se dice, para mirarlo de un vistazo. La portada es la generada con IA si el usuario eligió con qué
+   en «Imágenes» (`nuevo.py --imagenes`): se pide de fondo en cuanto pasa el paso 1 y aquí se espera, 90 s como mucho.
+   Sin elección, o si no llegó, el cuadro del titular.
 Si nuevo.py todavía empaqueta, lo espera.
 """
 
@@ -27,6 +29,7 @@ import difflib
 import hashlib
 import json
 import re
+import shutil
 import subprocess
 import sys
 import time
@@ -120,6 +123,28 @@ def texto_del_guion() -> str:
     return " ".join(l for l in lineas if not l.startswith("#") and not l.lower().startswith("corte de datos"))
 
 
+def gancho() -> str:
+    """La primera frase del guion, hasta su punto."""
+    return re.split(r"(?<=[.!?])\s+", texto_del_guion().strip(), maxsplit=1)[0]
+
+
+def sin_titular(m: dict) -> list[str]:
+    """
+    Sin `titular`, el gancho enorme del primer segundo y la portada son la primera frase del guion (main la pone de
+    `titular`), si tiene diez palabras o menos. Antes salían de la primera frase de la voz, y la voz no siempre para
+    donde el guion: «La T de ChatGPT nació en Google.» lo leyó de corrido con «no en una startup de moda» (8 nov 2026),
+    12 palabras, y el video se quedó sin titular y con la portada de respaldo, un cuadro con su subtítulo detrás.
+    """
+    if (m.get("titular") or "").strip():
+        return []
+    n = len(palabras_de(gancho()))
+    if n <= 10:
+        return []
+    return [f"el gancho («{gancho()}») tiene {n} palabras: así no sale enorme en el primer segundo ni en la portada. "
+            "Pon `titular`, de 2 a 5 palabras, la frase que detiene («Tu laptop no puede minar bitcoin»), o corta el gancho "
+            "a diez palabras o menos."]
+
+
 def titulo() -> str:
     for l in (RAIZ / "guion.md").read_text(encoding="utf-8").splitlines():
         if l.startswith("# "):
@@ -128,10 +153,105 @@ def titulo() -> str:
 
 
 def marca() -> dict:
+    """La marca del video: la que `marca.py aplicar` dejó anotada en el proyecto (`--marca`) o la de siempre."""
+    from marca import archivo, del_proyecto
+    nombre = del_proyecto(RAIZ)
     for d in (RAIZ.parent, RAIZ.parent.parent):
-        if (d / "marca.json").exists():
-            return json.loads((d / "marca.json").read_text(encoding="utf-8"))
+        if archivo(d, nombre).exists():
+            return json.loads(archivo(d, nombre).read_text(encoding="utf-8"))
     return {}
+
+
+def lanzar_portada(m: dict, horizontal: bool) -> subprocess.Popen | None:
+    """
+    La portada con IA, de fondo desde ya (portada_ia.py de video-base), si el usuario eligió con qué en «Imágenes»
+    (`nuevo.py --imagenes`, src/datos/imagenes.json). No mira el video, que aún no existe: va del titular, la paleta,
+    el protagonista (la vista de su modelo), el personaje del canal y las fotos que adjuntó el usuario. Mientras, se
+    hacen la voz y el render; en el paso «portada…» se espera (`esperar_portada`). Sin elección, nada: la del titular.
+    """
+    eleccion = RAIZ / "src" / "datos" / "imagenes.json"
+    if not eleccion.exists():
+        return None
+    con = json.loads(eleccion.read_text(encoding="utf-8")).get("con") or ""
+    if not con:
+        return None
+    # De 2 a 5 palabras: el titular si cabe; si no, el título del guion.
+    titular = m.get("titular") or ""
+    texto = titular if 2 <= len(palabras_de(titular)) <= 5 or not titulo() else titulo()
+    texto = re.sub(r"[.,;:]+$", "", texto.strip())
+    p = m.get("paleta") or {}
+    refs, partes = [], []
+    for a in sorted((RAIZ / "fuentes" / "adjuntas").glob("*"))[:2]:
+        refs.append(a)
+        partes.append("a photo the creator attached of the real subject (follow it for what the subject looks like)")
+    primero = m["momentos"][0]
+    c = (m.get("cosas") or {}).get(primero.get("cosa", ""), {})
+    ficha = MODELOS / "modelos" / str(c.get("modelo")) / "modelo.json"
+    prota = c.get("icono") and f"a glossy 3D toy version of the {pascal_a_kebab(c['icono']).replace('-', ' ')} icon"
+    if c.get("modelo") and ficha.exists():
+        prota = json.loads(ficha.read_text(encoding="utf-8")).get("descripcion") or c["modelo"]
+        if (ficha.parent / "vista.webp").exists():
+            refs.append(ficha.parent / "vista.webp")
+            partes.append("the main 3D object of the video, rendered (keep its design and colors)")
+    try:
+        quien = json.loads((RAIZ / "src" / "datos" / "marca.json").read_text(encoding="utf-8")).get("personaje", "perro")
+        poses = json.loads((RAIZ / "src" / "datos" / "personaje.json").read_text(encoding="utf-8"))["poses"]
+        pose = poses.get(primero.get("pose") or "normal") or poses.get("normal") or next(iter(poses.values()))
+        sticker = RAIZ / "public" / pose["cerrada"]
+    except (OSError, ValueError, KeyError, StopIteration):
+        quien, sticker = "ninguno", None
+    if quien != "ninguno" and sticker and sticker.exists():
+        refs.append(sticker)
+        partes.append("the channel's character, a cut-out photo sticker with a white border: put it on one side, small, "
+                      "exactly as it is (same face, same sticker look), reacting to the subject")
+    adjuntas = " ".join(f"Attached image {k + 1}: {d}." for k, d in enumerate(partes))
+    estilo = (f"Style: the same look as the video, a single playful 3D world like a toy diorama (soft plastic and clay "
+              f"materials, rounded shapes, soft studio light), with the background colors {p.get('oscuro', '#1a1a1a')} and "
+              f"{p.get('claro', '#f3ead8')} and an accent light {p.get('luz', '#ffb347')}. Title font: a heavy rounded geometric "
+              f"sans-serif (like Figtree ExtraBold), white, with the last word in {p.get('luz', '#ffb347')}.")
+    que = (f"The video ({titulo() or RAIZ.name}) opens with: \"{gancho()}\". Main subject: {prota or 'what that sentence is about'}, "
+           f"big and doing what surprises. {adjuntas}")
+    salida = RAIZ / "portada" / "ia.png"
+    cmd = PY + [str(BASE / "portada_ia.py"), con, str(salida), "--titulo", texto, "--estilo", estilo, "--que", que,
+                *[x for r in refs for x in ("--ref", str(r))], *(["--horizontal"] if horizontal else [])]
+    salida.parent.mkdir(exist_ok=True)
+    log = open(salida.parent / "ia.log", "w", encoding="utf-8")
+    paso(f"portada con IA ({'ChatGPT' if con == 'chatgpt' else 'Flow, ' + con}), de fondo mientras se hacen la voz y el render")
+    return subprocess.Popen(cmd, cwd=RAIZ, stdin=subprocess.DEVNULL, stdout=log, stderr=subprocess.STDOUT)
+
+
+def esperar_portada(proceso: subprocess.Popen | None) -> Path | None:
+    """
+    La portada con IA, si llegó: se espera 90 s como mucho (casi siempre ya está: tarda de 30 a 90 s y la voz y el
+    render, más). Si no llegó o falló, None y lo dice: va la del titular. Dice también lo que gastó.
+    """
+    if not proceso:
+        return None
+    salida, estado = RAIZ / "portada" / "ia.png", RAIZ / "portada" / "ia.png.json"
+    hasta = time.time() + 90
+    leido = {}
+    while time.time() < hasta:
+        if proceso.poll() is not None:
+            try:
+                leido = json.loads(estado.read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                leido = {}
+            # Si otro hacer.py ya la estaba generando, este sale al momento: se espera a aquel por su estado.
+            if leido.get("estado") != "generando":
+                break
+        time.sleep(1)
+    else:
+        # No se mata: si llega, queda en portada/ia.png, y otro hacer.py la toma sin pedirla otra vez.
+        paso("la portada con IA no llegó en 90 s: va la del cuadro del titular (si llega, queda en portada/ia.png)")
+        return None
+    if leido.get("estado") == "lista" and salida.exists():
+        if leido.get("hecha", 0) < INICIO:
+            paso(f"portada con IA: la de antes, que no cambió (nada nuevo gastado; aquella: {leido.get('gasto', '?')})")
+        else:
+            paso(f"portada con IA lista en {leido.get('segundos', '?')} s, mientras renderizaba. Gastó: {leido.get('gasto', '?')}")
+        return salida
+    paso(f"la portada con IA no salió ({leido.get('por') or 'mira portada/ia.log'}): va la del cuadro del titular")
+    return None
 
 
 def esperar_proyecto() -> None:
@@ -539,8 +659,10 @@ def main() -> None:
         m = json.loads((RAIZ / "momentos.json").read_text(encoding="utf-8"))
     except json.JSONDecodeError as e:
         sys.exit(f"✗ momentos.json no es JSON: {e}")
-    if errores := comprobar(m, palabras_de(texto_del_guion()), "el guion"):
+    if errores := comprobar(m, palabras_de(texto_del_guion()), "el guion") + sin_titular(m):
         sys.exit("✗ momentos.json:\n  " + "\n  ".join(errores))
+    # El titular sale del guion, no de dónde haga la pausa la voz (sin_titular).
+    m["titular"] = (m.get("titular") or "").strip() or gancho()
     mc = marca()
     if mc.get("cierre", {}).get("red", "ninguna") != "ninguna":
         frase = mc["cierre"].get("frase", "")
@@ -557,6 +679,9 @@ def main() -> None:
     if revisa:
         print("✓ momentos.json bien: ya puedes lanzar hacer.py de fondo")
         return
+    # En horizontal, la portada es la miniatura de YouTube (1280×720) y no entra en el video; en vertical, su primer cuadro.
+    horizontal = json.loads((RAIZ / "src" / "datos" / "formato.json").read_text(encoding="utf-8")).get("formato") == "horizontal"
+    con_ia = lanzar_portada(m, horizontal)
     paso("momentos.json bien; trayendo modelos e íconos")
     traer(m)
     subtitulos(m)
@@ -593,20 +718,23 @@ def main() -> None:
     video = RAIZ / "out" / f"{RAIZ.name}.mp4"
     paso("portada…")
     portada = RAIZ / "portada.png"
-    horizontal = json.loads((RAIZ / "src" / "datos" / "formato.json").read_text(encoding="utf-8")).get("formato") == "horizontal"
-    # En horizontal es la miniatura de YouTube (1280×720) y no entra en el video; en vertical, su primer cuadro.
     palabras = json.loads((RAIZ / "src" / "datos" / "voz.json").read_text(encoding="utf-8"))["palabras"]
-    propio = [w for w in (json.loads((RAIZ / "momentos.json").read_text(encoding="utf-8")).get("titular") or "").split() if normal(w)]
+    propio = [w for w in (m.get("titular") or "").split() if normal(w)]
     n = len(propio) or next((k + 1 for k, p in enumerate(palabras) if re.search(r"[.!?]$", p["w"])), 0)
     hay_titular = 0 < n <= max(10, len(propio))
-    if hay_titular and not horizontal:
-        # En vertical la portada es el cuadro del gancho con su titular ya entero (Titular.tsx lo deja completo en
-        # 3 cuadros por palabra): el protagonista 3D, la frase que detiene y nada más. Con un cuadro cualquiera y el
-        # título de guion.md encima salían los subtítulos de fondo con su recuadro y un título que delataba todo («El
-        # falso premio»): el revisor a ciegas le dio 4 de «lo vería».
+    if hecha := esperar_portada(con_ia):
+        # La generada con IA ya viene a su tamaño (1080×1920 o 1280×720).
+        shutil.copy(hecha, portada)
+    elif hay_titular:
+        # La portada es el cuadro del gancho con su titular ya entero (Titular.tsx lo deja completo en 3 cuadros por
+        # palabra): el protagonista 3D, la frase que detiene y nada más. Con un cuadro cualquiera y el título de guion.md
+        # encima salían los subtítulos de fondo con su recuadro y un título que delataba todo («El falso premio»): el
+        # revisor a ciegas le dio 4 de «lo vería». En horizontal es igual, a 1280×720: la de respaldo traía detrás el
+        # subtítulo de ese momento («Sí, esas», «Se llama Cavendish», 7 y 8 nov 2026).
         hasta = palabras[min(n, len(palabras)) - 1]["e"] + 10 / 30
         t = min(hasta - 0.15, (3 * n + 16) / 30)
-        subprocess.run(["ffmpeg", "-nostdin", "-v", "error", "-y", "-ss", f"{t:.2f}", "-i", str(video), "-frames:v", "1", str(portada)],
+        subprocess.run(["ffmpeg", "-nostdin", "-v", "error", "-y", "-ss", f"{t:.2f}", "-i", str(video), "-frames:v", "1",
+                        *(["-vf", "scale=1280:720:flags=lanczos"] if horizontal else []), str(portada)],
                        cwd=RAIZ, check=True, capture_output=True)
     else:
         # El fondo, cuando el titular ya se fue: a medias salía una palabra entrando encima de otra.

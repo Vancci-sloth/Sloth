@@ -1,7 +1,7 @@
 import type { Proveedor } from '../shared/providers.ts'
 import type { CuentaClaude, LimitesClaude, Model } from '../shared/types.ts'
 import type { AgentOptions, AgentRun } from './agent.ts'
-import { cancelarAntigravity, conectandoAntigravity, conectarAntigravity, cuentaAntigravity, modelosAntigravity, salirAntigravity, startAntigravity } from './antigravity.ts'
+import { cancelarAntigravity, conectandoAntigravity, conectarAntigravity, cuentaAntigravity, modelosAntigravity, quitarAntigravity, salirAntigravity, startAntigravity, usarAntigravity } from './antigravity.ts'
 import { startClaude } from './claude.ts'
 import { cancelarCursor, conectandoCursor, conectarCursor, cuentaCursor, modelosCursor, salirCursor, startCursor } from './cursor.ts'
 import { cuentaDeepSeek, deepseekModels } from './deepseek.ts'
@@ -27,6 +27,9 @@ export interface Otro {
   cancelar?(): Promise<CuentaClaude> | CuentaClaude
   salir?(): Promise<CuentaClaude> | CuentaClaude
   conectando?(): string | null
+  /** Con varias cuentas conectadas (Antigravity): trabajar con otra, o quitar una. */
+  usar?(id: string): CuentaClaude
+  quitar?(id: string): CuentaClaude
   /** Usar las llaves guardadas en Sloth, o no (Pi). */
   llaves?(usar: boolean): Promise<CuentaClaude>
   modelos(): Promise<Model[]>
@@ -35,7 +38,7 @@ export interface Otro {
 export const OTROS: Partial<Record<Proveedor, Otro>> = {
   deepseek: { como: 'llave', start: startClaude, cuenta: cuentaDeepSeek, modelos: deepseekModels },
   grok: { como: 'ventana', start: startGrok, ...cuentaGrok, modelos: modelosGrok },
-  antigravity: { como: 'navegador', start: startAntigravity, cuenta: cuentaAntigravity, conectar: conectarAntigravity, cancelar: cancelarAntigravity, salir: salirAntigravity, conectando: conectandoAntigravity, modelos: modelosAntigravity },
+  antigravity: { como: 'navegador', start: startAntigravity, cuenta: cuentaAntigravity, conectar: conectarAntigravity, cancelar: cancelarAntigravity, salir: salirAntigravity, usar: usarAntigravity, quitar: quitarAntigravity, conectando: conectandoAntigravity, modelos: modelosAntigravity },
   gemini: { como: 'llave', start: startGemini, cuenta: cuentaGemini, modelos: modelosGemini },
   cursor: { como: 'navegador', start: startCursor, cuenta: cuentaCursor, conectar: conectarCursor, cancelar: cancelarCursor, salir: salirCursor, conectando: conectandoCursor, modelos: modelosCursor },
   muse: { como: 'ventana', start: startMuse, ...cuentaMuse, modelos: modelosMuse },

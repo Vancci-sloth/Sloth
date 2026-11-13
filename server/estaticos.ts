@@ -1,5 +1,6 @@
 import { createReadStream, existsSync, statSync } from 'node:fs'
 import type { IncomingMessage, ServerResponse } from 'node:http'
+import { pipeline } from 'node:stream'
 import { extname, join, normalize, sep } from 'node:path'
 
 const TIPOS: Record<string, string> = {
@@ -41,9 +42,9 @@ export function estaticos(raiz: string) {
       const fin = trozo[1] && trozo[2] ? Math.min(Number(trozo[2]), largo - 1) : largo - 1
       if (inicio > fin || inicio >= largo) return res.writeHead(416, { 'content-range': `bytes */${largo}` }).end()
       res.writeHead(206, { ...cabeza, 'content-range': `bytes ${inicio}-${fin}/${largo}`, 'content-length': fin - inicio + 1 })
-      return createReadStream(archivo, { start: inicio, end: fin }).pipe(res)
+      return pipeline(createReadStream(archivo, { start: inicio, end: fin }), res, () => {})
     }
     res.writeHead(200, { ...cabeza, 'content-length': largo })
-    createReadStream(archivo).pipe(res)
+    pipeline(createReadStream(archivo), res, () => {})
   }
 }

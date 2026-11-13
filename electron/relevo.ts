@@ -39,6 +39,11 @@ const CONTEXTO = 'sloth'
 const SESION_PAGINA = 'sloth-pagina'
 /** Lo que se contesta con un `{}`: en un navegador de una sola página no hay nada que hacer. */
 const SIN_EFECTO = new Set(['Target.setDiscoverTargets', 'Browser.grantPermissions', 'Browser.resetPermissions', 'Browser.cancelDownload'])
+/**
+ * Lo que el agente no abre con `Page.navigate`: archivos de la computadora, páginas internas de Chromium y scripts. Las
+ * páginas de las redes y la voz las abre Sloth por su lado (`navegador:ir`), no por aquí.
+ */
+const ESQUEMAS_BLOQUEADOS = /^(file|chrome|chrome-extension|chrome-untrusted|devtools|view-source|javascript):/i
 /** Lo que se contesta y además anuncia la página (`Target.attachedToTarget`), después de la respuesta. */
 const ANUNCIO = Symbol('anuncio')
 
@@ -109,6 +114,9 @@ export function crearRelevo(pagina: PaginaDelRelevo, escribir: (texto: string) =
 
   function deLaPagina(c: Comando): Promise<unknown> {
     const hija = sesiones.get(c.sessionId!) === 'pagina' ? undefined : c.sessionId
+    if (c.method === 'Page.navigate' && ESQUEMAS_BLOQUEADOS.test(String(c.params?.url ?? '').trim())) {
+      return Promise.reject(new Error(`El navegador de Sloth no abre ${String(c.params?.url).split(':')[0]}: (archivos de la computadora, páginas internas ni scripts).`))
+    }
     // La página ya corre; sus marcos hijos no: Playwright se une a ellos con `waitForDebuggerOnStart`, y Chromium los
     // detiene hasta que esto les llega. Tragárselo dejaba congelados los captchas y los inicios de sesión de otro sitio.
     if (c.method === 'Runtime.runIfWaitingForDebugger' && hija === undefined) return Promise.resolve({})

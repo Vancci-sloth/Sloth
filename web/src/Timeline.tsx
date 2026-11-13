@@ -17,9 +17,33 @@ import { BarraSubagente, FilaSubagente, GrupoSubagentes } from './Subagentes'
 /** Una ruta del disco: `C:\…` en Windows; en Mac y Linux, de las carpetas de la gente (no `/api/…` y parecidas). */
 const RUTA = /^([A-Za-z]:[\\/]|\/(Users|home|Volumes|media|mnt|tmp)\/)/
 
-/** Clic en «Copiar» copia su bloque; clic en una ruta del disco (en `código`) la abre en el Explorador o el Finder. */
-function onMarkdownClick(e: React.MouseEvent) {
+const abrirEnDisco = (path: string, sessionId?: string) =>
+  fetch('/api/open', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ path, sessionId }) })
+
+/**
+ * Un enlace del agente: la web y el correo, fuera (en la app, al navegador); un archivo, señalado en el Explorador o el
+ * Finder: `C:\…`, `file:///…` o relativo a la carpeta del hilo (`out/video.mp4`). Nunca cambia la página de Sloth.
+ */
+function onEnlace(e: React.MouseEvent, a: HTMLAnchorElement, sessionId?: string) {
+  const href = a.getAttribute('href') ?? ''
+  if (href.startsWith('#')) return
+  e.preventDefault()
+  if (/^(https?|mailto):/i.test(href)) return void window.open(href, '_blank', 'noopener')
+  let ruta = href
+  try {
+    ruta = decodeURI(href)
+  } catch {
+    // Un `%` suelto: se queda como venía.
+  }
+  ruta = ruta.replace(/^file:\/\/\/?(?=[a-z]:)|^file:\/\//i, '')
+  if (RUTA.test(ruta) || sessionId) void abrirEnDisco(ruta, sessionId)
+}
+
+/** Clic en «Copiar» copia su bloque; clic en una ruta del disco (en `código` o enlace) la abre en el Explorador o el Finder. */
+function onMarkdownClick(e: React.MouseEvent, sessionId?: string) {
   const el = e.target as HTMLElement
+  const a = el.closest('a')
+  if (a) return onEnlace(e, a, sessionId)
   if (el.classList.contains('copy')) {
     const code = el.parentElement?.querySelector('code')?.textContent ?? ''
     navigator.clipboard.writeText(code.replace(/\n$/, '')).then(() => {
@@ -31,7 +55,7 @@ function onMarkdownClick(e: React.MouseEvent) {
   if (el.tagName !== 'CODE') return
   const text = el.textContent?.trim() ?? ''
   if (!RUTA.test(text) || text.includes('\n')) return
-  fetch('/api/open', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ path: text }) })
+  void abrirEnDisco(text)
 }
 
 /**
@@ -70,7 +94,7 @@ const Markdown = memo(function Markdown({ text, sessionId }: { text: string; ses
   }, [bloques])
   return (
     <>
-      <div className="md" ref={caja} onClick={(e) => (e.target instanceof HTMLImageElement ? setGrande(e.target.src) : onMarkdownClick(e))} />
+      <div className="md" ref={caja} onClick={(e) => (e.target instanceof HTMLImageElement ? setGrande(e.target.src) : onMarkdownClick(e, sessionId))} />
       {grande && (
         <div className="lightbox" onClick={() => setGrande(undefined)}>
           <img src={grande} alt="" />
@@ -154,7 +178,7 @@ function plegarTrabajo(lista: Item[], acabado: boolean): (Item | Trabajo)[] {
  * la fila que cambió (`Row` va memorizada y `buildTimeline` deja igual lo que no cambió). `relevos`: un modelo de cada
  * otro agente conectado, con los que el hilo sigue si el suyo llega al límite.
  */
-export function Timeline({ running, background, sessionId, proveedor = 'claude', subagente, onSubagente, onResponder, relevos }: { running: boolean; background: string[]; sessionId: string; proveedor?: string; subagente?: string; onSubagente?(id: string | null): void; onResponder?(text: string): Promise<unknown>; relevos?: Choice[] }) {
+export function Timeline({ running, background, sessionId, proveedor = 'claude', subagente, onSubagente, onResponder, relevos }: { running: boolean; background: string[]; sessionId: string; proveedor?: string; subagente?: string; onSubagente?(id: string | null): void; onResponder?(text: string, images?: string[]): Promise<unknown>; relevos?: Choice[] }) {
   const events = useEventos(sessionId) ?? SIN_EVENTOS
   const items = buildTimeline(events)
   const lanzador = subagente ? items.find((i): i is Extract<Item, { kind: 'tool' }> => i.kind === 'tool' && i.id === subagente && !!i.subagente) : undefined
@@ -484,7 +508,7 @@ function WithLinks({ text }: { text: string }) {
  * `anidado`: lo de un subagente que no se sabe cuál es, suelto en el hilo, va sangrado. Memorizada: mientras el agente
  * escribe, solo se vuelve a dibujar la fila que crece.
  */
-const Row = memo(function Row({ item, sessionId, anidado, proveedor, onAbrir, onResponder, relevos }: { item: Item; sessionId?: string; anidado: boolean; proveedor: string; onAbrir(id: string): void; onResponder?(text: string): Promise<unknown>; relevos?: Choice[] }) {
+const Row = memo(function Row({ item, sessionId, anidado, proveedor, onAbrir, onResponder, relevos }: { item: Item; sessionId?: string; anidado: boolean; proveedor: string; onAbrir(id: string): void; onResponder?(text: string, images?: string[]): Promise<unknown>; relevos?: Choice[] }) {
   const nested = anidado ? 'nested' : ''
   switch (item.kind) {
     case 'user':
@@ -551,7 +575,8 @@ function Respuestas({ opciones, onElegir }: { opciones: string[]; onElegir?(text
 
 /**
  * Un turno que acabó mal, dicho en llano; el error tal cual, al pasar el ratón. El último, con el hilo quieto
- * (`onResponder`), dice además qué hacer y deja «Reintentar», que le pide que siga donde se quedó. Todos llevan el símbolo
+ * (`onResponder`), dice además qué hacer y deja «Reintentar», que le pide que siga donde se quedó. Si falló antes de que el
+ * agente hiciera nada (sin conexión, por ejemplo), vuelve a mandar tu pedido tal cual (`item.pedido`). Todos llevan el símbolo
  * del agente del hilo, que pide una mejora con el error para que no vuelva a pasar. El error habla de ese agente: con
  * Codex, el plan y la cuenta son los de ChatGPT; si el hilo pasó luego a otro, el de quien falló (`item.agente`).
  *
@@ -559,7 +584,7 @@ function Respuestas({ opciones, onElegir }: { opciones: string[]; onElegir?(text
  * servidor le da lo hablado, la carpeta y la skill (`setModel` en sessions.ts), y sigue donde se quedó. Con Claude, además,
  * cuánto queda del límite y entrar con otra cuenta (`LimiteClaude.tsx`).
  */
-function Fallo({ item, datos, proveedor, sessionId, onResponder, relevos = [] }: { item: Extract<Item, { kind: 'turn_end' }>; datos: string; proveedor: string; sessionId?: string; onResponder?(text: string): Promise<unknown>; relevos?: Choice[] }) {
+function Fallo({ item, datos, proveedor, sessionId, onResponder, relevos = [] }: { item: Extract<Item, { kind: 'turn_end' }>; datos: string; proveedor: string; sessionId?: string; onResponder?(text: string, images?: string[]): Promise<unknown>; relevos?: Choice[] }) {
   const actual = proveedorDe(proveedor === 'claude' ? '' : `${proveedor}:`)
   const agente = item.agente ?? actual
   const e = errorLlano(item.error, item.caida, agente)
@@ -608,7 +633,12 @@ function Fallo({ item, datos, proveedor, sessionId, onResponder, relevos = [] }:
             </button>
           ))}
           {e.reintentar && (
-            <button className="primary" disabled={enviando} onClick={() => intentar(() => onResponder(REINTENTAR))}>
+            <button
+              className="primary"
+              disabled={enviando}
+              title={item.pedido ? 'Vuelve a mandar tu pedido' : 'Le pide que siga donde se quedó'}
+              onClick={() => intentar(() => (item.pedido ? onResponder(item.pedido.text, item.pedido.images) : onResponder(REINTENTAR)))}
+            >
               Reintentar
             </button>
           )}

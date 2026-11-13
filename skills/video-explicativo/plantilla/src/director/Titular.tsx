@@ -5,7 +5,7 @@ import React from "react";
 import { interpolate, spring, useCurrentFrame } from "remotion";
 import { measureText } from "@remotion/layout-utils";
 import { cuadro, PALABRAS } from "../tiempo";
-import { LETRA, PALETA, ZONA } from "../tema";
+import { ANCHO, LETRA, PALETA, ZONA } from "../tema";
 import { GUION } from "./guion";
 
 const normal = (s: string) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9ñ%$]/g, "");
@@ -61,10 +61,12 @@ export const Titular: React.FC = () => {
   const ultima = TITULAR.palabras.length - 1;
   let k = -1;
   return (
-    // En dos renglones sube medio renglón: bajando, el segundo se encimaba con la foto del gancho.
+    // En dos renglones sube medio renglón: bajando, el segundo se encimaba con la foto del gancho. Centrado en
+    // ZONA.texto.x: el margen 2x − ANCHO lo hace en cualquier formato (con x − 540, en horizontal caía 343 px a la
+    // derecha, encima del personaje y de la duración de YouTube en la miniatura; 9 nov 2026).
     <div style={{ position: "absolute", left: 0, right: 0, top: ZONA.texto.centro - TAM * 0.62 - (renglones.length > 1 ? TAM * 0.6 : 0), opacity: sale, transform: `scale(${0.9 + 0.1 * sale})` }}>
       {renglones.map((r, i) => (
-        <div key={i} style={{ display: "flex", justifyContent: "center", gap: espacio, height: TAM * 1.05, marginLeft: ZONA.texto.x - 540 }}>
+        <div key={i} style={{ display: "flex", justifyContent: "center", gap: espacio, height: TAM * 1.05, marginLeft: 2 * ZONA.texto.x - ANCHO }}>
           {r.map((p) => {
             k++;
             const a = spring({ frame: f - p.desde, fps: 30, config: { damping: 11, stiffness: 220, mass: 0.6 } });

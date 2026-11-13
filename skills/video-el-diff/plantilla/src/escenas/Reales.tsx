@@ -1,12 +1,12 @@
 import React from "react";
 import { AbsoluteFill, Easing, Freeze, Img, interpolate, Sequence, staticFile, useCurrentFrame } from "remotion";
 import { COLOR, FUENTE } from "../estilo";
-import { Caja, Camara, Emoji, Lleno, Metraje, Rotulo, Sello, Tarjeta, TextoMeme, useBeat, useFormato, useResorte, useSacudida } from "../piezas";
+import { Caja, Camara, Emoji, Flecha, Lleno, Mano, Metraje, Ovalo, Rotulo, Sello, Tarjeta, TextoMeme, useBeat, useFormato, useResorte, useSacudida } from "../piezas";
 import { encuadre, esVideo, type Contexto } from "../encuadre";
 import LINEAS from "../lineas.json";
 
 type Rect = [number, number, number, number];
-/** Renglones del OCR de cada captura (los escribe guion.py): el encuadre vertical no los corta. */
+/** Renglones del OCR de cada captura (los escribe el director): el encuadre vertical no los corta. */
 const RENGLONES = LINEAS as unknown as Record<string, Rect[]>;
 const centro: React.CSSProperties = { display: "flex", alignItems: "center", justifyContent: "center" };
 const fijo = { extrapolateLeft: "clamp", extrapolateRight: "clamp" } as const;
@@ -224,6 +224,7 @@ export const encadena = <B extends { inicio: number; fin: number; palabras: { t:
       fuente: v.fuente ?? pv.fuente,
       maxW: v.maxW ?? pv.maxW,
       maxH: v.maxH ?? pv.maxH,
+      desdeToma: (pv.desdeToma ?? 0) + Math.round((p.fin - p.inicio) * fps),
     };
     if (pv.video && (!v.video || (v.video.src === pv.video.src && v.video.desde === undefined))) {
       nv.video = { ...pv.video, ...v.video, desde: (pv.video.desde ?? 0) + avance };
@@ -240,6 +241,29 @@ export const encadena = <B extends { inicio: number; fin: number; palabras: { t:
     salida.push({ ...b, v: nv });
   });
   return salida;
+};
+
+/**
+ * El acercamiento lento de una captura (`empuje`, lo pone el director): crece hasta ese tanto en 12 s, contados desde
+ * que empezó la toma (`desdeToma` de `encadena`), para que una página citada no se quede quieta. En los Code Report
+ * ninguna captura está quieta: entra y se acerca de un 4 a un 10 % (REFERENCIAS.md).
+ */
+const acercamiento = (v: Record<string, any>, frame: number, fps: number) =>
+  1 + (v.empuje ?? 0) * Math.min(1, (frame + (v.desdeToma ?? 0)) / (12 * fps));
+
+/**
+ * Lo que se dibuja sobre algo de la captura, ya en píxeles de pantalla: la caja roja de siempre, el óvalo, la flecha
+ * curva que llega desde el lado donde hay sitio, o la mano que señala.
+ */
+const anotacion = (m: any, p: { x: number; y: number; w: number; h: number }, desde: number, i: number, grosor: number) => {
+  if (m.tipo === "ovalo") return <Ovalo key={i} {...p} desde={desde} color={m.color ?? COLOR.rojo} grosor={grosor} />;
+  if (m.tipo === "flecha" || m.tipo === "mano") {
+    const izquierda = p.x > 230;
+    const [x, y] = [izquierda ? p.x - 16 : p.x + p.w + 16, p.y + p.h / 2];
+    if (m.tipo === "mano") return <Mano key={i} x={x + (izquierda ? -70 : 70)} y={y} dir={izquierda ? "derecha" : "izquierda"} desde={desde} tam={140} />;
+    return <Flecha key={i} x={x} y={y} lado={izquierda ? "izquierda" : "derecha"} desde={desde} />;
+  }
+  return <Caja key={i} x={p.x - 8} y={p.y - 8} w={p.w + 16} h={p.h + 16} desde={desde} color={m.color ?? COLOR.rojo} grosor={grosor} />;
 };
 
 /** Una tecla de teclado que se hunde al presionarse. */
@@ -344,9 +368,7 @@ const CapturaHorizontal: React.FC = () => {
     if (m.es) T = cambio(desde);
     else if (!m.parte) T = undefined;
     const p = pant(m.r);
-    if (m.tipo !== "marcador") {
-      return [<Caja key={i} x={p.x - 8} y={p.y - 8} w={p.w + 16} h={p.h + 16} desde={desde} color={m.color ?? COLOR.rojo} grosor={8} />];
-    }
+    if (m.tipo !== "marcador") return [anotacion(m, p, desde, i, 8)];
     const sale = m.es || m.parte ? T : undefined;
     return [
       <Marcador key={i} {...p} desde={desde} claro={v.claro} sale={sale} />,
@@ -374,7 +396,7 @@ const CapturaHorizontal: React.FC = () => {
   const sacudida = useSacudida(v.sello ? momento(v.sello) : -100, 16, 10);
   const aparece = v.sigue ? 1 : interpolate(frame, [6, 12], [0, 1], fijo);
   const imagen = (
-    <Lleno style={{ ...centro, transform: sacudida }}>
+    <Lleno style={{ ...centro, transform: `${sacudida} scale(${acercamiento(v, frame, fps)})` }}>
       {completo ? marco : <Tarjeta rot={v.rot ?? 0} desde={v.sigue ? -30 : 0}>{marco}</Tarjeta>}
     </Lleno>
   );
@@ -490,7 +512,13 @@ const CapturaVertical: React.FC = () => {
     return largo * k >= F ? Math.min(0, Math.max(F - largo * k, t)) : (F - largo * k) / 2;
   };
   const tx = ajusta(r[0] + r[2] / 2, W, ZW);
-  const ty = ajusta(r[1] + r[3] / 2, H, ZH);
+  // `recorre` (lo pone el director la primera vez que sale una página): la toma empieza arriba, en el encabezado, y baja
+  // hasta la cita como quien desliza la pantalla, en vez de aparecer ya parada en ella. Es lo más parecido a la pantalla
+  // grabada de los Code Report que da una captura (REFERENCIAS.md). Solo si la página es más alta que la zona.
+  const llega = v.recorre && !v.sigue && H * k > ZH
+    ? interpolate(frame, [v.entra === "papel" ? 8 : 2, v.entra === "papel" ? 26 : 20], [0, 1], { ...fijo, easing: Easing.inOut(Easing.cubic) })
+    : 1;
+  const ty = ajusta(r[1] + r[3] / 2, H, ZH) * llega;
   const pant = (m: Rect) => ({ x: m[0] * k + tx, y: m[1] * k + ty, w: m[2] * k, h: m[3] * k });
 
   const foco = v.foco ? { k: momento(v.foco), F: Math.round((v.foco.dura ?? 1.5) * fps) } : undefined;
@@ -537,9 +565,7 @@ const CapturaVertical: React.FC = () => {
     if (m.es) T = cambio(desde);
     else if (!m.parte) T = undefined;
     const p = pant(m.r);
-    if (m.tipo !== "marcador") {
-      return [<Caja key={i} x={p.x - 8} y={p.y - 8} w={p.w + 16} h={p.h + 16} desde={desde} color={m.color ?? COLOR.rojo} grosor={7} />];
-    }
+    if (m.tipo !== "marcador") return [anotacion(m, p, desde, i, 7)];
     const sale = m.es || m.parte ? T : undefined;
     return [
       <Marcador key={i} {...p} desde={desde} claro={v.claro} sale={sale} />,
@@ -566,7 +592,7 @@ const CapturaVertical: React.FC = () => {
     <AbsoluteFill style={{ overflow: "hidden" }}>
       <AbsoluteFill
         style={{
-          transform: `${sacudida} translateY(${(1 - aparece) * 60}px)`,
+          transform: `${sacudida} translateY(${(1 - aparece) * 60}px) scale(${acercamiento(v, frame, fps)})`,
           opacity: aparece,
           WebkitMaskImage: mascara,
           maskImage: mascara,

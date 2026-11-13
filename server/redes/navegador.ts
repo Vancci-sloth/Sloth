@@ -59,9 +59,9 @@ export async function navegador(app: string, url = 'about:blank'): Promise<Brows
 /** Edge con el perfil de las redes, abriéndolo con `url` si no estaba. */
 async function abrirEdge(app: string, url: string): Promise<Browser> {
   if (!(await responde())) {
-    // Edge si está y, si no (lo normal en Mac y Linux), Chrome: Google deja entrar en los dos.
+    // Edge si está y, si no (lo normal en Mac y Linux), Chrome u otro Chromium: Google deja entrar en todos.
     const edge = chromiumDelSistema(false)
-    if (!edge) throw new Error(process.platform === 'win32' ? 'No encontré Microsoft Edge, que es el navegador con el que Sloth publica.' : SIN_CHROMIUM)
+    if (!edge) throw new Error(SIN_CHROMIUM)
     const perfil = join(app, 'data', 'redes', 'perfil')
     mkdirSync(perfil, { recursive: true })
     lanzarChromium(edge, [`--remote-debugging-port=${PUERTO}`, `--user-data-dir=${perfil}`, '--no-first-run', '--no-default-browser-check', url], true)

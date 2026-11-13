@@ -3,6 +3,20 @@ node_modules
 dist
 /trabajo/
 
+# Llaves y certificados (el repo es público): la firma de Apple y las llaves van solo en los secretos de GitHub.
+.env
+.env.*
+.dev.vars
+*.p12
+*.p8
+*.pfx
+*.cer
+*.pem
+*.key
+*.mobileprovision
+*.provisionprofile
+*.certSigningRequest
+
 # Lo que cada quien guarda solo en su copia: sus poses, su biblioteca de modelos 3D, lo que Sloth aprende de sus
 # videos y el material que no es de Sloth (memes, referencias, las métricas de Ideas).
 /references/
@@ -13,6 +27,9 @@ dist
 !/skills/video-el-diff/plantilla/public/img/grano.png
 !/skills/video-el-diff/plantilla/public/img/LEEME.md
 /skills/modelos-3d/modelos/
+/skills/modelos-3d/visor/
+/skills/modelos-3d/visor.nuevo-*/
+/skills/modelos-3d/visor.viejo-*/
 /skills/ideas-*/METODO.md
 # Las skills de la cuenta de claude.ai (docx, pdf…): Claude Code las baja a data/claude/skills, que es esta carpeta.
 /skills/synced/

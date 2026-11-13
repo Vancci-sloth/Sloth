@@ -1,12 +1,13 @@
 import React from "react";
-import { AbsoluteFill, Sequence, staticFile, useCurrentFrame } from "remotion";
+import { AbsoluteFill, Easing, interpolate, Sequence, staticFile, useCurrentFrame } from "remotion";
 import { Audio } from "@remotion/media";
 import linea from "./timeline.json";
 import { COLOR } from "./estilo";
 import { Beat, BeatProvider, Formato, FormatoProvider, HORIZONTAL } from "./piezas";
 import type { Rect } from "./encuadre";
-import { Interferencia, Logo, Meme, Titular } from "./escenas/Basicas";
+import { Entrada, Interferencia, Logo, Meme, Titular } from "./escenas/Basicas";
 import { Captura, Duelo, encadena, Tarjetas } from "./escenas/Reales";
+import { Diagrama } from "./escenas/Diagrama";
 import { Encima } from "./escenas/Encima";
 import { Gancho, paginasDe, Subtitulos, VERTICAL } from "./subtitulos";
 
@@ -14,7 +15,7 @@ export const FPS = linea.fps;
 export const DURACION = Math.ceil(linea.duracion * FPS);
 
 /**
- * El formato del episodio, el de `FORMATO` en `guion.py` (lo pone nuevo.py): vertical (1080x1920), compuesto para el
+ * El formato del episodio, el de `src/formato.json` (lo pone nuevo.py): vertical (1080x1920), compuesto para el
  * celular, u horizontal (1920x1080). Ver «Formato» en el SKILL.
  */
 export const ES_VERTICAL = (linea as { formato?: string }).formato === "vertical";
@@ -23,7 +24,7 @@ export const ALTO = ES_VERTICAL ? 1920 : 1080;
 
 /**
  * El lienzo vertical (`VERTICAL` en subtitulos.tsx): arriba el gancho (el sello y el rótulo de
- * `GANCHO` en guion.py), la escena en una zona de 1080x1156 acomodada a lo vertical (las ramas `vertical` de cada
+ * `gancho` de momentos.json), la escena en una zona de 1080x1156 acomodada a lo vertical (las ramas `vertical` de cada
  * escena) y debajo los subtítulos, que así no tapan lo citado.
  */
 export const ZONA = { y: VERTICAL.zonaY, alto: VERTICAL.zonaH };
@@ -65,13 +66,14 @@ const ESCENAS: Record<string, React.FC> = {
   captura: Captura,
   tarjetas: Tarjetas,
   duelo: Duelo,
+  diagrama: Diagrama,
 };
 
 /**
  * Los tipos que se acomodan solos al vertical (leen `useFormato`). Los demás (los gags propios de un episodio que no lo
  * leen) se dibujan en 1920x1080 y se escalan al ancho de la zona (`Respaldo`).
  */
-const VERTICALES = new Set(["captura", "titular", "tarjetas", "duelo", "meme", "logo"]);
+const VERTICALES = new Set(["captura", "titular", "tarjetas", "duelo", "meme", "logo", "diagrama"]);
 
 /** Una escena que no se acomoda al vertical: en 1920x1080, escalada al ancho de la zona y centrada. */
 const Respaldo: React.FC<{ W: number; H: number; children: React.ReactNode }> = ({ W, H, children }) => {
@@ -100,21 +102,45 @@ const Grano: React.FC = () => {
 
 const MUSICA = 0.08;
 
+/**
+ * La captura que cae como un papel sobre la anterior (`entra: "papel"`, lo pone el director cuando cambia de página):
+ * llega desde abajo, girada, y se asienta en 9 cuadros, con la de antes todavía debajo. En los Code Report las capturas
+ * se apilan como papeles en una mesa (REFERENCIAS.md); aquí un corte seco entre dos páginas claras apenas se notaba.
+ */
+const PAPEL = 9;
+const Papel: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const frame = useCurrentFrame();
+  const p = interpolate(frame, [0, PAPEL], [1, 0], { extrapolateLeft: "clamp", extrapolateRight: "clamp", easing: Easing.out(Easing.cubic) });
+  return (
+    <AbsoluteFill style={{ transform: p ? `translateY(${p * 62}%) rotate(${p * -8}deg) scale(${1 + p * 0.05})` : undefined, boxShadow: p ? "0 -24px 70px rgba(0,0,0,0.75)" : undefined }}>
+      {children}
+    </AbsoluteFill>
+  );
+};
+
 /** Cada beat en su momento, con la escena de su tipo dibujada en `formato`. */
 const Escenas: React.FC<{ beats: Beat[]; formato: Formato }> = ({ beats, formato }) => (
   <>
-    {beats.map((b) => {
+    {beats.map((b, i) => {
       const desde = Math.round(b.inicio * FPS);
       const dura = Math.max(1, Math.round(b.fin * FPS) - desde);
       const Escena = ESCENAS[b.v.tipo];
       const escena = Escena ? <Escena /> : <div style={{ color: "red", fontSize: 80 }}>{b.v.tipo}</div>;
+      const papel = b.v.entra === "papel";
+      const contenido = (
+        <>
+          {formato.vertical && !VERTICALES.has(b.v.tipo) ? <Respaldo W={formato.W} H={formato.H}>{escena}</Respaldo> : escena}
+          <Encima />
+        </>
+      );
+      // Bajo un papel que cae, la escena de antes se queda lo que tarda en asentarse.
+      const debajo = beats[i + 1]?.v.entra === "papel" ? PAPEL : 0;
       return (
-        <Sequence key={b.id} from={desde} durationInFrames={dura} name={`${b.id} · ${b.v.tipo}`}>
+        <Sequence key={b.id} from={desde} durationInFrames={dura + debajo} name={`${b.id} · ${b.v.tipo}`}>
           <BeatProvider value={b}>
             <FormatoProvider value={formato}>
-              {formato.vertical && !VERTICALES.has(b.v.tipo) ? <Respaldo W={formato.W} H={formato.H}>{escena}</Respaldo> : escena}
-              <Encima />
-              {SECCIONES.has(b.id) && <Interferencia />}
+              {papel ? <Papel>{contenido}</Papel> : contenido}
+              {SECCIONES.has(b.id) ? <Interferencia /> : b.v.entra && !papel ? <Entrada como={b.v.entra} /> : null}
             </FormatoProvider>
           </BeatProvider>
         </Sequence>

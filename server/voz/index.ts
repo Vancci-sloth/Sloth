@@ -8,14 +8,15 @@ import type { McpStdioServerConfig } from '@anthropic-ai/claude-agent-sdk'
 import type { Browser, Page } from 'playwright-core'
 import { WebSocket } from 'ws'
 import { conectarCDP } from '../playwright.ts'
-import { type EstadoVoz, type ProveedorVoz, NAVEGADOR_VOZ, type TrabajoVoz, type VozStudio } from '../../shared/types.ts'
+import { type EstadoVoz, type ProveedorVoz, NAVEGADOR_VOZ, type TrabajoVoz, type VozApi, type VozStudio } from '../../shared/types.ts'
 import { VENTA } from '../../shared/venta.ts'
-import { MOTORES, motorDe, segundosWav, textoParaVoz, vocesDelPanel } from '../../shared/voz.ts'
+import { juntarVoces, MOTORES, motorDe, segundosWav, textoParaVoz, vocesDeLista, vocesDelPanel } from '../../shared/voz.ts'
 import { chromiumDelSistema, lanzarChromium, nombreDe, paginaNueva, SIN_CHROMIUM, SIN_VENTANA } from '../chromium.ts'
 import { guardar } from '../disco.ts'
 import { bytes, cuerpo } from '../http.ts'
 import { integrado } from '../navegador-agente.ts'
 import { vozPorApi } from './apis.ts'
+import { enviarAudio, muestras } from './muestras.ts'
 import { voicesCloning } from './voices-cloning.ts'
 
 /**
@@ -63,6 +64,10 @@ const navegadorDeGoogle = () => chromiumDelSistema(process.platform === 'darwin'
 const nombreEdge = () => nombreDe(navegadorDeGoogle() ?? (process.platform === 'win32' ? 'msedge' : undefined))
 /** Lo más que espera una petición a que acabe su voz: el MCP repite, y Codex corta una herramienta a los 60 s. */
 const ESPERA_MAXIMA = 50_000
+/** Lo más largo que se prueba una voz en el menú, en letras: una frase, no un guion. */
+const PRUEBA_MAXIMA = 240
+/** Cuántas pruebas se guardan en `data/voz/pruebas`. */
+const PRUEBAS_GUARDADAS = 80
 
 type Trabajo = TrabajoVoz & { texto: string; salida: string; huella: string }
 type Cookie = { name: string; value: string; domain: string; path: string; expires: number; httpOnly: boolean; secure: boolean; sameSite?: string; partitionKey?: unknown }
@@ -95,6 +100,21 @@ export function voz(app: string, socio: Parameters<typeof voicesCloning>[1]) {
 
   const apis = vozPorApi(carpeta)
   const vc = voicesCloning(carpeta, socio)
+  const deMuestra = muestras(carpeta)
+  // Las frases con que se probaron voces en el menú, para oírlas otra vez sin gastar. Se quedan las últimas.
+  const pruebas = join(carpeta, 'pruebas')
+  const limpiarPruebas = () => {
+    try {
+      const viejas = readdirSync(pruebas)
+        .filter((f) => f.endsWith('.wav'))
+        .map((f) => ({ f, t: statSync(join(pruebas, f)).mtimeMs }))
+        .sort((a, b) => b.t - a.t)
+        .slice(PRUEBAS_GUARDADAS)
+      for (const { f } of viejas) for (const x of [f, `${f}.huella`]) rmSync(join(pruebas, x), { force: true })
+    } catch {
+      // Aún no hay ninguna.
+    }
+  }
   /** Las que se están generando por API, que no hacen fila. */
   let porApi = 0
 
@@ -332,7 +352,29 @@ export function voz(app: string, socio: Parameters<typeof voicesCloning>[1]) {
     const p = await pagina()
     try {
       await abrirDialogo(p.page)
-      const leidas = vocesDelPanel(await conPanel(p.page, (panel) => panel.innerText()))
+      const leidas = await conPanel(p.page, async (panel) => {
+        const grupos = vocesDelPanel(await panel.innerText())
+        // Sin filtro, el panel solo enseña 3 de cada grupo; filtrado por género, todas. Si algo de esto cambia en la
+        // página, se quedan las de los grupos.
+        const porGenero: Parameters<typeof juntarVoces>[1] = {}
+        const genero = (cual: string) => async () => {
+          await panel.locator('button:has-text("arrow_drop_down")').nth(1).click({ timeout: 5000 })
+          await p.page.locator('.cdk-overlay-pane').last().getByText(cual, { exact: true }).click({ timeout: 5000 })
+          await p.page.waitForTimeout(1500)
+        }
+        try {
+          for (const [g, cual] of [['mujer', 'Feminine'], ['hombre', 'Masculine']] as const) {
+            await genero(cual)()
+            porGenero[g] = vocesDeLista(await panel.innerText())
+          }
+        } catch {
+          // Se quedan las de los grupos.
+        } finally {
+          // El filtro se queda puesto en la página: se quita, o `ponerVoz` no encontraría las del otro género.
+          await genero('All genders')().catch(() => {})
+        }
+        return juntarVoces(grupos, porGenero)
+      })
       if (leidas.length) voces = leidas
       guardarCuenta()
     } finally {
@@ -558,12 +600,63 @@ export function voz(app: string, socio: Parameters<typeof voicesCloning>[1]) {
       const { motor } = motorDe(d.voz)
       if (motor === 'vc' && !vc.puede()) await vc.refrescar()
       if (motor === 'vc' && !vc.puede())
-        return enviar(409, { error: 'Las voces de Voices Cloning no están disponibles en esta computadora (hace falta la cuenta de Sloth y créditos de voz). Mientras, pídele la voz al usuario.' }), true
+        return enviar(409, { error: 'Las voces de Sloth no están disponibles en esta computadora (hace falta la cuenta de Sloth y créditos de voz). Mientras, pídele la voz al usuario.' }), true
       if (motor !== 'ai-studio' && motor !== 'vc' && !apis.tieneLlave(motor))
         return enviar(409, { error: `No hay llave de ${MOTORES[motor]}: que el usuario la ponga en Opciones → Voz. Mientras, pídele la voz.` }), true
       if (motor === 'ai-studio' && !cuenta)
         return enviar(409, { error: 'No hay cuenta de Google conectada para AI Studio: que el usuario la conecte en Opciones → Voz (o en el selector Voz del compositor). Mientras, pídele la voz.' }), true
       return enviar(200, publico(pedir(texto, d.voz.trim(), resolve(d.salida)))), true
+    }
+    if (await deMuestra.api(req, res, path)) return true
+    // Oír una voz con tu frase antes de elegirla (el menú «Voz»): sale una vez y se guarda, la segunda no gasta nada.
+    if (path === '/api/voz/probar' && metodo === 'POST') {
+      const d = await cuerpo<{ texto?: string; voz?: string }>(req)
+      const texto = d.texto?.trim().slice(0, PRUEBA_MAXIMA)
+      const nombre = d.voz?.trim()
+      if (!texto || !nombre) return enviar(400, { error: 'Escribe una frase y elige una voz.' }), true
+      const { motor } = motorDe(nombre)
+      if (motor === 'ai-studio' ? !cuenta : motor === 'vc' ? !vc.puede() : !apis.tieneLlave(motor)) return enviar(409, { error: 'Esa voz aún no está conectada.' }), true
+      const huella = createHash('sha1').update(`${nombre.toLowerCase()}\n${texto}`).digest('hex').slice(0, 20)
+      const t = pedir(texto, nombre, join(pruebas, `${huella}.wav`))
+      const hasta = Date.now() + ESPERA_MAXIMA
+      while ((t.estado === 'en-fila' || t.estado === 'generando') && Date.now() < hasta) await espera(300)
+      limpiarPruebas()
+      // El error de la fila está dicho para el agente; aquí lo lee quien prueba voces.
+      const cuota = motor === 'ai-studio' && /\(429\b/.test(t.error ?? '')
+      if (cuota) return enviar(429, { error: 'AI Studio llegó al límite de hoy con tu cuenta. Oye su muestra (sin tu frase) o prueba una voz de otro motor.' }), true
+      if (t.estado !== 'lista') return enviar(t.estado === 'error' ? 500 : 202, { error: t.error ?? 'Sigue generándose: vuelve a pulsar en un momento.' }), true
+      return enviar(200, { url: `/api/voz/prueba/${huella}.wav`, segundos: t.segundos }), true
+    }
+    const prueba = /^\/api\/voz\/prueba\/(\w+)\.wav$/.exec(path)
+    if (prueba && metodo === 'GET') {
+      const ruta = join(pruebas, `${prueba[1]}.wav`)
+      if (!existsSync(ruta)) return enviar(404, { error: 'Ya no está: vuelve a probarla.' }), true
+      enviarAudio(req, res, readFileSync(ruta), 'audio/wav', 86400)
+      return true
+    }
+    // Buscar en toda la biblioteca de Fish Audio, y dejar en el menú la que eliges de ahí.
+    if (path === '/api/voz/buscar' && metodo === 'GET') {
+      const q = new URL(req.url ?? '', 'http://x').searchParams.get('q')?.trim() ?? ''
+      return enviar(200, q.length < 2 ? [] : await apis.buscar(q)), true
+    }
+    const elegir = /^\/api\/voz\/(fish|elevenlabs)\/elegir$/.exec(path)
+    if (elegir && metodo === 'POST') {
+      const { voz: v } = await cuerpo<{ voz?: VozApi }>(req)
+      if (!v?.id || !v.nombre) return enviar(400, { error: 'Falta la voz.' }), true
+      apis.elegir(elegir[1] as ProveedorVoz, { id: v.id, nombre: v.nombre, descripcion: v.descripcion ?? '', propia: false, ...(v.muestra ? { muestra: v.muestra } : {}), ...(v.usos ? { usos: v.usos } : {}) })
+      return enviar(200, estado()), true
+    }
+    // Quitar una voz tuya guardada en esta computadora (las que Fish no dejó crear sin saldo).
+    const quitar = /^\/api\/voz\/(fish|elevenlabs)\/quitar$/.exec(path)
+    if (quitar && metodo === 'POST') {
+      try {
+        const { id } = await cuerpo<{ id?: unknown }>(req)
+        if (typeof id !== 'string') return enviar(400, { error: 'Falta la voz.' }), true
+        apis.quitarTuya(quitar[1] as ProveedorVoz, id)
+        return enviar(200, estado()), true
+      } catch (e) {
+        return enviar(400, { error: mensaje(e) }), true
+      }
     }
     if (await vc.api(req, res, path, estado)) return true
     // Fish Audio y ElevenLabs: poner o quitar la llave, volver a leer sus voces y clonar la tuya.

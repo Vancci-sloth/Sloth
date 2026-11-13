@@ -19,3 +19,10 @@ Si `marca.py ver` dice `Falta:`, pregúntaselo al usuario en un solo mensaje, an
 
 Lo que conteste va con `marca.py guardar` (una foto adjunta, con su ruta: la copia a `marca/`). Si después pide cambiar
 algo, `guardar` y `aplicar <proyecto>` en el video que está haciendo.
+
+## Varias marcas
+
+Quien tiene varios canales tiene una marca por canal: la de siempre en `marca.json` y las demás en
+`marcas/<nombre>.json`. Si el mensaje trae `Marca: <nombre>`, todo va con `--marca <nombre>` (`ver`, `guardar`, `nuevo.py`).
+Si pide una marca nueva («otra para mi canal de cocina»), dale un nombre corto, hazle las mismas preguntas y guárdala
+con `marca.py guardar --marca <nombre> '<json>'`; desde ese momento la elige en «Marca», junto a «Serie».

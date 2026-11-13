@@ -7,9 +7,11 @@
 // NOWPAYMENTS_API_KEY y NOWPAYMENTS_IPN_SECRET (la llave de la API y la clave de los avisos IPN, en Settings del panel de
 // NOWPayments, del modo `NOWPAYMENTS_MODO`; sin ellas no se ofrece pagar con cripto), STRIPE_SECRET_KEY y
 // STRIPE_WEBHOOK_SECRET (la tarjeta, con Stripe: `npm run stripe` pone las dos con la llave secreta; sin ellas no se ofrece),
-// VOICES_PK_LIVE (la llave de socio `pk_live_…` de Voices Cloning, para las voces de src/voz.ts; sin ella, la app no las ofrece),
-// FIRMA (la llave privada Ed25519 en PKCS8 y base64; la pública va en server/licencia.ts) y PUBLICAR (la llave de
-// `npm run publicar`, que también está en %APPDATA%\sloth\licencias\publicar.txt). La base de datos se crea con
+// VOICES_PK_LIVE, VOICES_PK_LIVE_2, VOICES_PK_LIVE_3… (las llaves de socio `pk_live_…` de Voices Cloning, una por secreto,
+// para las voces de src/voz.ts; una nueva va en el siguiente número libre y nunca encima de otra, que tiene sus usuarios),
+// FIRMA (la llave privada Ed25519 en PKCS8 y base64; la pública va en server/licencia.ts), PUBLICAR (la llave de
+// `npm run publicar`, solo en los secretos de GitHub: sube versiones) y ADMIN (la del creador, en
+// %APPDATA%\sloth\licencias\admin.txt: administra la comunidad, las voces y los apoyos a mano, no publica). La base de datos se crea con
 // `npm run licencias -- d1 migrations apply sloth-licencias --remote`. El instalador vive en el bucket DESCARGAS.
 {
   "name": "sloth-licencias",
@@ -20,7 +22,8 @@
   "routes": [{ "pattern": "api.sloth.vancci.org", "custom_domain": true }],
   "observability": { "enabled": true },
   // Cada mañana (9:00 de la Ciudad de México): el aviso de los cobros que vienen. Cada 10 minutos: las claves que no
-  // salieron por correo al confirmarse el pago (`reenviarClaves`).
+  // salieron por correo al confirmarse el pago (`reenviarClaves`), los créditos mensuales de voz con su correo y los premios
+  // de la rifa que quedaron a medias.
   "triggers": { "crons": ["0 15 * * *", "*/10 * * * *"] },
   "d1_databases": [{ "binding": "DB", "database_name": "sloth-licencias", "database_id": "0de2b337-32cc-474e-bcb4-14cac3181a5e" }],
   "r2_buckets": [{ "binding": "DESCARGAS", "bucket_name": "sloth-descargas" }],
@@ -64,7 +67,7 @@
     // las ve quien recibió créditos del creador (Administrador, en su Sloth).
     "VOZ_CREDITOS": 0,
     // "1": Voices Cloning es solo del creador, aunque alguien más tenga créditos (desde el 6 de noviembre de 2026, mientras
-    // se prueba). Para abrirlo a los demás, quítalo y despliega.
+    // se prueba). La actualización con créditos mensuales lo abre al terminar de publicarse (`voz-mensual.json` en R2).
     "VOZ_SOLO_CREADOR": "1",
     "CORREO_DE": "Sloth <avisos@vancci.org>",
     "CORREO_RESPUESTA": "soporte@vancci.org"

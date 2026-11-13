@@ -11,6 +11,8 @@ Final (~2 min):
    menos con 6 Chrome y con 2 (el codificador deja de quitarle procesador al dibujo) y pesa un 33 % más.
    Antes se renderizaba y se volvía a codificar con ffmpeg: medido en el de Celsius, directo tarda 36 s menos y se
    parece más a los cuadros sin comprimir (PSNR 45.7 contra 42.2).
+   Si el proyecto tiene src/datos/musica.json (nuevo.py --musica, por la línea `Música: de fondo`), le pone música bajo
+   la voz sin tocar la imagen (musica.py de video-base): la sintetizada o, con `{"pista": "<ruta>"}`, la del usuario.
 2. Pasa comprobar.mjs de video-base: tamaño, fps, sonoridad, pico, negros, arranque. Si algo sale con ✘, falla.
 3. Mide el centro de la pantalla (medir.py): cuánto tiempo está quieto, cuánto se mueve y qué tan lleno está; y en
    toda la pantalla, los parpadeos (algo que sale un solo cuadro).
@@ -49,6 +51,15 @@ def render(raiz: Path, salida: Path, *opciones: str) -> None:
     subprocess.run(["node", str(SKILL / "scripts" / "render.cjs"), str(salida), *opciones], check=True, cwd=raiz)
 
 
+def musica(raiz: Path, video: Path) -> None:
+    """La música de fondo, si el video la pidió (src/datos/musica.json)."""
+    archivo = raiz / "src" / "datos" / "musica.json"
+    if not archivo.exists():
+        return
+    pista = json.loads(archivo.read_text(encoding="utf-8") or "{}").get("pista")
+    correr(sys.executable, "-B", "-X", "utf8", str(BASE / "musica.py"), "--poner", str(video), *(["--pista", str(raiz / pista)] if pista else []))
+
+
 def sin_guardar(raiz: Path) -> list[str]:
     """Lo que el video hizo a mano y no está en la biblioteca de modelos ni en el kit."""
     biblioteca = SKILL.parent / "modelos-3d"
@@ -74,6 +85,7 @@ def final(raiz: Path) -> None:
     if faltan := sin_guardar(raiz):
         print("Sin guardar (guárdalo mientras renderiza; lo que solo sirve a este video, díselo al usuario):\n  " + "\n  ".join(faltan), flush=True)
     render(raiz, video, "--crf=14", "--x264-preset=veryfast", "--pixel-format=yuv420p", "--color-space=bt709")
+    musica(raiz, video)
     tamano = "1920x1080" if horizontal(raiz) else "1080x1920"
     r = subprocess.run(["node", str(BASE / "comprobar.mjs"), str(video), "--tamano", tamano], capture_output=True, text=True, encoding="utf8")
     print(r.stdout[-1500:])

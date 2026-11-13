@@ -1,5 +1,5 @@
 """
-El paso 2 de la fase 2, en segundos y sin agente: pone en public/ lo que juntó la fase 1. Se corre en la raíz del
+En segundos y sin agente: pone en public/ lo que se juntó en fuentes/material/ (lo llama hacer.py). Se corre en la raíz del
 episodio, y otra vez si llegó material nuevo (lo que ya está no se repite).
 
     python <skill>/scripts/material.py
@@ -20,9 +20,10 @@ import sys
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
-from comun import ffmpeg
+from comun import ffmpeg_h264
 
-RECODIFICAR = ["-c:v", "libx264", "-crf", "18", "-bf", "0", "-g", "15", "-r", "30", "-pix_fmt", "yuv420p", "-an"]
+# Lo que pide public/; el codificador lo pone ffmpeg_h264 (la NVIDIA si hay, o x264 a crf 18).
+RECODIFICAR = ["-bf", "0", "-g", "15", "-r", "30", "-pix_fmt", "yuv420p", "-an"]
 
 
 def al_dia(origen: Path, destino: Path) -> bool:
@@ -32,15 +33,15 @@ def al_dia(origen: Path, destino: Path) -> bool:
 def recodificar(origen: Path, destino: Path) -> None:
     destino.parent.mkdir(parents=True, exist_ok=True)
     parcial = destino.with_name(destino.stem + ".parcial.mp4")
-    ffmpeg("-i", str(origen), *RECODIFICAR, str(parcial))
+    ffmpeg_h264(lambda h264: ["-i", str(origen), *h264, *RECODIFICAR, str(parcial)], crf=18)
     parcial.replace(destino)
 
 
 def main() -> None:
     raiz = Path.cwd()
     m, public = raiz / "fuentes" / "material", raiz / "public"
-    if not (raiz / "guion.py").exists():
-        sys.exit("córrelo en la raíz del episodio (donde está guion.py)")
+    if not (raiz / "src" / "Video.tsx").exists():
+        sys.exit("córrelo en la raíz del episodio (la carpeta que creó nuevo.py)")
     copiadas = 0
     for sub, destino in [("web", "web"), ("tuits", "web"), ("personas", "web/personas"), ("memes", "web/memes"), ("logos", "web/logos")]:
         for f in sorted((m / sub).glob("*")) if (m / sub).exists() else []:
@@ -62,8 +63,6 @@ def main() -> None:
         list(pool.map(lambda t: recodificar(*t), trabajos))
     print(f"material: {copiadas} imágenes a public/web/, {len(trabajos)} videos recodificados"
           + ("" if tema.exists() else "; aún no está fuentes/tema/video.mp4"))
-    print("Rutas para guion.py: web/<archivo>, web/personas/, web/memes/, web/logos/, videos/<nombre>.mp4, clips/tema.mp4 "
-          "y recortes/ (los deja el agente de captura).")
 
 
 if __name__ == "__main__":

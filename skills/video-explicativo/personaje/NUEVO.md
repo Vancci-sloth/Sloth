@@ -23,7 +23,7 @@ Cuando el usuario elige «uno nuevo», se hace una vez, dentro del primer video,
    en `personaje/personaje.json`.
 6. **Guardar**: `<marca> guardar-personaje <id> <proyecto> "<cómo es, en inglés, para Codex>"` (p. ej. «a real orange
    tabby cat with a tiny blue bow tie»). Copia sus poses, su índice y su foto base a `personajes/<id>/` y lo pone en la
-   marca. Listo cuando `marca.py ver` dice `"personaje": "<id>"` y el proyecto se ve con él.
+   marca del video. Listo cuando `marca.py ver` (con la `--marca` del video, si lleva una) dice `"personaje": "<id>"` y el proyecto se ve con él.
 
 Para las poses de los siguientes videos, la foto de referencia es `personajes/<id>/base.png` y la descripción,
 `personajes/<id>/descripcion.txt`. Una pose que sirva para otros videos se guarda en su biblioteca: sus dos `.webp` a

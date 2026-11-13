@@ -17,8 +17,8 @@ código ni abras la plantilla**: todo lo que el video necesita se dice en `momen
 - **Cada dato es verdadero**, de su fuente primaria, con fecha de corte. Al video solo van cifras primarias o de medios
   serios; una dudosa no se dice.
 - **La voz la graba el usuario**, o la generas en AI Studio si el mensaje trae `Voz:`. Ninguna otra voz sintética.
-- **El cierre es el de la marca**: la última frase del guion es `cierre.frase` de `marca.json`, tal cual (si su red no
-  es `ninguna`). La tarjeta del canal la pone el director.
+- **El cierre es el de la marca**: la última frase del guion es `cierre.frase` de `marca.json` (o de la marca de la
+  línea `Marca:`), tal cual (si su red no es `ninguna`). La tarjeta del canal la pone el director.
 - **El video informa, no aconseja.** Si el tema es de dinero, nada de «compra» o «vende».
 - **Nada de emojis**, tampoco en los subtítulos: íconos de Phosphor o imágenes.
 - **Ningún modelo 3D se hace dos veces**: los objetos salen de la biblioteca (`modelos.py lista`) o son íconos de
@@ -26,7 +26,8 @@ código ni abras la plantilla**: todo lo que el video necesita se dice en `momen
 - El proyecto va en la carpeta de la línea `Carpeta: <nombre>` (sin ella, `explicado-<tema>`), y en el formato de
   `Formato:` (sin ella, vertical). Con `Formato: horizontal` (1920×1080, para YouTube) es `nuevo.py <carpeta> --formato
   horizontal` y nada más: el director acomoda el texto abajo, el personaje a la derecha y el mundo a todo el ancho, y
-  `hacer.py` deja `portada.png` como miniatura de YouTube (no entra en el video). Si piden el otro formato, es otro video.
+  `hacer.py` deja `portada.png` como miniatura de YouTube (la generada con IA o el cuadro del titular a 1280×720; no entra en el video). Si
+  piden el otro formato, es otro video.
 
 ## Para que lo vean
 
@@ -159,9 +160,10 @@ después del gancho, como prueba (quién lo dice, la cosa real): sin ellas, todo
   `ladra` un remate fuerte · `acostado` ya no tiene remedio · `lupa` se investiga · `llave` se desbloquea · `billetes`
   dinero que se paga. Una por idea, ni muy seguido ni de más. Un personaje propio tiene las suyas (las dice `hacer.py`
   si una no está).
-- **`titular`** (arriba, junto a `paleta`): el gancho, enorme y palabra por palabra en el primer segundo. Sin él va
-  la primera frase de la voz si tiene diez palabras o menos, entera en el primer medio segundo (por eso el gancho es una frase corta y sola), con la
-  última palabra del color de la luz: que sea la que sorprende («Tu tamal lleva **cal**»).
+- **`titular`** (arriba, junto a `paleta`): el gancho, enorme y palabra por palabra en el primer segundo, y la portada
+  (en vertical su primer cuadro; en horizontal, la miniatura). Sin él va la primera frase del guion, entera en el primer
+  medio segundo (por eso el gancho es una frase corta y sola), con la última palabra del color de la luz: que sea la que
+  sorprende («Tu tamal lleva **cal**»). Si esa frase pasa de diez palabras, `hacer.py` para y pide `titular`.
 - **`tema`**: `claro` u `oscuro`, el fondo desde ahí (en el giro). `paleta`: los dos fondos y la luz, sacados del
   lugar del tema (la oficina de correos en madera y kraft; el laboratorio en blanco y azul).
 - **Dirígelo como un set: lee [`CINE.md`](CINE.md) antes de escribir los momentos.** `escenas` (dos a cuatro lugares,
@@ -189,7 +191,12 @@ objeto), y nada de etiquetas de cambio sueltas («−94 %»): el número ya lo d
 ## Los pasos
 
 1. **En un solo mensaje**: `python -B -X utf8 <skill>/scripts/nuevo.py <carpeta>` (con `--formato horizontal` si
-   toca) en segundo plano (con `run_in_background`); `python -B -X utf8 <skill>/scripts/marca.py ver`;
+   toca, `--marca <nombre>` si el mensaje trae la línea `Marca:` y `--musica` si trae `Música: de fondo`: `final.py`
+   le pone entonces música sintetizada bajo la voz, que baja sola al hablar; `--imagenes chatgpt` o `--imagenes "<modelo>"`
+   si trae `Imágenes: con ChatGPT…` o `Imágenes: genéralas en Google Flow con <modelo>…`, y un `--adjunta <ruta>` por
+   cada `Imagen adjunta:`: `hacer.py` genera entonces la portada con eso, de fondo mientras renderiza; no la hagas tú)
+   en segundo plano (con `run_in_background`);
+   `python -B -X utf8 <skill>/scripts/marca.py ver` (con la misma `--marca`);
    `python -B -X utf8 <skill>/../modelos-3d/scripts/modelos.py lista`; y de dos a cuatro búsquedas web a la vez. Si a
    la marca le falta algo, pregúntalo ([`MARCA.md`](MARCA.md)).
    **La pieza central**: si la biblioteca no tiene el objeto que sostiene la historia (la olla del tamal, el aparato del

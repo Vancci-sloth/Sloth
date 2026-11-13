@@ -1,6 +1,7 @@
 import { memo, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { CANAL_CARD, IDEAS_CARD } from '../../shared/ideas' // ideas
-import type { AvanceCorto, AvisoComunidad, Card, Model, Previa, Serie, ServerPush, SessionMeta, VideoHecho } from '../../shared/types'
+import { MODELO3D_CARD } from '../../shared/modelos3d' // modelos 3D
+import type { AvanceCorto, AvisoComunidad, Card, Marcas, RifaGanada, Model, Previa, Serie, ServerPush, SessionMeta, VideoHecho } from '../../shared/types'
 import { NOMBRE_AGENTE, PROVEEDORES, proveedorDe } from '../../shared/providers'
 import { AvisoVideos } from './AvisoVideos'
 import { VENTA } from '../../shared/venta'
@@ -10,6 +11,8 @@ import { CuentaClaude, Opciones, Requisitos, useSinClaude } from './Opciones'
 import { api } from './api'
 import { eventos, useFallo, useResumen } from './eventos'
 import { useDesplazando } from './desplazando'
+import { useEncajar } from './encajar'
+import { useRecordado } from './recordado'
 import { avisarAnuncio, useAvisos } from './avisos'
 import { TituloDeFila, useBarraPlegada, vistaDeLote, vistaDeVideo, type Plegado, type Vista } from './Barra'
 import { Composer, Icon, Picker, type Choice, type Draft } from './Composer'
@@ -18,6 +21,8 @@ import { Confirm } from './Confirm'
 import { TusCambios } from './TusCambios'
 import { EstiloCambio } from './EstiloCambio'
 import { Novedades } from './Novedades'
+import { CreditosVoz } from './CreditosVoz'
+import { avisarGanasteRifa, GanasteRifa } from './GanasteRifa'
 import { ActualizarSloth, AvisoAgentes } from './Actualizar' // versiones nuevas
 import { TarjetasEnlaces } from './Enlaces' // tarjeta de los enlaces
 import { esDeEstudio, Estudio } from './Estudio' // panel de etapas
@@ -26,7 +31,7 @@ import { conReferencia, ReferenciaVideo } from './Referencia'
 import { useSoltar } from './Soltar'
 import { CON_CHATGPT, conOpenCode, conPrimero, elegirModelos, lineaSubagentes, Modelos, type Avanzado } from './Modelos'
 import { AvisoEquipo } from './Equipo' // tu equipo
-import { MisVideos, Rejilla, VideoDe } from './MisVideos'
+import { MisVideos, precargarVideos, Rejilla, VideoDe } from './MisVideos'
 import { Modelos3D } from './Modelos3D' // modelos 3D
 import { abrirPublicacion, Comunidad } from './Comunidad' // comunidad
 import { CompartirEstilo, ImportarEstilo } from './Estilos' // estilos compartidos
@@ -41,11 +46,11 @@ import { avisarTanda, AvisoRedes, ConNavegadorRedes, usePublicar } from './Redes
 import { NombreDelHilo, Renombrar } from './Renombrar'
 import { Segmento } from './Segmento'
 import { nombreDeVoz, SelectorVoz, useVoz, vozPosible } from './Voz' // voz de AI Studio, Fish Audio o ElevenLabs
-import { lineaVoz } from '../../shared/voz'
+import { lineaMusica, lineaVoz } from '../../shared/voz'
 import { SelectorClips, SelectorImagenes, useChatGPT, useFlow } from './Flow' // Google Flow
 import { imagenPosible, lineaClips, lineaImagenes, MODELOS_VIDEO, OPCIONES_CLIPS } from '../../shared/flow'
 import { Timeline } from './Timeline'
-import { Admin, useEsCreador } from './Admin' // Administrador, solo en la computadora del creador
+import { Admin, esPestanaAdmin, type PestanaAdmin, useArmarAdmin, useEsCreador } from './Admin' // Administrador, solo en la computadora del creador
 import { compact, duration } from './items'
 import './Barra.css'
 
@@ -59,7 +64,7 @@ type View =
   | { kind: 'videos'; estilo?: string }
   | { kind: 'modelos3d' } // modelos 3D
   | { kind: 'comunidad' } // comunidad
-  | { kind: 'admin' } // Administrador, solo en la computadora del creador
+  | { kind: 'admin'; pestana?: PestanaAdmin } // Administrador, solo en la computadora del creador
 
 /** Lo que se escribió en un hilo nuevo sin mandarlo. Vive en localStorage hasta que se manda o se borra. */
 type Saved = Draft & { cardId: string; at: number }
@@ -79,9 +84,12 @@ function readHash(): View {
   if (kind === 'mis-videos') return { kind: 'videos', estilo: id || undefined }
   if (kind === 'modelos-3d') return { kind: 'modelos3d' } // modelos 3D
   if (kind === 'comunidad' || kind === 'mejoras') return { kind: 'comunidad' } // comunidad (antes, Mejoras)
-  if (kind === 'admin') return { kind: 'admin' }
+  if (kind === 'admin') return { kind: 'admin', pestana: esPestanaAdmin(id) ? id : undefined }
   return { kind: 'new', cardId: kind === 'new' ? id : undefined }
 }
+
+/** Fuera del componente: la misma función siempre, para que el Administrador memorizado no se vuelva a pintar. */
+const irAPestanaAdmin = (pestana: PestanaAdmin) => go({ kind: 'admin', pestana })
 
 function go(view: View) {
   location.hash =
@@ -100,7 +108,7 @@ function go(view: View) {
                 : view.kind === 'comunidad' // comunidad
                 ? '/comunidad'
                 : view.kind === 'admin'
-                ? '/admin'
+                ? `/admin${view.pestana ? `/${view.pestana}` : ''}`
                 : view.cardId
                 ? `/new/${view.cardId}`
                 : '/'
@@ -153,9 +161,10 @@ export function App() {
     }
   })
   useEffect(() => localStorage.setItem('drafts', JSON.stringify(drafts)), [drafts])
-  // El hilo nuevo en blanco también escribe en un borrador, que solo sale en la lista cuando lo dejas a medias.
-  const [freshId, setFreshId] = useState(() => sessionStorage.getItem('fresh') ?? newId())
-  useEffect(() => sessionStorage.setItem('fresh', freshId), [freshId])
+  // El hilo nuevo en blanco también escribe en un borrador, que solo sale en la lista cuando lo dejas a medias. Se
+  // recuerda también al cerrar Sloth: al volver, lo que escribías sigue en el campo, no en «Borradores».
+  const [freshId, setFreshId] = useState(() => sessionStorage.getItem('fresh') || localStorage.getItem('fresh') || newId())
+  useEffect(() => (sessionStorage.setItem('fresh', freshId), localStorage.setItem('fresh', freshId)), [freshId])
   const draftId = view.kind === 'draft' ? view.id : view.kind === 'new' ? freshId : null
 
   useEffect(() => {
@@ -164,11 +173,17 @@ export function App() {
     return () => removeEventListener('hashchange', onHash)
   }, [])
 
+  // «Mis videos» se pide de antemano, con la app ya quieta: al entrar, la lista y sus primeras portadas ya están.
+  useEffect(() => {
+    const t = setTimeout(() => void precargarVideos().catch(() => {}), 2500)
+    return () => clearTimeout(t)
+  }, [])
+
   useEffect(() => {
     let ws: WebSocket
     let retry: ReturnType<typeof setTimeout>
     const connect = () => {
-      ws = new WebSocket(`ws://${location.host}/ws`)
+      ws = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`)
       socket.current = ws
       ws.onopen = async () => {
         const socket = ws
@@ -321,8 +336,8 @@ export function App() {
     if (view.kind === 'draft' && view.id === id) go({ kind: 'new' })
   }
 
-  // Los hilos de Ideas son de una card que no sale en el inicio: les da su icono.
-  const cardOf = (id: string) => cards.find((c) => c.id === id) ?? [IDEAS_CARD, CANAL_CARD].find((c) => c.id === id)
+  // Los hilos de Ideas y los de «Nuevo modelo» son de una card que no sale en el inicio: les da su icono.
+  const cardOf = (id: string) => cards.find((c) => c.id === id) ?? [IDEAS_CARD, CANAL_CARD, MODELO3D_CARD].find((c) => c.id === id)
   // Antes de dibujar: las etiquetas de hilo del compositor y de las burbujas lo leen al pintarse.
   threadIcons.clear()
   for (const s of sessions) {
@@ -364,8 +379,10 @@ export function App() {
   const campoBusca = useRef<HTMLInputElement>(null)
   // comunidad: tus avisos sin leer, junto a «Comunidad». Se piden cada 2 minutos mientras se ve Sloth, cada 10 con la
   // ventana oculta (un anuncio avisa aunque no la estés mirando), y al leerlos. Si subieron, se mira si hay un anuncio.
+  // Con ellos llega lo que ganaste en la rifa, que sale a toda la pantalla (`GanasteRifa`).
   const [avisosComunidad, setAvisosComunidad] = useState(0)
   const esCreador = useEsCreador()
+  const adminArmado = useArmarAdmin(esCreador)
   useEffect(() => {
     let sabidos = 0
     let pedida = 0
@@ -373,8 +390,9 @@ export function App() {
       if (document.visibilityState !== 'visible' && Date.now() - pedida < 600_000) return
       pedida = Date.now()
       try {
-        const { sinLeer } = await api<{ sinLeer: number }>('/api/comunidad/avisos?cuenta')
+        const { sinLeer, rifa } = await api<{ sinLeer: number; rifa?: RifaGanada }>('/api/comunidad/avisos?cuenta')
         setAvisosComunidad(sinLeer)
+        if (rifa) avisarGanasteRifa(rifa)
         if (sinLeer > sabidos) avisarAnuncio((await api<{ avisos: AvisoComunidad[] }>('/api/comunidad/avisos')).avisos, abrirPublicacion)
         sabidos = sinLeer
       } catch {
@@ -387,9 +405,25 @@ export function App() {
     return () => (clearInterval(t), removeEventListener('sloth-comunidad-avisos', pedir))
   }, [])
   const buscar = () => (plegar(false), setTimeout(() => campoBusca.current?.focus()))
+  // Un chat nuevo desde cualquier parte, con el cursor ya en su campo: Alt+N en Windows y Linux (también en un navegador,
+  // que no lo usa); en Mac, Cmd+N (en la ventana de Sloth: Opción+N escribe la ñ). Y Ctrl+Mayús+O, el de ChatGPT y
+  // Gemini. Ctrl+N también, en la ventana de Sloth (un navegador lo guarda para abrir otra ventana).
+  const alNuevo = useRef(newChat)
+  alNuevo.current = newChat
+  /** «Nuevo chat» ya se abrió al apretar el ratón: el clic de cuando suelta no abre otro. */
+  const abrioAlApretar = useRef(false)
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') e.preventDefault(), buscar()
+      const tecla = e.key.toLowerCase()
+      if ((e.ctrlKey || e.metaKey) && tecla === 'k') e.preventDefault(), buscar()
+      if (e.repeat || e.defaultPrevented) return
+      // En Mac, Cmd: Ctrl+N es «bajar una línea» en un campo de texto.
+      const mando = MAC ? e.metaKey && !e.ctrlKey : e.ctrlKey && !e.metaKey
+      // Por la tecla o por su sitio: algunos teclados (y lo que teclea un programa) no traen `code`.
+      const altN = !MAC && e.altKey && !e.ctrlKey && !e.metaKey && !e.shiftKey && (e.code === 'KeyN' || tecla === 'n')
+      const ctrlN = mando && !e.altKey && !e.shiftKey && tecla === 'n'
+      const ctrlMayusO = mando && !e.altKey && e.shiftKey && tecla === 'o'
+      if (altN || ctrlN || ctrlMayusO) e.preventDefault(), alNuevo.current()
     }
     addEventListener('keydown', onKey)
     return () => removeEventListener('keydown', onKey)
@@ -483,7 +517,22 @@ export function App() {
             </svg>
           </button>
         </div>
-        <button className={`new-chat${view.kind === 'new' ? ' active' : ''}`} onClick={newChat} title={plegada ? 'Nuevo chat' : undefined}>
+        {/* Abre al apretar, como los menús del sistema; con el teclado (Enter, espacio), al soltar. */}
+        <button
+          className={`new-chat${view.kind === 'new' ? ' active' : ''}`}
+          onPointerDown={(e) => {
+            // Con el dedo o el lápiz, abre al soltar (el clic); con el ratón, ya.
+            abrioAlApretar.current = e.button === 0 && e.pointerType === 'mouse'
+            if (abrioAlApretar.current) newChat()
+          }}
+          onClick={(e) => {
+            // Con el teclado (detail 0) o con el dedo, abre aquí.
+            if (e.detail === 0 || !abrioAlApretar.current) newChat()
+            abrioAlApretar.current = false
+          }}
+          title={`${plegada ? 'Nuevo chat · ' : ''}${MAC ? 'Cmd N' : 'Alt N'}`}
+          aria-keyshortcuts={MAC ? 'Meta+N Meta+Shift+O' : 'Alt+N Control+Shift+O'}
+        >
           <span className="new-chat-icon">
             <Icono de="mas" />
           </span>{' '}
@@ -497,7 +546,7 @@ export function App() {
             Ideas
           </button>
         )}
-        <button className={`new-chat${view.kind === 'videos' ? ' active' : ''}`} onClick={() => go({ kind: 'videos' })} title={plegada ? 'Mis videos' : undefined}>
+        <button className={`new-chat${view.kind === 'videos' ? ' active' : ''}`} onClick={() => go({ kind: 'videos' })} onPointerEnter={() => void precargarVideos({ reciente: 15_000 }).catch(() => {})} onPointerDown={(e) => e.button === 0 && go({ kind: 'videos' })} title={plegada ? 'Mis videos' : undefined}>
           <span className="new-chat-icon">
             <Icono de="video" />
           </span>{' '}
@@ -527,7 +576,14 @@ export function App() {
         </button>
         {/* Administrador: solo en la computadora del creador (la que tiene su llave de publicar.txt). */}
         {esCreador && (
-          <button className={`new-chat${view.kind === 'admin' ? ' active' : ''}`} onClick={() => go({ kind: 'admin' })} title={plegada ? 'Administrador' : undefined}>
+          // Con el ratón entra al apretar (ya está armado y oculto), como un menú del sistema; con el dedo o el teclado,
+          // al soltar o pulsar (así desplazar la barra con el dedo no entra).
+          <button
+            className={`new-chat${view.kind === 'admin' ? ' active' : ''}`}
+            onPointerDown={(e) => e.pointerType === 'mouse' && e.button === 0 && go({ kind: 'admin' })}
+            onClick={() => go({ kind: 'admin' })}
+            title={plegada ? 'Administrador' : undefined}
+          >
             <span className="new-chat-icon">
               <Icono de="escudo" />
             </span>{' '}
@@ -655,7 +711,10 @@ export function App() {
         )}
         {view.kind === 'modelos3d' && <Modelos3D />} {/* modelos 3D */}
         {view.kind === 'comunidad' && <Comunidad />}
-        {view.kind === 'admin' && esCreador && <Admin />}
+        {/* Se arma oculto en cuanto Sloth queda quieto (o al entrar): abrirlo después es solo enseñarlo. */}
+        {esCreador && (view.kind === 'admin' || adminArmado) && (
+          <Admin activa={view.kind === 'admin'} pestana={view.kind === 'admin' ? view.pestana : undefined} onPestana={irAPestanaAdmin} />
+        )}
         {/* comunidad: «Pedir una mejora», que abre el símbolo del agente de cualquier hilo y la publica en Mejoras. */}
         <PedirMejora sessions={sessions} />
         {view.kind === 'videos' && (
@@ -707,6 +766,8 @@ export function App() {
         )}
       </main>
       <Novedades />
+      <CreditosVoz />
+      <GanasteRifa />
       <EstiloCambio cards={cards} activa={newCard?.id} />
     </div>
   )
@@ -845,6 +906,13 @@ function NewSession(props: {
   const [serie, setSerie] = useState('')
   useEffect(() => setSerie(''), [card.id])
   const laSerie = series.find((s) => s.id === serie)
+  // La marca (una por canal, en la carpeta de trabajo de la card): el selector sale con dos o más. Sin elegir, la de
+  // siempre; se elige en cada video, nada se queda «activo».
+  const marcas = useMarcas(card)
+  const [marca, setMarca] = useState('')
+  useEffect(() => setMarca(''), [card.id])
+  const conMarcas = (marcas.base !== undefined ? 1 : 0) + marcas.otras.length > 1
+  const laMarca = conMarcas && marcas.otras.includes(marca) ? marca : ''
   const lote = !!card.lote && enlaces.length > 1 && !!porEnlace[card.id]
   // Todo estilo de video hace los dos formatos (skills/video-base/FORMATO.md): la skill hace solo el elegido. La card
   // recuerda el último; una idea de YouTube ya lo trae escrito en el mensaje (`Formato: horizontal`), y ese manda.
@@ -857,6 +925,10 @@ function NewSession(props: {
   const voz = useVoz()
   const [voces, setVoces] = useStored<Record<string, string>>('voz', {})
   const vozElegida = vozPosible(voz.estado, voces[card.id] ?? '') ? voces[card.id] : ''
+  // La música de fondo, en el menú «Voz» de los estilos que la saben poner (`card.musica`): apagada hasta que la
+  // enciendas, y la card recuerda la última elección.
+  const [musicas, setMusicas] = useStored<Record<string, boolean>>('musica', {})
+  const musica = !!card.musica && !!musicas[card.id]
   // Las imágenes: con ChatGPT o con un modelo de Google Flow (`Flow.tsx`), según lo que tengas conectado.
   const hayChatGPT = useChatGPT()
   const [imagenes, setImagenes] = useStored<string>('imagenes', '')
@@ -885,6 +957,7 @@ function NewSession(props: {
     []
   )
 
+  const opcionesBarra = useMemo(() => props.cards.map((c) => ({ id: c.id, titulo: c.title, skill: c.skill, icono: c.icon, detalle: c.description })), [props.cards])
   const composer = (
       <Composer
         models={models}
@@ -893,7 +966,12 @@ function NewSession(props: {
         draft={props.draft}
         onDraft={props.onDraft}
         bloqueo={sinCuenta ? 'Primero conecta tu cuenta (arriba)' : undefined}
-        placeholder={card.skill ? `Qué quieres de /${card.skill}…` : 'Qué cambio quieres en Sloth…'}
+        placeholder={card.skill ? `Qué quieres de ${card.title}… o escribe / para cambiar de estilo` : 'Qué cambio quieres en Sloth…'}
+        estilos={opcionesBarra}
+        onEstilo={(id) => {
+          const c = props.cards.find((x) => x.id === id)
+          if (c) props.onPick(c)
+        }}
         modelos={<Modelos conf={card.modelos} models={models} avanzado={avanzado} choice={choice} tareas={tareas} sinClaude={sinClaude} onAvanzado={cambiarModelos} />}
         extra={
           <>
@@ -908,6 +986,22 @@ function NewSession(props: {
                 onChange={setSerie}
               />
             )}
+            {conMarcas && (
+              <Picker
+                label={`Marca: ${laMarca || (marcas.base !== undefined ? 'la de siempre' : 'sin elegir')}`}
+                value={laMarca}
+                groups={[
+                  {
+                    label: 'El tono, el nicho y el cierre del canal',
+                    options: [
+                      { value: '', label: marcas.base === undefined ? 'Sin elegir' : marcas.base ? `La de siempre (${marcas.base})` : 'La de siempre' },
+                      ...marcas.otras.map((m) => ({ value: m, label: m }))
+                    ]
+                  }
+                ]}
+                onChange={setMarca}
+              />
+            )}
             {conFormato && (
               <Segmento
                 label="Formato"
@@ -919,7 +1013,15 @@ function NewSession(props: {
                 onCambio={(f) => setFormatos({ ...formatos, [card.id]: f })}
               />
             )}
-            {conFormato && <SelectorVoz card={card} voz={voz} valor={vozElegida} onCambio={(v) => setVoces({ ...voces, [card.id]: v })} />}
+            {conFormato && (
+              <SelectorVoz
+                card={card}
+                voz={voz}
+                valor={vozElegida}
+                musica={{ encendida: musica, onCambio: (m) => setMusicas({ ...musicas, [card.id]: m }) }}
+                onCambio={(v) => setVoces({ ...voces, [card.id]: v })}
+              />
+            )}
             {conFormato && <SelectorImagenes valor={imagenElegida} hayChatGPT={hayChatGPT} voz={voz} flow={flow} onCambio={setImagenes} />}
             {conFormato && card.clips && <SelectorClips valor={clipsElegidos} onCambio={setClips} />}
             {card.lote && enlaces.length > 1 && (
@@ -949,8 +1051,10 @@ function NewSession(props: {
           // La skill lo lee en el mensaje, debajo de lo que escribió el usuario.
           const pide = [
             laSerie && `Serie: ${laSerie.nombre} (${laSerie.archivo}; cómo se usa, en video-base/SERIES.md)${text ? '' : '. Elige tú el tema.'}`,
+            laMarca && `Marca: ${laMarca}`,
             conFormato && !formatoEscrito && `Formato: ${formato}`,
             conFormato && lineaVoz(card, vozElegida, nombreDeVoz(voz.estado, vozElegida)),
+            conFormato && lineaMusica(card, musica),
             conFormato && lineaImagenes(imagenElegida),
             conFormato && card.clips && lineaClips(clipsElegidos),
             // El modelo de cada subagente: lo medido, o lo que elegiste en «Avanzado». La skill lo lee aquí.
@@ -1005,11 +1109,25 @@ function NewSession(props: {
         )}
       </div>
       <div className="new-bottom">
+        {/* En una línea el icono, el nombre y la versión: le deja el alto a los carteles. */}
         <div className="new-head">
-          <span className="card-icon big"><Icon icon={card.icon ?? '✦'} /></span>
-          <h1>{card.title}</h1>
+          <h1>
+            <span className="card-icon big" aria-hidden>
+              <Icon icon={card.icon ?? '✦'} />
+            </span>
+            {card.title}{' '}
+            {card.version && (
+              <span className="estilo-version" title={`Versión ${card.version} de este estilo`}>
+                v{card.version}
+              </span>
+            )}
+          </h1>
           <p>{card.description}</p>
-          {card.version && <p className="estilo-version">Versión {card.version}</p>}
+          {card.tuya && (
+            <button className="compartir-boton" onClick={() => setCompartiendo(card)}>
+              <Icono de="compartir" className="icon-trazo" /> Compartir en la comunidad
+            </button>
+          )}
           <TusCambios card={card} clave={hilos.map((s) => s.id + s.updatedAt).join()} />
         </div>
         {/* Hasta saber qué cuentas hay no sale: el aviso de Claude no se asoma a quien solo tiene ChatGPT u OpenCode. */}
@@ -1055,6 +1173,7 @@ const Carteles = memo(function Carteles({ cards, activa, previas, sessions, acci
   // Al desplazarlas, las que pasan bajo el cursor no arrancan su video.
   const rejilla = useRef<HTMLDivElement>(null)
   useDesplazando(rejilla)
+  useEncajar(rejilla, cards.length)
   return (
     <div className="cards" ref={rejilla}>
       {cards.map((c) => (
@@ -1082,6 +1201,7 @@ const Carteles = memo(function Carteles({ cards, activa, previas, sessions, acci
               {!VENTA && (
                 <span
                   role="button"
+                  className="duplicar"
                   title={`Duplicar: sale una card nueva con la misma skill${c.skill ? ` /${c.skill}` : ''}, que puedes cambiar a tu gusto en cards.json`}
                   onClick={(e) => (e.stopPropagation(), acciones.duplicar(c))}
                 >
@@ -1089,7 +1209,7 @@ const Carteles = memo(function Carteles({ cards, activa, previas, sessions, acci
                 </span>
               )}
               {c.tuya && (
-                <span role="button" title="Compartir: en la comunidad o como archivo" onClick={(e) => (e.stopPropagation(), acciones.compartir(c))}>
+                <span role="button" className="compartir" title="Compartir: en la comunidad o como archivo" onClick={(e) => (e.stopPropagation(), acciones.compartir(c))}>
                   <Icono de="compartir" className="icon-trazo" />
                 </span>
               )}
@@ -1157,16 +1277,12 @@ function useTerminados(card: Card | null, hilos: SessionMeta[]) {
 
 /** Las series de la skill de una card (`GET /api/cards/<id>/series`). Si falla, no hay ninguna y no sale el selector. */
 function useSeries(card: Card) {
-  const [series, setSeries] = useState<Serie[]>([])
-  useEffect(() => {
-    if (!card.skill) return setSeries([])
-    let vivo = true
-    api<Serie[]>(`/api/cards/${card.id}/series`).then((s) => vivo && setSeries(s), () => vivo && setSeries([]))
-    return () => {
-      vivo = false
-    }
-  }, [card.id])
-  return series
+  return useRecordado<Serie[]>(`series:${card.id}`, [], () => (card.skill ? api<Serie[]>(`/api/cards/${card.id}/series`) : Promise.resolve([])), [card.id])
+}
+
+/** Las marcas de la carpeta de trabajo de una card (`GET /api/cards/<id>/marcas`). Si falla, ninguna. */
+function useMarcas(card: Card) {
+  return useRecordado<Marcas>(`marcas:${card.id}`, { otras: [] }, () => (card.etapas ? api<Marcas>(`/api/cards/${card.id}/marcas`) : Promise.resolve({ otras: [] })), [card.id])
 }
 
 /**
@@ -1201,7 +1317,7 @@ const SessionView = memo(function SessionView({ id, session, card, models }: { i
   const totals = useResumen(id)
   // Un video del lote que espera su turno arranca con su propio mensaje: un clic no le manda otro.
   const pendiente = !!session?.pendiente
-  const onResponder = useMemo(() => (pendiente ? undefined : (text: string) => api(`/api/sessions/${id}/send`, { text })), [id, pendiente])
+  const onResponder = useMemo(() => (pendiente ? undefined : (text: string, images?: string[]) => api(`/api/sessions/${id}/send`, { text, images })), [id, pendiente])
   // Con quién puede seguir el hilo si su agente llega al límite: el primer modelo de cada otro agente conectado.
   const actual = proveedorDe(session?.model ?? '')
   const relevos = useMemo(() => PROVEEDORES.filter((p) => p !== actual).flatMap((p) => (p === 'opencode' ? conOpenCode(models) : conPrimero(models, p))?.principal ?? []), [models, actual])
@@ -1520,6 +1636,8 @@ function cuando(t: number) {
 
 /** Para buscar sin que importen mayúsculas ni tildes. */
 const sinTildes = (t: string) => t.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase()
+/** En Mac, Opción+letra escribe (Opción+N, la ñ): el atajo de «Nuevo chat» es Cmd+N. */
+const MAC = /Mac|iPhone|iPad/.test(navigator.userAgent)
 
 /**
  * Abajo de la barra lateral: Opciones y Reiniciar backend, que aplica los cambios del servidor. Mientras el servidor
@@ -1527,6 +1645,10 @@ const sinTildes = (t: string) => t.normalize('NFD').replace(/\p{Diacritic}/gu, '
  */
 function Pie({ running, connected, enOpciones, fallo, plegada }: { running: boolean; connected: boolean; enOpciones: boolean; fallo: string; plegada: boolean }) {
   const [error, setError] = useState('')
+  // «Reconectando…» solo si se perdió una conexión que ya hubo: al abrir, mientras conecta la primera vez, salía y se
+  // iba, y movía la barra.
+  const yaConecto = useRef(false)
+  if (connected) yaConecto.current = true
   return (
     <div className="pie">
       <AvisoRedes connected={connected} /> {/* redes */}
@@ -1542,7 +1664,7 @@ function Pie({ running, connected, enOpciones, fallo, plegada }: { running: bool
       {VENTA ? (
         <>
           <ActualizarSloth />
-          {!connected && <span className="muted small pie-nota">Reconectando…</span>}
+          {!connected && yaConecto.current && <span className="muted small pie-nota">Reconectando…</span>}
         </>
       ) : (
         <button

@@ -1,7 +1,9 @@
-# Redes: trabajar con la cola de TikTok e Instagram
+# Redes: trabajar con la cola de TikTok, Instagram y YouTube Shorts
 
 Cómo funciona está en la cabecera de `server/redes/index.ts` y en los ADR 0002 (TikTok por su página) y 0003 (Instagram
-por la nube). Esto es lo que un hilo necesita para mirarla o moverla sin escribir scripts nuevos.
+por la nube). YouTube Shorts va por la API con el canal de Opciones → YouTube, y se activa aparte en su fila de Redes
+(cabecera de `server/redes/youtube.ts`; sus subidas, por `ref`, en `data/redes/youtube.json`). Esto es lo que un hilo
+necesita para mirarla o moverla sin escribir scripts nuevos.
 
 ## Antes de programar
 

@@ -1,0 +1,1145 @@
+<!doctype html>
+<!--
+  La guía de lo nuevo de la 0.4.2: sale una vez al abrir Sloth después de actualizar (web/src/Novedades.tsx, en un
+  iframe), y también se abre sola en un navegador. Una página suelta, sin dependencias: el logo (web/public/icon.svg) va
+  adentro, en #cara. Ocho escenas (el concierto, cinco novedades, los arreglos y el final, que es el mismo concierto); cada una tiene su guion en
+  `guiones`, y «Siguiente», las flechas o deslizar pasan de una a otra. Con ?escena=N abre directo en una.
+  Para la de otra versión: cambia sus escenas 1 a 6, el número (título, cabecera y el del escenario de la escena 0; la pantalla del final lo toma del título) y la
+  canción (YT_ID y la tarjeta #sonando); baile.webm es el video del creador bailando, recortado.
+-->
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sloth 0.4.2</title>
+<style>
+  /* Paleta de Sloth (web/src/styles.css) y la crema del logo. */
+  :root {
+    --bg: #0f0e0c; --panel: #171512; --panel-2: #221f1b; --line: #2e2a24; --text: #ede6d6; --muted: #9a907f;
+    --amber: #e8a33d; --amber-2: #f4b04a; --sobre-ambar: #1b1408; --ok: #8fc177; --bad: #e06c55;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); }
+  body { display: grid; place-items: center; overflow: hidden; color: var(--text); font-family: Inter, 'Segoe UI', system-ui, sans-serif; }
+  .escenario { position: relative; width: min(100vw, 100vh); max-width: 1080px; aspect-ratio: 1; user-select: none; -webkit-user-select: none; }
+  .escenario > svg, .escenario > canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+  canvas { pointer-events: none; }
+  .controles { position: absolute; left: 8.33%; right: 8.33%; bottom: 3.2%; display: flex; align-items: center; gap: 12px; font-size: clamp(12px, 1.85vmin, 20px); }
+  .controles button { font: inherit; font-weight: 700; border-radius: 12px; padding: .8em 1.25em; cursor: pointer; border: 2px solid var(--line); background: var(--panel); color: var(--text); display: inline-flex; align-items: center; gap: .55em; transition: transform .12s, background-color .2s, border-color .2s, opacity .3s; }
+  .controles button:hover { border-color: var(--muted); }
+  .controles button:active { transform: scale(.95); }
+  .controles button:focus-visible { outline: 3px solid var(--amber-2); outline-offset: 3px; }
+  .controles svg { width: 1.25em; height: 1.25em; }
+  #siguiente { margin-left: auto; background: var(--amber); border-color: var(--amber); color: var(--sobre-ambar); }
+  #siguiente:hover { background: var(--amber-2); border-color: var(--amber-2); }
+  #anterior.oculto { opacity: 0; pointer-events: none; }
+  #cuenta { flex: 1; text-align: center; color: var(--muted); font-variant-numeric: tabular-nums; font-weight: 600; }
+
+  .a { transform-box: fill-box; transform-origin: center; }
+  .izq { transform-box: fill-box; transform-origin: 0 50%; }
+  .abajo { transform-box: fill-box; transform-origin: 50% 100%; }
+  .arriba { transform-box: fill-box; transform-origin: 50% 0; }
+  .escena { display: none; }
+  .escena.visible { display: inline; }
+  #rayos { transition: opacity .9s; }
+  #brillo stop { transition: stop-color 1s; }
+  .num { font-variant-numeric: tabular-nums; }
+
+  /* Lo que se mueve siempre: el idol baila y los rayos giran. */
+  .gira { animation: girar 40s linear infinite; }
+  .baila { animation: bailar .96s cubic-bezier(.5,0,.5,1) infinite; }
+  @keyframes bailar {
+    0%, 100% { transform: translateY(0) rotate(-6deg) scale(1.04, .96); }
+    25% { transform: translateY(-40px) rotate(0) scale(1); }
+    50% { transform: translateY(0) rotate(6deg) scale(1.04, .96); }
+    75% { transform: translateY(-40px) rotate(0) scale(1); }
+  }
+  @media (prefers-reduced-motion: reduce) { .gira, .baila, .eq i { animation: none; } }
+
+  /* La canción de la fiesta: el reproductor de YouTube en una tarjeta, arriba a la derecha (escenas 0 y 6). */
+  .sonando { position: absolute; top: 3.2%; right: 3.2%; width: 31%; padding: 1.1%; background: var(--panel); border: 2px solid var(--line); border-radius: 12px; box-shadow: 0 14px 40px rgba(0, 0, 0, .5); font-size: clamp(10px, 1.55vmin, 17px); transition: opacity .45s, transform .45s cubic-bezier(.3,1.4,.5,1); }
+  .sonando.fuera { opacity: 0; transform: translateY(-18px) scale(.96); pointer-events: none; }
+  /* En las novedades se hace chiquita y se acomoda junto a la cabecera, sin tapar las barritas. */
+  .sonando { transition: opacity .45s, transform .45s cubic-bezier(.3,1.4,.5,1), width .5s cubic-bezier(.2,.8,.2,1), top .5s cubic-bezier(.2,.8,.2,1), right .5s cubic-bezier(.2,.8,.2,1), padding .5s; }
+  .sonando.mini { top: 1.4%; right: 8.33%; width: 19%; padding: .45%; }
+  .sonando.mini .sonando-cab { display: none; }
+  /* Tú bailando, recortado, a la izquierda (baile.webm, con transparencia y en bucle). En las novedades, chiquito
+     junto a la tarjeta de la canción. Es material propio: no entra al repo (.gitignore). */
+  .baile { position: absolute; left: 3.2%; top: 8.5%; height: 48%; pointer-events: none; transition: opacity .45s, left .5s cubic-bezier(.2,.8,.2,1), top .5s cubic-bezier(.2,.8,.2,1), height .5s cubic-bezier(.2,.8,.2,1); }
+  .baile.mini { left: 65.4%; top: .8%; height: 11%; }
+  .baile.fuera { opacity: 0; }
+  .sonando-cab { display: flex; align-items: center; gap: .75em; margin: .1em .2em .75em; line-height: 1.2; }
+  .sonando-cab span { display: block; color: var(--amber); font-size: .78em; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+  .sonando-cab b { display: block; color: var(--text); font-weight: 800; }
+  .sonando-cab small { color: var(--muted); font-size: 1em; font-weight: 600; }
+  .eq { display: flex; align-items: flex-end; gap: 3px; width: 1.7em; height: 1.7em; flex: none; }
+  .eq i { flex: 1; height: 100%; background: var(--amber); border-radius: 2px; transform-origin: bottom; animation: eq 1.1s steps(6) infinite; }
+  .eq i:nth-child(2) { animation-delay: -.4s; } .eq i:nth-child(3) { animation-delay: -.75s; } .eq i:nth-child(4) { animation-delay: -.2s; }
+  @keyframes eq { 0%, 100% { transform: scaleY(.25); } 30% { transform: scaleY(1); } 55% { transform: scaleY(.5); } 80% { transform: scaleY(.85); } }
+  .sonando-video { aspect-ratio: 16 / 9; border-radius: 8px; overflow: hidden; background: #000; }
+  .sonando-video iframe { display: block; width: 100%; height: 100%; border: 0; }
+</style>
+</head>
+<body>
+<div class="escenario" id="escenario">
+<svg id="lienzo" viewBox="0 0 1080 1080" xmlns="http://www.w3.org/2000/svg" font-family="Inter, 'Segoe UI', system-ui, sans-serif">
+  <defs>
+    <radialGradient id="brillo" cx="50%" cy="40%" r="62%">
+      <stop offset="0" stop-color="#e8a33d" stop-opacity=".30"/>
+      <stop offset=".55" stop-color="#e8a33d" stop-opacity=".07"/>
+      <stop offset="1" stop-color="#e8a33d" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="rayo" cx="50%" cy="50%" r="50%">
+      <stop offset="0" stop-color="#f4b04a" stop-opacity=".22"/>
+      <stop offset="1" stop-color="#f4b04a" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="telaB" cx="50%" cy="40%" r="70%">
+      <stop offset="0" stop-color="#e8a33d" stop-opacity=".35"/>
+      <stop offset="1" stop-color="#171512"/>
+    </radialGradient>
+    <linearGradient id="estelaScan" x1="0" x2="1">
+      <stop offset="0" stop-color="#f4b04a" stop-opacity="0"/>
+      <stop offset="1" stop-color="#f4b04a" stop-opacity=".55"/>
+    </linearGradient>
+    <clipPath id="clipPanel"><rect x="90" y="190" width="900" height="460" rx="28"/></clipPath>
+    <clipPath id="clipPantalla"><rect x="370" y="50" width="340" height="236" rx="14"/></clipPath>
+    <!-- Los puntos de la pantalla LED del escenario -->
+    <pattern id="led" width="8" height="8" patternUnits="userSpaceOnUse"><path d="M8 0V8H0" fill="none" stroke="#0b0a09" stroke-width="2.5"/></pattern>
+    <clipPath id="clipPrevia"><rect x="146" y="246" width="298" height="190" rx="12"/></clipPath>
+    <linearGradient id="g-antigravity" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ffe432"/><stop offset=".35" stop-color="#fc413d"/><stop offset=".65" stop-color="#3186ff"/><stop offset="1" stop-color="#00b95c"/>
+    </linearGradient>
+    <radialGradient id="g-instagram" cx="30%" cy="107%" r="150%">
+      <stop offset="0" stop-color="#fdf497"/><stop offset=".05" stop-color="#fdf497"/><stop offset=".45" stop-color="#fd5949"/><stop offset=".6" stop-color="#d6249f"/><stop offset=".9" stop-color="#285aeb"/>
+    </radialGradient>
+    <clipPath id="telA"><rect width="158" height="280" rx="18"/></clipPath>
+    <clipPath id="cuadro"><rect width="260" height="164" rx="8"/></clipPath>
+
+    <!-- Iconos de trazo (Lucide, como web/src/Iconos.tsx) -->
+    <symbol id="i-flecha" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></symbol>
+    <symbol id="i-izq" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></symbol>
+    <symbol id="i-reabrir" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></symbol>
+    <symbol id="i-zap" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"/></symbol>
+    <symbol id="i-video" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3.8a1 1 0 0 1 1.5-.86l11.5 7.2a1 1 0 0 1 0 1.72l-11.5 7.2A1 1 0 0 1 6 18.2z"/></symbol>
+    <symbol id="i-bandera" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 22V4a1 1 0 0 1 .4-.8A6 6 0 0 1 8 2c3 0 5 2 7.333 2q2 0 3.067-.8A1 1 0 0 1 20 4v10a1 1 0 0 1-.4.8A6 6 0 0 1 16 16c-3 0-5-2-8-2a6 6 0 0 0-4 1.528"/></symbol>
+    <symbol id="i-palomita" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></symbol>
+    <symbol id="i-descargar" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V3"/><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/></symbol>
+    <symbol id="i-pizarra" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h20"/><path d="M21 3v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V3"/><path d="m7 21 5-5 5 5"/></symbol>
+    <symbol id="i-risa" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20z"/><path d="M18 13a6 6 0 0 1-6 5 6 6 0 0 1-6-5h12Z"/><path d="M9 9h.01"/><path d="M15 9h.01"/></symbol>
+    <symbol id="i-disco" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12H2"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/><path d="M6 16h.01"/><path d="M10 16h.01"/></symbol>
+    <symbol id="i-carpeta" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></symbol>
+    <symbol id="i-alerta" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></symbol>
+    <symbol id="i-personas" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><path d="M9 3a4 4 0 1 0 0 8 4 4 0 0 0 0-8z"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></symbol>
+    <symbol id="i-claqueta" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.2 6 3 11l-.9-2.4c-.3-1.1.3-2.2 1.3-2.5l13.5-4c1.1-.3 2.2.3 2.5 1.3Z"/><path d="m6.2 5.3 3.1 3.9"/><path d="m12.4 3.4 3.1 4"/><path d="M3 11h18v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/></symbol>
+    <symbol id="i-microfono" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><path d="M12 19v3"/></symbol>
+    <symbol id="i-corazon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/></symbol>
+    <symbol id="i-buscar" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></symbol>
+    <symbol id="i-reloj" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></symbol>
+    <symbol id="i-mas" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></symbol>
+    <symbol id="i-copiar" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></symbol>
+    <symbol id="i-compartir" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><path d="m16 6-4-4-4 4"/><path d="M12 2v13"/></symbol>
+    <symbol id="i-basura" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2"/></symbol>
+    <symbol id="i-wifi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h.01"/><path d="M2 8.82a15 15 0 0 1 20 0"/><path d="M5 12.859a10 10 0 0 1 14 0"/><path d="M8.5 16.429a5 5 0 0 1 7 0"/></symbol>
+    <symbol id="i-wifi-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h.01"/><path d="M8.5 16.429a5 5 0 0 1 7 0"/><path d="M5 12.859a10 10 0 0 1 5.17-2.69"/><path d="M19 12.859a10 10 0 0 0-2.007-1.523"/><path d="M2 8.82a15 15 0 0 1 4.177-2.643"/><path d="M22 8.82a15 15 0 0 0-11.288-3.764"/><path d="m2 2 20 20"/></symbol>
+    <symbol id="i-llave" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></symbol>
+
+    <!-- Logos de otras marcas (web/src/Logos.tsx) -->
+    <symbol id="l-youtube" viewBox="0 0 24 24"><rect y="4" width="24" height="16" rx="4" fill="#ff0000"/><path d="M10 8v8l6-4z" fill="#fff"/></symbol>
+    <symbol id="l-antigravity" viewBox="0 0 24 24"><path fill="url(#g-antigravity)" fill-rule="evenodd" d="M21.751 22.607c1.34 1.005 3.35.335 1.508-1.508C17.73 15.74 18.904 1 12.037 1 5.17 1 6.342 15.74.815 21.1c-2.01 2.009.167 2.511 1.507 1.506 5.192-3.517 4.857-9.714 9.715-9.714 4.857 0 4.522 6.197 9.714 9.715z"/></symbol>
+    <path id="trazo-tiktok" d="M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.09 1.750 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 3.94-1.31 1.92-3.58 3.17-5.91 3.21-1.43.08-2.86-.31-4.08-1.030-2.02-1.19-3.44-3.37-3.65-5.71-.02-.5-.03-1-.01-1.49.18-1.9 1.12-3.72 2.58-4.96 1.66-1.44 3.98-2.13 6.15-1.72.02 1.48-.04 2.96-.04 4.44-.99-.32-2.15-.23-3.02.37-.63.41-1.11 1.04-1.36 1.75-.21.51-.15 1.07-.14 1.61.24 1.64 1.82 3.02 3.5 2.87 1.12-.01 2.19-.66 2.77-1.61.19-.33.4-.67.41-1.06.1-1.79.06-3.57.07-5.36.01-4.030-.01-8.05.02-12.07z"/>
+    <symbol id="l-tiktok" viewBox="0 0 24 24"><rect width="24" height="24" rx="6" fill="#000"/><g transform="translate(5.5 5.5) scale(.54)"><use href="#trazo-tiktok" fill="#25f4ee" transform="translate(-.8 -.8)"/><use href="#trazo-tiktok" fill="#fe2c55" transform="translate(.8 .8)"/><use href="#trazo-tiktok" fill="#fff"/></g></symbol>
+    <symbol id="l-instagram" viewBox="0 0 24 24"><rect width="24" height="24" rx="6" fill="url(#g-instagram)"/><g transform="translate(5 5) scale(.583)" fill="#fff"><path d="M7.0301.084c-1.2768.0602-2.1487.264-2.911.5634-.7888.3075-1.4575.72-2.1228 1.3877-.6652.6677-1.075 1.3368-1.3802 2.127-.2954.7638-.4956 1.6365-.552 2.914-.0564 1.2775-.0689 1.6882-.0626 4.947.0062 3.2586.0206 3.6671.0825 4.9473.061 1.2765.264 2.1482.5635 2.9107.308.7889.72 1.4573 1.388 2.1228.6679.6655 1.3365 1.0743 2.1285 1.38.7632.295 1.6361.4961 2.9134.552 1.2773.056 1.6884.069 4.9462.0627 3.2578-.0062 3.668-.0207 4.9478-.0814 1.28-.0607 2.147-.2652 2.9098-.5633.7889-.3086 1.4578-.72 2.1228-1.3881.665-.6682 1.0745-1.3378 1.3795-2.1284.2957-.7632.4966-1.636.552-2.9124.056-1.2809.0692-1.6898.063-4.948-.0063-3.2583-.021-3.6668-.0817-4.9465-.0607-1.2797-.264-2.1487-.5633-2.9117-.3084-.7889-.72-1.4568-1.3876-2.1228C21.2982 1.33 20.628.9208 19.8378.6165 19.074.321 18.2017.1197 16.9244.0645 15.6471.0093 15.236-.005 11.977.0014 8.718.0076 8.31.0215 7.0301.0839m.1402 21.6932c-1.17-.0509-1.8053-.2453-2.2287-.408-.5606-.216-.96-.4771-1.3819-.895-.422-.4178-.6811-.8186-.9-1.378-.1644-.4234-.3624-1.058-.4171-2.228-.0595-1.2645-.072-1.6442-.079-4.848-.007-3.2037.0053-3.583.0607-4.848.05-1.169.2456-1.805.408-2.2282.216-.5613.4762-.96.895-1.3816.4188-.4217.8184-.6814 1.3783-.9003.423-.1651 1.0575-.3614 2.227-.4171 1.2655-.06 1.6447-.072 4.848-.079 3.2033-.007 3.5835.005 4.8495.0608 1.169.0508 1.8053.2445 2.228.408.5608.216.96.4754 1.3816.895.4217.4194.6816.8176.9005 1.3787.1653.4217.3617 1.056.4169 2.2263.0602 1.2655.0739 1.645.0796 4.848.0058 3.203-.0055 3.5834-.061 4.848-.051 1.17-.245 1.8055-.408 2.2294-.216.5604-.4763.96-.8954 1.3814-.419.4215-.8181.6811-1.3783.9-.4224.1649-1.0577.3617-2.2262.4174-1.2656.0595-1.6448.072-4.8493.079-3.2045.007-3.5825-.006-4.848-.0608M16.953 5.5864A1.44 1.44 0 1 0 18.39 4.144a1.44 1.44 0 0 0-1.437 1.4424M5.8385 12.012c.0067 3.4032 2.7706 6.1557 6.173 6.1493 3.4026-.0065 6.157-2.7701 6.1506-6.1733-.0065-3.4032-2.771-6.1565-6.174-6.1498-3.403.0067-6.156 2.771-6.1496 6.1738M8 12.0077a4 4 0 1 1 4.008 3.9921A3.9996 3.9996 0 0 1 8 12.0077"/></g></symbol>
+    <symbol id="i-columnas" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"/><path d="M12 3v18"/></symbol>
+
+    <!-- El logo de Sloth (web/public/icon.svg), en sus coordenadas de 512 -->
+    <g id="cara">
+      <g fill="#f2e7cf" fill-rule="evenodd" stroke="#171719" stroke-width="10" stroke-linejoin="round" paint-order="stroke">
+      <path d="M 229 35.0 C 203.1 37.0, 175.6 43.3, 151.5 52.7 C 75.1 82.6, 25.4 152.6, 26.4 228.7 C 26.8 253.4, 29.9 267.6, 39.0 286.9 C 53.2 316.5, 75.6 338.7, 107.5 354.7 C 125.7 363.8, 157.2 372.5, 179.5 374.4 C 183.3 374.8, 189.6 375.5, 193.5 376.0 C 197.3 376.5, 224.8 377.4, 254.5 378.0 C 312.2 379.0, 316.5 379.4, 324.9 383.7 C 332.5 387.6, 335.9 392.6, 335.9 400.3 C 336.1 424.8, 300.0 439.2, 238.5 439.2 C 188.7 439.2, 153.8 432.4, 108.5 413.8 C 93.9 407.8, 92.1 408.1, 98.4 415.2 C 125.0 445.1, 164.7 465.4, 215 474.6 C 230.1 477.4, 282.4 477.2, 297.5 474.2 C 340.8 465.7, 366.8 448.3, 377.0 421 C 379.2 415.2, 379.5 412.8, 379.5 400.5 C 379.5 392.8, 379.2 385.0, 378.8 383.2 C 377.4 376.6, 372.0 366.8, 366.3 360.9 C 348.4 342.1, 324.6 337.0, 255 337 C 228.5 336.9, 195.5 335.4, 186.5 333.9 C 167.6 330.6, 162.5 329.5, 153.0 326.8 C 109.6 314.5, 80.0 285.3, 70.3 245.1 C 68.7 238.5, 68.8 212.8, 70.4 204.1 C 80.4 152.0, 118.7 110.7, 176 90.4 C 189.5 85.5, 208.4 81.1, 222.5 79.4 C 225.8 79.0, 229.6 78.5, 231 78.3 C 232.3 78.2, 242.7 77.7, 254 77.4 C 300.0 75.9, 339.1 84.6, 371.5 103.7 C 405.4 123.7, 433.0 160.6, 440.6 196 C 441.0 197.9, 441.5 200.1, 441.7 201 C 444.3 212.9, 444.1 234.1, 441.2 245.8 C 439.7 251.8, 439.8 254.2, 441.9 281.8 C 443.1 298.1, 444.9 315.7, 446.0 321 C 447.1 326.2, 448.0 333.5, 448.0 337.2 C 448.0 342.3, 448.3 344, 449.4 344 C 451.0 344, 460.7 328.1, 465.0 318.3 C 466.7 314.5, 468.7 310.1, 469.4 308.5 C 471.1 304.7, 477.3 286.3, 479.3 279 C 480.8 273.5, 483.0 261.8, 484.8 250.5 C 486.0 243.0, 485.5 204.4, 484.1 196.5 C 477.8 159.6, 462.9 127.6, 440.7 103.5 C 438.7 101.3, 437.0 99.2, 437.0 98.8 C 436.9 97.3, 412.3 76.7, 403.7 70.9 C 379.9 55.0, 347.3 42.7, 315 37.5 C 294.7 34.2, 255.0 33.1, 229 35.0" />
+      <path d="M 158 164.5 C 119.4 170.6, 91 201.5, 91 237.3 C 91 252.8, 95.3 263.3, 106.3 274.8 C 116.5 285.3, 116.3 285.3, 120.3 277.2 C 129.6 258.9, 144.3 247.6, 174.5 235.5 C 198.3 225.9, 207.0 219.5, 212.4 208 C 217.4 197.1, 215.1 182.0, 207.3 174.8 C 202.6 170.5, 193.0 166.2, 184.1 164.5 C 174.3 162.7, 169.5 162.7, 158 164.5 M 151.5 189.6 C 136.4 197.5, 138.1 214.8, 154.3 219.1 C 165.4 222.1, 177.2 212.4, 175.4 201.7 C 173.7 191.6, 160.4 184.9, 151.5 189.6" />
+      <path d="M 329.1 164.5 C 307.8 168.2, 297 178.7, 297 195.5 C 297 202.2, 297.4 203.9, 300.2 209.2 C 305.9 220.0, 314.5 225.3, 341 234.4 C 362.1 241.7, 372.0 245.8, 384.7 252.6 C 413.8 267.9, 433.5 286.9, 441.4 306.9 C 442.3 309.4, 443.4 311.7, 443.8 311.9 C 445.0 312.8, 447.2 325.9, 447.7 335.2 C 448.0 341.7, 448.5 344, 449.5 344 C 452.8 344, 452.8 340.4, 449.4 298.9 C 447.5 276.1, 446.0 256.7, 446.0 255.7 C 446.0 254.4, 445.1 254, 443 254 C 441.3 254, 439.9 253.4, 439.9 252.7 C 439.8 252.0, 439.3 252.7, 438.8 254.2 C 437.8 257.0, 435.6 257.8, 434.4 255.8 C 434.0 255.2, 432.6 249.7, 431.3 243.6 C 425.2 215.2, 418.3 201.0, 403.5 186.5 C 385.2 168.3, 356.1 159.7, 329.1 164.5 M 346 189.9 C 338.2 194.0, 335.0 201.0, 337.5 208.2 C 339.5 213.9, 342.3 216.6, 348.1 218.5 C 356.7 221.4, 365.4 217.9, 369.5 209.9 C 376.0 197.3, 359.1 182.9, 346 189.9" />
+      <path d="M 236 230.1 C 222.8 231.7, 216.2 236.5, 215.2 245.2 C 214.5 251.3, 217.2 256.0, 225.8 264.1 C 240.3 277.9, 255.6 281.5, 271.3 274.9 C 280.1 271.3, 291.1 261.6, 294.8 254.2 C 299.0 246.1, 296.8 237.0, 289.8 233.5 C 282.1 229.7, 254.1 227.9, 236 230.1" />
+      </g>
+    </g>
+
+    <!-- Sloth de idol: diadema, audífonos y micrófono de brazo -->
+    <g id="sloth-idol">
+      <use href="#cara"/>
+      <path d="M14 222 A242 252 0 0 1 498 222" fill="none" stroke="#171719" stroke-width="34" stroke-linecap="round"/>
+      <path d="M14 222 A242 252 0 0 1 498 222" fill="none" stroke="#e8a33d" stroke-width="16" stroke-linecap="round"/>
+      <rect x="-22" y="176" width="70" height="116" rx="30" fill="#e8a33d" stroke="#171719" stroke-width="10"/>
+      <rect x="464" y="176" width="70" height="116" rx="30" fill="#e8a33d" stroke="#171719" stroke-width="10"/>
+      <path d="M18 286 Q34 392 168 372" fill="none" stroke="#171719" stroke-width="16" stroke-linecap="round"/>
+      <path d="M18 286 Q34 392 168 372" fill="none" stroke="#9a907f" stroke-width="6" stroke-linecap="round"/>
+      <rect x="160" y="354" width="50" height="36" rx="18" fill="#171719"/>
+      <rect x="168" y="361" width="34" height="22" rx="11" fill="#2e2a24"/>
+    </g>
+
+    <g id="puntero"><path d="M0 0 L0 30 L8 23 L13.5 35 L19 32.5 L13.5 21 L24 21 Z" fill="#f2e7cf" stroke="#171719" stroke-width="2.5" stroke-linejoin="round" transform="scale(1.5)"/></g>
+    <rect id="panel" x="90" y="190" width="900" height="460" rx="28" fill="#171512" stroke="#2e2a24" stroke-width="3"/>
+  </defs>
+
+  <!-- Fondo que comparten todas -->
+  <rect width="1080" height="1080" fill="#0f0e0c"/>
+  <rect width="1080" height="1080" fill="url(#brillo)"/>
+  <g id="rayos" transform="translate(540 430)"><g class="gira a" fill="url(#rayo)" id="rayosG"></g></g>
+
+  <!-- Cabecera de la guía -->
+  <g id="cabecera" opacity="0">
+    <g transform="translate(90 50) scale(.15)"><use href="#cara"/></g>
+    <text x="180" y="112" font-size="46" font-weight="800" fill="#ede6d6">Lo nuevo de la <tspan fill="#e8a33d">0.4.2</tspan></text>
+    <g id="barras"></g>
+  </g>
+
+  <!-- 0 · El concierto: el perezoso sale al escenario y el número cae al ritmo -->
+  <g class="escena" id="e0"><g class="cuerpo">
+    <g class="tablado"></g>
+    <rect class="destello" width="1080" height="1080" fill="#f4b04a" opacity="0"/>
+    <g class="titulo"><text class="partir-letras" x="540" y="700" text-anchor="middle" font-size="64" font-weight="800" fill="#ede6d6" letter-spacing="1">Ya salió Sloth</text></g>
+    <g class="version-neon" style="transform-box: view-box; transform-origin: 540px 810px">
+      <text class="neon-glow" x="540" y="880" text-anchor="middle" font-size="210" font-weight="900" fill="none" stroke="#f4b04a" stroke-width="44" stroke-opacity=".22" stroke-linejoin="round">0.4.2</text>
+      <text class="partir-letras" x="540" y="880" text-anchor="middle" font-size="210" font-weight="900" fill="#f2e7cf" stroke="#e8a33d" stroke-width="16" stroke-linejoin="round" paint-order="stroke">0.4.2</text>
+    </g>
+    <g class="publico"></g>
+  </g></g>
+
+  <!-- 1 · YouTube Shorts en la cola de redes -->
+  <g class="escena" id="e1"><g class="cuerpo">
+    <use href="#panel"/>
+    <g clip-path="url(#clipPanel)">
+      <g class="vid-w"><g transform="translate(130 230)">
+        <g clip-path="url(#telA)">
+          <rect width="158" height="280" fill="url(#telaB)"/>
+          <g class="sloth-v"><g transform="translate(79 126) scale(.2) translate(-256 -265)"><use href="#cara"/></g></g>
+          <rect x="0" y="273" width="158" height="7" fill="#2e2a24"/>
+          <rect class="izq prog-v" x="0" y="273" width="158" height="7" fill="#e8a33d"/>
+        </g>
+        <rect width="158" height="280" rx="18" fill="none" stroke="#e8a33d" stroke-width="3"/>
+      </g></g>
+      <text x="209" y="546" text-anchor="middle" font-size="19" font-weight="700" fill="#ede6d6">Tu video vertical</text>
+      <g class="cola">
+        <rect x="320" y="214" width="640" height="412" rx="20" fill="#12110f" stroke="#2e2a24" stroke-width="2"/>
+        <use href="#i-reloj" x="344" y="238" width="26" height="26" style="color:#ede6d6"/>
+        <text x="382" y="260" font-size="23" font-weight="800" fill="#ede6d6">Cola de redes</text>
+        <g class="redes"></g>
+        <g class="preguntas">
+          <use href="#i-palomita" x="344" y="574" width="20" height="20" style="color:#8fc177"/>
+          <text x="372" y="590" font-size="16" fill="#9a907f">Creado para niños: <tspan font-weight="800" fill="#ede6d6">No</tspan></text>
+          <use href="#i-palomita" x="600" y="574" width="20" height="20" style="color:#8fc177"/>
+          <text x="628" y="590" font-size="16" fill="#9a907f">Sintético que parece real: <tspan font-weight="800" fill="#ede6d6">No</tspan></text>
+        </g>
+      </g>
+      <g class="fichas"></g>
+      <g class="cursor"><g class="punta" style="transform-box: fill-box; transform-origin: 0 0"><use href="#puntero"/></g></g>
+    </g>
+    <g class="kicker"><use href="#i-video" x="150" y="693" width="32" height="32" style="color:#e8a33d"/><text x="194" y="720" font-size="30" font-weight="800" fill="#e8a33d" letter-spacing="4">REDES</text></g>
+    <text class="partir-palabras" x="150" y="795" font-size="60" font-weight="800" fill="#ede6d6">Tus Shorts, en YouTube</text>
+    <g class="linea"><text x="150" y="850" font-size="32" font-weight="500" fill="#9a907f">Los verticales también suben a tu canal, cada</text></g>
+    <g class="linea"><text x="150" y="895" font-size="32" font-weight="500" fill="#9a907f">uno a su hora, y YouTube los publica solo.</text></g>
+  </g></g>
+
+  <!-- 2 · Antigravity con varias cuentas de Google -->
+  <g class="escena" id="e2"><g class="cuerpo">
+    <use href="#panel"/>
+    <g clip-path="url(#clipPanel)">
+      <g class="opciones-ag">
+        <rect x="120" y="214" width="400" height="412" rx="18" fill="#12110f" stroke="#2e2a24" stroke-width="2"/>
+        <use href="#l-antigravity" x="144" y="236" width="32" height="32"/>
+        <text x="188" y="261" font-size="23" font-weight="800" fill="#ede6d6">Antigravity</text>
+        <rect class="activa" x="138" y="286" width="364" height="70" rx="12" fill="rgba(143, 193, 119, 0.10)" stroke="#8fc177" stroke-width="2"/>
+        <g class="cuentas"></g>
+        <g transform="translate(140 534)">
+          <rect width="360" height="48" rx="12" fill="#221f1b" stroke="#2e2a24" stroke-width="2"/>
+          <use href="#i-mas" x="18" y="13" width="22" height="22" style="color:#ede6d6"/>
+          <text x="50" y="31" font-size="18" font-weight="700" fill="#ede6d6">Conectar otra cuenta</text>
+        </g>
+      </g>
+      <g class="ventana">
+        <rect x="550" y="214" width="410" height="412" rx="18" fill="#12110f" stroke="#2e2a24" stroke-width="2"/>
+        <text x="574" y="248" font-size="18" font-weight="700" fill="#9a907f">Hilo · Video de la semana</text>
+        <line x1="550" y1="264" x2="960" y2="264" stroke="#2e2a24" stroke-width="2"/>
+        <rect x="726" y="282" width="210" height="44" rx="12" fill="#221f1b"/>
+        <text x="744" y="310" font-size="17" fill="#ede6d6">Hazme el video</text>
+        <rect class="izq tecla" x="574" y="350" width="340" height="12" rx="6" fill="#2e2a24"/>
+        <rect class="izq tecla" x="574" y="376" width="290" height="12" rx="6" fill="#2e2a24"/>
+        <rect class="izq tecla" x="574" y="402" width="220" height="12" rx="6" fill="#2e2a24"/>
+        <g class="sigue"><use href="#i-palomita" x="574" y="432" width="20" height="20" style="color:#8fc177"/><text x="602" y="448" font-size="17" font-weight="700" fill="#8fc177">Sigue con otra cuenta</text></g>
+        <rect class="izq tecla2" x="574" y="478" width="320" height="12" rx="6" fill="#2e2a24"/>
+        <rect class="izq tecla2" x="574" y="504" width="270" height="12" rx="6" fill="#2e2a24"/>
+        <rect class="izq tecla2" x="574" y="530" width="300" height="12" rx="6" fill="#2e2a24"/>
+        <line x1="550" y1="572" x2="960" y2="572" stroke="#2e2a24" stroke-width="2"/>
+        <use href="#l-antigravity" x="574" y="588" width="20" height="20"/>
+        <text class="quien" x="602" y="604" font-size="16" fill="#9a907f">ana@gmail.com</text>
+      </g>
+      <g class="cursor"><g class="punta" style="transform-box: fill-box; transform-origin: 0 0"><use href="#puntero"/></g></g>
+    </g>
+    <g class="kicker"><use href="#i-personas" x="150" y="693" width="32" height="32" style="color:#e8a33d"/><text x="194" y="720" font-size="30" font-weight="800" fill="#e8a33d" letter-spacing="4">ANTIGRAVITY</text></g>
+    <text class="partir-palabras" x="150" y="795" font-size="60" font-weight="800" fill="#ede6d6">Varias cuentas de Google</text>
+    <g class="linea"><text x="150" y="850" font-size="32" font-weight="500" fill="#9a907f">Cuando a una se le acaba la cuota, el hilo</text></g>
+    <g class="linea"><text x="150" y="895" font-size="32" font-weight="500" fill="#9a907f">sigue solo con la siguiente.</text></g>
+  </g></g>
+
+  <!-- 3 · Compartir un estilo en un paso -->
+  <g class="escena" id="e3"><g class="cuerpo">
+    <use href="#panel"/>
+    <g clip-path="url(#clipPanel)">
+      <g class="card-w">
+        <rect x="130" y="230" width="330" height="330" rx="18" fill="#221f1b" stroke="#2e2a24" stroke-width="2"/>
+        <g clip-path="url(#clipPrevia)">
+          <rect x="146" y="246" width="298" height="190" fill="url(#telaB)"/>
+          <g class="sloth-c"><g transform="translate(295 350) scale(.2) translate(-256 -265)"><use href="#cara"/></g></g>
+        </g>
+        <rect x="160" y="260" width="48" height="26" rx="6" fill="#e8a33d"/>
+        <text x="184" y="279" text-anchor="middle" font-size="15" font-weight="800" fill="#1b1408">1.2</text>
+        <rect x="334" y="258" width="30" height="30" rx="7" fill="#ede6d6"/>
+        <use href="#i-copiar" x="341" y="265" width="16" height="16" style="color:#1b1408"/>
+        <g class="btn-compartir a">
+          <rect x="370" y="258" width="30" height="30" rx="7" fill="#8fc177"/>
+          <use href="#i-compartir" x="377" y="265" width="16" height="16" style="color:#1b1408"/>
+        </g>
+        <rect x="406" y="258" width="30" height="30" rx="7" fill="#e06c55"/>
+        <use href="#i-basura" x="413" y="265" width="16" height="16" style="color:#1b1408"/>
+        <text x="150" y="480" font-size="24" font-weight="800" fill="#ede6d6">Memes con mi voz</text>
+        <text x="150" y="512" font-size="17" fill="#9a907f">Tus fotos, tu voz y un meme</text>
+        <text x="150" y="536" font-size="17" fill="#9a907f">para cada frase.</text>
+      </g>
+      <g class="form">
+        <rect x="490" y="214" width="470" height="412" rx="18" fill="#12110f" stroke="#2e2a24" stroke-width="2"/>
+        <use href="#i-compartir" x="514" y="236" width="26" height="26" style="color:#8fc177"/>
+        <text x="552" y="258" font-size="22" font-weight="800" fill="#ede6d6">Compartir estilo</text>
+        <text x="514" y="298" font-size="15" font-weight="600" fill="#9a907f">Título</text>
+        <rect x="514" y="308" width="422" height="40" rx="10" fill="#221f1b" stroke="#2e2a24" stroke-width="2"/>
+        <g class="campo"><text x="530" y="334" font-size="17" font-weight="700" fill="#ede6d6">Memes con mi voz</text></g>
+        <text x="514" y="376" font-size="15" font-weight="600" fill="#9a907f">Lo que hace</text>
+        <rect x="514" y="386" width="422" height="40" rx="10" fill="#221f1b" stroke="#2e2a24" stroke-width="2"/>
+        <g class="campo"><text x="530" y="412" font-size="16" fill="#ede6d6">Tus fotos, tu voz y un meme para cada frase.</text></g>
+        <text x="514" y="454" font-size="15" font-weight="600" fill="#9a907f">Su último video</text>
+        <g class="campo">
+          <rect x="514" y="464" width="104" height="58" rx="8" fill="url(#telaB)" stroke="#2e2a24" stroke-width="2"/>
+          <use href="#i-video" x="556" y="483" width="20" height="20" style="color:#f2e7cf"/>
+          <text x="632" y="500" font-size="16" fill="#9a907f">memes-final.mp4</text>
+        </g>
+        <g transform="translate(514 546)">
+          <rect width="422" height="54" rx="12" fill="#e8a33d"/>
+          <text x="211" y="34" text-anchor="middle" font-size="20" font-weight="800" fill="#1b1408">Publicar</text>
+          <g class="revision">
+            <rect width="422" height="54" rx="12" fill="#221f1b" stroke="#e8a33d" stroke-width="2"/>
+            <use href="#i-reloj" x="20" y="15" width="24" height="24" style="color:#e8a33d"/>
+            <text x="54" y="34" font-size="18" font-weight="800" fill="#e8a33d">En revisión <tspan font-weight="500" fill="#9a907f">· te avisamos al aprobarlo</tspan></text>
+          </g>
+        </g>
+      </g>
+      <g class="cursor"><g class="punta" style="transform-box: fill-box; transform-origin: 0 0"><use href="#puntero"/></g></g>
+    </g>
+    <g class="kicker"><use href="#i-compartir" x="150" y="693" width="32" height="32" style="color:#e8a33d"/><text x="194" y="720" font-size="30" font-weight="800" fill="#e8a33d" letter-spacing="4">COMUNIDAD</text></g>
+    <text class="partir-palabras" x="150" y="795" font-size="60" font-weight="800" fill="#ede6d6">Comparte tu estilo</text>
+    <g class="linea"><text x="150" y="850" font-size="32" font-weight="500" fill="#9a907f">«Compartir» lo abre ya lleno: su título, lo que</text></g>
+    <g class="linea"><text x="150" y="895" font-size="32" font-weight="500" fill="#9a907f">hace y su último video. Y se publica ahí mismo.</text></g>
+  </g></g>
+
+  <!-- 4 · El estilo nuevo sale en su card al instante -->
+  <g class="escena" id="e4"><g class="cuerpo">
+    <use href="#panel"/>
+    <g clip-path="url(#clipPanel)">
+      <g class="hilo">
+        <rect x="120" y="214" width="400" height="412" rx="18" fill="#12110f" stroke="#2e2a24" stroke-width="2"/>
+        <use href="#i-columnas" x="144" y="234" width="24" height="24" style="color:#e8a33d"/>
+        <text x="178" y="254" font-size="19" font-weight="800" fill="#ede6d6">Nuevo estilo</text>
+        <line x1="120" y1="272" x2="520" y2="272" stroke="#2e2a24" stroke-width="2"/>
+        <rect x="216" y="290" width="284" height="44" rx="12" fill="#221f1b"/>
+        <text x="232" y="318" font-size="16" fill="#ede6d6">Recetas, con mi voz y mi cocina</text>
+        <rect class="izq tecla" x="144" y="358" width="330" height="12" rx="6" fill="#2e2a24"/>
+        <rect class="izq tecla" x="144" y="384" width="280" height="12" rx="6" fill="#2e2a24"/>
+        <rect class="izq tecla" x="144" y="410" width="310" height="12" rx="6" fill="#2e2a24"/>
+        <rect class="izq tecla" x="144" y="436" width="200" height="12" rx="6" fill="#2e2a24"/>
+        <g class="listo"><use href="#i-palomita" x="144" y="472" width="22" height="22" style="color:#8fc177"/><text x="174" y="489" font-size="18" font-weight="700" fill="#8fc177">Tu estilo ya está en el inicio</text></g>
+      </g>
+      <g class="inicio">
+        <rect x="550" y="214" width="410" height="412" rx="18" fill="#12110f" stroke="#2e2a24" stroke-width="2"/>
+        <text x="574" y="254" font-size="19" font-weight="800" fill="#ede6d6">Tus estilos</text>
+        <g class="rejilla"></g>
+        <rect class="hueco-n" x="760" y="446" width="180" height="160" rx="14" fill="none" stroke="#2e2a24" stroke-width="2" stroke-dasharray="8 8"/>
+      </g>
+      <g transform="translate(850 526)"><g class="card-nueva a">
+        <rect x="-90" y="-80" width="180" height="160" rx="14" fill="#221f1b" stroke="#e8a33d" stroke-width="3"/>
+        <rect x="-80" y="-70" width="160" height="94" rx="9" fill="url(#telaB)"/>
+        <g transform="translate(0 -24) scale(.13) translate(-256 -265)"><use href="#cara"/></g>
+        <rect x="18" y="-64" width="56" height="22" rx="6" fill="#e8a33d"/>
+        <text x="46" y="-48" text-anchor="middle" font-size="13" font-weight="800" fill="#1b1408">Nuevo</text>
+        <text x="-76" y="52" font-size="16" font-weight="800" fill="#ede6d6">Recetas con mi voz</text>
+      </g></g>
+    </g>
+    <g class="kicker"><use href="#i-columnas" x="150" y="693" width="32" height="32" style="color:#e8a33d"/><text x="194" y="720" font-size="30" font-weight="800" fill="#e8a33d" letter-spacing="4">ESTILOS</text></g>
+    <text class="partir-palabras" x="150" y="795" font-size="60" font-weight="800" fill="#ede6d6">Tu estilo, al instante</text>
+    <g class="linea"><text x="150" y="850" font-size="32" font-weight="500" fill="#9a907f">El que haces con «Nuevo estilo» sale en su</text></g>
+    <g class="linea"><text x="150" y="895" font-size="32" font-weight="500" fill="#9a907f">card en cuanto existe, sin reiniciar Sloth.</text></g>
+  </g></g>
+
+  <!-- 5 · Sin conexión: tu pedido se queda -->
+  <g class="escena" id="e5"><g class="cuerpo">
+    <use href="#panel"/>
+    <g clip-path="url(#clipPanel)">
+      <g class="ventana">
+        <rect x="150" y="214" width="780" height="412" rx="18" fill="#12110f" stroke="#2e2a24" stroke-width="2"/>
+        <text x="176" y="250" font-size="18" font-weight="700" fill="#9a907f">Hilo · Video de la semana</text>
+        <g class="wifi-ok"><use href="#i-wifi" x="884" y="230" width="28" height="28" style="color:#8fc177"/></g>
+        <g class="wifi-no"><use href="#i-wifi-off" x="884" y="230" width="28" height="28" style="color:#e06c55"/></g>
+        <line x1="150" y1="270" x2="930" y2="270" stroke="#2e2a24" stroke-width="2"/>
+        <g class="pedido">
+          <rect class="pedido-borde" x="574" y="288" width="332" height="86" rx="14" fill="#221f1b" stroke="#221f1b" stroke-width="2"/>
+          <rect x="588" y="300" width="62" height="62" rx="9" fill="url(#telaB)"/>
+          <g transform="translate(619 333) scale(.09) translate(-256 -265)"><use href="#cara"/></g>
+          <text x="666" y="326" font-size="18" font-weight="700" fill="#ede6d6">Hazme el video</text>
+          <text x="666" y="352" font-size="16" fill="#9a907f">con esta foto</text>
+        </g>
+        <rect class="izq tecla" x="176" y="404" width="520" height="12" rx="6" fill="#2e2a24"/>
+        <rect class="izq tecla" x="176" y="430" width="460" height="12" rx="6" fill="#2e2a24"/>
+        <rect class="izq tecla" x="176" y="456" width="380" height="12" rx="6" fill="#2e2a24"/>
+        <g class="mandado"><use href="#i-palomita" x="176" y="490" width="22" height="22" style="color:#8fc177"/><text x="206" y="507" font-size="18" font-weight="700" fill="#8fc177">Mandado tal cual, con su foto</text></g>
+        <g class="aviso">
+          <rect x="176" y="392" width="728" height="210" rx="14" fill="#221f1b" stroke="#e06c55" stroke-width="2"/>
+          <use href="#i-wifi-off" x="200" y="414" width="26" height="26" style="color:#e06c55"/>
+          <text x="238" y="435" font-size="21" font-weight="800" fill="#ede6d6">Sin conexión</text>
+          <text x="200" y="474" font-size="17" fill="#9a907f">Revisa tu internet. El firewall, el antivirus, una VPN o un</text>
+          <text x="200" y="500" font-size="17" fill="#9a907f">proxy pueden estar bloqueando. Tu pedido sigue aquí.</text>
+          <rect x="200" y="530" width="190" height="48" rx="10" fill="#e8a33d"/>
+          <use href="#i-reabrir" x="218" y="543" width="22" height="22" style="color:#1b1408"/>
+          <text x="250" y="561" font-size="18" font-weight="800" fill="#1b1408">Reintentar</text>
+        </g>
+      </g>
+      <g class="cursor"><g class="punta" style="transform-box: fill-box; transform-origin: 0 0"><use href="#puntero"/></g></g>
+    </g>
+    <g class="kicker"><use href="#i-wifi" x="150" y="693" width="32" height="32" style="color:#e8a33d"/><text x="194" y="720" font-size="30" font-weight="800" fill="#e8a33d" letter-spacing="4">SIN INTERNET</text></g>
+    <text class="partir-palabras" x="150" y="795" font-size="60" font-weight="800" fill="#ede6d6">Tu pedido no se pierde</text>
+    <g class="linea"><text x="150" y="850" font-size="32" font-weight="500" fill="#9a907f">Sloth te dice qué revisar, y «Reintentar» lo</text></g>
+    <g class="linea"><text x="150" y="895" font-size="32" font-weight="500" fill="#9a907f">vuelve a mandar tal cual, con sus imágenes.</text></g>
+  </g></g>
+
+  <!-- 6 · Los arreglos -->
+  <g class="escena" id="e6"><g class="cuerpo">
+    <use href="#panel"/>
+    <g clip-path="url(#clipPanel)">
+      <g class="arreglos"></g>
+    </g>
+    <g class="kicker"><use href="#i-llave" x="150" y="693" width="32" height="32" style="color:#e8a33d"/><text x="194" y="720" font-size="30" font-weight="800" fill="#e8a33d" letter-spacing="4">ARREGLOS</text></g>
+    <text class="partir-palabras" x="150" y="795" font-size="60" font-weight="800" fill="#ede6d6">Y quedó arreglado</text>
+    <g class="linea"><text x="150" y="850" font-size="32" font-weight="500" fill="#9a907f">Gracias por contarnos lo que fallaba.</text></g>
+  </g></g>
+
+  <!-- 7 · A crear: el mismo concierto, con el número en la pantalla -->
+  <g class="escena" id="e7"><g class="cuerpo">
+    <g class="tablado"></g>
+    <rect class="destello" width="1080" height="1080" fill="#f4b04a" opacity="0"/>
+    <g class="neon" style="transform-box: view-box; transform-origin: 540px 724px">
+      <text class="neon-glow" x="540" y="772" text-anchor="middle" font-size="140" font-weight="900" fill="none" stroke="#f4b04a" stroke-width="40" stroke-opacity=".22" stroke-linejoin="round">¡A crear!</text>
+      <text class="partir-letras" x="540" y="772" text-anchor="middle" font-size="140" font-weight="900" fill="#f2e7cf" stroke="#e8a33d" stroke-width="14" stroke-linejoin="round" paint-order="stroke">¡A crear!</text>
+    </g>
+    <g class="linea"><text x="540" y="838" text-anchor="middle" font-size="32" font-weight="600" fill="#ede6d6">Todo esto ya está en tu Sloth.</text></g>
+    <g class="linea"><text x="540" y="882" text-anchor="middle" font-size="28" font-weight="500" fill="#9a907f" class="despedida">Actualiza desde la app o en sloth.vancci.org</text></g>
+    <g class="publico"></g>
+  </g></g>
+</svg>
+<canvas id="chispas"></canvas>
+<video class="baile fuera" id="baile" src="baile.webm" muted loop playsinline preload="auto" aria-hidden="true"></video>
+<aside class="sonando fuera" id="sonando">
+  <div class="sonando-cab">
+    <div class="eq" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+    <div><span>Sonando</span><b>BAD</b><small>ATEEZ</small></div>
+  </div>
+  <div class="sonando-video"><iframe id="yt" title="ATEEZ - BAD (Official MV)" allow="autoplay; encrypted-media; picture-in-picture" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe></div>
+</aside>
+<nav class="controles">
+  <button id="anterior" class="oculto" type="button"><svg><use href="#i-izq"/></svg>Anterior</button>
+  <span id="cuenta"></span>
+  <button id="siguiente" type="button"><span id="sig-texto">Ver lo nuevo</span><svg><use id="sig-icono" href="#i-flecha"/></svg></button>
+</nav>
+</div>
+
+<script>
+'use strict';
+const NS = 'http://www.w3.org/2000/svg';
+const svg = document.getElementById('lienzo');
+const quieto = matchMedia('(prefers-reduced-motion: reduce)').matches;
+// Dentro de Sloth (web/src/Novedades.tsx, en un iframe): el final cierra la guía en vez de volver a empezar.
+const enSloth = window.parent !== window;
+const cerrarGuia = () => parent.postMessage('sloth-novedades-cerrar', location.origin);
+const escenas = [...svg.querySelectorAll('.escena')];
+const N = escenas.length;
+const C = { amber: '#e8a33d', amber2: '#f4b04a', ok: '#8fc177', bad: '#e06c55', text: '#ede6d6', muted: '#9a907f', line: '#2e2a24', crema: '#f2e7cf', p2: '#221f1b' };
+const COLORES = [C.amber, C.amber2, C.ok, C.bad, C.text, C.crema];
+const REBOTE = 'cubic-bezier(.3,1.6,.5,1)';
+const SUAVE = 'cubic-bezier(.2,.8,.2,1)';
+
+const en = (e, s) => e.querySelector(s);
+const todos = (e, s) => [...e.querySelectorAll(s)];
+const azar = (a, b) => a + Math.random() * (b - a);
+const espera = (ms) => new Promise((r) => setTimeout(r, quieto ? 0 : ms));
+function A(el, kf, op = {}) {
+  const o = { duration: 600, easing: SUAVE, fill: 'both', ...op };
+  if (quieto) Object.assign(o, { duration: 1, delay: 0, iterations: 1, endDelay: 0 });
+  return el.animate(kf, o);
+}
+const oculto = (el) => A(el, [{ opacity: 0 }, { opacity: 0 }], { duration: 1 });
+const aparece = (el, op = {}) => A(el, [{ opacity: 0, transform: 'translateY(24px)' }, { opacity: 1, transform: 'none' }], op);
+const salta = (el, op = {}) => A(el, [{ opacity: 0, transform: 'scale(.3)' }, { opacity: 1, transform: 'scale(1)' }], { duration: 600, easing: REBOTE, ...op });
+function tween(ms, f, vivo, ease = (t) => 1 - Math.pow(1 - t, 3)) {
+  if (quieto) { f(1); return Promise.resolve(true); }
+  return new Promise((res) => {
+    const t0 = performance.now();
+    const paso = (now) => {
+      if (!vivo()) return res(false);
+      const t = Math.min(1, (now - t0) / ms);
+      f(ease(t));
+      if (t < 1) requestAnimationFrame(paso); else res(true);
+    };
+    requestAnimationFrame(paso);
+  });
+}
+function sacudir(el, f = 12) {
+  if (quieto) return;
+  el.animate([0, 1, 2, 3, 4, 5, 6].map((k) => ({ transform: k === 6 ? 'translate(0,0)' : `translate(${azar(-f, f) * (1 - k / 7)}px, ${azar(-f, f) * (1 - k / 7)}px)` })), { duration: 460, easing: 'linear' });
+}
+// De la pantalla a las coordenadas de 1080
+function aLienzo(el) {
+  const r = el.getBoundingClientRect(), s = svg.getBoundingClientRect();
+  return [((r.left + r.width / 2 - s.left) / s.width) * 1080, ((r.top + r.height / 2 - s.top) / s.height) * 1080];
+}
+
+/* ---------- Partículas en canvas: confeti, chispas y cohetes ---------- */
+const cv = document.getElementById('chispas');
+const cx = cv.getContext('2d');
+let esc = 1;
+function medir() {
+  const r = cv.getBoundingClientRect(), d = Math.min(devicePixelRatio || 1, 2);
+  cv.width = Math.round(r.width * d); cv.height = Math.round(r.height * d); esc = cv.width / 1080;
+}
+addEventListener('resize', medir); medir();
+const P = [];
+let corriendo = false, ultimo = 0;
+function arrancar() { if (!corriendo && !quieto) { corriendo = true; ultimo = performance.now(); requestAnimationFrame(cuadro); } }
+function confeti(x, y, n, ang = -90, abre = 70, fuerza = [9, 18]) {
+  if (quieto) return;
+  for (let i = 0; i < n; i++) {
+    const a = ((ang + azar(-abre / 2, abre / 2)) * Math.PI) / 180, v = azar(...fuerza);
+    P.push({ t: 'c', x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, r: azar(0, 6.3), vr: azar(-0.25, 0.25), f: azar(0, 6.3), vf: azar(0.08, 0.2), w: azar(11, 19), h: azar(6, 11), c: COLORES[i % 6], redondo: Math.random() < 0.28 });
+  }
+  arrancar();
+}
+// Corazones que salen disparados, como el confeti
+function corazones(x, y, n, ang = -90, abre = 70, fuerza = [9, 18]) {
+  if (quieto) return;
+  const tonos = [C.bad, C.amber2, C.crema, C.bad];
+  for (let i = 0; i < n; i++) {
+    const a = ((ang + azar(-abre / 2, abre / 2)) * Math.PI) / 180, v = azar(...fuerza);
+    P.push({ t: 'c', x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, r: azar(-0.4, 0.4), vr: azar(-0.05, 0.05), f: azar(0, 6.3), vf: azar(0.03, 0.08), w: 0, h: azar(9, 15), c: tonos[i % 4], corazon: true });
+  }
+  arrancar();
+}
+function estallido(x, y, c, n = 80, fuerza = 9) {
+  if (quieto) return;
+  for (let i = 0; i < n; i++) {
+    const a = (i / n) * Math.PI * 2 + azar(-0.05, 0.05), v = azar(fuerza * 0.35, fuerza);
+    P.push({ t: 's', x, y, px: x, py: y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, c: Math.random() < 0.3 ? C.crema : c, vida: 1, dv: azar(0.007, 0.014) });
+  }
+  P.push({ t: 'o', x, y, r: 6, vida: 1, c });
+  arrancar();
+}
+function chispa(x, y, c = C.amber2) { P.push({ t: 's', x, y, px: x, py: y, vx: azar(-1.2, 1.2), vy: azar(-1.5, 0.5), c, vida: 0.9, dv: 0.035 }); arrancar(); }
+function cuadro(now) {
+  const dt = Math.min(3, (now - ultimo) / 16.67); ultimo = now;
+  cx.setTransform(1, 0, 0, 1, 0, 0); cx.clearRect(0, 0, cv.width, cv.height);
+  cx.setTransform(esc, 0, 0, esc, 0, 0);
+  for (let i = P.length - 1; i >= 0; i--) {
+    const p = P[i];
+    if (p.t === 'c') {
+      p.vy += 0.3 * dt; p.vx *= Math.pow(0.982, dt); p.vy *= Math.pow(0.985, dt);
+      if (p.vy > 3.6) p.vy = 3.6;
+      p.x += (p.vx + Math.sin(p.f) * 0.7) * dt; p.y += p.vy * dt; p.r += p.vr * dt; p.f += p.vf * dt;
+      if (p.y > 1120 || p.x < -60 || p.x > 1140) { P.splice(i, 1); continue; }
+      cx.globalCompositeOperation = 'source-over'; cx.globalAlpha = 1;
+      cx.save(); cx.translate(p.x, p.y); cx.rotate(p.r); cx.scale(1, Math.cos(p.f)); cx.fillStyle = p.c;
+      if (p.corazon) {
+        const k = p.h;
+        cx.beginPath(); cx.moveTo(0, k * 0.6);
+        cx.bezierCurveTo(-k * 1.2, -k * 0.2, -k * 0.6, -k * 1.2, 0, -k * 0.45);
+        cx.bezierCurveTo(k * 0.6, -k * 1.2, k * 1.2, -k * 0.2, 0, k * 0.6); cx.fill();
+      } else if (p.redondo) { cx.beginPath(); cx.arc(0, 0, p.h * 0.65, 0, 6.283); cx.fill(); } else cx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h);
+      cx.restore();
+    } else if (p.t === 's') {
+      p.px = p.x; p.py = p.y;
+      p.vy += 0.08 * dt; p.vx *= Math.pow(0.97, dt); p.vy *= Math.pow(0.97, dt);
+      p.x += p.vx * dt; p.y += p.vy * dt; p.vida -= p.dv * dt;
+      if (p.vida <= 0) { P.splice(i, 1); continue; }
+      cx.globalCompositeOperation = 'lighter'; cx.globalAlpha = p.vida;
+      cx.strokeStyle = p.c; cx.lineWidth = 1.5 + p.vida * 3; cx.lineCap = 'round';
+      cx.beginPath(); cx.moveTo(p.px - p.vx * 2, p.py - p.vy * 2); cx.lineTo(p.x, p.y); cx.stroke();
+    } else if (p.t === 'o') {
+      p.r += 7 * dt; p.vida -= 0.06 * dt;
+      if (p.vida <= 0) { P.splice(i, 1); continue; }
+      cx.globalCompositeOperation = 'lighter'; cx.globalAlpha = p.vida * 0.5;
+      cx.strokeStyle = p.c; cx.lineWidth = 4;
+      cx.beginPath(); cx.arc(p.x, p.y, p.r, 0, 6.283); cx.stroke();
+    }
+  }
+  cx.globalCompositeOperation = 'source-over'; cx.globalAlpha = 1;
+  if (P.length) requestAnimationFrame(cuadro); else { corriendo = false; cx.setTransform(1, 0, 0, 1, 0, 0); cx.clearRect(0, 0, cv.width, cv.height); }
+}
+// Una estela de chispas detrás de algo que vuela
+function estela(el, ms, c) {
+  if (quieto) return;
+  const t0 = performance.now();
+  const f = () => { if (performance.now() - t0 > ms) return; const [x, y] = aLienzo(el); chispa(x, y, c); chispa(x, y, c); requestAnimationFrame(f); };
+  requestAnimationFrame(f);
+}
+
+/* ---------- Piezas que se construyen una vez ---------- */
+function el(tag, attrs = {}, padre) {
+  const n = document.createElementNS(NS, tag);
+  for (const k in attrs) n.setAttribute(k, attrs[k]);
+  if (padre) padre.appendChild(n);
+  return n;
+}
+// Parte un texto en letras o palabras, cada una en su <g> para animarla
+function partir(t, modo) {
+  const s = t.textContent, g = el('g');
+  const unidades = [];
+  if (modo === 'letra') { for (let i = 0; i < s.length; i++) if (s[i] !== ' ') unidades.push([i, s[i]]); }
+  else { let i = 0; for (const w of s.split(' ')) { if (w) unidades.push([i, w]); i += w.length + 1; } }
+  for (const [i, u] of unidades) {
+    const x = t.getStartPositionOfChar(i).x;
+    const w = el('g', { class: (modo === 'letra' ? 'letra' : 'palabra') + ' a' }, g);
+    const n = t.cloneNode(false);
+    n.removeAttribute('class'); n.setAttribute('x', x.toFixed(1)); n.setAttribute('text-anchor', 'start'); n.textContent = u;
+    w.appendChild(n);
+  }
+  t.replaceWith(g);
+}
+/* ---------- El concierto: el escenario y el público ---------- */
+const COLOR_FOCO = [C.amber2, C.crema, C.ok, C.bad];
+// Focos, pantalla LED (con su texto), láseres, piso con luces y el idol que sube por el elevador
+function tablado(e, texto) {
+  const t = en(e, '.tablado');
+  const focos = el('g', { class: 'focos' }, t);
+  [190, 405, 675, 890].forEach((x, k) => {
+    const pos = el('g', { transform: `translate(${x} -30)` }, focos);
+    el('path', { class: 'foco arriba', d: 'M-14 0 L14 0 L170 980 L-170 980 Z', fill: `url(#foco${k})` }, pos);
+  });
+  const pantalla = el('g', { class: 'pantalla' }, t);
+  el('rect', { x: 370, y: 50, width: 340, height: 236, rx: 14, fill: '#0b0a09' }, pantalla);
+  const dentro = el('g', { 'clip-path': 'url(#clipPantalla)' }, pantalla);
+  for (let k = 0; k < 17; k++) el('rect', { class: 'barra-eq abajo', x: 374 + k * 20, y: 140, width: 14, height: 146, rx: 3, fill: COLORES[k % 4], 'fill-opacity': 0.4 }, dentro);
+  el('text', { class: 'titulo-pantalla', x: 540, y: 186, 'text-anchor': 'middle', 'font-size': 80, 'font-weight': 900, 'letter-spacing': 4, fill: C.amber }, dentro).textContent = texto;
+  el('rect', { x: 370, y: 50, width: 340, height: 236, fill: 'url(#led)' }, dentro);
+  el('rect', { x: 370, y: 50, width: 340, height: 236, rx: 14, fill: 'none', stroke: C.line, 'stroke-width': 4 }, pantalla);
+  const laseres = el('g', { class: 'laseres' }, t);
+  for (const [x, lado] of [[150, 1], [930, -1]]) {
+    const abanico = el('g', { class: 'abanico', 'data-lado': lado }, el('g', { transform: `translate(${x} 640)` }, laseres));
+    [-62, -48, -34, -20].forEach((a, j) => {
+      const r = ((-90 + lado * (90 + a)) * Math.PI) / 180;
+      el('line', { x1: 0, y1: 0, x2: Math.cos(r) * 1300, y2: Math.sin(r) * 1300, stroke: j % 2 ? C.ok : C.bad, 'stroke-width': 3, 'stroke-opacity': 0.75 }, abanico);
+    });
+  }
+  el('path', { d: 'M210 590 H870 L960 646 H120 Z', fill: '#171512', stroke: C.line, 'stroke-width': 3 }, t);
+  for (let x = 146; x < 940; x += 33) el('rect', { class: 'led', x, y: 638, width: 18, height: 6, rx: 3, fill: C.amber2 }, t);
+  el('ellipse', { class: 'sombra-idol a', cx: 540, cy: 594, rx: 110, ry: 13, fill: '#000', opacity: 0.55 }, t);
+  const idol = el('g', { class: 'sube-idol' }, el('g', { transform: 'translate(540 466) scale(.5) translate(-256 -270)' }, t));
+  el('use', { href: '#sloth-idol' }, el('g', { class: 'baila abajo' }, idol));
+}
+// La fila de cabezas de abajo; unos levantan su lightstick
+function publico(e, base) {
+  const pub = en(e, '.publico');
+  for (let k = 0; k < 15; k++) {
+    const x = 18 + k * 75 + azar(-8, 8), y = base + azar(-8, 8);
+    if (k % 2 === 0 || k % 5 === 3) {
+      el('line', { x1: x + 22, y1: y + 40, x2: x + 40, y2: y - 52, stroke: '#070706', 'stroke-width': 16, 'stroke-linecap': 'round' }, pub);
+      const vara = el('g', { class: 'vara', 'data-k': k }, el('g', { transform: `translate(${x + 40} ${y - 52})` }, pub));
+      el('rect', { x: -6, y: -58, width: 12, height: 64, rx: 4, fill: '#2e2a24' }, vara);
+      el('circle', { class: 'halo', cx: 0, cy: -80, r: 36, fill: C.amber, 'fill-opacity': 0.22 }, vara);
+      el('circle', { class: 'bulbo', cx: 0, cy: -80, r: 21, fill: C.amber, stroke: '#070706', 'stroke-width': 3 }, vara);
+      el('circle', { cx: 0, cy: -80, r: 8, fill: C.crema }, vara);
+    }
+    el('path', { d: `M${x - 60} 1090 Q${x - 54} ${y + 28} ${x} ${y + 26} Q${x + 54} ${y + 28} ${x + 60} 1090 Z`, fill: '#070706' }, pub);
+    el('circle', { cx: x, cy: y - 6, r: 30, fill: '#070706' }, pub);
+  }
+}
+const BEAT = 480; // Los tiempos del concierto
+const tono = () => [C.amber, C.ok, C.bad, C.crema, C.amber].map((c, k) => ({ fill: c, offset: k / 4, easing: 'steps(1)' }));
+// Arranca el concierto: pantalla, focos, ecualizador, luces, lightsticks y el idol subiendo
+function concierto(e) {
+  A(en(e, '.pantalla'), [{ opacity: 0 }, { opacity: 1, offset: 0.15 }, { opacity: 0.15, offset: 0.3 }, { opacity: 1, offset: 0.45 }, { opacity: 0.4, offset: 0.6 }, { opacity: 1 }], { duration: 800, easing: 'linear' });
+  A(en(e, '.focos'), [{ opacity: 0 }, { opacity: 1 }], { duration: 900 });
+  todos(e, '.foco').forEach((f, k) => A(f, [{ transform: `rotate(${k < 2 ? -26 : 26}deg)` }, { transform: `rotate(${k < 2 ? 16 : -16}deg)` }], { duration: 2100 + k * 380, iterations: Infinity, direction: 'alternate', easing: 'ease-in-out' }));
+  todos(e, '.barra-eq').forEach((b) => A(b, [{ transform: 'scaleY(.15)' }, { transform: `scaleY(${azar(0.5, 1)})` }], { duration: azar(240, 520), iterations: Infinity, direction: 'alternate', easing: 'steps(4)' }));
+  todos(e, '.led').forEach((l, k) => A(l, [{ opacity: 0.15 }, { opacity: 1 }, { opacity: 0.15 }], { duration: BEAT * 2, delay: -k * 60, iterations: Infinity, easing: 'steps(3)' }));
+  A(en(e, '.titulo-pantalla'), tono(), { duration: BEAT * 4, iterations: Infinity });
+  todos(e, '.vara').forEach((v) => {
+    A(v, [{ transform: 'rotate(-16deg)' }, { transform: 'rotate(16deg)' }], { duration: BEAT, delay: -v.dataset.k * 70, iterations: Infinity, direction: 'alternate', easing: 'ease-in-out' });
+    for (const c of todos(v, '.halo, .bulbo')) A(c, tono(), { duration: BEAT * 4, iterations: Infinity });
+  });
+  oculto(en(e, '.laseres')); oculto(en(e, '.neon-glow'));
+  A(en(e, '.sube-idol'), [{ transform: 'translateY(560px)', opacity: 0 }, { opacity: 1, offset: 0.15 }, { transform: 'translateY(-50px)', offset: 0.72 }, { transform: 'none', opacity: 1 }], { duration: 1100, delay: 300, easing: 'cubic-bezier(.2,.8,.2,1)' });
+  A(en(e, '.sombra-idol'), [{ transform: 'scale(0)' }, { transform: 'scale(1)' }], { duration: 500, delay: 1050 });
+}
+// El golpe grande: corazones, destello, láseres y el neón que late
+function explota(e, neon) {
+  corazones(-10, 1000, 90, -60, 30, [17, 28]); corazones(1090, 1000, 90, -120, 30, [17, 28]);
+  confeti(540, 640, 70, -90, 120, [12, 22]);
+  sacudir(en(e, '.cuerpo'), 14);
+  A(en(e, '.destello'), [{ opacity: 0 }, { opacity: 0.32, offset: 0.15 }, { opacity: 0 }], { duration: 700, easing: 'ease-out' });
+  A(en(e, '.laseres'), [{ opacity: 0.9 }, { opacity: 0.25 }, { opacity: 0.9 }], { duration: BEAT / 2, iterations: Infinity, easing: 'steps(2)' });
+  todos(e, '.abanico').forEach((a) => A(a, [{ transform: 'rotate(0deg)' }, { transform: `rotate(${a.dataset.lado * 22}deg)` }], { duration: BEAT * 2, iterations: Infinity, direction: 'alternate', easing: 'ease-in-out' }));
+  A(en(e, '.neon-glow'), [{ opacity: 1 }, { opacity: 0.35 }, { opacity: 1 }, { opacity: 0.8 }], { duration: BEAT * 2, iterations: Infinity, easing: 'steps(4)' });
+  A(neon, [{ transform: 'scale(1)' }, { transform: 'scale(1.07)', offset: 0.12 }, { transform: 'scale(1)', offset: 0.45 }, { transform: 'scale(1)' }], { duration: BEAT, iterations: Infinity, fill: 'none' });
+}
+// El público sigue lanzando corazones mientras la escena se ve
+async function lluviaDeCorazones(vivo) {
+  while (vivo() && !quieto) {
+    corazones(azar(80, 1000), 960, 9, -90, 50, [7, 13]);
+    await espera(azar(500, 1000));
+  }
+}
+function construir() {
+  // Rayos de luz
+  const rg = document.getElementById('rayosG');
+  for (let k = 0; k < 18; k++) el('path', { d: 'M0 0 L-36 -680 L36 -680 Z', transform: `rotate(${(k / 18) * 360})` }, rg);
+  // Barritas de la cabecera
+  const bg = document.getElementById('barras'), w = (900 - 5 * 14) / 6;
+  for (let k = 0; k < 6; k++) {
+    const x = 90 + k * (w + 14);
+    el('rect', { x, y: 150, width: w, height: 8, rx: 4, fill: C.line }, bg);
+    el('rect', { x, y: 150, width: w, height: 8, rx: 4, fill: C.amber, class: 'izq barra-llena', style: 'transform: scaleX(0)' }, bg);
+  }
+  // Los focos (un degradado por color) y el escenario del concierto, al principio y al final
+  const defs = svg.querySelector('defs');
+  COLOR_FOCO.forEach((c, k) => {
+    const g = el('linearGradient', { id: `foco${k}`, x1: 0, y1: 0, x2: 0, y2: 1 }, defs);
+    el('stop', { offset: 0, 'stop-color': c, 'stop-opacity': 0.5 }, g);
+    el('stop', { offset: 1, 'stop-color': c, 'stop-opacity': 0 }, g);
+  });
+  tablado(escenas[0], 'SLOTH'); publico(escenas[0], 1050);
+  tablado(escenas[7], document.title.replace('Sloth ', '')); publico(escenas[7], 1075);
+  // La cola de redes de la escena 1: TikTok e Instagram ya están; YouTube Shorts se activa
+  const redes = en(escenas[1], '.redes');
+  [['tiktok', 'TikTok'], ['instagram', 'Instagram'], ['youtube', 'YouTube Shorts']].forEach(([red, nombre], k) => {
+    const y = 286 + k * 92, f = el('g', { class: 'red' }, redes);
+    el('rect', { class: 'red-borde', x: 340, y, width: 600, height: 78, rx: 12, fill: '#171512', stroke: C.line, 'stroke-width': 2 }, f);
+    el('use', { href: `#l-${red}`, x: 358, y: y + 17, width: 44, height: 44 }, f);
+    el('text', { x: 418, y: y + 35, 'font-size': 20, 'font-weight': 800, fill: C.text }, f).textContent = nombre;
+    el('text', { class: 'sub', x: 418, y: y + 60, 'font-size': 15, fill: C.muted }, f).textContent = 'Hoy · 12:00';
+    el('text', { class: 'estado', x: 918, y: y + 46, 'text-anchor': 'end', 'font-size': 17, 'font-weight': 800, fill: C.amber }, f).textContent = 'En cola';
+    if (red !== 'youtube') return;
+    for (const [clase, fondo, texto, color] of [['activar', C.amber, 'Activar', '#1b1408'], ['activo', C.ok, 'Activo', '#1b1408']]) {
+      const b = el('g', { class: clase + ' a' }, f);
+      el('rect', { x: 800, y: y + 17, width: 120, height: 44, rx: 10, fill: fondo }, b);
+      el('text', { x: 860, y: y + 45, 'text-anchor': 'middle', 'font-size': 17, 'font-weight': 800, fill: color }, b).textContent = texto;
+    }
+  });
+  // Lo que vuela del video a cada red
+  const fichas = en(escenas[1], '.fichas');
+  for (let k = 0; k < 3; k++) {
+    const pos = el('g', { transform: 'translate(209 370)' }, fichas);
+    const v = el('g', { class: 'ficha' }, pos);
+    el('rect', { x: -20, y: -34, width: 40, height: 68, rx: 7, fill: C.amber, stroke: '#171719', 'stroke-width': 3 }, v);
+    el('use', { href: '#i-video', x: -10, y: -10, width: 20, height: 20, style: 'color:#1b1408' }, v);
+  }
+  // Las cuentas de Google de la escena 2
+  const cuentas = en(escenas[2], '.cuentas');
+  [['A', 'ana@gmail.com', C.amber, 0.7], ['B', 'beto@gmail.com', C.ok, 0.95], ['C', 'caro@gmail.com', C.amber2, 1]].forEach(([letra, correo, color, q], k) => {
+    const y = 286 + k * 80, f = el('g', { class: `cuenta${k === 2 ? ' cuenta-3' : ''}` }, cuentas);
+    el('circle', { cx: 172, cy: y + 35, r: 20, fill: color }, f);
+    el('text', { x: 172, y: y + 42, 'text-anchor': 'middle', 'font-size': 19, 'font-weight': 900, fill: '#1b1408' }, f).textContent = letra;
+    el('text', { x: 204, y: y + 30, 'font-size': 17, 'font-weight': 700, fill: C.text }, f).textContent = correo;
+    el('text', { class: 'cuota-t', x: 204, y: y + 54, 'font-size': 14, fill: C.muted }, f).textContent = 'Con cuota';
+    el('rect', { x: 404, y: y + 26, width: 80, height: 10, rx: 5, fill: C.line }, f);
+    el('rect', { class: 'izq q', 'data-q': q, x: 404, y: y + 26, width: 80, height: 10, rx: 5, fill: C.ok }, f);
+  });
+  // Los estilos del inicio de la escena 4, con un hueco para el que se está haciendo
+  const rejilla = en(escenas[4], '.rejilla');
+  [['Video explicativo', 'i-pizarra', 570, 276], ['Reel de comedia', 'i-risa', 760, 276], ['El Diff', 'i-claqueta', 570, 446]].forEach(([nombre, icono, x, y]) => {
+    el('rect', { x, y, width: 180, height: 160, rx: 14, fill: C.p2, stroke: C.line, 'stroke-width': 2 }, rejilla);
+    el('rect', { x: x + 10, y: y + 10, width: 160, height: 94, rx: 9, fill: '#171512' }, rejilla);
+    el('use', { href: `#${icono}`, x: x + 74, y: y + 41, width: 32, height: 32, style: `color:${C.muted}` }, rejilla);
+    el('text', { x: x + 14, y: y + 136, 'font-size': 16, 'font-weight': 800, fill: C.text }, rejilla).textContent = nombre;
+  });
+  // La lista de arreglos de la escena 6
+  const arreglos = en(escenas[6], '.arreglos');
+  [
+    ['El Diff ya no apaga tu Mac al terminar', 'Mac'],
+    ['Sin Edge, entras con Google desde Chrome, Brave o Vivaldi', 'Windows'],
+    ['Tus estilos sin card la recuperan al abrir Sloth', 'Estilos'],
+    ['La comunidad aguanta más y, si se cae, dice cuándo vuelve', 'Comunidad'],
+    ['Sloth para Mac va firmado con el certificado de Apple', 'Mac'],
+    ['Cada botón de las cards tiene su color', 'Cards'],
+  ].forEach(([texto, donde], k) => {
+    const y = 222 + k * 68, f = el('g', { class: 'arreglo' }, arreglos);
+    el('rect', { class: 'arreglo-borde', x: 120, y, width: 840, height: 58, rx: 12, fill: '#12110f', stroke: C.line, 'stroke-width': 2 }, f);
+    el('rect', { x: 140, y: y + 12, width: 34, height: 34, rx: 9, fill: 'none', stroke: C.muted, 'stroke-width': 2 }, f);
+    const t = el('g', { transform: `translate(157 ${y + 29})` }, f);
+    const tic = el('g', { class: 'tic a' }, t);
+    el('rect', { x: -17, y: -17, width: 34, height: 34, rx: 9, fill: C.ok }, tic);
+    el('use', { href: '#i-palomita', x: -12, y: -12, width: 24, height: 24, style: 'color:#1b1408' }, tic);
+    el('text', { x: 194, y: y + 36, 'font-size': 20, 'font-weight': 700, fill: C.text }, f).textContent = texto;
+    el('text', { x: 936, y: y + 36, 'text-anchor': 'end', 'font-size': 15, 'font-weight': 700, fill: C.muted }, f).textContent = donde;
+  });
+}
+
+/* ---------- Lo común de las novedades ---------- */
+function textos(e, base = 200) {
+  const k = en(e, '.kicker');
+  if (k) A(k, [{ opacity: 0, transform: 'translateX(-30px)' }, { opacity: 1, transform: 'none' }], { duration: 600, delay: base });
+  todos(e, '.palabra').forEach((w, i) => A(w, [{ opacity: 0, transform: 'translateY(60px) rotate(8deg) scale(.9)' }, { opacity: 1, transform: 'none' }], { duration: 800, delay: base + 120 + i * 80, easing: REBOTE }));
+  todos(e, '.linea').forEach((l, i) => aparece(l, { duration: 650, delay: base + 480 + i * 120 }));
+}
+async function mover(cur, de, a, ms) {
+  const [x0, y0] = de, [x1, y1] = a;
+  A(cur, [{ transform: `translate(${x0}px, ${y0}px)`, opacity: 0 }, { transform: `translate(${(x0 + x1) / 2 + 60}px, ${(y0 + y1) / 2 - 50}px)`, opacity: 1, offset: 0.45 }, { transform: `translate(${x1}px, ${y1}px)`, opacity: 1 }], { duration: ms, easing: 'cubic-bezier(.45,0,.2,1)' });
+  await espera(ms);
+}
+function clic(e, cur, x, y) {
+  en(cur, '.punta').animate([{ transform: 'scale(1)' }, { transform: 'scale(.8)' }, { transform: 'scale(1)' }], { duration: 260 });
+  const ondas = en(e, '.cuerpo');
+  for (const [r, d] of [[18, 0], [30, 90]]) {
+    const o = el('circle', { cx: x, cy: y, r, fill: 'none', stroke: C.amber2, 'stroke-width': 4, class: 'a temporal' }, ondas);
+    A(o, [{ transform: 'scale(.3)', opacity: 1 }, { transform: 'scale(2.4)', opacity: 0 }], { duration: 600, delay: d, easing: 'ease-out' });
+  }
+}
+
+/* ---------- Las escenas ---------- */
+const guiones = [
+  // 0 · El concierto
+  async (e, vivo) => {
+    concierto(e);
+    todos(en(e, '.titulo'), '.letra').forEach((l, k) => A(l, [{ opacity: 0, transform: 'translateY(34px) scale(.3)' }, { opacity: 1, transform: 'none' }], { duration: 520, delay: 1000 + k * 40, easing: REBOTE }));
+    // El número cae al ritmo, un golpe por cifra
+    const letras = todos(en(e, '.version-neon'), '.letra');
+    letras.forEach((l, k) => A(l, [{ opacity: 0, transform: 'scale(2.8) rotate(-8deg)' }, { opacity: 1, transform: 'scale(.9)', offset: 0.7 }, { opacity: 1, transform: 'none' }], { duration: 300, delay: 1700 + k * BEAT, easing: 'cubic-bezier(.6,0,.9,.45)' }));
+    await espera(1700); if (!vivo()) return;
+    for (const l of letras) {
+      await espera(240); if (!vivo()) return;
+      const b = l.getBBox(), x = b.x + b.width / 2, y = b.y + b.height / 2;
+      sacudir(en(e, '.cuerpo'), 6);
+      A(en(e, '.pantalla'), [{ opacity: 0.35 }, { opacity: 1 }], { duration: 200 });
+      estallido(x, y, C.amber2, 26, 6);
+      await espera(BEAT - 240); if (!vivo()) return;
+    }
+    explota(e, en(e, '.version-neon'));
+    await espera(1400); if (!vivo()) return;
+    pulsar();
+    lluviaDeCorazones(vivo);
+  },
+  // 1 · YouTube Shorts: se activa y el video entra a la cola de las tres redes
+  async (e, vivo) => {
+    textos(e);
+    A(en(e, '.vid-w'), [{ opacity: 0, transform: 'translateY(40px)' }, { opacity: 1, transform: 'none' }], { duration: 650, delay: 80, easing: REBOTE });
+    A(en(e, '.cola'), [{ opacity: 0, transform: 'translateX(50px)' }, { opacity: 1, transform: 'none' }], { duration: 650, delay: 200 });
+    A(en(e, '.prog-v'), [{ transform: 'scaleX(0)' }, { transform: 'scaleX(1)' }], { duration: 3200, iterations: Infinity, easing: 'linear' });
+    A(en(e, '.sloth-v'), [{ transform: 'translateY(4px)' }, { transform: 'translateY(-14px)' }], { duration: 480, iterations: Infinity, direction: 'alternate', easing: 'cubic-bezier(.5,0,.5,1)' });
+    const filas = todos(e, '.red'), yt = filas[2], fichas = todos(e, '.ficha');
+    filas.forEach((f, k) => {
+      aparece(f, { duration: 500, delay: 380 + k * 110 });
+      const est = en(f, '.estado'); est.textContent = 'En cola'; est.setAttribute('fill', C.amber); oculto(est);
+      en(f, '.red-borde').setAttribute('stroke', C.line);
+    });
+    en(yt, '.sub').textContent = 'Apagado';
+    oculto(en(yt, '.activo')); oculto(en(e, '.preguntas')); oculto(en(e, '.cursor'));
+    fichas.forEach(oculto);
+    await espera(1400); if (!vivo()) return;
+    const cur = en(e, '.cursor');
+    await mover(cur, [940, 640], [860, 508], 750); if (!vivo()) return;
+    clic(e, cur, 860, 508);
+    A(en(yt, '.activo'), [{ opacity: 0, transform: 'scale(.8)' }, { opacity: 1, transform: 'none' }], { duration: 400, easing: REBOTE });
+    A(en(yt, '.activar'), [{ opacity: 1 }, { opacity: 0 }], { duration: 200 });
+    en(yt, '.sub').textContent = 'Privado · Hoy 12:00';
+    estallido(860, 509, C.ok, 36, 6);
+    A(cur, [{ opacity: 1 }, { opacity: 0 }], { duration: 300, delay: 300 });
+    await espera(700); if (!vivo()) return;
+    A(en(yt, '.activo'), [{ opacity: 1 }, { opacity: 0 }], { duration: 300 });
+    // El video vuela a cada red
+    for (let k = 0; k < 3; k++) {
+      const dy = 286 + k * 92 + 39 - 370;
+      A(fichas[k], [{ opacity: 0, transform: 'translate(0,0) scale(.6)' }, { opacity: 1, transform: `translate(330px,${dy / 2 - 70}px) scale(1.1) rotate(-12deg)`, offset: 0.5 }, { opacity: 0, transform: `translate(${650}px,${dy}px) scale(.4)` }], { duration: 800, easing: 'cubic-bezier(.45,0,.3,1)' });
+      estela(fichas[k], 760, C.amber2);
+      setTimeout(() => {
+        if (!vivo()) return;
+        const f = filas[k];
+        A(en(f, '.red-borde'), [{ stroke: C.amber }, { stroke: C.line }], { duration: 900 });
+        salta(en(f, '.estado'), { duration: 450 });
+        confeti(880, 286 + k * 92 + 39, 18, -90, 120, [3, 8]);
+      }, quieto ? 0 : 760);
+      await espera(330); if (!vivo()) return;
+    }
+    await espera(800); if (!vivo()) return;
+    aparece(en(e, '.preguntas'), { duration: 500 });
+    await espera(1300); if (!vivo()) return;
+    // A su hora, YouTube lo publica solo
+    const est = en(yt, '.estado');
+    est.animate([{ transform: 'scaleX(1)' }, { transform: 'scaleX(0)' }], { duration: 160, easing: 'ease-in' }).onfinish = () => {
+      if (!vivo()) return;
+      est.textContent = 'Publicado'; est.setAttribute('fill', C.ok);
+      en(yt, '.sub').textContent = 'Lo publicó YouTube a las 12:00';
+      est.animate([{ transform: 'scaleX(0)' }, { transform: 'scaleX(1.15)' }, { transform: 'scaleX(1)' }], { duration: 380, easing: 'ease-out' });
+      A(en(yt, '.red-borde'), [{ stroke: C.ok }, { stroke: C.ok }], { duration: 400 });
+      confeti(880, 509, 50, -90, 150, [5, 12]); estallido(880, 509, C.ok, 40, 6);
+    };
+  },
+  // 2 · Antigravity: se acaba la cuota de una cuenta y el hilo sigue con otra
+  async (e, vivo) => {
+    textos(e);
+    A(en(e, '.opciones-ag'), [{ opacity: 0, transform: 'translateX(-60px)' }, { opacity: 1, transform: 'none' }], { duration: 650, delay: 80 });
+    A(en(e, '.ventana'), [{ opacity: 0, transform: 'translateY(40px)' }, { opacity: 1, transform: 'none' }], { duration: 650, delay: 200 });
+    const cuentas = todos(e, '.cuenta'), activa = en(e, '.activa'), quien = en(e, '.quien');
+    quien.textContent = 'ana@gmail.com';
+    cuentas.forEach((c) => {
+      const t = en(c, '.cuota-t'), q = en(c, '.q');
+      t.textContent = 'Con cuota'; t.setAttribute('fill', C.muted);
+      A(q, [{ transform: `scaleX(${q.dataset.q})`, fill: C.ok }, { transform: `scaleX(${q.dataset.q})`, fill: C.ok }], { duration: 1 });
+    });
+    cuentas.slice(0, 2).forEach((c, k) => aparece(c, { duration: 500, delay: 350 + k * 110 }));
+    oculto(cuentas[2]); oculto(en(e, '.sigue')); oculto(en(e, '.cursor'));
+    A(activa, [{ transform: 'translateY(0)' }, { transform: 'translateY(0)' }], { duration: 1 });
+    todos(e, '.tecla2').forEach((t) => A(t, [{ transform: 'scaleX(0)' }, { transform: 'scaleX(0)' }], { duration: 1 }));
+    await espera(1000); if (!vivo()) return;
+    // Conectar otra cuenta
+    const cur = en(e, '.cursor');
+    await mover(cur, [500, 640], [300, 558], 700); if (!vivo()) return;
+    clic(e, cur, 300, 558);
+    A(cuentas[2], [{ opacity: 0, transform: 'translateY(-20px) scale(.9)' }, { opacity: 1, transform: 'none' }], { duration: 550, easing: REBOTE });
+    confeti(300, 480, 30, -90, 140, [4, 9]);
+    A(cur, [{ opacity: 1 }, { opacity: 0 }], { duration: 300, delay: 300 });
+    await espera(700); if (!vivo()) return;
+    // El hilo trabaja con la cuenta 1 hasta que se le acaba la cuota
+    todos(e, '.tecla').forEach((t, k) => A(t, [{ transform: 'scaleX(0)' }, { transform: 'scaleX(1)' }], { duration: 520, delay: k * 520, easing: 'linear' }));
+    const q1 = en(cuentas[0], '.q');
+    A(q1, [{ transform: 'scaleX(.7)', fill: C.ok }, { fill: C.amber, offset: 0.55 }, { transform: 'scaleX(0)', fill: C.bad }], { duration: 1700, easing: 'cubic-bezier(.5,0,.85,.6)' });
+    await espera(1700); if (!vivo()) return;
+    const t1 = en(cuentas[0], '.cuota-t');
+    t1.textContent = 'Sin cuota hasta las 4:00 p. m.'; t1.setAttribute('fill', C.bad);
+    sacudir(cuentas[0], 8);
+    await espera(500); if (!vivo()) return;
+    // Sigue sola con la siguiente
+    A(activa, [{ transform: 'translateY(0)' }, { transform: 'translateY(80px)' }], { duration: 550, easing: REBOTE });
+    estallido(172, 401, C.ok, 36, 6);
+    quien.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 160 }).onfinish = () => {
+      if (!vivo()) return;
+      quien.textContent = 'beto@gmail.com';
+      quien.animate([{ opacity: 0, transform: 'translateY(8px)' }, { opacity: 1, transform: 'none' }], { duration: 300 });
+    };
+    aparece(en(e, '.sigue'), { delay: 300 });
+    todos(e, '.tecla2').forEach((t, k) => A(t, [{ transform: 'scaleX(0)' }, { transform: 'scaleX(1)' }], { duration: 420, delay: 600 + k * 380, easing: 'linear' }));
+    A(en(cuentas[1], '.q'), [{ transform: 'scaleX(.95)' }, { transform: 'scaleX(.8)' }], { duration: 1600, delay: 600 });
+  },
+  // 3 · Compartir: la pantalla sale ya llena y se publica ahí mismo
+  async (e, vivo) => {
+    textos(e);
+    A(en(e, '.card-w'), [{ opacity: 0, transform: 'translateY(40px)' }, { opacity: 1, transform: 'none' }], { duration: 650, delay: 80, easing: REBOTE });
+    A(en(e, '.sloth-c'), [{ transform: 'translateY(4px)' }, { transform: 'translateY(-14px)' }], { duration: 480, iterations: Infinity, direction: 'alternate', easing: 'cubic-bezier(.5,0,.5,1)' });
+    oculto(en(e, '.form')); oculto(en(e, '.revision')); oculto(en(e, '.cursor'));
+    todos(e, '.campo').forEach(oculto);
+    await espera(1200); if (!vivo()) return;
+    const cur = en(e, '.cursor');
+    await mover(cur, [600, 640], [385, 273], 800); if (!vivo()) return;
+    clic(e, cur, 385, 273);
+    en(e, '.btn-compartir').animate([{ transform: 'scale(1)' }, { transform: 'scale(.85)' }, { transform: 'scale(1)' }], { duration: 260 });
+    A(en(e, '.form'), [{ opacity: 0, transform: 'translateX(60px) scale(.96)' }, { opacity: 1, transform: 'none' }], { duration: 550, easing: REBOTE });
+    A(cur, [{ opacity: 1 }, { opacity: 0 }], { duration: 250, delay: 200 });
+    // Cada campo llega lleno
+    for (const [k, c] of todos(e, '.campo').entries()) {
+      await espera(k ? 260 : 450); if (!vivo()) return;
+      A(c, [{ opacity: 0, transform: 'translateX(-14px)' }, { opacity: 1, transform: 'none' }], { duration: 380 });
+      const [x, y] = aLienzo(c); chispa(x - 60, y); chispa(x, y); chispa(x + 60, y);
+    }
+    await espera(900); if (!vivo()) return;
+    await mover(cur, [930, 470], [725, 573], 650); if (!vivo()) return;
+    clic(e, cur, 725, 573);
+    A(en(e, '.revision'), [{ opacity: 0, transform: 'scale(.94)' }, { opacity: 1, transform: 'none' }], { duration: 400, easing: REBOTE });
+    confeti(725, 560, 60, -90, 160, [6, 13]);
+    A(cur, [{ opacity: 1 }, { opacity: 0 }], { duration: 300, delay: 400 });
+  },
+  // 4 · Nuevo estilo: al terminar su hilo, la card llega sola al inicio
+  async (e, vivo) => {
+    textos(e);
+    A(en(e, '.hilo'), [{ opacity: 0, transform: 'translateX(-60px)' }, { opacity: 1, transform: 'none' }], { duration: 650, delay: 80 });
+    A(en(e, '.inicio'), [{ opacity: 0, transform: 'translateX(60px)' }, { opacity: 1, transform: 'none' }], { duration: 650, delay: 200 });
+    const hueco = en(e, '.hueco-n');
+    A(hueco, [{ strokeDashoffset: 0 }, { strokeDashoffset: -32 }], { duration: 900, iterations: Infinity, easing: 'linear' });
+    oculto(en(e, '.listo')); oculto(en(e, '.card-nueva'));
+    todos(e, '.tecla').forEach((t, k) => A(t, [{ transform: 'scaleX(0)' }, { transform: 'scaleX(1)' }], { duration: 480, delay: 700 + k * 480, easing: 'linear' }));
+    await espera(700 + 4 * 480 + 200); if (!vivo()) return;
+    aparece(en(e, '.listo'), { duration: 450 });
+    await espera(350); if (!vivo()) return;
+    const nueva = en(e, '.card-nueva');
+    A(nueva, [{ opacity: 0, transform: 'translate(-530px,-40px) scale(.3) rotate(-20deg)' }, { opacity: 1, transform: 'translate(-260px,-200px) scale(.8) rotate(-8deg)', offset: 0.5 }, { opacity: 1, transform: 'none' }], { duration: 900, easing: 'cubic-bezier(.45,0,.3,1)' });
+    estela(nueva, 880, C.amber);
+    await espera(880); if (!vivo()) return;
+    hueco.getAnimations().forEach((a) => a.cancel());
+    nueva.animate([{ transform: 'scale(1)' }, { transform: 'scale(1.12, .9)' }, { transform: 'scale(.96, 1.05)' }, { transform: 'scale(1)' }], { duration: 450 });
+    sacudir(en(e, '.inicio'), 8);
+    confeti(850, 500, 70, -90, 160, [6, 14]); estallido(850, 526, C.amber, 44, 7);
+  },
+  // 5 · Sin internet: el aviso dice qué revisar y «Reintentar» manda el pedido tal cual
+  async (e, vivo) => {
+    textos(e);
+    A(en(e, '.ventana'), [{ opacity: 0, transform: 'translateY(40px)' }, { opacity: 1, transform: 'none' }], { duration: 650, delay: 80 });
+    A(en(e, '.pedido'), [{ opacity: 0, transform: 'translateX(40px)' }, { opacity: 1, transform: 'none' }], { duration: 550, delay: 350, easing: REBOTE });
+    oculto(en(e, '.aviso')); oculto(en(e, '.mandado')); oculto(en(e, '.wifi-no')); oculto(en(e, '.cursor'));
+    todos(e, '.tecla').forEach((t) => A(t, [{ transform: 'scaleX(0)' }, { transform: 'scaleX(0)' }], { duration: 1 }));
+    en(e, '.pedido-borde').setAttribute('stroke', C.p2);
+    await espera(1300); if (!vivo()) return;
+    // Se va el internet
+    A(en(e, '.wifi-ok'), [{ opacity: 1 }, { opacity: 0 }], { duration: 150 });
+    A(en(e, '.wifi-no'), [{ opacity: 0 }, { opacity: 1 }], { duration: 150 });
+    sacudir(en(e, '.ventana'), 9);
+    A(en(e, '.aviso'), [{ opacity: 0, transform: 'translateY(60px) scale(.94)' }, { opacity: 1, transform: 'none' }], { duration: 650, easing: REBOTE });
+    await espera(1700); if (!vivo()) return;
+    // Vuelve
+    A(en(e, '.wifi-no'), [{ opacity: 1 }, { opacity: 0 }], { duration: 150 });
+    A(en(e, '.wifi-ok'), [{ opacity: 0, transform: 'scale(.5)' }, { opacity: 1, transform: 'none' }], { duration: 400, easing: REBOTE });
+    chispa(898, 244, C.ok); chispa(898, 244, C.ok); chispa(898, 244, C.ok);
+    await espera(400); if (!vivo()) return;
+    const cur = en(e, '.cursor');
+    await mover(cur, [800, 640], [295, 554], 750); if (!vivo()) return;
+    clic(e, cur, 295, 554);
+    A(en(e, '.aviso'), [{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'translateY(40px) scale(.96)' }], { duration: 380, easing: 'ease-in' });
+    A(cur, [{ opacity: 1 }, { opacity: 0 }], { duration: 300, delay: 200 });
+    // El mismo pedido, con su foto, vuelve a salir
+    const borde = en(e, '.pedido-borde');
+    A(borde, [{ stroke: C.amber }, { stroke: C.amber }], { duration: 1 });
+    en(e, '.pedido').animate([{ transform: 'scale(1)' }, { transform: 'scale(1.05)' }, { transform: 'scale(1)' }], { duration: 420, easing: 'ease-out' });
+    estallido(740, 331, C.amber, 40, 7);
+    todos(e, '.tecla').forEach((t, k) => A(t, [{ transform: 'scaleX(0)' }, { transform: 'scaleX(1)' }], { duration: 480, delay: 500 + k * 440, easing: 'linear' }));
+    aparece(en(e, '.mandado'), { delay: 500 + 3 * 440 });
+  },
+  // 6 · Los arreglos se palomean uno por uno
+  async (e, vivo) => {
+    textos(e);
+    const filas = todos(e, '.arreglo');
+    filas.forEach((f, k) => {
+      A(f, [{ opacity: 0, transform: 'translateX(-40px)' }, { opacity: 1, transform: 'none' }], { duration: 500, delay: 100 + k * 90 });
+      oculto(en(f, '.tic'));
+      en(f, '.arreglo-borde').setAttribute('stroke', C.line);
+    });
+    await espera(1000); if (!vivo()) return;
+    for (const [k, f] of filas.entries()) {
+      salta(en(f, '.tic'), { duration: 450 });
+      A(en(f, '.arreglo-borde'), [{ stroke: C.ok }, { stroke: C.line }], { duration: 700 });
+      confeti(157, 251 + k * 68, 16, -60, 90, [3, 8]);
+      await espera(380); if (!vivo()) return;
+    }
+    confeti(540, 650, 90, -90, 120, [10, 18]);
+  },
+  // 7 · A crear: el mismo concierto y las letras caen al ritmo
+  async (e, vivo) => {
+    concierto(e);
+    const letras = todos(en(e, '.neon'), '.letra');
+    letras.forEach((l, k) => A(l, [{ opacity: 0, transform: 'scale(2.6) rotate(-10deg)' }, { opacity: 1, transform: 'scale(.9)', offset: 0.7 }, { opacity: 1, transform: 'none' }], { duration: 300, delay: 1300 + k * (BEAT / 4), easing: 'cubic-bezier(.6,0,.9,.45)' }));
+    todos(e, '.linea').forEach((l, k) => aparece(l, { delay: 1300 + letras.length * (BEAT / 4) + 300 + k * 150 }));
+    await espera(1300 + letras.length * (BEAT / 4) + 200); if (!vivo()) return;
+    explota(e, en(e, '.neon'));
+    lluviaDeCorazones(vivo);
+  },
+];
+
+/* ---------- Ir de una a otra ---------- */
+let actual = -1, token = 0, pulso = null;
+const cab = document.getElementById('cabecera');
+const sigBtn = document.getElementById('siguiente'), antBtn = document.getElementById('anterior');
+const sigTxt = document.getElementById('sig-texto'), sigIco = document.getElementById('sig-icono'), cuenta = document.getElementById('cuenta');
+const brilloStops = [...document.querySelectorAll('#brillo stop')];
+const TONO = [C.amber, C.bad, C.amber2, C.ok, C.amber, C.bad, C.ok, C.amber];
+
+function limpiar(e) {
+  e.getAnimations({ subtree: true }).forEach((a) => { if (!(a instanceof CSSAnimation)) a.cancel(); });
+  todos(e, '.temporal').forEach((n) => n.remove());
+}
+function pulsar() {
+  if (quieto) return;
+  pulso = sigBtn.animate([{ boxShadow: '0 0 0 0 rgba(232, 163, 61, .6)' }, { boxShadow: '0 0 0 16px rgba(232, 163, 61, 0)' }], { duration: 1400, iterations: Infinity });
+}
+// La canción: arranca con la fiesta (el reproductor oficial de YouTube, que se carga hasta entonces), sigue en las
+// novedades en chiquito y se quita con «Terminar» (el final). Dentro de Sloth suena sola (Electron deja reproducir sin
+// clic); en un navegador, que no deja sonar nada sin un clic, espera y arranca con el primer clic o tecla.
+const YT_ID = '-q_S27LbNKU'; // ATEEZ - BAD (Official MV)
+const YT_DESDE = 29; // El segundo de la canción donde arranca la fiesta
+const sonando = document.getElementById('sonando'), yt = document.getElementById('yt'), baile = document.getElementById('baile');
+const ordenar = (func) => yt.contentWindow?.postMessage(JSON.stringify({ event: 'command', func, args: [] }), '*');
+// Sin este saludo, el reproductor no siempre atiende las órdenes de la página.
+yt.addEventListener('load', () => yt.contentWindow.postMessage(JSON.stringify({ event: 'listening', id: 1, channel: 'widget' }), '*'));
+const darSonido = () => {
+  removeEventListener('pointerdown', darSonido, true); removeEventListener('keydown', darSonido, true);
+  if (yt.src && actual < 7) ordenar('playVideo');
+};
+if (!enSloth) { addEventListener('pointerdown', darSonido, true); addEventListener('keydown', darSonido, true); }
+function musica(i) {
+  const suena = i < 7;
+  for (const el of [sonando, baile]) {
+    el.classList.toggle('fuera', !suena);
+    el.classList.toggle('mini', i >= 1 && i <= 6);
+  }
+  if (suena) baile.play().catch(() => {}); else baile.pause();
+  if (suena && !yt.src) {
+    const origen = location.origin !== 'null' ? `&origin=${encodeURIComponent(location.origin)}` : '';
+    yt.src = `https://www.youtube-nocookie.com/embed/${YT_ID}?autoplay=1&start=${YT_DESDE}&enablejsapi=1&playsinline=1&rel=0${origen}`;
+  } else if (yt.src) {
+    ordenar(suena ? 'playVideo' : 'pauseVideo');
+  }
+}
+function interfaz(i, antes) {
+  musica(i);
+  antBtn.classList.toggle('oculto', i === 0);
+  sigTxt.textContent = i === 0 ? 'Ver lo nuevo' : i === 6 ? 'Terminar' : i === 7 ? (enSloth ? 'Empezar a crear' : 'Ver otra vez') : 'Siguiente';
+  sigIco.setAttribute('href', i === 7 && !enSloth ? '#i-reabrir' : '#i-flecha');
+  cuenta.textContent = i >= 1 && i <= 6 ? `${i} de 6` : '';
+  brilloStops.forEach((s) => (s.style.stopColor = TONO[i]));
+  document.getElementById('rayos').style.opacity = i === 0 || i === 7 ? 0 : 0.3;
+  const dentro = (k) => k >= 1 && k <= 6;
+  if (dentro(i) && !dentro(antes)) A(cab, [{ opacity: 0, transform: 'translateY(-40px)' }, { opacity: 1, transform: 'none' }], { duration: 600, delay: 150 });
+  if (!dentro(i) && dentro(antes)) A(cab, [{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'translateY(-40px)' }], { duration: 350 });
+  todos(cab, '.barra-llena').forEach((b, k) => {
+    b.getAnimations().forEach((a) => a.cancel());
+    if (k === i - 1) A(b, [{ transform: 'scaleX(0)' }, { transform: 'scaleX(1)' }], { duration: 800, delay: 200 });
+    else b.style.transform = `scaleX(${k < i - 1 ? 1 : 0})`;
+  });
+}
+function ir(i, dir = 1) {
+  if (i < 0 || i >= N || i === actual) return;
+  if (pulso) { pulso.cancel(); pulso = null; }
+  const antes = actual, prev = antes >= 0 ? escenas[antes] : null;
+  const t = ++token, vivo = () => t === token;
+  if (prev) {
+    const s = A(prev, [{ opacity: 1, transform: 'translateX(0)' }, { opacity: 0, transform: `translateX(${-dir * 180}px)` }], { duration: 380, easing: 'cubic-bezier(.5,0,.8,.3)' });
+    s.finished.then(() => { if (escenas[actual] !== prev) { prev.classList.remove('visible'); limpiar(prev); } }, () => {});
+  }
+  const e = escenas[i];
+  limpiar(e); e.classList.add('visible');
+  A(e, [{ opacity: 0, transform: `translateX(${dir * 200}px)` }, { opacity: 1, transform: 'translateX(0)' }], { duration: 750, delay: prev ? 220 : 0, easing: 'cubic-bezier(.2,1.1,.3,1)' });
+  actual = i;
+  interfaz(i, antes);
+  guiones[i](e, vivo);
+}
+const siguiente = () => (actual === N - 1 ? (enSloth ? cerrarGuia() : ir(0, 1)) : ir(actual + 1, 1));
+if (enSloth) document.querySelector('.despedida').textContent = 'Gracias por crear con Sloth.';
+const anterior = () => ir(actual - 1, -1);
+sigBtn.addEventListener('click', siguiente);
+antBtn.addEventListener('click', anterior);
+addEventListener('keydown', (ev) => {
+  if (ev.key === 'ArrowRight' || ev.key === 'PageDown') { ev.preventDefault(); siguiente(); }
+  if (ev.key === 'ArrowLeft' || ev.key === 'PageUp') { ev.preventDefault(); anterior(); }
+  if (ev.key === 'Escape' && enSloth) cerrarGuia();
+});
+// Deslizar con el dedo
+let x0 = null;
+const esc_ = document.getElementById('escenario');
+esc_.addEventListener('pointerdown', (ev) => (x0 = ev.clientX));
+esc_.addEventListener('pointerup', (ev) => { if (x0 === null) return; const d = ev.clientX - x0; x0 = null; if (Math.abs(d) > 60) d < 0 ? siguiente() : anterior(); });
+
+document.fonts.ready.then(() => {
+  construir();
+  escenas.forEach((e) => e.classList.add('visible'));
+  todos(svg, '.partir-letras').forEach((t) => partir(t, 'letra'));
+  todos(svg, '.partir-palabras').forEach((t) => partir(t, 'palabra'));
+  escenas.forEach((e) => e.classList.remove('visible'));
+  const pedida = +new URLSearchParams(location.search).get('escena') || 0;
+  ir(Math.min(Math.max(pedida, 0), N - 1));
+});
+</script>
+</body>
+</html>

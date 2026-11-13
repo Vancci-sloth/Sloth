@@ -1,0 +1,56 @@
+# Completa las Mac de una versión ya publicada en Windows, sin subir otra versión ni repetir los otros sistemas.
+# Firmadas y notarizadas como en venta.yml.
+name: Completar Mac de Sloth
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'La misma versión que ya se publicó en Windows'
+        required: true
+        type: string
+        default: '0.4.0'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: venta
+  cancel-in-progress: false
+
+jobs:
+  publicar:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: macos-15-intel, node: 24.18.0 }
+          - { os: macos-15, node: 24.18.0 }
+          - { os: macos-15-intel, node: 22.23.4, mac12: '1' }
+    runs-on: ${{ matrix.os }}
+    # La compilación y hasta 10 min de espera a Apple (scripts/notarizar.mjs).
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - run: node scripts/version-venta.mjs
+        env:
+          VERSION: ${{ inputs.version }}
+      - run: npm run compilar
+        env:
+          SLOTH_MAC12: ${{ matrix.mac12 }}
+          SLOTH_TUYO: ${{ secrets.SLOTH_TUYO }}
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      - run: npm run publicar
+        env:
+          SLOTH_MAC12: ${{ matrix.mac12 }}
+          PUBLICAR: ${{ secrets.PUBLICAR }}
+          FIRMADA: ${{ secrets.CSC_LINK != '' && '1' || '' }}

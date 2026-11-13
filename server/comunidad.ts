@@ -16,7 +16,7 @@ import { redactar as redactarConAgente } from './redactar.ts'
 /**
  * La comunidad, vista desde esta computadora. Vive en el Worker del cobro (`licencias/src/comunidad.ts`): todo
  * `/api/comunidad/*` pasa allá tal cual, con quién eres (`credencial`). En la app que se vende, la clave y la computadora
- * de su cuenta o de su apoyo; en la del creador, la llave de `npm run publicar` (%APPDATA%\sloth\licencias\publicar.txt), que lo deja
+ * de su cuenta o de su apoyo; en la del creador, su llave (`llaveDelCreador`, %APPDATA%\sloth\licencias\admin.txt), que lo deja
  * fijar, borrar lo de cualquiera y decir cómo va cada mejora. `SLOTH_COBRO` cambia a qué Worker se habla (`wrangler dev`).
  *
  * Aquí se queda lo que es de esta computadora:
@@ -267,14 +267,21 @@ export function comunidad(app: string, o: Opciones) {
   return { api }
 }
 
-/** La llave del creador: la de `npm run publicar`, en el repo y en su copia instalada. Sin ella (otra computadora), no entra como creador. */
+/**
+ * La llave del creador, en el repo y en su copia instalada: la de `admin.txt` (el secreto ADMIN del cobro), que
+ * administra pero no publica versiones; sin ella, la de `npm run publicar`, que lo puede todo. Sin ninguna (otra
+ * computadora), no entra como creador.
+ */
 export function llaveDelCreador(): Credencial | undefined {
-  try {
-    const llave = (process.env.PUBLICAR || readFileSync(join(process.env.APPDATA ?? '', 'sloth', 'licencias', 'publicar.txt'), 'utf8')).trim()
-    return llave ? { llave } : undefined
-  } catch {
-    return
-  }
+  const env = (process.env.SLOTH_ADMIN || process.env.PUBLICAR || '').trim()
+  if (env) return { llave: env }
+  for (const archivo of ['admin.txt', 'publicar.txt'])
+    try {
+      const llave = readFileSync(join(process.env.APPDATA ?? '', 'sloth', 'licencias', archivo), 'utf8').trim()
+      if (llave) return { llave }
+    } catch {
+      // No está en esta computadora: la siguiente.
+    }
 }
 
 

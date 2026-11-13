@@ -1,11 +1,11 @@
-import { spawn } from 'node:child_process'
+import { execFileSync, spawn } from 'node:child_process'
 import { existsSync } from 'node:fs'
 import { homedir } from 'node:os'
-import { join } from 'node:path'
+import { join, win32 } from 'node:path'
 import type { Browser, Page } from 'playwright-core'
 
 /**
- * Chrome o Edge del sistema, con un perfil de Sloth y CDP, donde se entra con Google (la voz y Flow, `server/voz/`; las
+ * Chrome, Edge u otro Chromium del sistema, con un perfil de Sloth y CDP, donde se entra con Google (la voz y Flow, `server/voz/`; las
  * redes, `server/redes/navegador.ts`): Google no deja entrar dentro de una app, y Safari no se deja manejar por CDP, así
  * que sin uno de los dos la sesión no tiene cómo pasar a Sloth. Sin ventana, se abre con `SIN_VENTANA` y sus páginas con
  * `paginaNueva`, para que Google no lo vea como un robot.
@@ -13,30 +13,72 @@ import type { Browser, Page } from 'playwright-core'
 
 /** En Mac, Chrome y Edge también se instalan solo para tu usuario, en `~/Applications`. */
 const enMac = (app: string, exe: string) => ['/Applications', join(homedir(), 'Applications')].map((d) => join(d, `${app}.app`, 'Contents', 'MacOS', exe))
+/** En Windows, en Archivos de programa o, instalado solo para tu usuario, en `%LOCALAPPDATA%`. */
+const programas = [process.env.PROGRAMFILES, process.env['PROGRAMFILES(X86)'], process.env.LOCALAPPDATA].filter((p): p is string => !!p)
+const enWindows = (...ruta: string[]) => programas.map((p) => join(p, ...ruta, 'Application'))
+/** Los demás Chromium donde también se entra con Google: Chrome antes que Brave y Vivaldi. */
 const CHROME =
   process.platform === 'win32'
-    ? []
+    ? [
+        ...enWindows('Google', 'Chrome').map((d) => join(d, 'chrome.exe')),
+        ...enWindows('BraveSoftware', 'Brave-Browser').map((d) => join(d, 'brave.exe')),
+        ...enWindows('Vivaldi').map((d) => join(d, 'vivaldi.exe'))
+      ]
     : process.platform === 'darwin'
       ? enMac('Google Chrome', 'Google Chrome')
       : ['/opt/google/chrome/chrome', '/usr/bin/google-chrome', '/usr/bin/chromium']
 const EDGE =
   process.platform === 'win32'
-    ? ['C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe', 'C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe']
+    ? ['C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe', ...enWindows('Microsoft', 'Edge').map((d) => join(d, 'msedge.exe'))]
     : process.platform === 'darwin'
       ? enMac('Microsoft Edge', 'Microsoft Edge')
       : ['/opt/microsoft/msedge/msedge']
 
-/** El primero que haya, Chrome antes que Edge si `chromePrimero`. */
+/**
+ * El primero que haya, Chrome antes que Edge si `chromePrimero`. En Windows, Edge sigue primero (ahí está la sesión de
+ * quien ya entró) y, sin él, tu navegador predeterminado si es un Chromium: hay quien quitó Edge (avisado en la comunidad
+ * el 8 de noviembre de 2026). Firefox no sirve: ya no habla CDP, y sin eso la sesión no pasa a Sloth.
+ */
 export function chromiumDelSistema(chromePrimero: boolean): string | undefined {
-  return (chromePrimero ? [...CHROME, ...EDGE] : [...EDGE, ...CHROME]).find((e) => existsSync(e))
+  const otros = [...(process.platform === 'win32' ? [predeterminado()].filter((e): e is string => !!e) : []), ...CHROME]
+  return (chromePrimero ? [...otros, ...EDGE] : [...EDGE, ...otros]).find((e) => existsSync(e))
 }
 
-export const nombreDe = (exe: string | undefined) => (exe && /edge/i.test(exe) ? 'Edge' : 'Chrome')
+/** El navegador predeterminado de Windows si es un Chromium, leído una vez del registro. */
+let leido: string | null | undefined
+function predeterminado(): string | null {
+  if (leido !== undefined) return leido
+  const reg = (...args: string[]) => {
+    try {
+      return execFileSync('reg', ['query', ...args], { encoding: 'utf8', windowsHide: true, timeout: 3000, stdio: ['ignore', 'pipe', 'ignore'] })
+    } catch {
+      return ''
+    }
+  }
+  // Windows 11 lo guarda en `UserChoiceLatest`; antes, y aún en muchos equipos, en `UserChoice`.
+  const clave = 'HKCU\\Software\\Microsoft\\Windows\\Shell\\Associations\\UrlAssociations\\https\\'
+  const progId = ['UserChoiceLatest', 'UserChoice'].map((k) => /ProgId\s+REG_SZ\s+(\S+)/.exec(reg(clave + k, '/v', 'ProgId'))?.[1]).find(Boolean)
+  const comando = progId ? /REG_(?:EXPAND_)?SZ\s+(.+)/.exec(reg(`HKCR\\${progId}\\shell\\open\\command`, '/ve'))?.[1] : undefined
+  return (leido = comando ? chromiumDeComando(comando) : null)
+}
 
-/** Lo que se dice si no hay ninguno: en Mac casi siempre es que solo hay Safari. */
+/** El programa de un comando del registro (`"C:\…\chrome.exe" --single-argument %1`), si es un Chromium que sirve. */
+export function chromiumDeComando(comando: string): string | null {
+  const m = /^\s*(?:"([^"]+)"|(\S+))/.exec(comando)
+  const exe = m?.[1] ?? m?.[2]
+  return exe && /^(chrome|msedge|brave|vivaldi|chromium)\.exe$/i.test(win32.basename(exe)) ? exe : null
+}
+
+/** Su nombre, para decirte dónde entrar. */
+export function nombreDe(exe: string | undefined) {
+  const n = win32.basename(exe ?? '').toLowerCase()
+  return n.includes('edge') ? 'Edge' : n.includes('brave') ? 'Brave' : n.includes('vivaldi') ? 'Vivaldi' : 'Chrome'
+}
+
+/** Lo que se dice si no hay ninguno: en Mac casi siempre es que solo hay Safari, y en Windows, Firefox. */
 export const SIN_CHROMIUM =
   process.platform === 'win32'
-    ? 'No encontré Microsoft Edge, donde se entra con Google.'
+    ? 'Para entrar con Google hace falta Chrome, Edge o Brave: Firefox no deja pasar la sesión a Sloth. Instala Chrome desde google.com/chrome y vuelve a intentarlo.'
     : process.platform === 'darwin'
       ? 'Para entrar con Google hace falta Google Chrome (o Microsoft Edge): Safari no deja pasar la sesión a Sloth. Instálalo desde google.com/chrome y vuelve a intentarlo.'
       : 'No encontré Google Chrome ni Microsoft Edge: instala uno para entrar con Google.'

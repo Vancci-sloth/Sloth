@@ -8,7 +8,7 @@ import { promisify } from 'node:util'
 import type { EstadoVoicesCloning, VozApi } from '../../shared/types.ts'
 import { trozosParaVoz, wavDePcm } from '../../shared/voz.ts'
 import { guardar } from '../disco.ts'
-import { cuerpo, json as enviar } from '../http.ts'
+import { bytes, cuerpo, json as enviar } from '../http.ts'
 import { COBRO } from '../licencia.ts'
 
 /**
@@ -16,8 +16,10 @@ import { COBRO } from '../licencia.ts'
  * llave aquí: la del socio la guarda el cobro (`licencias/src/voz.ts`), que sabe quién eres (tu cuenta o tu apoyo, o el
  * creador con su llave de `publicar.txt`) y gasta tus créditos, no los de otro. Sus voces van como `vc:<voice_id>`.
  *
- * Las voces se eligen en su ventana (`embed.js`, que abre `web/src/Voz.tsx` con el pase de `/api/voz/vc/sesion`): la
- * que eliges o clonas se guarda en `data/voz/voices-cloning.json` para el menú «Voz». Generar es pedir el guion por
+ * Sus voces se ven en el menú «Voz» de Sloth, como las demás: con el pase de una hora que da el cobro (`/voz/sesion`),
+ * este servidor pide a su API (la misma que usa su ventana, `embed.js`) los proveedores, el catálogo con su búsqueda y
+ * sus filtros, y clona tu voz (`/api/voz/vc/proveedores`, `/catalogo`, `/clonar`). La que eliges o clonas se guarda en
+ * `data/voz/voices-cloning.json`. Su ventana queda para lo demás que ofrecen (diálogo, texto largo, transcribir). Generar es pedir el guion por
  * trozos (`MAX` letras) a `/voz/tts`; cada trozo llega en MP3, que ffmpeg pasa a PCM, y se juntan en el mismo WAV de 16
  * bits que dan los demás motores, así que las skills no cambian. Si un trozo tarda de más (504 con `task_id`), se espera
  * su tarea; si hay mucha demanda (429), lo que diga `Retry-After`.
@@ -36,8 +38,36 @@ const FRECUENCIA = 44_100
 const RESPIRO = 0.3
 /** Lo más que se espera una tarea que tardó. */
 const ESPERA_TAREA = 10 * 60_000
-const SIN_CUENTA = 'Para usar las voces de Voices Cloning, crea tu cuenta gratis de Sloth (Opciones → Apoyo).'
-const SIN_CONEXION = 'No hay conexión con el cobro de Sloth, que pide las voces de Voices Cloning. Revisa tu internet.'
+const SIN_CUENTA = 'Para usar las voces de Sloth, crea tu cuenta gratis de Sloth (Opciones → Apoyo).'
+const SIN_CONEXION = 'No hay conexión con Sloth para pedir sus voces. Revisa tu internet.'
+/** Su API, la que usa su ventana, con el pase de sesión (`Authorization: Bearer et_…`). */
+const VC = 'https://www.voicescloning.art'
+/** Los proveedores que tiene dentro (`/api/v1/providers`), y lo que se puede pedir de su catálogo. */
+const PROVEEDORES_VC = /^(elevenlabs|edge|minimax|vbee|fishaudio|clone)$/
+const FILTROS_VC = ['gender', 'accent', 'age', 'category'] as const
+/** El país de una voz por su `locale` (`es-MX`), como se dice de una voz: «mexicana». */
+const PAISES: Record<string, [pais: string, de: string]> = {
+  MX: ['México', 'mexicana'], AR: ['Argentina', 'argentina'], ES: ['España', 'de España'], CO: ['Colombia', 'colombiana'],
+  CL: ['Chile', 'chilena'], PE: ['Perú', 'peruana'], VE: ['Venezuela', 'venezolana'], US: ['Estados Unidos', 'estadounidense'],
+  BO: ['Bolivia', 'boliviana'], EC: ['Ecuador', 'ecuatoriana'], UY: ['Uruguay', 'uruguaya'], PY: ['Paraguay', 'paraguaya'],
+  CR: ['Costa Rica', 'costarricense'], CU: ['Cuba', 'cubana'], DO: ['República Dominicana', 'dominicana'], GT: ['Guatemala', 'guatemalteca'],
+  HN: ['Honduras', 'hondureña'], NI: ['Nicaragua', 'nicaragüense'], PA: ['Panamá', 'panameña'], PR: ['Puerto Rico', 'puertorriqueña'],
+  SV: ['El Salvador', 'salvadoreña'], GQ: ['Guinea Ecuatorial', 'ecuatoguineana']
+}
+/** El nombre de una voz de Edge, que viene técnico («es-AR-ElenaNeural»): «Elena (Argentina)». Las demás, tal cual. */
+/** Un error del cobro como lo lee el cliente: «las voces de Sloth», sin el nombre del socio. */
+export function sinSocio(error: string): string {
+  return error
+    .replace(/(créditos de voz|usuario) de (las voces de )?Voices Cloning/g, '$1 de Sloth')
+    .replace(/(las )?voces de Voices Cloning( en Sloth)?/g, 'las voces de Sloth')
+    .replace(/Voices Cloning/g, 'las voces de Sloth')
+    .replace(/(^|[.:] )las/g, (_, a: string) => `${a}Las`)
+}
+
+export function nombreVc(nombre: string): string {
+  const m = /^[a-z]{2,3}-([A-Z]{2})-([A-Z][a-z]+)(?:Multilingual)?Neural$/.exec(nombre.trim())
+  return m ? `${m[2]} (${PAISES[m[1]]?.[0] ?? m[1]})` : nombre.trim()
+}
 const correr = promisify(execFile)
 
 class Fallo extends Error {
@@ -52,6 +82,21 @@ interface Respuesta<T> {
   status: number
   datos: T & { error?: string; code?: string; task_id?: string | number }
   espera?: number
+}
+
+/** Un cambio hecho desde Administrador: créditos (`valor`, + o −) o estado (`active` o `suspended`). */
+export interface CambioAdmin {
+  id: string
+  externo: string
+  tipo: 'creditos' | 'estado'
+  valor: number | string
+  cuando: string
+  /** El cambio que este deshace. */
+  deshace?: string
+  /** Cuándo se deshizo este. */
+  deshecho?: string
+  /** Los créditos que le quedaron, según Voices Cloning al hacerlo. */
+  saldo?: number
 }
 
 /** `carpeta`: `data/voz`. `credencial`: con qué se habla al cobro; `creador`: la llave del creador, si esta es su computadora. */
@@ -83,8 +128,159 @@ export function voicesCloning(carpeta: string, o: { credencial(): Credencial | u
       throw new Fallo(502, SIN_CONEXION)
     }
     const datos = ((await r.json().catch(() => ({}))) ?? {}) as Respuesta<T>['datos']
+    // Al cliente las voces son de Sloth: un cobro de antes aún nombra al socio en sus errores (Administrador lo ve tal cual).
+    if (!ruta.startsWith('/voz/admin') && typeof datos.error === 'string') datos.error = sinSocio(datos.error)
     const espera = Number(r.headers.get('retry-after'))
     return { status: r.status, datos, ...(Number.isFinite(espera) && espera > 0 ? { espera } : {}) }
+  }
+
+  /** El pase de una hora para su API, pedido al cobro y guardado hasta 5 minutos antes de que caduque. */
+  let pase: { token: string; hasta: number } | undefined
+  /** Sus proveedores con cuántas voces trae cada uno (`/api/v1/providers`), hasta `hasta`. */
+  let proveedores: { lista: { id: string; nombre: string; voces: number; aviso?: string }[]; hasta: number } | undefined
+  async function conPase(): Promise<string> {
+    if (pase && pase.hasta - 5 * 60_000 > Date.now()) return pase.token
+    const s = await pedirBien<{ token: string; expires_at?: string }>('/voz/sesion', { json: {} })
+    pase = { token: s.token, hasta: (s.expires_at && Date.parse(s.expires_at)) || Date.now() + 50 * 60_000 }
+    return pase.token
+  }
+
+  /** Su API con el pase. Si caducó antes de tiempo (401), se pide otro una vez. */
+  async function suApi<T>(ruta: string, init: { form?: FormData } = {}): Promise<T> {
+    for (let intento = 0; ; intento++) {
+      let r: Response
+      try {
+        r = await fetch(`${VC}${ruta}`, { method: init.form ? 'POST' : 'GET', headers: { authorization: `Bearer ${await conPase()}` }, body: init.form, signal: AbortSignal.timeout(2 * 60_000) })
+      } catch {
+        throw new Fallo(502, 'No hay conexión con las voces de Sloth. Revisa tu internet.')
+      }
+      if (r.status === 401 && intento === 0) {
+        pase = undefined
+        continue
+      }
+      const datos = ((await r.json().catch(() => ({}))) ?? {}) as T & { error?: string }
+      if (!r.ok) throw new Fallo(r.status, datos.error ?? `Las voces de Sloth respondieron ${r.status}.`)
+      return datos
+    }
+  }
+
+  /** Lo que el creador cambió desde Administrador (`apiAdmin`): los últimos 2.000. */
+  const archivoCambios = join(carpeta, 'admin-cambios.json')
+  function cambiosAdmin(): CambioAdmin[] {
+    try {
+      return (JSON.parse(readFileSync(archivoCambios, 'utf8')) as { cambios?: CambioAdmin[] }).cambios ?? []
+    } catch {
+      return []
+    }
+  }
+  /** La ficha de cada persona como la dio el cobro la última vez (`/voz/admin/usuario`), con cuándo: se abre con ella. */
+  const archivoFichas = join(carpeta, 'admin-fichas.json')
+  let fichas: Record<string, { datos: unknown; leido: number }> | undefined
+  function fichasAdmin() {
+    if (fichas) return fichas
+    try {
+      fichas = JSON.parse(readFileSync(archivoFichas, 'utf8')) as Record<string, { datos: unknown; leido: number }>
+    } catch {
+      fichas = {}
+    }
+    return fichas
+  }
+  let guardandoFichas: ReturnType<typeof setTimeout> | undefined
+  function guardarFicha(externo: string, datos: unknown) {
+    if (!externo) return
+    fichasAdmin()[externo] = { datos, leido: Date.now() }
+    // Varias seguidas (la lectura de fondo) se escriben juntas.
+    clearTimeout(guardandoFichas)
+    guardandoFichas = setTimeout(escribirFichas, 500)
+  }
+  function escribirFichas() {
+    clearTimeout(guardandoFichas)
+    if (!fichas) return
+    mkdirSync(carpeta, { recursive: true })
+    guardar(archivoFichas, JSON.stringify(fichas))
+  }
+  let leyendoFichas = false
+  /**
+   * Las fichas que falten o tengan más de 12 h, tras leer el panel y al abrir Sloth (con el panel guardado): así la de
+   * cualquiera se abre al momento, también la de quien no salió en las últimas llamadas. Las que nunca se han leído
+   * van primero, de tres en tres; las viejas (que ya se enseñan mientras tanto), de una en una cada 300 ms.
+   */
+  type PanelConUsuarios = { llaves?: { usuarios?: { datos?: { users?: { external_id?: string }[] } } }[] }
+  const usuariosDe = (panel: PanelConUsuarios) => [...new Set((panel.llaves ?? []).flatMap((l) => l.usuarios?.datos?.users ?? []).map((u) => String(u.external_id ?? '')))].filter(Boolean)
+  async function leerFicha(llave: { llave: string }, externo: string) {
+    const r = await pedir<unknown>(`/voz/admin/usuario?externo=${encodeURIComponent(externo)}`, { con: llave, espera: 30_000 }).catch(() => undefined)
+    if (r && r.status < 400) guardarFicha(externo, r.datos)
+  }
+  /** Las fichas de quien nunca se ha leído, de cuatro en cuatro, hasta `tope` ms (las que falten siguen de fondo). */
+  async function leerFichasNuevas(llave: { llave: string }, panel: PanelConUsuarios, tope: number) {
+    const hasta = Date.now() + tope
+    const nunca = usuariosDe(panel).filter((e) => !fichasAdmin()[e])
+    for (let i = 0; i < nunca.length && Date.now() < hasta; i += 4) await Promise.all(nunca.slice(i, i + 4).map((e) => leerFicha(llave, e)))
+  }
+  async function leerFichasDeFondo(llave: { llave: string }, panel: PanelConUsuarios) {
+    if (leyendoFichas) return
+    leyendoFichas = true
+    const leer = (externo: string) => leerFicha(llave, externo)
+    try {
+      const viejas = Date.now() - 12 * 3600_000
+      const todos = usuariosDe(panel)
+      const nunca = todos.filter((e) => !fichasAdmin()[e])
+      for (let i = 0; i < nunca.length; i += 3) await Promise.all(nunca.slice(i, i + 3).map(leer))
+      for (const externo of todos.filter((e) => fichasAdmin()[e] && fichasAdmin()[e].leido <= viejas)) {
+        await leer(externo)
+        await new Promise((ok) => setTimeout(ok, 300))
+      }
+    } finally {
+      leyendoFichas = false
+    }
+  }
+  /** Al abrir Sloth en la computadora del creador, con la lista del panel guardado (si ya se leyó alguna vez). */
+  let fichasAlAbrir = false
+  function leerFichasAlAbrir(llave: { llave: string }) {
+    if (fichasAlAbrir) return
+    fichasAlAbrir = true
+    try {
+      void leerFichasDeFondo(llave, JSON.parse(readFileSync(join(carpeta, 'admin.json'), 'utf8')))
+    } catch {
+      // Aún no se ha leído el panel: las fichas se leen tras la primera lectura.
+    }
+  }
+
+  /** Los cambios que se están deshaciendo ahora mismo (`apiAdmin`). */
+  const deshaciendo = new Set<string>()
+
+  type PanelCobro = { llaves?: { id: string; usuarios: { status: number; datos: { users?: unknown[]; total?: number; per_page?: number } } }[]; cuentas?: Record<string, unknown> }
+  /** El panel de la página 1 con los usuarios de las demás páginas de cada llave (hasta 20), y sus cuentas de Sloth. */
+  async function conTodasLasPaginas(llave: { llave: string }, datos: unknown, url: URL): Promise<unknown> {
+    const panel = datos as PanelCobro
+    const paginas = Math.min(20, Math.max(1, ...(panel.llaves ?? []).map((l) => Math.ceil((Number(l.usuarios.datos.total) || 0) / (Number(l.usuarios.datos.per_page) || 100)))))
+    if (paginas <= 1) return datos
+    const consumo = url.searchParams.get('consumo') ?? '1'
+    const otras = await Promise.all(
+      Array.from({ length: paginas - 1 }, (_, i) =>
+        pedir<PanelCobro>(`/voz/admin?pagina=${i + 2}&consumo=${consumo}`, { con: llave, espera: 60_000 }).then((x) => (x.status < 400 ? x.datos : undefined), () => undefined)
+      )
+    )
+    const llaves = (panel.llaves ?? []).map((l) => {
+      const mas = otras.flatMap((o) => o?.llaves?.find((x) => x.id === l.id)?.usuarios.datos.users ?? [])
+      return mas.length ? { ...l, usuarios: { ...l.usuarios, datos: { ...l.usuarios.datos, users: [...(l.usuarios.datos.users ?? []), ...mas] } } } : l
+    })
+    return { ...panel, llaves, cuentas: Object.assign({}, ...otras.map((o) => o?.cuentas ?? {}), panel.cuentas), todasLasPaginas: true }
+  }
+
+  function anotarCambio(tipo: CambioAdmin['tipo'], c: Record<string, unknown>, respuesta?: unknown) {
+    const externo = String(c.externo ?? '')
+    const valor = tipo === 'creditos' ? Number(c.amount) : String(c.status)
+    const todos = cambiosAdmin()
+    const deshace = typeof c.deshace === 'string' ? c.deshace : undefined
+    if (deshace) for (const x of todos) if (x.id === deshace) x.deshecho = new Date().toISOString()
+    // Tras sumar o quitar, Voices Cloning da `credits`: los que le quedan.
+    const saldo = tipo === 'creditos' ? Number((respuesta as { credits?: unknown } | undefined)?.credits) : NaN
+    const nuevo: CambioAdmin = { id: randomBytes(6).toString('hex'), externo, tipo, valor, cuando: new Date().toISOString(), ...(deshace ? { deshace } : {}), ...(Number.isFinite(saldo) ? { saldo } : {}) }
+    todos.push(nuevo)
+    mkdirSync(carpeta, { recursive: true })
+    guardar(archivoCambios, JSON.stringify({ cambios: todos.slice(-2000) }))
+    return nuevo
   }
 
   async function pedirBien<T>(ruta: string, init?: Parameters<typeof pedir>[1]): Promise<T> {
@@ -96,8 +292,8 @@ export function voicesCloning(carpeta: string, o: { credencial(): Credencial | u
   /** Vuelve a preguntar si se puede usar y cuántos créditos quedan. */
   async function refrescar() {
     try {
-      const d = await pedirBien<{ disponible: boolean; creador: boolean; creditos?: number; usados?: number; hoy?: number; generaciones?: number; estado?: string }>('/voz')
-      info = { configurado: d.disponible, creador: d.creador, creditos: d.creditos, usados: d.usados, hoy: d.hoy, generaciones: d.generaciones, estado: d.estado }
+      const d = await pedirBien<{ disponible: boolean; creador: boolean; mensuales?: number; creditos?: number; usados?: number; hoy?: number; generaciones?: number; estado?: string }>('/voz')
+      info = { configurado: d.disponible, creador: d.creador, mensuales: d.mensuales, creditos: d.creditos, usados: d.usados, hoy: d.hoy, generaciones: d.generaciones, estado: d.estado }
       error = ''
     } catch (e) {
       // Sin cuenta de Sloth no es un error: solo no se ofrece.
@@ -132,7 +328,7 @@ export function voicesCloning(carpeta: string, o: { credencial(): Credencial | u
         await espera(Math.min(60, r.espera ?? [5, 15, 30][intento]) * 1000)
         continue
       }
-      throw new Fallo(r.status, r.datos.error ?? `Voices Cloning respondió ${r.status}.`)
+      throw new Fallo(r.status, r.datos.error ?? `Las voces de Sloth respondieron ${r.status}.`)
     }
   }
 
@@ -160,14 +356,16 @@ export function voicesCloning(carpeta: string, o: { credencial(): Credencial | u
       return s
     },
 
-    /** La voz que elegiste (o clonaste) en la ventana: va primero en el menú. */
-    elegida(v: { voice_id?: unknown; name?: unknown; provider?: unknown }, clonada = false) {
+    /** La voz que elegiste (o clonaste): va primero en el menú, con cómo suena y su muestra si las da. */
+    elegida(v: { voice_id?: unknown; name?: unknown; provider?: unknown; descripcion?: unknown; muestra?: unknown }, clonada = false) {
       const id = String(v.voice_id ?? '').trim()
       if (!id || id.length > 200) throw new Fallo(400, 'La ventana no dio el id de la voz.')
       const nombre = String(v.name ?? '').trim().slice(0, 80) || (clonada ? 'Mi voz' : id)
       const antes = voces.find((x) => x.id === id)
-      const descripcion = clonada ? 'Tu voz clonada' : String(v.provider ?? '').trim().slice(0, 60) || antes?.descripcion || ''
-      voces = [{ id, nombre, descripcion, propia: clonada || !!antes?.propia }, ...voces.filter((x) => x.id !== id)].slice(0, 50)
+      const descripcion = clonada ? 'Tu voz clonada' : String(v.descripcion ?? '').trim().slice(0, 80) || String(v.provider ?? '').trim().slice(0, 60) || antes?.descripcion || ''
+      const muestra = typeof v.muestra === 'string' && /^https:\/\/www\.voicescloning\.art\/api\/media\//.test(v.muestra) ? v.muestra : antes?.muestra
+      const de = String(v.provider ?? '').trim().slice(0, 40) || antes?.de
+      voces = [{ id, nombre, descripcion, propia: clonada || !!antes?.propia, ...(muestra ? { muestra } : {}), ...(de ? { de } : {}) }, ...voces.filter((x) => x.id !== id)].slice(0, 50)
       guardarVoces()
     },
 
@@ -182,7 +380,7 @@ export function voicesCloning(carpeta: string, o: { credencial(): Credencial | u
     /** La voz de un guion entero, como WAV, y cuánto dura. */
     async generar(id: string, texto: string): Promise<{ wav: Uint8Array; segundos: number }> {
       if (!info.configurado) await refrescar()
-      if (!info.configurado) throw new Error(error || 'Las voces de Voices Cloning no están disponibles en esta computadora: hace falta la cuenta de Sloth (Opciones → Apoyo). Mientras, pídele la voz al usuario.')
+      if (!info.configurado) throw new Error(error || 'Las voces de Sloth no están disponibles en esta computadora: hace falta la cuenta de Sloth (Opciones → Apoyo). Mientras, pídele la voz al usuario.')
       const partes: Uint8Array[] = []
       for (const t of trozosParaVoz(texto, MAX)) partes.push(await trozo(id, t))
       void refrescar()
@@ -192,33 +390,145 @@ export function voicesCloning(carpeta: string, o: { credencial(): Credencial | u
 
     /**
      * `/api/admin*`, solo en la computadora del creador. `GET /api/admin`: si lo es. Lo demás (`/api/admin/voz…`) va al
-     * cobro (`/voz/admin…`) con su llave, tal cual.
+     * cobro (`/voz/admin…`) con su llave, tal cual. El panel de la primera página se guarda en `data/voz/admin.json`
+     * (con `leido`), y `GET /api/admin/voz/guardado` lo da sin preguntar al cobro: el Administrador se abre con él al
+     * instante mientras el cobro tarda sus segundos.
+     *
+     * Lo que el creador cambia desde aquí (créditos y estado) se anota en `data/voz/admin-cambios.json`: el registro del
+     * cobro anota igual el reparto mensual, la rifa o un regalo, y solo lo hecho aquí se puede deshacer. Un cambio con
+     * `deshace: <id>` lo marca deshecho. `GET /api/admin/voz/cambios?externo=` da los de una persona.
      */
     async apiAdmin(req: IncomingMessage, res: ServerResponse, url: URL): Promise<boolean> {
       if (url.pathname !== '/api/admin' && !url.pathname.startsWith('/api/admin/')) return false
       const llave = o.creador()
-      if (url.pathname === '/api/admin' && req.method === 'GET') return enviar(res, 200, { creador: !!llave })
+      if (url.pathname === '/api/admin' && req.method === 'GET') {
+        // La barra lo pregunta al abrir Sloth: es cuando se ponen al día las fichas, de fondo.
+        if (llave) leerFichasAlAbrir(llave)
+        return enviar(res, 200, { creador: !!llave })
+      }
       if (!llave) return enviar(res, 404, { error: 'No existe' })
+      const panel = join(carpeta, 'admin.json')
+      if (url.pathname === '/api/admin/voz/guardado' && req.method === 'GET') {
+        try {
+          return enviar(res, 200, JSON.parse(readFileSync(panel, 'utf8')))
+        } catch {
+          return enviar(res, 404, { error: 'Aún no se ha leído' })
+        }
+      }
+      if (url.pathname === '/api/admin/voz/cambios' && req.method === 'GET') {
+        const externo = url.searchParams.get('externo')
+        return enviar(res, 200, { cambios: cambiosAdmin().filter((c) => c.externo === externo) })
+      }
+      // La ficha guardada de alguien (sin preguntar al cobro); `null` si aún no se ha leído.
+      if (url.pathname === '/api/admin/voz/ficha' && req.method === 'GET') return enviar(res, 200, fichasAdmin()[url.searchParams.get('externo') ?? ''] ?? null)
       const m = /^\/api\/admin\/voz(\/[a-z]+)?$/.exec(url.pathname)
       if (!m) return enviar(res, 404, { error: 'No existe' })
       try {
         const metodo = req.method ?? 'GET'
-        const r = await pedir<unknown>(`/voz/admin${m[1] ?? ''}${url.search}`, { con: llave, metodo, json: metodo === 'GET' ? undefined : await cuerpo(req), espera: 60_000 })
+        const json = metodo === 'GET' ? undefined : await cuerpo<Record<string, unknown>>(req)
+        // Un cambio se deshace una sola vez (el aviso y la ficha lo ofrecen los dos), y solo con su contrario: a la misma
+        // persona, lo mismo al revés. Mientras uno va al cobro, otro igual espera su turno y ya lo ve deshecho.
+        const deshace = typeof json?.deshace === 'string' ? json.deshace : undefined
+        if (deshace) {
+          const viejo = cambiosAdmin().find((c) => c.id === deshace)
+          if (!viejo) return enviar(res, 404, { error: 'Ese cambio no está anotado en esta computadora.' })
+          if (viejo.deshecho || deshaciendo.has(deshace)) return enviar(res, 409, { error: 'Ese cambio ya se deshizo.' })
+          const contrario = viejo.tipo === 'creditos' ? m[1] === '/creditos' && Number(json?.amount) === -Number(viejo.valor) : m[1] === '/estado' && json?.status === (viejo.valor === 'suspended' ? 'active' : 'suspended')
+          if (viejo.externo !== json?.externo || !contrario) return enviar(res, 400, { error: 'Eso no deshace ese cambio.' })
+          deshaciendo.add(deshace)
+        }
+        let r: Awaited<ReturnType<typeof pedir<unknown>>>
+        try {
+          r = await pedir<unknown>(`/voz/admin${m[1] ?? ''}${url.search}`, { con: llave, metodo, json, espera: 60_000 })
+          // El panel trae 100 por llave y página: las demás páginas se piden a la vez y se juntan, así el buscador, la
+          // lista y las fichas de fondo ven a todos.
+          if (metodo === 'GET' && !m[1] && r.status < 400 && (url.searchParams.get('pagina') ?? '1') === '1') r = { ...r, datos: (await conTodasLasPaginas(llave, r.datos, url)) as typeof r.datos }
+        } finally {
+          if (deshace) deshaciendo.delete(deshace)
+        }
+        if (metodo === 'GET' && m[1] === '/usuario' && r.status < 400) guardarFicha(url.searchParams.get('externo') ?? '', r.datos)
         if (metodo !== 'GET' && r.status < 400) void refrescar()
-        return enviar(res, r.status, r.datos)
+        // El cambio anotado vuelve con la respuesta: con su id se deshace.
+        const cambio = json && r.status < 400 && (m[1] === '/creditos' || m[1] === '/estado') ? anotarCambio(m[1] === '/creditos' ? 'creditos' : 'estado', json, r.datos) : undefined
+        const primera = (k: string) => (url.searchParams.get(k) ?? '1') === '1'
+        if (metodo === 'GET' && !m[1] && r.status < 400 && primera('pagina') && primera('consumo') && r.datos && typeof r.datos === 'object') {
+          // Nadie sale en la lista sin su ficha: las de quien nunca se ha leído se leen antes de dar el panel (de cuatro
+          // en cuatro, 45 s como mucho). Solo se nota la primera vez de todas; después son las de quien se dio de alta.
+          await leerFichasNuevas(llave, r.datos as PanelConUsuarios, 45_000)
+          mkdirSync(carpeta, { recursive: true })
+          // Las fichas al disco antes que el panel: si Sloth se cierra entre los dos, nadie queda listado sin la suya.
+          escribirFichas()
+          guardar(panel, JSON.stringify({ ...r.datos, leido: Date.now() }))
+          void leerFichasDeFondo(llave, r.datos as PanelConUsuarios)
+        }
+        return enviar(res, r.status, cambio ? { ...r.datos, cambio } : r.datos)
       } catch (e) {
         return enviar(res, e instanceof Fallo ? e.status : 500, { error: mensaje(e) })
       }
     },
 
-    /** `/api/voz/vc*`: el pase de la ventana, la voz elegida, quitarla y volver a preguntar. */
+    /**
+     * `/api/voz/vc*`: sus proveedores y su catálogo (`GET`), clonar tu voz, el pase de su ventana, la voz elegida,
+     * quitarla y volver a preguntar.
+     */
     async api(req: IncomingMessage, res: ServerResponse, path: string, estadoVoz: () => unknown): Promise<boolean> {
+      if (req.method === 'GET' && (path === '/api/voz/vc/proveedores' || path === '/api/voz/vc/catalogo')) {
+        try {
+          if (path === '/api/voz/vc/proveedores') {
+            // El menú los pide al abrirse el compositor, para contar todas desde el principio: se guardan 10 minutos.
+            if (!proveedores || proveedores.hasta < Date.now()) {
+              const d = await suApi<{ providers?: { id: string; name: string; badge?: string; voice_count?: number }[] }>('/api/v1/providers?language=es')
+              proveedores = { lista: (d.providers ?? []).map((p) => ({ id: p.id, nombre: p.name, voces: p.voice_count ?? 0, ...(p.badge ? { aviso: p.badge } : {}) })), hasta: Date.now() + 10 * 60_000 }
+            }
+            return enviar(res, 200, { proveedores: proveedores.lista })
+          }
+          const q = new URL(req.url ?? '', 'http://x').searchParams
+          const proveedor = q.get('proveedor') ?? 'elevenlabs'
+          if (!PROVEEDORES_VC.test(proveedor)) return enviar(res, 400, { error: 'Ese proveedor no está en las voces de Sloth.' })
+          const p = new URLSearchParams({ provider: proveedor, page: String(Math.max(1, Number(q.get('pagina')) || 1)), per_page: '30' })
+          if (proveedor !== 'clone') p.set('language', 'es')
+          for (const f of FILTROS_VC) if (q.get(f)) p.set(f, q.get(f)!.slice(0, 40))
+          if (q.get('q')?.trim()) p.set('q', q.get('q')!.trim().slice(0, 80))
+          type V = { voice_id: string; name: string; provider?: string; locale?: string | null; gender?: string; age?: string; accent?: string; category?: string; description?: string; tier?: string; preview_url?: string }
+          const d = await suApi<{ voices?: V[]; has_more?: boolean; total?: number }>(`/api/v1/voices?${p}`)
+          const voz = (v: V): VozApi => ({
+            id: v.voice_id,
+            nombre: nombreVc(v.name),
+            // Como las de Fish: unas palabras que el menú dice en español («male, young, mexicana»); el país, por su locale.
+            descripcion: [v.gender, v.age, PAISES[v.locale?.split('-')[1] ?? '']?.[1] ?? v.accent, v.category].filter((x) => x && !/^(high_quality|standard|professional)$/.test(x)).join(', ').slice(0, 80),
+            propia: proveedor === 'clone',
+            ...(v.preview_url ? { muestra: v.preview_url } : {}),
+            ...(v.provider ? { de: v.provider } : {})
+          })
+          return enviar(res, 200, { voces: (d.voices ?? []).map(voz), mas: !!d.has_more, total: d.total ?? 0 })
+        } catch (e) {
+          return enviar(res, e instanceof Fallo && e.status < 500 ? e.status : 502, { error: mensaje(e) })
+        }
+      }
+      // Clonar tu voz con su API: la grabación (o el archivo) y su nombre. Queda la primera del menú.
+      if (req.method === 'POST' && path === '/api/voz/vc/clonar') {
+        try {
+          const q = new URL(req.url ?? '', 'http://x').searchParams
+          const audio = await bytes(req)
+          if (audio.length < 1000) return enviar(res, 400, { error: 'Elige una grabación de tu voz.' })
+          if (audio.length > 25e6) return enviar(res, 400, { error: 'La grabación pesa más de 25 MB: con un minuto basta.' })
+          const f = new FormData()
+          f.set('name', q.get('nombre')?.trim().slice(0, 80) || 'Mi voz')
+          f.set('audio_file', new Blob([audio as Uint8Array<ArrayBuffer>], { type: String(req.headers['content-type'] ?? 'audio/webm') }), q.get('archivo') || 'voz.webm')
+          const d = await suApi<{ voice_id?: string; name?: string }>('/api/v1/voices/clone', { form: f })
+          this.elegida({ voice_id: d.voice_id, name: d.name ?? f.get('name') }, true)
+          void refrescar()
+          return enviar(res, 200, estadoVoz())
+        } catch (e) {
+          return enviar(res, e instanceof Fallo && e.status < 500 ? e.status : 502, { error: mensaje(e) })
+        }
+      }
       const m = /^\/api\/voz\/vc(?:\/(sesion|elegida|quitar))?$/.exec(path)
       if (!m || req.method !== 'POST') return false
       try {
         if (m[1] === 'sesion') return enviar(res, 200, await this.sesion())
         if (m[1] === 'elegida') {
-          const d = await cuerpo<{ voz?: { voice_id?: unknown; name?: unknown; provider?: unknown }; clonada?: boolean }>(req)
+          const d = await cuerpo<{ voz?: { voice_id?: unknown; name?: unknown; provider?: unknown; descripcion?: unknown; muestra?: unknown }; clonada?: boolean }>(req)
           this.elegida(d.voz ?? {}, !!d.clonada)
         }
         if (m[1] === 'quitar') this.quitar(String((await cuerpo<{ id?: string }>(req)).id ?? ''))
@@ -237,13 +547,13 @@ async function bajar(url: string): Promise<Uint8Array> {
   try {
     u = new URL(url)
   } catch {
-    throw new Error('Voices Cloning dio un enlace de audio que no sirve.')
+    throw new Error('Las voces de Sloth dieron un enlace de audio que no sirve.')
   }
-  if (u.protocol !== 'https:' || !/(^|\.)voicescloning\.art$/.test(u.hostname)) throw new Error(`Voices Cloning dio el audio en otro sitio (${u.hostname}).`)
+  if (u.protocol !== 'https:' || !/(^|\.)voicescloning\.art$/.test(u.hostname)) throw new Error(`Las voces de Sloth dieron el audio en otro sitio (${u.hostname}).`)
   for (let intento = 0; ; intento++) {
     try {
       const r = await fetch(u, { signal: AbortSignal.timeout(2 * 60_000) })
-      if (!r.ok) throw new Error(`Voices Cloning no dio el audio (${r.status}).`)
+      if (!r.ok) throw new Error(`Las voces de Sloth no dieron el audio (${r.status}).`)
       return new Uint8Array(await r.arrayBuffer())
     } catch (e) {
       if (intento >= 2) throw e
@@ -260,7 +570,7 @@ export async function pcmDeMp3(mp3: Uint8Array): Promise<Uint8Array> {
     await correr('ffmpeg', ['-nostdin', '-v', 'error', '-y', '-i', `${base}.mp3`, '-f', 's16le', '-acodec', 'pcm_s16le', '-ac', '1', '-ar', String(FRECUENCIA), `${base}.pcm`], { timeout: 120_000 })
     return new Uint8Array(readFileSync(`${base}.pcm`))
   } catch (e) {
-    throw new Error(`No se pudo leer el audio de Voices Cloning con ffmpeg: ${mensaje(e)}`)
+    throw new Error(`No se pudo leer el audio de las voces de Sloth con ffmpeg: ${mensaje(e)}`)
   } finally {
     rmSync(`${base}.mp3`, { force: true })
     rmSync(`${base}.pcm`, { force: true })

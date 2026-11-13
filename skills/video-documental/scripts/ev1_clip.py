@@ -28,7 +28,8 @@ LOOKS = {
 }
 
 
-def make(src, out, ss, dur, look='natural', speed=1.0, focus=(0.5, 0.5), zoom=1.0, grain=0, vignette=True, size=None):
+def make(src, out, ss, dur, look='natural', speed=1.0, focus=(0.5, 0.5), zoom=1.0, grain=0, vignette=True, size=None, antes=()):
+    """antes: opciones de FFmpeg para la entrada (`-user_agent …` con una URL: Wikimedia corta al agente de FFmpeg)."""
     fx, fy = focus
     w, h = size or tamano()
     vf = [f'setpts=PTS/{speed}' if speed != 1 else None,
@@ -40,10 +41,11 @@ def make(src, out, ss, dur, look='natural', speed=1.0, focus=(0.5, 0.5), zoom=1.
           'fps=30', 'format=yuv420p']
     vf = ','.join(v for v in vf if v)
     need = dur * speed + 0.2
-    subprocess.run(['ffmpeg', '-nostdin', '-v', 'error', '-y', '-ss', f'{ss}', '-t', f'{need}', '-i', src,
-                    '-vf', vf, '-t', f'{dur}', '-an', '-c:v', 'libx264', '-crf', '17', '-preset', 'medium',
+    subprocess.run(['ffmpeg', '-nostdin', '-v', 'error', '-y', *antes, '-ss', f'{ss}', '-t', f'{need}', '-i', src,
+                    '-vf', vf, '-t', f'{dur}', '-an', '-c:v', 'libx264', '-crf', '17', '-preset', 'fast',
                     '-g', '30', '-keyint_min', '30', '-fps_mode', 'cfr', '-color_range', 'tv', '-colorspace', 'bt709',
-                    '-color_primaries', 'bt709', '-color_trc', 'bt709', out], check=True)
+                    '-color_primaries', 'bt709', '-color_trc', 'bt709', out], check=True, capture_output=True, text=True,
+                   encoding='utf-8', errors='replace')   # lo que diga FFmpeg va en la excepción, no suelto en la salida
     return out
 
 

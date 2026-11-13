@@ -1,16 +1,26 @@
 /**
- * La edición documental en Remotion. No se edita a mano: `build.py` la escribe en `edicion.json` con los dispositivos de
- * la skill (`components/ev1_devices.py`, `ev1_more.py`), que dejan cada capa como HTML con su tramo de cuadros y toda la
- * animación como una línea de tiempo de GSAP. Aquí cada capa se enseña solo en su tramo, la línea se lleva al cuadro que
- * toca y los clips de video van con `OffthreadVideo`, para que el render los tenga cuadro a cuadro.
+ * La edición documental en Remotion. No se edita a mano: el director (`components/director.py`) la escribe en
+ * `edicion.json` con los dispositivos de la skill (`ev1_devices.py`, `ev1_more.py`), que dejan cada capa como HTML con su
+ * tramo de cuadros y toda la animación como una línea de tiempo de GSAP. Aquí cada capa se enseña solo en su tramo, la
+ * línea se lleva al cuadro que toca y los clips de video van con `OffthreadVideo`, para que el render los tenga cuadro a
+ * cuadro; en el render final van como imágenes ya sacadas (`Cuadros`), que es varias veces más rápido.
  *
  * Así lo que se midió en las referencias (la skill venía para HyperFrames) se ve igual en el monitor de Sloth, en vivo,
  * y en el render. Las rutas son de `public/`.
  */
 import gsap from "gsap";
 import { memo, useLayoutEffect, useRef, useState, type CSSProperties, type FC, type HTMLAttributes } from "react";
-import { AbsoluteFill, Audio, OffthreadVideo, Sequence, continueRender, delayRender, staticFile, useCurrentFrame, useVideoConfig } from "remotion";
+import { AbsoluteFill, Audio, Img, OffthreadVideo, Sequence, continueRender, delayRender, getInputProps, staticFile, useCurrentFrame, useVideoConfig } from "remotion";
 import json from "./edicion.json";
+
+/** En el render final (`terminar.py`), los cuadros de cada clip ya están sacados en `_cuadros/<id>/` (`cuadros_render.cjs`). */
+const CON_CUADROS = (getInputProps() as { cuadros?: boolean }).cuadros === true;
+
+/** El cuadro que toca de un clip, como imagen: su tramo empieza en el cuadro 0 de su `Sequence`. */
+const Cuadros: FC<{ id: string; n: number; alfa: boolean }> = ({ id, n, alfa }) => {
+  const f = Math.min(n - 1, Math.max(0, useCurrentFrame()));
+  return <Img src={staticFile(`_cuadros/${id}/${String(f).padStart(5, "0")}.${alfa ? "png" : "jpg"}`)} style={{ width: "100%", height: "100%", objectFit: "cover" }} />;
+};
 
 type Capa = { id: string; f0: number; f1: number; z: number; cls: string; style: string; pieza: string };
 type Clip = Capa & { html: string };
@@ -88,13 +98,17 @@ const Capas = memo(() => (
       return (
         <P key={v.id} id={v.id} className={v.cls} style={estilo(v.style, v.z)} data-f0={v.f0} data-f1={v.f1}>
           <Sequence from={v.f0} durationInFrames={Math.max(1, v.f1 - v.f0)} premountFor={30} showInTimeline={false} name={v.pieza}>
-            <OffthreadVideo
-              src={ruta(v.src)}
-              trimBefore={v.desde > 0 ? v.desde : undefined}
-              muted
-              transparent={/\.webm$/i.test(v.src)}
-              style={{ width: "100%", height: "100%", objectFit: "cover" }}
-            />
+            {CON_CUADROS ? (
+              <Cuadros id={v.id} n={Math.max(1, v.f1 - v.f0)} alfa={/\.webm$/i.test(v.src)} />
+            ) : (
+              <OffthreadVideo
+                src={ruta(v.src)}
+                trimBefore={v.desde > 0 ? v.desde : undefined}
+                muted
+                transparent={/\.webm$/i.test(v.src)}
+                style={{ width: "100%", height: "100%", objectFit: "cover" }}
+              />
+            )}
           </Sequence>
         </P>
       );

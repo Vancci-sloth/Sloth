@@ -1,7 +1,7 @@
 import { execFile } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { existsSync, mkdirSync, readdirSync, renameSync, rmSync, statSync } from 'node:fs'
-import { join } from 'node:path'
+import { extname, join } from 'node:path'
 import { promisify } from 'node:util'
 
 /**
@@ -31,16 +31,16 @@ export function miniaturas(dir: string) {
   let libres = A_LA_VEZ
   const turnos: (() => void)[] = []
 
-  async function hacer(origen: string, destino: string, filtro: string) {
+  async function hacer(origen: string, destino: string, salida: string[]) {
     if (!libres) await new Promise<void>((r) => turnos.push(r))
     else libres--
     try {
       mkdirSync(dir, { recursive: true })
       // Con otro nombre mientras se escribe: si el servidor se cae a medias, no queda una miniatura rota.
-      const tmp = join(dir, `_${Math.random().toString(36).slice(2)}.webp`)
+      const tmp = join(dir, `_${Math.random().toString(36).slice(2)}${extname(destino)}`)
       // Un hilo cada uno: para un solo cuadro, repartirlo entre todos los núcleos tarda más (106 ms frente a 84 en un 1080p) y
       // le quita la máquina a la interfaz mientras se hacen las de una galería entera.
-      await execFileP('ffmpeg', ['-nostdin', '-v', 'error', '-y', '-threads', '1', '-filter_threads', '1', '-i', origen, '-vf', filtro, '-frames:v', '1', '-c:v', 'libwebp', '-threads', '1', '-quality', '80', tmp], { timeout: 30_000 })
+      await execFileP('ffmpeg', ['-nostdin', '-v', 'error', '-y', '-threads', '1', '-filter_threads', '1', '-i', origen, ...salida, '-threads', '1', tmp], { timeout: 60_000 })
       renameSync(tmp, destino)
     } finally {
       const siguiente = turnos.shift()
@@ -53,13 +53,16 @@ export function miniaturas(dir: string) {
    * La ruta de lo hecho de `file` con `filtro`, hecho si aún no lo estaba. Su nombre cambia si cambia el archivo o lo que
    * se hace (`clave`).
    */
-  async function hecho(file: string, filtro: string, clave: string): Promise<string> {
+  const destinoDe = (file: string, clave: string, ext: string) => {
     const st = statSync(file)
-    const destino = join(dir, `${createHash('sha1').update(`${file}|${st.mtimeMs}|${st.size}|${clave}`).digest('hex').slice(0, 16)}.webp`)
+    return join(dir, `${createHash('sha1').update(`${file}|${st.mtimeMs}|${st.size}|${clave}`).digest('hex').slice(0, 16)}.${ext}`)
+  }
+  async function hecho(file: string, salida: string[], clave: string, ext = 'webp'): Promise<string> {
+    const destino = destinoDe(file, clave, ext)
     if (existsSync(destino)) return destino
     let hecha = enCurso.get(destino)
     if (!hecha) {
-      hecha = hacer(file, destino, filtro).then(() => destino)
+      hecha = hacer(file, destino, salida).then(() => destino)
       enCurso.set(destino, hecha)
       hecha.finally(() => enCurso.delete(destino)).catch(() => {})
     }
@@ -68,15 +71,36 @@ export function miniaturas(dir: string) {
 
   return {
     /** La miniatura de una imagen: su recorte 4:3 del centro. */
-    miniatura: (file: string) => hecho(file, `scale=${ANCHO}:${ALTO}:force_original_aspect_ratio=increase,crop=${ANCHO}:${ALTO}`, `${ANCHO}x${ALTO}`),
+    miniatura: (file: string) => hecho(file, webp(`scale=${ANCHO}:${ALTO}:force_original_aspect_ratio=increase,crop=${ANCHO}:${ALTO}`), `${ANCHO}x${ALTO}`),
     /**
      * El primer cuadro de un video (la portada de un vertical), de `ALTO_CUADRO` px de alto: lo que enseña su tarjeta en las
      * galerías hasta que pasas el ratón. Antes cada tarjeta era un video que bajaba y decodificaba su primer cuadro en
      * 1080p: abrir «Mis videos» costaba segundos de CPU.
      */
-    cuadro: (video: string) => hecho(video, `scale=-2:${ALTO_CUADRO}`, `cuadro ${ALTO_CUADRO}`)
+    cuadro: (video: string) => hecho(video, webp(`scale=-2:${ALTO_CUADRO}`), `cuadro ${ALTO_CUADRO}`),
+    /**
+     * La vista previa de un video, la que se mueve al pasar el ratón por su tarjeta: sus primeros `SEGUNDOS_PREVIA` s, sin
+     * audio, a `ALTO_CUADRO` px de alto. El original es un 1080p de ~18 Mbps: arrancarlo tardaba 100–170 ms (medido, la
+     * mitad en decodificar su primer cuadro) y cada pasada por la rejilla decodificaba 1080p. Con `lista`, solo si ya
+     * está hecha (para no esperar a FFmpeg: entonces se enseña el original).
+     */
+    previa: (video: string) => hecho(video, PREVIA, CLAVE_PREVIA, 'mp4'),
+    previaLista(video: string): string | null {
+      try {
+        const destino = destinoDe(video, CLAVE_PREVIA, 'mp4')
+        return existsSync(destino) ? destino : null
+      } catch {
+        return null
+      }
+    }
   }
 }
+
+const webp = (filtro: string) => ['-vf', filtro, '-frames:v', '1', '-c:v', 'libwebp', '-quality', '80']
+const SEGUNDOS_PREVIA = 8
+/** H.264 con un cuadro clave cada segundo y el índice delante (`faststart`): empieza a moverse en cuanto llega. */
+const PREVIA = ['-t', String(SEGUNDOS_PREVIA), '-an', '-vf', `scale=-2:${400}`, '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '30', '-pix_fmt', 'yuv420p', '-g', '30', '-movflags', '+faststart']
+const CLAVE_PREVIA = `previa ${SEGUNDOS_PREVIA}s 400`
 
 /** Las tarjetas de video miden 200 px de alto: nítido con la pantalla escalada al 200 %. */
 const ALTO_CUADRO = 400

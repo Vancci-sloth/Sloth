@@ -23,6 +23,11 @@ renderizado, y no se pregunta: va siempre. El vídeo horizontal no la lleva dent
 En la raíz del proyecto, `portada.png` (si el proyecto entrega varios vídeos, uno por vídeo en
 `portada/<nombre del vídeo>.png`).
 
+Para no sumar tiempo, se puede pedir de fondo desde el principio, sin cuadros del vídeo, con
+`scripts/portada_ia.py` (el título, el estilo, las referencias y la elección de `Imágenes:`; ver su cabecera): la deja
+a 1080×1920 o 1280×720 y, si no hay cuenta o falla, dice por qué y el estilo usa su respaldo. Así la hace el
+explicativo (`hacer.py`).
+
 Si el mensaje trae `Imágenes: genéralas en Google Flow…`, la imagen va con `generar_imagen` y formato `9:16`
 ([FLOW.md](FLOW.md)): los pasos de abajo, con los tres cuadros en `referencias` y el pedido sin su primer párrafo,
 diciendo `vertical 9:16` en vez de `vertical 2:3 (1024x1536)`, a `portada.jpg`. Pásala a `portada.png` y sigue en el
@@ -63,8 +68,9 @@ Mírala (paso 4) y sigue en el paso 5. **Con ella:**
 5. `node <base>/scripts/portada.mjs out/<video>.mp4 portada.png`. La pone como primer fotograma, en el mismo archivo;
    correrlo otra vez cambia la portada, no suma otra. El `final.py` de cada estilo la vuelve a poner sola si
    `portada.png` ya existe, así que un render nuevo no la pierde. Codifica solo ese fotograma, con los mismos ajustes
-   de x264 que el vídeo, y lo pega delante sin recodificar el resto (un segundo, sin segunda compresión); si el vídeo no
-   lo deja, lo recodifica entero, como antes, y lo dice. El Diff no usa `portada.mjs`: su `final.py` la renderiza como
+   de x264 que el vídeo (también dónde va su color, `chromaloc`: sin eso ningún render de Remotion lo dejaba), y lo
+   pega delante sin recodificar el resto (unos 3 s, sin segunda compresión); si el vídeo no lo deja, lo recodifica
+   entero con NVENC si hay NVIDIA (o x264, como antes; `SLOTH_SIN_NVENC=1` lo apaga) y dice con cuál. El Diff no usa `portada.mjs`: su `final.py` la renderiza como
    un tramo más.
 
 ## En horizontal: la miniatura de YouTube

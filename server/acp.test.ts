@@ -5,7 +5,7 @@ import { dirname, join } from 'node:path'
 import test from 'node:test'
 import type { AgentEvent } from '../shared/types.ts'
 import { startAcp, type SaborAcp } from './acp.ts'
-import { errorAntigravity } from './antigravity.ts'
+import { elegirCuenta, errorAntigravity, grupoDe, renuevaEn } from './antigravity.ts'
 import { errorGemini } from './gemini.ts'
 
 /**
@@ -207,6 +207,35 @@ test('ACP compartido: dos hilos a la vez van en un solo proceso, cada uno con su
   process.kill(Number(pidA))
 })
 
+test('ACP compartido con varias cuentas: un proceso por cuenta, y cada hilo vuelve al de la suya', async () => {
+  const lanzadas: (string | undefined)[] = []
+  const sabor: SaborAcp = {
+    nombre: 'Antigravity',
+    prefijo: 'antigravity',
+    cuenta: (opts) => (opts.model.endsWith('-a') ? 'A' : 'B'),
+    lanzar: (_opts, cuenta) => (lanzadas.push(cuenta), { command: process.execPath, args: [SCRIPT_VARIAS], env: process.env }),
+    sinCuenta: 'Conecta tu cuenta.',
+    compartido: true
+  }
+  const hilo = (model: string) => {
+    let texto = ''
+    let fin!: () => void
+    const listo = new Promise<void>((ok) => (fin = ok))
+    const run = startAcp(sabor, { cwd: tmpdir(), model, onEvent: (e) => (e.t === 'text' && (texto += e.delta), e.t === 'turn_end' && fin()), onProviderSession() {} })
+    run.send('hola')
+    return { run, listo, pid: () => texto.split(' ')[0] }
+  }
+  const [a, b] = [hilo('antigravity:x-a'), hilo('antigravity:x-b')]
+  await Promise.all([a.listo, b.listo])
+  assert.notEqual(a.pid(), b.pid())
+  const otraA = hilo('antigravity:y-a')
+  await otraA.listo
+  assert.equal(otraA.pid(), a.pid())
+  assert.deepEqual(lanzadas.sort(), ['A', 'B'])
+  for (const h of [a, b, otraA]) h.run.close()
+  for (const pid of new Set([a.pid(), b.pid()])) process.kill(Number(pid))
+})
+
 /** Uno que contesta como Gemini CLI 0.66.0: modo y modelo fuera de `configOptions`, y el uso en `result.usage`. */
 const COMO_GEMINI = `
 let resto = ''
@@ -353,6 +382,15 @@ test('ACP: el desborde que llega como texto cierra el turno con relevo, y lo que
   assert.ok(!events.some((e) => e.t === 'context'))
 })
 
+test('ACP: el error del turno sabe con qué modelo y con qué cuenta pasó', async () => {
+  const vistos: unknown[] = []
+  const { run, listo } = colgado('error', { cuenta: () => 'A', errorDe: (texto, de) => (vistos.push(de), errorAntigravity(texto)) })
+  run.send('hola')
+  await listo
+  run.close()
+  assert.deepEqual(vistos, [{ modelo: 'x', cuenta: 'A' }])
+})
+
 test('ACP: un texto que solo habla de tokens no es un error', async () => {
   const { run, listo, finDe } = colgado('bien')
   run.send('hola')
@@ -379,12 +417,27 @@ test('ACP: sin `mudo` no hay plazo, y `/compact` de Antigravity es pasar a otra 
 
 test('Antigravity: conoce sus errores y deja pasar lo demás', () => {
   assert.deepEqual(errorAntigravity('Usage Limit Reached\n\nYou have reached your current quota for this period. Your limit will reset in 5 days, 2 hours.'), {
-    error: 'Se acabó tu cuota de este grupo de modelos. Se renueva en 5 días, 2 horas. Mientras, elige abajo un modelo del otro grupo (Gemini, o Claude y GPT) y pulsa «Reintentar».'
+    error: 'Se acabó tu cuota de este grupo de modelos. Se renueva en 5 días, 2 horas. Mientras, elige abajo un modelo del otro grupo (Gemini, o Claude y GPT) y pulsa «Reintentar», o conecta otra cuenta de Google en Opciones → Antigravity.',
+    cuota: true
   })
   assert.equal(errorAntigravity("Requested token count exceeds the model's maximum context length of 131072 tokens. You requested a total of 158550 tokens.")?.relevo, true)
   assert.equal(errorAntigravity('The input token count exceeds the maximum number of tokens allowed (131072).')?.relevo, true)
   assert.equal(errorAntigravity('Listo: el video pesa 12 MB y el modelo usó 3000 tokens.'), undefined)
   assert.equal(errorAntigravity(`The input tokens exceed… ${'x'.repeat(3000)}`), undefined)
+})
+
+test('Antigravity: la cuota es por grupo, y al acabarse en una cuenta sigue la siguiente que tenga', () => {
+  assert.equal(renuevaEn('Your limit will reset in 5 days, 2 hours.'), (5 * 24 + 2) * 3_600_000)
+  assert.equal(renuevaEn('Your limit will reset in 45 minutes.'), 45 * 60_000)
+  assert.equal(renuevaEn('Usage Limit Reached'), undefined)
+  assert.deepEqual([grupoDe('gemini-3.8-flash'), grupoDe('claude-opus-4-6-thinking'), grupoDe('gpt-oss-120b-medium'), grupoDe('')], ['gemini', 'otros', 'otros', 'gemini'])
+  const ahora = 1_000
+  const lista = { activa: 'b', cuentas: [{ id: 'a' }, { id: 'b', agotada: { gemini: 2_000 } }, { id: 'c', agotada: { gemini: 500 } }] }
+  // La que está en uso, mientras le quede; si no, la que le sigue (la de c ya se renovó).
+  assert.equal(elegirCuenta(lista, 'otros', ahora), 'b')
+  assert.equal(elegirCuenta(lista, 'gemini', ahora), 'c')
+  assert.equal(elegirCuenta({ ...lista, cuentas: lista.cuentas.map((c) => ({ ...c, agotada: { gemini: 5_000 } })) }, 'gemini', ahora), undefined)
+  assert.equal(elegirCuenta({ cuentas: [] }, 'gemini', ahora), undefined)
 })
 
 test('ACP: sin cuenta, el turno acaba pidiendo conectarla', async () => {

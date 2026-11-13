@@ -12,7 +12,7 @@ process.env.USERPROFILE = casa
 const originales = mkdtempSync(join(tmpdir(), 'sloth-originales-'))
 mkdirSync(join(originales, 'video-base'))
 process.env.SLOTH_SKILLS_ORIGINALES = originales
-const { enlazarSkills, enlazarSkillsCodex, guardarSkillTuya } = await import('./skills.ts')
+const { enlazarSkills, enlazarSkillsCodex, guardarSkillTuya, marcasDe } = await import('./skills.ts')
 
 test('Codex lee las mismas skills que Claude, y una copia vieja sale de sus carpetas', (t) => {
   t.after(() => rmSync(casa, { recursive: true, force: true }))
@@ -76,4 +76,17 @@ test('borrar un estilo tuyo guarda su skill en una copia y quita sus enlaces, si
   assert.equal(guardarSkillTuya(app, 'video-base', join(app, 'data'), [enlaces]), undefined)
   assert.ok(existsSync(join(app, 'skills', 'video-base', 'SKILL.md')))
   assert.ok(existsSync(join(enlaces, 'video-base', 'SKILL.md')))
+})
+
+test('las marcas de una card: la de siempre (marca.json) y una por canal en marcas/', () => {
+  const cwd = mkdtempSync(join(tmpdir(), 'sloth-marcas-'))
+  assert.deepEqual(marcasDe(cwd), { base: undefined, otras: [] })
+  writeFileSync(join(cwd, 'marca.json'), JSON.stringify({ cierre: { nombre: '@tech' } }))
+  assert.deepEqual(marcasDe(cwd), { base: '@tech', otras: [] })
+  mkdirSync(join(cwd, 'marcas'))
+  writeFileSync(join(cwd, 'marcas', 'Cocina.json'), '{}')
+  writeFileSync(join(cwd, 'marcas', 'Autos.json'), '{}')
+  writeFileSync(join(cwd, 'marcas', 'notas.txt'), '')
+  assert.deepEqual(marcasDe(cwd), { base: '@tech', otras: ['Autos', 'Cocina'] })
+  rmSync(cwd, { recursive: true })
 })

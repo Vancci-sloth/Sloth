@@ -50,7 +50,13 @@ function deCero(events: AgentEvent[]): Item[] {
         break
       }
       case 'turn_end':
-        items.push({ kind: 'turn_end', key: `end${i}`, ok: e.ok, error: e.error, caida: e.caida, costUsd: e.costUsd, ms: turnStart ? e.at - turnStart : 0 })
+      {
+        // El último mensaje tuyo sin nada del agente después.
+        const despues = items.slice(items.findLastIndex((it) => it.kind === 'user'))
+        const u = despues[0]
+        const pedido = !e.ok && u?.kind === 'user' && !despues.some((it) => it.kind === 'text' || it.kind === 'tool' || it.kind === 'turn_end') && (u.text.trim() || u.images.length) ? { text: u.text, images: u.images } : undefined
+        items.push({ kind: 'turn_end', key: `end${i}`, ok: e.ok, error: e.error, caida: e.caida, costUsd: e.costUsd, ms: turnStart ? e.at - turnStart : 0, pedido })
+      }
         for (const it of items) if (it.kind === 'tool' && !it.done && !(it.parent && lanzadores.has(it.parent))) it.done = true
         break
       case 'info':
@@ -227,4 +233,31 @@ test('errorLlano: el límite y la cuenta son los del agente del hilo, y con Chat
   assert.equal(errorLlano('Se acabó tu uso gratis de OpenCode por ahora.', false, 'opencode').titulo, 'Se acabó tu uso gratis de OpenCode')
   assert.equal(errorLlano('El modelo gratis llegó a su límite por ahora.', false, 'opencode').titulo, 'El modelo gratis está saturado')
   assert.equal(errorLlano('Conecta tu cuenta de OpenCode en Opciones: es gratis.', false, 'opencode').titulo, 'Falta tu cuenta de OpenCode')
+})
+
+test('sin conexión: lo dice en llano, sugiere firewall o proxy, y «Reintentar» vuelve a mandar el pedido', () => {
+  for (const error of ['API Error: Unable to connect to API (ConnectionRefused)', 'connect ECONNREFUSED 127.0.0.1:443', 'Unable to connect to API: Self-signed certificate detected', 'getaddrinfo ENOTFOUND api.anthropic.com']) {
+    const e = errorLlano(error)
+    assert.equal(e.titulo, 'No se pudo conectar con Claude', error)
+    assert.match(e.ayuda, /firewall/)
+    assert.match(e.ayuda, /proxy/)
+    assert.equal(e.reintentar, true)
+  }
+  // Falló antes de que el agente hiciera nada: el pedido queda para volver a mandarlo.
+  const nada = buildTimeline([
+    { t: 'user', text: 'Hazme un video explicativo', images: ['C:/foto.png'], at: 1 },
+    { t: 'turn_start', at: 1 },
+    { t: 'turn_end', at: 2, ok: false, error: 'API Error: Unable to connect to API (ConnectionRefused)' }
+  ])
+  const fin = nada.at(-1)
+  assert.deepEqual(fin?.kind === 'turn_end' && fin.pedido, { text: 'Hazme un video explicativo', images: ['C:/foto.png'] })
+  // Ya trabajó algo: «Reintentar» le pide que siga.
+  const algo = buildTimeline([
+    { t: 'user', text: 'Hazme un video', at: 1 },
+    { t: 'turn_start', at: 1 },
+    { t: 'tool', id: 't1', name: 'Read', input: {} },
+    { t: 'turn_end', at: 2, ok: false, error: 'ECONNRESET' }
+  ])
+  const fin2 = algo.at(-1)
+  assert.equal(fin2?.kind === 'turn_end' && fin2.pedido, undefined)
 })

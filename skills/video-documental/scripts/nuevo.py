@@ -1,12 +1,15 @@
 """
 Crea el proyecto de un video documental desde la grabación, en `<nombre>` (el de la línea `Carpeta:` de Sloth):
 
-    python -I -B -X utf8 <skill>/scripts/nuevo.py <grabación> <nombre> [--vertical]
+    python -I -B -X utf8 <skill>/scripts/nuevo.py <grabación> [<otra toma>…] <nombre> [--vertical]
+
+Con varias tomas, las junta en el orden en que vienen. Al acabar transcribe la voz (work/tx/words.json) y enseña lo
+dicho frase por frase con su segundo: con eso se escribe momentos.json.
 
 Va en el directorio actual (Sloth lanza la card en `trabajo/video-documental`, y su panel de etapas busca ahí la
 carpeta); dentro de un proyecto, junto a él. Deja:
 
-  package.json, src/, build.py, PLAN.md   la plantilla: Remotion dibuja src/edicion.json, que escribe build.py
+  package.json, src/                      la plantilla: Remotion dibuja src/edicion.json, que escribe el director (hacer.py)
   public/assets/ev1/                      tokens.css y fonts/, las del estilo
   fuentes/grabacion.<ext>                 la grabación (enlace duro si se puede: no ocupa más disco). Fuera de public/:
                                           Remotion copia public/ entero cada vez que empaqueta, y no la usa
@@ -29,8 +32,11 @@ import sys
 from pathlib import Path
 
 SKILL = Path(__file__).resolve().parent.parent
+# Los demás scripts de la skill buscan video-base por SLOTH_SKILLS: que sea la de esta copia.
+os.environ.setdefault("SLOTH_SKILLS", str(SKILL.parent))
 sys.path.insert(0, str(SKILL.parent / "video-base" / "scripts"))
 from espacio import enlazar_modulos  # noqa: E402
+from sloth import ffmpeg_h264  # noqa: E402  la NVIDIA si hay, o x264
 
 
 def modulos(destino: Path) -> None:
@@ -58,7 +64,7 @@ def crear(destino: Path, vertical: bool = False) -> None:
 
 
 def ffmpeg(*args: str) -> None:
-    subprocess.run(["ffmpeg", "-nostdin", "-v", "error", "-stats", "-y", *args], check=True)
+    subprocess.run(["ffmpeg", "-nostdin", "-v", "error", "-y", *args], check=True)
 
 
 def grabacion(destino: Path, origen: Path, vertical: bool = False) -> None:
@@ -70,23 +76,79 @@ def grabacion(destino: Path, origen: Path, vertical: bool = False) -> None:
     except OSError:
         shutil.copy(origen, src)
     w, h = (1080, 1920) if vertical else (1920, 1080)
-    print(f"cámara -> public/assets/media/cam_raw.mp4 (cruda, {w}x{h}, 30 fps constantes)")
-    ffmpeg("-i", str(src), "-map", "0:v:0", "-vf",
-           f"fps=30,scale={w}:{h}:force_original_aspect_ratio=decrease,pad={w}:{h}:(ow-iw)/2:(oh-ih)/2",
-           "-c:v", "libx264", "-crf", "14", "-preset", "medium", "-g", "30", "-keyint_min", "30", "-pix_fmt", "yuv420p",
-           "-color_range", "tv", "-colorspace", "bt709", "-color_primaries", "bt709", "-color_trc", "bt709", "-an",
-           str(media / "cam_raw.mp4"))
-    print("voz -> public/assets/media/vo.wav")
+    ffmpeg_h264(lambda h264: [
+        "-i", str(src), "-map", "0:v:0", "-vf",
+        f"fps=30,scale={w}:{h}:force_original_aspect_ratio=decrease,pad={w}:{h}:(ow-iw)/2:(oh-ih)/2",
+        *h264, "-g", "30", "-keyint_min", "30", "-pix_fmt", "yuv420p",
+        "-color_range", "tv", "-colorspace", "bt709", "-color_primaries", "bt709", "-color_trc", "bt709", "-an",
+        str(media / "cam_raw.mp4")], crf=14)
     ffmpeg("-i", str(src), "-map", "0:a:0", "-ac", "2", "-ar", "48000", "-c:a", "pcm_s24le", str(media / "vo.wav"))
+
+
+def juntar(destino: Path, tomas: list[Path], vertical: bool) -> Path:
+    """Varias tomas, una tras otra y en el orden en que vienen, en una sola grabación (fuentes/grabacion.mkv)."""
+    w, h = (1080, 1920) if vertical else (1920, 1080)
+    (destino / "fuentes").mkdir(exist_ok=True)
+    salida = destino / "fuentes" / "grabacion.mkv"
+    entradas = [x for t in tomas for x in ("-i", str(t))]
+    filtros = "".join(f"[{k}:v:0]fps=30,scale={w}:{h}:force_original_aspect_ratio=decrease,pad={w}:{h}:(ow-iw)/2:(oh-ih)/2,setsar=1[v{k}];"
+                      f"[{k}:a:0]aresample=48000,aformat=channel_layouts=stereo[a{k}];" for k in range(len(tomas)))
+    filtros += "".join(f"[v{k}][a{k}]" for k in range(len(tomas))) + f"concat=n={len(tomas)}:v=1:a=1[v][a]"
+    print(f"juntando {len(tomas)} tomas -> fuentes/grabacion.mkv")
+    ffmpeg_h264(lambda h264: [*entradas, "-filter_complex", filtros, "-map", "[v]", "-map", "[a]", *h264, "-pix_fmt", "yuv420p",
+                              "-c:a", "pcm_s16le", str(salida)], crf=14)
+    return salida
+
+
+def transcribir(destino: Path) -> None:
+    """Las palabras de la toma con su tiempo y, a la vista, lo dicho frase por frase con su segundo: de ahí salen las
+    `palabra` de momentos.json."""
+    r = subprocess.run([sys.executable, "-I", "-B", "-X", "utf8", str(SKILL / "scripts" / "transcribir.py"), str(destino)],
+                       capture_output=True, text=True, encoding="utf-8", errors="replace")
+    if r.returncode:
+        sys.exit(f"nuevo: la transcripción falló:\n{(r.stdout + r.stderr)[-1500:]}\nCuando se arregle: transcribir.py \"{destino}\"")
+    for aviso in (l for l in r.stdout.splitlines() if "OJO" in l):
+        print(aviso)
+    if "Esperando:" in r.stdout:
+        print("(la transcripción esperó a que otro video soltara la GPU)")
+    palabras = json.loads((destino / "work" / "tx" / "words.json").read_text(encoding="utf-8"))
+    if not palabras:
+        sys.exit("nuevo: la grabación no trae palabras: ¿se oye la voz?")
+    print(f"\nLo que dice la grabación: {len(palabras)} palabras, {palabras[-1]['e']:.1f} s. Entre corchetes, el segundo en que se "
+          "dice lo que sigue. Con esto se escribe momentos.json (cada `palabra` sale de aquí, tal cual): no abras words.json.")
+    linea, marca = [], -9.0
+    for p in palabras:
+        # Una marca al empezar cada frase y cada dos segundos o así: es el paso al que cambia la imagen.
+        if not linea or p["s"] - marca >= 1.8:
+            linea.append(f"[{p['s']:.1f}]")
+            marca = p["s"]
+        linea.append(p["w"])
+        if p["w"].rstrip().endswith((".", "?", "!", "…")):
+            print("  " + " ".join(linea))
+            linea = []
+    if linea:
+        print("  " + " ".join(linea))
+    # Lo que hacer.py va a exigir para lo que dura esta toma: dicho antes, sale a la primera.
+    dura = palabras[-1]["e"]
+    pide = [f"{int(dura / 2.2) + 1} momentos o más (uno cada dos segundos o menos)",
+            f"tu cara de {dura * 0.25:.0f} a {dura * 0.35:.0f} s en total, en tramos de 1,2 a 2,5 s y nunca dos seguidos",
+            "un clip en la mitad o más de los momentos de material", "`mega` en la frase estrella a cámara"]
+    if dura > 25:
+        pide += ["`grande` en dos palabras más", "una lista (`tarjetas`, `rafaga` o `muro`)", "un `negro`"]
+    pide.append("y una `pagina` (con su `marca`) o un `post` de algo que se afirme")
+    print(f"\nPara estos {dura:.0f} s, hacer.py exige: " + "; ".join(pide) + ".")
+    print("Un nombre que salió mal escrito («Cloud» por «Claude») va en `palabra` como salió y, arriba, en `corrige` "
+          "(`{\"Cloud\": \"Claude\"}`), para que los subtítulos lo escriban bien.")
 
 
 def main() -> None:
     args = [a for a in sys.argv[1:] if a not in ("--vacio", "--vertical")]
     vacio = "--vacio" in sys.argv
     vertical = "--vertical" in sys.argv
-    if len(args) != (1 if vacio else 2):
+    if len(args) < (1 if vacio else 2) or (vacio and len(args) != 1):
         sys.exit(__doc__)
     nombre = args[-1]
+    tomas = [Path(a) for a in args[:-1]]
     aqui = Path.cwd()
     # Dentro de un proyecto (tiene package.json), junto a él: si no, saldría un video dentro de otro.
     if (aqui / "package.json").exists():
@@ -94,15 +156,14 @@ def main() -> None:
     destino = aqui / nombre
     if destino.exists():
         sys.exit(f"{destino} ya existe: usa otro nombre (puede ser de otra sesión haciendo el mismo video).")
-    if not vacio and not Path(args[0]).is_file():
-        sys.exit(f"No existe la grabación {args[0]}")
+    for t in tomas:
+        if not t.is_file():
+            sys.exit(f"No existe la grabación {t}")
     crear(destino, vertical)
     if not vacio:
-        grabacion(destino, Path(args[0]), vertical)
-        d = subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0",
-                            str(destino / "public" / "assets" / "media" / "cam_raw.mp4")], capture_output=True, text=True).stdout.strip()
-        print(f"\n{destino}  ({float(d):.1f} s)")
-        print(f"sigue: python -I -B -X utf8 {SKILL / 'scripts' / 'transcribir.py'} \"{destino}\"")
+        grabacion(destino, tomas[0] if len(tomas) == 1 else juntar(destino, tomas, vertical), vertical)
+        transcribir(destino)
+        print(f"\nEl proyecto: {destino}\nSigue: buscar.py desde esa carpeta, y momentos.json en ella con hacer.py")
     else:
         print(f"listo: {destino}")
 
