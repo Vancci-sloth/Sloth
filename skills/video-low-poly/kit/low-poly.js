@@ -374,13 +374,13 @@
           tomas: [{ en: 1.7, pos: [1.6, 4.8, 13.4], aim: [0.7, 2.3, 0.8] }], enfoca: null },
         // Los tres del frente, uno junto a otro de oeste a este; cada bandera cuelga hacia fuera de lo suyo (`dir`: hacia
         // dónde se ponen las cosas, del lado contrario a su papel).
-        costa: { suelo: [-1.45, 3.75], huecos: [[-1.45, 3.75], [-0.75, 2.75], [-1.9, 2.75], [-0.3, 3.5]], alto: [-2.2, 4.2, 1.6], bandera: { at: [-0.2, 4.15], yaw: 0, height: 1.2 }, cam: { pos: [-1.6, 3.4, 10.9], aim: [-1.3, 0.6, 3.6] }, foco: [-1.3, 0.6, 3.8], barco: [[-4.3, 4.6], [-2.95, 3.55]] },
-        llanura: { suelo: [2.6, 4.5], alto: [2.4, 4.3, 2.4], dir: 1, bandera: { at: [1.25, 5.0], yaw: 0, height: 1.1, side: -1 }, cam: { pos: [2.6, 3.4, 11.4], aim: [2.3, 0.7, 4.4] }, foco: [2.6, 0.6, 4.4] },
-        valle: { suelo: [6.7, 3.4], alto: [6.6, 4.4, 1.5], dir: -1, bandera: { at: [8.0, 3.95], yaw: -0.05, height: 1.15 }, cam: { pos: [6.6, 3.6, 10.4], aim: [6.9, 0.9, 3.4] }, foco: [6.8, 0.8, 3.5] },
-        bosque: { suelo: [8.6, -0.4], alto: [8.0, 5.0, -2.0], dir: 1, bandera: { at: [7.2, 1.4], yaw: -0.1, height: 1.3, side: -1 }, cam: { pos: [7.6, 4.8, 7.6], aim: [8.2, 1.9, -0.3] }, foco: [8.2, 1.6, 0.2] },
+        costa: { suelo: [-1.45, 3.75], huecos: [[-1.45, 3.75], [-0.75, 2.75], [-1.9, 2.75], [-0.3, 3.5]], alto: [-2.2, 4.2, 1.6], bandera: { at: [-0.2, 4.15], yaw: 0, height: 1.2 }, cam: { pos: [-1.6, 2.0, 10.9], aim: [-1.3, 0.6, 3.6] }, foco: [-1.3, 0.6, 3.8], barco: [[-4.3, 4.6], [-2.95, 3.55]] },
+        llanura: { suelo: [2.6, 4.5], alto: [2.4, 4.3, 2.4], dir: 1, bandera: { at: [1.25, 5.0], yaw: 0, height: 1.1, side: -1 }, cam: { pos: [2.6, 2.06, 11.4], aim: [2.3, 0.7, 4.4] }, foco: [2.6, 0.6, 4.4] },
+        valle: { suelo: [6.7, 3.4], alto: [6.6, 4.4, 1.5], dir: -1, bandera: { at: [8.0, 3.95], yaw: -0.05, height: 1.15 }, cam: { pos: [6.6, 2.26, 10.4], aim: [6.9, 0.9, 3.4] }, foco: [6.8, 0.8, 3.5] },
+        bosque: { suelo: [8.6, -0.4], alto: [8.0, 5.0, -2.0], dir: 1, bandera: { at: [7.2, 1.4], yaw: -0.1, height: 1.3, side: -1 }, cam: { pos: [7.6, 3.44, 7.6], aim: [8.2, 1.9, -0.3] }, foco: [8.2, 1.6, 0.2] },
         // En vertical, el mundo entero se mira desde el mar del oeste: lo largo del mapa (de la costa a los montes) queda a
         // lo alto del cuadro, y las banderas se vuelven hacia la cámara.
-        todo: { ref: true, cam: VERTICAL ? { pos: [-11.5, 9.5, 4.2], aim: [1.6, 0.9, 2.4] } : { pos: [0.2, 5.4, 14.3], aim: [0.1, 2.7, 0] }, foco: VERTICAL ? [1.6, 0.9, 2.4] : [0.1, 2.2, 0.8], ap: 0.05,
+        todo: { ref: true, cam: VERTICAL ? { pos: [-11.5, 4.4, 4.2], aim: [1.6, 0.9, 2.4] } : { pos: [0.2, 5.4, 14.3], aim: [0.1, 2.7, 0] }, foco: VERTICAL ? [1.6, 0.9, 2.4] : [0.1, 2.2, 0.8], ap: 0.05,
           tomas: [{ en: 0.65, pos: [0.35, 5.25, 14.0], aim: [0.1, 2.65, 0] }, { en: 'fin', pos: [0.2, 5.4, 14.3], aim: [0.1, 2.7, 0] }], enfoca: [-1.45, 0.45] },
       }
       const lugar = (n) => LUGARES[n] || LUGARES.todo
@@ -711,7 +711,7 @@
       }
       const encuadre = (pos0, aim0, pts, dmin, dmax, alto = 0, soloAleja = false) => {
         let A = V3(aim0), v = V3(pos0).sub(A)
-        if (VERTICAL) { const el = Math.asin(v.y / v.length()), az = Math.atan2(v.x, v.z), e2 = Math.min(0.85, Math.max(el + 0.2, alto)), l = v.length(); v = new THREE.Vector3(Math.sin(az) * Math.cos(e2), Math.sin(e2), Math.cos(az) * Math.cos(e2)).multiplyScalar(l) }
+        if (VERTICAL && alto) { const el = Math.asin(v.y / v.length()), az = Math.atan2(v.x, v.z), e2 = Math.min(0.85, Math.max(el, alto)), l = v.length(); v = new THREE.Vector3(Math.sin(az) * Math.cos(e2), Math.sin(e2), Math.cos(az) * Math.cos(e2)).multiplyScalar(l) }
         let d = v.length(); const f = v.clone().normalize().negate(), r = new THREE.Vector3().crossVectors(f, UP).normalize(), u = new THREE.Vector3().crossVectors(r, f)
         // Si ya cabe, los números de la referencia tal cual: rehacerlos desde un vector normalizado deja errores de 1e-15
         // que, en alguna de las 64 pasadas, mueven un borde de píxel.
@@ -766,7 +766,7 @@
         if (!pts.length) pts.push(L.foco || L.cam.aim)
         const caben = fiel ? (p.cerca ? pts : flags.flatMap((b) => ptsBandera(b))).concat([L.foco || L.cam.aim]) : pts
         MG = fiel ? MG_REF : MG0
-        const q = encuadre(L.cam.pos, L.cam.aim, caben, fiel ? 0 : d0 * (p.cerca ? 0.6 : 0.9), d0 * (todo ? 4.5 : VERTICAL ? 3.4 : 2.4), todo && VERTICAL ? 0.55 : 0, fiel)
+        const q = encuadre(L.cam.pos, L.cam.aim, caben, fiel ? 0 : d0 * (p.cerca ? 0.6 : 0.9), d0 * (todo ? 4.5 : VERTICAL ? 3.4 : 2.4), 0, fiel)
         MG = MG0
         return { pos: q.pos, aim: q.aim, foco, ap: L.ap || 0.06, pts, flags, todo }
       }
@@ -830,7 +830,8 @@
       // Una bandera de otro lugar que se cruza con lo que se cuenta aquí (delante o detrás), o que quedaría cortada por el
       // borde, dobla su papel contra el alfiler mientras la cámara está aquí, y lo vuelve a abrir cuando se va.
       planos.forEach((p) => {
-        if (p.q.todo || (!VERTICAL && lugar(p.en).ref)) return  // en horizontal, los de la referencia como en ella
+        // en horizontal, si el video pasa solo en lugares de la referencia, como en ella (sin doblar nada)
+        if (p.q.todo || (!VERTICAL && lugar(p.en).ref && MOM.every((m) => lugar(m.en).ref))) return
         // con la cámara ya acercada al final del plano, que es cuando más se corta lo del borde
         const A = V3(p.q.aim), v = V3(p.q.pos).sub(A), d = v.length() * 0.95, f = v.clone().normalize().negate(), r = new THREE.Vector3().crossVectors(f, UP).normalize(), u = new THREE.Vector3().crossVectors(r, f)
         const sujeto = caja(A, f, r, u, d, p.q.pts)
