@@ -315,8 +315,8 @@
     name: 'Low-Poly',
     duration: D,
     fonts: ['700 150px "Oswald"'],
-    // El acabado de la referencia; en vertical, un lente un poco más abierto para que quepa el lugar.
-    render: { samples: 64, shutter: 0.4, tone: 'neutral', exposure: 1.0, bloom: 0.35, bloomThreshold: 1.25, vignette: 0.22, grain: 0.014, fov: VERTICAL ? 40 : 30, background: PAL.haze, far: 400 },
+    // El acabado de la referencia, igual en los dos formatos (el mismo lente largo también en vertical: la cámara se aleja).
+    render: { samples: 64, shutter: 0.4, tone: 'neutral', exposure: 1.0, bloom: 0.35, bloomThreshold: 1.25, vignette: 0.22, grain: 0.014, fov: 30, background: PAL.haze, far: 400 },
 
     build(S) {
       const { scene, camera } = S
@@ -364,7 +364,8 @@
       // cam: de dónde la mira la cámara y a qué apunta (en horizontal; en vertical se aleja para que quepa); foco: lo nítido.
       const LUGARES = {
         // `cam2`: si en la costa o en la llanura ya hay cosas, el mar se mira desde el oeste para que no estorben delante.
-        mar: { ref: true, suelo: [-4.2, 0.6], alto: [-3.5, 3.75, -0.7], agua: true, bandera: { at: [-4.95, 1.95], yaw: 0.25, height: 1.3 }, cam: { pos: [-0.9, 1.2, 9.0], aim: [-3.8, 1.45, 1.6] }, cam2: { pos: [-6.6, 1.9, 8.6], aim: [-4.3, 1.3, 1.5] }, evita: ['costa', 'llanura'], foco: [-3.8, 1.3, 1.9], barco: [[-6.4, 0.2], [-5.6, 3.3]] },
+        mar: { ref: true, suelo: [-4.2, 0.6], alto: [-3.5, 3.75, -0.7], agua: true, bandera: { at: [-4.95, 1.95], yaw: 0.25, height: 1.3 }, cam: { pos: [-0.9, 1.2, 9.0], aim: [-3.8, 1.45, 1.6] }, cam2: { pos: [-6.6, 1.9, 8.6], aim: [-4.3, 1.3, 1.5] }, evita: ['costa', 'llanura'], foco: [-3.8, 1.3, 1.9], barco: [[-6.4, 0.2], [-5.6, 3.3]],
+          tomas: [{ en: 0.7, pos: [-0.9, 1.2, 9.0], aim: [-3.8, 1.45, 1.6] }], enfoca: [-0.2, 1.0] },
         cielo: { ref: true, suelo: [-3.5, -0.7], alto: [-3.5, 3.75, -0.7], aire: true, bandera: { nube: true, at: [-1.35, 0.1], yaw: 0, height: 1.35 }, cam: { pos: [-2.4, 4.3, 7.6], aim: [-3.1, 4.7, -0.5] }, foco: [-3.2, 4.6, -0.6],
           tomas: [{ en: 0.3, pos: [-1.4, 2.3, 10.6], aim: [-3.7, 2.7, 0.8] }, { en: 1.6, pos: [-2.4, 4.3, 7.6], aim: [-3.1, 4.7, -0.5] }], enfoca: [0.1, 1.3] },
         montaña: { ref: true, suelo: [4.3, -0.3], alto: [3.3, 4.3, -1.0], bandera: { at: [5.95, 1.2], yaw: -0.05, height: 1.4, side: -1 }, cam: { pos: [2.8, 4.6, 9.6], aim: [3.1, 3.8, -0.4] }, foco: [4.4, 2.6, 1.2],
@@ -606,7 +607,7 @@
         obj.position.set(x, y, z); obj.rotation.y = giro; scene.add(obj)
         const b = Object.assign({ obj, t: e.t, x, y, z, s, giro }, extra); brotes.push(b); return b
       }
-      const matPiezas = faceted({ roughness: 0.85 })
+      const matPiezas = faceted()  // el de la tierra y los árboles: papel mate
       const casas = [], humos = [], molinos = [], camiones = [], faros = [], plantas = [], puentes = [], barcos = [], cultivos = []
       ENTRAN.forEach((e, k) => {
         const L = lugar(e.en)
@@ -621,7 +622,7 @@
         }
         if (e.tipo === 'fabrica') {
           const g = new THREE.Group(); g.add(mesh(factoryGeo(), matPiezas)); const b = ponEn(g, e, 1.5, -0.15)
-          const NP = 9, im = new THREE.InstancedMesh(puffGeo(), faceted({ roughness: 0.95, glow: 0.18 }), NP); im.castShadow = true; im.frustumCulled = false; scene.add(im)
+          const NP = 9, im = new THREE.InstancedMesh(puffGeo(), faceted({ glow: 0.22 }), NP); im.castShadow = true; im.frustumCulled = false; scene.add(im)
           const top = new THREE.Vector3(0.36, 0.97, -0.12).multiplyScalar(1.5).applyAxisAngle(new THREE.Vector3(0, 1, 0), -0.15).add(g.position)
           humos.push({ b, im, top, NP })
         }
@@ -632,7 +633,7 @@
         }
         if (e.tipo === 'faro') {
           const g = new THREE.Group(); g.add(mesh(lighthouseGeo(), matPiezas))
-          const luz = mesh(lampGeo(), faceted({ glow: 1.6, roughness: 0.4 })); luz.position.y = 1.03; luz.castShadow = false; g.add(luz)
+          const luz = mesh(lampGeo(), faceted({ glow: 0.22 })); luz.position.y = 1.03; luz.castShadow = false; g.add(luz)
           // En el mar, el faro va en el islote.
           let b
           if (e.en === 'mar') { const y = height(-5.2, 1.55) - 0.04; g.position.set(-5.2, y, 1.55); scene.add(g); b = { obj: g, t: e.t, x: -5.2, y, z: 1.55, s: 1.25, giro: 0 }; brotes.push(b) }
@@ -699,7 +700,7 @@
       // cuadro, con margen. En horizontal se queda el encuadre de la referencia mientras nada se corte; en vertical la
       // cámara sube un poco (el suelo llena lo alto del cuadro) y deja libre lo de abajo, donde la red pone el texto.
       const V3 = (a) => new THREE.Vector3(a[0], a[1], a[2]), UP = new THREE.Vector3(0, 1, 0)
-      const TV = Math.tan(THREE.MathUtils.degToRad((VERTICAL ? 40 : 30) / 2)), TH = TV * P.ancho / P.alto
+      const TV = Math.tan(THREE.MathUtils.degToRad(30 / 2)), TH = TV * P.ancho / P.alto
       // Los márgenes del cuadro (de 0 al borde, que es 1); en los lugares de la referencia, los de ella: que quepa entero.
       const MG0 = VERTICAL ? { l: 0.86, r: 0.86, t: 0.8, b: 0.5 } : { l: 0.93, r: 0.93, t: 0.88, b: 0.84 }, MG_REF = { l: 0.99, r: 0.99, t: 0.97, b: 0.97 }
       let MG = MG0
@@ -715,13 +716,15 @@
         // Si ya cabe, los números de la referencia tal cual: rehacerlos desde un vector normalizado deja errores de 1e-15
         // que, en alguna de las 64 pasadas, mueven un borde de píxel.
         if (soloAleja && caja(A, f, r, u, d, pts).cabe) return { pos: pos0.slice(), aim: aim0.slice() }
-        for (let it = 0; it < 6; it++) {
+        for (let it = 0; it < 20; it++) {
           const b = caja(A, f, r, u, d, pts)
           // En los lugares de la referencia (horizontal) se queda su composición (la misma mira): si algo no cabe, solo se aleja.
           if (soloAleja) { d = Math.min(dmax, d * Math.max(1, b.x1 / MG.r, -b.x0 / MG.l, b.y1 / MG.t, -b.y0 / MG.b) * 1.01); continue }
           A.addScaledVector(r, ((b.x0 + b.x1) / 2 - (MG.r - MG.l) / 2) * d * TH).addScaledVector(u, ((b.y0 + b.y1) / 2 - (MG.t - MG.b) / 2) * d * TV)
           d = K.clamp(d * Math.max((b.x1 - b.x0) / (MG.l + MG.r), (b.y1 - b.y0) / (MG.t + MG.b)) * 1.02, dmin, dmax)
         }
+        // Lo que aún se salga (los puntos a distinta hondura no escalan igual): se aleja por la misma línea hasta que quepa.
+        for (let it = 0; it < 40 && d < dmax && !caja(A, f, r, u, d, pts).cabe; it++) d = Math.min(dmax, d * 1.04)
         return { pos: A.clone().addScaledVector(f, -d).toArray(), aim: A.toArray() }
       }
       // Lo que tiene que caber: la bandera (el alfiler y el papel) y cada cosa con su tamaño.
@@ -763,7 +766,7 @@
         if (!pts.length) pts.push(L.foco || L.cam.aim)
         const caben = fiel ? (p.cerca ? pts : flags.flatMap((b) => ptsBandera(b))).concat([L.foco || L.cam.aim]) : pts
         MG = fiel ? MG_REF : MG0
-        const q = encuadre(L.cam.pos, L.cam.aim, caben, fiel ? 0 : d0 * (p.cerca ? 0.6 : 0.9), d0 * (todo ? 3.2 : 2.4), todo && VERTICAL ? 0.55 : 0, fiel)
+        const q = encuadre(L.cam.pos, L.cam.aim, caben, fiel ? 0 : d0 * (p.cerca ? 0.6 : 0.9), d0 * (todo ? 4.5 : VERTICAL ? 3.4 : 2.4), todo && VERTICAL ? 0.55 : 0, fiel)
         MG = MG0
         return { pos: q.pos, aim: q.aim, foco, ap: (L.ap || 0.06) * (VERTICAL ? 1.2 : 1), pts, flags, todo }
       }
@@ -803,7 +806,8 @@
         // Si se queda mucho más (con voz), sus puntos se van acercando despacio para que no se vaya antes de tiempo.
         const sale = Math.max(ultima.t + 0.05, sig ? sig.t - (lejos ? 0.7 : 0.5) : D)
         const cerca = (k) => ultima.pos.map((v, j) => ultima.aim[j] + (v - ultima.aim[j]) * k), fin2 = sig ? 0.95 : 0.97
-        if (sale - ultima.t > 2.6) {
+        // En los de la referencia, como ella (no se para entre sus tomas); en los demás, espera a que pase lo suyo.
+        if (sale - ultima.t > (fiel ? 2.6 : 0.6)) {
           const n = Math.floor((sale - ultima.t) / 1.3)
           for (let k = 1; k <= n; k++) { const tk = ultima.t + (sale - ultima.t) * k / (n + 1); poner(tk, cerca(1 - (1 - fin2) * k / (n + 1)), ultima.aim) }
           poner(sale, cerca(fin2), ultima.aim)
