@@ -358,14 +358,19 @@
       const MOUTH = river.rows[Math.round(river.n * 0.93)]
 
       // ------------------------------------------------------------ los lugares del mapa, cada uno con su encuadre
+      // Los de la referencia (`ref`) traen, en horizontal, sus `tomas`: los puntos de su grúa, cada uno a tantos segundos
+      // de que empieza lo suyo, y `enfoca`: cuándo pasa el foco a ellos (null: el río no lo mueve).
       // suelo: dónde se ponen las cosas; alto: dónde flota su nube; bandera: dónde se clava y hacia qué lado cuelga;
       // cam: de dónde la mira la cámara y a qué apunta (en horizontal; en vertical se aleja para que quepa); foco: lo nítido.
       const LUGARES = {
         // `cam2`: si en la costa o en la llanura ya hay cosas, el mar se mira desde el oeste para que no estorben delante.
-        mar: { ref: true, suelo: [-4.2, 0.9], alto: [-3.5, 3.75, -0.7], agua: true, bandera: { at: [-4.95, 1.95], yaw: 0.25, height: 1.3 }, cam: { pos: [-0.9, 1.2, 9.0], aim: [-3.8, 1.45, 1.6] }, cam2: { pos: [-6.6, 1.9, 8.6], aim: [-4.3, 1.3, 1.5] }, evita: ['costa', 'llanura'], foco: [-3.8, 1.3, 1.9], barco: [[-6.4, 0.2], [-5.6, 3.3]] },
-        cielo: { ref: true, suelo: [-3.5, -0.7], alto: [-3.5, 3.75, -0.7], aire: true, bandera: { nube: true, at: [-1.35, 0.1], yaw: 0, height: 1.35 }, cam: { pos: [-2.4, 4.3, 7.6], aim: [-3.1, 4.7, -0.5] }, foco: [-3.2, 4.6, -0.6] },
-        montaña: { ref: true, suelo: [4.3, -0.3], alto: [3.3, 4.3, -1.0], bandera: { at: [5.95, 1.2], yaw: -0.05, height: 1.4, side: -1 }, cam: { pos: [2.8, 4.6, 9.6], aim: [3.1, 3.8, -0.4] }, foco: [4.4, 2.6, 1.2] },
-        rio: { ref: true, suelo: [2.2, 1.7], alto: [0.1, 4.75, -1.6], bandera: { at: [0.9, 3.6], yaw: 0, height: 1.0 }, cam: { pos: [1.6, 4.8, 13.4], aim: [0.7, 2.3, 0.8] }, foco: [0.9, 0.9, 3.6] },
+        mar: { ref: true, suelo: [-4.2, 0.6], alto: [-3.5, 3.75, -0.7], agua: true, bandera: { at: [-4.95, 1.95], yaw: 0.25, height: 1.3 }, cam: { pos: [-0.9, 1.2, 9.0], aim: [-3.8, 1.45, 1.6] }, cam2: { pos: [-6.6, 1.9, 8.6], aim: [-4.3, 1.3, 1.5] }, evita: ['costa', 'llanura'], foco: [-3.8, 1.3, 1.9], barco: [[-6.4, 0.2], [-5.6, 3.3]] },
+        cielo: { ref: true, suelo: [-3.5, -0.7], alto: [-3.5, 3.75, -0.7], aire: true, bandera: { nube: true, at: [-1.35, 0.1], yaw: 0, height: 1.35 }, cam: { pos: [-2.4, 4.3, 7.6], aim: [-3.1, 4.7, -0.5] }, foco: [-3.2, 4.6, -0.6],
+          tomas: [{ en: 0.3, pos: [-1.4, 2.3, 10.6], aim: [-3.7, 2.7, 0.8] }, { en: 1.6, pos: [-2.4, 4.3, 7.6], aim: [-3.1, 4.7, -0.5] }], enfoca: [0.1, 1.3] },
+        montaña: { ref: true, suelo: [4.3, -0.3], alto: [3.3, 4.3, -1.0], bandera: { at: [5.95, 1.2], yaw: -0.05, height: 1.4, side: -1 }, cam: { pos: [2.8, 4.6, 9.6], aim: [3.1, 3.8, -0.4] }, foco: [4.4, 2.6, 1.2],
+          tomas: [{ en: 0.3, pos: [2.8, 4.6, 9.6], aim: [3.1, 3.8, -0.4] }, { en: 1.2, pos: [4.0, 3.8, 10.8], aim: [3.9, 2.8, 0.4] }], enfoca: [-0.6, 0.5] },
+        rio: { ref: true, suelo: [2.2, 1.7], alto: [0.1, 4.75, -1.6], bandera: { at: [0.9, 3.6], yaw: 0, height: 1.0 }, cam: { pos: [1.6, 4.8, 13.4], aim: [0.7, 2.3, 0.8] }, foco: [0.9, 0.9, 3.6],
+          tomas: [{ en: 1.7, pos: [1.6, 4.8, 13.4], aim: [0.7, 2.3, 0.8] }], enfoca: null },
         // Los tres del frente, uno junto a otro de oeste a este; cada bandera cuelga hacia fuera de lo suyo (`dir`: hacia
         // dónde se ponen las cosas, del lado contrario a su papel).
         costa: { suelo: [-1.45, 3.75], huecos: [[-1.45, 3.75], [-0.75, 2.75], [-1.9, 2.75], [-0.3, 3.5]], alto: [-2.2, 4.2, 1.6], bandera: { at: [-0.2, 4.15], yaw: 0, height: 1.2 }, cam: { pos: [-1.6, 3.4, 10.9], aim: [-1.3, 0.6, 3.6] }, foco: [-1.3, 0.6, 3.8], barco: [[-4.3, 4.6], [-2.95, 3.55]] },
@@ -374,7 +379,8 @@
         bosque: { suelo: [8.6, -0.4], alto: [8.0, 5.0, -2.0], dir: 1, bandera: { at: [7.2, 1.4], yaw: -0.1, height: 1.3, side: -1 }, cam: { pos: [7.6, 4.8, 7.6], aim: [8.2, 1.9, -0.3] }, foco: [8.2, 1.6, 0.2] },
         // En vertical, el mundo entero se mira desde el mar del oeste: lo largo del mapa (de la costa a los montes) queda a
         // lo alto del cuadro, y las banderas se vuelven hacia la cámara.
-        todo: { ref: true, cam: VERTICAL ? { pos: [-11.5, 9.5, 4.2], aim: [1.6, 0.9, 2.4] } : { pos: [0.2, 5.4, 14.3], aim: [0.1, 2.7, 0] }, foco: VERTICAL ? [1.6, 0.9, 2.4] : [0.1, 2.2, 0.8], ap: 0.05 },
+        todo: { ref: true, cam: VERTICAL ? { pos: [-11.5, 9.5, 4.2], aim: [1.6, 0.9, 2.4] } : { pos: [0.2, 5.4, 14.3], aim: [0.1, 2.7, 0] }, foco: VERTICAL ? [1.6, 0.9, 2.4] : [0.1, 2.2, 0.8], ap: 0.05,
+          tomas: [{ en: 0.65, pos: [0.35, 5.25, 14.0], aim: [0.1, 2.65, 0] }, { en: 'fin', pos: [0.2, 5.4, 14.3], aim: [0.1, 2.7, 0] }], enfoca: [-1.45, 0.45] },
       }
       const lugar = (n) => LUGARES[n] || LUGARES.todo
       // Delante del suelo de un lugar, donde para lo que llega (el camión) sin pisar sus cosas.
@@ -473,17 +479,18 @@
           const alto = P.momentos.some((o) => o.en === m.en && (o.entra || []).some((e) => ['fabrica', 'molino', 'faro', 'planta'].includes(e.tipo)))
           const B = { height: (alto ? 2.6 : 2.0) + sube, side: 1, yaw: 0 }, f = flag(num, texto, B), [cx, cz] = sitio(L, 0)
           B.at = [cx - f.width / 2 + piso * 0.12, cz - 1.0 - piso * 0.05]
-          return { m, L, B, f, t: m.t0 < 0 ? -9 : Math.min(m.t0 + 0.6, m.fin - 0.15) }
+          return { m, L, B, f, t: m.t0 < 0 ? -9 : m.t0 }
         }
         const B = piso ? Object.assign({}, L.bandera, { height: (L.bandera.height || 1.25) + sube, at: [L.bandera.at[0] + piso * 0.12 * (L.bandera.side || 1), L.bandera.at[1] - piso * 0.05] }) : L.bandera
         const f = flag(num, texto, B)
-        return { m, L, B, f, t: m.t0 < 0 ? -9 : Math.min(m.t0 + 0.6, m.fin - 0.15) }
+        return { m, L, B, f, t: m.t0 < 0 ? -9 : m.t0 }
       })
       // Lo que no puede crecer encima de una bandera ni de una cosa: su frente y su sitio.
       const LIBRES = []
-      BANDERAS.forEach(({ B }) => { if (!B.nube) LIBRES.push([B.at[0] + (B.side || 1) * 1.1, B.at[1] + 0.9, 1.6]) })
+      BANDERAS.forEach(({ B, L }) => { if (!B.nube && !L.ref) LIBRES.push([B.at[0] + (B.side || 1) * 1.1, B.at[1] + 0.9, 1.6]) })
       ENTRAN.forEach((e) => { if (!['vapor', 'nube', 'lluvia', 'anillo', 'rio', 'barco', 'puente'].includes(e.tipo) && !(e.tipo === 'faro' && e.en === 'mar')) { const [x, z] = sitio(lugar(e.en), e.hueco); LIBRES.push([x, z, { cultivo: 1.9, fabrica: 1.4, casas: 1.6 }[e.tipo] || 0.9]) } })
       de('camion').forEach((e) => { const a = sitio(lugar(e.en), e.hueco), b = parada(lugar(e.a)); for (let u = 0; u <= 1; u += 0.1) LIBRES.push([K.lerp(a[0], b[0], u), K.lerp(a[1], b[1], u), 0.45]) })
+      const libre = (x, z) => !LIBRES.some(([cx, cz, r]) => Math.hypot(x - cx, z - cz) < r)
       const clear = (x, z) => (usados.has('montaña') && x > 1.9 && x < 6.3 && z > 0.9 && z < 3.4) || (usados.has('rio') && x > 0.5 && x < 4.3 && z > 3.2 && z < 6.5) || LIBRES.some(([cx, cz, r]) => Math.hypot(x - cx, z - cz) < r)
 
       // ------------------------------------------------------------ árboles y rocas, por reglas (los de la referencia), y las arboledas que entran
@@ -496,7 +503,7 @@
         BANK_TREES.forEach((b, i) => {
           const row = river.rows[Math.round(b.s * river.n)], off = -Math.sign(row.nz) * (row.w + 0.6 + 0.45 * K.hash(i, 4))
           const x = row.x + row.nx * off, z = row.z + row.nz * off
-          if (!clear(x, z)) put(i % 4 === 1 ? 'ochre' : 'tree', x, z, r.range(0.7, 0.95), b.t)
+          if (libre(x, z)) put(i % 4 === 1 ? 'ochre' : 'tree', x, z, r.range(0.7, 0.95), b.t)
         })
         // Las arboledas y las rocas que entran en un momento: brotan de una en una.
         ENTRAN.filter((e) => e.tipo === 'arboles' || e.tipo === 'rocas').forEach((e, k) => {
@@ -518,7 +525,7 @@
         }
         for (let i = 0; i < 500; i++) {
           const x = r.range(-7, 9), z = r.range(-6, 6.5), y = height(x, z), { d, row } = river.near(x, z)
-          if (d < row.w + 0.3 || !free(x, z, 0.5) || clear(x, z)) continue
+          if (d < row.w + 0.3 || !free(x, z, 0.5) || !libre(x, z)) continue
           if ((y > -0.12 && y < 0.1 && r.chance(0.35)) || (y > 1.6 && y < 2.6 && r.chance(0.12)) || (d < row.w + 0.6 && row.s > 0.3 && r.chance(0.5))) put(r.chance(0.5) ? 'rock' : 'rock2', x, z, r.range(0.22, 0.6))
         }
       }
@@ -536,21 +543,32 @@
         [[0, 0.2, 0, 0.6], [0.7, 0.08, 0.05, 0.45], [-0.6, 0.05, 0.1, 0.4]],
       ]
       const nubes = {}
-      // Lo que una nube se ha ido tierra adentro: como en la referencia (7 cm por segundo) al principio, y nunca más de 60 cm.
-      const deriva = (t) => 0.6 * Math.tanh(0.07 * t / 0.6)
-      // La nube del mar es la A de la referencia y la del monte, la C (con sus semillas y desde donde se despliegan).
-      const FORMA = { mar: 0, cielo: 0, montaña: 1 }, DESDE = [[-0.6, 0, 0.3, 2.3], [-1.8, 0, 0, 2.6]]
-      const hazNube = (alto, t, en) => {
+      // Lo que una nube se ha ido tierra adentro: 7 cm por segundo, como en la referencia, y en un video largo cada vez más
+      // despacio (desde los 8,5 s, lo que dura la referencia), para que no se salga de su sitio.
+      const deriva = (t) => (t <= 8.5 ? 0.07 * t : 0.595 + 0.6 * Math.tanh((t - 8.5) * 0.07 / 0.6))
+      // La nube del mar es la A de la referencia, la del monte la C y la chica del banco la B (sus semillas y desde dónde se
+      // despliegan, las de ella).
+      const FORMA = { mar: 0, cielo: 0, montaña: 1 }, DESDE = [[-0.6, 0, 0.3, 2.3], [-1.8, 0, 0, 2.6], [-1, 0, 0, 2.6]], SEMILLA = [1, 3, 2]
+      const hazNube = (alto, t, en, forma) => {
         const key = alto.join(','); if (nubes[key]) return nubes[key]
-        const k = FORMA[en] ?? Object.keys(nubes).length % 2, [fx, fy, fz, vel] = DESDE[k]
-        const m = mesh(unfold(cloudGeo(PUFFS[k], k * 2 + 1), { from: [fx, fy, fz], start: t, speed: vel }), faceted({ unfold: true, fold: 0.42, glow: 0.22 }))
+        const k = forma ?? FORMA[en] ?? Object.keys(nubes).length % 2, [fx, fy, fz, vel] = DESDE[k]
+        const m = mesh(unfold(cloudGeo(PUFFS[k], SEMILLA[k]), { from: [fx, fy, fz], start: t, speed: vel }), faceted({ unfold: true, fold: 0.42, glow: 0.22 }))
         const g = new THREE.Group(); g.add(m); g.position.set(...alto); g.userData = { pos: alto, mesh: m, t, k, storm: null }; scene.add(g)
         return (nubes[key] = g)
       }
       ENTRAN.forEach((e, k) => {
         const L = lugar(e.en)
         if (e.tipo === 'nube') hazNube(L.alto, e.t, e.en)
-        if (e.tipo === 'lluvia') { const n = hazNube(L.alto, e.t < 0 ? e.t : e.t - 1.1, e.en); n.userData.storm = e.t }
+        if (e.tipo === 'lluvia') {
+          // Si ya había una nube en otro sitio, el banco crece hacia la de la lluvia con una chica en medio (la B de la
+          // referencia, año y medio antes de llover); la de la lluvia se despliega un segundo antes.
+          const otra = Object.values(nubes).find((n) => n.userData.pos.join(',') !== L.alto.join(','))
+          if (otra && !nubes[L.alto.join(',')] && e.t >= 0) {
+            const a = otra.userData.pos, medio = [(a[0] + L.alto[0]) / 2 + 0.2, (a[1] + L.alto[1]) / 2 + 0.725, (a[2] + L.alto[2]) / 2 - 0.75].map((v) => Math.round(v * 1000) / 1000)
+            hazNube(medio, Math.round((e.t - 1.5) * 1000) / 1000, null, 2)
+          }
+          const n = hazNube(L.alto, e.t < 0 ? e.t : Math.round((e.t - 1.0) * 1000) / 1000, e.en); n.userData.storm = e.t
+        }
       })
       // Una bandera en el cielo se clava en su nube y se va con ella.
       BANDERAS.forEach((b) => { if (b.B.nube && !nubes[b.L.alto.join(',')]) hazNube(b.L.alto, b.m.t0 < 0 ? -9 : b.m.t0, b.m.en) })
@@ -571,7 +589,7 @@
       const lluvias = de('lluvia').map((e, k) => {
         const L = lugar(e.en), nube = nubeArriba(L), NR = 150, im = new THREE.InstancedMesh(dropGeo(0.022, 0.15), dropMat, NR); im.frustumCulled = false; im.castShadow = false; scene.add(im)
         const [ax, ay, az] = L.alto
-        const q = Array.from({ length: NR }, (_, i) => { const x = ax + (K.hash(i + k * 300, 11) - 0.5) * 3.6, z = az + (K.hash(i + k * 300, 12) - 0.5) * 1.7, top = ay + 0.05; return { x, z, top, fall: top - Math.max(0, height(x - 0.2, z)), ph: K.hash(i + k * 300, 13), v: 6.5 + K.hash(i + k * 300, 14) * 1.5 } })
+        const q = Array.from({ length: NR }, (_, i) => { const x = ax + (K.hash(i + k * 300, 11) - 0.5) * 3.6, z = Math.round((az + 0.1) * 1000) / 1000 + (K.hash(i + k * 300, 12) - 0.5) * 1.7, top = ay + 0.05; return { x, z, top, fall: top - Math.max(0, height(x - 0.2, z)), ph: K.hash(i + k * 300, 13), v: 6.5 + K.hash(i + k * 300, 14) * 1.5 } })
         return { e, L, im, q, nube }
       })
 
@@ -683,15 +701,15 @@
         for (const p of pts) { const q = V3(p).sub(A), z = Math.max(0.5, d + q.dot(f)), nx = q.dot(r) / (z * TH), ny = q.dot(u) / (z * TV); x0 = Math.min(x0, nx); x1 = Math.max(x1, nx); y0 = Math.min(y0, ny); y1 = Math.max(y1, ny) }
         return { x0, x1, y0, y1, cabe: x0 >= -MG.l && x1 <= MG.r && y0 >= -MG.b && y1 <= MG.t }
       }
-      const encuadre = (pos0, aim0, pts, dmin, dmax, alto = 0) => {
+      const encuadre = (pos0, aim0, pts, dmin, dmax, alto = 0, soloAleja = false) => {
         let A = V3(aim0), v = V3(pos0).sub(A)
         if (VERTICAL) { const el = Math.asin(v.y / v.length()), az = Math.atan2(v.x, v.z), e2 = Math.min(0.85, Math.max(el + 0.2, alto)), l = v.length(); v = new THREE.Vector3(Math.sin(az) * Math.cos(e2), Math.sin(e2), Math.cos(az) * Math.cos(e2)).multiplyScalar(l) }
         let d = v.length(); const f = v.clone().normalize().negate(), r = new THREE.Vector3().crossVectors(f, UP).normalize(), u = new THREE.Vector3().crossVectors(r, f)
-        if (!VERTICAL && caja(A, f, r, u, d, pts).cabe) return { pos: A.clone().addScaledVector(f, -d).toArray(), aim: A.toArray() }
+        if (soloAleja && caja(A, f, r, u, d, pts).cabe) return { pos: A.clone().addScaledVector(f, -d).toArray(), aim: A.toArray() }
         for (let it = 0; it < 6; it++) {
           const b = caja(A, f, r, u, d, pts)
-          // En horizontal se queda la composición de la referencia (la misma mira): si algo no cabe, solo se aleja.
-          if (!VERTICAL) { d = Math.min(dmax, d * Math.max(1, b.x1 / MG.r, -b.x0 / MG.l, b.y1 / MG.t, -b.y0 / MG.b) * 1.01); continue }
+          // En los lugares de la referencia (horizontal) se queda su composición (la misma mira): si algo no cabe, solo se aleja.
+          if (soloAleja) { d = Math.min(dmax, d * Math.max(1, b.x1 / MG.r, -b.x0 / MG.l, b.y1 / MG.t, -b.y0 / MG.b) * 1.01); continue }
           A.addScaledVector(r, ((b.x0 + b.x1) / 2 - (MG.r - MG.l) / 2) * d * TH).addScaledVector(u, ((b.y0 + b.y1) / 2 - (MG.t - MG.b) / 2) * d * TV)
           d = K.clamp(d * Math.max((b.x1 - b.x0) / (MG.l + MG.r), (b.y1 - b.y0) / (MG.t + MG.b)) * 1.02, dmin, dmax)
         }
@@ -731,12 +749,12 @@
         // Nítido, lo que se cuenta: el centro de sus cosas (sin cosas, el foco del lugar).
         // En horizontal, los lugares de la referencia (`ref`) se miran y se enfocan como en ella: solo sus banderas tienen
         // que caber enteras, y lo nítido es su foco.
-        const fiel = !VERTICAL && L.ref, cosas = ENTRAN.filter((e) => mios(e)).flatMap(ptsCosa)
+        const fiel = !VERTICAL && L.ref && (p.en !== 'todo' || MOM.every((m) => lugar(m.en).ref)), cosas = ENTRAN.filter((e) => mios(e)).flatMap(ptsCosa)
         const foco = fiel || todo || !cosas.length ? L.foco || L.cam.aim : [0, 1, 2].map((j) => cosas.reduce((s, x) => s + x[j], 0) / cosas.length)
         if (!pts.length) pts.push(L.foco || L.cam.aim)
         const caben = fiel ? (p.cerca ? pts : flags.flatMap((b) => ptsBandera(b))).concat([L.foco || L.cam.aim]) : pts
         MG = fiel ? MG_REF : MG0
-        const q = encuadre(L.cam.pos, L.cam.aim, caben, d0 * (p.cerca ? 0.6 : 0.9), d0 * (todo ? 3.2 : 2.4), todo ? 0.55 : 0)
+        const q = encuadre(L.cam.pos, L.cam.aim, caben, fiel ? 0 : d0 * (p.cerca ? 0.6 : 0.9), d0 * (todo ? 3.2 : 2.4), todo && VERTICAL ? 0.55 : 0, fiel)
         MG = MG0
         return { pos: q.pos, aim: q.aim, foco, ap: (L.ap || 0.06) * (VERTICAL ? 1.2 : 1), pts, flags, todo }
       }
@@ -745,23 +763,54 @@
       // puntos se van acercando despacio (como los dos últimos de la referencia) para que no se vaya antes de tiempo, y
       // sale hacia el siguiente un poco antes de que empiece.
       const keysP = [], keysA = [], keysF = [], keysAp = []
+      // Los segundos, redondeados al milésimo: 1,2 + 1,6 da 2,8000000000000003, y la referencia dice 2,8.
+      const seg = (x) => Math.round(x * 1000) / 1000
+      const poner = (t, pos, aim) => {
+        // Una toma nueva quita las que quedaron después de ella (la de un lugar que la cámara aún no alcanzaba).
+        while (keysP.length && keysP[keysP.length - 1][0] > t - 0.3) { keysP.pop(); keysA.pop() }
+        keysP.push([t, pos]); keysA.push([t, aim])
+      }
       let antes = null
       planos.forEach((p, i) => {
-        const q = (p.q = pose(p)), sig = planos[i + 1]
+        const q = (p.q = pose(p)), sig = planos[i + 1], L = lugar(p.en)
+        // El plano de todo es el de la referencia solo si el video entero pasa en sus lugares; si no, se encuadra lo que hay.
+        const soloRef = MOM.every((m) => lugar(m.en).ref)
+        const fiel = !VERTICAL && L.tomas && !p.cerca && (p.en !== 'todo' || soloRef) && !(L.cam2 && ENTRAN.some((e) => L.evita.includes(e.en) && e.t < p.fin))
         const lejos = sig ? V3(pose(sig).pos).distanceTo(V3(q.pos)) > 6 : false
-        const llega = i === 0 ? 0 : Math.max(p.t + (antes.lejos ? 0.8 : 0.7), antes.sale + 0.9)
-        const sale = Math.max(llega + 0.05, sig ? sig.t - (lejos ? 0.7 : 0.5) : D)
-        const cerca = (k) => q.pos.map((v, j) => q.aim[j] + (v - q.aim[j]) * k), ultimo = sig ? 0.95 : 0.97
-        keysP.push([llega, q.pos]); keysA.push([llega, q.aim])
-        const n = Math.floor((sale - llega) / 1.3)
-        for (let k = 1; k <= n; k++) { const tk = llega + (sale - llega) * k / (n + 1); keysP.push([tk, cerca(1 - (1 - ultimo) * k / (n + 1))]); keysA.push([tk, q.aim]) }
-        if (sale - llega > 0.6) { keysP.push([sale, cerca(ultimo)]); keysA.push([sale, q.aim]) }
-        if (i === 0) keysF.push([0, q.foco]); else { keysF.push([Math.max(llega - 0.9, keysF[keysF.length - 1][0] + 0.05), keysF[keysF.length - 1][1]]); keysF.push([llega + 0.3, q.foco, 'inOut']) }
-        keysAp.push([llega, q.ap, 'inOut'])
+        const llega = i === 0 ? 0 : fiel ? seg(p.t + L.tomas[0].en) : Math.max(p.t + (antes.lejos ? 0.8 : 0.7), antes.sale + 0.9)
+        let ultima = { t: llega, pos: q.pos, aim: q.aim }
+        if (fiel) {
+          L.tomas.forEach((tm, k) => {
+            const tk = tm.en === 'fin' ? D : i === 0 && k === 0 ? 0 : seg(p.t + tm.en)
+            if (tk > D) return
+            // La toma de la referencia; si una bandera ya clavada no cabe, se aleja por la misma línea.
+            const flags = BANDERAS.filter((b) => (p.en === 'todo' || b.m.en === p.en) && b.t <= tk + 0.05)
+            MG = MG_REF
+            const e = flags.length ? encuadre(tm.pos, tm.aim, flags.flatMap((b) => ptsBandera(b)), 0, V3(tm.pos).distanceTo(V3(tm.aim)) * 2.4, 0, true) : tm
+            MG = MG0
+            poner(tk, e.pos, e.aim); ultima = { t: tk, pos: e.pos, aim: e.aim }
+          })
+        } else poner(llega, q.pos, q.aim)
+        // Si se queda mucho más (con voz), sus puntos se van acercando despacio para que no se vaya antes de tiempo.
+        const sale = Math.max(ultima.t + 0.05, sig ? sig.t - (lejos ? 0.7 : 0.5) : D)
+        const cerca = (k) => ultima.pos.map((v, j) => ultima.aim[j] + (v - ultima.aim[j]) * k), fin2 = sig ? 0.95 : 0.97
+        if (sale - ultima.t > 2.6) {
+          const n = Math.floor((sale - ultima.t) / 1.3)
+          for (let k = 1; k <= n; k++) { const tk = ultima.t + (sale - ultima.t) * k / (n + 1); poner(tk, cerca(1 - (1 - fin2) * k / (n + 1)), ultima.aim) }
+          poner(sale, cerca(fin2), ultima.aim)
+        }
+        // El foco: el de la referencia en sus lugares, cuando ella lo cambia; en los demás, al llegar.
+        const ve = fiel ? L.enfoca : [-0.9 + (llega - p.t), 0.3 + (llega - p.t)]
+        if (i === 0) { keysF.push([0, q.foco]); keysAp.push([0, q.ap]) }
+        else if (ve) {
+          const desde = Math.max(seg(p.t + ve[0]), keysF[keysF.length - 1][0] + 0.05), hasta = Math.max(seg(p.t + ve[1]), desde + 0.05)
+          keysF.push([desde, keysF[keysF.length - 1][1]], [hasta, q.foco, 'inOut'])
+          keysAp.push([desde, keysAp[keysAp.length - 1][1]], [hasta, q.ap, 'inOut'])
+        }
         Object.assign(p, { llega, sale }); antes = { sale, q, lejos }
       })
       if (keysP.length === 1) { keysP.push([D, keysP[0][1]]); keysA.push([D, keysA[0][1]]) }
-      if (keysAp.length === 1) keysAp.push([D, keysAp[0][1]])
+      if (keysAp.length === 1) { keysAp.push([D, keysAp[0][1]]); keysF.push([D, keysF[0][1]]) }
       const TODO = planos.find((p) => p.en === 'todo') || { llega: 1e9 }
       const camPos = K.path(keysP), camAim = K.path(keysA), camFoco = K.track(keysF), camAp = K.track(keysAp)
       const cam = (t) => ({ pos: camPos(t), aim: camAim(t), foco: camFoco(t), ap: camAp(t) })
@@ -791,12 +840,12 @@
             c.userData.mesh.material.color.copy(WHITE).lerp(STORM, c.userData.storm == null ? 0 : K.seg(t, c.userData.storm - 0.7, c.userData.storm + 0.5, K.ease.inOut))
           })
           vapores.forEach(({ e, L, im, q, base }) => {
-            const nube = nubeArriba(L), tx = nube ? nube.position.x : L.alto[0], tz = nube ? nube.position.z : L.alto[2], top = (nube ? nube.position.y + 0.25 : L.alto[1] - 0.4)
+            const nube = nubeArriba(L), tx = L.alto[0], tz = Math.round((L.alto[2] + 0.1) * 1000) / 1000, top = (nube ? nube.position.y + 0.25 : L.alto[1] - 0.4)
             const on = K.seg(t, e.t, e.t + 0.6)
             q.forEach((d, i) => {
               const u = ((t / d.life + d.ph) % 1 + 1) % 1, ee = u * u * (3 - 2 * u)
               const sc = d.s * Math.min(1, u * 16) * (1 - K.smooth(0.75, 1, u)) * (e.t < 0 ? 1 : on * (d.ph < on ? 1 : 0))
-              K.place(im, i, [K.lerp(d.x, tx + d.dx, ee * ee) + 0.08 * Math.sin(u * 9 + i), base + (top - base) * Math.pow(u, 1.35), K.lerp(d.z, tz + d.dz, ee * ee) + 0.08 * Math.cos(u * 7 + i * 1.7)], [0, u * 5 + i, 0.25 * Math.sin(u * 11 + i)], sc)
+              K.place(im, i, [K.lerp(d.x, tx + d.dx, ee * ee) + 0.08 * Math.sin(u * 9 + i), base + top * Math.pow(u, 1.35), K.lerp(d.z, tz + d.dz, ee * ee) + 0.08 * Math.cos(u * 7 + i * 1.7)], [0, u * 5 + i, 0.25 * Math.sin(u * 11 + i)], sc)
             })
             im.instanceMatrix.needsUpdate = true
           })
@@ -846,7 +895,7 @@
           puentes.forEach((planks) => planks.forEach(({ m, t: t0 }) => { const a = t0 < 0 ? 1 : K.spring(t - t0, 2.6, 0.4); m.visible = t0 < 0 || t > t0; m.scale.set(Math.max(0.001, a), 1, Math.max(0.001, a)) }))
           BANDERAS.forEach((b) => {
             b.f.pop(t, b.t, plegado(b, t))
-            if (b.giro != null) b.f.group.rotation.y = K.lerp(b.B.yaw, b.giro, K.smooth(TODO.llega - 1.1, TODO.llega - 0.1, t))
+            if (b.giro != null) b.f.group.rotation.y = K.lerp(b.B.yaw, b.giro, K.smooth(TODO.t - 0.2, TODO.llega + 0.3, t))
           })
           const bx = -6.9 + 0.1 * t, bz = -1.4, wv = (x, z) => 0.075 * (Math.sin(x * 1.25 + t * 1.35) * Math.cos(z * 1.05 - t * 1.1) * 0.6 + Math.sin(x * 2.7 - z * 2.2 + t * 2.3) * 0.4)
           boat.position.set(bx, wv(bx, bz) + 0.03, bz); boat.rotation.set(0.08 * Math.sin(t * 1.3), 0.5, (wv(bx + 0.3, bz) - wv(bx - 0.3, bz)) * 1.2)
@@ -854,7 +903,7 @@
           K.look(camera, cp, ca); K.focus(camera, c.foco, c.ap)
           // La bruma empieza donde empezaba en la referencia respecto a lo que se mira: si la cámara se aleja (el plano
           // general en vertical), se aleja con ella y no lava el mundo.
-          const dist = Math.hypot(cp[0] - ca[0], cp[1] - ca[1], cp[2] - ca[2]); scene.fog.near = Math.max(12, dist * 0.85); scene.fog.far = scene.fog.near + 44
+          const dist = Math.hypot(cp[0] - ca[0], cp[1] - ca[1], cp[2] - ca[2]); scene.fog.near = Math.max(12, dist - 3); scene.fog.far = scene.fog.near + 44
           sky.position.copy(camera.position)
         },
       }
@@ -871,8 +920,18 @@
       MOMS.forEach((m, i) => (m.entra || []).forEach((e, j) => {
         const t = m.t0, pan = (K.hash(i, j) - 0.5) * 0.6
         k.withMinor(() => {
-          if (e.tipo === 'vapor') for (let u = t; u < t + 1.6; u += 0.22 + r() * 0.12) k.tone(u, { f: [[0, 1300 + r() * 500], [0.25, 2100 + r() * 900]], dur: 0.3, gain: 0.035, a: 0.05, pan: -0.5 + r() * 0.4, verb: 0.4 })
-          if (e.tipo === 'nube' || (e.tipo === 'lluvia' && i > 0)) { const tt = e.tipo === 'lluvia' ? t - 1.1 : t; k.play('paper', tt, { dur: 1.2, gain: 0.8, pan }); k.play('paper', tt + 0.54, { dur: 0.72, gain: 0.5, pan }) }
+          const nubeLuego = MOMS.find((o, j2) => j2 > i && (o.entra || []).some((x) => x.tipo === 'nube'))
+          if (e.tipo === 'vapor') for (let u = i === 0 ? 0.15 : t; u < (nubeLuego ? nubeLuego.t0 + 0.6 : t + 1.6); u += 0.22 + r() * 0.12) k.tone(u, { f: [[0, 1300 + r() * 500], [0.25, 2100 + r() * 900]], dur: 0.3, gain: 0.035, a: 0.05, pan: -0.5 + r() * 0.4, verb: 0.4 })
+          // cada nube al desplegarse: papel, del lado donde está (la A a la izquierda, la C a la derecha). El segundo, redondeado:
+          // el kit siembra el ruido de cada sonido con su segundo, y 4,1 − 1,5 da 2,5999…, no 2,6
+          const papel = (tt, dur, x) => { tt = Math.round(tt * 1000) / 1000; const pn = Math.round(K.clamp(x * 0.09, -0.6, 0.6) * 10) / 10; k.play('paper', tt, { dur, gain: 0.8, pan: pn }); k.play('paper', tt + dur * 0.45, { dur: dur * 0.6, gain: 0.5, pan: pn }) }
+          const alto = (n) => ({ mar: [-3.5], cielo: [-3.5], montaña: [3.3], rio: [0.1], costa: [-2.2], llanura: [2.4], valle: [6.6], bosque: [8.0] })[n] || [0]
+          if (e.tipo === 'nube') papel(t, 1.2, alto(e.en || m.en)[0])
+          if (e.tipo === 'lluvia' && i > 0) {
+            const antes = MOMS.slice(0, i).find((o) => (o.entra || []).some((x) => x.tipo === 'nube' && (x.en || o.en) !== (e.en || m.en)))
+            if (antes) papel(t - 1.5, 0.55, (alto(antes.en)[0] + alto(e.en || m.en)[0]) / 2 + 0.2)
+            papel(t - 1.0, 1.2, alto(e.en || m.en)[0])
+          }
           if (e.tipo === 'rio') { for (let u = 0; u < 1; u += 0.035 + r() * 0.02) k.tone(t + u * 1.9, { f: [[0, 2300 - 900 * u + r() * 400], [0.06, 1500 - 600 * u]], dur: 0.09, gain: 0.05, a: 0.004, pan: 0.4 - 0.7 * u, verb: 0.25 }); for (let b = 0; b < 13; b++) k.play('pop', t + (0.3 + b * 0.05) * 1.9 + 0.16, { gain: 0.3, f: 520 + (b * 97) % 340, pan: 0.3 - 0.04 * b }) }
           if (e.tipo === 'arboles') for (let b = 0; b < 8; b++) k.play('pop', t + b * 0.11, { gain: 0.35, f: 480 + (b * 113) % 320, pan: pan + (b % 3 - 1) * 0.15 })
           if (e.tipo === 'rocas') for (let b = 0; b < 4; b++) k.play('thud', t + b * 0.11, { gain: 0.25, f: 110 + b * 12, pan })
@@ -893,9 +952,8 @@
         if (e.tipo === 'anillo') { k.play('success', t, { gain: 0.6, f: 'A5' }); k.play('sparkle', t + 0.1, { gain: 0.6 }) }
       }))
       // las banderas: el alfiler entra, el papel da la vuelta
-      MOMS.filter((m) => m.bandera).forEach((m, i) => {
-        if (m.t0 < 0.1) return
-        const t = Math.min(m.t0 + 0.6, m.fin - 0.15)
+      MOMS.filter((m) => m.bandera && m.t0 >= 0.1).forEach((m, i) => {
+        const t = m.t0
         k.play('pop', t, { gain: 0.9, f: 560 + (i % 3) * 60, pan: [-0.3, 0.35, 0][i % 3] }); k.play('swish', t + 0.12, { gain: 0.5, dur: 0.2 }); k.play('tock', t + 0.3, { gain: 0.45, f: 700 })
       })
     },

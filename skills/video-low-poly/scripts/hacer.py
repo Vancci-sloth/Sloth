@@ -322,10 +322,14 @@ def plan(m: dict, ps: list[dict], guion: list[str], indices: list[int]) -> tuple
                 o[clave] = mo[clave]
         momentos.append(o)
     # La cámara viaja de un lugar a otro en algo más de un segundo: dos cambios de lugar más juntos no dejan ver nada.
+    # Desde que empieza cada lugar (la referencia pasa del monte al río en 0,8 s).
+    empieza = momentos[0]
     for a, b in zip(momentos, momentos[1:]):
-        if b["en"] != a["en"] and b["t"] - a["t"] < 0.75:  # la referencia pasa del monte al río en 0,8 s
-            errores.append(f"«{b['en']}» empieza {b['t'] - a['t']:.1f} s después de «{a['en']}»: la cámara no llega a verlo. "
-                           "Junta esos momentos en un lugar o ancla el segundo más adelante")
+        if b["en"] != a["en"]:
+            if b["t"] - empieza["t"] < 0.75:
+                errores.append(f"«{b['en']}» empieza {b['t'] - empieza['t']:.1f} s después de «{empieza['en']}»: la cámara no llega a "
+                               "verlo. Junta esos momentos en un lugar o ancla el segundo más adelante")
+            empieza = b
     return {"ancho": 1080 if vertical else 1920, "alto": 1920 if vertical else 1080, "duracion": duracion, "voz": not sin_voz, "momentos": momentos}, errores
 
 

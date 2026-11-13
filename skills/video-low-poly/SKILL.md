@@ -82,7 +82,9 @@ ahí desde el inicio.
   - `todo`: el mundo entero. **El último momento va en `todo`**: la cámara sale a ver todas las etapas con el resultado.
 - **`bandera`**: el nombre de la etapa (de una a tres palabras, 16 letras como mucho), en el momento en que empieza. Se
   clava en su lugar con su número, en orden, y es lo que se lee sin sonido. De tres a seis por video, una por etapa, y
-  dos como mucho por lugar (la segunda va en el mismo poste, arriba).
+  dos como mucho por lugar (la segunda va en el mismo poste, arriba). Sale en la palabra (o el `segundo`) de su momento:
+  para que salga cuando ya se ve lo que nombra, va en un momento propio, más adelante, sin `entra` (en la referencia,
+  «Condensación» sale 0,85 s después de que empieza la nube).
 - **`entra`**: lo que brota ahí, de una a tres cosas (un nombre, o `{ "tipo": "camion", "a": "costa" }`). Se queda hasta
   el final: el mundo se va armando.
 
