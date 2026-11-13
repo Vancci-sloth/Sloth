@@ -795,10 +795,10 @@
       const keysP = [], keysA = [], keysF = [], keysAp = []
       // Los segundos, redondeados al milésimo: 1,2 + 1,6 da 2,8000000000000003, y la referencia dice 2,8.
       const seg = (x) => Math.round(x * 1000) / 1000
-      const poner = (t, pos, aim) => {
+      const poner = (t, pos, aim, ease = 'inOut') => {
         // Una toma nueva quita las que quedaron después de ella (la de un lugar que la cámara aún no alcanzaba).
         while (keysP.length && keysP[keysP.length - 1][0] > t - 0.3) { keysP.pop(); keysA.pop() }
-        keysP.push([t, pos]); keysA.push([t, aim])
+        keysP.push([t, pos, ease]); keysA.push([t, aim, ease])
       }
       let antes = null
       planos.forEach((p, i) => {
@@ -827,8 +827,8 @@
         // En los de la referencia, como ella (no se para entre sus tomas); en los demás, espera a que pase lo suyo.
         if (sale - ultima.t > (fiel ? 2.6 : 0.6)) {
           const n = Math.floor((sale - ultima.t) / 1.3)
-          for (let k = 1; k <= n; k++) { const tk = ultima.t + (sale - ultima.t) * k / (n + 1); poner(tk, cerca(1 - (1 - fin2) * k / (n + 1)), ultima.aim) }
-          poner(sale, cerca(fin2), ultima.aim)
+          for (let k = 1; k <= n; k++) { const tk = ultima.t + (sale - ultima.t) * k / (n + 1); poner(tk, cerca(1 - (1 - fin2) * k / (n + 1)), ultima.aim, 'linear') }
+          poner(sale, cerca(fin2), ultima.aim, 'linear')
         }
         // El foco: el de la referencia en sus lugares, cuando ella lo cambia; en los demás, al llegar.
         const ve = fiel ? L.enfoca : [-0.9 + (llega - p.t), 0.3 + (llega - p.t)]
@@ -843,7 +843,9 @@
       if (keysP.length === 1) { keysP.push([D, keysP[0][1]]); keysA.push([D, keysA[0][1]]) }
       if (keysAp.length === 1) { keysAp.push([D, keysAp[0][1]]); keysF.push([D, keysF[0][1]]) }
       const TODO = planos.find((p) => p.en === 'todo') || { llega: 1e9 }
-      const camPos = K.path(keysP), camAim = K.path(keysA), camFoco = K.track(keysF), camAp = K.track(keysAp)
+      // En los lugares de la referencia, su K.path (fluye por las tomas); de cosa en cosa, su K.track: con tomas juntas, K.path
+      // se pasa de largo (una lejana y luego una cercana: sigue acercándose y corta la bandera), K.track entra suave y para.
+      const camPos = PASO ? K.track(keysP) : K.path(keysP), camAim = PASO ? K.track(keysA) : K.path(keysA), camFoco = K.track(keysF), camAp = K.track(keysAp)
       const cam = (t) => ({ pos: camPos(t), aim: camAim(t), foco: camFoco(t), ap: camAp(t) })
       // Una bandera de otro lugar que se cruza con lo que se cuenta aquí (delante o detrás), o que quedaría cortada por el
       // borde, dobla su papel contra el alfiler mientras la cámara está aquí, y lo vuelve a abrir cuando se va.
