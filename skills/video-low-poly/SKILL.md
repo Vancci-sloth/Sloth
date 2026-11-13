@@ -53,6 +53,8 @@ los efectos, para que la voz quede encima (así lo trae el kit).
 `momentos.json`, `"voz": false` y cada momento con su `segundo` en vez de `palabra` (el primero en `0`; `dura`, si el
 video debe durar más que el último momento y segundo y medio). `guion.md` solo lleva el `# Título`. El sonido es la
 mezcla completa del kit (música, ambiente y efectos) a −15 LUFS, como la referencia. Las banderas cuentan la historia.
+[`ejemplo/momentos.json`](ejemplo/momentos.json) es la animación de referencia (el ciclo del agua) escrita así: sale igual
+que ella, byte a byte.
 
 ## momentos.json
 

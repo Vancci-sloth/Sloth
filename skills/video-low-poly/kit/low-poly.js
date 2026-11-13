@@ -469,6 +469,13 @@
 
       // ------------------------------------------------------------ las banderas: una por cada momento que la trae, numeradas en orden
       const yaHay = {}
+      // Las banderas se planean aquí y se arman después del barquito, donde las arma la referencia: three.js dibuja por
+      // el orden de los materiales, y donde una gota o un árbol atraviesa el papel gana el último en dibujarse.
+      const anchoBandera = (num, word) => {
+        const meas = document.createElement('canvas').getContext('2d'); meas.font = '700 150px "Oswald"'; meas.letterSpacing = '7px'
+        const wn = num ? meas.measureText(String(num)).width : -34
+        return Math.ceil(50 + wn + 34 + meas.measureText(word).width + 50 + 70) * (0.64 / 250)
+      }
       const BANDERAS = MOM.filter((m) => m.bandera).map((m, k) => {
         const L = lugar(m.en), num = k + 1, texto = String(m.bandera).toUpperCase()
         // La segunda de un mismo lugar va en el mismo sitio, casi un metro más arriba: un poste de señales.
@@ -477,13 +484,12 @@
         // cabe de lado. En horizontal (y en el mar, el cielo, el monte y el río), donde la puso la referencia.
         if (VERTICAL && (L.dir || L.huecos)) {
           const alto = P.momentos.some((o) => o.en === m.en && (o.entra || []).some((e) => ['fabrica', 'molino', 'faro', 'planta'].includes(e.tipo)))
-          const B = { height: (alto ? 2.6 : 2.0) + sube, side: 1, yaw: 0 }, f = flag(num, texto, B), [cx, cz] = sitio(L, 0)
+          const B = { height: (alto ? 2.6 : 2.0) + sube, side: 1, yaw: 0 }, f = { width: anchoBandera(num, texto) }, [cx, cz] = sitio(L, 0)
           B.at = [cx - f.width / 2 + piso * 0.12, cz - 1.0 - piso * 0.05]
-          return { m, L, B, f, t: m.t0 < 0 ? -9 : m.t0 }
+          return { m, L, B, f, num, texto, t: m.t0 < 0 ? -9 : m.t0 }
         }
         const B = piso ? Object.assign({}, L.bandera, { height: (L.bandera.height || 1.25) + sube, at: [L.bandera.at[0] + piso * 0.12 * (L.bandera.side || 1), L.bandera.at[1] - piso * 0.05] }) : L.bandera
-        const f = flag(num, texto, B)
-        return { m, L, B, f, t: m.t0 < 0 ? -9 : m.t0 }
+        return { m, L, B, f: { width: anchoBandera(num, texto) }, num, texto, t: m.t0 < 0 ? -9 : m.t0 }
       })
       // Lo que no puede crecer encima de una bandera ni de una cosa: su frente y su sitio.
       const LIBRES = []
@@ -679,6 +685,7 @@
 
       // ------------------------------------------------------------ el barquito de papel de siempre y las banderas
       const boat = mesh(boatGeo(), faceted({ roughness: 0.8 })); boat.material.side = THREE.DoubleSide; scene.add(boat)
+      BANDERAS.forEach((b) => Object.assign(b.f, flag(b.num, b.texto, b.B)))
       BANDERAS.forEach((b) => {
         const [x, z] = b.B.at
         // en la nube, `at` es en el espacio de la nube: el pie, bajo la cima del copo, para que se vaya con ella
@@ -705,7 +712,9 @@
         let A = V3(aim0), v = V3(pos0).sub(A)
         if (VERTICAL) { const el = Math.asin(v.y / v.length()), az = Math.atan2(v.x, v.z), e2 = Math.min(0.85, Math.max(el + 0.2, alto)), l = v.length(); v = new THREE.Vector3(Math.sin(az) * Math.cos(e2), Math.sin(e2), Math.cos(az) * Math.cos(e2)).multiplyScalar(l) }
         let d = v.length(); const f = v.clone().normalize().negate(), r = new THREE.Vector3().crossVectors(f, UP).normalize(), u = new THREE.Vector3().crossVectors(r, f)
-        if (soloAleja && caja(A, f, r, u, d, pts).cabe) return { pos: A.clone().addScaledVector(f, -d).toArray(), aim: A.toArray() }
+        // Si ya cabe, los números de la referencia tal cual: rehacerlos desde un vector normalizado deja errores de 1e-15
+        // que, en alguna de las 64 pasadas, mueven un borde de píxel.
+        if (soloAleja && caja(A, f, r, u, d, pts).cabe) return { pos: pos0.slice(), aim: aim0.slice() }
         for (let it = 0; it < 6; it++) {
           const b = caja(A, f, r, u, d, pts)
           // En los lugares de la referencia (horizontal) se queda su composición (la misma mira): si algo no cabe, solo se aleja.

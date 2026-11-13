@@ -1,0 +1,14 @@
+{
+  "formato": "horizontal",
+  "voz": false,
+  "momentos": [
+    { "segundo": 0, "en": "mar", "bandera": "Evaporation", "entra": ["vapor"] },
+    { "segundo": 1.2, "en": "cielo", "entra": ["nube"] },
+    { "segundo": 2.05, "bandera": "Condensation" },
+    { "segundo": 4.1, "en": "montaña", "entra": ["lluvia"] },
+    { "segundo": 4.75, "bandera": "Precipitation" },
+    { "segundo": 4.9, "en": "rio", "entra": ["rio"] },
+    { "segundo": 6.6, "bandera": "Collection" },
+    { "segundo": 6.85, "en": "todo", "entra": ["anillo"] }
+  ]
+}
