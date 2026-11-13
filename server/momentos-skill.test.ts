@@ -140,6 +140,13 @@ test('el --revisa de Low-Poly dice todo lo que falla de una vez, y ✓ cuando es
     })
     assert.equal(bien.status, 0, bien.stderr)
     assert.match(bien.stdout, /^✓ momentos\.json bien: 5 momentos, de mar → cielo → montaña → rio → todo/)
+    // Sin voz, como la referencia: cada momento en su segundo, sin palabras del guion.
+    const sinVoz = hacer({ voz: false, momentos: [{ segundo: 0, en: 'mar', bandera: 'Evaporación', entra: ['vapor'] }, { segundo: 1.2, en: 'cielo', entra: ['nube'] }, { segundo: 1.0, en: 'todo' }] })
+    assert.equal(sinVoz.status, 1)
+    assert.match(sinVoz.stderr, /momento 3: su `segundo` \(1\) va antes que el del anterior/)
+    const sinVozBien = hacer({ voz: false, momentos: [{ segundo: 0, en: 'mar', bandera: 'Evaporación', entra: ['vapor'] }, { segundo: 1.2, en: 'cielo', entra: ['nube'] }, { segundo: 6.85, en: 'todo', entra: ['anillo'] }] })
+    assert.equal(sinVozBien.status, 0, sinVozBien.stderr)
+    assert.match(sinVozBien.stdout, /8\.5 s sin voz/)
   } finally {
     rmSync(dir, { recursive: true, force: true })
   }

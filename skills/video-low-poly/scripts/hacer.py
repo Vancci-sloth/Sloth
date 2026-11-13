@@ -8,6 +8,10 @@ out/<carpeta>.mp4 con su portada y su hoja de cuadros. Sigue el motor común (vi
     python -B -X utf8 <skill>/scripts/hacer.py                               otra vez, con la voz que ya hay
     --muestras <n>   un borrador más rápido (el video final va con las 64 del estilo)
 
+Sin voz (`"voz": false` en momentos.json, como la referencia): cada momento va en su `segundo` en vez de en una
+palabra, guion.md solo hace falta para el título, y el sonido es la mezcla completa del kit (música, ambiente y
+efectos) a −15 LUFS, como pedía la referencia.
+
 Desde la raíz del proyecto. En orden, y para en el primer ✗ diciendo qué arreglar:
 1. Comprueba momentos.json contra guion.md (cada palabra, cada lugar y cada cosa) antes de pagar la voz.
 2. La voz (solo si el guion cambió) y sus palabras con su segundo (el transcriptor de Sloth).
@@ -68,10 +72,12 @@ AMBIENTE = {"vapor", "nube", "lluvia", "anillo", "rio", "barco"}  # no ocupan hu
 HUECOS = 4
 
 
-def texto_del_guion() -> str:
+def texto_del_guion(hace_falta: bool = True) -> str:
     """Lo que se dice: guion.md sin el título ni la línea del corte de datos."""
     archivo = RAIZ / "guion.md"
     if not archivo.exists():
+        if not hace_falta:
+            return ""
         sys.exit(f"✗ Falta guion.md en {RAIZ}.")
     lineas = [l for l in archivo.read_text(encoding="utf-8").splitlines() if l.strip()]
     return " ".join(l for l in lineas if not l.startswith("#") and not l.lower().startswith("corte de datos"))
@@ -80,9 +86,10 @@ def texto_del_guion() -> str:
 def titulo(m: dict) -> str:
     if (m.get("titulo") or "").strip():
         return m["titulo"].strip()
-    for l in (RAIZ / "guion.md").read_text(encoding="utf-8").splitlines():
-        if l.startswith("# "):
-            return l[2:].strip()
+    if (RAIZ / "guion.md").exists():
+        for l in (RAIZ / "guion.md").read_text(encoding="utf-8").splitlines():
+            if l.startswith("# "):
+                return l[2:].strip()
     return RAIZ.name
 
 
@@ -103,9 +110,26 @@ def comprobar(m: dict, dichas: list[str], donde: str) -> tuple[list[int], list[s
     ms = m.get("momentos")
     if not isinstance(ms, list) or not ms:
         return [], errores + ["no hay `momentos`"]
-    indices, malos = anclar(ms, dichas, donde)
-    errores += malos
-    if indices and indices[0] > 2:
+    if m.get("voz") is False:
+        # Sin voz, cada momento en su segundo, en orden, y el primero en el 0.
+        indices, antes = [], -1.0
+        for k, mo in enumerate(ms):
+            seg = mo.get("segundo")
+            if not isinstance(seg, (int, float)) or isinstance(seg, bool):
+                errores.append(f"momento {k + 1}: sin voz, cada momento dice su `segundo`")
+            elif k == 0 and seg != 0:
+                errores.append("momento 1: el primer momento es el primer cuadro: `segundo: 0`")
+            elif seg <= antes:
+                errores.append(f"momento {k + 1}: su `segundo` ({seg}) va antes que el del anterior; ordénalos")
+            else:
+                antes = seg
+            indices.append(k)
+        if m.get("dura") is not None and (not isinstance(m["dura"], (int, float)) or m["dura"] <= antes):
+            errores.append("`dura`: los segundos del video, más que el del último momento")
+    else:
+        indices, malos = anclar(ms, dichas, donde)
+        errores += malos
+    if m.get("voz") is not False and indices and indices[0] > 2:
         errores.append(f"momento 1 («{ms[0].get('palabra')}»): el primer momento es el primer cuadro (ya está desde el "
                        "principio), así que su palabra va al principio del guion, en sus tres primeras palabras")
     en, ocupado, vistos, banderas, solos, por_lugar = None, {}, set(), 0, {"rio": 0, "anillo": 0}, {}
@@ -268,15 +292,20 @@ def palabras(reloj: Reloj) -> list[dict]:
 
 
 def plan(m: dict, ps: list[dict], guion: list[str], indices: list[int]) -> tuple[dict, list[str]]:
-    """revision/plan.json: cada momento en el segundo en que la voz dice su palabra."""
+    """revision/plan.json: cada momento en el segundo en que la voz dice su palabra (sin voz, en su `segundo`)."""
+    sin_voz = m.get("voz") is False
     dichas = [normal(p["w"]) for p in ps]
     a_voz = mapa(guion, dichas)
     vertical = m.get("formato", "vertical") == "vertical"
-    duracion = round(ps[-1]["e"] + 1.6, 2)  # el último segundo se queda quieto, con el resultado a la vista
+    # El último segundo y medio se queda quieto, con el resultado a la vista (en la referencia, 1,65 s tras el anillo).
+    if sin_voz:
+        duracion = round(float(m.get("dura") or m["momentos"][-1]["segundo"] + 1.65), 2)
+    else:
+        duracion = round(ps[-1]["e"] + 1.6, 2)
     momentos, errores, en = [], [], None
     for k, (mo, i) in enumerate(zip(m["momentos"], indices)):
         en = lugar_de(mo["en"]) if mo.get("en") else en
-        t = 0.0 if k == 0 else ps[a_voz.get(i, i)]["s"]
+        t = float(mo["segundo"]) if sin_voz else 0.0 if k == 0 else ps[a_voz.get(i, i)]["s"]
         if momentos and t <= momentos[-1]["t"]:
             t = momentos[-1]["t"] + 0.3
         es = []
@@ -294,20 +323,21 @@ def plan(m: dict, ps: list[dict], guion: list[str], indices: list[int]) -> tuple
         momentos.append(o)
     # La cámara viaja de un lugar a otro en algo más de un segundo: dos cambios de lugar más juntos no dejan ver nada.
     for a, b in zip(momentos, momentos[1:]):
-        if b["en"] != a["en"] and b["t"] - a["t"] < 1.5:
+        if b["en"] != a["en"] and b["t"] - a["t"] < 0.75:  # la referencia pasa del monte al río en 0,8 s
             errores.append(f"«{b['en']}» empieza {b['t'] - a['t']:.1f} s después de «{a['en']}»: la cámara no llega a verlo. "
                            "Junta esos momentos en un lugar o ancla el segundo más adelante")
-    return {"ancho": 1080 if vertical else 1920, "alto": 1920 if vertical else 1080, "duracion": duracion, "momentos": momentos}, errores
+    return {"ancho": 1080 if vertical else 1920, "alto": 1920 if vertical else 1080, "duracion": duracion, "voz": not sin_voz, "momentos": momentos}, errores
 
 
 def main() -> None:
     sys.stdout.reconfigure(encoding="utf-8")
     args = sys.argv[1:]
     m = leer(RAIZ)
-    guion_txt = texto_del_guion()
+    sin_voz = m.get("voz") is False
+    guion_txt = texto_del_guion(not sin_voz)
     guion = palabras_de(guion_txt)
     indices, errores = comprobar(m, guion, "el guion")
-    if "--dura" in args:
+    if "--dura" in args and not sin_voz:
         pide, n = float(args[args.index("--dura") + 1]), len(guion)
         if abs(n / POR_SEGUNDO - pide) > pide * 0.1:
             errores.append(f"el guion tiene {n} palabras: dicho a {POR_SEGUNDO} por segundo dura {n / POR_SEGUNDO:.0f} s y "
@@ -318,13 +348,19 @@ def main() -> None:
         for mo in m["momentos"]:
             if mo.get("en") and (not lugares or lugares[-1] != lugar_de(mo["en"])):
                 lugares.append(lugar_de(mo["en"]))
-        print(f"✓ momentos.json bien: {len(m['momentos'])} momentos, de {' → '.join(lugares)}; ~{len(guion) / POR_SEGUNDO:.0f} s de voz.")
+        if sin_voz:
+            dura = f"{float(m.get('dura') or m['momentos'][-1]['segundo'] + 1.65):.1f} s sin voz"
+        else:
+            dura = f"~{len(guion) / POR_SEGUNDO:.0f} s de voz"
+        print(f"✓ momentos.json bien: {len(m['momentos'])} momentos, de {' → '.join(lugares)}; {dura}.")
         return
 
     reloj = Reloj(RAIZ)
-    voz(args, guion_txt, reloj)
-    ps = palabras(reloj)
-    reloj.paso(f"voz: {len(ps)} palabras, {ps[-1]['e']:.1f} s")
+    ps = []
+    if not sin_voz:
+        voz(args, guion_txt, reloj)
+        ps = palabras(reloj)
+        reloj.paso(f"voz: {len(ps)} palabras, {ps[-1]['e']:.1f} s")
     p, errores = plan(m, ps, guion, indices)
     parar(errores, "los tiempos de la voz")
     guardar(RAIZ / "revision" / "plan.json", p)
@@ -342,7 +378,7 @@ def main() -> None:
         from sloth import turno  # uno a la vez en la tarjeta, como los demás renders de Sloth
         with turno("render-gpu", "Esperando: otro video está usando la tarjeta."):
             r = subprocess.run(["node", str(SKILL / "scripts" / "render.mjs"), ".", "--plan", "revision/plan.json", "--salida", str(imagen.relative_to(RAIZ)),
-                                "--sonido", str(efectos.relative_to(RAIZ)), "--voz", *(["--muestras", muestras] if muestras else [])],
+                                "--sonido", str(efectos.relative_to(RAIZ)), *([] if sin_voz else ["--voz"]), *(["--muestras", muestras] if muestras else [])],
                                cwd=RAIZ, capture_output=True, text=True, encoding="utf-8", errors="replace")
         for l in r.stdout.splitlines():
             if l.startswith("⚠"):
@@ -352,13 +388,19 @@ def main() -> None:
         guardar(hecho, {"clave": clave})
 
     reloj.paso("mezcla y master…")
-    mezcla = RAIZ / "revision" / "_mezcla.wav"
-    # La voz a −16 LUFS y los efectos del estilo debajo (el kit ya los baja cuando hay voz); luego el master a −14.
-    subprocess.run(["ffmpeg", "-nostdin", "-v", "error", "-y", "-i", str(VOZ / "original.wav"), "-i", str(efectos), "-filter_complex",
-                    "[0:a]aresample=48000,loudnorm=I=-16:TP=-2:LRA=11[v];[1:a]aresample=48000,volume=0.9[e];"
-                    "[v][e]amix=inputs=2:duration=longest:normalize=0[m]", "-map", "[m]", "-ac", "2", "-ar", "48000", "-c:a", "pcm_s24le",
-                    str(mezcla.with_name("_mezcla-cruda.wav"))], check=True)
-    subprocess.run(["node", str(BASE / "masterizar.mjs"), str(mezcla.with_name("_mezcla-cruda.wav")), str(mezcla)], check=True, capture_output=True)
+    mezcla, cruda = RAIZ / "revision" / "_mezcla.wav", RAIZ / "revision" / "_mezcla-cruda.wav"
+    if sin_voz:
+        # La mezcla completa del kit (música, ambiente y efectos), tal cual, a −15 LUFS como pedía la referencia.
+        shutil.copy(efectos, cruda)
+        lufs = "-15"
+    else:
+        # La voz a −16 LUFS y los efectos del estilo debajo (el kit ya los baja cuando hay voz); luego el master a −14.
+        subprocess.run(["ffmpeg", "-nostdin", "-v", "error", "-y", "-i", str(VOZ / "original.wav"), "-i", str(efectos), "-filter_complex",
+                        "[0:a]aresample=48000,loudnorm=I=-16:TP=-2:LRA=11[v];[1:a]aresample=48000,volume=0.9[e];"
+                        "[v][e]amix=inputs=2:duration=longest:normalize=0[m]", "-map", "[m]", "-ac", "2", "-ar", "48000", "-c:a", "pcm_s24le",
+                        str(cruda)], check=True)
+        lufs = "-14"
+    subprocess.run(["node", str(BASE / "masterizar.mjs"), str(cruda), str(mezcla), "--lufs", lufs], check=True, capture_output=True)
     salida = RAIZ / "out" / f"{RAIZ.name}.mp4"
     salida.parent.mkdir(parents=True, exist_ok=True)
     subprocess.run(["ffmpeg", "-nostdin", "-v", "error", "-y", "-i", str(imagen), "-i", str(mezcla), "-map", "0:v", "-map", "1:a", "-c:v", "copy",

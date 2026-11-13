@@ -46,7 +46,13 @@ miniatura de 1280×720, que no entra en el video. Si piden el otro formato, es o
 La línea `Voz:` del mensaje dice si la generas tú en AI Studio o la manda el usuario ([VOZ.md](../video-base/VOZ.md)).
 Con AI Studio, `hacer.py --studio <Voz>` la pide y la espera (no la pidas también con `generar_voz`). Sin `Voz:`, dale
 el guion al usuario para que lo grabe y, con su audio, `hacer.py --audio <archivo>`. La voz se guarda: corregir un
-momento no la paga otra vez; cambiar el guion, sí.
+momento no la paga otra vez; cambiar el guion, sí. Con voz, el kit de sonido deja fuera la música y el ambiente y baja
+los efectos, para que la voz quede encima (así lo trae el kit).
+
+**Sin voz** (si el usuario lo pide así, como la animación de referencia: de 7 a 12 s, solo imagen y sonido): en
+`momentos.json`, `"voz": false` y cada momento con su `segundo` en vez de `palabra` (el primero en `0`; `dura`, si el
+video debe durar más que el último momento y segundo y medio). `guion.md` solo lleva el `# Título`. El sonido es la
+mezcla completa del kit (música, ambiente y efectos) a −15 LUFS, como la referencia. Las banderas cuentan la historia.
 
 ## momentos.json
 
@@ -68,7 +74,8 @@ ahí desde el inicio.
 ```
 
 - **`en`**: el lugar del mapa donde pasa (sin él, el del momento anterior). La cámara va sola de un lugar al siguiente y
-  se queda mientras pasa lo suyo; **entre dos lugares, un segundo y medio de voz o más** (`hacer.py` lo exige).
+  se queda mientras pasa lo suyo, en un solo movimiento de grúa como el de la referencia. Entre dos lugares, mejor un
+  segundo y medio de voz o más; menos de tres cuartos de segundo no deja verlo (`hacer.py` lo exige).
   - `mar`: el mar junto al islote · `cielo`: el cielo sobre la costa · `montaña`: el monte nevado y su ladera
   - `rio`: el río que baja del monte al mar · `costa`: el puerto junto a la playa · `llanura`: el llano del pueblo
   - `valle`: el campo al este · `bosque`: el bosque de pinos en la ladera
