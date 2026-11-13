@@ -106,3 +106,41 @@ test('el --revisa del documental dice todo lo que falla de una vez, y ✓ cuando
     rmSync(dir, { recursive: true, force: true })
   }
 })
+
+test('el --revisa de Low-Poly dice todo lo que falla de una vez, y ✓ cuando está bien', { skip: !python }, () => {
+  const dir = mkdtempSync(join(tmpdir(), 'sloth-lowpoly-'))
+  try {
+    writeFileSync(join(dir, 'guion.md'), '# El ciclo del agua\n\nEl sol calienta el mar. El vapor sube y se junta en una nube. Llueve en el monte y un río lo devuelve al mar otra vez.\n')
+    const hacer = (m: unknown) => {
+      writeFileSync(join(dir, 'momentos.json'), JSON.stringify(m))
+      return spawnSync(python!, ['-I', '-B', '-X', 'utf8', join(REPO, 'skills', 'video-low-poly', 'scripts', 'hacer.py'), '--revisa'], { cwd: dir, encoding: 'utf8' })
+    }
+    const mal = hacer({
+      momentos: [
+        { palabra: 'el mar', en: 'mar', bandera: 'Una bandera demasiado larga', entra: ['vapor'] },
+        { palabra: 'se junta', en: 'cielo', entra: ['casas', 'dragon'] },
+        { palabra: 'Llueve', en: 'montaña', entra: [{ tipo: 'camion', a: 'mar' }] },
+        { palabra: 'no se dice', en: 'rio' },
+      ],
+    })
+    assert.equal(mal.status, 1)
+    const errores = mal.stderr.split('\n').filter((l) => l.startsWith('  '))
+    for (const esperado of [/momento 1 .*su palabra va al principio/, /bandera «Una bandera demasiado larga» es larga/, /«casas» no va en «cielo»/, /no hay cosa «dragon»/,
+      /«camion» no va en «montaña»/, /el camión dice `a`/, /momento 4 .*no dice «no se dice»/, /el último momento va `en: "todo"`/])
+      assert.ok(errores.some((e) => esperado.test(e)), `falta ${esperado} en:\n${mal.stderr}`)
+    const bien = hacer({
+      formato: 'horizontal',
+      momentos: [
+        { palabra: 'El sol', en: 'mar', bandera: 'Evaporación', entra: ['vapor'] },
+        { palabra: 'se junta', en: 'cielo', bandera: 'Condensación', entra: ['nube'] },
+        { palabra: 'Llueve', en: 'montaña', bandera: 'Lluvia', entra: ['lluvia'] },
+        { palabra: 'un río', en: 'río', bandera: 'Río', entra: ['rio'] },
+        { palabra: 'otra vez', en: 'todo', entra: ['anillo'] },
+      ],
+    })
+    assert.equal(bien.status, 0, bien.stderr)
+    assert.match(bien.stdout, /^✓ momentos\.json bien: 5 momentos, de mar → cielo → montaña → rio → todo/)
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+})

@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Low-Poly</title>
+<!--
+  La página que dibuja un video Low-Poly cuadro por cuadro: la abre render.mjs en Chrome sin ventana (con la tarjeta) y
+  llama a seek(t) en cada cuadro. Corre el kit de render (stage.js) y el de sonido (sound.js) tal como vinieron, con
+  three.js 0.187.0 (solo el núcleo) y Oswald desde esta carpeta: no necesita internet.
+
+  ?plan=<url>       el plan del video (revision/plan.json, de hacer.py): lo dibuja el director (low-poly.js)
+  ?estilo=<url>     o un estilo suelto que se registra con registerStyle (la animación de referencia, para comparar)
+  ?muestras=<n>     sub-render por cuadro (sin él, los del estilo: 64)
+  ?ancho=&alto=     el tamaño del cuadro (1080×1920 en vertical, 1920×1080 en horizontal)
+-->
+<style>
+  @font-face { font-family: 'Oswald'; src: url('letra/oswald.woff2') format('woff2'); font-weight: 200 700; }
+  html, body { margin: 0; background: #000; overflow: hidden; }
+  canvas { display: block; }
+</style>
+<script type="importmap">{ "imports": { "three": "./three/three.module.js" } }</script>
+</head>
+<body>
+<canvas id="c"></canvas>
+<script type="module">
+import * as THREE from 'three'
+window.THREE = THREE
+const q = new URLSearchParams(location.search)
+const W = +(q.get('ancho') || 1920), H = +(q.get('alto') || 1080)
+const cargar = (src) => new Promise((ok, mal) => { const s = document.createElement('script'); s.src = src; s.onload = ok; s.onerror = () => mal(new Error('no cargó ' + src)); document.head.appendChild(s) })
+try {
+  await cargar('stage.js')
+  await cargar('sound.js')
+  if (q.get('plan')) {
+    window.PLAN = await (await fetch(q.get('plan'), { cache: 'no-store' })).json()
+    await cargar('low-poly.js')
+  } else {
+    // Un estilo suelto, como vino: un bloque `{ ... registerStyle({...}) }` sin más.
+    const codigo = await (await fetch(q.get('estilo'), { cache: 'no-store' })).text()
+    ;(0, eval)(codigo)
+  }
+  const style = window.STYLES[window.STYLES.length - 1]
+  const canvas = document.getElementById('c')
+  canvas.style.width = W + 'px'; canvas.style.height = H + 'px'
+  const samples = +(q.get('muestras') || 0) || undefined
+  const S = await K.run(canvas, style, { samples, width: W, height: H })
+  window.DURATION = S.duration
+  window.seek = (t) => S.seek(t)
+  // El sonido entero del video, como WAV de 32 bits en coma flotante y en base64, a 48 kHz: lo mezcla hacer.py con la voz.
+  window.sonido = async (voz) => {
+    const r = await SOUND.renderOffline((k) => style.sound(k), S.duration, 48000, { voiceover: !!voz })
+    const datos = r.inter.length * 4, buf = new ArrayBuffer(44 + datos), v = new DataView(buf)
+    const txt = (o, s) => [...s].forEach((c, i) => v.setUint8(o + i, c.charCodeAt(0)))
+    txt(0, 'RIFF'); v.setUint32(4, 36 + datos, true); txt(8, 'WAVE'); txt(12, 'fmt ')
+    v.setUint32(16, 16, true); v.setUint16(20, 3, true); v.setUint16(22, 2, true); v.setUint32(24, r.sr, true)
+    v.setUint32(28, r.sr * 8, true); v.setUint16(32, 8, true); v.setUint16(34, 32, true); txt(36, 'data'); v.setUint32(40, datos, true)
+    new Float32Array(buf, 44).set(r.inter)
+    const bytes = new Uint8Array(buf); let bin = ''
+    for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000))
+    return btoa(bin)
+  }
+  // Lo que el director avisa (una cosa que no cupo, un lugar repetido): render.mjs lo repite.
+  window.avisos = window.AVISOS || []
+  window.listo = true
+} catch (e) {
+  window.fallo = String(e && e.stack || e)
+}
+</script>
+</body>
+</html>

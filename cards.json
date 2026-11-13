@@ -580,6 +580,43 @@
     }
   },
   {
+    "id": "video-low-poly",
+    "title": "Low-Poly",
+    "description": "Un proceso contado en un mundo en miniatura de papel facetado: cada etapa brota en su lugar (el mar, el río, el pueblo, el campo, el puerto) con su bandera numerada y una sola grúa de cámara las recorre hasta ver el mundo entero. Tú pones la voz.",
+    "skill": "video-low-poly",
+    "version": "1.0",
+    "icon": "globo",
+    "etapas": [
+      {
+        "nombre": "Guion",
+        "listo": "guion.md",
+        "copiar": true,
+        "fase": "guion"
+      },
+      {
+        "nombre": "Tu voz",
+        "listo": "fuentes/voz/original.wav",
+        "espera": "Graba el guion (con el celular basta) y súbelo aquí o mándalo por el chat.",
+        "fase": "sonido"
+      },
+      {
+        "nombre": "Revisión",
+        "listo": "revision/hoja.png",
+        "fase": "video"
+      },
+      {
+        "nombre": "Video",
+        "listo": "out/!(render*|borrador*|_*).mp4",
+        "fase": "video"
+      },
+      {
+        "nombre": "Portada",
+        "listo": "portada.png",
+        "fase": "entrega"
+      }
+    ]
+  },
+  {
     "id": "frutinovela",
     "title": "Frutinovela",
     "description": "Una telenovela de frutas en 3D que hablan con sus propias voces: los mismos personajes en cada escena, drama de traición o familia y un final que pide la siguiente parte. Se hace en Google Flow con tus cuentas de Google.",

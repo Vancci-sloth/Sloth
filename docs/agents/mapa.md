@@ -65,7 +65,10 @@ Este es el mapa:
 - El motor de los estilos (`skills/video-base/MOTOR.md`): el agente escribe `momentos.json` (qué se ve en cada
   palabra) y el `hacer.py` del estilo hace lo demás; lo que comparten está en `video-base/scripts/momentos.py` y
   `render.cjs`. El Documental (`skills/video-documental`) lo sigue desde la 2.0: `components/director.py` arma la edición
-  con los dispositivos medidos, `scripts/material.py` baja y trata lo que pide cada momento y `buscar.py` lo busca.
+  con los dispositivos medidos, `scripts/material.py` baja y trata lo que pide cada momento y `buscar.py` lo busca. Low-Poly
+  (`skills/video-low-poly`) también: su director (`kit/low-poly.js`) arma un mundo de three.js desde `revision/plan.json`
+  con los kits de render y de sonido de su referencia (`kit/stage.js`, `kit/sound.js`, sin tocar), y `scripts/render.mjs` lo
+  dibuja cuadro por cuadro en Chrome con la tarjeta.
 - La carpeta del video: un hilo de video nace con su carpeta nombrada por Sloth, y el mensaje lleva la línea
   `Carpeta: <nombre>`, que leen las skills. Con `lote`, varios enlaces pueden ser un video cada uno
   (`lote-MMDD-HHMM-NN`, ver `skills/video-base/LOTE.md`). Cambiar la carpeta desde el estudio usa una que ya existe.

@@ -1,6 +1,6 @@
 # El motor: un video desde `momentos.json`
 
-Los estilos que lo siguen (el explicativo, el documental y El Diff) se hacen igual: el agente escribe **qué se ve en cada
+Los estilos que lo siguen (el explicativo, el documental, El Diff y Low-Poly) se hacen igual: el agente escribe **qué se ve en cada
 palabra** y un comando hace todo lo demás de fondo. Así un video tarda minutos y no se programa: el del explicativo
 pasó de 16 min y $2,70 a 3,7 min y $0,49 (`docs/plan-videos-rapidos.md`). Un estilo nuevo, o uno que se rehace, nace con
 este contrato; lo que cambia de un estilo a otro es su director y su material, no cómo se pide.
@@ -34,9 +34,9 @@ movimiento) y `pares` (el antes y el después lado a lado).
 
 ## Lo de cada estilo
 
-| | Explicativo | Documental | El Diff |
-|---|---|---|---|
-| De qué parte | un tema: escribe `guion.md` | tu grabación: `nuevo.py` la transcribe | un tema o un video: escribe `guion.md` y los datos con su cita |
-| Qué pone un momento | `cosa` 3D, `tarjeta`, `pose`, `camara` | `ve` (material real), `forma`, `entra`, `grande` | `fuente` y `cita`, `clip`, `meme`, `diagrama`, `titular`; encima, `rotulo`, `logo`, `sello`, `ovalo` |
-| De dónde sale lo que se ve | la biblioteca de modelos 3D y fotos | internet: `buscar.py` y las URL, que baja `material.py` | la página de cada cita (`capturar.mjs`), logos, memes y recortes, que baja `hacer.py` |
-| Su director | `plantilla/src/director` (React) | `components/director.py` (los dispositivos medidos) | `scripts/director.py`, que escribe `guion.json` para la plantilla |
+| | Explicativo | Documental | El Diff | Low-Poly |
+|---|---|---|---|---|
+| De qué parte | un tema: escribe `guion.md` | tu grabación: `nuevo.py` la transcribe | un tema o un video: escribe `guion.md` y los datos con su cita | un proceso que pasa en un lugar: escribe `guion.md` |
+| Qué pone un momento | `cosa` 3D, `tarjeta`, `pose`, `camara` | `ve` (material real), `forma`, `entra`, `grande` | `fuente` y `cita`, `clip`, `meme`, `diagrama`, `titular`; encima, `rotulo`, `logo`, `sello`, `ovalo` | `en` (un lugar del mapa), `bandera`, `entra` (cosas facetadas) |
+| De dónde sale lo que se ve | la biblioteca de modelos 3D y fotos | internet: `buscar.py` y las URL, que baja `material.py` | la página de cada cita (`capturar.mjs`), logos, memes y recortes, que baja `hacer.py` | nada de fuera: el mundo y sus cosas se arman en código |
+| Su director | `plantilla/src/director` (React) | `components/director.py` (los dispositivos medidos) | `scripts/director.py`, que escribe `guion.json` para la plantilla | `kit/low-poly.js` (three.js con su kit de render por acumulación), desde `revision/plan.json` |
