@@ -109,8 +109,32 @@ ahí desde el inicio.
 | `puente` | un puente de tablas que se arma de orilla a orilla | rio |
 
   Cuatro cosas como mucho por lugar. Cada cosa enseña lo que dice la voz en ese momento: si ninguna lo enseña, el
-  momento no trae cosa (solo la bandera o el cambio de lugar), y no se pone otra que «se parezca».
+  momento no trae cosa (solo la bandera o el cambio de lugar), y no se pone otra que «se parezca»: se hace su pieza.
 - **`camara: "cerca"`**: ese momento se acerca a lo que entra (sin su bandera). Úsalo una o dos veces, en lo que importa.
+
+## Piezas a la medida
+
+El estilo cuenta con objetos del tema, como pide su referencia («change the story, the objects and the words; do not
+change the look»): el cafeto con sus cerezas, el tostador, la taza que se llena. Lo que el tema necesita y la tabla no
+trae se escribe en `piezas/<nombre>.js` del proyecto, una por objeto, y entra con `{ "pieza": "<nombre>" }` en `entra`;
+se pone en su lugar y brota como las demás. Es lo único que se programa, y solo eso: el mundo, la cámara, las banderas,
+la luz y el sonido los sigue poniendo el director. Se copia de [`ejemplo/piezas/`](ejemplo/piezas/) (`taza.js`,
+`arbusto.js`):
+
+```js
+registrarPieza('taza', {
+  radio: 0.7, alto: 1.5, escala: 1.4,          // lo que ocupa (para encuadrarla y despejarle el suelo) y su tamaño
+  crear({ THREE, K, PAL, tone, jitter, facet, merge, faceted, mesh, unfold }) {
+    // primitivas movidas (jitter), facetadas con un tono de PAL por triángulo (facet + tone), material faceted()
+    return { objeto: grupo, update(t, t0) { /* lo que se mueve: solo función de t, sin Math.random ni relojes */ } }
+  },
+  sonido(k, t0, { pan }) { k.play('pop', t0, { pan }) },   // sonidos del kit (pop, tock, paper, tape, ding…)
+})
+```
+
+Las reglas de la referencia valen para la pieza: formas simples bien facetadas antes que un modelo complicado que se ve
+mal, solo colores de `PAL`, el material `faceted()` (con `glow` para lo que brilla, como la nube), y nada de texturas,
+modelos bajados ni `Math.random` (`K.rng(semilla)`). Mírala en la hoja: si no se reconoce, se simplifica.
 
 ## Los pasos
 

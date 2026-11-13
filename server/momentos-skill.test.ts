@@ -147,6 +147,12 @@ test('el --revisa de Low-Poly dice todo lo que falla de una vez, y ✓ cuando es
     const sinVozBien = hacer({ voz: false, momentos: [{ segundo: 0, en: 'mar', bandera: 'Evaporación', entra: ['vapor'] }, { segundo: 1.2, en: 'cielo', entra: ['nube'] }, { segundo: 6.85, en: 'todo', entra: ['anillo'] }] })
     assert.equal(sinVozBien.status, 0, sinVozBien.stderr)
     assert.match(sinVozBien.stdout, /8\.5 s sin voz/)
+    // Una pieza a la medida: tiene que estar su archivo, con registrarPieza.
+    const conPieza = { voz: false, momentos: [{ segundo: 0, en: 'llanura', bandera: 'Taza', entra: [{ pieza: 'taza' }] }, { segundo: 2, en: 'todo' }] }
+    assert.match(hacer(conPieza).stderr, /falta piezas\/taza\.js/)
+    mkdirSync(join(dir, 'piezas'))
+    writeFileSync(join(dir, 'piezas', 'taza.js'), "registrarPieza('taza', { crear() { return { objeto: null } } })")
+    assert.equal(hacer(conPieza).status, 0)
   } finally {
     rmSync(dir, { recursive: true, force: true })
   }

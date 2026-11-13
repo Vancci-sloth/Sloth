@@ -157,6 +157,22 @@ def comprobar(m: dict, dichas: list[str], donde: str) -> tuple[list[int], list[s
         if len(es) > 3:
             errores.append(f"{que}: entran {len(es)} cosas a la vez; tres como mucho, que se vea cada una")
         for e in es:
+            if e.get("pieza") is not None:
+                # Una pieza a la medida: piezas/<nombre>.js del proyecto (ver «Piezas a la medida» en SKILL.md).
+                n = str(e["pieza"])
+                e_en = lugar_de(e["en"]) if e.get("en") else en
+                if not re.fullmatch(r"[a-z0-9-]+", n):
+                    errores.append(f"{que}: la pieza «{n}» se nombra en minúsculas y con guiones (como su archivo)")
+                elif not (RAIZ / "piezas" / f"{n}.js").exists():
+                    errores.append(f"{que}: falta piezas/{n}.js (la pieza «{n}»)")
+                elif "registrarPieza(" not in (RAIZ / "piezas" / f"{n}.js").read_text(encoding="utf-8"):
+                    errores.append(f"{que}: piezas/{n}.js no llama a registrarPieza('{n}', {{ ... }})")
+                if e_en in ("todo", "cielo"):
+                    errores.append(f"{que}: una pieza va en un lugar con suelo, no en «{e_en}»")
+                ocupado[e_en] = ocupado.get(e_en, 0) + 1
+                if ocupado[e_en] == HUECOS + 1:
+                    errores.append(f"{que}: en «{e_en}» ya hay {HUECOS} cosas; la que sigue va en otro lugar")
+                continue
             tipo = normal(str(e.get("tipo", "")))
             if tipo not in COSAS:
                 errores.append(f"{que}: no hay cosa «{e.get('tipo')}»; son {', '.join(COSAS)}")
@@ -310,7 +326,7 @@ def plan(m: dict, ps: list[dict], guion: list[str], indices: list[int]) -> tuple
             t = momentos[-1]["t"] + 0.3
         es = []
         for e in entradas(mo):
-            x = {"tipo": normal(str(e["tipo"]))}
+            x = {"tipo": "pieza", "pieza": str(e["pieza"])} if e.get("pieza") is not None else {"tipo": normal(str(e["tipo"]))}
             if e.get("en"):
                 x["en"] = lugar_de(e["en"])
             if e.get("a"):
@@ -372,7 +388,8 @@ def main() -> None:
     # El render, solo si cambió algo que se ve (el plan o el kit): arreglar la mezcla no dibuja otra vez.
     kit = SKILL / "kit"
     muestras = args[args.index("--muestras") + 1] if "--muestras" in args else None
-    clave = huella(json.dumps(p, sort_keys=True), muestras or "", *[(kit / n).read_bytes() for n in ("low-poly.js", "stage.js", "sound.js", "pagina.html")])
+    clave = huella(json.dumps(p, sort_keys=True), muestras or "", *[(kit / n).read_bytes() for n in ("low-poly.js", "stage.js", "sound.js", "pagina.html")],
+                  *[f.read_bytes() for f in sorted((RAIZ / "piezas").glob("*.js"))])
     imagen, efectos, hecho = RAIZ / "revision" / "_imagen.mp4", RAIZ / "revision" / "_efectos.wav", RAIZ / "revision" / "_imagen.json"
     previo = json.loads(hecho.read_text(encoding="utf-8")) if hecho.exists() else {}
     if previo.get("clave") == clave and imagen.exists() and efectos.exists():

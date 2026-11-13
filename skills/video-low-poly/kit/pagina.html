@@ -33,6 +33,11 @@ try {
   await cargar('sound.js')
   if (q.get('plan')) {
     window.PLAN = await (await fetch(q.get('plan'), { cache: 'no-store' })).json()
+    // Las piezas a la medida del video (piezas/<nombre>.js del proyecto), antes del director que las coloca.
+    window.PIEZAS = {}
+    window.registrarPieza = (nombre, pieza) => { window.PIEZAS[nombre] = pieza }
+    const piezas = new Set(PLAN.momentos.flatMap((m) => (m.entra || []).filter((e) => e.pieza).map((e) => e.pieza)))
+    for (const n of piezas) await cargar('/p/piezas/' + encodeURIComponent(n) + '.js')
     await cargar('low-poly.js')
   } else {
     // Un estilo suelto, como vino: un bloque `{ ... registerStyle({...}) }` sin más.

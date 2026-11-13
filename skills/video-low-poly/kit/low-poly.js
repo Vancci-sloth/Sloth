@@ -494,8 +494,10 @@
       })
       // Lo que no puede crecer encima de una bandera ni de una cosa: su frente y su sitio.
       const LIBRES = []
+      // Las piezas a la medida (piezas/<nombre>.js del video): lo que el catálogo no trae y el tema pide.
+      const PIEZA = (e) => (window.PIEZAS || {})[e.pieza] || {}
       BANDERAS.forEach(({ B, L }) => { if (!B.nube && !L.ref) LIBRES.push([B.at[0] + (B.side || 1) * 1.1, B.at[1] + 0.9, 1.6]) })
-      ENTRAN.forEach((e) => { if (!['vapor', 'nube', 'lluvia', 'anillo', 'rio', 'barco', 'puente'].includes(e.tipo) && !(e.tipo === 'faro' && e.en === 'mar')) { const [x, z] = sitio(lugar(e.en), e.hueco); LIBRES.push([x, z, { cultivo: 1.9, fabrica: 1.4, casas: 1.6 }[e.tipo] || 0.9]) } })
+      ENTRAN.forEach((e) => { if (!['vapor', 'nube', 'lluvia', 'anillo', 'rio', 'barco', 'puente'].includes(e.tipo) && !(e.tipo === 'faro' && e.en === 'mar')) { const [x, z] = sitio(lugar(e.en), e.hueco); LIBRES.push([x, z, e.tipo === 'pieza' ? (PIEZA(e).radio || 0.8) + 0.3 : { cultivo: 1.9, fabrica: 1.4, casas: 1.6 }[e.tipo] || 0.9]) } })
       de('camion').forEach((e) => { const a = sitio(lugar(e.en), e.hueco), b = parada(lugar(e.a)); for (let u = 0; u <= 1; u += 0.1) LIBRES.push([K.lerp(a[0], b[0], u), K.lerp(a[1], b[1], u), 0.45]) })
       const libre = (x, z) => !LIBRES.some(([cx, cz, r]) => Math.hypot(x - cx, z - cz) < r)
       const clear = (x, z) => (usados.has('montaña') && x > 1.9 && x < 6.3 && z > 0.9 && z < 3.4) || (usados.has('rio') && x > 0.5 && x < 4.3 && z > 3.2 && z < 6.5) || LIBRES.some(([cx, cz, r]) => Math.hypot(x - cx, z - cz) < r)
@@ -608,7 +610,7 @@
         const b = Object.assign({ obj, t: e.t, x, y, z, s, giro }, extra); brotes.push(b); return b
       }
       const matPiezas = faceted()  // el de la tierra y los árboles: papel mate
-      const casas = [], humos = [], molinos = [], camiones = [], faros = [], plantas = [], puentes = [], barcos = [], cultivos = []
+      const casas = [], humos = [], molinos = [], camiones = [], faros = [], plantas = [], puentes = [], barcos = [], cultivos = [], piezas = []
       ENTRAN.forEach((e, k) => {
         const L = lugar(e.en)
         if (e.tipo === 'casas') {
@@ -673,6 +675,17 @@
           const g = new THREE.Group(); g.add(mesh(boatGeo(), (() => { const m = faceted({ roughness: 0.8 }); m.side = THREE.DoubleSide; return m })())); g.scale.setScalar(2.2); scene.add(g)
           const [a, bb] = e.a && lugar(e.a).barco ? [L.barco[1], lugar(e.a).barco[1]] : L.barco
           barcos.push({ e, g, a, b: bb })
+        }
+        if (e.tipo === 'pieza') {
+          // Se arma con las mismas herramientas de la referencia y se pone en su hueco como cualquier cosa: brota con un
+          // rebote, salvo que la pieza diga `propia` (se aparece sola, con su `update`).
+          const pz = PIEZA(e)
+          if (!pz.crear) { AVISOS.push('no está la pieza «' + e.pieza + '» (piezas/' + e.pieza + '.js)'); return }
+          const H = { THREE, K, PAL, tone, jitter, facet, merge, unfold, faceted, mesh, roofGeo, dropGeo, height, rng: K.rng, t0: e.t }
+          const hecho = pz.crear(H), g = new THREE.Group(); g.add(hecho.objeto)
+          const b = ponEn(g, e, pz.escala || 1, pz.giro || 0)
+          if (hecho.propia) brotes.splice(brotes.indexOf(b), 1)
+          piezas.push({ e, hecho, g })
         }
         if (e.tipo === 'puente') {
           const row = river.rows[Math.round(river.n * 0.45)], planks = []
@@ -743,18 +756,23 @@
         if (e.tipo === 'barco') return (e.a && lugar(e.a).barco ? [L.barco[1], lugar(e.a).barco[1]] : L.barco).map(([x, z]) => [x, 1.2, z])
         if (e.tipo === 'puente') { const r = river.rows[Math.round(river.n * 0.45)]; return cerca(r.x, r.z, 0.9, 0.4) }
         if (e.tipo === 'faro' && e.en === 'mar') return cerca(-5.2, 1.55, 0.4, 1.9)
-        const [x, z] = sitio(L, e.hueco), R = { casas: [1.4, 1.0], cultivo: [1.4, 0.3], fabrica: [1.0, 3.0], molino: [0.6, 2.4], faro: [0.4, 2.0], planta: [0.6, 1.6], arboles: [1.0, 1.0], rocas: [0.7, 0.4] }[e.tipo] || [0.6, 0.8]
+        const [x, z] = sitio(L, e.hueco), R = e.tipo === 'pieza' ? [PIEZA(e).radio || 0.8, PIEZA(e).alto || 1.2] : { casas: [1.4, 1.0], cultivo: [1.4, 0.3], fabrica: [1.0, 3.0], molino: [0.6, 2.4], faro: [0.4, 2.0], planta: [0.6, 1.6], arboles: [1.0, 1.0], rocas: [0.7, 0.4] }[e.tipo] || [0.6, 0.8]
         return cerca(x, z, R[0], R[1])
       }
-      const planos = []
-      MOM.forEach((m, i) => { const prev = planos[planos.length - 1]; if (prev && prev.en === m.en && !m.camara) { prev.fin = m.fin; prev.ms.push(m) } else planos.push({ en: m.en, t: i === 0 ? 0 : m.t, fin: m.fin, cerca: m.camara === 'cerca', ms: [m] }) })
+      const planos = [], SOLO_REF = MOM.every((m) => lugar(m.en).ref)
+      // Si el video pasa solo por lugares de la referencia (y en horizontal), un plano por lugar, como en ella. Si no, la
+      // cámara va de cosa en cosa («close on each stage in turn»): cada momento que trae algo es su toma, encuadrada en lo suyo.
+      const PASO = !(SOLO_REF && !VERTICAL)
+      MOM.forEach((m, i) => { const prev = planos[planos.length - 1]; if (prev && prev.en === m.en && !m.camara && !(PASO && (m.entra || []).length && m.en !== 'todo')) { prev.fin = m.fin; prev.ms.push(m) } else planos.push({ en: m.en, t: i === 0 ? 0 : m.t, fin: m.fin, cerca: m.camara === 'cerca', ms: [m] }) })
       const pose = (p) => {
         const L0 = lugar(p.en), L = L0.cam2 && ENTRAN.some((e) => L0.evita.includes(e.en) && e.t < p.fin) ? Object.assign({}, L0, { cam: L0.cam2 }) : L0
         const d0 = V3(L.cam.pos).distanceTo(V3(L.cam.aim)), todo = p.en === 'todo'
         // Lo de este lugar que ya está o entra en este plano; en el de todo, todo.
-        const hasta = p.fin, mios = (x) => (todo || x.en === p.en) && x.t < hasta
+        const hasta = p.fin, mios = (x) => todo ? x.t < hasta : PASO ? p.ms.includes(MOM[x.i]) : x.en === p.en && x.t < hasta
         let pts = ENTRAN.filter((e) => mios(e) && (!p.cerca || p.ms.includes(MOM[e.i]))).flatMap(ptsCosa)
-        const flags = BANDERAS.filter((b) => (todo || b.m.en === p.en) && b.t < hasta)
+        let flags = BANDERAS.filter((b) => (todo || b.m.en === p.en) && b.t < hasta)
+        // De cosa en cosa: la bandera que sale en esta toma, o la última de su lugar si no trae ninguna.
+        if (PASO && !todo) { const mias = flags.filter((b) => p.ms.includes(b.m)); flags = mias.length ? mias : flags.slice(-1) }
         // En el de todo en vertical, cada bandera ya vuelta hacia la cámara (`giro`).
         if (todo && VERTICAL) flags.forEach((b) => { const o = b.B.nube ? b.L.alto : [0, 0, 0], dx = L.cam.pos[0] - b.f.group.position.x - o[0], dz = L.cam.pos[2] - b.f.group.position.z - o[2]; b.giro = Math.atan2(dx, dz) })
         if (!p.cerca) pts = pts.concat(flags.flatMap((b) => ptsBandera(b, b.giro ?? b.B.yaw)))
@@ -766,7 +784,7 @@
         if (!pts.length) pts.push(L.foco || L.cam.aim)
         const caben = fiel ? (p.cerca ? pts : flags.flatMap((b) => ptsBandera(b))).concat([L.foco || L.cam.aim]) : pts
         MG = fiel ? MG_REF : MG0
-        const q = encuadre(L.cam.pos, L.cam.aim, caben, fiel ? 0 : d0 * (p.cerca ? 0.6 : 0.9), d0 * (todo ? 4.5 : VERTICAL ? 3.4 : 2.4), 0, fiel)
+        const q = encuadre(L.cam.pos, L.cam.aim, caben, fiel ? 0 : d0 * (p.cerca ? 0.4 : todo ? 0.9 : 0.5), d0 * (todo ? 4.5 : VERTICAL ? 3.4 : 2.4), 0, fiel)
         MG = MG0
         return { pos: q.pos, aim: q.aim, foco, ap: L.ap || 0.06, pts, flags, todo }
       }
@@ -835,7 +853,7 @@
         // con la cámara ya acercada al final del plano, que es cuando más se corta lo del borde
         const A = V3(p.q.aim), v = V3(p.q.pos).sub(A), d = v.length() * 0.95, f = v.clone().normalize().negate(), r = new THREE.Vector3().crossVectors(f, UP).normalize(), u = new THREE.Vector3().crossVectors(r, f)
         const sujeto = caja(A, f, r, u, d, p.q.pts)
-        BANDERAS.filter((b) => !p.q.flags.includes(b) && b.t < p.sale).forEach((b) => {
+        BANDERAS.filter((b) => !p.q.flags.includes(b) && b.m.en !== p.en && b.t < p.sale).forEach((b) => {
           const pb = ptsBandera(b), k = caja(A, f, r, u, d, pb)
           const dentro = k.x1 > -1 && k.x0 < 1 && k.y1 > -1 && k.y0 < 1
           const corta = dentro && !(k.x0 >= -1 && k.x1 <= 1 && k.y0 >= -1 && k.y1 <= 1)
@@ -906,6 +924,7 @@
             g.position.set(x, wv(x, z) + 0.03, z); g.rotation.set(0.08 * Math.sin(t * 1.3), Math.atan2(-(b[1] - a[1]), b[0] - a[0]) || 0.5, (wv(x + 0.3, z) - wv(x - 0.3, z)) * 1.2)
             const pop = e.t < 0 ? 1 : K.spring(t - e.t, 2.2, 0.4); g.visible = e.t < 0 || t > e.t; g.scale.setScalar(2.2 * Math.max(0.001, pop))
           })
+          piezas.forEach(({ e, hecho, g }) => hecho.update && hecho.update(t, e.t, g))
           puentes.forEach((planks) => planks.forEach(({ m, t: t0 }) => { const a = t0 < 0 ? 1 : K.spring(t - t0, 2.6, 0.4); m.visible = t0 < 0 || t > t0; m.scale.set(Math.max(0.001, a), 1, Math.max(0.001, a)) }))
           BANDERAS.forEach((b) => {
             b.f.pop(t, b.t, plegado(b, t))
@@ -963,6 +982,7 @@
         if (e.tipo === 'molino' || e.tipo === 'faro') { k.play('pop', t, { gain: 0.8, f: 520, pan }); k.play('tock', t + 0.25, { gain: 0.4, f: 700, pan }) }
         if (e.tipo === 'faro') k.play('ding', t + 0.35, { gain: 0.35, f: 'E6', pan })
         if (e.tipo === 'planta') { k.play('pop', t, { gain: 0.5, f: 700, pan }); k.play('sparkle', t + 0.3, { gain: 0.4, n: 4 }) }
+        if (e.tipo === 'pieza') { const pz = (window.PIEZAS || {})[e.pieza] || {}; if (pz.sonido) pz.sonido(k, t, { pan }); else { k.play('pop', t, { gain: 0.8, f: 560, pan }); k.play('tock', t + 0.25, { gain: 0.4, f: 700, pan }) } }
         if (e.tipo === 'anillo') { k.play('success', t, { gain: 0.6, f: 'A5' }); k.play('sparkle', t + 0.1, { gain: 0.6 }) }
       }))
       // las banderas: el alfiler entra, el papel da la vuelta
