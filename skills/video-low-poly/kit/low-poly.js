@@ -496,9 +496,54 @@
       const LIBRES = []
       // Las piezas a la medida (piezas/<nombre>.js del video): lo que el catálogo no trae y el tema pide.
       const PIEZA = (e) => (window.PIEZAS || {})[e.pieza] || {}
+      // En horizontal, las banderas de los lugares nuevos no se tapan entre sí en el plano del mundo entero: la costa, el
+      // llano y el valle quedan juntos y sus papeles se cruzaban. Cada una, en orden, toma el primer sitio libre: el suyo,
+      // detrás de sus cosas y más alta (como en vertical), o en su poste, más arriba. Las de la referencia no se mueven.
+      if (!VERTICAL) {
+        const T = LUGARES.todo.cam, cp = new THREE.Vector3(...T.pos), f = new THREE.Vector3(...T.aim).sub(cp).normalize()
+        const r = new THREE.Vector3().crossVectors(f, new THREE.Vector3(0, 1, 0)).normalize(), u = new THREE.Vector3().crossVectors(r, f)
+        const tv = Math.tan(THREE.MathUtils.degToRad(15)), th = tv * P.ancho / P.alto
+        const rect = (B, w) => {
+          const s = B.side || 1, h = B.height || 1.25, c = Math.cos(B.yaw || 0), sn = Math.sin(B.yaw || 0), y0 = height(B.at[0], B.at[1]) - 0.02
+          const pts = [[0, h + 0.05], [s * (w + 0.1), h + 0.05], [s * (w + 0.1), h - 0.72], [0, h - 0.72]].map(([dx, dy]) => new THREE.Vector3(B.at[0] + dx * c, y0 + dy, B.at[1] - dx * sn).sub(cp))
+          const xs = pts.map((q) => q.dot(r) / (q.dot(f) * th)), ys = pts.map((q) => q.dot(u) / (q.dot(f) * tv))
+          return [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)]
+        }
+        const cruce = (a, b) => Math.max(0, Math.min(a[1], b[1]) - Math.max(a[0], b[0]) + 0.01) * Math.max(0, Math.min(a[3], b[3]) - Math.max(a[2], b[2]) + 0.01)
+        const puestas = []
+        BANDERAS.forEach((b) => {
+          if (b.B.nube) return
+          if (b.L.ref || !b.L.bandera) { puestas.push(rect(b.B, b.f.width)); return }
+          const altas = ENTRAN.some((e) => e.en === b.m.en && (['fabrica', 'molino', 'faro', 'planta'].includes(e.tipo) || (e.tipo === 'pieza' && (PIEZA(e).alto || 0) * (PIEZA(e).escala || 1) > 1.3)))
+          const [cx, cz] = sitio(b.L, 0), detras = (dx, h) => ({ height: h, side: 1, yaw: 0, at: [cx - b.f.width / 2 + dx, cz - 1.0] })
+          const sube = (k) => Object.assign({}, b.B, { height: (b.B.height || 1.25) + 0.95 * k })
+          const h0 = altas ? 2.6 : 2.0
+          const opciones = [b.B, detras(0, h0), detras(0.6, h0), detras(-0.6, h0), detras(1.2, h0), sube(1), detras(0, h0 + 0.95), sube(2)]
+          let mejor = null
+          for (const B of opciones) { const R = rect(B, b.f.width), choca = puestas.reduce((s, o) => s + cruce(R, o), 0); if (!mejor || choca < mejor.choca) mejor = { B, R, choca }; if (!choca) break }
+          b.B = mejor.B; puestas.push(mejor.R)
+        })
+      }
       BANDERAS.forEach(({ B, L }) => { if (!B.nube && !L.ref) LIBRES.push([B.at[0] + (B.side || 1) * 1.1, B.at[1] + 0.9, 1.6]) })
       ENTRAN.forEach((e) => { if (!['vapor', 'nube', 'lluvia', 'anillo', 'rio', 'barco', 'puente'].includes(e.tipo) && !(e.tipo === 'faro' && e.en === 'mar')) { const [x, z] = sitio(lugar(e.en), e.hueco); LIBRES.push([x, z, e.tipo === 'pieza' ? (PIEZA(e).radio || 0.8) + 0.3 : { cultivo: 1.9, fabrica: 1.4, casas: 1.6 }[e.tipo] || 0.9]) } })
-      de('camion').forEach((e) => { const a = sitio(lugar(e.en), e.hueco), b = parada(lugar(e.a)); for (let u = 0; u <= 1; u += 0.1) LIBRES.push([K.lerp(a[0], b[0], u), K.lerp(a[1], b[1], u), 0.45]) })
+      // Y nada alto entre la cámara y lo que brota en un lugar nuevo (como la referencia, que no deja nada delante del río):
+      // de cosa en cosa la cámara se acerca, y un pino delante tapaba media toma.
+      ENTRAN.forEach((e) => {
+        const L = lugar(e.en)
+        if (L.ref || !L.cam || ['vapor', 'nube', 'lluvia', 'anillo', 'rio', 'barco'].includes(e.tipo)) return
+        const [x, z] = e.tipo === 'puente' ? [river.rows[Math.round(river.n * 0.45)].x, river.rows[Math.round(river.n * 0.45)].z] : sitio(L, e.hueco)
+        // la vista del lugar y, en vertical, la de lado (la del cultivo, ver `ladeado`)
+        const az = Math.atan2(L.cam.pos[0] - L.cam.aim[0], L.cam.pos[2] - L.cam.aim[2])
+        for (const a of VERTICAL ? [az, az - 0.95] : [az]) for (const k of [1.4, 2.3, 3.2, 4.1, 5.0]) LIBRES.push([x + Math.sin(a) * k, z + Math.cos(a) * k, 0.6 + 0.08 * k])
+      })
+      // El camino del camión, y lo que hay entre él y la cámara que lo sigue.
+      de('camion').forEach((e) => {
+        const L = lugar(e.en), a = sitio(L, e.hueco), b = parada(lugar(e.a)), az = Math.atan2(L.cam.pos[0] - L.cam.aim[0], L.cam.pos[2] - L.cam.aim[2])
+        for (let u = 0; u <= 1; u += 0.1) {
+          const x = K.lerp(a[0], b[0], u), z = K.lerp(a[1], b[1], u); LIBRES.push([x, z, 0.45])
+          for (const k of [1.0, 2.0, 3.0]) LIBRES.push([x + Math.sin(az) * k, z + Math.cos(az) * k, 0.6])
+        }
+      })
       const libre = (x, z) => !LIBRES.some(([cx, cz, r]) => Math.hypot(x - cx, z - cz) < r)
       const clear = (x, z) => (usados.has('montaña') && x > 1.9 && x < 6.3 && z > 0.9 && z < 3.4) || (usados.has('rio') && x > 0.5 && x < 4.3 && z > 3.2 && z < 6.5) || LIBRES.some(([cx, cz, r]) => Math.hypot(x - cx, z - cz) < r)
 
@@ -716,15 +761,17 @@
       const TV = Math.tan(THREE.MathUtils.degToRad(30 / 2)), TH = TV * P.ancho / P.alto
       // Los márgenes del cuadro (de 0 al borde, que es 1); en los lugares de la referencia, los de ella: que quepa entero.
       const MG0 = VERTICAL ? { l: 0.86, r: 0.86, t: 0.8, b: 0.5 } : { l: 0.93, r: 0.93, t: 0.88, b: 0.84 }, MG_REF = { l: 0.99, r: 0.99, t: 0.97, b: 0.97 }
+      // Lo que llena lo que brota en su toma: el centro del cuadro (en vertical, lo ancho y arriba de lo de abajo).
+      const MG_SUJETO = VERTICAL ? { l: 0.78, r: 0.78, t: 0.55, b: 0.2 } : { l: 0.68, r: 0.68, t: 0.66, b: 0.62 }
       let MG = MG0
       const caja = (A, f, r, u, d, pts) => {
         let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity
         for (const p of pts) { const q = V3(p).sub(A), z = Math.max(0.5, d + q.dot(f)), nx = q.dot(r) / (z * TH), ny = q.dot(u) / (z * TV); x0 = Math.min(x0, nx); x1 = Math.max(x1, nx); y0 = Math.min(y0, ny); y1 = Math.max(y1, ny) }
         return { x0, x1, y0, y1, cabe: x0 >= -MG.l && x1 <= MG.r && y0 >= -MG.b && y1 <= MG.t }
       }
-      const encuadre = (pos0, aim0, pts, dmin, dmax, alto = 0, soloAleja = false) => {
+      const encuadre = (pos0, aim0, pts, dmin, dmax, alto = 0, soloAleja = false, giro = 0) => {
         let A = V3(aim0), v = V3(pos0).sub(A)
-        if (VERTICAL && alto) { const el = Math.asin(v.y / v.length()), az = Math.atan2(v.x, v.z), e2 = Math.min(0.85, Math.max(el, alto)), l = v.length(); v = new THREE.Vector3(Math.sin(az) * Math.cos(e2), Math.sin(e2), Math.cos(az) * Math.cos(e2)).multiplyScalar(l) }
+        if (alto || giro) { const el = Math.asin(v.y / v.length()), az = Math.atan2(v.x, v.z) + giro, e2 = Math.min(0.85, Math.max(el, alto)), l = v.length(); v = new THREE.Vector3(Math.sin(az) * Math.cos(e2), Math.sin(e2), Math.cos(az) * Math.cos(e2)).multiplyScalar(l) }
         let d = v.length(); const f = v.clone().normalize().negate(), r = new THREE.Vector3().crossVectors(f, UP).normalize(), u = new THREE.Vector3().crossVectors(r, f)
         // Si ya cabe, los números de la referencia tal cual: rehacerlos desde un vector normalizado deja errores de 1e-15
         // que, en alguna de las 64 pasadas, mueven un borde de píxel.
@@ -752,7 +799,7 @@
         if (e.tipo === 'vapor') { const [x, z] = L.suelo; return [[x - 1.5, 0, z + 1], [x + 1.5, 0, z + 1], [L.alto[0], L.alto[1] - 0.3, L.alto[2]]] }
         if (e.tipo === 'rio') return [0.05, 0.5, 0.95].map((s) => { const r = river.rows[Math.round(s * river.n)]; return [r.x, r.y, r.z] })
         if (e.tipo === 'anillo') return [[ringAt[0] - 2, 0, ringAt[1]], [ringAt[0] + 2, 0, ringAt[1]], [ringAt[0], 0, ringAt[1] + 1.5]]
-        if (e.tipo === 'camion') { const a = sitio(L, e.hueco); return cerca(a[0], a[1], 0.5, 0.6) }
+        if (e.tipo === 'camion') { const a = sitio(L, e.hueco); return cerca(a[0], a[1], 0.8, 0.7) }
         if (e.tipo === 'barco') return (e.a && lugar(e.a).barco ? [L.barco[1], lugar(e.a).barco[1]] : L.barco).map(([x, z]) => [x, 1.2, z])
         if (e.tipo === 'puente') { const r = river.rows[Math.round(river.n * 0.45)]; return cerca(r.x, r.z, 0.9, 0.4) }
         if (e.tipo === 'faro' && e.en === 'mar') return cerca(-5.2, 1.55, 0.4, 1.9)
@@ -769,6 +816,26 @@
         const d0 = V3(L.cam.pos).distanceTo(V3(L.cam.aim)), todo = p.en === 'todo'
         // Lo de este lugar que ya está o entra en este plano; en el de todo, todo.
         const hasta = p.fin, mios = (x) => todo ? x.t < hasta : PASO ? p.ms.includes(MOM[x.i]) : x.en === p.en && x.t < hasta
+        // De cosa en cosa: lo que brota en esta toma es el sujeto. Se encuadra con la bandera que sale con él (si sale
+        // una), y si no, solo y grande; lo nítido es el sujeto, no el papel. Una bandera vieja no se mete en su toma.
+        if (PASO && !todo) {
+          // Lo que viaja se encuadra donde sale: la cámara lo sigue (deCosaEnCosa).
+          const S = ENTRAN.filter(mios).flatMap((e) => e.tipo === 'barco' && e.t >= 0 ? (([x, z]) => [[x - 0.8, 0, z], [x + 0.8, 0, z], [x, 1.0, z]])(e.a && lugar(e.a).barco ? L.barco[1] : L.barco[0]) : ptsCosa(e))
+          const mias = BANDERAS.filter((b) => p.ms.includes(b.m))
+          const F = p.cerca ? [] : mias.length || S.length ? mias : BANDERAS.filter((b) => b.m.en === p.en && b.t < hasta).slice(-1)
+          const Fp = F.flatMap((b) => ptsBandera(b)), todos = S.concat(Fp)
+          // Lo plano (un cultivo, un camino) se mira algo más desde arriba: rasante, en vertical quedaba una raya entre mar y cielo.
+          const ys = S.map((x) => x[1]), xs = S.map((x) => x[0]), zs = S.map((x) => x[2])
+          const plano = S.length && Math.max(...ys) - Math.min(...ys) < 0.35 * Math.max(Math.max(...xs) - Math.min(...xs), Math.max(...zs) - Math.min(...zs))
+          // En vertical, lo ancho y plano (un cultivo) no cabe a lo ancho del cuadro: se mira de lado, desde el oeste, y
+          // corre hacia el fondo.
+          const ladeado = VERTICAL && plano && Math.max(...xs) - Math.min(...xs) > 1.8
+          MG = Fp.length ? MG0 : MG_SUJETO
+          const q = encuadre(L.cam.pos, L.cam.aim, todos.length ? todos : [L.foco || L.cam.aim], d0 * (p.cerca ? 0.4 : 0.6), d0 * (VERTICAL ? 3.4 : 2.4), plano ? 0.42 : 0, false, ladeado ? -0.95 : 0)
+          MG = MG0
+          const centro = (pts) => [0, 1, 2].map((j) => pts.reduce((s, x) => s + x[j], 0) / pts.length)
+          return { pos: q.pos, aim: q.aim, foco: S.length ? centro(S) : Fp.length ? centro(Fp) : L.foco || L.cam.aim, ap: L.ap || 0.06, pts: S.concat(Fp), flags: F, todo }
+        }
         let pts = ENTRAN.filter((e) => mios(e) && (!p.cerca || p.ms.includes(MOM[e.i]))).flatMap(ptsCosa)
         let flags = BANDERAS.filter((b) => (todo || b.m.en === p.en) && b.t < hasta)
         // De cosa en cosa: la bandera que sale en esta toma, o la última de su lugar si no trae ninguna.
@@ -801,7 +868,8 @@
         keysP.push([t, pos, ease]); keysA.push([t, aim, ease])
       }
       let antes = null
-      planos.forEach((p, i) => {
+      if (PASO) deCosaEnCosa()
+      else planos.forEach((p, i) => {
         const q = (p.q = pose(p)), sig = planos[i + 1], L = lugar(p.en)
         // El plano de todo es el de la referencia solo si el video entero pasa en sus lugares; si no, se encuadra lo que hay.
         const soloRef = MOM.every((m) => lugar(m.en).ref)
@@ -840,6 +908,71 @@
         }
         Object.assign(p, { llega, sale }); antes = { sale, q, lejos }
       })
+      // De cosa en cosa (todo video que no sea solo de lugares de la referencia): la cámara llega a cada toma justo antes
+      // de que brote lo suyo y se queda quieta mientras crece (un segundo como mínimo), con el foco ya puesto en ello; sale
+      // hacia la siguiente lo más tarde que puede. Lo que viaja (el camión, el barco) se sigue con la cámara.
+      function deCosaEnCosa() {
+        const QUEDA = 1.0
+        planos.forEach((p) => { p.q = pose(p) })
+        // Lo que viaja en una toma: dónde está en cada segundo (como lo mueve update).
+        const viajero = (p) => {
+          if (p.en === 'todo') return null
+          for (const e of ENTRAN.filter((x) => p.ms.includes(MOM[x.i]))) {
+            const c = camiones.find((x) => x.e === e)
+            if (c) return (t) => { const u = e.t < 0 ? 1 : K.seg(t, e.t, e.t + c.viaje, K.ease.inOut); return [K.lerp(c.a[0], c.b[0], u), K.lerp(c.a[1], c.b[1], u)] }
+            const b = barcos.find((x) => x.e === e)
+            if (b && e.t >= 0) { const dur = Math.max(2, e.fin - e.t); return (t) => { const u = K.seg(t, e.t, e.t + dur, K.ease.inOut); return [K.lerp(b.a[0], b.b[0], u), K.lerp(b.a[1], b.b[1], u)] } }
+          }
+          return null
+        }
+        // La toma corrida hasta donde va lo que viaja: el mismo encuadre, trasladado (la altura, a medias con el suelo).
+        // En el primer segundo la mira pasa de su encuadre (lo que viaja con su bandera) a lo que viaja, que queda al centro.
+        const sigue = (p, t) => {
+          if (!p.viaja) return p.q
+          const [x0, z0] = p.viaja(p.t), [x, z] = p.viaja(t), d = [x - x0, 0.5 * (Math.max(0, height(x, z)) - Math.max(0, height(x0, z0))), z - z0]
+          const foco = [x, Math.max(0, height(x, z)) + 0.3, z], k = K.smooth(p.t, p.t + 1.2, t)
+          const aim = p.q.aim.map((v, j) => K.lerp(v + d[j], foco[j], k))
+          return { pos: aim.map((v, j) => v + (p.q.pos[j] - p.q.aim[j]) * K.lerp(1, 0.85, k)), aim, foco }
+        }
+        // Lo que tarda en verse entero lo que brota en una toma (desplegarse, brotar uno por uno), para quedarse a verlo.
+        const CRECE = { cultivo: 1.3, casas: 1.4, arboles: 1.4, rio: 2.1, puente: 1.0, nube: 1.3, lluvia: 1.2 }
+        const queda = (p) => Math.max(QUEDA, ...ENTRAN.filter((e) => p.ms.includes(MOM[e.i])).map((e) => CRECE[e.tipo] || 0))
+        // Una toma sin nada que brote ni bandera nueva (el mundo entero, sin anillo) no tiene que llegar a tiempo de nada.
+        const libre = (p) => !ENTRAN.some((e) => p.ms.includes(MOM[e.i])) && !BANDERAS.some((b) => p.ms.includes(b.m))
+        const lejos = (a, b) => Math.max(V3(a.pos).distanceTo(V3(b.pos)), V3(a.aim).distanceTo(V3(b.aim)))
+        // Si no da el tiempo para llegar antes de que brote, primero viaja más rápido, luego se queda menos en lo de antes
+        // (nunca menos de 0,6 s) y solo al final llega tarde.
+        planos.forEach((p, i) => {
+          p.viaja = viajero(p)
+          if (i === 0) { p.llega = 0; p.viaje = 0; return }
+          const a = planos[i - 1], deja = Math.max(a.t + queda(a), a.llega + 0.5), minimo = Math.max(a.t + 0.6, a.llega + 0.4)
+          let v = K.clamp(0.55 + 0.1 * lejos(sigue(a, p.t), p.q), 0.6, 1.5)
+          // Lo que viaja arranca despacio: se puede llegar un poco después de que sale.
+          const llega = libre(p) ? Math.max(p.t - 0.1, deja + v) : p.viaja ? p.t + 0.35 : p.t - 0.1
+          if (llega - v < deja) v = Math.max(0.8, llega - deja)
+          if (llega - v < minimo) v = Math.max(0.6, llega - minimo)
+          p.viaje = seg(v)
+          p.llega = seg(Math.max(llega, minimo + v))
+        })
+        const pon = (keys, t, v, ease) => { while (keys.length && keys[keys.length - 1][0] > t - 0.02) keys.pop(); keys.push([t, v, ease]) }
+        planos.forEach((p, i) => {
+          const sig = planos[i + 1], q = p.q
+          p.sale = sig ? seg(Math.max(p.llega + 0.05, sig.llega - sig.viaje)) : D
+          pon(keysP, p.llega, q.pos, 'inOut'); pon(keysA, p.llega, q.aim, 'inOut')
+          // el foco pasa a lo nuevo mientras la cámara viaja
+          if (i === 0) { keysF.push([0, q.foco]); keysAp.push([0, q.ap]) }
+          else { const desde = planos[i - 1].sale; keysF.push([desde, keysF[keysF.length - 1][1]], [p.llega, q.foco, 'inOut']); keysAp.push([desde, keysAp[keysAp.length - 1][1]], [p.llega, q.ap, 'inOut']) }
+          if (p.viaja) {
+            for (let t = p.llega + 0.25; t < p.sale - 0.05; t += 0.25) { const s = sigue(p, t); pon(keysP, seg(t), s.pos, 'linear'); pon(keysA, seg(t), s.aim, 'linear'); keysF.push([seg(t), s.foco, 'linear']); keysAp.push([seg(t), q.ap]) }
+            const s = sigue(p, p.sale); pon(keysP, p.sale, s.pos, 'linear'); pon(keysA, p.sale, s.aim, 'linear'); keysF.push([p.sale, s.foco, 'linear']); keysAp.push([p.sale, q.ap])
+          } else {
+            // quieta mientras dura lo suyo; si se queda mucho (con voz), se va acercando despacio
+            const n = Math.floor((p.sale - p.llega) / 1.3), cerca = (k) => q.pos.map((v, j) => q.aim[j] + (v - q.aim[j]) * k), fin2 = sig ? 0.95 : 0.97
+            for (let k = 1; k <= n; k++) pon(keysP, seg(p.llega + (p.sale - p.llega) * k / (n + 1)), cerca(1 - (1 - fin2) * k / (n + 1)), 'linear'), pon(keysA, seg(p.llega + (p.sale - p.llega) * k / (n + 1)), q.aim, 'linear')
+            pon(keysP, p.sale, n ? cerca(fin2) : q.pos, 'linear'); pon(keysA, p.sale, q.aim, 'linear')
+          }
+        })
+      }
       if (keysP.length === 1) { keysP.push([D, keysP[0][1]]); keysA.push([D, keysA[0][1]]) }
       if (keysAp.length === 1) { keysAp.push([D, keysAp[0][1]]); keysF.push([D, keysF[0][1]]) }
       const TODO = planos.find((p) => p.en === 'todo') || { llega: 1e9 }

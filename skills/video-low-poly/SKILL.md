@@ -75,9 +75,11 @@ ahí desde el inicio.
 }
 ```
 
-- **`en`**: el lugar del mapa donde pasa (sin él, el del momento anterior). La cámara va sola de un lugar al siguiente y
-  se queda mientras pasa lo suyo, en un solo movimiento de grúa como el de la referencia. Entre dos lugares, mejor un
-  segundo y medio de voz o más; menos de tres cuartos de segundo no deja verlo (`hacer.py` lo exige).
+- **`en`**: el lugar del mapa donde pasa (sin él, el del momento anterior). La cámara va sola de cosa en cosa: llega
+  justo antes de que brote, la enfoca y se queda quieta mientras crece; lo que viaja (el camión, el barco) lo sigue.
+  Entre dos momentos que traen algo, mejor un segundo y medio de voz o más (un cultivo o un pueblo tardan algo más en
+  verse enteros): con menos, la cámara se queda menos en lo de antes. Menos de tres cuartos de segundo entre dos
+  lugares no deja verlo (`hacer.py` lo exige).
   - `mar`: el mar junto al islote · `cielo`: el cielo sobre la costa · `montaña`: el monte nevado y su ladera
   - `rio`: el río que baja del monte al mar · `costa`: el puerto junto a la playa · `llanura`: el llano del pueblo
   - `valle`: el campo al este · `bosque`: el bosque de pinos en la ladera
