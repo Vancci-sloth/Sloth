@@ -323,7 +323,8 @@ export function Picker(props: {
   flotante?: boolean
   value: string
   disabled?: boolean
-  groups: { label: string; options: { value: string; label: string }[] }[]
+  /** `detalle` va a la derecha de la opción, apagado (lo que cuesta y tarda cada modelo). */
+  groups: { label: string; options: { value: string; label: string; detalle?: string }[] }[]
   onChange(value: string): void
 }) {
   const [open, setOpen] = useState(false)
@@ -416,6 +417,7 @@ export function Picker(props: {
                   }}
                 >
                   {o.label}
+                  {o.detalle && <span className="picker-detalle">{o.detalle}</span>}
                   {o.value === props.value && (
                     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                       <path d="M20 6 9 17l-5-5" />

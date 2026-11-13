@@ -78,7 +78,8 @@ Este es el mapa:
   `momentos.json` y `scripts/hacer.py` hace lo demás; `scripts/director.py` arma las escenas (`guion.json`) para su
   plantilla. Su vara son diez Code Report (`REFERENCIAS.md`).
 - `modelos` (`web/src/Modelos.tsx`): en «Optimizado», el modelo y el esfuerzo medidos para el hilo. Una card sin medir
-  usa lo último que eligió el usuario a mano. En «Avanzado» se eligen. Los subagentes van siempre en el modelo y el
+  usa lo último que eligió el usuario a mano. En «Avanzado» se eligen; junto a cada modelo medido sale lo que cuesta y
+  tarda un minuto de video (`porMinuto` de la card: al medir otro modelo, se añade ahí). Los subagentes van siempre en el modelo y el
   esfuerzo del hilo: en Claude, Sloth los manda en la línea `Subagentes: todos = <alias> <esfuerzo>.` (las `tareas`
   medidas de la card ya no se usan). La excepción es el `guionista` del explicativo (`server/claude.ts`), que va en Opus.
 - La galería: al elegir un estilo, sus videos terminados ocupan el sitio de las cards (`videosApi` en `etapas.ts`);

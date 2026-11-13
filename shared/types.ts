@@ -136,6 +136,20 @@ export interface ModeloTarea {
 export interface ModelosConf {
   principal?: ModeloTarea
   tareas?: (ModeloTarea & { nombre: string; para: string })[]
+  /** Lo medido con cada modelo y esfuerzo que se probó en el estilo: el hilo nuevo lo enseña junto a cada modelo. */
+  porMinuto?: PorMinuto[]
+}
+
+/**
+ * Lo que cuesta (a precio de la API) y tarda un minuto de video con un modelo y un esfuerzo, de lo medido: lo que costó
+ * y tardó el video entre lo que dura. `medido` dice cuándo y con qué video.
+ */
+export interface PorMinuto {
+  model: string
+  effort: string
+  usd: number
+  minutos: number
+  medido: string
 }
 
 /** Un video terminado de un estilo. Con `sessionId`, el hilo que lo hizo; sin él, es de una carpeta de fuera. */

@@ -75,7 +75,10 @@
         "model": "claude-sonnet-5-5",
         "effort": "medium",
         "medido": "12 nov 2026, con el director: un episodio de 6 min en 8,6 a 10,3 min y $1,53 a $2,08, y uno de 1 min en 4,0 min y $1,17, sin subagentes. Antes iba en Opus high con unos 28 subagentes: de 36 a 84 min y de $32 a $50 por episodio de 6 min."
-      }
+      },
+      "porMinuto": [
+        { "model": "claude-sonnet-5-5", "effort": "medium", "usd": 1.17, "minutos": 4, "medido": "12 nov 2026: un episodio de 1 min, en 4,0 min y $1,17 (los de 6 min salen a $0,30 y 1,6 min por minuto)." }
+      ]
     },
     "sinHerramientas": [
       "mcp__21st__add_to_list",
@@ -284,7 +287,12 @@
         "model": "claude-sonnet-5-5",
         "effort": "medium",
         "medido": "5 nov 2026, tamal, agua y estafas con el director: medium 2.9–4.3 min y $0.27–0.38; high 2.9–7.0 min y $0.39–1.08, con guiones igual de buenos. Sin esto iba en Opus high."
-      }
+      },
+      "porMinuto": [
+        { "model": "claude-sonnet-5-5", "effort": "medium", "usd": 0.66, "minutos": 7.2, "medido": "5 nov 2026: tamal, agua y estafas (90 s entre los tres), en 10,8 min y $0,99." },
+        { "model": "claude-sonnet-5-5", "effort": "high", "usd": 1.22, "minutos": 9.3, "medido": "5 nov 2026: tamal, agua y estafas (90 s entre los tres), en 14 min y $1,83." },
+        { "model": "claude-opus-5-5", "effort": "high", "usd": 2.17, "minutos": 6.8, "medido": "13 nov 2026: «Cómo funciona Sloth», de 55 s, con la voz de AI Studio, en 6,2 min y $1,98." }
+      ]
     },
     "etapas": [
       {
@@ -485,7 +493,11 @@
         "model": "claude-sonnet-5-5",
         "effort": "medium",
         "medido": "11 nov 2026, la misma grabación de 53 s con el director: Sonnet medio 3,6 min y $0,40 en 7 pasos (2,6 min y $0,38 con una de 40 s); Haiku medio 6,2 min y $0,40 en 28 pasos, con peor material. Sin esto iba en Opus alto."
-      }
+      },
+      "porMinuto": [
+        { "model": "claude-sonnet-5-5", "effort": "medium", "usd": 0.45, "minutos": 4.1, "medido": "11 nov 2026: una grabación de 53 s, en 3,6 min y $0,40." },
+        { "model": "claude-haiku-5-5", "effort": "medium", "usd": 0.45, "minutos": 7, "medido": "11 nov 2026: la misma grabación de 53 s, en 6,2 min y $0,40, con peor material." }
+      ]
     },
     "etapas": [
       {
