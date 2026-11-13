@@ -1,0 +1,5 @@
+.sobre-ti { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
+.sobre-ti textarea { width: 100%; padding: 8px 10px; background: var(--bg); border: 1px solid var(--line); border-radius: var(--radio); color: var(--text); font-size: 13.5px; line-height: 1.45; resize: vertical; }
+.sobre-ti textarea:focus { outline: none; border-color: var(--amber); }
+.sobre-ti-estado { min-height: 1.2em; }
+.panel > .sobre-ti { margin: 0; padding: 12px 14px; }

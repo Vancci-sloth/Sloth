@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { Icono } from './Iconos'
 import { Logo } from './Logos'
+import { SobreTi } from './SobreTi'
 import { AvisoPrimerAgente, Requisitos, useConAgente } from './Opciones'
 import type { Model } from '../../shared/types'
 import './Bienvenida.css'
@@ -47,7 +48,8 @@ export const BIENVENIDA_CERRADA = 'sloth-bienvenida-cerrada'
 
 /**
  * La bienvenida: sale la primera vez que se abre Sloth y luego desde Opciones. Dice qué hace, qué hace falta (con lo
- * que falta a la vista, para hacerlo ahí mismo), cómo va un video, cuánto tarda y qué cuesta.
+ * que falta a la vista, para hacerlo ahí mismo), deja contar de ti para todos los agentes, cómo va un video, cuánto tarda
+ * y qué cuesta.
  */
 export function Bienvenida({ models }: { models: Model[] }) {
   const [abierta, setAbierta] = useState(() => !localStorage.getItem(VISTA))
@@ -125,13 +127,18 @@ export function Bienvenida({ models }: { models: Model[] }) {
           ))}
           {conAgente === false && <AvisoPrimerAgente onIr={cerrar} />}
         </Paso>
-        <Paso n={2} titulo="Prepara tu computadora" hecho={listo}>
+        <Paso n={2} titulo="Cuéntale de ti (opcional)">
+          A qué te dedicas, de qué es tu canal, para quién haces videos y cómo te gusta que te hablen. Lo escribes una vez
+          y todos los agentes lo tienen en cuenta en cada chat; lo cambias cuando quieras en Opciones → Sobre ti.
+          <SobreTi />
+        </Paso>
+        <Paso n={3} titulo="Prepara tu computadora" hecho={listo}>
           Los estilos usan unas herramientas (FFmpeg, Python…). Si falta alguna, aquí sale el botón para descargarla; tarda unos
           minutos y solo se hace una vez.
           <Requisitos onListo={setListo} />
         </Paso>
         {anclada !== null && (
-          <Paso n={3} titulo="Ten Sloth a mano (opcional)" hecho={anclada}>
+          <Paso n={4} titulo="Ten Sloth a mano (opcional)" hecho={anclada}>
             {anclada ? 'Sloth está anclada a la barra de tareas.' : 'Ánclala a la barra de tareas para abrirla con un clic.'}
             {!anclada && (
               <div className="anclar">
@@ -148,12 +155,12 @@ export function Bienvenida({ models }: { models: Model[] }) {
             )}
           </Paso>
         )}
-        <Paso n={anclada === null ? 3 : 4} titulo="Haz tu primer video">
+        <Paso n={anclada === null ? 4 : 5} titulo="Haz tu primer video">
           Elige un estilo, escribe el tema o pega un enlace y pulsa <b>↑</b>. Cuando el guion está listo, Sloth te pide tu voz:
           grábalo con el celular y súbelo en la etapa «Tu voz». Luego arma el video y lo revisa. El Diff tarda de una a dos
           horas; el Video explicativo, unos 40 minutos. Cuando acaba, lo descargas desde el video o en «Mis videos».
         </Paso>
-        <Paso n={anclada === null ? 4 : 5} titulo="Lo que gasta">
+        <Paso n={anclada === null ? 5 : 6} titulo="Lo que gasta">
           Cada video usa una parte de los límites de tu plan, que ves en Opciones. Las cifras en dólares que salen en cada
           video dicen cuánto costaría pagado aparte, no lo que se te cobra. Un video gasta bastante: con el plan Pro el límite
           se acaba pronto, y con Max alcanza para varios. Con una llave de API no hay límites: esas cifras son lo que pagas.

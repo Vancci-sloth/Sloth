@@ -7,7 +7,7 @@ import { OpenCode, type OpenCodeClient, type OpenCodeEvent } from '@opencode/cli
 import type { Model, Tokens } from '../shared/types.ts'
 import type { AgentOptions, AgentRun, SkillRef } from './agent.ts'
 import { asegurarAgente, rutaAgente } from './agentes.ts'
-import { INSTRUCCIONES } from './instrucciones.ts'
+import { instrucciones } from './instrucciones.ts'
 import { navegadorAgente } from './navegador-agente.ts'
 import { mcpVoz } from './voz/index.ts'
 import { mcpFlow } from './flow/index.ts'
@@ -411,7 +411,7 @@ export function startOpenCode(opts: AgentOptions, conectar: () => Promise<Servid
     sesion = viva
     if (cerrado) return
     s.oyentes.set(sesion, oir)
-    await c.session.instructions.entry.put({ sessionID: sesion, key: 'sloth', value: INSTRUCCIONES })
+    await c.session.instructions.entry.put({ sessionID: sesion, key: 'sloth', value: instrucciones() })
     // Si el navegador no arranca, el hilo sigue sin él.
     await Promise.all(
       Object.entries(servidoresMcp).map(([nombre, srv]) =>

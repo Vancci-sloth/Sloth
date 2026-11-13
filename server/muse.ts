@@ -6,7 +6,7 @@ import type { AgentEvent, Model, Tokens } from '../shared/types.ts'
 import { conRutas, IMAGE_TYPES, type AgentOptions, type AgentRun, type SkillRef } from './agent.ts'
 import { rutaAgente } from './agentes.ts'
 import { cuentaConVentana } from './cuenta-ventana.ts'
-import { conSkill, INSTRUCCIONES, mcpSloth } from './instrucciones.ts'
+import { conSkill, instrucciones, mcpSloth } from './instrucciones.ts'
 import { RpcLineas } from './rpc-lineas.ts'
 
 /**
@@ -194,7 +194,7 @@ export function startMuse(opts: AgentOptions): AgentRun {
   void ready.catch(() => {})
 
   function partes(text: string, images: string[]) {
-    const texto = conRutas(primero ? `<sloth>\n${INSTRUCCIONES}\n</sloth>\n\n${text}` : text, images)
+    const texto = conRutas(primero ? `<sloth>\n${instrucciones()}\n</sloth>\n\n${text}` : text, images)
     primero = false
     return [{ type: 'text', text: texto }, ...images.map((p) => ({ type: 'image', mediaType: IMAGE_TYPES[extname(p).toLowerCase()] ?? 'image/png', base64Data: readFileSync(p).toString('base64') }))]
   }

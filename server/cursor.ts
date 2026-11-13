@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url'
 import type { AgentEvent, CuentaClaude, Model, Tokens } from '../shared/types.ts'
 import { conRutas, IMAGE_TYPES, type AgentOptions, type AgentRun, type SkillRef } from './agent.ts'
 import { asegurarAgente, rutaAgente } from './agentes.ts'
-import { conSkill, INSTRUCCIONES, mcpSloth } from './instrucciones.ts'
+import { conSkill, instrucciones, mcpSloth } from './instrucciones.ts'
 import { matarArbol } from './rpc-lineas.ts'
 
 /**
@@ -212,7 +212,7 @@ export function startCursor(opts: AgentOptions): AgentRun {
     turno++
     parte = 0
     // Cursor no tiene instrucciones de sistema que el SDK deje poner: van al principio del primer mensaje.
-    const text = conRutas(primero ? `<sloth>\n${INSTRUCCIONES}\n</sloth>\n\n${texto}` : texto, images)
+    const text = conRutas(primero ? `<sloth>\n${instrucciones()}\n</sloth>\n\n${texto}` : texto, images)
     primero = false
     const mensaje = images.length ? { text, images: images.map((p) => ({ mimeType: IMAGE_TYPES[extname(p).toLowerCase()] ?? 'image/png', data: readFileSync(p).toString('base64') })) } : text
     orden({ type: 'mandar', mensaje, modelo: seleccion(opts.model, opts.effort) })

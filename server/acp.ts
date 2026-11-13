@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import { extname } from 'node:path'
 import type { AgentEvent, Tokens } from '../shared/types.ts'
 import { conRutas, IMAGE_TYPES, type AgentOptions, type AgentRun, type SkillRef } from './agent.ts'
-import { conSkill, INSTRUCCIONES, mcpSloth } from './instrucciones.ts'
+import { conSkill, instrucciones, mcpSloth } from './instrucciones.ts'
 import { RpcLineas } from './rpc-lineas.ts'
 
 /**
@@ -431,7 +431,7 @@ export function startAcp(sabor: SaborAcp, opts: AgentOptions): AgentRun {
   void ready.catch(() => {})
 
   function bloques(text: string, images: string[]) {
-    const texto = conRutas(primero ? `<sloth>\n${INSTRUCCIONES}\n</sloth>\n\n${text}` : text, images)
+    const texto = conRutas(primero ? `<sloth>\n${instrucciones()}\n</sloth>\n\n${text}` : text, images)
     primero = false
     return [
       { type: 'text', text: texto },

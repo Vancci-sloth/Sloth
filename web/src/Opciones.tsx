@@ -17,6 +17,7 @@ import { Logo } from './Logos'
 import { BotonNavegador } from './Navegador'
 import { RadarOpciones } from './RadarOpciones' // radar
 import { Segmento } from './Segmento'
+import { SobreTi } from './SobreTi'
 import { ConNavegadorRedes, RedesOpciones } from './Redes' // redes
 import { YoutubeOpciones } from './Youtube'
 import { useVoz, VozOpciones } from './Voz' // voz de AI Studio
@@ -104,6 +105,9 @@ function Ajustes({ onDone, iniciando, onIniciando }: { onDone(): void; iniciando
         {OTROS_AGENTES.map((p) => (
           <CuentaAgente key={p} p={p} />
         ))}
+      </Grupo>
+      <Grupo titulo="Sobre ti" nota="A qué te dedicas, tu canal, tu público y cómo te gusta que te hablen. Todos los agentes lo leen al empezar cada chat, así no lo repites en cada video. Lo que pidas en un mensaje manda sobre esto.">
+        <SobreTi />
       </Grupo>
       <Grupo titulo="Voz" nota="Al pedir un video eliges en «Voz» si la mandas tú o si el agente la genera con una de estas. La sesión de Google vive en un perfil aparte del navegador de Sloth, que ningún agente usa; las llaves, en tu usuario de esta computadora.">
         <VozOpciones voz={voz} />
