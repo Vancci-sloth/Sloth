@@ -41,18 +41,20 @@
     // GRATIS: los lugares gratis de por vida que se dieron cuando Sloth se vendía (ya no se dan). El apoyo cuesta lo mismo
     // para todos, en MONEDA e IVA incluido; las FUNDADORES primeras personas que apoyan (hasta FUNDADORES_HASTA si se pone,
     // una fecha ISO) son fundadoras. Cada suscripción conserva su monto y su moneda aunque estos cambien. Solo cuentan las
-    // pagadas de verdad (modo produccion), no las de prueba.
+    // pagadas de verdad (modo produccion), no las de prueba. Desde el 13 de noviembre de 2026 el apoyo es uno solo, de $10
+    // (antes, $15 de Fundador y $30 de Donador PRO); lo pagado de más se dio como tiempo (src/bajar-apoyo.ts). Si vuelve a
+    // bajar, se corre igual `node scripts/bajar-apoyo.mjs` con la fecha del cambio.
     "GRATIS": 25,
     "FUNDADORES": 25,
-    "PRECIO_MENSUAL": 15,
-    "PRECIO_ANUAL": 150,
+    "PRECIO_MENSUAL": 10,
+    "PRECIO_ANUAL": 100,
     // El mensual y el de una vez también van con el monto que elija cada quien, desde APOYO_MINIMO; desde APOYO_GRANDE al
-    // mes, con la insignia de apoyo grande en la comunidad.
+    // mes, con la insignia de apoyo grande (Donador PRO) en la comunidad, aunque la página ya no lo ofrece aparte.
     "APOYO_MINIMO": 1,
     "APOYO_GRANDE": 30,
     // Con Mercado Pago, que solo cobra en pesos: los mismos, en MXN (la página dice a cuántos dólares equivalen).
-    "PRECIO_MENSUAL_MXN": 299,
-    "PRECIO_ANUAL_MXN": 2990,
+    "PRECIO_MENSUAL_MXN": 199,
+    "PRECIO_ANUAL_MXN": 1990,
     "APOYO_MINIMO_MXN": 20,
     "APOYO_GRANDE_MXN": 599,
     // Con cripto, el monto elegido va desde aquí: NOWPayments no acepta menos de unos $11 en USDT por TRON, la red más

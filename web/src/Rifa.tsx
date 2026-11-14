@@ -8,7 +8,7 @@ import './Rifa.css'
  * «Participa en la rifa», hasta arriba de la comunidad mientras el creador tiene una abierta (`licencias/src/rifa.ts`):
  * «Llévate créditos de Sloth» (qué y para cuántos lo decide el creador en cada sorteo), cuántos participan, quién ya
  * ganó y un solo botón. La rifa sigue abierta entre sorteos: quien participa entra en todos hasta que gana una vez. Al pulsarlo queda claro que ya estás dentro y adónde llega el aviso
- * si ganas. Quien ya tiene los créditos de cada mes (paga $15 USD o más) o es Fundador la ve, con por qué no participa.
+ * si ganas. Quien ya tiene los créditos de cada mes (paga $10 USD o más) o es Fundador la ve, con por qué no participa.
  * Cerrada, durante unos días, quién ganó qué. Al creador le lleva a Administrador, donde se sortea (`RifaAdmin.tsx`).
  */
 export const RIFA_CAMBIO = 'sloth-rifa'

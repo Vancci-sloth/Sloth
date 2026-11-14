@@ -41,7 +41,9 @@
  * Por la página son `FUNDADORES` lugares como mucho (llenos, la página solo enseña el grande y «Lo que gustes»); con un enlace
  * de invitación del creador (`enlaces_fundador`, que da `npm run fundador`), que es de una sola persona y deja de servir
  * con su primer pago, la página ofrece el precio de Fundador aunque los lugares estén ocupados. Cada suscripción conserva el monto y la moneda con que se creó: las de antes
- * del 30 de octubre de 2026 siguen en pesos; las nuevas, en `MONEDA`.
+ * del 30 de octubre de 2026 siguen en pesos; las nuevas, en `MONEDA`. Desde el 13 de noviembre de 2026 el apoyo es uno
+ * solo, de $10 (199 MXN), que es también el de Fundador: las de más bajaron a $10 y lo pagado de más se les dio como
+ * tiempo (`bajar-apoyo.ts`).
  * Cuando Sloth se vendía, las primeras personas se unieron gratis de por vida (plan `gratis`, `GRATIS` como mucho): son
  * fundadoras como las primeras que apoyan (`esFundador`), con lo nuevo `ANTICIPO` antes y sin el recordatorio. Ya no se
  * dan.
@@ -70,6 +72,7 @@ import { cancelarStripe, firmaDeStripe, leerStripe, modoStripe, pagoDeSesion, se
 import { olvidarRegistroVoz, renovarVoces, voz } from './voz.ts'
 import { entregarRifas } from './rifa.ts'
 import { APERTURA_VOZ } from './voz-mensual.ts'
+import { bajarApoyo, reanudarPausadas } from './bajar-apoyo.ts'
 
 export interface Env {
   DB: D1Database
@@ -193,6 +196,13 @@ export interface Fila {
   stripe: string | null
   /** El enlace de Fundador con que se abrió (`enlaces_fundador`): al confirmarse el primer pago, ya no sirve a nadie más. */
   enlace_fundador?: string | null
+  /** Lo pagado de más cuando el apoyo bajó a $10, en días (`bajar-apoyo.ts`): en lo pagado de una vez, se suman a sus pagos. */
+  extra_dias?: number
+  /** Hasta cuándo vale con esos días: una suscripción no baja de ahí al volver a leerse. */
+  extra_hasta?: string | null
+  /** La suscripción de PayPal o Mercado Pago que se pausó para no cobrar antes de `extra_hasta`: el cron la reanuda ese día. */
+  reanudar?: string | null
+  extra_avisado?: string | null
 }
 
 /** Lo que el cobro guarda de una suscripción o de los pagos del año. `hasta`: su próximo cobro o su fin, si se sabe. */
@@ -202,11 +212,11 @@ export interface Lectura {
 }
 
 /** Un año (o un mes, el apoyo `unico` y el mensual con cripto) pagado de una vez, con Mercado Pago, PayPal, cripto o tarjeta: no se renueva solo. */
-const deUnaVez = (f: Pick<Fila, 'preferencia' | 'orden' | 'cripto' | 'stripe' | 'plan'>) => !!(f.preferencia || f.orden || f.cripto || (f.stripe && f.plan !== 'mensual'))
+export const deUnaVez = (f: Pick<Fila, 'preferencia' | 'orden' | 'cripto' | 'stripe' | 'plan'>) => !!(f.preferencia || f.orden || f.cripto || (f.stripe && f.plan !== 'mensual'))
 /** Lo más que se apoya de una sola vez con el monto que elija cada quien, en cada moneda. */
 const APOYO_MAXIMO: Record<string, number> = { USD: 1000, MXN: 20000 }
 /** Quién cobra la suscripción de la fila, o quién cobró el primer año: para los correos y la página de gracias. */
-const pasarela = (f: Pick<Fila, 'preapproval' | 'preferencia' | 'cripto' | 'stripe'>) => (f.stripe ? 'Stripe' : f.cripto ? 'NOWPayments' : f.preapproval || f.preferencia ? 'Mercado Pago' : 'PayPal')
+export const pasarela = (f: Pick<Fila, 'preapproval' | 'preferencia' | 'cripto' | 'stripe'>) => (f.stripe ? 'Stripe' : f.cripto ? 'NOWPayments' : f.preapproval || f.preferencia ? 'Mercado Pago' : 'PayPal')
 
 /** Cuántos se han unido: los lugares gratis tomados y las suscripciones pagadas alguna vez (de ellas, las de fundador). */
 export interface Cuenta {
@@ -470,6 +480,7 @@ export default {
       ctx.waitUntil(reenviarClaves(env).catch((e) => console.error('Claves sin mandar', e instanceof Error ? e.message : e)))
       ctx.waitUntil(renovarVoces(env, ctx).catch((e) => console.error('Créditos mensuales de voz', e instanceof Error ? e.message : e)))
       ctx.waitUntil(entregarRifas(env, ctx).catch((e) => console.error('Premios de la rifa', e instanceof Error ? e.message : e)))
+      ctx.waitUntil(reanudarPausadas(env).catch((e) => console.error('Reanudar pausadas', e instanceof Error ? e.message : e)))
       return
     }
     ctx.waitUntil(avisarCobros(env).catch((e) => console.error('Avisos de cobro', e instanceof Error ? e.message : e)))
@@ -511,6 +522,7 @@ async function atender(req: Request, env: Env, ctx: ExecutionContext, url: URL):
     if (req.method === 'POST' && url.pathname === '/cancelar') return await cancelar(env, await cuerpo(req))
     if (req.method === 'POST' && url.pathname === '/pago') return await pago(env, await cuerpo(req))
     if (req.method === 'POST' && url.pathname === '/a-mano') return await aMano(req, env)
+    if (req.method === 'POST' && url.pathname === '/bajar-apoyo') return await bajarApoyo(req, env)
     if (url.pathname === '/comunidad' || url.pathname.startsWith('/comunidad/')) return await comunidad(req, env, url, ctx)
     if (url.pathname === '/voz' || url.pathname.startsWith('/voz/')) return await voz(req, env, ctx, url)
     return json({ error: 'No existe' }, 404)
@@ -1382,7 +1394,7 @@ export async function firmaDeNowpayments(aviso: unknown, firma: string | null, s
  * Vuelve a leer la suscripción (de PayPal o de Mercado Pago) o los pagos del año pagado de una vez, y la guarda. `otros`:
  * lo que trajo un aviso, por si la búsqueda aún no lo ve (el pago de Mercado Pago) o no es la última orden (las de PayPal).
  */
-async function refrescar(env: Env, fila: Fila, otros: Otros = {}): Promise<Fila> {
+export async function refrescar(env: Env, fila: Fila, otros: Otros = {}): Promise<Fila> {
   if (deUnaVez(fila)) return guardarEstado(env, fila, leerPagos(await pagosDelAño(env, fila, otros), fila))
   if (fila.stripe) return refrescarStripe(env, fila)
   if (fila.paypal) return guardarEstado(env, fila, leerPaypal(await paypal<SuscripcionPaypal>(env, 'GET', `/v1/billing/subscriptions/${encodeURIComponent(fila.paypal)}`)))
@@ -1527,8 +1539,7 @@ async function guardarEstado(env: Env, fila: Fila, l: Lectura): Promise<Fila> {
   const nueva: Fila = {
     ...fila,
     estado,
-    // Lo pagado de una vez sale entero de sus pagos: uno reembolsado deja de contar.
-    pagado_hasta: deUnaVez(fila) ? (l.hasta ?? null) : (l.hasta ?? fila.pagado_hasta),
+    pagado_hasta: hastaConExtra(fila, l),
     autorizada: fila.autorizada ?? (estado === 'authorized' || estado === 'pagado' ? ahora : null),
     revisada: ahora
   }
@@ -1546,6 +1557,22 @@ async function guardarEstado(env: Env, fila: Fila, l: Lectura): Promise<Fila> {
     .bind(estado, nueva.pagado_hasta, nueva.autorizada, ahora, fila.id)
     .run()
   return nueva
+}
+
+/**
+ * Hasta cuándo vale la fila con lo que se acaba de leer. Lo pagado de una vez sale entero de sus pagos (uno reembolsado
+ * deja de contar), más los días que se le dieron al bajar el apoyo a $10 (`extra_dias`). Una suscripción vale hasta su
+ * próximo cobro, o lo último que se vio si ya no lo dice (cancelada o en pausa), y nunca menos que `extra_hasta`.
+ */
+export function hastaConExtra(f: Pick<Fila, 'preferencia' | 'orden' | 'cripto' | 'stripe' | 'plan' | 'pagado_hasta' | 'extra_dias' | 'extra_hasta'>, l: Lectura): string | null {
+  if (deUnaVez(f)) return l.hasta ? masDias(l.hasta, f.extra_dias ?? 0) : null
+  const hasta = l.hasta ?? f.pagado_hasta
+  return hasta && f.extra_hasta && Date.parse(hasta) < Date.parse(f.extra_hasta) ? f.extra_hasta : hasta
+}
+
+/** `iso` más `dias` días, en ISO. */
+export function masDias(iso: string, dias: number): string {
+  return dias ? new Date(Date.parse(iso) + dias * DIA).toISOString() : iso
 }
 
 /**
@@ -1609,7 +1636,7 @@ function bienvenida(env: Env, f: Fila) {
 }
 
 /** Un apoyo de Fundador que el creador dio a mano (una transferencia): ninguna pasarela lo lee ni lo cancela. */
-const deAMano = (f: Pick<Fila, 'plan' | 'paypal' | 'orden' | 'preapproval' | 'preferencia' | 'cripto' | 'stripe'>) =>
+export const deAMano = (f: Pick<Fila, 'plan' | 'paypal' | 'orden' | 'preapproval' | 'preferencia' | 'cripto' | 'stripe'>) =>
   f.plan === 'unico' && !(f.paypal || f.orden || f.preapproval || f.preferencia || f.cripto || f.stripe)
 
 /** Hasta cuándo vale un apoyo a mano al sumarle `meses`: desde lo ya pagado, si aún no se acaba. */
@@ -1665,7 +1692,9 @@ export function vigencia(f: Pick<Fila, 'estado' | 'pagado_hasta'>, ahora: number
 
 /** Lo que guarda Sloth: `datos` tal cual se firmó (un JSON en texto) y su firma. */
 async function firmada(env: Env, f: Fila, equipo: string, ahora: number): Promise<Response> {
-  const { activa, hasta } = vigencia(f, ahora)
+  // La pausada al bajar el apoyo sigue activa y se reanuda sola: la app la enseña con su próximo cobro y su «Cancelar».
+  const estado: Estado = f.estado === 'paused' && f.reanudar ? 'authorized' : f.estado
+  const { activa, hasta } = vigencia({ estado, pagado_hasta: f.pagado_hasta }, ahora)
   // Fundador: un apoyo de su correo que entró entre los primeros y se llegó a pagar (`esFundador`), o su lugar gratis de por vida.
   const fundador = !!(await env.DB.prepare(`SELECT 1 FROM licencias l WHERE l.email = ? AND ${esFundador('l')} LIMIT 1`).bind(f.email).first())
   const datos = JSON.stringify({
@@ -1674,7 +1703,7 @@ async function firmada(env: Env, f: Fila, equipo: string, ahora: number): Promis
     email: f.email,
     plan: f.plan,
     monto: f.monto,
-    estado: f.estado,
+    estado,
     activa,
     pagadaHasta: f.pagado_hasta ?? undefined,
     hasta: new Date(hasta).toISOString(),
@@ -1817,7 +1846,7 @@ function tokenMp(env: Env): string {
   return token
 }
 
-async function mp<T>(env: Env, metodo: string, ruta: string, cuerpo?: unknown, extra: Record<string, string> = {}): Promise<T> {
+export async function mp<T>(env: Env, metodo: string, ruta: string, cuerpo?: unknown, extra: Record<string, string> = {}): Promise<T> {
   const r = await fetch(`${MP}${ruta}`, {
     method: metodo,
     headers: { authorization: `Bearer ${tokenMp(env)}`, 'content-type': 'application/json', ...extra },
@@ -1850,7 +1879,7 @@ async function tokenPaypal(env: Env): Promise<string> {
 }
 
 /** Una llamada a PayPal. `cuerpo` en texto va tal cual (el aviso que se comprueba); si no, en JSON. */
-async function paypal<T>(env: Env, metodo: string, ruta: string, cuerpo?: unknown, extra: Record<string, string> = {}): Promise<T> {
+export async function paypal<T>(env: Env, metodo: string, ruta: string, cuerpo?: unknown, extra: Record<string, string> = {}): Promise<T> {
   const r = await fetch(`${PAYPAL[env.PAYPAL_MODO]}${ruta}`, {
     method: metodo,
     headers: { authorization: `Bearer ${await tokenPaypal(env)}`, 'content-type': 'application/json', ...extra },
@@ -1972,7 +2001,7 @@ function escapar(texto: string): string {
 }
 
 /** «21 de noviembre de 2026», en la hora de la Ciudad de México. */
-function fecha(iso: string): string {
+export function fecha(iso: string): string {
   return new Date(iso).toLocaleDateString('es-MX', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'America/Mexico_City' })
 }
 

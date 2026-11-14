@@ -138,9 +138,9 @@ Los créditos mensuales de voz necesitan la migración `0024_voz_mensual.sql` y 
 la app. El script de publicación manda `vozMensual` y, al terminar de subir el `latest*.yml`, el Worker guarda la marca
 `voz-mensual.json` en R2: ahí abre las voces aunque siga `VOZ_SOLO_CREADOR=1`. Hasta entonces siguen solo para el creador.
 Cada diez minutos refresca a 100.000 los créditos de cada correo, una vez por mes natural de Ciudad de México, **SOLO a
-quien paga activamente $15 USD o más** (`PRECIO_MENSUAL`; 299 MXN en los apoyos en pesos, o el anual) y a nadie más: ni
-cuentas gratis, ni apoyos de menos (el monto que cada quien elige), ni lugares gratis de Fundador de por vida. Lo decidió
-el creador el 7 de noviembre de 2026 y la regla es una sola, `daCreditos` en `licencias/src/voz-mensual.ts`, que usa
+quien paga activamente el apoyo o más** (`PRECIO_MENSUAL`: $10 USD desde el 13 de noviembre de 2026, antes $15; 199 MXN
+en los apoyos en pesos, o el anual) y a nadie más: ni cuentas gratis, ni apoyos de menos (el monto que cada quien elige),
+ni lugares gratis de Fundador de por vida. Lo decidió el creador el 7 de noviembre de 2026 y la regla es una sola, `daCreditos` en `licencias/src/voz-mensual.ts`, que usa
 también la rifa. También lo hace al consultar `/voz`. Refrescar es sumar lo que falta para llegar a 100.000: lo
 no usado no se acumula, nunca se quita lo que el creador dio de más, y no se recuperan meses anteriores. El correo lleva
 la **clave de Sloth existente**, que se pega en Opciones → Voz → Voces de Sloth, y se reintenta sin repetir la entrega. Todo sale de las mismas llaves de socio y aparece en Administrador.
@@ -153,10 +153,15 @@ put NOMBRE`. Desde PowerShell, la tubería le pone un BOM delante y la pasarela 
 Cloning (`pk_live_…`) va en el siguiente `VOICES_PK_LIVE_<n>` libre (mira `secret list`), nunca encima de una que ya
 está: cada una es su cuenta, con sus usuarios (ADR 0018). Su saldo se ve en Administrador.
 
+Desde el 13 de noviembre de 2026 el apoyo es uno solo, de $10 USD (199 MXN), y la página enseña solo ese y «Lo que
+gustes» (antes, $15 de Fundador y $30 de Donador PRO). A quien había pagado más se le dio lo pagado de más como tiempo
+con `node scripts/bajar-apoyo.mjs` (`licencias/src/bajar-apoyo.ts`): su suscripción bajó a $10 y no cobra antes de que se
+acabe; las de PayPal y Mercado Pago quedaron en pausa y el cron las reanuda ese día (`reanudar`). Si el apoyo vuelve a
+bajar, se cambia el precio, se despliega y se corre igual con la fecha del cambio (`--probar` primero).
+
 Cuando el usuario pida un link de Fundador, dale uno nuevo con `npm run fundador -- nuevo <para quién>`. Es de una sola
-persona: la página ofrece los $15 (cada mes o una vez) hasta que alguien paga con él, aunque los 25 lugares públicos
-estén ocupados. Sin link, la página enseña el de Fundador mientras quede alguno de los 25, y llenos, solo «Lo que
-gustes» y $30. Con `lista` ves los que se han dado y quién usó cada uno, y con `revocar <código>` uno deja de servir.
+persona: quien apoya con $10 o más con él es Fundador aunque los 25 lugares públicos estén ocupados; sin link, lo es
+mientras quede alguno de los 25. Con `lista` ves los que se han dado y quién usó cada uno, y con `revocar <código>` uno deja de servir.
 Si alguien apoyó por transferencia, `npm run fundador -- dar <correo> [meses]` lo hace Fundador esos meses (1 si no se
 dice) y le manda su clave por correo; si ya tenía uno así, se le suman. Con 0 meses, solo se le vuelve a mandar.
 

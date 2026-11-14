@@ -4,7 +4,7 @@
  * y en Administrador se abre, se sortea con la ruleta y se cierra (`web/src/RifaAdmin.tsx`).
  *
  * - Participa una persona por correo (`externo`, el id de la primera licencia de su correo, el mismo usuario que en las
- *   voces), con un botón. Quien ya recibe los créditos de cada mes (paga activamente $15 USD o más, `daCreditos`) o es
+ *   voces), con un botón. Quien ya recibe los créditos de cada mes (paga activamente $10 USD o más, `daCreditos`) o es
  *   Fundador queda fuera (`fuera`). Las cuentas gratis y quien apoya con menos sí entran. Se vuelve a mirar en cada
  *   sorteo: quien empezó a apoyar después ya no entra.
  * - Abrirla no dice qué se rifa. La rifa sigue abierta hasta que el creador la cierra, y mientras sortea cuando quiere:
@@ -56,7 +56,7 @@ function porQue(env: Env, f: Fuera): string {
 /**
  * Lo que deja fuera de la rifa al correo `email` (una expresión SQL), o NULL si puede entrar: bloqueado, Fundador (el
  * que pagó su lugar o el gratis de por vida, por decisión del creador) o quien ya recibe los créditos de cada mes
- * (`daCreditos`: paga activamente $15 USD o más). Quien apoya con menos (el monto que elige, desde $1) sí participa.
+ * (`daCreditos`: paga activamente $10 USD o más). Quien apoya con menos (el monto que elige, desde $1) sí participa.
  * Su alias (`rf`) no es el de ninguna consulta que la use: con el mismo, compararía cada correo consigo mismo.
  */
 export const fuera = (env: Env, email: string) => `(SELECT CASE

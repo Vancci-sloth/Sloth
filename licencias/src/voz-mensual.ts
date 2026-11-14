@@ -1,6 +1,6 @@
 /**
  * Los 100.000 créditos mensuales de Sloth salen de las cuentas del socio (`voz.ts`). Se refrescan (se llena hasta 100.000, sin acumular) una vez por mes natural
- * de Ciudad de México, sin recuperar meses anteriores. SOLO para quien paga activamente $15 USD o más (`daCreditos`) y
+ * de Ciudad de México, sin recuperar meses anteriores. SOLO para quien paga activamente $10 USD o más (`daCreditos`) y
  * nadie más; una persona es el id de la primera licencia de su correo, aunque tenga más de una clave o computadora.
  *
  * Empieza cuando `scripts/publicar.mjs` termina de subir una actualización que trae esta función. Desplegar el Worker
@@ -42,10 +42,10 @@ export async function vocesPublicadas(env: Env): Promise<boolean> {
 /** Desde cuánto se reciben los créditos: el apoyo sugerido (`PRECIO_MENSUAL` en `MONEDA`; en pesos, `PRECIO_MENSUAL_MXN`). */
 export const desdeCuanto = (env: Env) => ({
   moneda: String(env.MONEDA ?? 'USD').replace(/[^A-Z]/g, '') || 'USD',
-  monto: Number(env.PRECIO_MENSUAL) || 15,
-  pesos: Number(env.PRECIO_MENSUAL_MXN) || 299
+  monto: Number(env.PRECIO_MENSUAL) || 10,
+  pesos: Number(env.PRECIO_MENSUAL_MXN) || 199
 })
-/** «$15 USD (299 MXN en los apoyos en pesos)», para Administrador. */
+/** «$10 USD (199 MXN en los apoyos en pesos)», para Administrador. */
 export const desdeTexto = (env: Env) => {
   const d = desdeCuanto(env)
   return `$${d.monto} ${d.moneda} (${d.pesos} MXN en los apoyos en pesos)`
@@ -53,7 +53,8 @@ export const desdeTexto = (env: Env) => {
 
 /**
  * La licencia `t` da los créditos del mes (una expresión SQL; `ahora`, la fecha con que se compara): SOLO quien paga
- * activamente $15 USD o más, por decisión del creador (7 de noviembre de 2026), y nadie más. Es un apoyo de producción,
+ * activamente el apoyo ($15 USD desde el 7 de noviembre de 2026, por decisión del creador; desde el 13, que el apoyo es
+ * uno solo, $10 USD) o más, y nadie más. Es un apoyo de producción,
  * con pago confirmado (`autorizada`) y sin vencer: el mensual o el de una vez (que vale ese mes) de al menos
  * `PRECIO_MENSUAL` en `MONEDA` o `PRECIO_MENSUAL_MXN` en los de pesos, o el anual. NO reciben: las cuentas gratis, los
  * apoyos de menos (el monto que cada quien elige, desde $1), los vencidos, los de prueba, los que aún no pagan y los
@@ -173,7 +174,7 @@ async function avisarEntrega(env: Env, b: Entrega): Promise<void> {
 /**
  * Cuánto saldo queda libre para repartir (rifas, regalos) sin quedarse corto con lo de cada mes: el saldo general de
  * todas las llaves, menos lo que ya tienen los usuarios sin gastar (asignar no gasta el saldo, pero generar sí), menos
- * lo que falta por entregar este mes a quien apoya con $15 o más (a cada uno, lo que le falta para llegar a 100,000).
+ * lo que falta por entregar este mes a quien apoya con $10 o más (a cada uno, lo que le falta para llegar a 100,000).
  */
 export function cuentaDeReparto(o: { saldo: number; usuarios: { externo: string; creditos: number }[]; beneficiarios: string[]; entregados: Set<string> }) {
   const tienen = new Map(o.usuarios.map((u) => [u.externo, Math.max(0, Math.floor(u.creditos))]))

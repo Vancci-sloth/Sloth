@@ -9,8 +9,8 @@ interface __BaseEnv_Env {
 	ORIGEN: "https://api.sloth.vancci.org";
 	GRATIS: 25;
 	FUNDADORES: 25;
-	PRECIO_MENSUAL: 15;
-	PRECIO_ANUAL: 150;
+	PRECIO_MENSUAL: 10;
+	PRECIO_ANUAL: 100;
 	MONEDA: "USD";
 	CORREO_DE: "Sloth <avisos@vancci.org>";
 	CORREO_RESPUESTA: "soporte@vancci.org";

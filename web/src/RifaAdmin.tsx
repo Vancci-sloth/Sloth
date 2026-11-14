@@ -81,7 +81,7 @@ export function RifaAdmin() {
   return (
     <section className="admin-seccion admin-rifa">
       <p className="muted small">
-        Entre quienes no tienen los créditos de cada mes: cuentas gratis y apoyos de menos de $15 USD. Quien paga $15 o más y los Fundadores no participan. Mientras está abierta sale hasta arriba de la comunidad como «Participa en la rifa · Llévate créditos de Sloth», sin decir cuántos. Rifa cuando quieras y cuantas veces quieras, cada vez con su premio: nadie gana dos veces en la misma rifa. Cada ganador recibe sus créditos en su cuenta de voz, el aviso en su Sloth y un correo.
+        Entre quienes no tienen los créditos de cada mes: cuentas gratis y apoyos de menos de $10 USD. Quien paga $10 o más y los Fundadores no participan. Mientras está abierta sale hasta arriba de la comunidad como «Participa en la rifa · Llévate créditos de Sloth», sin decir cuántos. Rifa cuando quieras y cuantas veces quieras, cada vez con su premio: nadie gana dos veces en la misma rifa. Cada ganador recibe sus créditos en su cuenta de voz, el aviso en su Sloth y un correo.
       </p>
       {error && <p className="bad small">{error}</p>}
       {panel && !a && (

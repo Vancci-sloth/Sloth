@@ -54,7 +54,7 @@ test('el mes cambia a medianoche de Ciudad de México, también al cambiar de a�
   assert.equal(periodoVoz(new Date('2027-01-01T06:00:00Z')), '2027-01')
 })
 
-test('SOLO quien paga activamente $15 USD o más (o 299 MXN, o el anual): nadie más, una persona por correo', (t) => {
+test('SOLO quien paga activamente el apoyo, $10 USD o más (o 199 MXN, o el anual): nadie más, una persona por correo', (t) => {
   const { db, env, licencia } = preparar(t)
   licencia('cuenta-original', 'persona@example.com', 'cuenta', 'gratis', 'produccion', null, null)
   licencia('apoyo1', 'persona@example.com', 'mensual', 'authorized')
@@ -70,11 +70,11 @@ test('SOLO quien paga activamente $15 USD o más (o 299 MXN, o el anual): nadie 
   licencia('gratis', 'gratis@example.com', 'cuenta', 'gratis', 'produccion', null, null)
   licencia('vetada', 'vetada@example.com', 'cuenta', 'vetada')
   licencia('apoyovetado', 'vetada@example.com', 'mensual', 'authorized')
-  // Con el monto que elige cada quien: menos de $15 no da créditos, aunque pague.
+  // Con el monto que elige cada quien: menos de $10 no da créditos, aunque pague.
   licencia('cinco', 'cinco@example.com', 'mensual', 'authorized', 'produccion', '2099-01-01', '2026-11-01', 5)
-  licencia('catorce', 'catorce@example.com', 'unico', 'pagado', 'produccion', '2099-01-01', '2026-11-01', 14)
+  licencia('nueve', 'nueve@example.com', 'unico', 'pagado', 'produccion', '2099-01-01', '2026-11-01', 9)
   licencia('treinta', 'treinta@example.com', 'mensual', 'authorized', 'produccion', '2099-01-01', '2026-11-01', 30)
-  // Los de antes, en pesos: desde 299 MXN.
+  // En pesos: desde 199 MXN.
   licencia('pesos', 'pesos@example.com', 'mensual', 'authorized', 'produccion', '2099-01-01', '2026-11-01', 299, 'MXN')
   licencia('pocospesos', 'pocospesos@example.com', 'mensual', 'authorized', 'produccion', '2099-01-01', '2026-11-01', 100, 'MXN')
   const filas = db.prepare(beneficiariosVoz(env)).all(NOVIEMBRE.toISOString(), null) as { externo: string }[]

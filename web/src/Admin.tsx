@@ -54,7 +54,7 @@ interface Panel {
   mensuales?: number
   /** Cuánto saldo queda libre para repartir (`cuentaDeReparto` del cobro); `error` si una llave no respondió. */
   reparto?: Reparto | { error: string } | null
-  /** Desde cuánto se reciben: «$15 USD (299 MXN en los apoyos en pesos)». */
+  /** Desde cuánto se reciben: «$10 USD (199 MXN en los apoyos en pesos)». */
   mensualesDesde?: string
   repartos?: { externo: string; periodo: string; creditos: number; estado: string; entregado: string | null; correo: string | null; error: string | null }[]
   pagina: number
@@ -1046,7 +1046,7 @@ function Mensuales({ panel, quien, onAbrir }: { panel: Panel; quien(externo: str
   return (
     <>
       <p className="admin-nota">
-        {num(panel.mensuales)} créditos al mes solo para cada correo que paga activamente {panel.mensualesDesde ?? '$15 USD'} o más (o el anual). Nadie más: ni cuentas gratis, ni apoyos de menos, ni lugares gratis de Fundador. Cada mes se llenan hasta {num(panel.mensuales)}: no se acumulan. Salen de tus llaves de socio.
+        {num(panel.mensuales)} créditos al mes solo para cada correo que paga activamente {panel.mensualesDesde ?? '$10 USD'} o más (o el anual). Nadie más: ni cuentas gratis, ni apoyos de menos, ni lugares gratis de Fundador. Cada mes se llenan hasta {num(panel.mensuales)}: no se acumulan. Salen de tus llaves de socio.
       </p>
       {panel.repartos?.length ? (
         <Tabla

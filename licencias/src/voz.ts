@@ -45,7 +45,7 @@
  * Con `VOZ_SOLO_CREADOR` en `"1"`, nadie más que el creador la usa, aunque tenga créditos: a los demás `GET /voz` les
  * dice que no está, lo demás responde 403 y Administrador no da de alta a nadie, hasta publicar la actualización con
  * `vozMensual` (marca `voz-mensual.json` en R2). Desde ahí `voz-mensual.ts` refresca a 100.000 (sin acumular) por correo y mes, SOLO
- * a quien paga activamente $15 USD o más (`daCreditos`): ni cuentas gratis, ni apoyos de menos, ni lugares gratis de Fundador. El cron también los entrega y manda la clave personal de Sloth por correo.
+ * a quien paga activamente $10 USD o más (`daCreditos`): ni cuentas gratis, ni apoyos de menos, ni lugares gratis de Fundador. El cron también los entrega y manda la clave personal de Sloth por correo.
  */
 import { BLOQUEADA, CLAVE, EMAIL, EQUIPO, type Env, Rechazo, correo, cuerpo, delCreador, json, nuevaClave, vigencia, vigilar } from './index.ts'
 import { DE_LA_APP } from './comunidad.ts'
