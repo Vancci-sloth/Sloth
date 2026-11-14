@@ -492,10 +492,10 @@ async function api(req: IncomingMessage, res: ServerResponse, url: URL): Promise
   // Pagar con la cuenta o con una llave de API (`server/acceso.ts`). Devuelve la cuenta como queda.
   const acceso = /^\/api\/(claude|codex|deepseek|gemini)\/acceso$/.exec(path)
   if (acceso && method === 'POST') {
-    const { api, llave } = await body<{ api: boolean; llave?: string | null }>(req)
+    const { api, llave, direccion } = await body<{ api: boolean; llave?: string | null; direccion?: string }>(req)
     const p = acceso[1] as Proveedor
     try {
-      await cambiarAcceso(p, !!api, llave)
+      await cambiarAcceso(p, !!api, llave, direccion)
       const soloLlave = p === 'deepseek' || p === 'gemini'
       send(res, 200, await (p === 'codex' ? cuentaCodex() : soloLlave ? OTROS[p]!.cuenta() : cuentaClaude(APP, true)))
       if (soloLlave) pedirModelos()

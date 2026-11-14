@@ -717,6 +717,8 @@ export interface CuentaClaude {
 export interface LlaveAgente {
   final: string
   activa: boolean
+  /** Claude: la dirección compatible con la API de Anthropic adonde va la llave, si no es la de Anthropic. */
+  direccion?: string
 }
 
 /**

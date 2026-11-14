@@ -403,12 +403,16 @@ const API = {
 function useLlave(c: UsoCuenta, proveedor: 'claude' | 'codex') {
   const [pegando, setPegando] = useState(false)
   const [llave, setLlave] = useState('')
+  /** Claude: otra dirección compatible con la API de Anthropic (un proxy), como el «custom base URL» de Cline. */
+  const [direccion, setDireccion] = useState('')
   const l = c.cuenta?.llave
   const a = API[proveedor]
   const cambiar = (api: boolean, nueva?: string | null) =>
-    c.pedir(`/api/${proveedor}/acceso`, { api, llave: nueva }).then((cuenta) => cuenta && (setPegando(false), setLlave('')))
+    c.pedir(`/api/${proveedor}/acceso`, { api, llave: nueva, ...(nueva ? { direccion } : {}) }).then((cuenta) => cuenta && (setPegando(false), setLlave('')))
+  const otra = proveedor === 'claude' && !!direccion.trim()
+  const host = (d?: string) => d?.replace(/^https?:\/\//, '')
   // Con la llave, el menú de la cuenta lleva a lo que se gasta; lo demás está en `selector`.
-  const menu = l?.activa ? [{ label: 'Llave de API', options: [{ value: 'uso-api', label: 'Ver lo que gastas ↗' }] }] : []
+  const menu = l?.activa && !l.direccion ? [{ label: 'Llave de API', options: [{ value: 'uso-api', label: 'Ver lo que gastas ↗' }] }] : []
   /** Lo que toca hacer con lo elegido en el menú; `false` si no es de la llave. */
   const elegir = (que: string) => que === 'uso-api' && (window.open(a.uso, '_blank', 'noreferrer'), true)
   /** Elegir la llave sin ninguna guardada abre el campo; volver a la suscripción lo cierra. */
@@ -427,13 +431,13 @@ function useLlave(c: UsoCuenta, proveedor: 'claude' | 'codex') {
         valor={pegando || l?.activa ? 'api' : 'cuenta'}
         opciones={[
           { id: 'cuenta', texto: 'Tu suscripción', disabled: c.ocupado },
-          { id: 'api', texto: l ? `Llave de API …${l.final}` : 'Llave de API', disabled: c.ocupado },
+          { id: 'api', texto: l ? `Llave de API …${l.final}${l.direccion ? ` · ${host(l.direccion)}` : ''}` : 'Llave de API', disabled: c.ocupado },
         ]}
         onCambio={elegirPago}
       />
       {l && !pegando && (
         <>
-          <button className="ghost small" disabled={c.ocupado} onClick={() => setPegando(true)}>
+          <button className="ghost small" disabled={c.ocupado} onClick={() => (setDireccion(l.direccion ?? ''), setPegando(true))}>
             Cambiar de llave
           </button>
           <button className="ghost small" disabled={c.ocupado} onClick={() => void cambiar(false, null)}>
@@ -459,12 +463,29 @@ function useLlave(c: UsoCuenta, proveedor: 'claude' | 'codex') {
           Cancelar
         </button>
       </div>
+      {proveedor === 'claude' && (
+        <input
+          type="url"
+          placeholder="Otra dirección (opcional), como https://api.ejemplo.com"
+          value={direccion}
+          onChange={(e) => setDireccion(e.target.value)}
+          autoComplete="off"
+          spellCheck={false}
+        />
+      )}
       <p className="muted small">
-        Se cobra por uso en tu cuenta de{' '}
-        <a href={a.llaves} target="_blank" rel="noreferrer">
-          {a.marca}
-        </a>
-        , no en tu plan. Se guarda solo en Sloth, en esta computadora. {a.hilos}
+        {otra ? (
+          <>Se cobra en el servicio de esa dirección, que debe ser compatible con la API de Anthropic. </>
+        ) : (
+          <>
+            Se cobra por uso en tu cuenta de{' '}
+            <a href={a.llaves} target="_blank" rel="noreferrer">
+              {a.marca}
+            </a>
+            , no en tu plan.{' '}
+          </>
+        )}
+        Se guarda solo en Sloth, en esta computadora. {a.hilos}
       </p>
     </form>
   )
