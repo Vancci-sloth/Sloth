@@ -598,6 +598,16 @@
     "skill": "video-low-poly",
     "version": "1.0",
     "icon": "globo",
+    "modelos": {
+      "principal": {
+        "model": "claude-sonnet-5-5",
+        "effort": "medium",
+        "medido": "13 nov 2026, con el director: «cómo llega el agua potable a tu casa», de 20 s y sin voz, en 3,9 min y $0,40, en 17 pasos, con sus cuatro piezas a la medida y sin subagentes."
+      },
+      "porMinuto": [
+        { "model": "claude-sonnet-5-5", "effort": "medium", "usd": 1.21, "minutos": 11.8, "medido": "13 nov 2026: el agua potable, de 20 s y sin voz, en 3,9 min y $0,40. Casi todo es fijo (el guion, las piezas): un video de un minuto no cuesta el triple." }
+      ]
+    },
     "etapas": [
       {
         "nombre": "Guion",
