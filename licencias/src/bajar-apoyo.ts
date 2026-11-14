@@ -83,7 +83,9 @@ export async function bajarApoyo(req: Request, env: Env): Promise<Response> {
     .all<Fila>()
   const pendientes = results
     .map((f) => ({ f, precio: precioEn(env, f.moneda) }))
-    .filter(({ f, precio }) => precio && ((f.extra_dias ?? 0) > 0 || extraDe(f, precio) > 0)) as { f: Fila; precio: number }[]
+    .filter(({ f, precio }) => precio && ((f.extra_dias ?? 0) > 0 || extraDe(f, precio) > 0))
+    // Con la cuenta de PayPal en revisión, PayPal no deja cambiar sus suscripciones (`USER_ACCOUNT_RESTRICTED`): se dejan para después.
+    .filter(({ f }) => !(c.sinPaypal === true && accionDe(f) === 'paypal')) as { f: Fila; precio: number }[]
   if (c.probar === true)
     return json({
       quedan: pendientes.length,
