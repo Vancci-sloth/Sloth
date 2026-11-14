@@ -155,9 +155,11 @@ está: cada una es su cuenta, con sus usuarios (ADR 0018). Su saldo se ve en Adm
 
 Desde el 13 de noviembre de 2026 el apoyo es uno solo, de $10 USD (199 MXN), y la página enseña solo ese y «Lo que
 gustes» (antes, $15 de Fundador y $30 de Donador PRO). A quien había pagado más se le dio lo pagado de más como tiempo
-con `node scripts/bajar-apoyo.mjs` (`licencias/src/bajar-apoyo.ts`): su suscripción bajó a $10 y no cobra antes de que se
-acabe; las de PayPal y Mercado Pago quedaron en pausa y el cron las reanuda ese día (`reanudar`). Si el apoyo vuelve a
-bajar, se cambia el precio, se despliega y se corre igual con la fecha del cambio (`--probar` primero).
+con `node scripts/bajar-apoyo.mjs 2026-11-14T02:40:00Z` (`licencias/src/bajar-apoyo.ts`), a 35 personas: las de Stripe
+bajaron a $10 con el cobro aplazado; las de Mercado Pago, a 199 MXN y en pausa, y el cron las reanuda ese día
+(`reanudar`). Las 11 de PayPal se cancelaron (`--cancelar-paypal`), con su folio y sus días: con la cuenta en revisión,
+PayPal no deja cambiarlas ni pausarlas (`USER_ACCOUNT_RESTRICTED`), y si quieren seguir apoyan otra vez. Si el apoyo
+vuelve a bajar, se cambia el precio, se despliega y se corre igual con la fecha del cambio (`--probar` primero).
 
 Cuando el usuario pida un link de Fundador, dale uno nuevo con `npm run fundador -- nuevo <para quién>`. Es de una sola
 persona: quien apoya con $10 o más con él es Fundador aunque los 25 lugares públicos estén ocupados; sin link, lo es
