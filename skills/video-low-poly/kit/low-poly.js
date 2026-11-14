@@ -387,7 +387,8 @@
       // Delante del suelo de un lugar, donde para lo que llega (el camión) sin pisar sus cosas.
       const parada = (L) => [L.suelo[0], L.suelo[1] + 1.1]
       // Donde se estaciona lo que llega (el camión): delante y a un lado de las cosas del lugar, para no taparlas.
-      const destino = (L) => [L.suelo[0] - (L.dir || -1) * 1.5, L.suelo[1] + 1.3]
+      // (lo bastante a un lado para librar la más ancha de las que brotan ahí: un pueblo ocupa más que un molino)
+      const destino = (L) => { const r = Math.max(0.7, ...ENTRAN.filter((e) => lugar(e.en) === L).map((e) => e.tipo === 'pieza' ? (PIEZA(e).radio || 0.8) * (PIEZA(e).escala || 1) : (TAM[e.tipo] || [0])[0])); return [L.suelo[0] - (L.dir || -1) * (r + 0.8), L.suelo[1] + 1.3] }
       // Lo que ocupa cada cosa del catálogo: [radio, alto].
       const TAM = { casas: [1.4, 1.0], cultivo: [1.4, 0.3], fabrica: [1.0, 3.0], molino: [0.6, 2.4], faro: [0.4, 2.0], planta: [0.6, 1.6], arboles: [1.0, 1.0], rocas: [0.7, 0.4] }
       // Los huecos de un lugar para sus cosas: el primero en su suelo y los demás hacia `dir`, lejos de su bandera.

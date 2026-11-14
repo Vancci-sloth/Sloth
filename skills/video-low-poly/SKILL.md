@@ -142,15 +142,19 @@ modelos bajados ni `Math.random` (`K.rng(semilla)`). Mírala en la hoja: si no s
 
 1. Escribe `guion.md` (arriba) con los datos que hagan falta, buscados a la vez. Listo cuando lo leíste como alguien que
    no sabe nada del tema y se entiende a la primera.
-2. Escribe `momentos.json` y corre `python -B -X utf8 <skill>/scripts/hacer.py --revisa` (un segundo, sin fondo) hasta
+2. Haz la lista de lo que se tiene que ver en cada etapa (la tubería, el tanque, la taza) y, al lado, la cosa de la tabla
+   que lo enseña tal cual. Lo que no tenga una que lo enseña tal cual se escribe como pieza en `piezas/` antes de seguir:
+   cambiarlo por otra cosa del catálogo (un camión en vez de una tubería, una fábrica en vez de una planta de agua) o
+   dejarlo para «si lo quieres» es justo lo que este estilo no hace. Listo cuando cada etapa enseña lo suyo.
+3. Escribe `momentos.json` y corre `python -B -X utf8 <skill>/scripts/hacer.py --revisa` (un segundo, sin fondo) hasta
    que diga ✓: dice todo lo que falla de una vez. Listo con ✓.
-3. Corre `python -B -X utf8 <skill>/scripts/hacer.py --studio <Voz>` (o `--audio <archivo>`, o nada si la voz ya está)
+4. Corre `python -B -X utf8 <skill>/scripts/hacer.py --studio <Voz>` (o `--audio <archivo>`, o nada si la voz ya está)
    **en segundo plano** y termina tu mensaje: te avisa al acabar. Un video de 30 s tarda unos 5 minutos (el render son
    ~0,3 s por cuadro con la tarjeta). Si dice ✗, arregla lo que dice y vuelve a correrlo: la voz y el render que no
    cambiaron no se repiten.
-4. Mira `revision/hoja.png` (un cuadro cada 1,5 s) y `portada.png`: que cada lugar enseñe lo que se dice y que su
+5. Mira `revision/hoja.png` (un cuadro cada 1,5 s) y `portada.png`: que cada lugar enseñe lo que se dice y que su
    bandera se lea. Otro render solo si algo de verdad no se ve, todo en una vuelta.
-5. Entrega la ruta de `out/<carpeta>.mp4`, cuánto dura, el proceso en una línea, y que el audio no lo oíste.
+6. Entrega la ruta de `out/<carpeta>.mp4`, cuánto dura, el proceso en una línea, y que el audio no lo oíste.
 
 El proyecto va en la carpeta de la línea `Carpeta: <nombre>` del mensaje, con ese nombre exacto (sin ella,
 `low-poly-<tema>`).
