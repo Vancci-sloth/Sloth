@@ -3,7 +3,8 @@
 // creador, como `npm run fundador -- dar`.
 //   node scripts/bajar-apoyo.mjs <fecha ISO del cambio> --probar   qué haría con cada quien, sin tocar nada
 //   node scripts/bajar-apoyo.mjs <fecha ISO del cambio> [--uno]    lo hace, de pocos en pocos (con --uno, solo uno)
-//   --sin-paypal deja fuera las suscripciones de PayPal (con la cuenta en revisión, PayPal no deja cambiarlas)
+//   --sin-paypal deja fuera las suscripciones de PayPal (con la cuenta en revisión, PayPal no deja cambiarlas), y
+//   --cancelar-paypal las cancela: conservan lo pagado y sus días, y si quieren seguir apoyan otra vez con $10
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
@@ -22,7 +23,7 @@ async function pedir(cuerpo) {
   const r = await fetch('https://api.sloth.vancci.org/bajar-apoyo', {
     method: 'POST',
     headers: { authorization: `Bearer ${llave}`, 'content-type': 'application/json' },
-    body: JSON.stringify({ antes, ...(opciones.includes('--sin-paypal') ? { sinPaypal: true } : {}), ...cuerpo })
+    body: JSON.stringify({ antes, ...(opciones.includes('--sin-paypal') ? { sinPaypal: true } : {}), ...(opciones.includes('--cancelar-paypal') ? { cancelarPaypal: true } : {}), ...cuerpo })
   })
   const d = await r.json()
   if (!r.ok) {

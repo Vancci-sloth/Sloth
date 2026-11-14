@@ -12,7 +12,7 @@
  * Luego un correo le dice a cada quien hasta cuándo vale y cuándo se le cobra. Con `probar`, solo dice qué haría.
  * Cada fila se hace una vez (`extra_dias`) y se avisa una vez (`extra_avisado`): repetirlo sigue donde se quedó.
  */
-import { correo, deAMano, delCreador, deUnaVez, fecha, json, masDias, mp, pasarela, paypal, refrescar, Rechazo, cuerpo, type Env, type Fila } from './index.ts'
+import { correo, letras, deAMano, delCreador, deUnaVez, fecha, json, masDias, mp, pasarela, paypal, refrescar, Rechazo, cuerpo, type Env, type Fila } from './index.ts'
 import { stripe } from './stripe.ts'
 
 const DIA = 24 * 3600_000
@@ -43,8 +43,13 @@ export function tiempo(dias: number): string {
 
 const dinero = (monto: number, moneda: string) => `$${monto.toLocaleString('es-MX')} ${moneda}`
 
-/** Lo que pasa con el cobro de la fila: `stripe`, `paypal` o `mp` se cambian y aplazan; `nada`, no hay cobro que mover. */
-export type Accion = 'stripe' | 'paypal' | 'mp' | 'nada'
+/**
+ * Lo que pasa con el cobro de la fila: `stripe`, `paypal` o `mp` se cambian y aplazan; `nada`, no hay cobro que mover.
+ * `paypal-cancelada`: con la cuenta de PayPal en revisión (`USER_ACCOUNT_RESTRICTED`, desde el 5 de noviembre de 2026)
+ * PayPal no deja cambiar ni pausar la suscripción, así que se cancela (`cancelarPaypal`, decidido por el creador el 13 de
+ * noviembre): conserva lo pagado y sus días, y si quiere seguir apoya otra vez con $10.
+ */
+export type Accion = 'stripe' | 'paypal' | 'paypal-cancelada' | 'mp' | 'nada'
 
 export function accionDe(f: Pick<Fila, 'estado' | 'stripe' | 'paypal' | 'preapproval' | 'plan'>): Accion {
   if (f.estado !== 'authorized' && f.estado !== 'paused') return 'nada'
@@ -95,7 +100,7 @@ export async function bajarApoyo(req: Request, env: Env): Promise<Response> {
       })
     })
   const hechos: Hecho[] = []
-  for (const { f, precio } of pendientes.slice(0, limite)) hechos.push(await unaFila(env, f, precio))
+  for (const { f, precio } of pendientes.slice(0, limite)) hechos.push(await unaFila(env, f, precio, c.cancelarPaypal === true))
   return json({ quedan: pendientes.length - hechos.filter((h) => h.avisado).length, hechos })
 }
 
@@ -104,8 +109,8 @@ function resumen(f: Fila, accion: Accion, dias: number): Hecho {
 }
 
 /** Una fila: su cobro (si no se hizo ya), sus días y su correo. Un error se reporta y la fila se queda para la siguiente vuelta. */
-async function unaFila(env: Env, f: Fila, precio: number): Promise<Hecho> {
-  const accion = accionDe(f)
+async function unaFila(env: Env, f: Fila, precio: number, cancelarPaypal: boolean): Promise<Hecho> {
+  const accion: Accion = cancelarPaypal && accionDe(f) === 'paypal' ? 'paypal-cancelada' : accionDe(f)
   let dias = f.extra_dias ?? 0
   const h = resumen(f, accion, dias || extraDe(f, precio))
   try {
@@ -114,12 +119,17 @@ async function unaFila(env: Env, f: Fila, precio: number): Promise<Hecho> {
       dias = extraDe(f, precio)
       const hasta = masDias(antes, dias)
       await aplazarCobro(env, f, accion, precio, hasta)
-      // El mensual con cripto paga el siguiente mes al nuevo precio; lo de una vez conserva lo que se pagó.
-      const monto = accion !== 'nada' || (f.cripto && f.plan === 'mensual') ? precio : f.monto
+      // El mensual con cripto paga el siguiente mes al nuevo precio; lo de una vez y lo cancelado conservan lo que se pagó.
+      const monto = (accion !== 'nada' && accion !== 'paypal-cancelada') || (f.cripto && f.plan === 'mensual') ? precio : f.monto
       await env.DB.prepare('UPDATE licencias SET extra_dias = ?, extra_hasta = ?, pagado_hasta = ?, reanudar = ?, monto = ? WHERE id = ?')
         .bind(dias, hasta, hasta, accion === 'paypal' || accion === 'mp' ? hasta : null, monto, f.id)
         .run()
       f = { ...f, extra_dias: dias, extra_hasta: hasta, pagado_hasta: hasta, monto }
+      // Cancelada por Sloth: su folio, como cuando la cancela quien apoya.
+      if (accion === 'paypal-cancelada') {
+        f = { ...f, estado: 'cancelled', folio: f.folio ?? `C-${letras(8)}`, cancelada: f.cancelada ?? new Date().toISOString() }
+        await env.DB.prepare("UPDATE licencias SET estado = 'cancelled', folio = ?, cancelada = ? WHERE id = ?").bind(f.folio, f.cancelada, f.id).run()
+      }
     } else antes = masDias(f.pagado_hasta!, -dias)
     Object.assign(h, { dias, antes, hasta: f.pagado_hasta! })
     h.avisado = await avisar(env, f, accion, h)
@@ -162,6 +172,11 @@ async function aplazarCobro(env: Env, f: Fila, accion: Accion, precio: number, h
       await paypal(env, 'POST', `${ruta}/suspend`, { reason: 'El apoyo bajo a 10 USD: lo pagado de mas vale hasta que se reanude' }).catch((e) => {
         if (!(e instanceof Rechazo) || e.status !== 422) throw e
       })
+  } else if (accion === 'paypal-cancelada') {
+    // Ya cancelada, PayPal contesta 422: basta con que ya no cobre.
+    await paypal(env, 'POST', `/v1/billing/subscriptions/${encodeURIComponent(f.paypal!)}/cancel`, { reason: 'El apoyo bajo a 10 USD y PayPal no deja cambiar el monto' }).catch(async (e) => {
+      if (!(e instanceof Rechazo) || e.status !== 422 || (await refrescar(env, f)).estado !== 'cancelled') throw e
+    })
   } else if (accion === 'mp') {
     const ruta = `/preapproval/${encodeURIComponent(f.preapproval!)}`
     await mp(env, 'PUT', ruta, { auto_recurring: { transaction_amount: precio, currency_id: f.moneda } })
@@ -178,7 +193,12 @@ function avisar(env: Env, f: Fila, accion: Accion, h: Hecho): Promise<boolean> {
     `El apoyo de Sloth ahora es uno solo, de $10 USD al mes ($199 MXN con Mercado Pago). Tú pagaste ${h.monto}, más que eso, y lo que pagaste de más no se pierde: te da ${tiempo(h.dias)} más de apoyo.`
   ]
   const hasta = `Tu apoyo ahora vale hasta el ${fecha(h.hasta)} (antes, hasta el ${fecha(h.antes)}).${f.fundador ? ' Sigues siendo Fundador.' : ''}`
-  if (accion !== 'nada') {
+  if (accion === 'paypal-cancelada') {
+    parrafos.push(
+      `${hasta} PayPal no nos deja bajar tu suscripción a ${dinero(precio, f.moneda)}, así que la cancelamos para que no te vuelva a cobrar ${h.monto}: ya no te cobra nada. Tu folio de cancelación es ${f.folio}.`,
+      `Si quieres seguir apoyando cuando se acabe, apoya otra vez con $10 USD al mes en sloth.vancci.org, con tarjeta o Mercado Pago, y te llega una clave nueva. Mientras, la tuya sigue igual.`
+    )
+  } else if (accion !== 'nada') {
     parrafos.push(
       `${hasta} ${quien} no te cobra nada antes de esa fecha. Desde ahí te cobra ${dinero(precio, f.moneda)} al mes (IVA incluido), ya no ${h.monto}.`
     )
