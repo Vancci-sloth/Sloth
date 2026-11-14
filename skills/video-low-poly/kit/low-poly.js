@@ -386,6 +386,10 @@
       const lugar = (n) => LUGARES[n] || LUGARES.todo
       // Delante del suelo de un lugar, donde para lo que llega (el camión) sin pisar sus cosas.
       const parada = (L) => [L.suelo[0], L.suelo[1] + 1.1]
+      // Donde se estaciona lo que llega (el camión): delante y a un lado de las cosas del lugar, para no taparlas.
+      const destino = (L) => [L.suelo[0] - (L.dir || -1) * 1.5, L.suelo[1] + 1.3]
+      // Lo que ocupa cada cosa del catálogo: [radio, alto].
+      const TAM = { casas: [1.4, 1.0], cultivo: [1.4, 0.3], fabrica: [1.0, 3.0], molino: [0.6, 2.4], faro: [0.4, 2.0], planta: [0.6, 1.6], arboles: [1.0, 1.0], rocas: [0.7, 0.4] }
       // Los huecos de un lugar para sus cosas: el primero en su suelo y los demás hacia `dir`, lejos de su bandera.
       const sitio = (L, k = 0) => { if (L.huecos) return L.huecos[k % L.huecos.length]; const s = L.dir || 1, off = [[0, 0], [1.75 * s, -0.25], [0.6 * s, -1.3], [-1.0 * s, -1.15], [2.6 * s, -1.2]][k % 5]; return [L.suelo[0] + off[0], L.suelo[1] + off[1]] }
 
@@ -395,7 +399,9 @@
       const ENTRAN = [], ocupados = {}
       MOM.forEach((m, i) => (m.entra || []).forEach((e) => {
         const k = ocupados[m.en] = (ocupados[m.en] || 0) + (['vapor', 'nube', 'lluvia', 'anillo', 'rio', 'barco'].includes(e.tipo) ? 0 : 1)
-        ENTRAN.push(Object.assign({ en: m.en, t: m.t0, fin: m.fin, i, hueco: k - 1 }, e))
+        // `arranca`: cuándo empieza a viajar lo que viaja; en el primer momento ya está ahí y sale a los 0,3 s.
+        const viaja = (e.tipo === 'camion' || e.tipo === 'barco') && (m.t0 >= 0 || e.a)
+        ENTRAN.push(Object.assign({ en: m.en, t: m.t0, fin: m.fin, i, hueco: k - 1, arranca: viaja ? (m.t0 >= 0 ? m.t0 : 0.3) : null }, e))
       }))
       const de = (tipo) => ENTRAN.filter((e) => e.tipo === tipo)
       const usados = new Set(MOM.map((m) => m.en))
@@ -496,31 +502,45 @@
       const LIBRES = []
       // Las piezas a la medida (piezas/<nombre>.js del video): lo que el catálogo no trae y el tema pide.
       const PIEZA = (e) => (window.PIEZAS || {})[e.pieza] || {}
-      // En horizontal, las banderas de los lugares nuevos no se tapan entre sí en el plano del mundo entero: la costa, el
-      // llano y el valle quedan juntos y sus papeles se cruzaban. Cada una, en orden, toma el primer sitio libre: el suyo,
-      // detrás de sus cosas y más alta (como en vertical), o en su poste, más arriba. Las de la referencia no se mueven.
-      if (!VERTICAL) {
+      // Las banderas no se tapan entre sí ni tapan las cosas en el plano del mundo entero: la costa, el llano y el valle
+      // quedan juntos y sus papeles se cruzaban (en vertical, que lo mira desde el oeste, quedaban uno detrás de otro).
+      // Cada una, en orden, toma el primer sitio libre: el suyo, detrás de sus cosas y más alta, a un lado, o en su poste,
+      // más arriba. En el video que pasa solo por lugares de la referencia no se mueve ninguna (las de ella, como ella).
+      {
         const T = LUGARES.todo.cam, cp = new THREE.Vector3(...T.pos), f = new THREE.Vector3(...T.aim).sub(cp).normalize()
         const r = new THREE.Vector3().crossVectors(f, new THREE.Vector3(0, 1, 0)).normalize(), u = new THREE.Vector3().crossVectors(r, f)
         const tv = Math.tan(THREE.MathUtils.degToRad(15)), th = tv * P.ancho / P.alto
+        const caja2d = (pts) => { const q = pts.map((p) => new THREE.Vector3(...p).sub(cp)), xs = q.map((v) => v.dot(r) / (v.dot(f) * th)), ys = q.map((v) => v.dot(u) / (v.dot(f) * tv)); return [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)] }
+        // en vertical, en el plano de todo, cada bandera mira a la cámara (ver `giro`)
+        const yawDe = (B) => VERTICAL ? Math.atan2(T.pos[0] - B.at[0], T.pos[2] - B.at[1]) : B.yaw || 0
         const rect = (B, w) => {
-          const s = B.side || 1, h = B.height || 1.25, c = Math.cos(B.yaw || 0), sn = Math.sin(B.yaw || 0), y0 = height(B.at[0], B.at[1]) - 0.02
-          const pts = [[0, h + 0.05], [s * (w + 0.1), h + 0.05], [s * (w + 0.1), h - 0.72], [0, h - 0.72]].map(([dx, dy]) => new THREE.Vector3(B.at[0] + dx * c, y0 + dy, B.at[1] - dx * sn).sub(cp))
-          const xs = pts.map((q) => q.dot(r) / (q.dot(f) * th)), ys = pts.map((q) => q.dot(u) / (q.dot(f) * tv))
-          return [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)]
+          const s = B.side || 1, h = B.height || 1.25, yaw = yawDe(B), c = Math.cos(yaw), sn = Math.sin(yaw), y0 = height(B.at[0], B.at[1]) - 0.02
+          return caja2d([[0, h + 0.05], [s * (w + 0.1), h + 0.05], [s * (w + 0.1), h - 0.72], [0, h - 0.72]].map(([dx, dy]) => [B.at[0] + dx * c, y0 + dy, B.at[1] - dx * sn]))
         }
         const cruce = (a, b) => Math.max(0, Math.min(a[1], b[1]) - Math.max(a[0], b[0]) + 0.01) * Math.max(0, Math.min(a[3], b[3]) - Math.max(a[2], b[2]) + 0.01)
-        const puestas = []
+        // lo que ocupan las cosas que se paran en el suelo
+        const cosas = ENTRAN.filter((e) => TAM[e.tipo] || e.tipo === 'pieza').filter((e) => !(e.tipo === 'faro' && e.en === 'mar')).map((e) => {
+          const [x, z] = sitio(lugar(e.en), e.hueco), [rr, alto] = e.tipo === 'pieza' ? [(PIEZA(e).radio || 0.8) * 0.8, (PIEZA(e).alto || 1.2) * (PIEZA(e).escala || 1) * 0.9] : [TAM[e.tipo][0], e.tipo === 'fabrica' ? 3.0 : Math.min(1.6, TAM[e.tipo][1])], y = Math.max(0, height(x, z))  // la fábrica, con su humo
+          return caja2d([[x - rr, y, z], [x + rr, y, z], [x, y, z - rr], [x, y, z + rr], [x - rr, y + alto, z], [x + rr, y + alto, z]])
+        })
+        const puestas = [], soloRef = !VERTICAL && MOM.every((m) => lugar(m.en).ref)
         BANDERAS.forEach((b) => {
           if (b.B.nube) return
-          if (b.L.ref || !b.L.bandera) { puestas.push(rect(b.B, b.f.width)); return }
+          if ((b.L.ref && soloRef) || b.L.agua || !b.L.bandera) { puestas.push(rect(b.B, b.f.width)); return }
           const altas = ENTRAN.some((e) => e.en === b.m.en && (['fabrica', 'molino', 'faro', 'planta'].includes(e.tipo) || (e.tipo === 'pieza' && (PIEZA(e).alto || 0) * (PIEZA(e).escala || 1) > 1.3)))
           const [cx, cz] = sitio(b.L, 0), detras = (dx, h) => ({ height: h, side: 1, yaw: 0, at: [cx - b.f.width / 2 + dx, cz - 1.0] })
           const sube = (k) => Object.assign({}, b.B, { height: (b.B.height || 1.25) + 0.95 * k })
+          const lado = (k) => Object.assign({}, b.B, { at: [b.B.at[0] + r.x * k, b.B.at[1] + r.z * k] })
           const h0 = altas ? 2.6 : 2.0
-          const opciones = [b.B, detras(0, h0), detras(0.6, h0), detras(-0.6, h0), detras(1.2, h0), sube(1), detras(0, h0 + 0.95), sube(2)]
+          const opciones = VERTICAL ? [b.B, lado(0.8), lado(-0.8), sube(1), lado(1.6), lado(-1.6), sube(2)]
+            : b.L.ref ? [b.B, sube(1), detras(0, h0), detras(0.6, h0), detras(-0.6, h0), sube(2)]
+            : [b.B, detras(0, h0), detras(0.6, h0), detras(-0.6, h0), detras(1.2, h0), sube(1), detras(0, h0 + 0.95), sube(2)]
           let mejor = null
-          for (const B of opciones) { const R = rect(B, b.f.width), choca = puestas.reduce((s, o) => s + cruce(R, o), 0); if (!mejor || choca < mejor.choca) mejor = { B, R, choca }; if (!choca) break }
+          for (const B of opciones) {
+            const R = rect(B, b.f.width), choca = puestas.reduce((s, o) => s + cruce(R, o), 0) + 0.5 * cosas.reduce((s, o) => s + cruce(R, o), 0)
+            if (!mejor || choca < mejor.choca - 1e-6) mejor = { B, R, choca }
+            if (!choca) break
+          }
           b.B = mejor.B; puestas.push(mejor.R)
         })
       }
@@ -538,7 +558,7 @@
       })
       // El camino del camión, y lo que hay entre él y la cámara que lo sigue.
       de('camion').forEach((e) => {
-        const L = lugar(e.en), a = sitio(L, e.hueco), b = parada(lugar(e.a)), az = Math.atan2(L.cam.pos[0] - L.cam.aim[0], L.cam.pos[2] - L.cam.aim[2])
+        const L = lugar(e.en), a = parada(L), b = destino(lugar(e.a)), az = Math.atan2(L.cam.pos[0] - L.cam.aim[0], L.cam.pos[2] - L.cam.aim[2])
         for (let u = 0; u <= 1; u += 0.1) {
           const x = K.lerp(a[0], b[0], u), z = K.lerp(a[1], b[1], u); LIBRES.push([x, z, 0.45])
           for (const k of [1.0, 2.0, 3.0]) LIBRES.push([x + Math.sin(az) * k, z + Math.cos(az) * k, 0.6])
@@ -705,13 +725,14 @@
         if (e.tipo === 'camion') {
           const g = new THREE.Group(), cuerpo = mesh(truckGeo(), matPiezas); g.add(cuerpo)
           const ruedas = [[0.2, 0.135], [0.2, -0.135], [-0.2, 0.135], [-0.2, -0.135]].map(([x, z]) => { const w = mesh(wheelGeo(), matPiezas); w.position.set(x, 0.055, z); g.add(w); return w })
-          const a = sitio(L, e.hueco), bb = parada(lugar(e.a))
+          // sale de delante de su lugar (detrás de sus cosas no se veía) y se estaciona a un lado de las del otro
+          const a = parada(L), bb = destino(lugar(e.a))
           scene.add(g); g.scale.setScalar(1.7)
           // El camino: una cinta de arena que se despliega delante del camión.
           const paso = 24, tris = []
           const pt = (u, lado) => { const x = K.lerp(a[0], bb[0], u), z = K.lerp(a[1], bb[1], u), dx = bb[0] - a[0], dz = bb[1] - a[1], l = Math.hypot(dx, dz), nx = -dz / l, nz = dx / l; const xx = x + nx * lado * 0.2, zz = z + nz * lado * 0.2; return [xx, Math.max(0, height(xx, zz)) + 0.025, zz] }
           for (let i = 0; i < paso; i++) { const u0 = i / paso, u1 = (i + 1) / paso; tris.push([pt(u0, -1), pt(u1, -1), pt(u1, 1)], [pt(u0, -1), pt(u1, 1), pt(u0, 1)]) }
-          const viaje = Math.max(1.6, Math.min(4, e.fin - e.t - 0.2))
+          const viaje = Math.max(1.6, Math.min(4, e.fin - (e.arranca ?? e.t) - 0.2))
           const geo = unfold(facet(upward(tris), (c) => tone(PAL.bed, c.x * 5 + c.z * 3, 1)), { from: [a[0], 0, a[1]], start: e.t - 0.3, duration: viaje * 0.6 })
           scene.add(mesh(geo, faceted({ unfold: true, fold: 0.3 }), { cast: false }))
           camiones.push({ e, g, ruedas, a, b: bb, viaje })
@@ -799,11 +820,11 @@
         if (e.tipo === 'vapor') { const [x, z] = L.suelo; return [[x - 1.5, 0, z + 1], [x + 1.5, 0, z + 1], [L.alto[0], L.alto[1] - 0.3, L.alto[2]]] }
         if (e.tipo === 'rio') return [0.05, 0.5, 0.95].map((s) => { const r = river.rows[Math.round(s * river.n)]; return [r.x, r.y, r.z] })
         if (e.tipo === 'anillo') return [[ringAt[0] - 2, 0, ringAt[1]], [ringAt[0] + 2, 0, ringAt[1]], [ringAt[0], 0, ringAt[1] + 1.5]]
-        if (e.tipo === 'camion') { const a = sitio(L, e.hueco); return cerca(a[0], a[1], 0.8, 0.7) }
+        if (e.tipo === 'camion') { const a = parada(L); return cerca(a[0], a[1], 0.8, 0.7) }
         if (e.tipo === 'barco') return (e.a && lugar(e.a).barco ? [L.barco[1], lugar(e.a).barco[1]] : L.barco).map(([x, z]) => [x, 1.2, z])
         if (e.tipo === 'puente') { const r = river.rows[Math.round(river.n * 0.45)]; return cerca(r.x, r.z, 0.9, 0.4) }
         if (e.tipo === 'faro' && e.en === 'mar') return cerca(-5.2, 1.55, 0.4, 1.9)
-        const [x, z] = sitio(L, e.hueco), R = e.tipo === 'pieza' ? [PIEZA(e).radio || 0.8, PIEZA(e).alto || 1.2] : { casas: [1.4, 1.0], cultivo: [1.4, 0.3], fabrica: [1.0, 3.0], molino: [0.6, 2.4], faro: [0.4, 2.0], planta: [0.6, 1.6], arboles: [1.0, 1.0], rocas: [0.7, 0.4] }[e.tipo] || [0.6, 0.8]
+        const [x, z] = sitio(L, e.hueco), R = e.tipo === 'pieza' ? [PIEZA(e).radio || 0.8, PIEZA(e).alto || 1.2] : TAM[e.tipo] || [0.6, 0.8]
         return cerca(x, z, R[0], R[1])
       }
       const planos = [], SOLO_REF = MOM.every((m) => lugar(m.en).ref)
@@ -820,7 +841,7 @@
         // una), y si no, solo y grande; lo nítido es el sujeto, no el papel. Una bandera vieja no se mete en su toma.
         if (PASO && !todo) {
           // Lo que viaja se encuadra donde sale: la cámara lo sigue (deCosaEnCosa).
-          const S = ENTRAN.filter(mios).flatMap((e) => e.tipo === 'barco' && e.t >= 0 ? (([x, z]) => [[x - 0.8, 0, z], [x + 0.8, 0, z], [x, 1.0, z]])(e.a && lugar(e.a).barco ? L.barco[1] : L.barco[0]) : ptsCosa(e))
+          const S = ENTRAN.filter(mios).flatMap((e) => e.tipo === 'barco' && e.arranca != null ? (([x, z]) => [[x - 0.8, 0, z], [x + 0.8, 0, z], [x, 1.0, z]])(e.a && lugar(e.a).barco ? L.barco[1] : L.barco[0]) : ptsCosa(e))
           const mias = BANDERAS.filter((b) => p.ms.includes(b.m))
           const F = p.cerca ? [] : mias.length || S.length ? mias : BANDERAS.filter((b) => b.m.en === p.en && b.t < hasta).slice(-1)
           const Fp = F.flatMap((b) => ptsBandera(b)), todos = S.concat(Fp)
@@ -919,9 +940,9 @@
           if (p.en === 'todo') return null
           for (const e of ENTRAN.filter((x) => p.ms.includes(MOM[x.i]))) {
             const c = camiones.find((x) => x.e === e)
-            if (c) return (t) => { const u = e.t < 0 ? 1 : K.seg(t, e.t, e.t + c.viaje, K.ease.inOut); return [K.lerp(c.a[0], c.b[0], u), K.lerp(c.a[1], c.b[1], u)] }
+            if (c) return (t) => { const u = e.arranca == null ? 1 : K.seg(t, e.arranca, e.arranca + c.viaje, K.ease.inOut); return [K.lerp(c.a[0], c.b[0], u), K.lerp(c.a[1], c.b[1], u)] }
             const b = barcos.find((x) => x.e === e)
-            if (b && e.t >= 0) { const dur = Math.max(2, e.fin - e.t); return (t) => { const u = K.seg(t, e.t, e.t + dur, K.ease.inOut); return [K.lerp(b.a[0], b.b[0], u), K.lerp(b.a[1], b.b[1], u)] } }
+            if (b && e.arranca != null) { const dur = Math.max(2, e.fin - e.arranca); return (t) => { const u = K.seg(t, e.arranca, e.arranca + dur, K.ease.inOut); return [K.lerp(b.a[0], b.b[0], u), K.lerp(b.a[1], b.b[1], u)] } }
           }
           return null
         }
@@ -1046,7 +1067,7 @@
             im.instanceMatrix.needsUpdate = true
           })
           camiones.forEach(({ e, g, ruedas, a, b, viaje }) => {
-            const u = e.t < 0 ? 1 : K.seg(t, e.t, e.t + viaje, K.ease.inOut), x = K.lerp(a[0], b[0], u), z = K.lerp(a[1], b[1], u)
+            const u = e.arranca == null ? 1 : K.seg(t, e.arranca, e.arranca + viaje, K.ease.inOut), x = K.lerp(a[0], b[0], u), z = K.lerp(a[1], b[1], u)
             const ang = Math.atan2(-(b[1] - a[1]), b[0] - a[0]), y = Math.max(0, height(x, z)) + 0.02
             const yb = Math.max(0, height(x + Math.cos(ang) * 0.25, z - Math.sin(ang) * 0.25))
             g.position.set(x, y + 0.01 * Math.sin(t * 22) * (u > 0 && u < 1 ? 1 : 0), z); g.rotation.set(0, ang, Math.atan2(yb - y + 0.02, 0.25) * 0.6)
@@ -1054,7 +1075,7 @@
             ruedas.forEach((w) => { w.rotation.z = -u * Math.hypot(b[0] - a[0], b[1] - a[1]) / 0.055 })
           })
           barcos.forEach(({ e, g, a, b }) => {
-            const u = e.t < 0 ? 0.5 : K.seg(t, e.t, e.t + Math.max(2, e.fin - e.t), K.ease.inOut), x = K.lerp(a[0], b[0], u), z = K.lerp(a[1], b[1], u)
+            const u = e.arranca == null ? 0.5 : K.seg(t, e.arranca, e.arranca + Math.max(2, e.fin - e.arranca), K.ease.inOut), x = K.lerp(a[0], b[0], u), z = K.lerp(a[1], b[1], u)
             const wv = (x, z) => 0.075 * (Math.sin(x * 1.25 + t * 1.35) * Math.cos(z * 1.05 - t * 1.1) * 0.6 + Math.sin(x * 2.7 - z * 2.2 + t * 2.3) * 0.4)
             g.position.set(x, wv(x, z) + 0.03, z); g.rotation.set(0.08 * Math.sin(t * 1.3), Math.atan2(-(b[1] - a[1]), b[0] - a[0]) || 0.5, (wv(x + 0.3, z) - wv(x - 0.3, z)) * 1.2)
             const pop = e.t < 0 ? 1 : K.spring(t - e.t, 2.2, 0.4); g.visible = e.t < 0 || t > e.t; g.scale.setScalar(2.2 * Math.max(0.001, pop))
