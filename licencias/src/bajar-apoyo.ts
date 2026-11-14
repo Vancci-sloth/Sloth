@@ -130,15 +130,21 @@ async function unaFila(env: Env, f: Fila, precio: number): Promise<Hecho> {
   return h
 }
 
+const PRODUCTO_STRIPE = 'sloth-apoyo-mensual'
+
 /** Baja el cobro de la suscripción a `precio` y lo aplaza a `hasta`. Cada paso se puede repetir si el anterior falló a medias. */
 async function aplazarCobro(env: Env, f: Fila, accion: Accion, precio: number, hasta: string) {
   if (accion === 'stripe') {
-    const s = await stripe<{ items: { data: { id: string; price: { product: string } }[] } }>(env, 'GET', `/v1/subscriptions/${encodeURIComponent(f.stripe!)}`)
+    const s = await stripe<{ items: { data: { id: string }[] } }>(env, 'GET', `/v1/subscriptions/${encodeURIComponent(f.stripe!)}`)
     const item = s.items.data[0]
+    // El producto que crea Checkout queda archivado y no acepta precios nuevos: va a uno propio, activo, que se crea una vez.
+    await stripe(env, 'POST', '/v1/products', { id: PRODUCTO_STRIPE, name: 'Sloth - apoyo mensual' }).catch((e) => {
+      if (!(e instanceof Rechazo) || e.status !== 400 || !/already exists/i.test(e.message)) throw e
+    })
     await stripe(env, 'POST', `/v1/subscriptions/${encodeURIComponent(f.stripe!)}`, {
       'items[0][id]': item.id,
       'items[0][price_data][currency]': f.moneda.toLowerCase(),
-      'items[0][price_data][product]': item.price.product,
+      'items[0][price_data][product]': PRODUCTO_STRIPE,
       'items[0][price_data][unit_amount]': String(Math.round(precio * 100)),
       'items[0][price_data][recurring][interval]': 'month',
       'items[0][price_data][tax_behavior]': 'inclusive',
