@@ -20,6 +20,9 @@ import { guardar } from './disco.ts'
  *   el servidor que lo hizo, el de ChatGPT o la API, y no se puede pasar de uno a otro.
  * - Claude sí se cambia a media conversación: el razonamiento que hizo otra cuenta (Sonnet 5.5, Haiku 5.5) la API lo
  *   descarta sin error, y el hilo sigue con sus mensajes y herramientas.
+ * - Claude con otra dirección (`direccion`): la llave va a un servicio compatible con la API de Anthropic (un proxy, un
+ *   revendedor) en vez de a api.anthropic.com, como el «custom base URL» de Cline. Claude Code la lee de
+ *   `ANTHROPIC_BASE_URL`, que solo se pone mientras se paga con esa llave.
  * - Los agentes nuevos no ven estas llaves (`entornoSinLlaves`); a Pi se le pueden prestar en Opciones (`entornoAgente`).
  */
 const ARCHIVO = join(resolve(dirname(fileURLToPath(import.meta.url)), '..'), 'data', 'agentes.json')
@@ -29,7 +32,7 @@ const CODEX_API = 'sloth-api'
 const CODEX_ENV = 'SLOTH_OPENAI_API_KEY'
 
 /** `prestar`: el agente (Pi) usa las llaves que guardaste para los demás (`entornoAgente`). */
-type Guardado = Partial<Record<Proveedor, { llave?: string; api?: boolean; prestar?: boolean }>>
+type Guardado = Partial<Record<Proveedor, { llave?: string; api?: boolean; prestar?: boolean; direccion?: string }>>
 
 let datos: Guardado = {}
 try {
@@ -37,6 +40,8 @@ try {
 } catch {
   // Sin archivo, los dos con su cuenta.
 }
+/** La dirección que puso Sloth en `ANTHROPIC_BASE_URL`: la de fuera, si la había, no se toca. */
+let direccionPuesta: string | undefined
 aplicar()
 
 function aplicar() {
@@ -44,6 +49,12 @@ function aplicar() {
     const llave = llaveEnUso(p)
     if (llave) process.env[ENTORNO[p]] = llave
     else delete process.env[ENTORNO[p]]
+  }
+  const dir = llaveEnUso('claude') && datos.claude?.direccion
+  if (dir) process.env.ANTHROPIC_BASE_URL = direccionPuesta = dir
+  else if (direccionPuesta && process.env.ANTHROPIC_BASE_URL === direccionPuesta) {
+    delete process.env.ANTHROPIC_BASE_URL
+    direccionPuesta = undefined
   }
 }
 
@@ -59,6 +70,7 @@ export function llaveEnUso(p: Proveedor) {
 export function entornoSinLlaves(): NodeJS.ProcessEnv {
   const env = { ...process.env }
   for (const p of ['claude', 'codex'] as const) if (llaveEnUso(p) && env[ENTORNO[p]] === llaveEnUso(p)) delete env[ENTORNO[p]]
+  if (direccionPuesta && env.ANTHROPIC_BASE_URL === direccionPuesta) delete env.ANTHROPIC_BASE_URL
   return env
 }
 
@@ -103,7 +115,7 @@ export const llaveGuardada = (p: Proveedor) => datos[p]?.llave
 /** Lo que Opciones sabe de la llave guardada: su final y si es con ella como se paga. */
 export function llaveDe(p: Proveedor): LlaveAgente | undefined {
   const l = datos[p]?.llave
-  return l ? { final: l.slice(-4), activa: !!datos[p]?.api } : undefined
+  return l ? { final: l.slice(-4), activa: !!datos[p]?.api, ...(datos[p]?.direccion ? { direccion: datos[p]!.direccion } : {}) } : undefined
 }
 
 /** Cómo se dice la cuenta cuando se paga con la llave. */
@@ -130,19 +142,39 @@ export type CodexLlave = NonNullable<ReturnType<typeof codexConLlave>>
 
 /**
  * Cambia cómo paga `p`. `llave`: la nueva (se prueba antes de guardarla), `null` para quitarla (y volver a la cuenta),
- * o nada para usar la que ya estaba.
+ * o nada para usar la que ya estaba. `direccion` (solo Claude) va con una llave nueva: vacía, la de Anthropic.
  */
-export async function cambiarAcceso(p: Proveedor, api: boolean, llave?: string | null) {
+export async function cambiarAcceso(p: Proveedor, api: boolean, llave?: string | null, direccion?: string) {
   const nueva = llave === undefined ? datos[p]?.llave : llave?.trim() || undefined
   if (api && !nueva) throw new Error('Pega primero tu llave de API.')
-  if (llave && nueva) await probar(p, nueva)
-  datos = { ...datos, [p]: { ...(nueva ? { llave: nueva, api } : {}), prestar: datos[p]?.prestar } }
+  const dir = p !== 'claude' ? undefined : llave === undefined ? datos[p]?.direccion : normalizarDireccion(direccion)
+  if (llave && nueva) await probar(p, nueva, dir)
+  datos = { ...datos, [p]: { ...(nueva ? { llave: nueva, api, ...(dir ? { direccion: dir } : {}) } : {}), prestar: datos[p]?.prestar } }
   escribir()
   aplicar()
 }
 
+/**
+ * «https://proxy.com/v1/» → «https://proxy.com»: Claude Code le añade `/v1/messages`. Vacía o la de Anthropic, nada.
+ */
+export function normalizarDireccion(d?: string) {
+  const t = d?.trim().replace(/\/+$/, '').replace(/\/v1$/, '')
+  if (!t) return undefined
+  if (/^[a-z][a-z0-9+.-]*:\/\//i.test(t) && !/^https?:\/\//i.test(t)) throw new Error('La dirección debe empezar con https://')
+  let url: URL
+  try {
+    url = new URL(/^https?:\/\//i.test(t) ? t : `https://${t}`)
+  } catch {
+    throw new Error('Esa dirección no es válida. Debe ser como https://api.ejemplo.com')
+  }
+  if (url.protocol !== 'https:' && url.protocol !== 'http:') throw new Error('La dirección debe empezar con https://')
+  const limpia = url.toString().replace(/\/+$/, '')
+  return limpia === 'https://api.anthropic.com' ? undefined : limpia
+}
+
 /** Pide la lista de modelos, que no gasta nada: así se sabe si la llave vale. */
-async function probar(p: Proveedor, llave: string) {
+async function probar(p: Proveedor, llave: string, direccion?: string) {
+  if (p === 'claude' && direccion) return probarDireccion(llave, direccion)
   const res =
     p === 'claude'
       ? await fetch('https://api.anthropic.com/v1/models', { headers: { 'x-api-key': llave, 'anthropic-version': '2023-06-01' } })
@@ -154,4 +186,21 @@ async function probar(p: Proveedor, llave: string) {
   // Google contesta 400 a una llave que no vale.
   if (res.status === 401 || res.status === 403 || (p === 'gemini' && res.status === 400)) throw new Error(`${marca} no aceptó esa llave. Revísala y vuelve a pegarla.`)
   throw new Error(`${marca} respondió ${res.status}. Vuelve a intentarlo en un momento.`)
+}
+
+/**
+ * Con otra dirección, la llave se prueba ahí. Hay servicios que no tienen la lista de modelos (404): basta con que
+ * contesten y no rechacen la llave.
+ */
+async function probarDireccion(llave: string, direccion: string) {
+  const { host } = new URL(direccion)
+  let res: Response
+  try {
+    res = await fetch(`${direccion}/v1/models`, { headers: { 'x-api-key': llave, 'anthropic-version': '2023-06-01' }, signal: AbortSignal.timeout(15_000) })
+  } catch {
+    throw new Error(`No se pudo conectar con ${host}. Revisa la dirección.`)
+  }
+  if (res.ok || res.status === 404 || res.status === 405) return
+  if (res.status === 401 || res.status === 403) throw new Error(`${host} no aceptó esa llave. Revísala y vuelve a pegarla.`)
+  throw new Error(`${host} respondió ${res.status}. Revisa la dirección o vuelve a intentarlo en un momento.`)
 }

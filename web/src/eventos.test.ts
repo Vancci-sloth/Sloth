@@ -93,10 +93,13 @@ test('el resumen suma solo lo nuevo y no cambia de objeto si nada cambió', () =
   ]
   const r1 = resumenDe(ev)
   assert.deepEqual({ cost: r1.cost, read: r1.read, out: r1.out, ms: r1.ms, used: r1.context?.used }, { cost: 0.5, read: 15, out: 7, ms: 2000, used: 10 })
+  assert.deepEqual({ nuevos: r1.nuevos, cache: r1.cache, turnos: r1.turnos, ultimo: r1.ultimo }, { nuevos: 10, cache: 5, turnos: 1, ultimo: { tokens: 22, usd: 0.5 } })
   const mas = [...ev, texto(1)]
   assert.equal(resumenDe(mas), r1, 'un trozo de texto no cambia el resumen')
   const r2 = resumenDe([...mas, { t: 'turn_start', at: 5000 }, { t: 'turn_end', at: 6000, ok: false }])
   assert.equal(r2.sinCosto, 1)
+  assert.equal(r2.turnos, 2)
+  assert.deepEqual(r2.ultimo, r1.ultimo, 'un turno sin tokens no borra el último que se midió')
   assert.equal(r2.ms, 3000)
 })
 

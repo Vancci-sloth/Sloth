@@ -62,7 +62,7 @@ const modulos: Record<string, string> = {
   'node:fs': 'export const existsSync = () => true; export const mkdirSync = () => {}',
   '@opencode/client': 'export const OpenCode = { make: () => globalThis.__slothOpenCodePrueba.cliente }',
   './agentes.ts': 'export const asegurarAgente = async () => "opencode"; export const rutaAgente = () => "opencode"',
-  './instrucciones.ts': 'export const INSTRUCCIONES = "Prueba"',
+  './instrucciones.ts': 'export const instrucciones = () => "Prueba"',
   './navegador-agente.ts': 'export const navegadorAgente = () => ({playwright:{command:"node",args:[]}})',
   './voz/index.ts': 'export const mcpVoz = () => ({})',
   './flow/index.ts': 'export const mcpFlow = () => ({})',

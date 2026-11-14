@@ -11,6 +11,7 @@ import { alBajarAgente, descartarRoto, programaClaude, rutaAgente } from './agen
 import { sitiosDeAgente } from './tope-agentes.ts'
 import { dolaresDeepSeek, entornoDeepSeek, modeloDeepSeek, SIN_LLAVE, tarifaDeepSeek } from './deepseek.ts'
 import { llaveGuardada } from './acceso.ts'
+import { conSobreTi } from './sobre-ti.ts'
 import { proveedorDe } from '../shared/providers.ts'
 
 /** Las herramientas que lanzan un subagente. */
@@ -144,7 +145,7 @@ export function startClaude(opts: AgentOptions): AgentRun {
       settingSources: ['user', 'project', 'local'],
       // Lo que su card nunca usó, fuera del contexto: un servidor entero (`mcp__openseo`) o una herramienta.
       disallowedTools: opts.sinHerramientas,
-      systemPrompt: { type: 'preset', preset: 'claude_code', append: `${OPCIONES}\n\n${UN_VIDEO_POR_HILO}` },
+      systemPrompt: { type: 'preset', preset: 'claude_code', append: conSobreTi(`${OPCIONES}\n\n${UN_VIDEO_POR_HILO}`) },
       // El guionista: Opus que escribe un solo archivo de un resumen, sin más herramientas que Write. Con todas, el que
       // escribía el guion de un video arrancaba con 38 mil tokens y costaba $0,26 por 100 palabras (6-nov).
       ...(deepseek ? {} : { agents: { guionista: GUIONISTA } }),

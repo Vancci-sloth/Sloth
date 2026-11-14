@@ -282,6 +282,13 @@ input, textarea, select { font: inherit; color: inherit; }
 .context-limit.agotandose .context-limit-bar > span { background: var(--bad); }
 .context-limit.agotandose b { color: var(--bad); }
 .context-limit-reset, .context-limit-note { font-size: 10.5px; color: var(--muted); }
+/* Los tokens del chat: una barra partida (caché, nuevos, escritos) y su muestra junto a cada cifra. */
+.context-tokens { display: flex; gap: 2px; height: 7px; border-radius: 4px; overflow: hidden; background: var(--panel-2); }
+.context-tokens > span { min-width: 3px; flex-basis: 0; }
+.context-muestra { display: inline-block; width: 8px; height: 8px; margin-right: 6px; border-radius: 2px; vertical-align: 0; }
+.context-tokens .cache, .context-muestra.cache { background: var(--muted); }
+.context-tokens .nuevos, .context-muestra.nuevos { background: var(--text); }
+.context-tokens .escritos, .context-muestra.escritos { background: var(--amber); }
 .editor { position: relative; font-size: 15px; line-height: 1.5; }
 .editor .field { min-height: 46px; max-height: 320px; overflow-y: auto; outline: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
 /* La ayuda del campo vacío, más tenue que lo escrito pero legible (contraste 5:1 sobre el compositor). */
@@ -323,6 +330,9 @@ a.link-chip:hover { border-color: var(--amber); }
 .picker-option { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; padding: 6px 10px; border-radius: 7px; font-size: 13px; text-align: left; white-space: nowrap; color: var(--text); }
 .picker-option:hover { background: var(--panel-2); }
 .picker-option.on { color: var(--amber); background: var(--amber-tinte); }
+.picker-detalle { margin-left: auto; color: var(--suave); font-size: 12px; font-variant-numeric: tabular-nums; }
+.picker-option.on .picker-detalle { color: inherit; }
+.picker-detalle + svg { margin-left: -4px; }
 .picker-menu.down { bottom: auto; top: calc(100% + 8px); animation-name: drop; }
 /* La lista de modelos dentro de Avanzado conserva el menú de Sloth y sale por encima de su panel. */
 .picker-menu.picker-flotante { position: fixed; margin: 0; min-width: 0; color: var(--text); }

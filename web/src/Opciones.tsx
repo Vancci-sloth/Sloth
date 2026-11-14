@@ -17,6 +17,7 @@ import { Logo } from './Logos'
 import { BotonNavegador } from './Navegador'
 import { RadarOpciones } from './RadarOpciones' // radar
 import { Segmento } from './Segmento'
+import { SobreTi } from './SobreTi'
 import { ConNavegadorRedes, RedesOpciones } from './Redes' // redes
 import { YoutubeOpciones } from './Youtube'
 import { useVoz, VozOpciones } from './Voz' // voz de AI Studio
@@ -104,6 +105,9 @@ function Ajustes({ onDone, iniciando, onIniciando }: { onDone(): void; iniciando
         {OTROS_AGENTES.map((p) => (
           <CuentaAgente key={p} p={p} />
         ))}
+      </Grupo>
+      <Grupo titulo="Sobre ti" nota="A qué te dedicas, tu canal, tu público y cómo te gusta que te hablen. Todos los agentes lo leen al empezar cada chat, así no lo repites en cada video. Lo que pidas en un mensaje manda sobre esto.">
+        <SobreTi />
       </Grupo>
       <Grupo titulo="Voz" nota="Al pedir un video eliges en «Voz» si la mandas tú o si el agente la genera con una de estas. La sesión de Google vive en un perfil aparte del navegador de Sloth, que ningún agente usa; las llaves, en tu usuario de esta computadora.">
         <VozOpciones voz={voz} />
@@ -399,12 +403,16 @@ const API = {
 function useLlave(c: UsoCuenta, proveedor: 'claude' | 'codex') {
   const [pegando, setPegando] = useState(false)
   const [llave, setLlave] = useState('')
+  /** Claude: otra dirección compatible con la API de Anthropic (un proxy), como el «custom base URL» de Cline. */
+  const [direccion, setDireccion] = useState('')
   const l = c.cuenta?.llave
   const a = API[proveedor]
   const cambiar = (api: boolean, nueva?: string | null) =>
-    c.pedir(`/api/${proveedor}/acceso`, { api, llave: nueva }).then((cuenta) => cuenta && (setPegando(false), setLlave('')))
+    c.pedir(`/api/${proveedor}/acceso`, { api, llave: nueva, ...(nueva ? { direccion } : {}) }).then((cuenta) => cuenta && (setPegando(false), setLlave('')))
+  const otra = proveedor === 'claude' && !!direccion.trim()
+  const host = (d?: string) => d?.replace(/^https?:\/\//, '')
   // Con la llave, el menú de la cuenta lleva a lo que se gasta; lo demás está en `selector`.
-  const menu = l?.activa ? [{ label: 'Llave de API', options: [{ value: 'uso-api', label: 'Ver lo que gastas ↗' }] }] : []
+  const menu = l?.activa && !l.direccion ? [{ label: 'Llave de API', options: [{ value: 'uso-api', label: 'Ver lo que gastas ↗' }] }] : []
   /** Lo que toca hacer con lo elegido en el menú; `false` si no es de la llave. */
   const elegir = (que: string) => que === 'uso-api' && (window.open(a.uso, '_blank', 'noreferrer'), true)
   /** Elegir la llave sin ninguna guardada abre el campo; volver a la suscripción lo cierra. */
@@ -423,13 +431,13 @@ function useLlave(c: UsoCuenta, proveedor: 'claude' | 'codex') {
         valor={pegando || l?.activa ? 'api' : 'cuenta'}
         opciones={[
           { id: 'cuenta', texto: 'Tu suscripción', disabled: c.ocupado },
-          { id: 'api', texto: l ? `Llave de API …${l.final}` : 'Llave de API', disabled: c.ocupado },
+          { id: 'api', texto: l ? `Llave de API …${l.final}${l.direccion ? ` · ${host(l.direccion)}` : ''}` : 'Llave de API', disabled: c.ocupado },
         ]}
         onCambio={elegirPago}
       />
       {l && !pegando && (
         <>
-          <button className="ghost small" disabled={c.ocupado} onClick={() => setPegando(true)}>
+          <button className="ghost small" disabled={c.ocupado} onClick={() => (setDireccion(l.direccion ?? ''), setPegando(true))}>
             Cambiar de llave
           </button>
           <button className="ghost small" disabled={c.ocupado} onClick={() => void cambiar(false, null)}>
@@ -455,12 +463,29 @@ function useLlave(c: UsoCuenta, proveedor: 'claude' | 'codex') {
           Cancelar
         </button>
       </div>
+      {proveedor === 'claude' && (
+        <input
+          type="url"
+          placeholder="Otra dirección (opcional), como https://api.ejemplo.com"
+          value={direccion}
+          onChange={(e) => setDireccion(e.target.value)}
+          autoComplete="off"
+          spellCheck={false}
+        />
+      )}
       <p className="muted small">
-        Se cobra por uso en tu cuenta de{' '}
-        <a href={a.llaves} target="_blank" rel="noreferrer">
-          {a.marca}
-        </a>
-        , no en tu plan. Se guarda solo en Sloth, en esta computadora. {a.hilos}
+        {otra ? (
+          <>Se cobra en el servicio de esa dirección, que debe ser compatible con la API de Anthropic. </>
+        ) : (
+          <>
+            Se cobra por uso en tu cuenta de{' '}
+            <a href={a.llaves} target="_blank" rel="noreferrer">
+              {a.marca}
+            </a>
+            , no en tu plan.{' '}
+          </>
+        )}
+        Se guarda solo en Sloth, en esta computadora. {a.hilos}
       </p>
     </form>
   )

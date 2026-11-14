@@ -31,6 +31,7 @@ import { modelos3dAcciones } from './modelos3d-acciones.ts' // modelos 3D
 import { miniaturas } from './miniaturas.ts' // panel de etapas
 import { guardarMeta, guardarYoutube, opciones } from './opciones.ts'
 import { previas } from './previas.ts' // previas de las cards
+import { guardarSobreTi, sobreTi } from './sobre-ti.ts'
 import { radar } from './radar/index.ts' // radar
 import { comunidad, llaveDelCreador } from './comunidad.ts' // comunidad
 import { desempacar, estilos } from './estilos.ts' // estilos compartidos
@@ -491,10 +492,10 @@ async function api(req: IncomingMessage, res: ServerResponse, url: URL): Promise
   // Pagar con la cuenta o con una llave de API (`server/acceso.ts`). Devuelve la cuenta como queda.
   const acceso = /^\/api\/(claude|codex|deepseek|gemini)\/acceso$/.exec(path)
   if (acceso && method === 'POST') {
-    const { api, llave } = await body<{ api: boolean; llave?: string | null }>(req)
+    const { api, llave, direccion } = await body<{ api: boolean; llave?: string | null; direccion?: string }>(req)
     const p = acceso[1] as Proveedor
     try {
-      await cambiarAcceso(p, !!api, llave)
+      await cambiarAcceso(p, !!api, llave, direccion)
       const soloLlave = p === 'deepseek' || p === 'gemini'
       send(res, 200, await (p === 'codex' ? cuentaCodex() : soloLlave ? OTROS[p]!.cuenta() : cuentaClaude(APP, true)))
       if (soloLlave) pedirModelos()
@@ -527,6 +528,13 @@ async function api(req: IncomingMessage, res: ServerResponse, url: URL): Promise
     const { ids, skill } = await body<{ ids?: string[]; skill?: string }>(req)
     send(res, 200, await instalar(APP, ids, pide(skill)))
     return true
+  }
+
+  // «Sobre ti»: lo que cada quien cuenta de sí, para todos los agentes (`server/sobre-ti.ts`).
+  if (path === '/api/sobre-ti' && method === 'GET') return send(res, 200, { texto: sobreTi() }), true
+  if (path === '/api/sobre-ti' && method === 'POST') {
+    const { texto } = await body<{ texto?: string }>(req)
+    return send(res, 200, { texto: guardarSobreTi(texto ?? '') }), true
   }
 
   // El programa de cada agente, que se baja al elegirlo (`server/agentes.ts`). Al acabar, su catálogo de modelos.

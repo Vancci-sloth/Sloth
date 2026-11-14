@@ -28,6 +28,9 @@ Este es el mapa:
   (`cursor.ts`, `cursor-puente.mjs`); Muse Code, su MSP (`muse.ts`); Pi, su RPC con una extensión que le pasa los MCP de
   Sloth (`pi.ts`). Lo que comparten (las instrucciones, la skill por su ruta, los MCP del hilo) está en
   `server/instrucciones.ts`; el JSON-RPC por líneas, en `server/rpc-lineas.ts`.
+- «Sobre ti» (`server/sobre-ti.ts`, `web/src/SobreTi.tsx`): lo que cada quien cuenta de sí en la bienvenida o en
+  Opciones, en `data/sobre-ti.json`. Va con las instrucciones de Sloth a todos los agentes (`conSobreTi`: el `append`
+  de Claude, las `developerInstructions` de Codex e `instrucciones()` de los demás), leído al empezar cada hilo.
 - `server/sessions.ts`: cada hilo es `data/sessions/<id>.json` (qué es) y `<id>.jsonl` (lo que pasó). Retoma la sesión
   del proveedor tras reiniciar, reparte los lotes según la máquina y cierra el proceso de un video del lote al acabar.
   Un chat de Claude, DeepSeek, Codex u OpenCode con su sesión guardada suelta el proceso a la media hora; los demás
@@ -81,7 +84,8 @@ Este es el mapa:
   `momentos.json` y `scripts/hacer.py` hace lo demás; `scripts/director.py` arma las escenas (`guion.json`) para su
   plantilla. Su vara son diez Code Report (`REFERENCIAS.md`).
 - `modelos` (`web/src/Modelos.tsx`): en «Optimizado», el modelo y el esfuerzo medidos para el hilo. Una card sin medir
-  usa lo último que eligió el usuario a mano. En «Avanzado» se eligen. Los subagentes van siempre en el modelo y el
+  usa lo último que eligió el usuario a mano. En «Avanzado» se eligen; junto a cada modelo medido sale lo que cuesta y
+  tarda un minuto de video (`porMinuto` de la card: al medir otro modelo, se añade ahí). Los subagentes van siempre en el modelo y el
   esfuerzo del hilo: en Claude, Sloth los manda en la línea `Subagentes: todos = <alias> <esfuerzo>.` (las `tareas`
   medidas de la card ya no se usan). La excepción es el `guionista` del explicativo (`server/claude.ts`), que va en Opus.
 - La galería: al elegir un estilo, sus videos terminados ocupan el sitio de las cards (`videosApi` en `etapas.ts`);

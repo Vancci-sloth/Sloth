@@ -204,8 +204,14 @@ export function useEscritos(id: string): FileDraft[] {
  */
 export type Resumen = {
   cost: number
+  /** Lo leído: `nuevos` (se cobra entero) más `cache` (lo que ya había leído, mucho más barato). */
   read: number
+  nuevos: number
+  cache: number
   out: number
+  /** Los turnos acabados, y el último: sus tokens (leídos y escritos) y lo que costó, si se supo. */
+  turnos: number
+  ultimo?: { tokens: number; usd?: number }
   /** El tiempo que el agente pasó trabajando: la suma de cada turno, no lo que lleva abierta la sesión. */
   ms: number
   /** Los turnos sin costo (se cortaron antes de saberlo, fueron el primero tras retomar el hilo o Codex sin precio). */
@@ -217,7 +223,7 @@ export type Resumen = {
 
 /** Por el primer evento de cada hilo: lo sumado hasta ahora. Solo se suma lo nuevo, y si nada cambia va el mismo objeto. */
 const sumas = new WeakMap<AgentEvent, { n: number; ultimo: AgentEvent; turnStart: number; r: Resumen; deFlow: Set<string>; pedidos: Set<string> }>()
-const VACIO: Resumen = { cost: 0, read: 0, out: 0, ms: 0, sinCosto: 0, flowVideos: 0, flowCreditos: 0 }
+const VACIO: Resumen = { cost: 0, read: 0, nuevos: 0, cache: 0, out: 0, turnos: 0, ms: 0, sinCosto: 0, flowVideos: 0, flowCreditos: 0 }
 
 export function resumenDe(events?: AgentEvent[]): Resumen {
   if (!events?.length) return VACIO
@@ -245,8 +251,13 @@ export function resumenDe(events?: AgentEvent[]): Resumen {
     if (e.t !== 'turn_end') continue
     r.cost += e.costUsd ?? 0
     if (e.costUsd === undefined) r.sinCosto++
-    r.read += e.tokens ? e.tokens.input + e.tokens.cacheRead : 0
-    r.out += e.tokens?.output ?? 0
+    const t = e.tokens
+    r.nuevos += t?.input ?? 0
+    r.cache += t?.cacheRead ?? 0
+    r.read = r.nuevos + r.cache
+    r.out += t?.output ?? 0
+    r.turnos++
+    if (t) r.ultimo = { tokens: t.input + t.cacheRead + t.output, usd: e.costUsd }
     if (s.turnStart) r.ms += e.at - s.turnStart
     s.turnStart = 0
   }

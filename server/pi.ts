@@ -9,7 +9,7 @@ import { conRutas, IMAGE_TYPES, type AgentOptions, type AgentRun, type SkillRef 
 import { comandoAgente } from './agentes.ts'
 import { cuentaConVentana } from './cuenta-ventana.ts'
 import { guardar } from './disco.ts'
-import { conSkill, INSTRUCCIONES, mcpSloth } from './instrucciones.ts'
+import { conSkill, instrucciones, mcpSloth } from './instrucciones.ts'
 import { matarArbol } from './rpc-lineas.ts'
 
 /**
@@ -261,7 +261,7 @@ export function startPi(opts: AgentOptions): AgentRun {
   }
 
   const { provider, modelId } = modeloDe(opts.model)
-  const args = ['--extension', extension(), '--append-system-prompt', INSTRUCCIONES, ...(opts.resume ? ['--session', opts.resume] : [])]
+  const args = ['--extension', extension(), '--append-system-prompt', instrucciones(), ...(opts.resume ? ['--session', opts.resume] : [])]
   const env = { ...entornoAgente('pi'), SLOTH_MCP: JSON.stringify(mcpSloth(opts.lote, opts.hilo)) }
   rpc = new Rpc(args, opts.cwd, env, oir, (code) => {
     const habia = busy

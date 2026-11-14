@@ -61,6 +61,18 @@ export function subagentes(choice: Choice | undefined): Tarea[] {
 /** La línea que la skill lee para elegir el modelo de cada subagente: `Subagentes: todos = haiku high.` */
 export const lineaSubagentes = (tareas: Tarea[]) => (tareas.length ? `Subagentes: ${tareas.map((t) => `${t.nombre} = ${t.model}${t.effort ? ` ${t.effort}` : ''}`).join('; ')}.` : '')
 
+/**
+ * Lo que cuesta y tarda un minuto de video con un modelo, de lo medido en la card (`porMinuto`): «$0.45 · 4 min». Con
+ * `effort`, solo lo medido con ese esfuerzo; sin él, con su esfuerzo de siempre o, si no se midió así, con el que se
+ * midió, que entonces se nombra. Sin medir, nada.
+ */
+export function textoPorMinuto(conf: ModelosConf | undefined, model: string, effort?: string, deSiempre?: string): string | undefined {
+  const medidas = (conf?.porMinuto ?? []).filter((p) => p.model === model.replace('[1m]', ''))
+  const exacta = medidas.find((p) => p.effort === (effort ?? deSiempre))
+  const p = exacta ?? (effort ? undefined : medidas.sort((a, b) => a.usd - b.usd)[0])
+  return p && `${exacta ? '' : `${p.effort} · `}$${p.usd.toFixed(2)} · ${Math.max(1, Math.round(p.minutos))} min`
+}
+
 /** Un modelo del catálogo con un esfuerzo que admite. Una elección vieja guardada puede decir `claude-opus-5-5[1m]`: es el mismo. */
 function valido(models: Model[], c: { model: string; effort?: string }): Choice | undefined {
   const m = models.find((x) => x.id === c.model.replace('[1m]', ''))
@@ -83,6 +95,7 @@ export function Modelos(props: {
   const { avanzado, choice, tareas, models } = props
   const modelo = models.find((m) => m.id === choice?.model)
   const principalMedido = props.conf?.principal?.medido
+  const porMinuto = choice && textoPorMinuto(props.conf, choice.model, choice.effort)
 
   useEffect(() => {
     if (!open) return
@@ -127,24 +140,33 @@ export function Modelos(props: {
                     flotante
                     label={modelo?.label ?? choice?.model ?? 'Modelo'}
                     value={choice?.model ?? ''}
-                    groups={gruposModelos(models).map((g) => ({ ...g, options: g.options.map((o) => ({ ...o, label: o.label.replace(/^Codex · /, '') })) }))}
+                    menuWidth={340}
+                    groups={gruposModelos(models).map((g) => ({
+                      ...g,
+                      options: g.options.map((o) => ({
+                        ...o,
+                        label: o.label.replace(/^Codex · /, ''),
+                        detalle: textoPorMinuto(props.conf, o.value, undefined, o.value === choice?.model ? choice.effort : models.find((m) => m.id === o.value)?.defaultEffort)
+                      }))
+                    }))}
                     onChange={(model) => cambiarPrincipal({ model, effort: models.find((m) => m.id === model)?.defaultEffort })}
                   />
                   <Picker
                     className="modelos-selector"
                     menuClassName="modelos-lista"
-                    menuWidth={160}
+                    menuWidth={props.conf?.porMinuto?.some((p) => p.model === choice?.model) ? 230 : 160}
                     flotante
                     label={choice?.effort ?? 'Esfuerzo'}
                     value={choice?.effort ?? ''}
                     disabled={!modelo?.efforts.length}
-                    groups={[{ label: 'Esfuerzo', options: (modelo?.efforts ?? []).map((x) => ({ value: x, label: x })) }]}
+                    groups={[{ label: 'Esfuerzo', options: (modelo?.efforts ?? []).map((x) => ({ value: x, label: x, detalle: choice && textoPorMinuto(props.conf, choice.model, x) })) }]}
                     onChange={(effort) => cambiarPrincipal({ effort })}
                   />
                 </>
               ) : (
                 <span>
                   {modelo?.label ?? choice?.model} · {choice?.effort}
+                  {porMinuto && <span className="picker-detalle"> · {porMinuto}</span>}
                 </span>
               )}
             </Fila>
@@ -165,11 +187,18 @@ export function Modelos(props: {
                   ? 'Lo que medimos como mejor para el hilo; sus subagentes van en ese mismo modelo y esfuerzo. Pasa el ratón por «medido» para ver la prueba.'
                   : 'Esta skill aún no se ha medido: el hilo va en lo último que elegiste a mano (o en Opus high, si nunca elegiste), y sus subagentes, en ese mismo modelo y esfuerzo.'}
           </p>
+          {!!props.conf?.porMinuto?.length && (
+            <p className="modelos-nota muted small" title={props.conf.porMinuto.map((p) => `${modeloNombre(models, p.model)} ${p.effort}: ${p.medido}`).join('\n')}>
+              Junto a cada modelo medido con este estilo: lo que cuesta un minuto de video y cuánto tarda en salir. Es a precio de la API: con tu plan de Claude o ChatGPT no se cobra aparte, gasta de su límite. Los demás aún no se han medido.
+            </p>
+          )}
         </div>
       )}
     </div>
   )
 }
+
+const modeloNombre = (models: Model[], id: string) => models.find((m) => m.id === id)?.label ?? id
 
 function Fila({ nombre, para, medido, children }: { nombre: string; para: string; medido?: string; children: React.ReactNode }) {
   return (
