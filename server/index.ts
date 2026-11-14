@@ -28,6 +28,7 @@ import { cerrarVigilantesOciosos, etapasApi, folderOf, mismaCwd, queFalta, video
 import { cerrarMotoresOciosos } from './motor.ts'
 import { modelos3d } from './modelos3d.ts' // modelos 3D
 import { modelos3dAcciones } from './modelos3d-acciones.ts' // modelos 3D
+import { subtitulos } from './subtitulos.ts' // subtítulos
 import { miniaturas } from './miniaturas.ts' // panel de etapas
 import { guardarMeta, guardarYoutube, opciones } from './opciones.ts'
 import { previas } from './previas.ts' // previas de las cards
@@ -41,7 +42,7 @@ import { voz } from './voz/index.ts' // voz de AI Studio
 import { flow } from './flow/index.ts' // Google Flow
 import { youtube } from './youtube.ts'
 import { peticionDeConfianza } from './origen.ts'
-import { actualizarYtDlp, instalandoAlgo, instalar, pythonSlothEntero, requisitos, rutaPythonSloth } from './requisitos.ts'
+import { actualizarYtDlp, BANDERAS, instalandoAlgo, instalar, pythonSlothEntero, requisitos, rutaPythonSloth } from './requisitos.ts'
 import { espacio } from './espacio.ts' // espacio en disco
 import { equipo } from './equipo.ts' // tu equipo
 import { licencia } from './licencia.ts' // suscripción
@@ -211,6 +212,16 @@ const acciones3d = modelos3dAcciones({
   trabajo: join(carpetaTrabajo(APP), 'modelos-3d'),
   python: () => rutaPythonSloth() ?? (process.platform === 'win32' ? 'python' : 'python3')
 }) // modelos 3D
+// Los subtítulos de un video terminado, desde su Entrega: con el transcriptor local y FFmpeg, sin agente.
+const subtitular = subtitulos({
+  carpeta: (id) => {
+    const meta = sessions.meta(id)
+    return meta && cards().find((c) => c.id === meta.cardId)?.etapas?.length ? folderOf(meta) : undefined
+  },
+  scripts: join(carpetaSkill('video-base') ?? join(APP, 'skills', 'video-base'), 'scripts'),
+  python: rutaPythonSloth,
+  banderas: BANDERAS
+}) // subtítulos
 // El buscador propio de noticias de tecnología: lee sus fuentes en segundo plano y las skills buscan ahí.
 const noticias = radar(APP) // radar
 // Tus estilos en un archivo para compartirlos, y los de otros, instalados entre los tuyos.
@@ -264,6 +275,7 @@ function ocupado(): string | null {
   if (narrar.ocupado()) return narrar.ocupado() // voz de AI Studio: una a medias
   if (generarFlow.ocupado()) return generarFlow.ocupado() // Google Flow: un pedido a medias
   if (acciones3d.ocupado()) return acciones3d.ocupado() // modelos 3D: una importación a medias
+  if (subtitular.ocupado()) return subtitular.ocupado() // subtítulos: uno a medias
   return maquina.ocupado() ?? instalandoAlgo() ?? bajandoAgente() ?? conectando() ?? conectandoCodex() ?? conectandoOpenCode() ?? conectandoOtro()
 }
 
@@ -690,6 +702,7 @@ async function api(req: IncomingMessage, res: ServerResponse, url: URL): Promise
   if (idear && (await idear.api(req, res, url))) return true // ideas
   if (await acciones3d.api(req, res, url)) return true // modelos 3D
   if (await biblioteca3d.api(req, res, url)) return true // modelos 3D
+  if (await subtitular.api(req, res, url)) return true // subtítulos
   if (await noticias.api(req, res, url)) return true // radar
   if (await comunidadApi.api(req, res, url)) return true // comunidad
   if (await narrar.admin(req, res, url)) return true // Administrador, solo en la computadora del creador

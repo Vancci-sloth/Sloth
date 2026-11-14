@@ -147,6 +147,10 @@ Este es el mapa:
   «Importar .glb» corre `modelos.py importar` sin agente, en una carpeta temporal que se borra (Draco y Meshopt se
   abren; el decodificador de Draco va con el modelo); «Nuevo modelo» abre un hilo de `MODELO3D_CARD` (`shared/modelos3d.ts`,
   no sale en el inicio) en su propia carpeta, `<trabajo>/modelos-3d/<nombre>` (skill `modelos-3d`, §6).
+- Los subtítulos (`server/subtitulos.ts`, `web/src/Subtitulos.tsx`): en la Entrega de un hilo (`Final.tsx`), gratis y sin
+  agente. `video-base/scripts/subtitulos.py` transcribe el video terminado con el transcriptor local; el servidor arma los
+  renglones, el .srt y un .ass, y FFmpeg graba una copia en `<carpeta del video>/subtitulos/<video>/`, fuera de `out/`
+  para que no cuente como otro video. Corregir el texto o cambiar el estilo solo vuelve a grabar.
 - `server/originales.ts` y `web/src/TusCambios.tsx`: en la app que se vende, «Con tus cambios (N)» bajo la card dice qué
   archivos de su skill (y de video-base) ya no son como los trae la versión, y vuelve a la original, entera o uno a uno.
   Lo que se pisa, también al actualizar (`prepararSkills`), se copia antes a `data/skills-tuyas`.

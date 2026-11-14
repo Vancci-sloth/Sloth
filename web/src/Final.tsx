@@ -1,12 +1,14 @@
 import { useEffect, useState } from 'react'
 import type { Card, SessionMeta, VideoFinal } from '../../shared/types'
 import { api } from './api'
+import { SubtitulosEntrega } from './Subtitulos'
 import { YoutubeBoton } from './Youtube'
 import './Final.css'
 
 /**
  * Lo que se hace con un video terminado, arriba de la fase Entrega del estudio: bajarlo, verlo en su carpeta y pedirle
- * un cambio de un clic. Los cambios le llegan al agente como si los escribieras, y no se pueden pedir mientras trabaja.
+ * un cambio de un clic, o ponerle subtítulos gratis (`Subtitulos.tsx`). Los cambios le llegan al agente como si los
+ * escribieras, y no se pueden pedir mientras trabaja.
  */
 
 /** Lo que pide cada cambio de un clic. `conVoz`: vale también cuando la voz es una grabación del usuario (El Diff). */
@@ -68,6 +70,7 @@ export function Final({ session, card, carpeta, finales }: { session: SessionMet
           Ver en la carpeta
         </button>
       </div>
+      <SubtitulosEntrega key={session.id} sessionId={session.id} finales={finales} />
       <div className="final-cambios">
         <span className="muted small">¿Algún cambio?</span>
         {cambios.map((c) => (

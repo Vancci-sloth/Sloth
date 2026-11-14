@@ -1,0 +1,23 @@
+/* Los subtítulos de un video terminado, en la Entrega (`Subtitulos.tsx`, dentro de `.final`). */
+.sub { align-self: stretch; display: flex; flex-direction: column; gap: 10px; padding-top: 12px; border-top: 1px solid var(--line); }
+.sub .ico { width: 15px; height: 15px; flex: none; }
+.sub-fila { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; }
+.sub-titulo { display: inline-flex; align-items: center; gap: 7px; margin-right: 4px; font-weight: 600; font-size: 13.5px; }
+.sub-fila .picker-trigger { font-size: 13px; color: var(--suave); }
+.sub-pie { display: flex; align-items: center; gap: 12px; }
+.sub-pie .final-boton.principal { flex: none; margin-left: auto; }
+
+.sub-trabajando { display: flex; flex-direction: column; gap: 8px; }
+.sub-trabajando .working { margin: 0; }
+
+.sub-listo { display: flex; gap: 16px; align-items: flex-start; }
+.sub-listo video { flex: none; max-width: 50%; max-height: 280px; border-radius: 12px; background: #000; }
+.sub-acciones { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; min-width: 0; }
+.sub-acciones .final-boton.activa { border-color: var(--amber); color: var(--amber); }
+
+.sub-renglones { list-style: none; margin: 0; padding: 4px; max-height: 260px; overflow-y: auto; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); }
+.sub-renglones li { display: flex; align-items: center; gap: 10px; padding: 0 6px; }
+.sub-tiempo { flex: none; width: 42px; font-family: var(--mono); font-size: 12px; color: var(--muted); text-align: right; }
+.sub-tiempo:hover { color: var(--amber); }
+.sub-renglones input { flex: 1; min-width: 0; padding: 3px 8px; border: 1px solid transparent; border-radius: 8px; background: none; color: var(--text); font: inherit; font-size: 13.5px; }
+.sub-renglones input:focus { outline: none; border-color: var(--amber); background: var(--panel-2); }
