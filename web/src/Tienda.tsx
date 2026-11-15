@@ -234,7 +234,7 @@ export function Cerrada({ estilos, onRevisar }: { estilos: number; onRevisar(): 
         </p>
       )}
       <div className="tienda-cerrada-acciones">
-        <button className="tienda-cerrada-ya" onClick={() => window.open(`${PAGINA}/#apoyar`, '_blank')}>
+        <button className="tienda-cerrada-ya" onClick={() => window.open(`${PAGINA}/#pago`, '_blank')}>
           Otras formas de pago
         </button>
         <button className="tienda-cerrada-ya" title="Pega la clave que te llegó al correo al apoyar" onClick={() => (location.hash = '/opciones')}>

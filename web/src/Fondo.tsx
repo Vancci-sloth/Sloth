@@ -140,7 +140,7 @@ export function Fondo({ onEstilos }: { onEstilos?(): void }) {
 
       <p className="fondo-apoyo">
         <Icono de="estrella" /> ¿Quieres que crezca? La mitad de tu apoyo con tarjeta va directo aquí.{' '}
-        <button className="fondo-enlace" onClick={() => window.open(`${PAGINA}/#apoyar`, '_blank')}>
+        <button className="fondo-enlace" onClick={() => window.open(`${PAGINA}/#pago`, '_blank')}>
           Apoyar a Sloth
         </button>
       </p>

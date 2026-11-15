@@ -17,7 +17,8 @@ const INICIOS = 'sloth:inicios'
 
 /** Si la clave quita el recordatorio: un apoyo vigente o un lugar gratis de por vida (de cuando Sloth se vendía). */
 const apoya = (l?: Licencia) => !!l?.activa && l.plan !== 'cuenta'
-const apoyar = () => window.open(`${PAGINA}/#apoyar`, '_blank')
+/** Abre la página ya en el formulario del pago (`#pago`), no en la tabla de lo que trae el apoyo. */
+const apoyar = () => window.open(`${PAGINA}/#pago`, '_blank')
 
 /**
  * Sloth es gratis (`server/licencia.ts`). Cada `CADA` inicios, a quien no apoya le recuerda que puede hacerlo, sin
