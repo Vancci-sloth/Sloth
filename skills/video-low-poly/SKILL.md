@@ -151,7 +151,9 @@ modelos bajados ni `Math.random` (`K.rng(semilla)`). Mírala en la hoja: si no s
 4. Corre `python -B -X utf8 <skill>/scripts/hacer.py --studio <Voz>` (o `--audio <archivo>`, o nada si la voz ya está)
    **en segundo plano** y termina tu mensaje: te avisa al acabar. Un video de 30 s tarda unos 5 minutos (el render son
    ~0,3 s por cuadro con la tarjeta). Si dice ✗, arregla lo que dice y vuelve a correrlo: la voz y el render que no
-   cambiaron no se repiten.
+   cambiaron no se repiten. Si el mensaje trae `Imágenes: con ChatGPT…` o `Imágenes: genéralas en Google Flow con
+   <modelo>…`, súmale `--imagenes chatgpt` o `--imagenes "<modelo>"`: genera la portada con eso, de fondo mientras
+   renderiza; no la hagas tú.
 5. Mira `revision/hoja.png` (un cuadro cada 1,5 s) y `portada.png`: que cada lugar enseñe lo que se dice y que su
    bandera se lea. Otro render solo si algo de verdad no se ve, todo en una vuelta.
 6. Entrega la ruta de `out/<carpeta>.mp4`, cuánto dura, el proceso en una línea, y que el audio no lo oíste.

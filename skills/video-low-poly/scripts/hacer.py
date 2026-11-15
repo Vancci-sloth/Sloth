@@ -7,6 +7,7 @@ out/<carpeta>.mp4 con su portada y su hoja de cuadros. Sigue el motor común (vi
     python -B -X utf8 <skill>/scripts/hacer.py --audio <archivo>             la que grabó el usuario (m4a, mp3, un video…)
     python -B -X utf8 <skill>/scripts/hacer.py                               otra vez, con la voz que ya hay
     --muestras <n>   un borrador más rápido (el video final va con las 64 del estilo)
+    --imagenes <con> la portada con IA: `chatgpt` o el modelo de Flow de la línea `Imágenes:` (se recuerda en el proyecto)
 
 Sin voz (`"voz": false` en momentos.json, como la referencia): cada momento va en su `segundo` en vez de en una
 palabra, guion.md solo hace falta para el título, y el sonido es la mezcla completa del kit (música, ambiente y
@@ -18,7 +19,9 @@ Desde la raíz del proyecto. En orden, y para en el primer ✗ diciendo qué arr
 3. Ancla cada momento a la palabra que dijo la voz y escribe revision/plan.json: lo que dibuja el director (kit/low-poly.js).
 4. Dibuja cada cuadro en Chrome con la tarjeta (render.mjs, 64 sub-render por cuadro, como la referencia) y su sonido,
    salido del mismo plan; si el plan y el kit no cambiaron, no lo dibuja otra vez.
-5. Mezcla la voz con los efectos, masteriza (−14 LUFS), pone la portada y deja revision/hoja.png.
+5. Mezcla la voz con los efectos, masteriza (−14 LUFS), pone la portada y deja revision/hoja.png. La portada es la
+   generada con IA si el usuario eligió con qué en «Imágenes» (se pide de fondo desde el paso 2 y aquí se espera, 90 s
+   como mucho); si no, o si falla, un cuadro del video con su título.
 """
 
 import difflib
@@ -37,7 +40,7 @@ from pathlib import Path
 SKILL = Path(__file__).resolve().parent.parent
 BASE = (Path(os.environ["SLOTH_SKILLS"]) if os.environ.get("SLOTH_SKILLS") else SKILL.parent) / "video-base" / "scripts"
 sys.path.insert(0, str(BASE))
-from momentos import Reloj, anclar, guardar, hoja, leer, normal, palabras_de, parar  # noqa: E402
+from momentos import Reloj, anclar, con_imagenes, esperar_portada, guardar, hoja, leer, normal, opcion, palabras_de, parar, pedir_portada  # noqa: E402
 
 RAIZ = Path.cwd()
 VOZ = RAIZ / "fuentes" / "voz"
@@ -91,6 +94,29 @@ def titulo(m: dict) -> str:
             if l.startswith("# "):
                 return l[2:].strip()
     return RAIZ.name
+
+
+def pedir_la_portada(m: dict, con: str, guion_txt: str) -> subprocess.Popen | None:
+    """La portada con IA de este video, de fondo (`pedir_portada` de la base): el mundo de papel con su etapa más clara."""
+    etapas = [str(mo["bandera"]) for mo in m["momentos"] if mo.get("bandera")]
+    cosas = []
+    for mo in m["momentos"]:
+        for e in entradas(mo):
+            nombre = str(e.get("pieza") or e.get("tipo") or "")
+            if nombre and nombre not in cosas:
+                cosas.append(nombre)
+    estilo = ("Style: the same look as the video, a miniature low-poly diorama made of matte faceted paper (flat-shaded "
+              "triangles, no textures): a small world with sea, coast, hills, a river, a village, fields and forest, seen from a "
+              "low crane camera with shallow depth of field, soft warm daylight and a peach haze that swallows the distance. "
+              "One small paper flag on a thin pole marks the stage. Title font: a tall condensed bold sans-serif (like Oswald "
+              "Bold), cream (#fff6e4).")
+    abre = re.split(r"(?<=[.!?])\s", guion_txt.strip())[0][:200]
+    que = (f"The video ({titulo(m)}) tells a process step by step inside that world"
+           + (f": {', '.join(etapas)}" if etapas else "") + "."
+           + (f" It opens with: \"{abre}\"." if abre else "")
+           + (f" Things that appear in it (names in Spanish): {', '.join(cosas[:8])}." if cosas else "")
+           + " Main subject: the stage that best tells what the video is about, big, built out of the same faceted paper.")
+    return pedir_portada(RAIZ, con, titulo(m), estilo, que, horizontal=m.get("formato", "vertical") != "vertical")
 
 
 def lugar_de(n) -> str | None:
@@ -353,6 +379,7 @@ def main() -> None:
     sys.stdout.reconfigure(encoding="utf-8")
     args = sys.argv[1:]
     m = leer(RAIZ)
+    con = con_imagenes(RAIZ, opcion(args, "--imagenes"))
     sin_voz = m.get("voz") is False
     guion_txt = texto_del_guion(not sin_voz)
     guion = palabras_de(guion_txt)
@@ -376,6 +403,7 @@ def main() -> None:
         return
 
     reloj = Reloj(RAIZ)
+    con_ia = pedir_la_portada(m, con, guion_txt)
     ps = []
     if not sin_voz:
         voz(args, guion_txt, reloj)
@@ -433,9 +461,13 @@ def main() -> None:
     # De fondo, el mejor cuadro: el segundo lugar ya armado (con su bandera), o la mitad si hay uno solo.
     ts = [mo["t"] for mo in p["momentos"]]
     fondo = min(p["duracion"] - 0.5, (ts[1] + 1.4) if len(ts) > 1 else p["duracion"] / 2)
-    subprocess.run(["node", str(BASE / "portada_sin_ia.mjs"), str(salida), str(portada), "--titulo", titulo(m), "--t", f"{fondo:.2f}",
-                    "--fuente", str(kit / "letra" / "oswald.woff2"), "--color", "#fff6e4", *([] if vertical else ["--horizontal"])],
-                   check=True, capture_output=True)
+    if hecha := esperar_portada(RAIZ, con_ia, reloj.inicio, "la del cuadro del video con su título"):
+        # La generada con IA ya viene a su tamaño (1080×1920 o 1280×720).
+        shutil.copy(hecha, portada)
+    else:
+        subprocess.run(["node", str(BASE / "portada_sin_ia.mjs"), str(salida), str(portada), "--titulo", titulo(m), "--t", f"{fondo:.2f}",
+                        "--fuente", str(kit / "letra" / "oswald.woff2"), "--color", "#fff6e4", *([] if vertical else ["--horizontal"])],
+                       check=True, capture_output=True)
     if vertical:
         subprocess.run(["node", str(BASE / "portada.mjs"), str(salida), str(portada)], check=True, capture_output=True)
     reloj.listo(salida, [hoja(salida, RAIZ / "revision" / "hoja.png"), portada])

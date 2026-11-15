@@ -19,6 +19,10 @@ este contrato; lo que cambia de un estilo a otro es su director y su material, n
 4. **`<skill>/scripts/hacer.py`**, de fondo, hace el resto (material, voz, edición, render, medida, portada). Dice sus
    pasos con su segundo (`[  12 s] render…`), para en el primer ✗ diciendo qué arreglar, no repite lo que ya está hecho
    (la voz del mismo guion, el material ya bajado) y termina en **`✓ listo: <mp4>`** con lo que hay que mirar.
+   **La portada la genera con IA** si el mensaje trae la línea `Imágenes:`, que le llega con `--imagenes chatgpt` o
+   `--imagenes "<modelo de Flow>"`: la pide de fondo al empezar y la espera al final (`con_imagenes`, `pedir_portada` y
+   `esperar_portada` de `momentos.py`; [PORTADA.md](PORTADA.md)). Sin la línea, o si falla, pone la de respaldo del
+   estilo y dice por qué. El agente no la hace a mano.
 5. **Deja `revision/hoja.png`** (el video de un vistazo, lo único que el agente mira) y **`revision/tiempos.json`** (los
    segundos de máquina de cada paso).
 6. **Un director determinista** pone lo que no se decide en cada video (cámara, cortes, encuadre, sonidos, subtítulos):

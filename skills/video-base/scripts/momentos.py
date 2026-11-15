@@ -6,6 +6,8 @@ comparten; el contrato entero, en MOTOR.md de video-base.
     import sys; sys.path.insert(0, "<base>/scripts")
     from momentos import Reloj, anclar, busca, hoja, leer, normal, palabras_de, parar, tiras, pares
 
+La portada con IA también es de todos (`con_imagenes`, `pedir_portada`, `esperar_portada`; PORTADA.md).
+
 Solo la biblioteca estándar y FFmpeg: corre con el `python` del sistema y con el de Sloth.
 """
 
@@ -136,6 +138,99 @@ class Reloj:
                      "pasos": self.pasos})
         except OSError:
             pass
+
+
+def opcion(args: list[str], nombre: str) -> str | None:
+    """El valor que sigue a `nombre` en `args`, que se queda sin los dos; None si no viene."""
+    if nombre not in args:
+        return None
+    i = args.index(nombre)
+    if i + 1 >= len(args) or args[i + 1].startswith("--"):
+        sys.exit(f"✗ {nombre} lleva su valor")
+    valor = args[i + 1]
+    del args[i:i + 2]
+    return valor
+
+
+def con_imagenes(raiz: Path, pedido: str | None) -> str:
+    """
+    Con qué se genera la portada de este video: lo de la línea `Imágenes:` del mensaje, que llega a `hacer.py` con
+    `--imagenes chatgpt` o `--imagenes "<modelo de Flow>"` (`pedido`) y se queda apuntado en `portada/imagenes.json`
+    para las corridas que sigan sin él. Vacío si el usuario no eligió con qué: el estilo pone su portada de respaldo.
+    """
+    apunte = raiz / "portada" / "imagenes.json"
+    if pedido is not None:
+        con = "chatgpt" if pedido.strip().lower() in ("chatgpt", "codex") else pedido.strip()
+        guardar(apunte, {"con": con})
+        return con
+    try:
+        return json.loads(apunte.read_text(encoding="utf-8")).get("con") or ""
+    except (OSError, ValueError):
+        return ""
+
+
+def _decir(texto: str) -> None:
+    print("  " + texto, flush=True)
+
+
+def pedir_portada(raiz: Path, con: str, titulo: str, estilo: str, que: str, refs: list[Path] | tuple = (),
+                  horizontal: bool = False, decir=None) -> subprocess.Popen | None:
+    """
+    La portada con IA de todo estilo, de fondo desde ya (portada_ia.py), con lo que el usuario eligió en «Imágenes»
+    (`con`: `chatgpt` o un modelo de Flow; vacío, nada). No mira el video, que aún no existe: va del `titulo` (de dos a
+    cinco palabras), de cómo se ve el estilo (`estilo`, en inglés: su mundo, sus colores, su letra), de lo que cuenta
+    este video (`que`) y de las imágenes de referencia que ya haya (`refs`: el personaje, el protagonista, una foto).
+    Queda en `portada/ia.png`, a 1080×1920 o a 1280×720 con `horizontal`; se recoge con `esperar_portada`.
+    """
+    titulo = re.sub(r"[.,;:]+$", "", " ".join(titulo.split()))
+    if not con or not titulo:
+        return None
+    decir = decir or _decir
+    salida = raiz / "portada" / "ia.png"
+    salida.parent.mkdir(parents=True, exist_ok=True)
+    cmd = [sys.executable, "-B", "-X", "utf8", str(Path(__file__).with_name("portada_ia.py")), con, str(salida),
+           "--titulo", titulo, "--estilo", estilo, "--que", que,
+           *[x for r in refs if Path(r).is_file() for x in ("--ref", str(r))], *(["--horizontal"] if horizontal else [])]
+    log = open(salida.parent / "ia.log", "w", encoding="utf-8")
+    decir(f"portada con IA ({'ChatGPT' if con == 'chatgpt' else 'Flow, ' + con}), de fondo mientras se hace el video")
+    return subprocess.Popen(cmd, cwd=raiz, stdin=subprocess.DEVNULL, stdout=log, stderr=subprocess.STDOUT)
+
+
+def esperar_portada(raiz: Path, proceso: subprocess.Popen | None, desde: float, respaldo: str, tope: float = 90,
+                    decir=None) -> Path | None:
+    """
+    La portada con IA que pidió `pedir_portada`, si llegó: se espera `tope` segundos como mucho (casi siempre ya está:
+    tarda de 30 a 90 s, y el video, más). Si no llegó o falló, None, y dice por qué y que va `respaldo` («la del cuadro
+    del titular»). `desde` es cuándo arrancó este `hacer.py`: una de antes que no cambió no gastó nada nuevo.
+    """
+    if not proceso:
+        return None
+    decir = decir or _decir
+    salida, estado = raiz / "portada" / "ia.png", raiz / "portada" / "ia.png.json"
+    hasta = time.time() + tope
+    leido: dict = {}
+    while time.time() < hasta:
+        if proceso.poll() is not None:
+            try:
+                leido = json.loads(estado.read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                leido = {}
+            # Si otro hacer.py ya la estaba generando, este sale al momento: se espera a aquel por su estado.
+            if leido.get("estado") != "generando":
+                break
+        time.sleep(1)
+    else:
+        # No se mata: si llega, queda en portada/ia.png, y otro hacer.py la toma sin pedirla otra vez.
+        decir(f"la portada con IA no llegó en {tope:.0f} s: va {respaldo} (si llega, queda en portada/ia.png)")
+        return None
+    if leido.get("estado") == "lista" and salida.exists():
+        if leido.get("hecha", 0) < desde:
+            decir(f"portada con IA: la de antes, que no cambió (nada nuevo gastado; aquella: {leido.get('gasto', '?')})")
+        else:
+            decir(f"portada con IA lista en {leido.get('segundos', '?')} s, mientras se hacía el video. Gastó: {leido.get('gasto', '?')}")
+        return salida
+    decir(f"la portada con IA no salió ({leido.get('por') or 'mira portada/ia.log'}): va {respaldo}")
+    return None
 
 
 def duracion(video: Path) -> float:

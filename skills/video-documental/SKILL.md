@@ -130,7 +130,9 @@ Son cinco llamadas si sale a la primera; cada vuelta de más cuesta.
    `python -I -B -X utf8 <skill>/scripts/hacer.py` **en segundo plano** (`run_in_background`); termina tu mensaje: te
    avisa al acabar. No esperes con `sleep` ni lo vigiles. `hacer.py` lo revisa primero, en un segundo: **si dice ✗**,
    dice todo lo que falla de una vez; arréglalo con Edit y vuelve a lanzarlo en el mismo mensaje (lo ya bajado no se
-   baja otra vez; una referencia que no bajó se cambia por otra de `busca.jpg`).
+   baja otra vez; una referencia que no bajó se cambia por otra de `busca.jpg`). Si el mensaje trae `Imágenes: con
+   ChatGPT…` o `Imágenes: genéralas en Google Flow con <modelo>…`, súmale `--imagenes chatgpt` o
+   `--imagenes "<modelo>"`: genera la portada con eso, de fondo mientras renderiza; no la hagas tú.
 5. **Si dice ✓**, mira `revision/hoja.png` (un cuadro por segundo): que cada imagen sea lo que dice la frase, que
    nada salga en blanco y que la palabra roja se lea. Otro render solo si una imagen no es lo que se dice o no se ve,
    y todo en una vuelta. Un ✘ de la medida (ritmo, quieto) es del director: entrega y díselo al usuario. **Entrega**:

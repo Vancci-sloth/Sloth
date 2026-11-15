@@ -195,6 +195,8 @@ Qué enseñar por cada cosa que se menciona y las recetas de lo raro (un post de
    frase del logo lleva su base. Luego `python -B -X utf8 <skill>/scripts/hacer.py --revisa --dura <minutos>` (sin
    fondo, un segundo) hasta que diga ✓: dice todo lo que falla de una vez. Luego, **en segundo plano**:
    `python -B -X utf8 <skill>/scripts/hacer.py --studio <Voz> --dura <minutos>` (la voz que ya pediste no se repite).
+   Si el mensaje trae `Imágenes: con ChatGPT…` o `Imágenes: genéralas en Google Flow con <modelo>…`, súmale
+   `--imagenes chatgpt` o `--imagenes "<modelo>"`: genera la portada del vertical con eso, de fondo; no la hagas tú.
    Sin voz que generar: `hacer.py --sin-voz` de fondo (deja el material y las escenas listos), dile al usuario que su
    guion está en la etapa Guion y pídele el audio; cuando llegue, `hacer.py --audio <archivo>`. Termina tu mensaje: te
    avisa al acabar. No esperes con `sleep` ni lo vigiles.

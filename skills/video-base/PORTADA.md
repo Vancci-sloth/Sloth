@@ -23,10 +23,13 @@ renderizado, y no se pregunta: va siempre. El vídeo horizontal no la lleva dent
 En la raíz del proyecto, `portada.png` (si el proyecto entrega varios vídeos, uno por vídeo en
 `portada/<nombre del vídeo>.png`).
 
-Para no sumar tiempo, se puede pedir de fondo desde el principio, sin cuadros del vídeo, con
-`scripts/portada_ia.py` (el título, el estilo, las referencias y la elección de `Imágenes:`; ver su cabecera): la deja
-a 1080×1920 o 1280×720 y, si no hay cuenta o falla, dice por qué y el estilo usa su respaldo. Así la hace el
-explicativo (`hacer.py`).
+**En los estilos con `hacer.py`** (el explicativo, El Diff, el documental, Low-Poly: [MOTOR.md](MOTOR.md)) no la haces
+tú: `hacer.py` la pide de fondo desde el principio, sin cuadros del vídeo, y la pone al final. Solo le pasas lo de la
+línea `Imágenes:` con `--imagenes chatgpt` o `--imagenes "<modelo de Flow>"` (en el explicativo, a `nuevo.py`). Por
+dentro es `scripts/portada_ia.py` (el título, el estilo, las referencias y la elección; ver su cabecera), que la deja a
+1080×1920 o 1280×720, y `pedir_portada` y `esperar_portada` de `scripts/momentos.py`. Sin la línea, sin cuenta o si
+falla, dice por qué y el estilo pone su respaldo (un cuadro del vídeo). Un estilo nuevo con `hacer.py` la pide igual.
+Lo de abajo es para los estilos sin `hacer.py` (el reel, la frutinovela).
 
 Si el mensaje trae `Imágenes: genéralas en Google Flow…`, la imagen va con `generar_imagen` y formato `9:16`
 ([FLOW.md](FLOW.md)): los pasos de abajo, con los tres cuadros en `referencias` y el pedido sin su primer párrafo,
