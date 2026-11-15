@@ -1313,12 +1313,14 @@ export interface RifaGanada {
 
 /** El fondo de la comunidad (`licencias/src/fondo.ts`): `GET /api/comunidad/fondo`. */
 export interface FondoComunidad {
-  /** El periodo que se reparte junto: un mes ('2027-01'); el primero junta noviembre y diciembre de 2026. */
+  /** El periodo que se reparte junto: un mes ('2027-01'); el primero junta del 15 de noviembre al fin de diciembre de 2026. */
   periodo: string
   /** «enero de 2027»; el primero, «noviembre y diciembre de 2026». */
   mes: string
   /** El primer reparto, el 1 de enero de 2027: hay tiempo para prepararse. */
   primero?: true
+  /** En el primero, desde cuándo cuenta lo que entra, en ISO: lo cobrado antes no es del fondo. */
+  desde?: string
   /** Lo que se lleva la comunidad este mes, por moneda, en unidades y del mayor al menor. Vacío: aún nada. */
   montos: { moneda: string; monto: number }[]
   /**

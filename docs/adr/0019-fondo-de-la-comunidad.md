@@ -19,8 +19,9 @@ y no medía nada de lo que se hace con un estilo compartido (ADR 0017).
 - **Participar es de quien quiera** (`licencias/src/reparto.ts`): quien pone su Binance ID se lleva del fondo la parte
   de los puntos de sus estilos; sin él, sus puntos se ven pero el fondo se reparte entre los demás. Lo que gana cada
   quien depende de cuánta gente usa su estilo.
-- **El primer reparto es el 1 de enero de 2027** y junta todo desde noviembre (`PRIMER_PERIODO` en `fondo.ts`): hay
-  tiempo para hacer un estilo y compartirlo. Después, cada mes.
+- **El primer reparto es el 1 de enero de 2027** y junta lo que entra desde el 15 de noviembre de 2026 a las 14:45 de
+  Ciudad de México (`DESDE` en `fondo.ts`): hay tiempo para hacer un estilo y compartirlo. Lo que Stripe había cobrado
+  antes, también lo de noviembre, es del creador y no entra. Después, cada mes.
 - **El creador cierra cada periodo en Administrador → Fondo** (`web/src/FondoAdmin.tsx`), cuando ya terminó y después
   de revisar las pruebas. Al cerrar queda una foto: el fondo, los puntos y el Binance ID de ese momento. Paga cada parte
   y la marca con su referencia, que le avisa por correo a quien cobró.

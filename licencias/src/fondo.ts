@@ -5,12 +5,13 @@
  * de noviembre de 2026. Arriba de la comunidad sale cuánto va, en vivo, y el paso a paso para participar
  * (`web/src/Fondo.tsx`).
  *
- * El primer reparto es el 1 de enero de 2027 y junta todo desde noviembre (`PRIMER_PERIODO`): así quien quiera
- * participar tiene tiempo de hacer su estilo. De ahí en adelante, cada mes (`periodoFondo`).
+ * El primer reparto es el 1 de enero de 2027 y junta lo que entra desde que el fondo se anunció (`DESDE`, el 15 de
+ * noviembre de 2026): así quien quiera participar tiene tiempo de hacer su estilo. Lo que Stripe había cobrado antes no
+ * cuenta: es del creador. De ahí en adelante, cada mes (`periodoFondo`).
  *
  * - `GET /comunidad/fondo`: el periodo y lo que se lleva la comunidad, por moneda.
  *
- * Lo cobrado sale de los movimientos del saldo de Stripe (`balance_transactions`) desde el día 1, que ya vienen sin su
+ * Lo cobrado sale de los movimientos del saldo de Stripe (`balance_transactions`) del periodo, que ya vienen sin su
  * comisión. El IVA no viene ahí: los precios lo llevan dentro (Stripe Tax, `tax_behavior: inclusive`), así que se saca
  * qué parte de lo cobrado en el mes fue impuesto, de las sesiones de los pagos sueltos y de las facturas de los
  * mensuales (`proporcionDeImpuesto`), y se quita en esa misma proporción. Se lee a lo más cada minuto (en la memoria del
@@ -112,9 +113,13 @@ export function inicioDelMes(periodo: string): number {
   return Date.UTC(anio, mes - 1, 1, 6) / 1000
 }
 
-/** El primer periodo del fondo, que se reparte el 1 de enero de 2027, y desde qué mes junta. */
+/** El primer periodo del fondo, que se reparte el 1 de enero de 2027. */
 export const PRIMER_PERIODO = '2026-12'
-const DESDE_PRIMERO = '2026-11'
+/**
+ * Desde cuándo cuenta lo que entra, en segundos: el 15 de noviembre de 2026 a las 14:45 de Ciudad de México, cuando el
+ * creador lo fijó. Lo cobrado antes, también lo de noviembre, es suyo y no entra al fondo.
+ */
+export const DESDE = Date.UTC(2026, 10, 15, 20, 45) / 1000
 const PERIODO = /^\d{4}-(0[1-9]|1[0-2])$/
 
 /** El periodo del fondo al que cuenta una fecha: su mes de Ciudad de México o, antes del primer reparto, el primero. */
@@ -126,14 +131,14 @@ export function periodoFondo(ahora = new Date()): string {
 /** Si es un periodo del fondo: un mes, del primero en adelante. */
 export const esPeriodo = (p: string) => PERIODO.test(p) && p >= PRIMER_PERIODO
 
-/** De cuándo a cuándo (en segundos) entra lo de un periodo: su mes; el primero, desde noviembre de 2026. */
+/** De cuándo a cuándo (en segundos) entra lo de un periodo: su mes; el primero, desde `DESDE`. */
 export function tramoDe(periodo: string): { desde: number; hasta: number } {
   const [anio, mes] = periodo.split('-').map(Number)
-  return { desde: inicioDelMes(periodo === PRIMER_PERIODO ? DESDE_PRIMERO : periodo), hasta: Date.UTC(anio, mes, 1, 6) / 1000 }
+  return { desde: periodo === PRIMER_PERIODO ? DESDE : inicioDelMes(periodo), hasta: Date.UTC(anio, mes, 1, 6) / 1000 }
 }
 
 /** Cómo se llama un periodo: «enero de 2027»; el primero, «noviembre y diciembre de 2026». */
-export const nombreDe = (periodo: string) => (periodo === PRIMER_PERIODO ? `${mesDe(DESDE_PRIMERO).replace(/ de \d+$/, '')} y ${mesDe(periodo)}` : mesDe(periodo))
+export const nombreDe = (periodo: string) => (periodo === PRIMER_PERIODO ? `noviembre y ${mesDe(periodo)}` : mesDe(periodo))
 
 /** Los periodos del fondo, del primero al de `ahora`. */
 export function periodosHasta(ahora = new Date()): string[] {
@@ -204,7 +209,14 @@ export async function fondoDe(env: Env, periodo: string, ahora = new Date()): Pr
   const guardado = guardados.get(periodo)
   if (guardado && ahora.getTime() - guardado.leido < CADA) return guardado.fondo
   const tramo = tramoDe(periodo)
-  const vacio: FondoComunidad = { periodo, mes: nombreDe(periodo), montos: [], cuentas: [], cierra: new Date(tramo.hasta * 1000).toISOString(), ...(periodo === PRIMER_PERIODO ? { primero: true } : {}) }
+  const vacio: FondoComunidad = {
+    periodo,
+    mes: nombreDe(periodo),
+    montos: [],
+    cuentas: [],
+    cierra: new Date(tramo.hasta * 1000).toISOString(),
+    ...(periodo === PRIMER_PERIODO ? { primero: true, desde: new Date(tramo.desde * 1000).toISOString() } : {})
+  }
   if (!env.STRIPE_SECRET_KEY) return vacio
   try {
     const [movimientos, pagos] = await Promise.all([todos<Movimiento & { id: string }>(env, '/v1/balance_transactions', tramo), pagosDelMes(env, tramo)])

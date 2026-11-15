@@ -53,13 +53,14 @@ test('el mes empieza a medianoche de Ciudad de México, también en enero', () =
   assert.equal(new Date(inicioDelMes('2027-01') * 1000).toISOString(), '2027-01-01T06:00:00.000Z')
 })
 
-test('el primer reparto es el 1 de enero de 2027 y junta noviembre y diciembre; después, cada mes', () => {
+test('el primer reparto es el 1 de enero de 2027 y junta desde el 15 de noviembre, no lo cobrado antes; después, cada mes', () => {
   const iso = (s: number) => new Date(s * 1000).toISOString()
   // Todo lo de antes de enero cuenta para el primer periodo, también el 31 de diciembre por la noche en México.
   for (const cuando of ['2026-11-15T12:00:00Z', '2026-12-01T12:00:00Z', '2027-01-01T05:59:00Z']) assert.equal(periodoFondo(new Date(cuando)), PRIMER_PERIODO)
   assert.equal(periodoFondo(new Date('2027-01-01T06:00:00Z')), '2027-01')
   assert.equal(periodoFondo(new Date('2027-03-10T12:00:00Z')), '2027-03')
-  assert.deepEqual([iso(tramoDe(PRIMER_PERIODO).desde), iso(tramoDe(PRIMER_PERIODO).hasta)], ['2026-11-01T06:00:00.000Z', '2027-01-01T06:00:00.000Z'])
+  // Lo que Stripe cobró del 1 al 15 de noviembre es del creador: el primer tramo empieza el 15 a las 14:45 de México.
+  assert.deepEqual([iso(tramoDe(PRIMER_PERIODO).desde), iso(tramoDe(PRIMER_PERIODO).hasta)], ['2026-11-15T20:45:00.000Z', '2027-01-01T06:00:00.000Z'])
   assert.deepEqual([iso(tramoDe('2027-01').desde), iso(tramoDe('2027-01').hasta)], ['2027-01-01T06:00:00.000Z', '2027-02-01T06:00:00.000Z'])
   assert.equal(nombreDe(PRIMER_PERIODO), 'noviembre y diciembre de 2026')
   assert.equal(nombreDe('2027-01'), 'enero de 2027')

@@ -9,7 +9,8 @@ import './Fondo.css'
  * «Fondo de la comunidad», arriba de la comunidad (`licencias/src/fondo.ts`): lo que se lleva la comunidad en este
  * periodo, la mitad de cada apoyo con tarjeta, en vivo (se vuelve a pedir cada minuto), con sus cuentas ya hechas: lo
  * cobrado, la comisión de Stripe, lo devuelto y el IVA, lo que queda y la mitad. Dice cuándo se reparte: el primer
- * reparto es el 1 de enero de 2027 y junta todo desde noviembre, para que haya tiempo de prepararse.
+ * reparto es el 1 de enero de 2027 y junta lo que entra desde el 15 de noviembre (`desde`; lo de antes no cuenta), para
+ * que haya tiempo de prepararse.
  *
  * Participar es de quien quiera (`licencias/src/reparto.ts`): «¿Quieres participar?» abre el paso a paso (hacer un
  * estilo, compartirlo en Estilos, que otros lo usen y poner tu Binance ID, adonde se te paga). Quien ya participa ve
@@ -50,7 +51,7 @@ export function Fondo({ onEstilos }: { onEstilos?(): void }) {
       <p className="fondo-texto">
         {fondo.primero ? (
           <>
-            Es la mitad de lo que entra con tarjeta desde noviembre. <b>El primer reparto es el {reparto}</b>, entre quienes comparten estilos que la gente usa: tienes hasta
+            Es la mitad de lo que entra con tarjeta{fondo.desde && ` desde el ${dia(fondo.desde)}`}. <b>El primer reparto es el {reparto}</b>, entre quienes comparten estilos que la gente usa: tienes hasta
             entonces para hacer el tuyo, compartirlo y poner tu Binance ID. {faltan}
           </>
         ) : (

@@ -36,7 +36,7 @@ export function FondoAdmin() {
     <section className="admin-seccion admin-fondo">
       <p className="muted small">
         La mitad de lo que entra con tarjeta se reparte entre quienes comparten estilos y pusieron su Binance ID, según los puntos de sus estilos. El primer reparto es el 1 de
-        enero y junta noviembre y diciembre; después, cada mes. Antes de cerrar un periodo revisa las pruebas de cada estilo en Comunidad → Estilos: al cerrarlo queda fijo.
+        enero y junta lo que entra desde el 15 de noviembre (lo cobrado antes no cuenta); después, cada mes. Antes de cerrar un periodo revisa las pruebas de cada estilo en Comunidad → Estilos: al cerrarlo queda fijo.
       </p>
       {error && <p className="bad small">{error}</p>}
       {r && (
