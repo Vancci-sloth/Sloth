@@ -21,6 +21,9 @@ const CAMBIOS: { texto: string; pide: string; conVoz?: boolean }[] = [
 /** No pisa la actual: el servidor pasa el hilo a una carpeta nueva y se lo dice al agente (`otraVersion` en etapas.ts). */
 const VERSION = 'Haz otra versión'
 
+/** Dónde está un video en el disco, con la barra de su carpeta: `\` en Windows y `/` en Mac y Linux. */
+const enDisco =(carpeta: string, ruta: string) => (carpeta.includes('\\') ? `${carpeta}\\${ruta.replaceAll('/', '\\')}` : `${carpeta}/${ruta}`)
+
 /** El nombre de un video en su botón: `video-vertical.mp4` es «vertical». */
 const etiqueta = (f: VideoFinal) => (f.ruta.split('/').pop() ?? f.ruta).replace(/\.mp4$/i, '').replace(/^video-/, '')
 
@@ -64,8 +67,8 @@ export function Final({ session, card, carpeta, finales }: { session: SessionMet
             Descargar{finales.length > 1 ? ` ${etiqueta(f)}` : ''}
           </a>
         ))}
-        {finales.map((f) => <YoutubeBoton key={`youtube:${f.ruta}`} nombre={finales.length > 1 ? etiqueta(f) : undefined} disabled={trabaja} video={{ cardId: card.id, ruta: `${carpeta}\\${f.ruta.replaceAll('/', '\\')}`, titulo: session.title }} />)}
-        <button className="final-boton" title={carpeta} onClick={() => abrir(`${carpeta}\\${finales[0].ruta.replaceAll('/', '\\')}`)}>
+        {finales.map((f) => <YoutubeBoton key={`youtube:${f.ruta}`} nombre={finales.length > 1 ? etiqueta(f) : undefined} disabled={trabaja} video={{ cardId: card.id, ruta: enDisco(carpeta, f.ruta), titulo: session.title }} />)}
+        <button className="final-boton" title={carpeta} onClick={() => abrir(enDisco(carpeta, finales[0].ruta))}>
           <CarpetaIcono />
           Ver en la carpeta
         </button>

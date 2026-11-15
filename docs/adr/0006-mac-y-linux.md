@@ -36,7 +36,7 @@ con macOS 12 (cada uno con su `.zip`, con el que se actualiza) y un AppImage par
   en esa carpeta la de Intel pudo dejar los suyos. En un Mac con Intel no hay torch 2.8 (el último para Intel es el 2.2), así que su Python de Sloth va
   sin torch: transcribe con Parakeet sin afinar los tiempos (`parakeet-solo`) y no tiene vectores (huellas compara por
   palabras). No se ha probado en un Mac de verdad.
-- **Lo de Windows en el servidor** tiene su par: la Papelera (Finder, `gio trash`), «abrir en su carpeta» (`open -R`, `xdg-open`), la ventana donde se autoriza Claude (Terminal o la
+- **Lo de Windows en el servidor** tiene su par: la Papelera (`NSFileManager` desde `osascript`, sin el Finder, que pide un permiso; `gio trash`), «abrir en su carpeta» (`open -R`, `xdg-open`), la ventana donde se autoriza Claude (Terminal o la
   terminal de Linux), las llaves de Opciones (`%APPDATA%/sloth/variables.json`) y el id del equipo de la licencia.
 - **Firma de Apple.** Sin cuenta de desarrollador, la de Mac sale con firma ad hoc: se abre la primera vez desde
   Configuración → Privacidad y seguridad → «Abrir de todos modos», y «Actualizar» abre la descarga en el navegador

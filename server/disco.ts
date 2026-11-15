@@ -1,6 +1,8 @@
 import { execFile } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { closeSync, existsSync, openSync, readSync, realpathSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { homedir } from 'node:os'
+import { join, parse } from 'node:path'
 import { promisify } from 'node:util'
 
 /**
@@ -31,8 +33,8 @@ export function guardar(archivo: string, texto: string | Uint8Array) {
 const execFileP = promisify(execFile)
 
 /**
- * Manda archivos a la Papelera de reciclaje de Windows, de donde se pueden recuperar. Devuelve los que siguen en su sitio:
- * en uso, o porque cancelaste el aviso de Windows. Las rutas van por una variable de entorno y no dentro del comando,
+ * Manda archivos a la Papelera del sistema, de donde se pueden recuperar. Devuelve los que siguen en su sitio: en uso, o
+ * porque cancelaste el aviso de Windows. En Windows, las rutas van por una variable de entorno y no dentro del comando,
  * para que ninguna comilla las rompa, de cien en cien para no pasar su límite.
  */
 export async function aLaPapelera(rutas: string[]): Promise<string[]> {
@@ -50,30 +52,42 @@ export async function aLaPapelera(rutas: string[]): Promise<string[]> {
 }
 
 /**
- * En Mac, a la Papelera por el Finder, que deja «Devolver» (la primera vez, macOS pregunta si Sloth puede usar el
- * Finder); en Linux, con `gio trash`, la de GNOME y casi todos los escritorios. Las rutas van como argumentos.
+ * En Mac, a la Papelera con `NSFileManager`, desde el JavaScript de `osascript`. Antes iba por el Finder, que pide el
+ * permiso de controlarlo: la app que se vende no lo tiene (ni lo declara), macOS lo negaba sin avisar y ningún video se
+ * borraba. Devuelve por la salida las rutas que no pudo mover. En Linux, con `gio trash`, la de GNOME y casi todos los
+ * escritorios. Las rutas van como argumentos.
  */
 const PAPELERA_MAC = [
-  'on run rutas',
-  '  repeat with r in rutas',
-  '    try',
-  '      tell application "Finder" to delete (POSIX file (r as text) as alias)',
-  '    on error e',
-  '      log e',
-  '    end try',
-  '  end repeat',
-  'end run'
+  "ObjC.import('Foundation')",
+  'function run(rutas) {',
+  '  const fm = $.NSFileManager.defaultManager',
+  '  return rutas.filter((r) => !fm.trashItemAtURLResultingItemURLError($.NSURL.fileURLWithPath(r), null, null)).join("\\n")',
+  '}'
 ].join('\n')
 
 async function aLaPapeleraFuera(rutas: string[]) {
+  const mac = process.platform === 'darwin'
   for (let i = 0; i < rutas.length; i += 100) {
     const parte = rutas.slice(i, i + 100)
     try {
-      const { stderr } = process.platform === 'darwin' ? await execFileP('osascript', ['-e', PAPELERA_MAC, ...parte]) : await execFileP('gio', ['trash', '--', ...parte])
-      if (stderr.trim()) console.error('papelera:', stderr.trim())
+      const { stdout, stderr } = mac ? await execFileP('osascript', ['-l', 'JavaScript', '-e', PAPELERA_MAC, ...parte]) : await execFileP('gio', ['trash', '--', ...parte])
+      const fallo = [stderr, mac ? stdout : ''].join('\n').trim()
+      if (fallo) console.error('papelera:', fallo)
     } catch (error) {
       console.error('papelera:', error instanceof Error ? error.message : error)
     }
+  }
+  // Lo que macOS no movió va a mano a `~/.Trash`, con la hora en el nombre para no pisar otro que se llame igual. Solo
+  // sirve en el disco del usuario; lo de otro disco se queda donde está y se avisa.
+  if (mac) for (const r of rutas) if (existsSync(r)) aTrash(r)
+}
+
+function aTrash(ruta: string) {
+  const { name, ext } = parse(ruta)
+  try {
+    renameSync(ruta, join(homedir(), '.Trash', `${name} ${new Date().toTimeString().slice(0, 8).replaceAll(':', '.')}${ext}`))
+  } catch (error) {
+    console.error('papelera:', error instanceof Error ? error.message : error)
   }
 }
 

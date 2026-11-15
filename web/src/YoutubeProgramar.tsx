@@ -42,7 +42,7 @@ export function YoutubeLote({ videos, cardId }: { videos: VideoHecho[]; cardId?:
   return <>
     <section className="youtube-lote-barra">
       <div><strong>YouTube</strong><span className="muted small">{datos ? `Horizontales · ${pendientes.length} por revisar · ${programados.length} programados${trabajando ? ' · Subiendo el lote…' : ''}` : error || 'Buscando videos largos…'}</span></div>
-      <div className="youtube-lote-acciones"><YoutubeEliminar videos={datos?.videos ?? []} onEliminar={async (r) => { await leer(); setAviso(r.quedan ? `${r.quedan} no se pudieron eliminar: siguen pendientes, en uso o Windows no los dejó mover.` : '') }} /><button className="primary" onClick={() => setAbierto(true)}>Revisar y programar{pendientes.length ? ` (${pendientes.length})` : ''}</button></div>
+      <div className="youtube-lote-acciones"><YoutubeEliminar videos={datos?.videos ?? []} onEliminar={async (r) => { await leer(); setAviso(r.quedan ? `${r.quedan} no se pudieron eliminar: siguen pendientes, en uso o no se pudieron mover a la Papelera.` : '') }} /><button className="primary" onClick={() => setAbierto(true)}>Revisar y programar{pendientes.length ? ` (${pendientes.length})` : ''}</button></div>
     </section>
     {aviso && <p className="bad small" role="status">{aviso}</p>}
     {abierto && createPortal(<RevisionYoutube cardId={cardId} cerrar={() => { setAbierto(false); void leer() }} onCambio={leer} />, document.body)}
@@ -250,7 +250,7 @@ export function RevisionYoutube({ cardId, ruta, cerrar, onCambio }: { cardId?: s
               {!cerrado && elegidos.has(v.huella) && problema(v) && <p className="muted small">{problema(v)}</p>}
               {s?.id && <a className="small" href={`https://studio.youtube.com/video/${encodeURIComponent(s.id)}/edit`} target="_blank" rel="noreferrer">Abrir en YouTube Studio</a>}
               {s?.estado === 'cola' && !s.id && <button className="ghost small" onClick={() => void quitar(v)}>Quitar de la cola</button>}
-              <YoutubeEliminar videos={[v]} individual disabled={ocupado || !!importando} onEliminar={async (r) => { await leer(); onCambio?.(); if (r.quedan) setError('El archivo sigue en uso o Windows no lo dejó mover. Puedes reintentarlo.') }} />
+              <YoutubeEliminar videos={[v]} individual disabled={ocupado || !!importando} onEliminar={async (r) => { await leer(); onCambio?.(); if (r.quedan) setError('El archivo sigue en uso o no se pudo mover a la Papelera. Puedes reintentarlo.') }} />
             </div>
             <YoutubeRecomendaciones video={v} cerrado={cerrado} agente={modelo ? agente : undefined} tituloActual={b.titulo} descripcionActual={b.descripcion} usarDescripcion={(descripcion) => cambiar(v, { descripcion })} usarTitulo={(titulo) => cambiar(v, { titulo })} verImagen={(src) => setPrevia({ src })} />
           </article>

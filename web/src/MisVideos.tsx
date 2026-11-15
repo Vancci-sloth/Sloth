@@ -467,7 +467,7 @@ export function MisVideos({ cards, sessions, estilo, onEstilo }: { cards: Card[]
           onConfirm={async () => {
             setFallo('')
             const r = await api<{ borrados: number; quedan: number }>('/api/redes/eliminar', { rutas: programados.map((v) => v.ruta) })
-            if (r.quedan) setFallo(`${r.quedan === 1 ? 'Uno no se borró' : `${r.quedan} no se borraron`}: un agente trabaja en su carpeta, o Windows no lo dejó mover.`)
+            if (r.quedan) setFallo(`${r.quedan === 1 ? 'Uno no se borró' : `${r.quedan} no se borraron`}: un agente trabaja en su carpeta, o no se pudo mover a la Papelera.`)
             otraVuelta()
           }}
         >

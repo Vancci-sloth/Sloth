@@ -301,7 +301,7 @@ export async function videosApi(req: IncomingMessage, res: ServerResponse, url: 
     if (trabaja) return json(res, 409, { error: 'Un agente trabaja en su carpeta. Espera a que termine.' })
     const ps = (await marcas?.([video]))?.publicaciones[ruta] ?? []
     if (ps.some((p) => p.estado === 'cola' || p.estado === 'subiendo')) return json(res, 409, { error: 'Está en la cola de una red: descártalo ahí (✕ en su insignia) antes de borrarlo.' })
-    if ((await aLaPapelera([ruta])).length) return json(res, 409, { error: 'Windows no lo dejó mover a la Papelera: puede que otro programa lo tenga abierto.' })
+    if ((await aLaPapelera([ruta])).length) return json(res, 409, { error: 'No se pudo mover a la Papelera: puede que otro programa lo tenga abierto.' })
     return json(res, 200, { ok: true })
   }
   // Bajar uno o varios: se copian a la carpeta Descargas con el nombre de su carpeta delante. Así no sale un diálogo de
