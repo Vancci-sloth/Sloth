@@ -1,0 +1,12 @@
+/* Opciones → Piloto automático: el formulario del brief y la lista de los últimos videos. */
+.piloto-form label { display: flex; flex-direction: column; gap: 4px; color: var(--muted); font-size: 12px; }
+.piloto-form input:not([type='checkbox']), .piloto-form textarea, .piloto-form select { padding: 7px 11px; border-radius: 8px; background: var(--panel); border: 1px solid var(--line); outline: none; color: var(--text); font-size: 13px; resize: vertical; }
+.piloto-form input:focus, .piloto-form textarea:focus, .piloto-form select:focus { border-color: var(--amber); }
+.piloto-dos { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.piloto-form .piloto-check { flex-direction: row; align-items: center; gap: 8px; color: var(--text); }
+.piloto-check input { accent-color: var(--amber); }
+.piloto-botones { display: flex; align-items: center; gap: 12px; }
+.piloto-turno { display: grid; grid-template-columns: 78px 1fr auto auto auto; align-items: center; gap: 10px; min-height: 28px; }
+.piloto-turno .ghost { padding: 2px 4px; }
+.piloto-turno .ghost svg { width: 14px; height: 14px; }
+.piloto .falta { color: var(--amber); }

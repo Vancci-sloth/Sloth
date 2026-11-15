@@ -937,8 +937,31 @@ export function redes(app: string, sessions: Sessions, cards: () => Card[], avis
     return false
   }
 
+  /**
+   * Un video terminado a la cola de todas las redes conectadas, con el texto que escribe su agente, a la hora `cuando`
+   * (`'2026-10-12 16:00'`) si está libre y aún da tiempo; si no, en el siguiente hueco del ritmo. Lo usa el piloto automático. // piloto
+   */
+  async function programarVideo(cardId: string, ruta: string, cuando: string) {
+    if (roto) throw new Error(roto)
+    const card = cards().find((c) => c.id === cardId)
+    if (!card) throw new Error('No existe ese estilo')
+    const conectados = conectadas()
+    if (!conectados.length) throw new Error('Conecta una red en Opciones antes de programar.')
+    if (!videosDe(card, sessions).some((v) => v.ruta === ruta)) throw new Error('No es un video de este estilo')
+    const b = await borrador(card, ruta)
+    if (!b.texto.trim()) throw new Error(b.aviso ?? 'No se pudo escribir el texto del video.')
+    for (const r of conectados) {
+      const previa = publicacion(r.id, ruta)
+      if (previa && previa.estado !== 'error') continue
+      const libre = !ocupadas(r.id).includes(cuando) && enFecha(cuando) >= Date.now() + MARGEN
+      encolar(card, b, r.id, libre ? cuando : hueco(r.id))
+    }
+    guardar()
+    seguir()
+  }
+
   // Para «Mis videos». Con redes.json dañado, ninguna: todo saldría «Sin programar».
-  return { api, ocupado, marcas: async (videos: VideoHecho[]) => (roto ? undefined : marcas(videos)) }
+  return { api, ocupado, programarVideo, marcas: async (videos: VideoHecho[]) => (roto ? undefined : marcas(videos)) }
 }
 
 function tamano(ruta: string) {

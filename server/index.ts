@@ -38,6 +38,7 @@ import { comunidad, llaveDelCreador } from './comunidad.ts' // comunidad
 import { desempacar, estilos } from './estilos.ts' // estilos compartidos
 import { carpetaTrabajo } from './trabajo.ts'
 import { redes } from './redes/index.ts' // redes
+import { piloto } from './piloto.ts' // piloto
 import { voz } from './voz/index.ts' // voz de AI Studio
 import { flow } from './flow/index.ts' // Google Flow
 import { youtube } from './youtube.ts'
@@ -188,6 +189,36 @@ function cards(): Card[] {
 // van con el canal que conecta YouTube.
 const subirLargos = youtube(APP, sessions, cards, `http://127.0.0.1:${PORT}/api/youtube/oauth`, undefined, () => modelos)
 const publicar = redes(APP, sessions, cards, broadcast, subirLargos.lectura) // redes
+// El piloto automático (`server/piloto.ts`): hace videos solo, en lotes, y los mete a la cola de redes. Apagado por defecto. // piloto
+const pilotoAuto = piloto({
+  dir: join(APP, 'data', 'piloto'),
+  cards: () => cards(),
+  modelos: () => modelos,
+  hilos: {
+    crear: ({ cardId, modelo, esfuerzo, videos }) => {
+      const card = cards().find((c) => c.id === cardId)
+      if (!card) throw new Error('No existe esa card')
+      mkdirSync(card.cwd, { recursive: true })
+      const n = videos.length
+      const carpetas = carpetasDeLote(card, n)
+      const lote = videos.map((v, i) => ({ carpeta: carpetas[i], title: v.title, text: [v.text, `Lote: video ${i + 1} de ${n}. Carpeta: ${carpetas[i]}`].join('\n\n') }))
+      return sessions.crearLote({ cardId, model: modelo, effort: esfuerzo, cwd: card.cwd }, lote, card.skill ? skillRef(card.skill) : undefined).map((m) => m.id)
+    },
+    estado: (id) => {
+      const m = sessions.meta(id)
+      return m ? { trabajando: !!(m.running || m.background?.length || m.pendiente), t: m.updatedAt } : undefined
+    }
+  },
+  videoDe: (cardId, sesion) => {
+    const card = cards().find((c) => c.id === cardId)
+    return card ? videosDe(card, sessions).find((v) => v.sessionId === sesion && v.vertical === true)?.ruta : undefined
+  },
+  programar: async (cardId, ruta, cuando) => {
+    if (!publicar) throw new Error('Esta versión no publica en redes.')
+    await publicar.programarVideo(cardId, ruta, cuando)
+  }
+})
+pilotoAuto.arrancar()
 
 // Cada card de estilo enseña su último video terminado, en pequeño.
 const previa = previas(join(APP, 'data', 'previas'), cards) // previas de las cards
@@ -697,6 +728,7 @@ async function api(req: IncomingMessage, res: ServerResponse, url: URL): Promise
   if (await etapasApi(req, res, url, sessions, cards(), broadcast, miniatura)) return true // panel de etapas
   if (await videosApi(req, res, url, sessions, cards(), publicar?.marcas, cuadro, { hacer: previaChica, lista: previaLista })) return true // panel de etapas; `publicar.marcas`, de redes
   if (publicar && (await publicar.api(req, res, url))) return true // redes
+  if (await pilotoAuto.api(req, res, path)) return true // piloto
   if (subirLargos && (await subirLargos.api(req, res, url))) return true // videos largos de YouTube
   if (await previa.api(req, res, url)) return true // previas de las cards
   if (idear && (await idear.api(req, res, url))) return true // ideas
