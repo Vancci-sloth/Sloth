@@ -7,6 +7,12 @@ import { adjuntosDe, consultaBuscar, consultaFeed, consultaIndice, estiloEnSuSit
 const imagen = (n: number) => ({ tipo: 'imagen', llave: `${String(n).padStart(20, 'a')}.png` })
 const video = { tipo: 'video', llave: 'bbbbbbbbbbbbbbbbbbbb.mp4', poster: 'cccccccccccccccccccc.webp', vertical: true }
 
+/**
+ * D1 no acepta más de 100 niveles entre una expresión y las de sus subconsultas, y SQLite solo trae 1000: sin esto, una
+ * consulta que en producción falla aquí pasaba (el buscador, con `sinAcentos` dentro de un `IN (SELECT …)`).
+ */
+const COMO_D1 = { limits: { exprDepth: 100 } } as ConstructorParameters<typeof DatabaseSync>[1]
+
 test('solo guarda archivos de la comunidad, cada uno con su tipo', () => {
   assert.deepEqual(adjuntosDe([imagen(1), video]), [imagen(1), video])
   assert.deepEqual(adjuntosDe('nada'), [])
@@ -43,7 +49,7 @@ test('un comentario lleva solo imágenes de la comunidad, a lo más cuatro', () 
 })
 
 test('el feed por actividad, por lo más reciente y, para el creador, lo que no ha contestado', () => {
-  const db = new DatabaseSync(':memory:')
+  const db = new DatabaseSync(':memory:', COMO_D1)
   for (const m of ['0004_comunidad', '0009_comentarios_adjuntos', '0019_estilos', '0026_comunidad_recientes']) db.exec(readFileSync(new URL(`../migrations/${m}.sql`, import.meta.url), 'utf8'))
   const pub = db.prepare("INSERT INTO publicaciones (id, autor, categoria, titulo, texto, creada, actividad, fijada) VALUES (?, ?, 'general', '', '', ?, ?, ?)")
   const com = db.prepare("INSERT INTO comentarios (id, publicacion, autor, texto, creada) VALUES (?, ?, ?, '', ?)")
@@ -75,7 +81,7 @@ test('el feed por actividad, por lo más reciente y, para el creador, lo que no 
 })
 
 test('el buscador encuentra cada palabra sin importar acentos ni mayúsculas, en el título, el texto o un comentario', () => {
-  const db = new DatabaseSync(':memory:')
+  const db = new DatabaseSync(':memory:', COMO_D1)
   for (const m of ['0004_comunidad', '0009_comentarios_adjuntos', '0019_estilos', '0026_comunidad_recientes']) db.exec(readFileSync(new URL(`../migrations/${m}.sql`, import.meta.url), 'utf8'))
   const pub = db.prepare("INSERT INTO publicaciones (id, autor, categoria, titulo, texto, creada, actividad, reportes, aprobada) VALUES (?, ?, 'ayuda', ?, ?, ?, ?, ?, ?)")
   pub.run('a', 'ana', 'La voz clonada suena ROBÓTICA', 'Grabé 30 segundos.', '2026-11-01', '2026-11-01', 0, 1)
@@ -92,6 +98,8 @@ test('el buscador encuentra cada palabra sin importar acentos ni mayúsculas, en
   assert.deepEqual(ids('robotica'), ['a', 'b', 'e'])
   assert.deepEqual(ids('Robótica', { id: 'yo', creador: true }), ['d', 'a', 'b', 'e'])
   assert.deepEqual(ids('voz robot'), ['a'])
+  // Con todas las palabras que admite, para quien menos ve: cabe en el límite de D1.
+  assert.deepEqual(ids('la voz clonada suena robotica grabe segundos'), ['a'])
   assert.deepEqual(ids('niño'), ['c'])
   assert.deepEqual(ids('nino'), [])
   assert.deepEqual(ids('  '), [])
@@ -108,7 +116,7 @@ test('el buscador encuentra cada palabra sin importar acentos ni mayúsculas, en
 })
 
 test('el índice del buscador trae lo que cada quien ve, sin lo oculto ni lo que no se aprobó', () => {
-  const db = new DatabaseSync(':memory:')
+  const db = new DatabaseSync(':memory:', COMO_D1)
   for (const m of ['0004_comunidad', '0009_comentarios_adjuntos', '0019_estilos', '0026_comunidad_recientes']) db.exec(readFileSync(new URL(`../migrations/${m}.sql`, import.meta.url), 'utf8'))
   db.prepare("INSERT INTO miembros (id, clave, nombre, creado, visto) VALUES ('ana', 'k1', 'Ana', '2026-11-01', '2026-11-01')").run()
   const pub = db.prepare("INSERT INTO publicaciones (id, autor, categoria, titulo, texto, creada, actividad, reportes, aprobada) VALUES (?, ?, 'general', ?, ?, ?, ?, ?, ?)")

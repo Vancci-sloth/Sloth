@@ -372,22 +372,26 @@ const RESULTADOS = 20
 export function consultaBuscar(yo: { id: string; creador: boolean }, q: string): { sql: string; valores: (string | number)[] } {
   const palabras = palabrasDe(q)
   if (!palabras.length) return { sql: '', valores: [] }
-  const donde: string[] = []
   const valores: (string | number)[] = []
   // Las palabras solo llevan letras y números (`palabrasDe`): ni `%` ni `_` llegan al LIKE.
   const comoTexto = (p: string) => `%${p}%`
   // Un comentario oculto (reportado por `OCULTAR`) no cuenta, salvo el tuyo o para el creador: así no se adivina su texto.
-  const comentarioVisible = yo.creador ? '' : ' AND (comentarios.reportes < ? OR comentarios.autor = ?)'
-  for (const p of palabras) {
-    donde.push(
-      `(${sinAcentos('titulo')} LIKE ? OR ${sinAcentos('texto')} LIKE ? OR id IN (SELECT publicacion FROM comentarios WHERE ${sinAcentos('comentarios.texto')} LIKE ?${comentarioVisible}))`
-    )
-    valores.push(comoTexto(p), comoTexto(p), comoTexto(p), ...(yo.creador ? [] : [OCULTAR, yo.id]))
+  const comentarioVisible = yo.creador ? '' : ' AND (reportes < ? OR autor = ?)'
+  // Cada palabra, en su tabla unida (`e0`, `e1`…): las publicaciones que la tienen en el título (`t` = 1), en el texto
+  // o en un comentario. No va como `id IN (SELECT …)` dentro de la condición: D1 no acepta más de 100 niveles entre una
+  // expresión y las de sus subconsultas, `sinAcentos` ya lleva la mitad y así el buscador fallaba siempre. Unida, cada
+  // una cuenta por separado, y lo de afuera (qué ve `yo`, el orden) se queda sin `sinAcentos`.
+  const encontradas = palabras.map((p, i) => {
+    valores.push(comoTexto(p), comoTexto(p), comoTexto(p), comoTexto(p), ...(yo.creador ? [] : [OCULTAR, yo.id]))
+    return `JOIN (SELECT id, MAX(t) AS t FROM (SELECT id, ${sinAcentos('titulo')} LIKE ? AS t FROM publicaciones WHERE ${sinAcentos('titulo')} LIKE ? OR ${sinAcentos('texto')} LIKE ? UNION ALL SELECT publicacion, 0 FROM comentarios WHERE ${sinAcentos('texto')} LIKE ?${comentarioVisible}) GROUP BY id) e${i} ON e${i}.id = p.id`
+  })
+  const donde: string[] = []
+  if (!yo.creador) donde.push('((p.reportes < ? AND p.aprobada = 1) OR p.autor = ?)'), valores.push(OCULTAR, yo.id)
+  const enTitulo = palabras.map((_, i) => `e${i}.t`).join(' AND ')
+  return {
+    sql: `SELECT p.* FROM publicaciones p ${encontradas.join(' ')}${donde.length ? ` WHERE ${donde.join(' AND ')}` : ''} ORDER BY (${enTitulo}) DESC, p.actividad DESC LIMIT ${RESULTADOS}`,
+    valores
   }
-  if (!yo.creador) donde.push('((reportes < ? AND aprobada = 1) OR autor = ?)'), valores.push(OCULTAR, yo.id)
-  const enTitulo = palabras.map(() => `${sinAcentos('titulo')} LIKE ?`).join(' AND ')
-  valores.push(...palabras.map(comoTexto))
-  return { sql: `SELECT * FROM publicaciones WHERE ${donde.join(' AND ')} ORDER BY (${enTitulo}) DESC, actividad DESC LIMIT ${RESULTADOS}`, valores }
 }
 
 /** Lo que más trae el índice del buscador. */
