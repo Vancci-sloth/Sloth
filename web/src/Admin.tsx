@@ -2,6 +2,7 @@ import { type KeyboardEvent as TeclaReact, memo, type ReactNode, type Ref, useCa
 import { api } from './api'
 import { Icono, type NombreIcono } from './Iconos'
 import { coincide, type Cuenta, explicar, fechaCorta, hace, num, planCorto, planLargo, segundos, sinAcentos, STATUS } from './admin-formato'
+import { FondoAdmin } from './FondoAdmin'
 import { RifaAdmin } from './RifaAdmin'
 
 export { fecha, num } from './admin-formato'
@@ -14,7 +15,8 @@ import './Admin.css'
  * Se abre al instante con lo último que se leyó (lo guarda el servidor en `data/voz/admin.json`, y aquí en memoria) y se
  * vuelve a leer de fondo: el cobro tarda unos segundos en preguntar a cada llave. Arriba, el buscador (ya enfocado; «/»
  * vuelve a él) y las cifras que importan en una fila; debajo, pestañas en vez de una página larga: Usuarios, Llamadas,
- * Rifa (`RifaAdmin.tsx`), Créditos mensuales, Llaves y lo que responde Voices Cloning tal cual (`#/admin/<pestaña>`).
+ * Rifa (`RifaAdmin.tsx`), Fondo (`FondoAdmin.tsx`: el reparto del fondo de la comunidad), Créditos mensuales, Llaves y lo que
+ * responde Voices Cloning tal cual (`#/admin/<pestaña>`).
  *
  * Con el teclado: escribir filtra, ↑↓ eligen la fila, Enter abre su ficha con el cursor en «créditos»; ahí Enter suma
  * (un número negativo quita) y Esc vuelve al buscador. Cada cambio de créditos o de estado se deshace: en el aviso que
@@ -134,6 +136,7 @@ const PESTANAS = [
   { id: 'usuarios', nombre: 'Usuarios', icono: 'personas' },
   { id: 'llamadas', nombre: 'Llamadas', icono: 'sonido' },
   { id: 'rifa', nombre: 'Rifa', icono: 'boleto' },
+  { id: 'fondo', nombre: 'Fondo', icono: 'corona' },
   { id: 'mensuales', nombre: 'Créditos mensuales', icono: 'calendario' },
   { id: 'llaves', nombre: 'Llaves', icono: 'escudo' },
   { id: 'tal-cual', nombre: 'Tal cual', icono: 'hilo' }
@@ -412,6 +415,7 @@ export const Admin = memo(function Admin({ activa, pestana = 'usuarios', onPesta
               <Llamadas panel={panel} buscar={buscar} quien={quien} soloFallas={soloFallas} onSoloFallas={setSoloFallas} onAbrir={setAbierto} />
             )}
             {pestanaActual.id === 'rifa' && <RifaAdmin />}
+            {pestanaActual.id === 'fondo' && <FondoAdmin />}
             {pestanaActual.id === 'mensuales' && <Mensuales panel={panel} quien={quien} onAbrir={setAbierto} />}
             {pestanaActual.id === 'llaves' && <Llaves panel={panel} quien={quien} cargando={cargando} onConsumo={setConsumo} />}
             {pestanaActual.id === 'tal-cual' && <TalCual panel={panel} />}

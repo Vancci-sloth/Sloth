@@ -48,6 +48,16 @@ export interface Card {
   /** Un estilo que instalaste de otro: de dónde vino. Al volver a instalarlo de ahí, se pone al día. */
   origen?: OrigenEstilo
   /**
+   * Un estilo tuyo que salió de uno de la comunidad (lo copió «Nuevo estilo» de uno instalado): la publicación de aquel.
+   * Al compartirlo, cuenta como su variante (`licencias/src/tienda.ts`).
+   */
+  deComunidad?: string
+  /**
+   * Cómo se usa, para quien lo instala: la plantilla que se llena al compartirlo (`shared/guia.ts`). La escribe «Nuevo
+   * estilo» al hacerlo y llega con uno instalado de la comunidad. Se ve bajo su nombre (`web/src/Guia.tsx`).
+   */
+  guia?: GuiaEstilo
+  /**
    * Lo que el agente de Claude de esta card no ve: herramientas (`NotebookEdit`, `mcp__21st__bookmark`) o servidores MCP
    * enteros (`mcp__openseo`), también los del usuario. Sale de lo que sus hilos nunca usaron (`medidor economizar`, en
    * sloth-medidor): menos herramientas ofrecidas, menos contexto en cada mensaje.
@@ -108,6 +118,18 @@ export interface EstiloAnterior {
   titulo: string
   /** Si este usuario tenía el de antes y está guardado. Si no (instaló de cero), el aviso solo pide leerlo. */
   guardado: boolean
+}
+
+/** La guía de uso de un estilo compartido: los campos de su plantilla (`CAMPOS_GUIA` en `shared/guia.ts`). */
+export interface GuiaEstilo {
+  /** Lo que pone cada vez quien lo usa: un tema, un enlace, su grabación… */
+  das: string
+  /** Lo que sale: qué video, de cuánto y en qué formato. */
+  entrega: string
+  /** Un mensaje de ejemplo, listo para mandar. */
+  ejemplo: string
+  /** Lo que hace falta aparte de Sloth (cuentas, material propio), si algo. */
+  necesita?: string
 }
 
 /** De dónde vino un estilo instalado: de un archivo (sin `publicacion`) o de la comunidad, y de qué versión de Sloth. */
@@ -1189,6 +1211,10 @@ export interface AdjuntoComunidad {
   url: string
   /** El nombre del estilo. */
   nombre?: string
+  /** El estilo de la comunidad del que salió este (su publicación): así cuenta como su variante (`licencias/src/tienda.ts`). */
+  de?: string
+  /** Cómo se usa el estilo: en Estilos no se publica sin ella (`shared/guia.ts`). */
+  guia?: GuiaEstilo
   /** La portada de un video: su llave y su URL. */
   poster?: string
   posterUrl?: string
@@ -1262,7 +1288,7 @@ export interface RoadmapComunidad {
 
 export interface FeedComunidad {
   /** Con lo que llevas hecho, para «Comienza aquí». */
-  yo: Autor & { publicaciones: number; comentarios: number }
+  yo: Autor & { publicaciones: number; comentarios: number; /** Apoya a Sloth ahora: entra a los estilos de la comunidad. */ apoya?: boolean }
   /** Las licencias activas. */
   miembros: number
   /** Las que abrieron Sloth en las últimas 24 horas. */
@@ -1283,6 +1309,125 @@ export interface RifaGanada {
   creditos: number
   /** Ya están en tu cuenta. */
   entregados: boolean
+}
+
+/** El fondo de la comunidad (`licencias/src/fondo.ts`): `GET /api/comunidad/fondo`. */
+export interface FondoComunidad {
+  /** El periodo que se reparte junto: un mes ('2027-01'); el primero junta noviembre y diciembre de 2026. */
+  periodo: string
+  /** «enero de 2027»; el primero, «noviembre y diciembre de 2026». */
+  mes: string
+  /** El primer reparto, el 1 de enero de 2027: hay tiempo para prepararse. */
+  primero?: true
+  /** Lo que se lleva la comunidad este mes, por moneda, en unidades y del mayor al menor. Vacío: aún nada. */
+  montos: { moneda: string; monto: number }[]
+  /**
+   * Las cuentas de cada moneda, ya hechas: lo cobrado con tarjeta, lo que se quedó Stripe, lo devuelto y el IVA; lo que
+   * queda (`neto`) y la mitad para la comunidad. En unidades, todo positivo.
+   */
+  cuentas: { moneda: string; cobrado: number; comision: number; devuelto: number; impuesto: number; neto: number; comunidad: number }[]
+  /** Cuándo cierra el periodo y se reparte (00:00 del día 1 siguiente en Ciudad de México), en ISO. */
+  cierra: string
+}
+
+/** Lo tuyo en el fondo de la comunidad (`licencias/src/reparto.ts`): `GET /api/comunidad/fondo/mio`. */
+export interface MiFondo {
+  /** Participas: pusiste tu Binance ID, adonde se te paga. */
+  participa: boolean
+  /** Tu Binance ID, tapado: «••••1234». */
+  binance?: string
+  /** Los puntos de tus estilos en este periodo. */
+  puntos: number
+  /** Lo que llevas si el periodo cerrara ahora; si no participas, lo que llevarías. */
+  estimado: FondoComunidad['montos']
+  /** Tus partes de los periodos ya cerrados, del último al primero. */
+  partes: { periodo: string; mes: string; montos: FondoComunidad['montos']; pagado?: string }[]
+}
+
+/** La parte de una persona en el reparto de un periodo. Solo la ve el creador. */
+export interface ParteReparto {
+  miembro: Autor
+  correo: string
+  /** Adónde se le paga: entero. */
+  binance: string
+  puntos: number
+  montos: FondoComunidad['montos']
+  /** De qué estilos salen sus puntos, y cuántas personas hicieron videos con cada uno. */
+  estilos: { id: string; titulo: string; puntos: number; personas: number }[]
+  /** Lo que conviene mirar antes de pagarle. */
+  avisos: string[]
+  /** Cuándo se marcó como pagada, y con qué referencia. */
+  pagado?: string
+  referencia?: string
+}
+
+/** El reparto del fondo de un periodo, para el creador: `GET /api/comunidad/fondo/reparto?periodo=`. */
+export interface RepartoFondo {
+  periodo: string
+  mes: string
+  /** Los periodos que hay, del primero al de hoy. */
+  periodos: { id: string; mes: string }[]
+  /** Ya terminó: se puede cerrar. */
+  termino: boolean
+  /** Cuándo se cerró. Sin él, lo demás va en vivo. */
+  cerrado?: string
+  /** Las cuentas del fondo; sin ellas, si Stripe no contestó. */
+  fondo: FondoComunidad | null
+  /** Los puntos entre los que se reparte. */
+  puntos: number
+  partes: ParteReparto[]
+  /** Quienes tienen puntos pero no participan (no dieron su Binance ID): no se llevan nada. */
+  fuera: { miembro: Autor; puntos: number }[]
+}
+
+/** Cómo se ordena la tienda de estilos: los favoritos (más me gusta), los más usados, descargados, lo que más gana este mes o lo nuevo. */
+export type OrdenTienda = 'favoritos' | 'usados' | 'descargas' | 'ganando' | 'nuevos'
+
+/** Un estilo de la tienda (`licencias/src/tienda.ts`), con sus números, que son públicos. */
+export interface EstiloTienda {
+  publicacion: PublicacionComunidad
+  /** De siempre: computadoras que lo instalaron, videos que otras personas terminaron con él, cuántas personas y variantes. */
+  descargas: number
+  videos: number
+  personas: number
+  variantes: number
+  /** Este mes, lo que cuenta para el fondo: los videos, con su tope por persona. */
+  mes: { personas: number; videos: number; variantes: number; puntos: number }
+  /** Si se lleva del fondo: su autor quiso participar (dio su Binance ID) y no es el creador de Sloth. */
+  participa: boolean
+  /** Lo que se llevaría del fondo si el periodo cerrara ahora; vacío si no participa. */
+  estimado: FondoComunidad['montos']
+  /** El estilo de la comunidad del que salió. */
+  basadoEn?: { id: string; titulo: string }
+}
+
+/** `GET /api/comunidad/estilos`. */
+export interface TiendaEstilos {
+  estilos: EstiloTienda[]
+  /** El fondo de este mes; sin él, si Stripe no contestó. */
+  fondo: FondoComunidad | null
+  /** Los puntos de los estilos que se llevan del fondo en este periodo. */
+  puntos: number
+  /** A quien no apoya: la tienda está cerrada (solo ve sus estilos), y cuántos estilos hay dentro. */
+  cerrada?: { estilos: number }
+  /** Cuánto vale cada cosa, y los días que tiene que llevar una cuenta para que sus videos sumen. */
+  reglas: { persona: number; video: number; tope: number; variante: number; dias: number }
+}
+
+/** Solo el creador: las pruebas de los videos de un estilo en un mes (`GET /api/comunidad/estilos/pruebas`). */
+export interface PruebasEstilo {
+  periodo: string
+  videos: {
+    equipo: string
+    huella: string
+    /** El número de persona (las computadoras y conexiones que se tocan son una). */
+    persona: number
+    autor: Autor
+    /** La URL de su portada. */
+    prueba?: string
+    descartado: boolean
+    creado: string
+  }[]
 }
 
 /** La rifa de la comunidad (`licencias/src/rifa.ts`), como la ve cada quien: `GET /api/comunidad/rifa`. */

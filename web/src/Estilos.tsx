@@ -1,8 +1,10 @@
 import { type ReactNode, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import type { AdjuntoComunidad, Card, FeedComunidad, PublicacionComunidad, VideoHecho } from '../../shared/types'
+import { faltaEnGuia, guiaDe } from '../../shared/guia'
+import type { AdjuntoComunidad, Card, FeedComunidad, GuiaEstilo, PublicacionComunidad, VideoHecho } from '../../shared/types'
 import { api, ErrorApi } from './api'
 import { abrirPublicacion } from './Comunidad'
+import { GuiaCampos } from './Guia'
 import { Icono } from './Iconos'
 import './Estilos.css'
 
@@ -93,7 +95,8 @@ type Paquete = { listo: AdjuntoComunidad } | { error: string; arreglable: boolea
 
 /**
  * «Compartir» de un estilo tuyo, en una sola pantalla y sin salir de donde estás (como «Publish to Community» de Figma):
- * ya trae su título, lo que hace y su último video; tú solo revisas y publicas. Al abrir se empaqueta y se sube, así lo
+ * ya trae su título, lo que hace, su último video y su guía de uso si «Nuevo estilo» la dejó en su card; tú solo revisas y
+ * publicas. La guía es la plantilla de `shared/guia.ts`, la misma para todos: sin ella completa no se publica. Al abrir se empaqueta y se sube, así lo
  * que impide compartirlo sale antes de escribir nada, con un botón para que «Nuevo estilo» lo arregle. Si aún no te
  * pusiste nombre en la comunidad, se pide aquí. Al terminar dice que está en revisión y que te llega un aviso cuando el
  * creador lo apruebe. Abajo, guardarlo como archivo para pasarlo a mano.
@@ -106,6 +109,7 @@ export function CompartirEstilo({ card, onCerrar }: { card: Card; onCerrar(): vo
   const [nombre, setNombre] = useState('')
   const [titulo, setTitulo] = useState(card.title)
   const [texto, setTexto] = useState(card.description ?? '')
+  const [guia, setGuia] = useState<Partial<GuiaEstilo>>(card.guia ?? {})
   const [videos, setVideos] = useState<VideoHecho[] | null>(null)
   const [video, setVideo] = useState<string | null>(null)
   const [publicando, setPublicando] = useState(false)
@@ -134,7 +138,16 @@ export function CompartirEstilo({ card, onCerrar }: { card: Card; onCerrar(): vo
   }, [card.id])
 
   const sinCuenta = !!paquete && 'sinCuenta' in paquete
-  const falta = !titulo.trim() ? 'Ponle un título.' : nombreActual === '' && !nombre.trim() ? 'Escribe tu nombre: así te ven los demás.' : ''
+  const sinGuia = faltaEnGuia(guia)
+  const falta = !titulo.trim()
+    ? 'Ponle un título.'
+    : nombreActual === '' && !nombre.trim()
+      ? 'Escribe tu nombre: así te ven los demás.'
+      : !texto.trim()
+        ? 'Di qué hace tu estilo.'
+        : sinGuia
+          ? `Falta «${sinGuia}»: es lo que lee quien lo instala.`
+          : ''
   const puede = !!paquete && 'listo' in paquete && !falta && !publicando && nombreActual !== undefined
 
   async function publicar() {
@@ -147,7 +160,7 @@ export function CompartirEstilo({ card, onCerrar }: { card: Card; onCerrar(): vo
         setNombreActual(nombre.trim())
       }
       // El video sube al publicar: solo sus primeros segundos, como en «Lo que hice».
-      const adjuntos = [paquete.listo, ...(video ? [await api<AdjuntoComunidad>('/api/comunidad/video', { ruta: video })] : [])]
+      const adjuntos = [{ ...paquete.listo, guia: guiaDe(guia) }, ...(video ? [await api<AdjuntoComunidad>('/api/comunidad/video', { ruta: video })] : [])]
       const p = await api<PublicacionComunidad>('/api/comunidad/publicar', { categoria: 'estilos', titulo: titulo.trim(), texto: texto.trim(), adjuntos })
       dispatchEvent(new Event('sloth-comunidad'))
       setHecha(p)
@@ -268,9 +281,15 @@ export function CompartirEstilo({ card, onCerrar }: { card: Card; onCerrar(): vo
             <input value={titulo} maxLength={140} onChange={(e) => setTitulo(e.target.value)} />
           </label>
           <label>
-            <span>Qué hace y qué te pide cada vez</span>
-            <textarea value={texto} rows={3} maxLength={2000} placeholder="Por ejemplo: videos de datos curiosos con imágenes de Flow; solo le das el tema." onChange={(e) => setTexto(e.target.value)} />
+            <span>Qué hace</span>
+            <textarea value={texto} rows={2} maxLength={2000} placeholder="Por ejemplo: videos de datos curiosos con imágenes de Flow, narrados con tu voz." onChange={(e) => setTexto(e.target.value)} />
           </label>
+          {/* La plantilla de uso: la misma para todos los estilos, para que quien lo instala sepa cómo usarlo. */}
+          <div className="compartir-guia">
+            <strong>Cómo se usa</strong>
+            <span>Lo lee quien lo instala, en la comunidad y bajo el nombre del estilo. Todos los estilos lo llevan.</span>
+          </div>
+          <GuiaCampos valor={guia} onCambio={setGuia} />
           <div className="compartir-video">
             <span>Un video hecho con él</span>
             {videos === null ? (
@@ -294,6 +313,7 @@ export function CompartirEstilo({ card, onCerrar }: { card: Card; onCerrar(): vo
         </div>
       )}
       {(error || archivo.error) && <p className="bad compartir-error">{error || archivo.error}</p>}
+      {!error && !archivo.error && falta && paquete && 'listo' in paquete && <p className="compartir-falta">{falta}</p>}
     </Modal>
   )
 }

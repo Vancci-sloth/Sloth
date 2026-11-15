@@ -34,7 +34,8 @@ import { AvisoEquipo } from './Equipo' // tu equipo
 import { MisVideos, precargarVideos, Rejilla, VideoDe } from './MisVideos'
 import { Modelos3D } from './Modelos3D' // modelos 3D
 import { abrirPublicacion, Comunidad } from './Comunidad' // comunidad
-import { CompartirEstilo, ImportarEstilo } from './Estilos' // estilos compartidos
+import { abrirBorrador, CompartirEstilo, ImportarEstilo } from './Estilos' // estilos compartidos
+import { GuiaVista } from './Guia'
 import { PedirMejora } from './PedirMejora' // comunidad
 import { Icono } from './Iconos'
 import { Bienvenida } from './Bienvenida'
@@ -1123,6 +1124,7 @@ function NewSession(props: {
             )}
           </h1>
           <p>{card.description}</p>
+          {card.guia && <GuiaVista key={card.id} guia={card.guia} plegada={!card.origen} onEjemplo={() => abrirBorrador(card.id, card.guia!.ejemplo)} />}
           {card.tuya && (
             <button className="compartir-boton" onClick={() => setCompartiendo(card)}>
               <Icono de="compartir" className="icon-trazo" /> Compartir en la comunidad

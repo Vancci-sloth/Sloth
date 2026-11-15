@@ -18,6 +18,11 @@
 .compartir-campos input, .compartir-campos textarea { width: 100%; padding: 8px 10px; background: var(--bg); border: 1px solid var(--line); border-radius: var(--radio); color: var(--text); font-size: 13.5px; resize: vertical; }
 .compartir-campos input:focus, .compartir-campos textarea:focus { outline: none; border-color: var(--amber); }
 .compartir-video p { margin: 0; }
+/* La plantilla de uso (Guia.tsx): su título y para qué es. */
+.compartir-guia { display: flex; flex-direction: column; gap: 2px; padding-top: 12px; border-top: 1px solid var(--line); }
+.compartir-guia strong { font-size: 14px; }
+.compartir-guia span { color: var(--muted); font-size: 12.5px; }
+.compartir-falta { margin: 12px 0 0; color: var(--suave); font-size: 13px; }
 
 /* Sus últimos videos: el elegido, con borde ámbar y palomita. */
 .compartir-videos { display: flex; gap: 8px; flex-wrap: wrap; }

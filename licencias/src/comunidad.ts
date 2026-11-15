@@ -19,6 +19,9 @@
  * En Estilos, cada publicación lleva un estilo empaquetado (`server/estilos.ts`), que se instala desde ahí. Es código que
  * corre en la computadora de quien lo instala: uno nuevo, o uno al que le cambian el paquete, queda `aprobada = 0` y solo
  * lo ven quien lo compartió y el creador (le llega un aviso) hasta que lo aprueba (migración 0019).
+ * Va con lo que hace y su guía de uso (`shared/guia.ts`): sin la plantilla completa no se publica (`estiloEnSuSitio`).
+ * Los estilos son de quien apoya (`apoya`): a los demás no les salen en el feed, ni en el buscador, ni se les abre su
+ * publicación ni se les entrega su paquete (402, `SOLO_APOYO`); lo suyo sí, que compartir un estilo es de cualquiera.
  *
  * - `GET /comunidad?categoria=&orden=&antes=`: quién eres, los números de la comunidad y una página del feed: las fijadas
  *   y luego lo que tuvo actividad más reciente, lo último publicado o, para el creador, lo que no ha contestado
@@ -31,6 +34,9 @@
  * - `POST /comunidad/c/<id>/borrar`, `/megusta`, `/reportar` y `/revisada`: lo mismo para un comentario.
  * - `GET /comunidad/avisos` (`?cuenta`: solo cuántos sin leer, y lo que ganaste en la rifa) y `POST /comunidad/avisos/leidos`.
  * - `/comunidad/rifa*`: la rifa del creador (`rifa.ts`).
+ * - `GET /comunidad/fondo`: lo que este mes se lleva la comunidad, la mitad de lo que cae por Stripe (`fondo.ts`).
+ * - `GET /comunidad/estilos` y `POST /comunidad/estilos/uso`: la tienda de estilos y lo que se mide de cada uno (`tienda.ts`).
+ * - `/comunidad/fondo/*`: participar en el fondo con tu Binance ID, y su reparto, que cierra y paga el creador (`reparto.ts`).
  * - `POST /comunidad/roadmap` `{meta}`: tu voto de qué sigue (uno por miembro; el de un Fundador vale dos). Da la votación.
  * - `POST /comunidad/perfil` `{nombre?, foto?, creditos?}`: `creditos`, solo un Fundador (sale en `GET /creditos`).
  * - `PUT /comunidad/archivo`, con el archivo de cuerpo y su `content-type`: una imagen o un video (sus primeros
@@ -39,6 +45,10 @@
  *   `POST` la da a todos ya (`liberar` en `index.ts`), cuando el chat de un live cumple su meta.
  */
 import type { AdjuntoComunidad, Autor, AvisoComunidad, CategoriaComunidad, ComentarioComunidad, FeedComunidad, OrdenComunidad, PublicacionComunidad, RifaGanada, RoadmapComunidad } from '../../shared/types.ts'
+import { faltaEnGuia, guiaDe } from '../../shared/guia.ts'
+import { fondo } from './fondo.ts'
+import { cerrar, mio, pagado, participar, reparto, salir } from './reparto.ts'
+import { descartar, olvidarNumeros, pruebas, tienda, usos } from './tienda.ts'
 import { ganada, rifa } from './rifa.ts'
 import { BLOQUEADA, CLAVE, EQUIPO, cupo, delCreador, esFundador, type Env, type Fila, Rechazo, cuerpo, json, letras, liberar, servir, vigencia, vigilar } from './index.ts'
 
@@ -79,14 +89,14 @@ const ID = /^[a-z0-9]+$/
  * Lo más que publica, comenta, reporta o sube cada miembro en un día (`cupo`): que un error o un abuso no llene la
  * comunidad ni la cuenta de R2. Un video pesa hasta 50 MB: van aparte, menos.
  */
-const AL_DIA = { publicaciones: 10, comentarios: 100, reportes: 20, archivos: 60, videos: 10 }
+const AL_DIA = { publicaciones: 10, comentarios: 100, reportes: 20, archivos: 60, videos: 10, usos: 30, binance: 3 }
 /** Lo subido con dueño que nada usa (una publicación que no se hizo, o un abuso) se borra pasado esto. */
 const SUELTO = 2 * 24 * 3600_000
 /** El identificador que manda la app (`server/licencia.ts`): el de la computadora resumido, o un UUID. Otro lo inventó alguien. */
 export const DE_LA_APP = /^(?:[0-9a-f]{32}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/
 
 /** El cupo del día de `yo`. Quien llega al tope queda vigilado: se le avisa por correo. */
-async function conCupo(env: Env, yo: Miembro, tipo: keyof typeof AL_DIA): Promise<boolean> {
+export async function conCupo(env: Env, yo: Miembro, tipo: keyof typeof AL_DIA): Promise<boolean> {
   if (await cupo(env, yo.id, tipo, AL_DIA[tipo])) return true
   const email = (await env.DB.prepare('SELECT email FROM licencias WHERE clave = ?').bind(yo.clave).first<{ email: string }>())?.email
   if (email) await vigilar(env, email, `llegó al tope del día de ${tipo} (${AL_DIA[tipo]})`)
@@ -110,7 +120,7 @@ let numeros: { miembros: number; activos: number; hasta: number } | undefined
 let votosGuardados: { votos: Map<string, number>; hasta: number } | undefined
 let creditosGuardados: { nombres: string[]; hasta: number } | undefined
 
-interface Miembro {
+export interface Miembro {
   id: string
   clave: string
   nombre: string
@@ -123,7 +133,7 @@ interface Miembro {
   insignia?: Autor['insignia'] | null
 }
 
-interface Guardada {
+export interface Guardada {
   id: string
   autor: string
   categoria: CategoriaComunidad
@@ -156,22 +166,22 @@ interface ComentarioGuardado {
 }
 
 /** Un adjunto como se guarda: sin URLs, que dependen de `ORIGEN`. */
-type Adjunto = Pick<AdjuntoComunidad, 'tipo' | 'llave' | 'poster' | 'vertical' | 'nombre'>
+type Adjunto = Pick<AdjuntoComunidad, 'tipo' | 'llave' | 'poster' | 'vertical' | 'nombre' | 'de' | 'guia'>
 
 export async function comunidad(req: Request, env: Env, url: URL, ctx: ExecutionContext): Promise<Response> {
   const ruta = url.pathname
-  // Lo único libre: los archivos, que se piden por un nombre que no se adivina.
+  // Lo único libre: las imágenes y los videos, que se piden por un nombre que no se adivina. El paquete de un estilo, no.
   const archivo = /^\/comunidad\/archivo\/([^/]+)$/.exec(ruta)
   if (archivo && (req.method === 'GET' || req.method === 'HEAD')) return servirArchivo(req, env, archivo[1])
 
   const yo = await quien(req, env)
   if (ruta === '/comunidad' && req.method === 'GET') return json(await feed(env, yo, url))
   if (ruta === '/comunidad/indice' && req.method === 'GET') {
-    const { sql, valores } = consultaIndice({ id: yo.id, creador: esCreador(yo) })
+    const { sql, valores } = consultaIndice({ id: yo.id, creador: esCreador(yo), apoya: apoya(yo) })
     return json({ publicaciones: (await env.DB.prepare(sql).bind(...valores).all()).results })
   }
   if (ruta === '/comunidad/buscar' && req.method === 'GET') {
-    const { sql, valores } = consultaBuscar({ id: yo.id, creador: esCreador(yo) }, url.searchParams.get('q') ?? '')
+    const { sql, valores } = consultaBuscar({ id: yo.id, creador: esCreador(yo), apoya: apoya(yo) }, url.searchParams.get('q') ?? '')
     const filas = sql ? ((await env.DB.prepare(sql).bind(...valores).all()).results as unknown as Guardada[]) : []
     return json({ publicaciones: await armar(env, yo, filas) })
   }
@@ -192,6 +202,17 @@ export async function comunidad(req: Request, env: Env, url: URL, ctx: Execution
     return json({ ok: true })
   }
   if (ruta === '/comunidad/archivo' && req.method === 'PUT') return json(await subir(req, env, yo))
+  if (ruta === '/comunidad/fondo' && req.method === 'GET') return json(await fondo(env))
+  if (ruta === '/comunidad/fondo/mio' && req.method === 'GET') return json(await mio(env, yo))
+  if (ruta === '/comunidad/fondo/participar' && req.method === 'POST') return json(await participar(req, env, yo, await cuerpo(req)))
+  if (ruta === '/comunidad/fondo/salir' && req.method === 'POST') return json(await salir(req, env, yo))
+  if (ruta === '/comunidad/fondo/reparto' && req.method === 'GET') return json(await reparto(env, yo, url))
+  if (ruta === '/comunidad/fondo/cerrar' && req.method === 'POST') return json(await cerrar(env, yo, await cuerpo(req)))
+  if (ruta === '/comunidad/fondo/pagado' && req.method === 'POST') return json(await pagado(env, yo, await cuerpo(req)))
+  if (ruta === '/comunidad/estilos' && req.method === 'GET') return json(await tienda(env, yo, url))
+  if (ruta === '/comunidad/estilos/uso' && req.method === 'POST') return json(await usos(req, env, yo))
+  if (ruta === '/comunidad/estilos/pruebas' && req.method === 'GET') return json(await pruebas(env, yo, url))
+  if (ruta === '/comunidad/estilos/descartar' && req.method === 'POST') return json(await descartar(req, env, yo))
   if (ruta === '/comunidad/rifa' || ruta.startsWith('/comunidad/rifa/')) return json(await rifa(req, env, ctx, { id: yo.id, clave: yo.clave, nombre: yo.nombre, creador: esCreador(yo) }, ruta))
   if (ruta === '/comunidad/liberar' && (req.method === 'GET' || req.method === 'POST')) {
     if (!esCreador(yo)) throw new Rechazo(403, 'Eso solo lo hace el creador de Sloth.')
@@ -203,6 +224,7 @@ export async function comunidad(req: Request, env: Env, url: URL, ctx: Execution
   if (p && req.method === 'POST') {
     const pub = await env.DB.prepare('SELECT * FROM publicaciones WHERE id = ?').bind(p[1]).first<Guardada>()
     if (!pub || !laVe(pub, yo)) throw new Rechazo(404, 'Esa publicación ya no existe.')
+    soloConApoyo(pub, yo)
     if (p[2] === 'megusta') return json(await megusta(env, yo, pub))
     if (p[2] === 'comentar') return json(await comentar(env, yo, pub, await cuerpo(req)))
     if (p[2] === 'borrar') return json(await borrar(env, yo, pub))
@@ -279,7 +301,7 @@ const insignia = (env: Env) => `(SELECT CASE WHEN MAX(${esFundador('li')}) THEN 
   AND li.email = (SELECT lc.email FROM licencias lc WHERE lc.clave = m.clave)) AS insignia`
 
 const nuevoId = () => letras(12).toLowerCase()
-const urlDe = (env: Env, llave: string) => `${env.ORIGEN}/comunidad/archivo/${llave}`
+export const urlDe = (env: Env, llave: string) => `${env.ORIGEN}/comunidad/archivo/${llave}`
 /** Los adjuntos guardados (JSON), con sus URLs. */
 const conUrls = (env: Env, adjuntos: string): AdjuntoComunidad[] =>
   (JSON.parse(adjuntos) as Adjunto[]).map((a) => ({ ...a, url: urlDe(env, a.llave), ...(a.poster ? { posterUrl: urlDe(env, a.poster) } : {}) }))
@@ -289,7 +311,22 @@ const autor = (env: Env, m: Pick<Miembro, 'id' | 'nombre' | 'foto' | 'clave' | '
   ...(m.foto ? { foto: urlDe(env, m.foto) } : {}),
   ...(m.clave === CREADOR ? { creador: true } : m.insignia ? { insignia: m.insignia } : {})
 })
-const esCreador = (m: Miembro) => m.clave === CREADOR
+export const esCreador = (m: Miembro) => m.clave === CREADOR
+/** Quien apoya a Sloth ahora (su insignia: un apoyo pagado y sin vencer, o su lugar de por vida), y el creador. */
+export const apoya = (m: Miembro) => esCreador(m) || !!m.insignia
+export const SOLO_APOYO = 'Los estilos de la comunidad son para quienes apoyan a Sloth. Apoya y entra a instalar los que quieras.'
+/** Un estilo de otro no se le abre a quien no apoya: 402, que la app enseña como la invitación a apoyar. */
+function soloConApoyo(x: { categoria: string; autor: string }, yo: Miembro) {
+  if (x.categoria === 'estilos' && x.autor !== yo.id && !apoya(yo)) throw new Rechazo(402, SOLO_APOYO)
+}
+/** Lo mismo en una consulta: a quien no apoya, los estilos de otros no le salen. `p`: el prefijo de la tabla. */
+const sinEstilosAjenos = (yo: Quien, p = '') => (yo.creador || yo.apoya ? '' : `(${p}categoria != 'estilos' OR ${p}autor = ?)`)
+/** Quién pide una consulta. Sin `apoya`, no apoya. */
+export interface Quien {
+  id: string
+  creador: boolean
+  apoya?: boolean
+}
 /** Lo reportado por `OCULTAR` personas, y un estilo sin aprobar, solo lo ven quien lo escribió y el creador. */
 const laVe = (x: { autor: string; reportes: number; aprobada?: number }, yo: Miembro) => (x.reportes < OCULTAR && x.aprobada !== 0) || x.autor === yo.id || esCreador(yo)
 
@@ -314,7 +351,7 @@ function aviso(env: Env, para: string, de: Miembro, tipo: AvisoComunidad['tipo']
  * comentario o, sin comentarios, la publicación) no es suya, por actividad. `antes` es la `actividad` (o la `creada`,
  * en `recientes`) de la última que ya tienes.
  */
-export function consultaFeed(yo: { id: string; creador: boolean }, p: { categoria: string; antes: string; orden: string }): { sql: string; valores: (string | number)[] } {
+export function consultaFeed(yo: Quien, p: { categoria: string; antes: string; orden: string }): { sql: string; valores: (string | number)[] } {
   const orden = (ORDENES as readonly string[]).includes(p.orden) ? (p.orden as OrdenComunidad) : p.orden ? null : 'actividad'
   if (!orden) throw new Rechazo(400, 'Ese orden no existe.')
   if (orden === 'sin-contestar' && !yo.creador) throw new Rechazo(403, 'Eso solo lo ve el creador de Sloth.')
@@ -326,6 +363,7 @@ export function consultaFeed(yo: { id: string; creador: boolean }, p: { categori
     valores.push(p.categoria)
   }
   if (!yo.creador) donde.push('((reportes < ? AND aprobada = 1) OR autor = ?)'), valores.push(OCULTAR, yo.id)
+  if (sinEstilosAjenos(yo)) donde.push(sinEstilosAjenos(yo)), valores.push(yo.id)
   if (orden === 'sin-contestar')
     donde.push('COALESCE((SELECT c.autor FROM comentarios c WHERE c.publicacion = publicaciones.id ORDER BY c.creada DESC LIMIT 1), autor) != ?'), valores.push(yo.id)
   const columna = orden === 'recientes' ? 'creada' : 'actividad'
@@ -337,7 +375,7 @@ export function consultaFeed(yo: { id: string; creador: boolean }, p: { categori
 }
 
 /** `col` en minúsculas y sin acentos, en SQL: así «robotica» encuentra «Robótica». */
-const sinAcentos = (col: string) =>
+export const sinAcentos = (col: string) =>
   [
     ...[...'áàâäãÁÀÂÄÃ'].map((c) => [c, 'a']),
     ...[...'éèêëÉÈÊË'].map((c) => [c, 'e']),
@@ -369,7 +407,7 @@ const RESULTADOS = 20
  * La consulta del buscador: las publicaciones donde está cada palabra (en el título, el texto o algún comentario), lo
  * que `yo` puede ver; primero las que la tienen en el título y luego por actividad. Sin palabras, ninguna (`sql` vacío).
  */
-export function consultaBuscar(yo: { id: string; creador: boolean }, q: string): { sql: string; valores: (string | number)[] } {
+export function consultaBuscar(yo: Quien, q: string): { sql: string; valores: (string | number)[] } {
   const palabras = palabrasDe(q)
   if (!palabras.length) return { sql: '', valores: [] }
   const valores: (string | number)[] = []
@@ -387,6 +425,7 @@ export function consultaBuscar(yo: { id: string; creador: boolean }, q: string):
   })
   const donde: string[] = []
   if (!yo.creador) donde.push('((p.reportes < ? AND p.aprobada = 1) OR p.autor = ?)'), valores.push(OCULTAR, yo.id)
+  if (sinEstilosAjenos(yo)) donde.push(sinEstilosAjenos(yo, 'p.')), valores.push(yo.id)
   const enTitulo = palabras.map((_, i) => `e${i}.t`).join(' AND ')
   return {
     sql: `SELECT p.* FROM publicaciones p ${encontradas.join(' ')}${donde.length ? ` WHERE ${donde.join(' AND ')}` : ''} ORDER BY (${enTitulo}) DESC, p.actividad DESC LIMIT ${RESULTADOS}`,
@@ -402,18 +441,18 @@ const EN_INDICE = 2000
  * principio del texto, la sección, el nombre de quien la escribió y sus fechas. Con él, la app encuentra al instante lo
  * que está en un título; lo demás (el texto entero, los comentarios) lo busca `consultaBuscar`.
  */
-export function consultaIndice(yo: { id: string; creador: boolean }): { sql: string; valores: (string | number)[] } {
-  const visible = yo.creador ? '' : ' WHERE ((p.reportes < ? AND p.aprobada = 1) OR p.autor = ?)'
+export function consultaIndice(yo: Quien): { sql: string; valores: (string | number)[] } {
+  const donde = [...(yo.creador ? [] : ['((p.reportes < ? AND p.aprobada = 1) OR p.autor = ?)']), ...(sinEstilosAjenos(yo) ? [sinEstilosAjenos(yo, 'p.')] : [])]
   return {
-    sql: `SELECT p.id, p.titulo, substr(p.texto, 1, 300) AS texto, p.categoria, p.creada, p.actividad, COALESCE(m.nombre, '') AS autor FROM publicaciones p LEFT JOIN miembros m ON m.id = p.autor${visible} ORDER BY p.actividad DESC LIMIT ${EN_INDICE}`,
-    valores: yo.creador ? [] : [OCULTAR, yo.id]
+    sql: `SELECT p.id, p.titulo, substr(p.texto, 1, 300) AS texto, p.categoria, p.creada, p.actividad, COALESCE(m.nombre, '') AS autor FROM publicaciones p LEFT JOIN miembros m ON m.id = p.autor${donde.length ? ` WHERE ${donde.join(' AND ')}` : ''} ORDER BY p.actividad DESC LIMIT ${EN_INDICE}`,
+    valores: [...(yo.creador ? [] : [OCULTAR, yo.id]), ...(sinEstilosAjenos(yo) ? [yo.id] : [])]
   }
 }
 
 /** La página del feed, con quién eres y los números de la comunidad. */
 async function feed(env: Env, yo: Miembro, url: URL): Promise<FeedComunidad> {
   const { sql, valores } = consultaFeed(
-    { id: yo.id, creador: esCreador(yo) },
+    { id: yo.id, creador: esCreador(yo), apoya: apoya(yo) },
     { categoria: url.searchParams.get('categoria') ?? '', antes: url.searchParams.get('antes') ?? '', orden: url.searchParams.get('orden') ?? '' }
   )
   const ahora = Date.now()
@@ -440,7 +479,7 @@ async function feed(env: Env, yo: Miembro, url: URL): Promise<FeedComunidad> {
   const filas = pubs.results as unknown as Guardada[]
   const n = cuentas.results[0] as { publicaciones: number; comentarios: number; avisos: number }
   return {
-    yo: { ...autor(env, yo), creditos: !!yo.creditos, publicaciones: n.publicaciones, comentarios: n.comentarios },
+    yo: { ...autor(env, yo), creditos: !!yo.creditos, apoya: apoya(yo), publicaciones: n.publicaciones, comentarios: n.comentarios },
     miembros: numeros!.miembros,
     activos: numeros!.activos,
     avisos: n.avisos,
@@ -451,7 +490,7 @@ async function feed(env: Env, yo: Miembro, url: URL): Promise<FeedComunidad> {
 }
 
 /** Las publicaciones como las ve `yo`: con su autor, si le gustan y las caras de los últimos que comentaron. */
-async function armar(env: Env, yo: Miembro, filas: Guardada[]): Promise<PublicacionComunidad[]> {
+export async function armar(env: Env, yo: Miembro, filas: Guardada[]): Promise<PublicacionComunidad[]> {
   if (!filas.length) return []
   const ids = filas.map((f) => f.id)
   const marcas = ids.map(() => '?').join(', ')
@@ -489,7 +528,7 @@ async function armar(env: Env, yo: Miembro, filas: Guardada[]): Promise<Publicac
   }))
 }
 
-async function miembros(env: Env, ids: string[]): Promise<Map<string, Autor>> {
+export async function miembros(env: Env, ids: string[]): Promise<Map<string, Autor>> {
   const unicos = [...new Set(ids)]
   const mapa = new Map<string, Autor>()
   // D1 acepta hasta 100 valores por consulta.
@@ -505,6 +544,7 @@ async function miembros(env: Env, ids: string[]): Promise<Map<string, Autor>> {
 async function abrir(env: Env, yo: Miembro, id: string): Promise<{ publicacion: PublicacionComunidad; comentarios: ComentarioComunidad[] }> {
   const f = await env.DB.prepare('SELECT * FROM publicaciones WHERE id = ?').bind(id).first<Guardada>()
   if (!f || !laVe(f, yo)) throw new Rechazo(404, 'Esa publicación ya no existe.')
+  soloConApoyo(f, yo)
   const [todos, gustan] = await env.DB.batch([
     env.DB.prepare(`SELECT * FROM comentarios WHERE publicacion = ? ORDER BY creada LIMIT ${MAX_COMENTARIOS}`).bind(id),
     env.DB.prepare('SELECT l.comentario FROM likes_comentarios l JOIN comentarios c ON c.id = l.comentario WHERE c.publicacion = ? AND l.miembro = ?').bind(id, yo.id)
@@ -553,10 +593,13 @@ export function adjuntosDe(valor: unknown): Adjunto[] {
   if (!Array.isArray(valor)) return []
   const lista = valor.flatMap((a): Adjunto[] => {
     if (!a || typeof a !== 'object') return []
-    const { tipo, llave, poster, vertical, nombre } = a as Record<string, unknown>
+    const { tipo, llave, poster, vertical, nombre, de, guia } = a as Record<string, unknown>
     if ((tipo !== 'imagen' && tipo !== 'video' && tipo !== 'estilo') || typeof llave !== 'string' || !LLAVE.test(llave)) return []
     if ((tipo === 'imagen') !== IMAGEN.test(llave) || (tipo === 'estilo') !== ESTILO.test(llave)) return []
-    if (tipo === 'estilo') return [{ tipo, llave, nombre: texto(nombre, 80) || 'Estilo' }]
+    if (tipo === 'estilo') {
+      const g = guiaDe(guia)
+      return [{ tipo, llave, nombre: texto(nombre, 80) || 'Estilo', ...(typeof de === 'string' && ID.test(de) ? { de } : {}), ...(g ? { guia: g } : {}) }]
+    }
     return [
       {
         tipo,
@@ -571,11 +614,19 @@ export function adjuntosDe(valor: unknown): Adjunto[] {
   return lista.filter((a, i) => a.tipo === 'imagen' || i === video || i === estilo).slice(0, 10)
 }
 
-/** Un estilo va en Estilos, y en Estilos va siempre uno. */
-export function estiloEnSuSitio(categoria: CategoriaComunidad, adjuntos: Adjunto[]) {
-  const lleva = adjuntos.some((a) => a.tipo === 'estilo')
-  if (categoria === 'estilos' && !lleva) throw new Rechazo(400, 'En Estilos se comparte un estilo: elígelo con «Estilo», o usa «Compartir» en su card.')
-  if (categoria !== 'estilos' && lleva) throw new Rechazo(400, 'Un estilo se comparte en la sección Estilos.')
+/**
+ * Un estilo va en Estilos, y en Estilos va siempre uno, con lo que hace (`texto`) y su guía de uso completa: la plantilla
+ * de `shared/guia.ts`, la misma para todos, para que quien lo instala sepa cómo usarlo.
+ */
+export function estiloEnSuSitio(categoria: CategoriaComunidad, adjuntos: Adjunto[], cuerpoTexto: string) {
+  const estilo = adjuntos.find((a) => a.tipo === 'estilo')
+  if (categoria !== 'estilos') {
+    if (estilo) throw new Rechazo(400, 'Un estilo se comparte en la sección Estilos.')
+    return
+  }
+  if (!estilo) throw new Rechazo(400, 'En Estilos se comparte un estilo: elígelo con «Estilo», o usa «Compartir» en su card.')
+  const falta = cuerpoTexto ? faltaEnGuia(estilo.guia) : 'Qué hace'
+  if (falta) throw new Rechazo(400, `Para compartir un estilo hay que decir cómo se usa: falta «${falta}». Se llena con «Compartir» en su card; si tu Sloth no te lo pide, actualízala.`)
 }
 
 const llaveDelEstilo = (adjuntos: string) => (JSON.parse(adjuntos) as Adjunto[]).find((a) => a.tipo === 'estilo')?.llave
@@ -606,7 +657,7 @@ async function publicar(env: Env, yo: Miembro, c: Record<string, unknown>): Prom
   const cuerpoTexto = texto(c.texto, 20_000)
   const adjuntos = adjuntosDe(c.adjuntos)
   if (!titulo && !cuerpoTexto && !adjuntos.length) throw new Rechazo(400, 'Escribe algo o agrega una imagen.')
-  estiloEnSuSitio(categoria, adjuntos)
+  estiloEnSuSitio(categoria, adjuntos, cuerpoTexto)
   await soloSuyos(env, yo, llavesDe(JSON.stringify(adjuntos)))
   if (!esCreador(yo) && !(await conCupo(env, yo, 'publicaciones')))
     throw new Rechazo(429, `Ya publicaste ${AL_DIA.publicaciones} veces hoy. Mañana sigues.`)
@@ -666,7 +717,7 @@ async function cambiar(env: Env, yo: Miembro, f: Guardada, c: Record<string, unk
   if (c.fijada !== undefined) nueva.fijada = c.fijada ? 1 : 0
   if (c.estado !== undefined) nueva.estado = c.estado === 'haciendo' || c.estado === 'hecha' ? c.estado : null
   if (nueva.categoria !== 'mejoras') nueva.estado = null
-  if (contenido) estiloEnSuSitio(nueva.categoria, JSON.parse(nueva.adjuntos) as Adjunto[])
+  if (contenido) estiloEnSuSitio(nueva.categoria, JSON.parse(nueva.adjuntos) as Adjunto[], nueva.texto)
   // Lo que se aprobó es ese paquete: otro (o el mismo, al pasar a Estilos) vuelve a esperar.
   const otroPaquete = nueva.categoria === 'estilos' && (f.categoria !== 'estilos' || llaveDelEstilo(nueva.adjuntos) !== llaveDelEstilo(f.adjuntos))
   if (otroPaquete && !creador) nueva.aprobada = 0
@@ -688,6 +739,8 @@ async function cambiar(env: Env, yo: Miembro, f: Guardada, c: Record<string, unk
     ...(nueva.aprobada && !f.aprobada ? aviso(env, f.autor, yo, 'aprobado', f.id) : []),
     ...(!nueva.aprobada && f.aprobada ? [porAprobar(env, yo, f.id)] : [])
   ])
+  // Un estilo que entra o sale de la tienda: sus números se vuelven a contar.
+  if (nueva.aprobada !== f.aprobada || nueva.categoria !== f.categoria) olvidarNumeros()
   // Lo que se quitó al editar ya no se usa.
   await quitarArchivos(env, llavesDe(f.adjuntos).filter((l) => !llavesDe(nueva.adjuntos).includes(l)))
   return (await armar(env, yo, [nueva]))[0]
@@ -699,12 +752,14 @@ async function borrar(env: Env, yo: Miembro, f: Guardada): Promise<{ ok: true }>
   const fotos = await llavesDeComentarios(env, 'SELECT adjuntos FROM comentarios WHERE publicacion = ?', f.id)
   await env.DB.batch([
     env.DB.prepare('DELETE FROM likes WHERE publicacion = ?').bind(f.id),
+    env.DB.prepare('DELETE FROM estilo_usos WHERE publicacion = ?').bind(f.id),
     env.DB.prepare(`DELETE FROM likes_comentarios WHERE comentario IN (${suyos})`).bind(f.id),
     env.DB.prepare(`DELETE FROM reportes WHERE objeto = ? OR objeto IN (${suyos})`).bind(f.id, f.id),
     env.DB.prepare('DELETE FROM avisos WHERE publicacion = ?').bind(f.id),
     env.DB.prepare('DELETE FROM comentarios WHERE publicacion = ?').bind(f.id),
     env.DB.prepare('DELETE FROM publicaciones WHERE id = ?').bind(f.id)
   ])
+  if (f.categoria === 'estilos') olvidarNumeros()
   await quitarArchivos(env, [...llavesDe(f.adjuntos), ...fotos])
   return { ok: true }
 }
@@ -923,7 +978,7 @@ export const esDe = (metadatos: Record<string, string> | undefined, miembro: str
 
 /**
  * Cada mañana: lo subido con dueño (desde que se anota, ver `subir`) que pasado `SUELTO` nada usa (ni una publicación,
- * ni un comentario, ni una foto de perfil) se borra.
+ * ni un comentario, ni una foto de perfil, ni la prueba de un video de un estilo) se borra.
  */
 export async function olvidarSueltos(env: Env, ahora = Date.now()) {
   const viejos: string[] = []
@@ -938,7 +993,9 @@ export async function olvidarSueltos(env: Env, ahora = Date.now()) {
   for (const sql of [
     "SELECT coalesce(adjuntos, '') || ' ' || coalesce(texto, '') AS t FROM publicaciones",
     "SELECT coalesce(adjuntos, '') || ' ' || coalesce(texto, '') AS t FROM comentarios",
-    'SELECT foto AS t FROM miembros WHERE foto IS NOT NULL'
+    'SELECT foto AS t FROM miembros WHERE foto IS NOT NULL',
+    // Las portadas que prueban los videos de los estilos (`tienda.ts`).
+    'SELECT prueba AS t FROM estilo_usos WHERE prueba IS NOT NULL'
   ]) {
     const { results } = await env.DB.prepare(sql).all<{ t: string }>()
     for (const r of results) for (const l of llavesEn(r.t)) usadas.add(l)
@@ -955,9 +1012,15 @@ export const sueltos = (viejas: string[], usadas: Set<string>) => viejas.filter(
 async function servirArchivo(req: Request, env: Env, llave: string): Promise<Response> {
   const cabeza = LLAVE.test(llave) ? await env.DESCARGAS.head(`comunidad/${llave}`) : null
   if (!cabeza) throw new Rechazo(404, 'No existe')
+  // El paquete de un estilo no es libre como las imágenes: se pide con la cuenta, y lo baja quien apoya o quien lo subió.
+  const estilo = ESTILO.test(llave)
+  if (estilo) {
+    const yo = await quien(req, env)
+    if (!apoya(yo) && !esDe(cabeza.customMetadata, yo.id)) throw new Rechazo(402, SOLO_APOYO)
+  }
   return servir(req, env, `comunidad/${llave}`, cabeza.size, {
     'content-type': cabeza.httpMetadata?.contentType ?? 'application/octet-stream',
-    'cache-control': 'public, max-age=31536000, immutable'
+    'cache-control': estilo ? 'private, no-store' : 'public, max-age=31536000, immutable'
   })
 }
 

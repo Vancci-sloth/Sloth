@@ -35,9 +35,25 @@ test('un estilo es un paquete de la comunidad, uno solo, con su nombre, y va en 
   // Con otra extensión no es un estilo, ni un estilo es una imagen.
   assert.deepEqual(adjuntosDe([{ ...estilo, llave: 'ffffffffffffffffffff.png' }, { tipo: 'imagen', llave: estilo.llave }]), [])
   assert.deepEqual(adjuntosDe([{ tipo: 'estilo', llave: estilo.llave }]), [{ tipo: 'estilo', llave: estilo.llave, nombre: 'Estilo' }])
-  assert.doesNotThrow(() => estiloEnSuSitio('estilos', adjuntosDe([estilo])))
-  assert.throws(() => estiloEnSuSitio('estilos', adjuntosDe([imagen(1)])), /se comparte un estilo/)
-  assert.throws(() => estiloEnSuSitio('general', adjuntosDe([estilo])), /sección Estilos/)
+  assert.throws(() => estiloEnSuSitio('estilos', adjuntosDe([imagen(1)]), 'Algo'), /se comparte un estilo/)
+  assert.throws(() => estiloEnSuSitio('general', adjuntosDe([estilo]), 'Algo'), /sección Estilos/)
+  assert.doesNotThrow(() => estiloEnSuSitio('general', adjuntosDe([imagen(1)]), ''))
+})
+
+test('un estilo no se publica sin decir qué hace y cómo se usa: su plantilla completa', () => {
+  const guia = { das: 'Solo el tema del video.', entrega: 'Un vertical de 30 segundos.', ejemplo: 'Hazme un video del ciclo del agua.' }
+  const estilo = { tipo: 'estilo', llave: 'ffffffffffffffffffff.estilo', nombre: 'Receta rápida' }
+  const con = (g: unknown) => adjuntosDe([{ ...estilo, guia: g }])
+  // La guía se guarda limpia: recortada, sin lo que no es suyo ni los campos vacíos.
+  assert.deepEqual(con({ ...guia, das: `  Solo el
+ tema del video.  `, necesita: ' ', otro: 'x', ejemplo: 'e'.repeat(900) }), [{ ...estilo, guia: { ...guia, ejemplo: 'e'.repeat(400) } }])
+  assert.deepEqual(con('nada'), [estilo])
+  assert.doesNotThrow(() => estiloEnSuSitio('estilos', con({ ...guia, necesita: 'Google Flow con créditos.' }), 'Recetas en 30 segundos.'))
+  assert.doesNotThrow(() => estiloEnSuSitio('estilos', con(guia), 'Recetas en 30 segundos.'))
+  // Una Sloth de antes no la manda: dice qué falta y que se actualice.
+  assert.throws(() => estiloEnSuSitio('estilos', adjuntosDe([estilo]), 'Recetas.'), /falta «Qué le das».*actualízala/)
+  assert.throws(() => estiloEnSuSitio('estilos', con({ ...guia, ejemplo: 'x' }), 'Recetas.'), /falta «Ejemplo de lo que le escribes»/)
+  assert.throws(() => estiloEnSuSitio('estilos', con(guia), ''), /falta «Qué hace»/)
   assert.deepEqual(fotosDeComentario([estilo]), [])
 })
 
@@ -133,4 +149,27 @@ test('el índice del buscador trae lo que cada quien ve, sin lo oculto ni lo que
   assert.equal(ana[0].texto.length, 300)
   assert.deepEqual(filas({ id: 'beto', creador: false }).map((f) => f.id), ['a', 'b', 'c'])
   assert.deepEqual(filas({ id: 'yo', creador: true }).map((f) => f.id), ['a', 'b', 'c'])
+})
+
+test('los estilos de otros no le salen a quien no apoya: ni en el feed, ni en el buscador, ni en su índice', () => {
+  const db = new DatabaseSync(':memory:', COMO_D1)
+  for (const m of ['0004_comunidad', '0009_comentarios_adjuntos', '0019_estilos', '0026_comunidad_recientes']) db.exec(readFileSync(new URL(`../migrations/${m}.sql`, import.meta.url), 'utf8'))
+  const pub = db.prepare("INSERT INTO publicaciones (id, autor, categoria, titulo, texto, creada, actividad) VALUES (?, ?, ?, ?, '', ?, ?)")
+  pub.run('g', 'ana', 'general', 'Hola receta', '2026-11-01', '2026-11-01')
+  pub.run('e1', 'ana', 'estilos', 'Receta rápida', '2026-11-02', '2026-11-02')
+  pub.run('e2', 'beto', 'estilos', 'Receta lenta', '2026-11-03', '2026-11-03')
+  const ver = (yo: { id: string; creador: boolean; apoya?: boolean }) => {
+    const feed = consultaFeed(yo, { categoria: '', antes: '', orden: 'recientes' })
+    const buscar = consultaBuscar(yo, 'receta')
+    const indice = consultaIndice(yo)
+    return [feed, buscar, indice].map((c) => (db.prepare(c.sql).all(...c.valores) as { id: string }[]).map((f) => f.id).sort().join())
+  }
+  // Quien apoya y el creador, todo. Quien no, lo demás y sus propios estilos (compartir es de cualquiera).
+  assert.deepEqual(ver({ id: 'caro', creador: false, apoya: true }), ['e1,e2,g', 'e1,e2,g', 'e1,e2,g'])
+  assert.deepEqual(ver({ id: 'yo', creador: true }), ['e1,e2,g', 'e1,e2,g', 'e1,e2,g'])
+  assert.deepEqual(ver({ id: 'caro', creador: false, apoya: false }), ['g', 'g', 'g'])
+  assert.deepEqual(ver({ id: 'ana', creador: false }), ['e1,g', 'e1,g', 'e1,g'])
+  // Y la sección Estilos, vacía de lo ajeno.
+  const estilos = consultaFeed({ id: 'caro', creador: false }, { categoria: 'estilos', antes: '', orden: '' })
+  assert.deepEqual(db.prepare(estilos.sql).all(...estilos.valores), [])
 })

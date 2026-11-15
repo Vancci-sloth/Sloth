@@ -54,6 +54,7 @@ import { eventosEnVivo } from './eventos-en-vivo.ts'
 import { enviarCliente } from './enviar-cliente.ts'
 import { anteriorDe, conservarAnterior, olvidarAnterior } from './anteriores.ts'
 import { cuidarEstilos, mudarTuyas } from './estilos-perdidos.ts'
+import { usosDeEstilos } from './estilos-usos.ts'
 import { cambiosDeCard, carpetaSkill, configClaudeDev, duplicateCard, enlazarSkills, enlazarSkillsCodex, guardarSkillTuya, marcasDe, readCards, removeCard, seriesDe, SKILLS, skillRef, volverAOriginal } from './skills.ts'
 import { estaticos } from './estaticos.ts'
 import { type Agente, version } from './version.ts'
@@ -107,6 +108,8 @@ const clients = new Set<WebSocket>()
 const suscripciones = new Map<WebSocket, string | null>()
 /** Barra lateral: el avance de cada video, que oye lo que se manda para saber cuándo mirarlo. Nace después que los hilos. */
 let avance: ReturnType<typeof avances> | undefined
+/** Lo que se mide de los estilos de la comunidad (`server/estilos-usos.ts`). Nace después que la comunidad. */
+let usosEstilos: ReturnType<typeof usosDeEstilos> | undefined
 function broadcast(msg: ServerPush) {
   let text: string | undefined
   for (const ws of clients) {
@@ -121,6 +124,7 @@ const eventos = eventosEnVivo((sessionId, from, events) => {
   // Al acabar cada turno de «Nuevo estilo», el estilo que ya está en `skills/` y no tiene card la recibe ahí mismo (la
   // que escribió el hilo, o una hecha con su SKILL.md), aunque el agente no la haya guardado o la haya puesto en cards.json.
   if (events.some((e) => e.t === 'turn_end') && sessions.meta(sessionId)?.cardId === 'nuevo-estilo') cuidarTuyas(cuidarEstilos)
+  if (events.some((e) => e.t === 'turn_end') && usosEstilos?.deLaComunidad(sessions.meta(sessionId)?.cardId)) void usosEstilos.revisar()
 })
 const sessions = new Sessions(
   join(APP, 'data', 'sessions'),
@@ -240,8 +244,15 @@ const comunidadApi = comunidad(APP, {
   revisar: (paquete, publicacion) => {
     const carpeta = join(carpetaTrabajo(APP), 'estilos-por-revisar', publicacion)
     return { carpeta, manifiesto: desempacar(paquete, carpeta) }
+  },
+  deEstilo: (id) => {
+    const card = cards().find((c) => c.id === id)
+    return card?.origen?.publicacion ?? card?.deComunidad
   }
 }) // comunidad
+// Los videos terminados con estilos de la comunidad cuentan en su tienda y en el fondo: al arrancar y al acabar cada turno.
+usosEstilos = usosDeEstilos(APP, { cards, videos: (card) => videosDe(card, sessions), prueba: comunidadApi.prueba, enviar: comunidadApi.usos })
+setTimeout(() => void usosEstilos?.revisar(), 60_000).unref()
 // En qué fase va cada video y cuántas etapas lleva, para la barra lateral.
 avance = avances(sessions, cards, broadcast)
 // Opciones → Espacio en disco: lo que dejan los videos y ya no hace falta. Lo seguro lo borra solo, cada 6 horas.

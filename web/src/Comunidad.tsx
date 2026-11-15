@@ -9,6 +9,9 @@ import { LINK } from './etiquetas'
 import { Unirse } from './Licencia'
 import { Icono as IconoBase, type NombreIcono, trazosDe } from './Iconos'
 import { Liberar } from './Liberar'
+import { Fondo } from './Fondo'
+import { GuiaVista } from './Guia'
+import { Tienda } from './Tienda'
 import { Rifa } from './Rifa'
 import './Comunidad.css'
 
@@ -46,7 +49,7 @@ export const SECCIONES: { id: CategoriaComunidad; nombre: string; icono: NombreI
   { id: 'hice', nombre: 'Lo que hice', icono: 'video', escribe: 'Cuenta cómo lo hiciste: el estilo, lo que le pediste a Sloth, lo que aprendiste.' },
   { id: 'ayuda', nombre: 'Ayuda', icono: 'pregunta', escribe: '¿Qué no te sale? Cuéntalo y, si puedes, pega una captura.' },
   { id: 'mejoras', nombre: 'Mejoras', icono: 'flechaArriba', escribe: '¿Qué le falta a Sloth o qué debería hacer mejor?' },
-  { id: 'estilos', nombre: 'Estilos', icono: 'claqueta', escribe: 'Qué hace tu estilo, qué pide cada vez y, si puedes, un video que hiciste con él.' },
+  { id: 'estilos', nombre: 'Estilos', icono: 'claqueta', escribe: 'Qué hace tu estilo.' },
   { id: 'anuncios', nombre: 'Anuncios', icono: 'megafono', escribe: '¿Qué hay de nuevo en Sloth?' },
 ]
 const seccionDe = (id: CategoriaComunidad) => SECCIONES.find((s) => s.id === id) ?? SECCIONES[0]
@@ -121,6 +124,8 @@ export function Comunidad() {
   // La app que se vende sin cuenta gratis todavía (401): la crea aquí.
   const [sinCuenta, setSinCuenta] = useState(false)
   const [abierta, setAbierta] = useState<string | null>(null)
+  // La tienda de estilos se vuelve a pedir al cerrar una publicación: sus me gusta y su estado pudieron cambiar.
+  const [tiendaVersion, setTiendaVersion] = useState(0)
   // El compositor abierto: en qué sección y, si llega de «Mis videos», con qué. `clave` lo vuelve a armar.
   const [escribiendo, setEscribiendo] = useState<{
     seccion: CategoriaComunidad
@@ -420,6 +425,8 @@ export function Comunidad() {
 
           {feed && <Rifa creador={!!yo?.creador} conNombre={conNombre} />}
 
+          {feed && <Fondo onEstilos={seccion === 'estilos' ? undefined : () => irA('estilos')} />}
+
           {yo?.creador && <Liberar onAnunciar={(v) => abrirCompositor('anuncios', `Sloth ${v} ya es para todos`)} />}
 
           {escribiendo && escribe ? (
@@ -478,6 +485,7 @@ export function Comunidad() {
                 </button>
               ))}
             </nav>
+            {seccion !== 'estilos' && (
             <label className="com-orden" title="Cómo se ordena lo que ves">
               <Icono de={ORDENES.find((o) => o.id === orden)?.icono ?? 'hilo'} />
               <select
@@ -492,6 +500,7 @@ export function Comunidad() {
                 ))}
               </select>
             </label>
+            )}
           </div>
 
           {yo && (
@@ -511,8 +520,9 @@ export function Comunidad() {
               <button onClick={() => void cargar()}>Reintentar</button>
             </div>
           )}
-          {lista === null && !error && <div className="com-cargando">Cargando…</div>}
-          {lista?.length === 0 && (
+          {seccion === 'estilos' && feed && <Tienda version={tiendaVersion} creador={!!yo?.creador} onAbrir={setAbierta} conNombre={conNombre} />}
+          {seccion !== 'estilos' && lista === null && !error && <div className="com-cargando">Cargando…</div>}
+          {seccion !== 'estilos' && lista?.length === 0 && (
             <div className="com-vacio">
               <div className="com-vacio-logo">
                 <img src="/icon.svg" alt="" />
@@ -523,14 +533,12 @@ export function Comunidad() {
                   ? 'Aquí sale lo que alguien escribió y aún no le respondes.'
                   : seccion === 'anuncios'
                   ? 'Lo nuevo de Sloth saldrá aquí.'
-                  : seccion === 'estilos'
-                    ? 'Comparte uno tuyo con «Compartir un estilo tuyo», aquí arriba: sale aquí cuando el creador lo aprueba.'
-                    : 'Sé el primero: preséntate o comparte un video que hiciste con Sloth.'}
+                  : 'Sé el primero: preséntate o comparte un video que hiciste con Sloth.'}
               </p>
             </div>
           )}
 
-          {!!lista?.length && (
+          {seccion !== 'estilos' && !!lista?.length && (
             <div className="com-feed">
               {lista.map((p) => (
                 <Tarjeta
@@ -608,7 +616,7 @@ export function Comunidad() {
           onBorrada={() => (olvidar({ seccion, orden }, abierta), setLista((l) => l?.filter((x) => x.id !== abierta) ?? l), setAbierta(null))}
           conNombre={conNombre}
           // En «Sin contestar», lo que acabas de contestar se va al cerrar.
-          onCerrar={() => (visto(abierta), setAbierta(null), orden === 'sin-contestar' && void cargar(true))}
+          onCerrar={() => (visto(abierta), setAbierta(null), setTiendaVersion((v) => v + 1), orden === 'sin-contestar' && void cargar(true))}
         />
       )}
       {perfil && yo && (
@@ -1073,6 +1081,7 @@ function Abierta(props: {
                 {video && (
                   <video className={`com-video${video.vertical ? ' vertical' : ''}`} src={video.url} poster={video.posterUrl} controls loop playsInline preload="metadata" />
                 )}
+                {estilo?.guia && <GuiaVista guia={estilo.guia} />}
                 {estilo && <ParaInstalar p={p} nombre={estilo.nombre ?? p.titulo} suya={suya} />}
                 {imagenes.length > 0 && (
                   <div className={`com-fotos n${Math.min(imagenes.length, 3)}`}>

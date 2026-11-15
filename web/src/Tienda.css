@@ -1,0 +1,81 @@
+/* La tienda de estilos (Tienda.tsx): el buscador y los órdenes arriba, y una rejilla de estilos con sus números. */
+.tienda { display: flex; flex-direction: column; gap: 14px; }
+.tienda-barra { display: flex; flex-direction: column; gap: 10px; }
+.tienda-buscar { display: flex; align-items: center; gap: 10px; padding: 0 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); }
+.tienda-buscar:focus-within { border-color: var(--amber); }
+.tienda-buscar .ico { flex: none; width: 18px; height: 18px; color: var(--muted); }
+.tienda-buscar input { flex: 1; min-width: 0; padding: 12px 0; border: 0; background: none; color: var(--text); font: inherit; font-size: 15px; outline: none; }
+.tienda-ordenes { display: flex; flex-wrap: wrap; gap: 4px 16px; }
+.tienda-ordenes button { display: inline-flex; align-items: center; gap: 6px; padding: 6px 0; border-bottom: 2px solid transparent; background: none; color: var(--muted); font-size: 13.5px; font-weight: 650; }
+.tienda-ordenes button:hover { color: var(--text); }
+.tienda-ordenes button.on { color: var(--amber-2); border-bottom-color: var(--amber); }
+.tienda-ordenes .ico { width: 15px; height: 15px; }
+
+.tienda-reglas-boton { display: inline-flex; align-items: center; gap: 6px; padding: 0; background: none; color: var(--suave); font-size: 13px; font-weight: 600; }
+.tienda-reglas-boton:hover { color: var(--text); }
+.tienda-reglas-boton .ico { width: 15px; height: 15px; }
+.tienda-reglas-texto { margin-top: 8px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); }
+.tienda-reglas-texto p { margin: 0; color: var(--suave); font-size: 13.5px; line-height: 1.55; }
+.tienda-reglas-texto p + p { margin-top: 8px; }
+.tienda-reglas-texto b { color: var(--amber-2); }
+.tienda-error { margin: 0; color: var(--bad); font-size: 13.5px; }
+
+.tienda-rejilla { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 14px; }
+.tienda-estilo { display: flex; flex-direction: column; overflow: hidden; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); }
+.tienda-estilo:hover { border-color: color-mix(in srgb, var(--amber) 55%, var(--line)); }
+.tienda-portada { position: relative; display: grid; place-items: center; aspect-ratio: 16 / 10; padding: 0; overflow: hidden; background: var(--panel-2); color: var(--muted); }
+.tienda-portada img { width: 100%; height: 100%; object-fit: cover; }
+.tienda-portada > .ico { width: 34px; height: 34px; }
+.tienda-revision { position: absolute; top: 8px; left: 8px; padding: 3px 8px; border-radius: 8px; background: var(--amber); color: var(--sobre-ambar); font-size: 11.5px; font-weight: 750; }
+.tienda-cuerpo { display: flex; flex: 1; flex-direction: column; gap: 6px; padding: 12px 14px 14px; }
+.tienda-nombre { padding: 0; background: none; color: var(--text); font-size: 15.5px; font-weight: 750; text-align: left; line-height: 1.3; }
+.tienda-nombre:hover { color: var(--amber-2); }
+.tienda-autor { color: var(--muted); font-size: 12.5px; }
+.tienda-texto { display: -webkit-box; margin: 0; overflow: hidden; color: var(--suave); font-size: 13px; line-height: 1.45; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.tienda-numeros { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; margin-top: auto; padding-top: 4px; color: var(--suave); font-size: 12.5px; font-weight: 650; font-variant-numeric: tabular-nums; }
+.tienda-numeros span, .tienda-gusta { display: inline-flex; align-items: center; gap: 4px; }
+.tienda-numeros .ico { width: 14px; height: 14px; }
+.tienda-gusta { padding: 2px 6px; margin-left: -6px; border-radius: 8px; background: none; color: var(--suave); font: inherit; }
+.tienda-gusta:hover { background: var(--panel-2); color: var(--text); }
+.tienda-gusta.on { color: var(--amber-2); }
+.tienda-mes { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 10px; padding-top: 8px; border-top: 1px solid var(--line); color: var(--muted); font-size: 12.5px; }
+.tienda-mes b { color: var(--text); }
+.tienda-gana { color: var(--ok); font-weight: 750; }
+
+/* Las pruebas, solo del creador: una ventana con las portadas de cada persona; las que no cuentan, apagadas. */
+.tienda-pruebas-boton { align-self: flex-start; margin-top: 4px; }
+.tienda-pruebas { position: fixed; inset: 0; z-index: 90; display: flex; overflow-y: auto; padding: 24px 16px; background: rgba(15, 14, 12, 0.72); backdrop-filter: blur(10px); }
+.tienda-pruebas-caja { display: flex; flex-direction: column; gap: 16px; width: min(920px, 100%); margin: auto; padding: 22px 24px; border: 1px solid var(--line); border-radius: 16px; background: var(--panel); }
+.tienda-pruebas-caja header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.tienda-pruebas-caja header strong { display: block; font-size: 18px; }
+.tienda-pruebas-caja header span { color: var(--suave); font-size: 13px; }
+.tienda-pruebas-cerrar { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 10px; background: none; color: var(--muted); }
+.tienda-pruebas-cerrar:hover { background: var(--panel-2); color: var(--text); }
+.tienda-pruebas-cerrar .ico { width: 18px; height: 18px; }
+.tienda-pruebas-vacio { margin: 0; color: var(--muted); }
+.tienda-persona { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; padding-top: 12px; border-top: 1px solid var(--line); }
+.tienda-persona h3 { margin: 0; font-size: 14px; font-weight: 700; }
+.tienda-aviso { color: var(--amber-2); }
+.tienda-portadas { display: flex; flex-wrap: wrap; gap: 8px; }
+.tienda-portadas button { position: relative; display: grid; place-items: center; width: 96px; height: 128px; padding: 0; overflow: hidden; border: 2px solid var(--line); border-radius: 10px; background: var(--panel-2); color: var(--muted); }
+.tienda-portadas button:hover { border-color: var(--amber); }
+.tienda-portadas img { width: 100%; height: 100%; object-fit: cover; }
+.tienda-portadas .descartada { border-color: var(--bad); }
+.tienda-portadas .descartada img { opacity: 0.3; filter: grayscale(1); }
+.tienda-portadas .descartada span { position: absolute; inset: auto 0 6px; color: var(--bad); font-size: 11.5px; font-weight: 800; text-align: center; }
+
+/* Para quien no apoya: cuántos estilos hay, lo que recibe quien apoya y el botón. Debajo, sus propios estilos. */
+.tienda-cerrada { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 36px 28px; border: 1px solid var(--amber); border-radius: 16px; background: linear-gradient(180deg, var(--amber-tinte), transparent 70%), var(--panel); text-align: center; }
+.tienda-cerrada-icono { width: 52px; height: 52px; display: grid; place-items: center; border-radius: 14px; background: var(--amber-tinte); color: var(--amber); }
+.tienda-cerrada-icono .ico { width: 26px; height: 26px; }
+.tienda-cerrada h2 { margin: 0; font-size: 28px; font-weight: 800; letter-spacing: -0.02em; line-height: 1.15; }
+.tienda-cerrada p { margin: 0; max-width: 520px; color: var(--suave); font-size: 15px; line-height: 1.5; }
+.tienda-cerrada ul { display: flex; flex-direction: column; gap: 8px; margin: 6px 0; padding: 0; list-style: none; text-align: left; }
+.tienda-cerrada li { display: flex; align-items: center; gap: 10px; color: var(--text); font-size: 14.5px; }
+.tienda-cerrada li .ico { width: 17px; height: 17px; flex: none; color: var(--amber); }
+.tienda-cerrada-acciones { display: flex; align-items: center; flex-wrap: wrap; justify-content: center; gap: 14px; margin-top: 4px; }
+.tienda-cerrada-boton { padding: 12px 24px; border-radius: 12px; background: var(--amber); color: var(--sobre-ambar); font-size: 15px; font-weight: 800; }
+.tienda-cerrada-boton:hover { background: var(--amber-2); }
+.tienda-cerrada-ya { padding: 0; color: var(--suave); font-size: 13.5px; text-decoration: underline; text-underline-offset: 3px; }
+.tienda-cerrada-ya:hover { color: var(--text); }
+.tienda-tuyos { margin: 22px 0 10px; font-size: 16px; font-weight: 700; }

@@ -56,7 +56,9 @@ Este es el mapa:
   venta deja borrar (`tuya`); la skill sale a `data/skills-tuyas` (`guardarSkillTuya`). «Compartir» (en su card, junto a
   su nombre o en Comunidad → Estilos) abre `CompartirEstilo` (`web/src/Estilos.tsx`): una pantalla ya llena que lo
   empaqueta en un `.sloth-estilo` (`server/estilos.ts`, ADR 0017) y lo publica en Estilos, donde sale cuando el creador
-  lo aprueba, o lo guarda como archivo; «Importar» o «Instalar» lo pone entre los tuyos, con su `origen`.
+  lo aprueba, o lo guarda como archivo; «Importar» o «Instalar» lo pone entre los tuyos, con su `origen`. Todo estilo
+  compartido lleva su guía de uso, una plantilla igual para todos (`shared/guia.ts`, `web/src/Guia.tsx`): qué le das, qué
+  te entrega, un ejemplo y qué necesita. El Worker no lo publica sin ella y queda en la card de quien lo instala (`guia`).
 - Lo que el estudio ve en vivo: `server/claude.ts` saca los borradores de lo que escribe el agente (Write y los heredocs
   de Bash), el WebSocket los lleva a `web/src/App.tsx` y `Etapas.tsx` los dibuja.
 - El estudio de video (`web/src/Estudio.tsx`): toda card cuyas etapas tengan `fase` se ve igual, con las cinco fases
@@ -140,7 +142,14 @@ Este es el mapa:
   Publicar una mejora (la ven todos): `POST /api/mejoras {texto}`. Un anuncio a nombre del creador, en su tono:
   `docs/agents/anuncios.md`. La rifa (`licencias/src/rifa.ts`): arriba de la comunidad «Participa en la rifa» (`Rifa.tsx`,
   solo quien usa Sloth gratis), en Administrador se arma y se sortea con la ruleta (`RifaAdmin.tsx`); el ganador recibe
-  sus créditos de voz, un correo y el aviso a pantalla completa (`GanasteRifa.tsx`).
+  sus créditos de voz, un correo y el aviso a pantalla completa (`GanasteRifa.tsx`). Debajo, el fondo de la comunidad
+  (`licencias/src/fondo.ts`, `Fondo.tsx`, ADR 0019): la mitad de lo que cae por Stripe en el mes, sin IVA, en vivo, y el
+  paso a paso para llevarse una parte con un estilo compartido. La sección Estilos es la tienda (`licencias/src/tienda.ts`,
+  `Tienda.tsx`): buscar, favoritos, más usados, y los números públicos de cada estilo con sus puntos del mes, que mide
+  la app (`server/estilos-usos.ts`). Los estilos son de quien apoya: a los demás, la tienda les enseña la invitación
+  a apoyar y el cobro no les entrega el paquete. El reparto (`licencias/src/reparto.ts`): participa quien pone su
+  Binance ID (en el recuadro del fondo), el primero es el 1 de enero de 2027 y el creador cierra cada periodo y marca
+  lo pagado en Administrador → Fondo (`FondoAdmin.tsx`); el envío es a mano, desde Binance.
 - `server/modelos3d.ts` y `web/src/Modelos3D.tsx`: «Modelos 3D» enseña la biblioteca `skills/modelos-3d` que usan los
   agentes (la de `SKILLS`), que llenan los videos. Empieza vacía; la moneda de la plantilla
   va en `modelos-3d/plantilla`, sin enseñarse. Sus botones (`server/modelos3d-acciones.ts`, `web/src/Modelos3DAcciones.tsx`):

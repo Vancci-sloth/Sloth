@@ -1,8 +1,10 @@
 import { type CSSProperties, type MutableRefObject, type ReactNode, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { faltaEnGuia, guiaDe } from '../../shared/guia'
 import { NOMBRE_AGENTE, type Proveedor } from '../../shared/providers'
 import type { AdjuntoComunidad, AyudaMejora, OrigenMejora, VideoHecho, VideosDeTodos } from '../../shared/types'
 import { api } from './api'
+import { GuiaCampos } from './Guia'
 import { Icono as IconoBase, type NombreIcono } from './Iconos'
 import { MarcaAgente } from './Logos'
 import './Escribir.css'
@@ -12,7 +14,8 @@ import './Escribir.css'
  * (`PedirMejora.tsx`). Crece con el texto; Enter lo manda y Mayús+Enter es otra línea (en el título, Enter baja al texto).
  * Las capturas se pegan, se sueltan o se eligen, y suben a la comunidad en cuanto llegan (`/api/comunidad/archivo`); un
  * video se elige de «Mis videos» y suben sus primeros 5 segundos con su portada (`/api/comunidad/video`): el entero se
- * enlaza en el texto. En Estilos se elige además uno de tus estilos, que se empaqueta y sube (`/api/comunidad/estilo`).
+ * enlaza en el texto. En Estilos se elige además uno de tus estilos, que se empaqueta y sube (`/api/comunidad/estilo`),
+ * y bajo el texto va su guía de uso (`Guia.tsx`): sin la plantilla completa no se guarda.
  * «Ayúdame a decirlo» (el símbolo del agente) le pide al agente del hilo (sin hilo, Claude) que
  * entienda lo escrito y proponga cómo decirlo; desde un hilo, con lo que pasaba en él.
  */
@@ -109,8 +112,8 @@ export function Escribir(props: {
     setSubiendo((l) => [...l, { id, poster, estilo }])
     try {
       const a = await subida
-      // Un solo video y un solo estilo: el nuevo reemplaza al de antes.
-      setAdjuntos((l) => [...(a.tipo === 'imagen' ? l : l.filter((x) => x.tipo !== a.tipo)), a])
+      // Un solo video y un solo estilo: el nuevo reemplaza al de antes. Otro paquete sin guía se queda con la ya escrita.
+      setAdjuntos((l) => [...(a.tipo === 'imagen' ? l : l.filter((x) => x.tipo !== a.tipo)), a.tipo === 'estilo' && !a.guia ? { ...a, guia: l.find((x) => x.tipo === 'estilo')?.guia } : a])
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
     } finally {
@@ -143,6 +146,8 @@ export function Escribir(props: {
   }
 
   const vacio = !titulo.trim() && !texto.trim() && !adjuntos.length
+  // El estilo de una publicación de Estilos, con su guía de uso.
+  const estilo = props.conEstilo ? adjuntos.find((a) => a.tipo === 'estilo') : undefined
   const vigente = !!propuesta?.mejora && texto.trim() === propuesta.base
 
   /** El agente lee lo escrito (y el hilo, si lo hay) y propone el texto; se usa con un clic. */
@@ -173,10 +178,12 @@ export function Escribir(props: {
 
   async function listo() {
     if (vacio || subiendo.length || ocupado) return
+    const falta = !estilo ? '' : !texto.trim() ? 'Qué hace' : faltaEnGuia(estilo.guia)
+    if (falta) return setError(falta === 'Qué hace' ? 'Di qué hace el estilo: es lo que lee quien lo instala.' : `Falta «${falta}» en cómo se usa: es lo que lee quien lo instala.`)
     setOcupado(true)
     setError('')
     try {
-      await props.onListo({ titulo: titulo.trim(), texto: texto.trim(), adjuntos })
+      await props.onListo({ titulo: titulo.trim(), texto: texto.trim(), adjuntos: adjuntos.map((a) => (a.tipo === 'estilo' ? { ...a, guia: guiaDe(a.guia) } : a)) })
       if (!props.editando) {
         setTitulo('')
         setTexto('')
@@ -244,6 +251,7 @@ export function Escribir(props: {
           void subirImagenes(archivos)
         }}
       />
+      {estilo && <GuiaCampos valor={estilo.guia ?? {}} onCambio={(g) => setAdjuntos((l) => l.map((a) => (a === estilo ? { ...a, guia: g as AdjuntoComunidad['guia'] } : a)))} />}
       {(adjuntos.length > 0 || subiendo.length > 0) && (
         <div className="esc-fotos">
           {adjuntos.map((a) => (

@@ -5,11 +5,13 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 import { tmpdir } from 'node:os'
 import { extname, join, resolve, sep } from 'node:path'
 import { promisify } from 'node:util'
+import { guiaDe } from '../shared/guia.ts'
 import { NOMBRE_AGENTE, proveedorDe } from '../shared/providers.ts'
-import type { AdjuntoComunidad, AyudaMejora, OrigenMejora, PublicacionComunidad, ServerPush, VideoHecho } from '../shared/types.ts'
+import type { AdjuntoComunidad, AyudaMejora, GuiaEstilo, OrigenMejora, PublicacionComunidad, ServerPush, VideoHecho } from '../shared/types.ts'
 import { bytes, cuerpo, json as enviar } from './http.ts'
 import { EstiloMalo, type Instalado, type Manifiesto, PESO as PESO_ESTILO, TIPO as TIPO_ESTILO } from './estilos.ts'
 import { COBRO } from './licencia.ts'
+import type { UsoEstilo } from './estilos-usos.ts'
 import type { Sessions } from './sessions.ts'
 import { redactar as redactarConAgente } from './redactar.ts'
 
@@ -25,8 +27,12 @@ import { redactar as redactarConAgente } from './redactar.ts'
  *   de portada; quien quiera enseñarlo entero pega su enlace en el texto.
  * - `POST /api/comunidad/redactar` `{texto, origen?}`: «Ayúdame a decirlo». El agente del hilo lee lo que escribiste (y lo que pasaba
  *   en el hilo de donde sale) y propone el texto (`AyudaMejora`).
- * - `POST /api/comunidad/estilo` `{cardId}`: empaqueta un estilo tuyo (`server/estilos.ts`) y lo sube. Da su adjunto.
- * - `POST /api/comunidad/estilo/instalar` `{publicacion}`: baja el estilo de esa publicación de Estilos y lo instala.
+ * - `POST /api/comunidad/estilo` `{cardId}`: empaqueta un estilo tuyo (`server/estilos.ts`) y lo sube. Da su adjunto, que
+ *   dice de qué estilo de la comunidad salió (`de`), si salió de uno: así cuenta como su variante; y su guía de uso
+ *   (`guia`), si su card la trae: la plantilla que se revisa antes de publicar (`shared/guia.ts`).
+ * - `POST /api/comunidad/estilo/instalar` `{publicacion}`: baja el estilo de esa publicación de Estilos y lo instala,
+ *   con la guía de uso de la publicación en su card,
+ *   y le avisa a la comunidad su descarga (`usos`, que también manda los videos de `server/estilos-usos.ts`).
  * - `POST /api/comunidad/estilo/revisar` `{publicacion}`: solo el creador. Lo abre en una carpeta, sin instalarlo, para
  *   leerlo (o que su agente lo lea) antes de aprobarlo.
  * - `POST /api/mejoras` `{texto, imagenes?, adjuntos?}`: publica una mejora. Lo usan «Pedir una mejora» de cada hilo y
@@ -62,10 +68,12 @@ interface Opciones {
   /** Los estilos de esta computadora (`estilos()` de `server/estilos.ts`). */
   estilos: {
     empaquetarCard(id: string): { paquete: Buffer; manifiesto: Manifiesto }
-    instalarPaquete(paquete: Buffer, origen: { publicacion: string; llave: string; autor?: string }): Instalado
+    instalarPaquete(paquete: Buffer, origen: { publicacion: string; llave: string; autor?: string }, guia?: GuiaEstilo): Instalado
   }
   /** Abre el paquete de una publicación para revisarlo, sin instalarlo. Da su carpeta. */
   revisar(paquete: Buffer, publicacion: string): { carpeta: string; manifiesto: Manifiesto }
+  /** La publicación de Estilos de la que salió el estilo de esa card (su `origen` o su `deComunidad`), si salió de una. */
+  deEstilo(cardId: string): string | undefined
 }
 
 export function comunidad(app: string, o: Opciones) {
@@ -104,12 +112,9 @@ export function comunidad(app: string, o: Opciones) {
     const { publicacion: p } = await nubeJson<{ publicacion: PublicacionComunidad }>(`/comunidad/p/${id}`)
     const llave = p.adjuntos.find((a) => a.tipo === 'estilo')?.llave
     if (!llave || !/^[a-z0-9]{20}\.estilo$/.test(llave)) throw new Rechazo(404, 'Esa publicación no trae un estilo.')
-    let r: Response
-    try {
-      r = await fetch(`${NUBE}/comunidad/archivo/${llave}`, { signal: AbortSignal.timeout(120_000) })
-    } catch {
-      throw new Rechazo(502, SIN_CONEXION)
-    }
+    // El paquete se pide con tu cuenta: es de quien apoya (o de quien lo subió), y el cobro dice si no (402).
+    const r = await nube(`/comunidad/archivo/${llave}`)
+    if (r.status === 402) throw new Rechazo(402, ((await r.json().catch(() => ({}))) as { error?: string }).error ?? 'Los estilos de la comunidad son para quienes apoyan a Sloth.')
     if (!r.ok) throw new Rechazo(r.status === 404 ? 404 : 502, r.status === 404 ? 'El estilo ya no está en la comunidad.' : SIN_CONEXION)
     const paquete = Buffer.from(await r.arrayBuffer())
     if (paquete.length > PESO_ESTILO) throw new Rechazo(413, 'Ese estilo pesa de más.')
@@ -222,13 +227,20 @@ export function comunidad(app: string, o: Opciones) {
         return enviar(res, 200, await subir(await bytes(req), tipo))
       }
       if (ruta === '/api/comunidad/estilo' && metodo === 'POST') {
-        const { paquete, manifiesto } = o.estilos.empaquetarCard(String((await cuerpo<{ cardId?: string }>(req)).cardId ?? ''))
-        const a: AdjuntoComunidad = { tipo: 'estilo', nombre: manifiesto.titulo, ...(await subir(paquete, TIPO_ESTILO)) }
+        const cardId = String((await cuerpo<{ cardId?: string }>(req)).cardId ?? '')
+        const { paquete, manifiesto } = o.estilos.empaquetarCard(cardId)
+        // Si salió de un estilo de la comunidad, lo dice: cuenta como su variante.
+        const de = o.deEstilo(cardId)
+        const guia = manifiesto.card.guia
+        const a: AdjuntoComunidad = { tipo: 'estilo', nombre: manifiesto.titulo, ...(de ? { de } : {}), ...(guia ? { guia } : {}), ...(await subir(paquete, TIPO_ESTILO)) }
         return enviar(res, 200, a)
       }
       if (ruta === '/api/comunidad/estilo/instalar' && metodo === 'POST') {
         const { p, llave, paquete } = await estiloDe(String((await cuerpo<{ publicacion?: string }>(req)).publicacion ?? ''))
-        return enviar(res, 200, o.estilos.instalarPaquete(paquete, { publicacion: p.id, llave, ...(p.autor.nombre ? { autor: p.autor.nombre } : {}) }))
+        const instalado = o.estilos.instalarPaquete(paquete, { publicacion: p.id, llave, ...(p.autor.nombre ? { autor: p.autor.nombre } : {}) }, guiaDe(p.adjuntos.find((a) => a.tipo === 'estilo')?.guia))
+        // Su descarga cuenta en la tienda (una por computadora); si no llega, no se reintenta.
+        void usos([{ publicacion: p.id, tipo: 'descarga' }]).catch(() => {})
+        return enviar(res, 200, instalado)
       }
       if (ruta === '/api/comunidad/estilo/revisar' && metodo === 'POST') {
         const c = await o.credencial()
@@ -264,7 +276,18 @@ export function comunidad(app: string, o: Opciones) {
     }
   }
 
-  return { api }
+  /** Lo que se hizo aquí con estilos de la comunidad (`server/estilos-usos.ts`): cuenta en su tienda. */
+  async function usos(lista: UsoEstilo[]): Promise<void> {
+    await nubeJson('/comunidad/estilos/uso', { cuerpo: JSON.stringify({ usos: lista }) })
+  }
+
+  /** La portada de un video, subida: la prueba de que se hizo, que solo ve el creador. Da su llave. */
+  async function prueba(ruta: string): Promise<string | undefined> {
+    const c = existsSync(ruta) ? await o.cuadro(ruta) : ''
+    return c ? (await subir(readFileSync(c), 'image/webp')).llave : undefined
+  }
+
+  return { api, usos, prueba }
 }
 
 /**

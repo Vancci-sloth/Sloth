@@ -92,6 +92,32 @@ test('lo instala en otra Sloth con su card y su origen, y lo pone al día si vie
   }
 })
 
+test('la guía de uso viaja limpia en su card, y al instalarlo de la comunidad manda la de su publicación', () => {
+  const de = sloth()
+  const a = sloth(false)
+  try {
+    const guia = { das: 'Solo el tema de la receta.', entrega: 'Un vertical de 30 segundos.', ejemplo: 'Hazme la receta de unos chilaquiles.' }
+    de.tuya.guia = { ...guia, das: '  Solo el tema\n de la receta.  ', necesita: '' }
+    const { paquete, manifiesto } = empacar(de)
+    assert.deepEqual(manifiesto.card.guia, guia)
+    const tusCards = join(a.app, 'data', 'tus-cards.json')
+    const leer = () => (JSON.parse(readFileSync(tusCards, 'utf8')) as Card[])[0]
+    // De un archivo: la de su paquete.
+    instalar({ paquete, app: a.app, tusCards, cards: a.cards, sloth: '0.3.44', base: a.base, deSloth: a.deSloth })
+    assert.deepEqual(leer().guia, guia)
+    // De la comunidad: la que su autor revisó al publicarlo.
+    const publicada = { ...guia, ejemplo: 'Hazme la receta de un pozole rojo.' }
+    instalar({ paquete, app: a.app, tusCards, cards: [...a.cards, { ...leer(), cwd: '', tuya: true }], sloth: '0.3.44', base: a.base, deSloth: a.deSloth, guia: publicada })
+    assert.deepEqual(leer().guia, publicada)
+    // Una que no dice nada no viaja.
+    de.tuya.guia = { das: ' ', entrega: '', ejemplo: '' }
+    assert.equal(empacar(de).manifiesto.card.guia, undefined)
+  } finally {
+    de.fin()
+    a.fin()
+  }
+})
+
 test('pide una Sloth al menos tan nueva y avisa qué cambió de video-base desde la suya', () => {
   const de = sloth()
   const a = sloth(false)

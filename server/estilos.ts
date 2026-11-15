@@ -3,7 +3,8 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 import { homedir } from 'node:os'
 import { dirname, join, relative, sep } from 'node:path'
 import { gunzipSync, gzipSync } from 'node:zlib'
-import type { Card, OrigenEstilo } from '../shared/types.ts'
+import { guiaDe } from '../shared/guia.ts'
+import type { Card, GuiaEstilo, OrigenEstilo } from '../shared/types.ts'
 import { guardar } from './disco.ts'
 import { bytes, json as enviar } from './http.ts'
 import { huella, nombreCopia } from './originales.ts'
@@ -21,6 +22,7 @@ import { huella, nombreCopia } from './originales.ts'
  *   Python son los del estilo del que partió (`basadoEn`, que lee `server/requisitos.ts`).
  * - `sloth`: la versión donde se hizo, que es la mínima para instalarlo. `usa`: la huella de cada archivo de `video-base`
  *   que nombra. Si al instalar alguno ya no es igual, Sloth ofrece adaptarlo a tu versión con «Nuevo estilo».
+ * - Su guía de uso (`guia` de su card, `shared/guia.ts`), si la tiene; la de su publicación en la comunidad manda.
  * Instalar escribe solo en `<app>/skills/<id>` y en `data/tus-cards.json`. Lo de antes, al actualizar, va a
  * `data/skills-tuyas` como al borrar un estilo.
  */
@@ -43,7 +45,7 @@ const TIPOS = new Set(['md', 'txt', 'json', 'py', 'mjs', 'cjs', 'js', 'ts', 'tsx
 const SIN_TIPO = new Set(['LICENSE', 'README', 'NOTICE', '.gitkeep', '.gitignore'])
 const TEXTO = new Set(['md', 'txt', 'json', 'py', 'mjs', 'cjs', 'js', 'ts', 'tsx', 'jsx', 'css', 'html', 'svg', 'ps1', 'sh', 'yml', 'yaml', 'csv'])
 /** Lo de la card que viaja; `cwd` no: el estilo trabaja donde todos los tuyos. */
-const CAMPOS = ['title', 'description', 'icon', 'version', 'etapas', 'lote', 'editor', 'modelos', 'voz', 'clips', 'musica'] as const
+const CAMPOS = ['title', 'description', 'icon', 'version', 'etapas', 'lote', 'editor', 'modelos', 'voz', 'clips', 'musica', 'guia'] as const
 const ID = /^[a-z0-9]+(-[a-z0-9]+)*$/
 
 export interface Manifiesto {
@@ -144,6 +146,10 @@ function cardLimpia(card: Partial<Card>): Partial<Card> {
   if (typeof limpia.title !== 'string' || !limpia.title.trim()) throw new EstiloMalo('El estilo no tiene título.')
   limpia.title = String(limpia.title).slice(0, 80)
   limpia.description = String(limpia.description ?? '').slice(0, 400)
+  // Su guía de uso, limpia; una que no dice nada no viaja.
+  const guia = guiaDe(limpia.guia)
+  if (guia) limpia.guia = guia
+  else delete limpia.guia
   if (limpia.etapas !== undefined && !Array.isArray(limpia.etapas)) throw new EstiloMalo('Las etapas del estilo no son una lista.')
   // Lo que `listo` y `muestra` buscan es dentro de la carpeta del video.
   for (const e of (limpia.etapas ?? []) as Record<string, unknown>[]) {
@@ -264,6 +270,8 @@ export function instalar(o: {
   base: string
   deSloth: DeSloth[]
   origen?: Omit<OrigenEstilo, 'sloth'>
+  /** La guía de uso de su publicación en la comunidad: es la que su autor revisó al compartirlo. */
+  guia?: GuiaEstilo
 }): Instalado {
   const { manifiesto: m, archivos } = leerPaquete(o.paquete)
   if (compararVersion(o.sloth, m.sloth) < 0) throw new EstiloMalo(`Este estilo se hizo con Sloth ${m.sloth} y tienes la ${o.sloth}: actualiza Sloth para instalarlo.`)
@@ -297,7 +305,7 @@ export function instalar(o: {
     throw new EstiloMalo(`No se pudo instalar: ${error instanceof Error ? error.message : error}. Si algo tiene abierto un archivo del estilo, ciérralo y vuelve a intentarlo.`)
   }
 
-  const card = { ...m.card, id: m.id, skill: m.id, ...(m.basadoEn ? { basadoEn: m.basadoEn } : {}), origen: { ...o.origen, sloth: m.sloth } } as Partial<Card>
+  const card = { ...m.card, id: m.id, skill: m.id, ...(m.basadoEn ? { basadoEn: m.basadoEn } : {}), ...(o.guia ? { guia: o.guia } : {}), origen: { ...o.origen, sloth: m.sloth } } as Partial<Card>
   const lista = existsSync(o.tusCards) ? (JSON.parse(readFileSync(o.tusCards, 'utf8')) as Partial<Card>[]) : []
   const i = lista.findIndex((c) => c.id === m.id)
   if (i >= 0) lista[i] = card
@@ -330,8 +338,8 @@ export function estilos(app: string, cards: () => Card[]) {
     return empaquetar({ card, carpeta: join(skills, card.skill ?? id), sloth, base: base(), deSloth: deSloth() })
   }
 
-  const instalarPaquete = (paquete: Buffer, origen?: Omit<OrigenEstilo, 'sloth'>) =>
-    instalar({ paquete, app, tusCards, cards: cards(), sloth, base: base(), deSloth: deSloth(), origen })
+  const instalarPaquete = (paquete: Buffer, origen?: Omit<OrigenEstilo, 'sloth'>, guia?: GuiaEstilo) =>
+    instalar({ paquete, app, tusCards, cards: cards(), sloth, base: base(), deSloth: deSloth(), origen, guia })
 
   async function api(req: IncomingMessage, res: ServerResponse, url: URL): Promise<boolean> {
     const ruta = url.pathname
@@ -339,7 +347,7 @@ export function estilos(app: string, cards: () => Card[]) {
     const metodo = req.method ?? 'GET'
     try {
       if (ruta === '/api/estilos' && metodo === 'GET') {
-        return enviar(res, 200, cards().filter((c) => c.tuya).map((c) => ({ id: c.id, title: c.title, description: c.description, icon: c.icon, ...(c.origen ? { origen: c.origen } : {}) })))
+        return enviar(res, 200, cards().filter((c) => c.tuya).map((c) => ({ id: c.id, title: c.title, description: c.description, icon: c.icon, ...(c.origen ? { origen: c.origen } : {}), ...(c.guia ? { guia: c.guia } : {}) })))
       }
       const archivo = /^\/api\/estilos\/([\w-]+)\/archivo$/.exec(ruta)
       if (archivo && metodo === 'POST') {
