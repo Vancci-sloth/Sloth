@@ -80,6 +80,13 @@ function alDia(meta: SessionMeta & { provider?: string; queue?: unknown; pendien
 
 type Mensaje = Extract<AgentEvent, { t: 'user' }>
 
+/**
+ * Si el mensaje acaba preguntándole algo al usuario: con «?» o con el bloque `<opciones>` de sus botones, que las
+ * instrucciones de Sloth (`OPCIONES`, claude.ts) ponen al final de toda pregunta cerrada, en todos los agentes.
+ */
+function preguntaAlFinal(texto: string): boolean {
+  return /<opciones>[\s\S]*<\/opciones>\s*$/.test(texto) || /\?[\s*_`)"»]*$/.test(texto)
+}
 /** El último mensaje del agente en estos eventos (no el de un subagente), entero. */
 function ultimoTexto(events: AgentEvent[]): string {
   const ultimo = events.findLast((e) => e.t === 'text' && !e.parent)
@@ -550,7 +557,7 @@ export class Sessions {
     const list = this.load(id)
     const turno = list.slice(list.findLastIndex((e) => e.t === 'turn_start') + 1)
     const suyas = turno.filter((e) => e.t === 'tool' && !e.parent)
-    if (!suyas.length || suyas.some((e) => e.t === 'tool' && PREGUNTAS.test(e.name)) || /\?[\s*_`)"»]*$/.test(ultimoTexto(turno))) return
+    if (!suyas.length || suyas.some((e) => e.t === 'tool' && PREGUNTAS.test(e.name)) || preguntaAlFinal(ultimoTexto(turno))) return
     clearTimeout(this.aMedias.get(id))
     const reloj = setTimeout(() => {
       this.aMedias.delete(id)

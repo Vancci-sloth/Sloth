@@ -44,7 +44,7 @@ function preparar(t: test.TestContext, model = 'codex:gpt-prueba') {
     /** Un turno que trabaja y acaba (`ok`) con `texto` como último mensaje; luego pasa el rato de calma. */
     turno(texto = 'Preparé un borrador. El video aún no está terminado.', { ok = true, herramienta = 'Bash' } = {}) {
       emit({ t: 'tool', id: `h${Math.random()}`, name: herramienta, input: {} })
-      for (const trozo of texto.match(/.{1,12}/g) ?? []) emit({ t: 'text', id: 'm', delta: trozo })
+      for (const trozo of texto.match(/[\s\S]{1,12}/g) ?? []) emit({ t: 'text', id: 'm', delta: trozo })
       emit({ t: 'turn_end', at: Date.now(), ok })
       t.mock.timers.tick(4000)
     }
@@ -136,4 +136,38 @@ test('queFalta lee lo que falta de las etapas de la card, salvo lo que espera al
   const viejo = new Date(Date.now() - 60_000)
   utimesSync(join(dir, 'out', 'video.mp4'), viejo, viejo)
   assert.deepEqual(queFalta(meta, card), [])
+})
+
+for (const [caso, texto] of [
+  ['tras una pregunta', 'La prueba está lista. ¿La apruebas o cambio algo?\n\n<opciones>\nAprobada, haz la versión final\nQuiero cambiar algo\n</opciones>'],
+  ['sin signo de interrogación', 'Elige cómo seguir.\n<opciones>\nAprobar\nCambiar\n</opciones>'],
+  ['con espacios al final', 'Elige cómo seguir.\n<opciones>\nAprobar\nCambiar\n</opciones> \n\t']
+]) {
+  test(`espera tu respuesta si el último mensaje acaba con <opciones>: ${caso}`, (t) => {
+    const h = preparar(t)
+    h.sessions.send(h.meta.id, 'Hazme el video')
+    h.turno(texto)
+    assert.deepEqual(h.pedidos(), [])
+    assert.deepEqual(h.avisos(), [])
+    assert.equal(h.sessions.meta(h.meta.id)?.running, false)
+    const antes = structuredClone(h.sessions.get(h.meta.id))
+    t.mock.timers.tick(4000)
+    assert.deepEqual(h.sessions.get(h.meta.id), antes)
+    // Esperar la respuesta no consume ninguno de los tres intentos de continuación.
+    for (let i = 0; i < 3; i++) {
+      h.emit({ t: 'turn_start', at: Date.now() })
+      h.turno()
+      assert.equal(h.pedidos().length, i + 1)
+    }
+  })
+}
+
+test('un bloque <opciones> a mitad del mensaje no impide continuar el video', (t) => {
+  const h = preparar(t)
+  h.sessions.send(h.meta.id, 'Hazme el video')
+  h.turno('Antes dudé entre <opciones>A\nB</opciones> pero ya elegí. Sigo con el render.')
+  assert.equal(h.pedidos().length, 1)
+  assert.match(h.pedidos()[0], /falta Video, Portada/)
+  assert.deepEqual(h.avisos(), ['El agente cerró su turno con el video sin acabar (falta: Video, Portada): Sloth le pide que siga.'])
+  assert.equal(h.sessions.meta(h.meta.id)?.running, true)
 })
