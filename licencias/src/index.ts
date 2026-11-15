@@ -69,7 +69,7 @@
 import type { VersionLiberable } from '../../shared/types.ts'
 import { comunidad, creditos, olvidarSueltos } from './comunidad.ts'
 import { cancelarStripe, firmaDeStripe, leerStripe, modoStripe, pagoDeSesion, sesion, sesionStripe, suscripcionStripe, type PagoStripe, type SesionStripe } from './stripe.ts'
-import { olvidarRegistroVoz, renovarVoces, voz } from './voz.ts'
+import { olvidarRegistroVoz, voz } from './voz.ts'
 import { entregarRifas } from './rifa.ts'
 import { APERTURA_VOZ } from './voz-mensual.ts'
 import { bajarApoyo, reanudarPausadas } from './bajar-apoyo.ts'
@@ -474,11 +474,10 @@ export default {
     return r
   },
 
-  /** Cada 10 minutos, las claves que no salieron, los créditos de voz y los premios de la rifa; cada mañana, el aviso de los cobros que vienen. */
+  /** Cada 10 minutos, las claves que no salieron y los premios de la rifa; cada mañana, el aviso de los cobros que vienen. */
   async scheduled(evento: ScheduledController, env: Env, ctx: ExecutionContext) {
     if (evento.cron === '*/10 * * * *') {
       ctx.waitUntil(reenviarClaves(env).catch((e) => console.error('Claves sin mandar', e instanceof Error ? e.message : e)))
-      ctx.waitUntil(renovarVoces(env, ctx).catch((e) => console.error('Créditos mensuales de voz', e instanceof Error ? e.message : e)))
       ctx.waitUntil(entregarRifas(env, ctx).catch((e) => console.error('Premios de la rifa', e instanceof Error ? e.message : e)))
       ctx.waitUntil(reanudarPausadas(env).catch((e) => console.error('Reanudar pausadas', e instanceof Error ? e.message : e)))
       return
@@ -764,8 +763,14 @@ async function precios(env: Env, codigo?: unknown) {
   const fundador = codigo !== undefined && (await enlaceFundador(env, codigo))
   // La tarjeta, con Stripe y la clave de sus avisos, a los mismos precios en `MONEDA`.
   const conTarjeta = !!(env.STRIPE_SECRET_KEY && env.STRIPE_WEBHOOK_SECRET)
+  // Cuántos estilos tiene la tienda de la comunidad (los aprobados, como `cerrada` en `tienda.ts`), para que la página
+  // diga «Más de N estilos». Si la consulta falla, no va: el precio no depende de ella.
+  const estilos = await env.DB.prepare("SELECT COUNT(*) AS n FROM publicaciones WHERE categoria = 'estilos' AND aprobada = 1")
+    .first<{ n: number }>()
+    .then((f) => f?.n ?? 0, () => 0)
   return {
     ...t,
+    ...(estilos ? { estilos } : {}),
     ...(conCripto ? { cripto } : {}),
     ...(conTarjeta ? { tarjeta: true } : {}),
     ...(env.SIN_PAYPAL === '1' ? { sinPaypal: true } : {}),

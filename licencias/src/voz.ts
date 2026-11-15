@@ -44,12 +44,12 @@
  *
  * Con `VOZ_SOLO_CREADOR` en `"1"`, nadie más que el creador la usa, aunque tenga créditos: a los demás `GET /voz` les
  * dice que no está, lo demás responde 403 y Administrador no da de alta a nadie, hasta publicar la actualización con
- * `vozMensual` (marca `voz-mensual.json` en R2). Desde ahí `voz-mensual.ts` refresca a 100.000 (sin acumular) por correo y mes, SOLO
- * a quien paga activamente $10 USD o más (`daCreditos`): ni cuentas gratis, ni apoyos de menos, ni lugares gratis de Fundador. El cron también los entrega y manda la clave personal de Sloth por correo.
+ * `vozMensual` (marca `voz-mensual.json` en R2). Los créditos de cada mes ya no se dan (`voz-mensual.ts`): cada quien
+ * usa los que tiene, los que gana en la rifa o los que le da el creador.
  */
 import { BLOQUEADA, CLAVE, EMAIL, EQUIPO, type Env, Rechazo, correo, cuerpo, delCreador, json, nuevaClave, vigencia, vigilar } from './index.ts'
 import { DE_LA_APP } from './comunidad.ts'
-import { beneficiarioVoz, beneficiariosVoz, CREDITOS_MENSUALES, cuentaDeReparto, desdeTexto, entregarVozMensual, periodoVoz, repartirVozMensual, vocesPublicadas, type RepartidorVoz } from './voz-mensual.ts'
+import { cuentaDeReparto, vocesPublicadas, type RepartidorVoz } from './voz-mensual.ts'
 
 const BASE = 'https://www.voicescloning.art'
 /** El usuario del creador en Voices Cloning. */
@@ -113,8 +113,6 @@ export async function voz(req: Request, env: Env, ctx: ExecutionContext, url: UR
     if (req.method === 'GET' && ruta === '/voz') return json({ disponible: false, creador: false })
     throw new Rechazo(403, CERRADA)
   }
-  const beneficiario = q.email && llaves.length && await vocesPublicadas(env) ? await beneficiarioVoz(env, q.email) : null
-  if (beneficiario) await entregarVozMensual(env, beneficiario, repartidor(env, ctx, llaves))
   if (req.method === 'GET' && ruta === '/voz') {
     if (!llaves.length) return json({ disponible: false, creador: q.creador })
     const c = await cuentaDe(env, ctx, llaves, q.externo, false)
@@ -122,7 +120,7 @@ export async function voz(req: Request, env: Env, ctx: ExecutionContext, url: UR
     const r = await vc(c.llave, 'GET', `/api/partner/v1/users/${encodeURIComponent(q.externo)}`)
     if (r.status >= 400) return responder(r)
     const u = r.datos
-    return json({ disponible: true, creador: q.creador, alta: true, creditos: u.credits, usados: u.used_total, hoy: u.used_today, generaciones: u.generations, estado: u.status, ...(beneficiario ? { mensuales: CREDITOS_MENSUALES } : {}) })
+    return json({ disponible: true, creador: q.creador, alta: true, creditos: u.credits, usados: u.used_total, hoy: u.used_today, generaciones: u.generations, estado: u.status })
   }
   if (!llaves.length) throw new Rechazo(503, SIN_LLAVE)
   if (req.method === 'POST' && ruta === '/voz/sesion') {
@@ -291,8 +289,7 @@ async function admin(req: Request, env: Env, ctx: ExecutionContext, url: URL, ll
       configurado: llaves.length > 0,
       soloCreador: await soloCreador(env),
       reparto: await reparto(env, llaves, deCadaLlave.map((l) => l.saldo)),
-      mensuales: CREDITOS_MENSUALES,
-      mensualesDesde: desdeTexto(env),
+      // Lo que se entregó cuando había créditos de cada mes (`voz-mensual.ts`).
       repartos: (await env.DB.prepare('SELECT externo, periodo, creditos, estado, entregado, correo, error FROM voz_mensual ORDER BY periodo DESC, externo LIMIT 300').all()).results,
       creditosIniciales: creditosIniciales(env),
       pagina,
@@ -342,7 +339,7 @@ async function admin(req: Request, env: Env, ctx: ExecutionContext, url: URL, ll
     return responder(r)
   }
   if (ruta === '/voz/admin/alta') {
-    if (await soloCreador(env)) throw new Rechazo(409, 'Las voces de Sloth se abrirán cuando se publique la actualización con los créditos mensuales.')
+    if (await soloCreador(env)) throw new Rechazo(409, 'Las voces de Sloth se abrirán cuando se publique la actualización que las trae.')
     const email = String(c.email ?? '').trim().toLowerCase()
     const creditos = Math.max(0, Math.floor(Number(c.creditos) || 0))
     const fila = await env.DB.prepare('SELECT id FROM licencias WHERE email = ? ORDER BY creada LIMIT 1').bind(email).first<{ id: string }>()
@@ -424,9 +421,8 @@ export function juntas(cuentas: { saldo: Respuesta; usuarios: Respuesta; uso: Re
 }
 
 /**
- * Para «Créditos para repartir» de Administrador (`cuentaDeReparto`): el saldo de todas las llaves, los créditos de todos
- * sus usuarios (todas las páginas, hasta 2.000 por llave) y quién recibe los de este mes y a quién ya se le entregaron.
- * Si una llave no responde, no se adivina: va `error`.
+ * Para «Créditos para repartir» de Administrador (`cuentaDeReparto`): el saldo de todas las llaves y los créditos de
+ * todos sus usuarios (todas las páginas, hasta 2.000 por llave). Si una llave no responde, no se adivina: va `error`.
  */
 async function reparto(env: Env, llaves: Llave[], saldos: Respuesta[]) {
   if (!llaves.length) return null
@@ -441,16 +437,7 @@ async function reparto(env: Env, llaves: Llave[], saldos: Respuesta[]) {
       for (const u of lista) usuarios.push({ externo: String(u.external_id ?? ''), creditos: numero(u.credits) ?? 0 })
       if (lista.length < 100) break
     }
-  const [beneficiarios, entregados] = await Promise.all([
-    env.DB.prepare(beneficiariosVoz(env)).bind(new Date().toISOString(), null).all<{ externo: string }>(),
-    env.DB.prepare('SELECT externo FROM voz_mensual WHERE periodo = ? AND entregado IS NOT NULL').bind(periodoVoz()).all<{ externo: string }>()
-  ])
-  return cuentaDeReparto({
-    saldo: saldos.reduce((t, r) => t + (numero(r.datos.balance) ?? 0), 0),
-    usuarios,
-    beneficiarios: beneficiarios.results.map((b) => b.externo),
-    entregados: new Set(entregados.results.map((e) => e.externo))
-  })
+  return cuentaDeReparto({ saldo: saldos.reduce((t, r) => t + (numero(r.datos.balance) ?? 0), 0), usuarios })
 }
 
 /** Los usuarios que el registro conoce, aunque Voices Cloning no los liste en esta página. */
@@ -504,11 +491,6 @@ function repartidor(env: Env, ctx: ExecutionContext, llaves: Llave[]): Repartido
     async preparar(externo) {
       return (await cuentaDe(env, ctx, llaves, externo, 0)).llave.id
     },
-    async quedan(externo, id) {
-      const r = await vc(llaves.find((l) => l.id === id)!, 'GET', `/api/partner/v1/users/${encodeURIComponent(externo)}`)
-      if (r.status >= 400) throw new Error(mensajeDe(r))
-      return numero(r.datos.credits) ?? 0
-    },
     async sumar(externo, id, creditos) {
       const llave = llaves.find((l) => l.id === id)!
       const t = Date.now()
@@ -519,7 +501,7 @@ function repartidor(env: Env, ctx: ExecutionContext, llaves: Llave[]): Repartido
   }
 }
 
-/** Para la rifa (`rifa.ts`): el mismo repartidor de los créditos mensuales, o nada si el cobro no tiene llaves de socio. */
+/** Para la rifa (`rifa.ts`): con qué se le suman sus créditos a cada ganador, o nada si el cobro no tiene llaves de socio. */
 export async function repartidorVoz(env: Env, ctx: ExecutionContext): Promise<RepartidorVoz | undefined> {
   const llaves = await llavesDe(env)
   return llaves.length ? repartidor(env, ctx, llaves) : undefined
@@ -527,12 +509,6 @@ export async function repartidorVoz(env: Env, ctx: ExecutionContext): Promise<Re
 
 /** Si las voces de Sloth ya son de todos (no solo del creador). */
 export const vozAbierta = async (env: Env) => !(await soloCreador(env))
-
-/** Cada diez minutos: créditos y correo de quienes apoyan, sin que necesiten abrir la app. */
-export async function renovarVoces(env: Env, ctx: ExecutionContext): Promise<void> {
-  const llaves = await llavesDe(env)
-  if (llaves.length) await repartirVozMensual(env, repartidor(env, ctx, llaves))
-}
 
 const nombreDe = (externo: string) => (externo === CREADOR_VOZ ? 'Vancci (creador de Sloth)' : 'Usuario de Sloth')
 

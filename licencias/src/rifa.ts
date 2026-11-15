@@ -1,11 +1,11 @@
 /**
- * La rifa de la comunidad: el creador rifa créditos de voz de Sloth (o algo que da a mano) entre quienes no tienen los
- * créditos de cada mes. Arriba de la comunidad sale «Participa en la rifa · Llévate créditos de Sloth» (`web/src/Rifa.tsx`)
+ * La rifa de la comunidad: el creador rifa créditos de voz de Sloth (o algo que da a mano) entre las cuentas gratis y
+ * quienes apoyan con menos del sugerido. Arriba de la comunidad sale «Participa en la rifa · Llévate créditos de Sloth» (`web/src/Rifa.tsx`)
  * y en Administrador se abre, se sortea con la ruleta y se cierra (`web/src/RifaAdmin.tsx`).
  *
  * - Participa una persona por correo (`externo`, el id de la primera licencia de su correo, el mismo usuario que en las
- *   voces), con un botón. Quien ya recibe los créditos de cada mes (paga activamente $10 USD o más, `daCreditos`) o es
- *   Fundador queda fuera (`fuera`). Las cuentas gratis y quien apoya con menos sí entran. Se vuelve a mirar en cada
+ *   voces), con un botón. Quien paga activamente $10 USD o más (`daCreditos`; cuando se hizo la rifa recibía créditos
+ *   cada mes, que ya no se dan: la regla sigue igual hasta que el creador diga otra cosa) o es Fundador queda fuera (`fuera`). Las cuentas gratis y quien apoya con menos sí entran. Se vuelve a mirar en cada
  *   sorteo: quien empezó a apoyar después ya no entra.
  * - Abrirla no dice qué se rifa. La rifa sigue abierta hasta que el creador la cierra, y mientras sortea cuando quiere:
  *   ahora unos premios, veinte minutos después otros. Cada sorteo lleva una lista de premios, del mayor al menor, y cada
@@ -13,7 +13,7 @@
  *   participa en los siguientes. Solo una abierta a la vez.
  * - Sortear elige al azar (`crypto.getRandomValues`, sin sesgo) y guarda el sorteo y sus ganadores en una sola
  *   transacción: con la rifa ya cerrada no entra nada, y dos sorteos cruzados no dan el mismo ganador dos veces.
- * - A cada ganador se le suman sus créditos en su cuenta de voz de Sloth (el repartidor de `voz.ts`, como los mensuales),
+ * - A cada ganador se le suman sus créditos en su cuenta de voz de Sloth (el repartidor de `voz.ts`),
  *   le llega un correo y, en su Sloth, el aviso a pantalla completa (`web/src/GanasteRifa.tsx`, que sale de
  *   `GET /comunidad/avisos?cuenta`). La suma no se repite sola si pudo haber llegado (`revisar`); el creador decide en
  *   Administrador. Lo que quedó a medias, y los correos que no salieron, los retoma el cron (`entregarRifas`).
@@ -49,14 +49,14 @@ type Fuera = 'vetada' | 'fundador' | 'apoya'
 function porQue(env: Env, f: Fuera): string {
   const d = desdeCuanto(env)
   if (f === 'vetada') return 'Tu cuenta está bloqueada.'
-  if (f === 'fundador') return `Los Fundadores no participan en la rifa: es para quien no tiene los créditos de cada mes (cuentas gratis y apoyos de menos de $${d.monto} ${d.moneda}).`
-  return `Tú ya apoyas a Sloth con $${d.monto} ${d.moneda} o más y tienes tus 100,000 créditos cada mes: la rifa es para quien no los tiene.`
+  if (f === 'fundador') return `Los Fundadores no participan en la rifa: es para las cuentas gratis y los apoyos de menos de $${d.monto} ${d.moneda}.`
+  return `Tú ya apoyas a Sloth con $${d.monto} ${d.moneda} o más: la rifa es para las cuentas gratis y los apoyos de menos.`
 }
 
 /**
  * Lo que deja fuera de la rifa al correo `email` (una expresión SQL), o NULL si puede entrar: bloqueado, Fundador (el
- * que pagó su lugar o el gratis de por vida, por decisión del creador) o quien ya recibe los créditos de cada mes
- * (`daCreditos`: paga activamente $10 USD o más). Quien apoya con menos (el monto que elige, desde $1) sí participa.
+ * que pagó su lugar o el gratis de por vida, por decisión del creador) o quien paga activamente $10 USD o más
+ * (`daCreditos`). Quien apoya con menos (el monto que elige, desde $1) sí participa.
  * Su alias (`rf`) no es el de ninguna consulta que la use: con el mismo, compararía cada correo consigo mismo.
  */
 export const fuera = (env: Env, email: string) => `(SELECT CASE
@@ -406,7 +406,7 @@ export async function entregarRifas(env: Env, ctx: ExecutionContext, rifa?: stri
 }
 
 /**
- * Como los créditos mensuales (`voz-mensual.ts`): se toma el premio, se prepara su cuenta (repetible) y se marca
+ * Se toma el premio, se prepara su cuenta (repetible) y se marca
  * `enviando` ANTES de pedir la suma, que no tiene idempotencia. Un corte ahí deja `revisar`, nunca una suma doble.
  */
 export async function entregarPremio(env: Env, g: Ganador, repartidor: RepartidorVoz | undefined, ahora = new Date()): Promise<void> {

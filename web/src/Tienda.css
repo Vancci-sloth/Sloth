@@ -74,8 +74,13 @@
 .tienda-cerrada li { display: flex; align-items: center; gap: 10px; color: var(--text); font-size: 14.5px; }
 .tienda-cerrada li .ico { width: 17px; height: 17px; flex: none; color: var(--amber); }
 .tienda-cerrada-acciones { display: flex; align-items: center; flex-wrap: wrap; justify-content: center; gap: 14px; margin-top: 4px; }
-.tienda-cerrada-boton { padding: 12px 24px; border-radius: 12px; background: var(--amber); color: var(--sobre-ambar); font-size: 15px; font-weight: 800; }
+.tienda-cerrada-boton { display: inline-flex; align-items: center; gap: 9px; margin-top: 4px; padding: 14px 28px; border-radius: 12px; background: var(--amber); color: var(--sobre-ambar); font-size: 17px; font-weight: 800; }
+.tienda-cerrada-boton .ico { width: 19px; height: 19px; }
 .tienda-cerrada-boton:hover { background: var(--amber-2); }
+.tienda-cerrada-boton:disabled { opacity: 0.7; cursor: default; }
+.tienda-cerrada p.tienda-cerrada-nota { max-width: 440px; font-size: 13.5px; }
+.tienda-cerrada p.tienda-cerrada-error { color: var(--bad); }
+.tienda-cerrada-nota a { color: inherit; text-decoration: underline; text-underline-offset: 3px; }
 .tienda-cerrada-ya { padding: 0; color: var(--suave); font-size: 13.5px; text-decoration: underline; text-underline-offset: 3px; }
 .tienda-cerrada-ya:hover { color: var(--text); }
 .tienda-tuyos { margin: 22px 0 10px; font-size: 16px; font-weight: 700; }

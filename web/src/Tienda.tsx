@@ -84,7 +84,7 @@ export function Tienda({ version, creador, onAbrir, conNombre }: { version: numb
   if (tienda?.cerrada)
     return (
       <section className="tienda" aria-label="Tienda de estilos">
-        <Cerrada estilos={tienda.cerrada.estilos} />
+        <Cerrada estilos={tienda.cerrada.estilos} onRevisar={() => setRecargar((n) => n + 1)} />
         {!!tienda.estilos.length && (
           <>
             <h3 className="tienda-tuyos">Tus estilos en la comunidad</h3>
@@ -154,14 +154,52 @@ export function Tienda({ version, creador, onAbrir, conNombre }: { version: numb
 }
 
 const PAGINA = 'https://sloth.vancci.org'
+/** La versión de los términos que acepta quien apoya desde aquí: la de `TERMINOS` en la página (su «Última actualización»). */
+const TERMINOS = '2026-11-13'
+/** Cada cuánto se mira si el pago ya entró, y durante cuánto, después de abrir el cobro. */
+const MIRAR_CADA = 8000
+const MIRAR_DURANTE = 10 * 60_000
 
 /**
- * La tienda, para quien no apoya: cuántos estilos hay dentro, lo que recibe quien apoya y el botón para apoyar. Al
- * apoyar llega una clave al correo; se pega en Opciones y la tienda se abre.
+ * La tienda, para quien no apoya: cuántos estilos hay dentro, lo que recibe quien apoya y el botón que los desbloquea.
+ * «Desbloquea N estilos» abre de una vez el pago con tarjeta en Stripe, con el correo de su cuenta
+ * (`/api/licencia/apoyar`): al pagarse, la comunidad lo reconoce por ese correo y la tienda se abre sola (`onRevisar`
+ * vuelve a pedirla al regresar a Sloth y cada pocos segundos). Las otras formas de pago siguen en la página; quien
+ * apoyó con otro correo pega su clave en Opciones.
  */
-export function Cerrada({ estilos }: { estilos: number }) {
+export function Cerrada({ estilos, onRevisar }: { estilos: number; onRevisar(): void }) {
+  const [ocupado, setOcupado] = useState(false)
+  const [esperando, setEsperando] = useState(false)
+  const [error, setError] = useState('')
   // «Más de 10», «más de 20»…; con pocos, uno menos de los que hay.
   const mas = estilos > 10 ? Math.floor((estilos - 1) / 10) * 10 : estilos - 1
+
+  useEffect(() => {
+    if (!esperando) return
+    const reloj = setInterval(onRevisar, MIRAR_CADA)
+    const fin = setTimeout(() => setEsperando(false), MIRAR_DURANTE)
+    addEventListener('focus', onRevisar)
+    return () => {
+      clearInterval(reloj)
+      clearTimeout(fin)
+      removeEventListener('focus', onRevisar)
+    }
+  }, [esperando])
+
+  async function desbloquear() {
+    setOcupado(true)
+    setError('')
+    try {
+      const { enlace } = await api<{ enlace: string }>('/api/licencia/apoyar', { terminos: TERMINOS })
+      window.open(enlace, '_blank')
+      setEsperando(true)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setOcupado(false)
+    }
+  }
+
   return (
     <div className="tienda-cerrada">
       <span className="tienda-cerrada-icono">
@@ -174,18 +212,30 @@ export function Cerrada({ estilos }: { estilos: number }) {
           <Icono de="claqueta" /> Todos los estilos de la comunidad, y los que vayan llegando.
         </li>
         <li>
-          <Icono de="sonido" /> 100,000 créditos de voz cada mes.
-        </li>
-        <li>
           <Icono de="estrella" /> Lo nuevo de Sloth antes que nadie, y tu voto en lo que sale primero.
         </li>
         <li>
           <Icono de="personas" /> La mitad de tu apoyo con tarjeta va al fondo de quienes hacen los estilos.
         </li>
       </ul>
+      <button className="tienda-cerrada-boton" disabled={ocupado} onClick={() => void desbloquear()}>
+        <Icono de="candado" /> {ocupado ? 'Abriendo el pago…' : estilos > 1 ? `Desbloquea ${numero(estilos)} estilos` : 'Desbloquea los estilos'}
+      </button>
+      {error && <p className="tienda-cerrada-nota tienda-cerrada-error">{error}</p>}
+      {esperando ? (
+        <p className="tienda-cerrada-nota">Se abrió el pago en tu navegador. En cuanto pagues, los estilos se abren aquí solos.</p>
+      ) : (
+        <p className="tienda-cerrada-nota">
+          $10 USD al mes, con tarjeta. Al desbloquear aceptas ese cobro automático de cada mes, que cancelas cuando quieras, y los{' '}
+          <a href={`${PAGINA}/terminos`} target="_blank" rel="noreferrer">
+            términos
+          </a>
+          .
+        </p>
+      )}
       <div className="tienda-cerrada-acciones">
-        <button className="tienda-cerrada-boton" onClick={() => window.open(`${PAGINA}/#apoyar`, '_blank')}>
-          Apoyar con $10 al mes
+        <button className="tienda-cerrada-ya" onClick={() => window.open(`${PAGINA}/#apoyar`, '_blank')}>
+          Otras formas de pago
         </button>
         <button className="tienda-cerrada-ya" title="Pega la clave que te llegó al correo al apoyar" onClick={() => (location.hash = '/opciones')}>
           Ya apoyo

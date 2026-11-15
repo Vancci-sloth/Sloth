@@ -1,7 +1,8 @@
 /**
  * La clave de la app que se vende (`VENTA`): la de una cuenta gratis, con la que se entra a la comunidad, o la de un
  * apoyo, que quita el recordatorio (`web/src/Licencia.tsx`). Sloth abre sin ella. El apoyo se paga en la página de Sloth,
- * que da la clave; la cuenta se crea aquí (`/api/licencia/unirse`). El cobro es `licencias/`, un Worker de Cloudflare con
+ * que da la clave, o con tarjeta desde la tienda de estilos (`/api/licencia/apoyar`); la cuenta se crea aquí
+ * (`/api/licencia/unirse`). El cobro es `licencias/`, un Worker de Cloudflare con
  * PayPal: aquí solo se le pregunta. Su respuesta llega firmada y se guarda en `data/licencia.json`. Sin
  * internet, vale hasta su `hasta` (una semana como mucho), y editar el archivo no la alarga. Se vuelve a preguntar al
  * abrir y cada 6 horas.
@@ -174,6 +175,15 @@ export function licencia(app: string) {
         error = ''
         escribir()
         return enviar(res, 200, estado())
+      }
+      // «Desbloquea N estilos» (`web/src/Tienda.tsx`): quien ya tiene su cuenta apoya con tarjeta sin pasar por la página.
+      // El cobro abre el pago de Stripe con el correo de la cuenta y, al pagarse, la comunidad lo reconoce por ese
+      // correo (su insignia), sin escribir otra clave. Los términos y el cobro de cada mes se aceptan junto al botón.
+      if (ruta === '/api/licencia/apoyar' && metodo === 'POST') {
+        const email = estado().email
+        if (!email) throw new Rechazo(400, 'Primero crea tu cuenta de Sloth, con tu correo.')
+        const { terminos } = await cuerpo<{ terminos?: string }>(req)
+        return enviar(res, 200, await cobro<{ enlace: string }>('/suscribir', { email, plan: 'mensual', pasarela: 'tarjeta', acepto: true, terminos }))
       }
       // Para la ventana de Electron, al buscar la versión nueva: quien apoya la recibe antes (licencias/, `ANTICIPO`).
       if (ruta === '/api/licencia/credencial' && metodo === 'GET') return enviar(res, 200, (await credencial()) ?? {})

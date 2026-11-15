@@ -80,8 +80,8 @@ antes de la primera publicación con esto hay que desplegar el cobro, o ignora `
 los envíos a Apple.
 
 1. Actualiza `novedad.txt`: un renglón corto con lo que trae la versión, que se ve al pasar el cursor sobre «Actualizar».
-   Una versión puede llevar además su guía animada (`web/src/Novedades.tsx`, la 0.4.2 en
-   `web/public/novedades/0.4.2.html`, que reemplaza a la de antes), que sale una vez al abrirla a quien actualizó. Su
+   Una versión puede llevar además su guía animada (`web/src/Novedades.tsx`, la 0.4.3 en
+   `web/public/novedades/0.4.3.html`, que reemplaza a la de antes), que sale una vez al abrirla a quien actualizó. Su
    número en `Novedades.tsx` debe ser el que saldrá: `version-venta.mjs` sube solo la última cifra de la publicada, y un
    salto (0.5.0) se pone a mano en `package.json`.
 2. Comprueba el diff completo entre `origin/venta` y `main`: se publicará todo lo que haya entrado a `main`. Guarda la
@@ -134,16 +134,16 @@ borra. Si pasa, `npm run licencias -- deployments list` y `npm run licencias -- 
 Aplica las migraciones cuando el cambio incluya alguna, antes de desplegar código que necesite esas columnas.
 Comprueba la ruta afectada en `https://api.sloth.vancci.org`. Este despliegue es independiente de
 `main` y `venta`; subir la app no actualiza el Worker. Los nombres de sus secretos están en la cabecera de su configuración.
-Los créditos mensuales de voz necesitan la migración `0024_voz_mensual.sql` y el Worker actualizado **antes** de publicar
-la app. El script de publicación manda `vozMensual` y, al terminar de subir el `latest*.yml`, el Worker guarda la marca
-`voz-mensual.json` en R2: ahí abre las voces aunque siga `VOZ_SOLO_CREADOR=1`. Hasta entonces siguen solo para el creador.
-Cada diez minutos refresca a 100.000 los créditos de cada correo, una vez por mes natural de Ciudad de México, **SOLO a
-quien paga activamente el apoyo o más** (`PRECIO_MENSUAL`: $10 USD desde el 13 de noviembre de 2026, antes $15; 199 MXN
-en los apoyos en pesos, o el anual) y a nadie más: ni cuentas gratis, ni apoyos de menos (el monto que cada quien elige),
-ni lugares gratis de Fundador de por vida. Lo decidió el creador el 7 de noviembre de 2026 y la regla es una sola, `daCreditos` en `licencias/src/voz-mensual.ts`, que usa
-también la rifa. También lo hace al consultar `/voz`. Refrescar es sumar lo que falta para llegar a 100.000: lo
-no usado no se acumula, nunca se quita lo que el creador dio de más, y no se recuperan meses anteriores. El correo lleva
-la **clave de Sloth existente**, que se pega en Opciones → Voz → Voces de Sloth, y se reintenta sin repetir la entrega. Todo sale de las mismas llaves de socio y aparece en Administrador.
+Las voces de Sloth se abren a todos con la marca `voz-mensual.json` en R2, que el Worker guarda cuando el script de
+publicación (que manda `vozMensual`) termina de subir el `latest*.yml`; sin ella, con `VOZ_SOLO_CREADOR=1`, son solo del
+creador.
+**Los créditos de voz de cada mes ya no se dan** (decisión del creador, 15 de noviembre de 2026). En noviembre de 2026
+se entregaron 100.000 a quien pagaba activamente el apoyo; desde esa fecha quien los recibió conserva su saldo, nadie
+más los recibe y no se rellenan: el Worker ya no los entrega ni manda su correo, y la app ya no los anuncia (ni el
+aviso a pantalla completa, ni Opciones → Voz, ni la tienda de estilos). No los prometas en anuncios, guías ni correos.
+Los créditos ahora llegan solo por la rifa o porque el creador los da (Administrador o `/voz/admin/regalo`). Lo
+entregado sigue en `voz_mensual` (migración 0024) y en Administrador → Créditos mensuales. La regla de quién paga el
+apoyo sugerido o más (`daCreditos` en `licencias/src/voz-mensual.ts`) la sigue usando la rifa para dejarlos fuera.
 La rifa necesita la migración `0025_rifas.sql` y el Worker desplegado; con créditos, además, las voces ya abiertas.
 Su sección y su ruleta llegan a la Administrador instalada con la siguiente versión de la app.
 Un reparto en `enviando` o `revisar` requiere comprobar el movimiento en el proveedor antes de volver a sumarlo: su API

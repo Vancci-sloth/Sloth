@@ -321,7 +321,7 @@ function VoicesCloningOpciones({ voz }: { voz: UsoVoz }) {
           <strong>Voces de Sloth</strong>
           <span>
             {vc?.estado === 'suspended' ? 'Tu usuario está suspendido. ' : ''}
-            {vc?.disponible ? `${vc.voces.length} ${vc.voces.length === 1 ? 'voz' : 'voces'} en el menú Voz` : '100.000 créditos de voz al mes, solo para quienes apoyan a Sloth con $10 USD o más al mes.'}
+            {vc?.disponible ? `${vc.voces.length} ${vc.voces.length === 1 ? 'voz' : 'voces'} en el menú Voz` : 'Voces listas y la tuya clonada, con créditos de Sloth.'}
           </span>
         </div>
         {vc?.disponible ? (
@@ -360,11 +360,9 @@ function VoicesCloningOpciones({ voz }: { voz: UsoVoz }) {
               </div>
             </>
           )}
-          {typeof vc?.hoy === 'number' && vc.hoy > 0 && <span className="muted">{vc.hoy.toLocaleString('es-MX')} usados hoy</span>}
-          {!!vc?.mensuales && <span className="muted">Se refrescan a {vc.mensuales.toLocaleString('es-MX')} cada mes mientras pagues $10 USD o más · no se acumulan</span>}
-        </div>
+          {typeof vc?.hoy === 'number' && vc.hoy > 0 && <span className="muted">{vc.hoy.toLocaleString('es-MX')} usados hoy</span>}        </div>
       )}
-      <p className="muted small fila-extra">Las eliges en el menú Voz, en su pestaña, o clonas la tuya grabándola ahí. Usa tu clave personal de Sloth, la que recibes por correo al apoyar. Los 100.000 al mes son solo para quien paga activamente $10 USD o más; con menos, con la cuenta gratis o como Fundador sin pago no se reciben. Si ya la pusiste en Apoyo, se conecta sola. Los créditos salen del saldo general del proveedor de Sloth.</p>
+      <p className="muted small fila-extra">Las eliges en el menú Voz, en su pestaña, o clonas la tuya grabándola ahí. Usa tu clave personal de Sloth, la que te llegó por correo. Si ya la pusiste en Apoyo, se conecta sola. Los créditos se ganan en la rifa de la comunidad o te los da el creador de Sloth; ya no se dan cada mes.</p>
       {pegando && (
         <form className="fila-extra" onSubmit={(ev) => {
           ev.preventDefault()
