@@ -1,0 +1,1227 @@
+<!doctype html>
+<!--
+  La guía de lo nuevo de la 0.4.3: sale una vez al abrir Sloth después de actualizar (web/src/Novedades.tsx, en un
+  iframe), y también se abre sola en un navegador. Una página suelta, sin dependencias: el logo (web/public/icon.svg) va
+  adentro, en #cara. Nueve escenas (el concierto, siete novedades, la última los arreglos, y el final, que es el mismo
+  concierto); cada una tiene su guion en `guiones`, y «Siguiente», las flechas o deslizar pasan de una a otra. Con
+  ?escena=N abre directo en una. La cuenta de escenas sale sola del número de <g class="escena">.
+  Para la de otra versión: cambia las escenas de en medio (su dibujo, sus piezas en `construir` y su guion), el número
+  (título, cabecera y el del escenario de la escena 0; la pantalla del final lo toma del título) y la canción (YT_ID, BEAT
+  y la tarjeta #sonando); baile.webm es el video del creador bailando, recortado.
+-->
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sloth 0.4.3</title>
+<style>
+  /* Paleta de Sloth (web/src/styles.css) y la crema del logo. */
+  :root {
+    --bg: #0f0e0c; --panel: #171512; --panel-2: #221f1b; --line: #2e2a24; --text: #ede6d6; --muted: #9a907f;
+    --amber: #e8a33d; --amber-2: #f4b04a; --sobre-ambar: #1b1408; --ok: #8fc177; --bad: #e06c55;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); }
+  body { display: grid; place-items: center; overflow: hidden; color: var(--text); font-family: Inter, 'Segoe UI', system-ui, sans-serif; }
+  .escenario { position: relative; width: min(100vw, 100vh); max-width: 1080px; aspect-ratio: 1; user-select: none; -webkit-user-select: none; }
+  .escenario > svg, .escenario > canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+  canvas { pointer-events: none; }
+  .controles { position: absolute; left: 8.33%; right: 8.33%; bottom: 3.2%; display: flex; align-items: center; gap: 12px; font-size: clamp(12px, 1.85vmin, 20px); }
+  .controles button { font: inherit; font-weight: 700; border-radius: 12px; padding: .8em 1.25em; cursor: pointer; border: 2px solid var(--line); background: var(--panel); color: var(--text); display: inline-flex; align-items: center; gap: .55em; transition: transform .12s, background-color .2s, border-color .2s, opacity .3s; }
+  .controles button:hover { border-color: var(--muted); }
+  .controles button:active { transform: scale(.95); }
+  .controles button:focus-visible { outline: 3px solid var(--amber-2); outline-offset: 3px; }
+  .controles svg { width: 1.25em; height: 1.25em; }
+  #siguiente { margin-left: auto; background: var(--amber); border-color: var(--amber); color: var(--sobre-ambar); }
+  #siguiente:hover { background: var(--amber-2); border-color: var(--amber-2); }
+  #anterior.oculto { opacity: 0; pointer-events: none; }
+  #cuenta { flex: 1; text-align: center; color: var(--muted); font-variant-numeric: tabular-nums; font-weight: 600; }
+
+  .a { transform-box: fill-box; transform-origin: center; }
+  .izq { transform-box: fill-box; transform-origin: 0 50%; }
+  .abajo { transform-box: fill-box; transform-origin: 50% 100%; }
+  .arriba { transform-box: fill-box; transform-origin: 50% 0; }
+  .escena { display: none; }
+  .escena.visible { display: inline; }
+  #rayos { transition: opacity .9s; }
+  #brillo stop { transition: stop-color 1s; }
+  .num { font-variant-numeric: tabular-nums; }
+
+  /* Lo que se mueve siempre: el perezoso baila y los rayos giran. */
+  .gira { animation: girar 40s linear infinite; }
+  .baila { animation: bailar 1.09s cubic-bezier(.5,0,.5,1) infinite; }
+  @keyframes bailar {
+    0%, 100% { transform: translateY(0) rotate(-6deg) scale(1.04, .96); }
+    25% { transform: translateY(-40px) rotate(0) scale(1); }
+    50% { transform: translateY(0) rotate(6deg) scale(1.04, .96); }
+    75% { transform: translateY(-40px) rotate(0) scale(1); }
+  }
+  @media (prefers-reduced-motion: reduce) { .gira, .baila, .eq i { animation: none; } }
+
+  /* La canción de la fiesta: el reproductor de YouTube en una tarjeta, arriba a la derecha, en el concierto. */
+  .sonando { position: absolute; top: 3.2%; right: 3.2%; width: 31%; padding: 1.1%; background: var(--panel); border: 2px solid var(--line); border-radius: 12px; box-shadow: 0 14px 40px rgba(0, 0, 0, .5); font-size: clamp(10px, 1.55vmin, 17px); transition: opacity .45s, transform .45s cubic-bezier(.3,1.4,.5,1); }
+  .sonando.fuera { opacity: 0; transform: translateY(-18px) scale(.96); pointer-events: none; }
+  /* En las novedades se hace chiquita y se acomoda junto a la cabecera, sin tapar las barritas. */
+  .sonando { transition: opacity .45s, transform .45s cubic-bezier(.3,1.4,.5,1), width .5s cubic-bezier(.2,.8,.2,1), top .5s cubic-bezier(.2,.8,.2,1), right .5s cubic-bezier(.2,.8,.2,1), padding .5s; }
+  .sonando.mini { top: 1.4%; right: 8.33%; width: 19%; padding: .45%; }
+  .sonando.mini .sonando-cab { display: none; }
+  /* Tú bailando, recortado, a la izquierda (baile.webm, con transparencia y en bucle). En las novedades, chiquito
+     junto a la tarjeta de la canción. Es material propio: no entra al repo (.gitignore). */
+  .baile { position: absolute; left: 3.2%; top: 8.5%; height: 48%; pointer-events: none; transition: opacity .45s, left .5s cubic-bezier(.2,.8,.2,1), top .5s cubic-bezier(.2,.8,.2,1), height .5s cubic-bezier(.2,.8,.2,1); }
+  .baile.mini { left: 65.4%; top: .8%; height: 11%; }
+  .baile.fuera { opacity: 0; }
+  .sonando-cab { display: flex; align-items: center; gap: .75em; margin: .1em .2em .75em; line-height: 1.2; }
+  .sonando-cab span { display: block; color: var(--amber); font-size: .78em; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+  .sonando-cab b { display: block; color: var(--text); font-weight: 800; }
+  .sonando-cab small { color: var(--muted); font-size: 1em; font-weight: 600; }
+  .eq { display: flex; align-items: flex-end; gap: 3px; width: 1.7em; height: 1.7em; flex: none; }
+  .eq i { flex: 1; height: 100%; background: var(--amber); border-radius: 2px; transform-origin: bottom; animation: eq 1.1s steps(6) infinite; }
+  .eq i:nth-child(2) { animation-delay: -.4s; } .eq i:nth-child(3) { animation-delay: -.75s; } .eq i:nth-child(4) { animation-delay: -.2s; }
+  @keyframes eq { 0%, 100% { transform: scaleY(.25); } 30% { transform: scaleY(1); } 55% { transform: scaleY(.5); } 80% { transform: scaleY(.85); } }
+  .sonando-video { aspect-ratio: 16 / 9; border-radius: 8px; overflow: hidden; background: #000; }
+  .sonando-video iframe { display: block; width: 100%; height: 100%; border: 0; }
+</style>
+</head>
+<body>
+<div class="escenario" id="escenario">
+<svg id="lienzo" viewBox="0 0 1080 1080" xmlns="http://www.w3.org/2000/svg" font-family="Inter, 'Segoe UI', system-ui, sans-serif">
+  <defs>
+    <radialGradient id="brillo" cx="50%" cy="40%" r="62%">
+      <stop offset="0" stop-color="#e8a33d" stop-opacity=".30"/>
+      <stop offset=".55" stop-color="#e8a33d" stop-opacity=".07"/>
+      <stop offset="1" stop-color="#e8a33d" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="rayo" cx="50%" cy="50%" r="50%">
+      <stop offset="0" stop-color="#f4b04a" stop-opacity=".22"/>
+      <stop offset="1" stop-color="#f4b04a" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="telaB" cx="50%" cy="40%" r="70%">
+      <stop offset="0" stop-color="#e8a33d" stop-opacity=".35"/>
+      <stop offset="1" stop-color="#171512"/>
+    </radialGradient>
+    <linearGradient id="estelaScan" x1="0" x2="1">
+      <stop offset="0" stop-color="#f4b04a" stop-opacity="0"/>
+      <stop offset="1" stop-color="#f4b04a" stop-opacity=".55"/>
+    </linearGradient>
+    <clipPath id="clipPanel"><rect x="90" y="190" width="900" height="460" rx="28"/></clipPath>
+    <clipPath id="clipPantalla"><rect x="370" y="50" width="340" height="236" rx="14"/></clipPath>
+    <!-- Los puntos de la pantalla LED del escenario -->
+    <pattern id="led" width="8" height="8" patternUnits="userSpaceOnUse"><path d="M8 0V8H0" fill="none" stroke="#0b0a09" stroke-width="2.5"/></pattern>
+    <clipPath id="telS"><rect width="220" height="392" rx="18"/></clipPath>
+    <clipPath id="clipFrasco"><rect x="190" y="316" width="180" height="270" rx="22"/></clipPath>
+
+    <!-- Iconos de trazo (Lucide, como web/src/Iconos.tsx) -->
+    <symbol id="i-flecha" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></symbol>
+    <symbol id="i-izq" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></symbol>
+    <symbol id="i-reabrir" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></symbol>
+    <symbol id="i-zap" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"/></symbol>
+    <symbol id="i-video" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3.8a1 1 0 0 1 1.5-.86l11.5 7.2a1 1 0 0 1 0 1.72l-11.5 7.2A1 1 0 0 1 6 18.2z"/></symbol>
+    <symbol id="i-bandera" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 22V4a1 1 0 0 1 .4-.8A6 6 0 0 1 8 2c3 0 5 2 7.333 2q2 0 3.067-.8A1 1 0 0 1 20 4v10a1 1 0 0 1-.4.8A6 6 0 0 1 16 16c-3 0-5-2-8-2a6 6 0 0 0-4 1.528"/></symbol>
+    <symbol id="i-palomita" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></symbol>
+    <symbol id="i-descargar" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V3"/><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/></symbol>
+    <symbol id="i-pizarra" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h20"/><path d="M21 3v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V3"/><path d="m7 21 5-5 5 5"/></symbol>
+    <symbol id="i-risa" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20z"/><path d="M18 13a6 6 0 0 1-6 5 6 6 0 0 1-6-5h12Z"/><path d="M9 9h.01"/><path d="M15 9h.01"/></symbol>
+    <symbol id="i-disco" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12H2"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/><path d="M6 16h.01"/><path d="M10 16h.01"/></symbol>
+    <symbol id="i-carpeta" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></symbol>
+    <symbol id="i-alerta" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></symbol>
+    <symbol id="i-personas" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><path d="M9 3a4 4 0 1 0 0 8 4 4 0 0 0 0-8z"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></symbol>
+    <symbol id="i-claqueta" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.2 6 3 11l-.9-2.4c-.3-1.1.3-2.2 1.3-2.5l13.5-4c1.1-.3 2.2.3 2.5 1.3Z"/><path d="m6.2 5.3 3.1 3.9"/><path d="m12.4 3.4 3.1 4"/><path d="M3 11h18v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/></symbol>
+    <symbol id="i-microfono" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><path d="M12 19v3"/></symbol>
+    <symbol id="i-corazon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/></symbol>
+    <symbol id="i-buscar" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></symbol>
+    <symbol id="i-reloj" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></symbol>
+    <symbol id="i-mas" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></symbol>
+    <symbol id="i-copiar" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></symbol>
+    <symbol id="i-compartir" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><path d="m16 6-4-4-4 4"/><path d="M12 2v13"/></symbol>
+    <symbol id="i-basura" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2"/></symbol>
+    <symbol id="i-wifi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h.01"/><path d="M2 8.82a15 15 0 0 1 20 0"/><path d="M5 12.859a10 10 0 0 1 14 0"/><path d="M8.5 16.429a5 5 0 0 1 7 0"/></symbol>
+    <symbol id="i-wifi-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h.01"/><path d="M8.5 16.429a5 5 0 0 1 7 0"/><path d="M5 12.859a10 10 0 0 1 5.17-2.69"/><path d="M19 12.859a10 10 0 0 0-2.007-1.523"/><path d="M2 8.82a15 15 0 0 1 4.177-2.643"/><path d="M22 8.82a15 15 0 0 0-11.288-3.764"/><path d="m2 2 20 20"/></symbol>
+    <symbol id="i-llave" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></symbol>
+
+    <symbol id="i-columnas" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"/><path d="M12 3v18"/></symbol>
+    <symbol id="i-subtitulos" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="14" x="3" y="5" rx="2" ry="2"/><path d="M7 15h4"/><path d="M15 15h2"/><path d="M7 11h2"/><path d="M13 11h4"/></symbol>
+    <symbol id="i-musica" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></symbol>
+    <symbol id="i-montana" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m8 3 4 8 5-5 5 15H2L8 3z"/></symbol>
+    <symbol id="i-monedas" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="6"/><path d="M18.09 10.37A6 6 0 1 1 10.34 18"/><path d="M7 6h1v4"/><path d="m16.71 13.88.7.71-2.82 2.82"/></symbol>
+    <symbol id="i-tarjeta" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="14" x="2" y="5" rx="2"/><path d="M2 10h20"/></symbol>
+    <symbol id="i-imagen" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></symbol>
+    <symbol id="i-mensaje" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></symbol>
+    <symbol id="i-cubo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></symbol>
+    <symbol id="i-persona" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></symbol>
+    <symbol id="i-bicho" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m8 2 1.88 1.88"/><path d="M14.12 3.88 16 2"/><path d="M9 7.13v-1a3.003 3.003 0 1 1 6 0v1"/><path d="M12 20c-3.3 0-6-2.7-6-6v-3a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v3c0 3.3-2.7 6-6 6"/><path d="M12 20v-9"/><path d="M6.53 9C4.6 8.8 3 7.1 3 5"/><path d="M6 13H2"/><path d="M3 21c0-2.1 1.7-3.9 3.8-4"/><path d="M20.97 5c0 2.1-1.6 3.8-3.5 4"/><path d="M22 13h-4"/><path d="M17.2 17c2.1.1 3.8 1.9 3.8 4"/></symbol>
+
+    <!-- El logo de Sloth (web/public/icon.svg), en sus coordenadas de 512 -->
+    <g id="cara">
+      <g fill="#f2e7cf" fill-rule="evenodd" stroke="#171719" stroke-width="10" stroke-linejoin="round" paint-order="stroke">
+      <path d="M 229 35.0 C 203.1 37.0, 175.6 43.3, 151.5 52.7 C 75.1 82.6, 25.4 152.6, 26.4 228.7 C 26.8 253.4, 29.9 267.6, 39.0 286.9 C 53.2 316.5, 75.6 338.7, 107.5 354.7 C 125.7 363.8, 157.2 372.5, 179.5 374.4 C 183.3 374.8, 189.6 375.5, 193.5 376.0 C 197.3 376.5, 224.8 377.4, 254.5 378.0 C 312.2 379.0, 316.5 379.4, 324.9 383.7 C 332.5 387.6, 335.9 392.6, 335.9 400.3 C 336.1 424.8, 300.0 439.2, 238.5 439.2 C 188.7 439.2, 153.8 432.4, 108.5 413.8 C 93.9 407.8, 92.1 408.1, 98.4 415.2 C 125.0 445.1, 164.7 465.4, 215 474.6 C 230.1 477.4, 282.4 477.2, 297.5 474.2 C 340.8 465.7, 366.8 448.3, 377.0 421 C 379.2 415.2, 379.5 412.8, 379.5 400.5 C 379.5 392.8, 379.2 385.0, 378.8 383.2 C 377.4 376.6, 372.0 366.8, 366.3 360.9 C 348.4 342.1, 324.6 337.0, 255 337 C 228.5 336.9, 195.5 335.4, 186.5 333.9 C 167.6 330.6, 162.5 329.5, 153.0 326.8 C 109.6 314.5, 80.0 285.3, 70.3 245.1 C 68.7 238.5, 68.8 212.8, 70.4 204.1 C 80.4 152.0, 118.7 110.7, 176 90.4 C 189.5 85.5, 208.4 81.1, 222.5 79.4 C 225.8 79.0, 229.6 78.5, 231 78.3 C 232.3 78.2, 242.7 77.7, 254 77.4 C 300.0 75.9, 339.1 84.6, 371.5 103.7 C 405.4 123.7, 433.0 160.6, 440.6 196 C 441.0 197.9, 441.5 200.1, 441.7 201 C 444.3 212.9, 444.1 234.1, 441.2 245.8 C 439.7 251.8, 439.8 254.2, 441.9 281.8 C 443.1 298.1, 444.9 315.7, 446.0 321 C 447.1 326.2, 448.0 333.5, 448.0 337.2 C 448.0 342.3, 448.3 344, 449.4 344 C 451.0 344, 460.7 328.1, 465.0 318.3 C 466.7 314.5, 468.7 310.1, 469.4 308.5 C 471.1 304.7, 477.3 286.3, 479.3 279 C 480.8 273.5, 483.0 261.8, 484.8 250.5 C 486.0 243.0, 485.5 204.4, 484.1 196.5 C 477.8 159.6, 462.9 127.6, 440.7 103.5 C 438.7 101.3, 437.0 99.2, 437.0 98.8 C 436.9 97.3, 412.3 76.7, 403.7 70.9 C 379.9 55.0, 347.3 42.7, 315 37.5 C 294.7 34.2, 255.0 33.1, 229 35.0" />
+      <path d="M 158 164.5 C 119.4 170.6, 91 201.5, 91 237.3 C 91 252.8, 95.3 263.3, 106.3 274.8 C 116.5 285.3, 116.3 285.3, 120.3 277.2 C 129.6 258.9, 144.3 247.6, 174.5 235.5 C 198.3 225.9, 207.0 219.5, 212.4 208 C 217.4 197.1, 215.1 182.0, 207.3 174.8 C 202.6 170.5, 193.0 166.2, 184.1 164.5 C 174.3 162.7, 169.5 162.7, 158 164.5 M 151.5 189.6 C 136.4 197.5, 138.1 214.8, 154.3 219.1 C 165.4 222.1, 177.2 212.4, 175.4 201.7 C 173.7 191.6, 160.4 184.9, 151.5 189.6" />
+      <path d="M 329.1 164.5 C 307.8 168.2, 297 178.7, 297 195.5 C 297 202.2, 297.4 203.9, 300.2 209.2 C 305.9 220.0, 314.5 225.3, 341 234.4 C 362.1 241.7, 372.0 245.8, 384.7 252.6 C 413.8 267.9, 433.5 286.9, 441.4 306.9 C 442.3 309.4, 443.4 311.7, 443.8 311.9 C 445.0 312.8, 447.2 325.9, 447.7 335.2 C 448.0 341.7, 448.5 344, 449.5 344 C 452.8 344, 452.8 340.4, 449.4 298.9 C 447.5 276.1, 446.0 256.7, 446.0 255.7 C 446.0 254.4, 445.1 254, 443 254 C 441.3 254, 439.9 253.4, 439.9 252.7 C 439.8 252.0, 439.3 252.7, 438.8 254.2 C 437.8 257.0, 435.6 257.8, 434.4 255.8 C 434.0 255.2, 432.6 249.7, 431.3 243.6 C 425.2 215.2, 418.3 201.0, 403.5 186.5 C 385.2 168.3, 356.1 159.7, 329.1 164.5 M 346 189.9 C 338.2 194.0, 335.0 201.0, 337.5 208.2 C 339.5 213.9, 342.3 216.6, 348.1 218.5 C 356.7 221.4, 365.4 217.9, 369.5 209.9 C 376.0 197.3, 359.1 182.9, 346 189.9" />
+      <path d="M 236 230.1 C 222.8 231.7, 216.2 236.5, 215.2 245.2 C 214.5 251.3, 217.2 256.0, 225.8 264.1 C 240.3 277.9, 255.6 281.5, 271.3 274.9 C 280.1 271.3, 291.1 261.6, 294.8 254.2 C 299.0 246.1, 296.8 237.0, 289.8 233.5 C 282.1 229.7, 254.1 227.9, 236 230.1" />
+      </g>
+    </g>
+
+    <!-- Sloth de rockero: corona, bigote y su pie de micrófono -->
+    <g id="sloth-rock">
+      <path d="M452 566 L548 262" fill="none" stroke="#171719" stroke-width="24" stroke-linecap="round"/>
+      <path d="M452 566 L548 262" fill="none" stroke="#9a907f" stroke-width="10" stroke-linecap="round"/>
+      <g transform="translate(556 236) rotate(17)">
+        <rect x="-27" y="-66" width="54" height="88" rx="27" fill="#2e2a24" stroke="#171719" stroke-width="10"/>
+        <path d="M-22 -40h44M-24 -22h48" fill="none" stroke="#9a907f" stroke-width="5"/>
+      </g>
+      <use href="#cara"/>
+      <path d="M152 44 L130 -58 L206 -6 L256 -88 L306 -6 L382 -58 L360 44 Z" fill="#e8a33d" stroke="#171719" stroke-width="12" stroke-linejoin="round"/>
+      <rect x="148" y="24" width="216" height="28" rx="9" fill="#f4b04a" stroke="#171719" stroke-width="10"/>
+      <circle cx="130" cy="-58" r="14" fill="#e06c55" stroke="#171719" stroke-width="8"/>
+      <circle cx="256" cy="-88" r="16" fill="#f2e7cf" stroke="#171719" stroke-width="8"/>
+      <circle cx="382" cy="-58" r="14" fill="#8fc177" stroke="#171719" stroke-width="8"/>
+      <path d="M256 298 C 234 280 196 282 172 308 C 194 328 234 324 256 306 C 278 324 318 328 340 308 C 316 282 278 280 256 298 Z" fill="#171719"/>
+    </g>
+
+    <g id="puntero"><path d="M0 0 L0 30 L8 23 L13.5 35 L19 32.5 L13.5 21 L24 21 Z" fill="#f2e7cf" stroke="#171719" stroke-width="2.5" stroke-linejoin="round" transform="scale(1.5)"/></g>
+    <rect id="panel" x="90" y="190" width="900" height="460" rx="28" fill="#171512" stroke="#2e2a24" stroke-width="3"/>
+  </defs>
+
+  <!-- Fondo que comparten todas -->
+  <rect width="1080" height="1080" fill="#0f0e0c"/>
+  <rect width="1080" height="1080" fill="url(#brillo)"/>
+  <g id="rayos" transform="translate(540 430)"><g class="gira a" fill="url(#rayo)" id="rayosG"></g></g>
+
+  <!-- Cabecera de la guía -->
+  <g id="cabecera" opacity="0">
+    <g transform="translate(90 50) scale(.15)"><use href="#cara"/></g>
+    <text x="180" y="112" font-size="46" font-weight="800" fill="#ede6d6">Lo nuevo de la <tspan fill="#e8a33d">0.4.3</tspan></text>
+    <g id="barras"></g>
+  </g>
+
+  <!-- 0 · El concierto: el perezoso sale al escenario y el número cae al ritmo del bajo -->
+  <g class="escena" id="e0"><g class="cuerpo">
+    <g class="tablado"></g>
+    <rect class="destello" width="1080" height="1080" fill="#f4b04a" opacity="0"/>
+    <g class="titulo"><text class="partir-letras" x="540" y="700" text-anchor="middle" font-size="64" font-weight="800" fill="#ede6d6" letter-spacing="1">Ya salió Sloth</text></g>
+    <g class="version-neon" style="transform-box: view-box; transform-origin: 540px 810px">
+      <text class="neon-glow" x="540" y="880" text-anchor="middle" font-size="210" font-weight="900" fill="none" stroke="#f4b04a" stroke-width="44" stroke-opacity=".22" stroke-linejoin="round">0.4.3</text>
+      <text class="partir-letras" x="540" y="880" text-anchor="middle" font-size="210" font-weight="900" fill="#f2e7cf" stroke="#e8a33d" stroke-width="16" stroke-linejoin="round" paint-order="stroke">0.4.3</text>
+    </g>
+    <g class="publico"></g>
+  </g></g>
+
+  <!-- 1 · Low-Poly: el mundo en miniatura, una cosa por etapa con su bandera -->
+  <g class="escena" id="e1"><g class="cuerpo">
+    <use href="#panel"/>
+    <g clip-path="url(#clipPanel)">
+      <g class="camara" style="transform-box: view-box; transform-origin: 0 0"><g class="mundo"></g></g>
+      <g class="pedido-lp">
+        <rect x="114" y="582" width="332" height="46" rx="12" fill="#221f1b" stroke="#2e2a24" stroke-width="2"/>
+        <use href="#i-montana" x="128" y="594" width="22" height="22" style="color:#e8a33d"/>
+        <text x="160" y="611" font-size="17" font-weight="700" fill="#ede6d6">Cómo llega el agua a tu casa</text>
+      </g>
+      <g class="listo-lp">
+        <rect x="768" y="582" width="198" height="46" rx="12" fill="#221f1b" stroke="#8fc177" stroke-width="2"/>
+        <use href="#i-palomita" x="782" y="594" width="22" height="22" style="color:#8fc177"/>
+        <text x="814" y="611" font-size="17" font-weight="800" fill="#8fc177">Tu video, listo</text>
+      </g>
+    </g>
+    <g class="kicker"><use href="#i-montana" x="150" y="693" width="32" height="32" style="color:#e8a33d"/><text x="194" y="720" font-size="30" font-weight="800" fill="#e8a33d" letter-spacing="4">ESTILO NUEVO</text></g>
+    <text class="partir-palabras" x="150" y="795" font-size="60" font-weight="800" fill="#ede6d6">Nuevo estilo: Low-Poly</text>
+    <g class="linea"><text x="150" y="850" font-size="32" font-weight="500" fill="#9a907f">Un proceso contado en un mundo en miniatura:</text></g>
+    <g class="linea"><text x="150" y="895" font-size="32" font-weight="500" fill="#9a907f">cada etapa brota en su lugar, con su bandera.</text></g>
+  </g></g>
+
+  <!-- 2 · Subtítulos gratis en la Entrega -->
+  <g class="escena" id="e2"><g class="cuerpo">
+    <use href="#panel"/>
+    <g clip-path="url(#clipPanel)">
+      <g class="vid-s"><g transform="translate(140 224)">
+        <g clip-path="url(#telS)">
+          <rect width="220" height="392" fill="url(#telaB)"/>
+          <g class="sloth-v"><g transform="translate(110 170) scale(.27) translate(-256 -265)"><use href="#cara"/></g></g>
+          <text class="sub-t a" x="110" y="312" text-anchor="middle" font-size="27" font-weight="900" fill="#ede6d6" stroke="#0f0e0c" stroke-width="7" stroke-linejoin="round" paint-order="stroke"></text>
+          <rect x="0" y="385" width="220" height="7" fill="#2e2a24"/>
+          <rect class="izq prog-v" x="0" y="385" width="220" height="7" fill="#e8a33d"/>
+        </g>
+        <rect width="220" height="392" rx="18" fill="none" stroke="#e8a33d" stroke-width="3"/>
+      </g></g>
+      <g class="entrega">
+        <rect x="400" y="214" width="560" height="412" rx="18" fill="#12110f" stroke="#2e2a24" stroke-width="2"/>
+        <use href="#i-palomita" x="424" y="236" width="26" height="26" style="color:#8fc177"/>
+        <text x="460" y="257" font-size="22" font-weight="800" fill="#ede6d6">Entrega</text>
+        <g transform="translate(424 282)">
+          <rect width="512" height="52" rx="12" fill="#221f1b" stroke="#2e2a24" stroke-width="2"/>
+          <use href="#i-descargar" x="18" y="14" width="24" height="24" style="color:#ede6d6"/>
+          <text x="54" y="33" font-size="18" font-weight="700" fill="#ede6d6">Descargar</text>
+          <text x="494" y="32" text-anchor="end" font-size="15" fill="#9a907f">vertical.mp4</text>
+        </g>
+        <rect x="424" y="350" width="512" height="252" rx="14" fill="#171512" stroke="#2e2a24" stroke-width="2"/>
+        <use href="#i-subtitulos" x="444" y="366" width="26" height="26" style="color:#e8a33d"/>
+        <text x="480" y="386" font-size="20" font-weight="800" fill="#ede6d6">Subtítulos</text>
+        <g font-size="15" font-weight="700" fill="#ede6d6">
+          <rect x="444" y="406" width="170" height="40" rx="10" fill="#221f1b" stroke="#2e2a24" stroke-width="2"/><text x="458" y="431">Palabra resaltada</text>
+          <rect x="624" y="406" width="150" height="40" rx="10" fill="#221f1b" stroke="#2e2a24" stroke-width="2"/><text x="638" y="431">Tamaño: mediano</text>
+          <rect x="784" y="406" width="146" height="40" rx="10" fill="#221f1b" stroke="#2e2a24" stroke-width="2"/><text x="798" y="431">Posición: abajo</text>
+        </g>
+        <text x="444" y="484" font-size="16" fill="#9a907f">Gratis: Sloth oye la voz en tu computadora.</text>
+        <g transform="translate(444 524)">
+          <rect width="472" height="56" rx="12" fill="#e8a33d"/>
+          <text x="236" y="35" text-anchor="middle" font-size="20" font-weight="800" fill="#1b1408">Ponerle subtítulos</text>
+          <g class="progreso-s">
+            <rect width="472" height="56" rx="12" fill="#221f1b" stroke="#e8a33d" stroke-width="2"/>
+            <text x="20" y="26" font-size="16" font-weight="700" fill="#e8a33d">Oyendo la voz…</text>
+            <rect x="20" y="36" width="432" height="8" rx="4" fill="#2e2a24"/>
+            <rect class="izq barra-s" x="20" y="36" width="432" height="8" rx="4" fill="#e8a33d"/>
+          </g>
+          <g class="hecho-s a">
+            <rect width="472" height="56" rx="12" fill="#221f1b" stroke="#8fc177" stroke-width="2"/>
+            <use href="#i-palomita" x="20" y="16" width="24" height="24" style="color:#8fc177"/>
+            <text x="54" y="35" font-size="18" font-weight="800" fill="#8fc177">Listo <tspan font-weight="500" fill="#9a907f">· 0 tokens · 0 créditos</tspan></text>
+          </g>
+        </g>
+      </g>
+      <g class="cursor"><g class="punta" style="transform-box: fill-box; transform-origin: 0 0"><use href="#puntero"/></g></g>
+    </g>
+    <g class="kicker"><use href="#i-subtitulos" x="150" y="693" width="32" height="32" style="color:#e8a33d"/><text x="194" y="720" font-size="30" font-weight="800" fill="#e8a33d" letter-spacing="4">SUBTÍTULOS</text></g>
+    <text class="partir-palabras" x="150" y="795" font-size="60" font-weight="800" fill="#ede6d6">Subtítulos gratis</text>
+    <g class="linea"><text x="150" y="850" font-size="32" font-weight="500" fill="#9a907f">Debajo de «Descargar», en cada video. Sin agente</text></g>
+    <g class="linea"><text x="150" y="895" font-size="32" font-weight="500" fill="#9a907f">ni créditos: todo pasa en tu computadora.</text></g>
+  </g></g>
+
+  <!-- 3 · Música de fondo, que baja sola cuando hablas -->
+  <g class="escena" id="e3"><g class="cuerpo">
+    <use href="#panel"/>
+    <g clip-path="url(#clipPanel)">
+      <g class="menu-voz">
+        <rect x="120" y="214" width="370" height="412" rx="18" fill="#12110f" stroke="#2e2a24" stroke-width="2"/>
+        <use href="#i-microfono" x="144" y="236" width="26" height="26" style="color:#ede6d6"/>
+        <text x="182" y="257" font-size="22" font-weight="800" fill="#ede6d6">Voz</text>
+        <g class="con-musica"><text x="230" y="257" font-size="22" font-weight="800" fill="#e8a33d">· con música</text></g>
+        <rect x="138" y="284" width="334" height="66" rx="12" fill="rgba(143, 193, 119, 0.10)" stroke="#8fc177" stroke-width="2"/>
+        <circle cx="172" cy="317" r="20" fill="#8fc177"/>
+        <use href="#i-microfono" x="161" y="306" width="22" height="22" style="color:#1b1408"/>
+        <text x="204" y="312" font-size="18" font-weight="700" fill="#ede6d6">Tu voz</text>
+        <text x="204" y="336" font-size="14" fill="#9a907f">Clonada</text>
+        <rect x="138" y="362" width="334" height="66" rx="12" fill="#171512" stroke="#2e2a24" stroke-width="2"/>
+        <circle cx="172" cy="395" r="20" fill="#2e2a24"/>
+        <use href="#i-microfono" x="161" y="384" width="22" height="22" style="color:#9a907f"/>
+        <text x="204" y="390" font-size="18" font-weight="700" fill="#ede6d6">AI Studio</text>
+        <text x="204" y="414" font-size="14" fill="#9a907f">De Google</text>
+        <line x1="120" y1="500" x2="490" y2="500" stroke="#2e2a24" stroke-width="2"/>
+        <rect class="musica-borde" x="138" y="520" width="334" height="82" rx="12" fill="#171512" stroke="#2e2a24" stroke-width="2"/>
+        <use href="#i-musica" x="156" y="547" width="28" height="28" style="color:#e8a33d"/>
+        <text x="198" y="556" font-size="18" font-weight="800" fill="#ede6d6">Música de fondo</text>
+        <text x="198" y="581" font-size="14" fill="#9a907f">Baja sola cuando hablan</text>
+        <rect x="424" y="545" width="32" height="32" rx="8" fill="none" stroke="#9a907f" stroke-width="2"/>
+        <g transform="translate(440 561)"><g class="casilla a">
+          <rect x="-16" y="-16" width="32" height="32" rx="8" fill="#e8a33d"/>
+          <use href="#i-palomita" x="-11" y="-11" width="22" height="22" style="color:#1b1408"/>
+        </g></g>
+      </g>
+      <g class="mezcla">
+        <rect x="510" y="214" width="450" height="412" rx="18" fill="#12110f" stroke="#2e2a24" stroke-width="2"/>
+        <text x="534" y="254" font-size="19" font-weight="800" fill="#ede6d6">Así suena tu video</text>
+        <use href="#i-microfono" x="534" y="280" width="22" height="22" style="color:#ede6d6"/>
+        <text x="564" y="297" font-size="16" font-weight="700" fill="#9a907f">Voz</text>
+        <g class="pista-voz"></g>
+        <use href="#i-musica" x="534" y="422" width="22" height="22" style="color:#e8a33d"/>
+        <text x="564" y="439" font-size="16" font-weight="700" fill="#9a907f">Música</text>
+        <line class="sin-musica" x1="536" y1="500" x2="936" y2="500" stroke="#2e2a24" stroke-width="3" stroke-dasharray="8 8"/>
+        <g class="pista-musica"></g>
+        <g class="cabezal"><line x1="0" y1="312" x2="0" y2="540" stroke="#f2e7cf" stroke-width="3" stroke-linecap="round"/></g>
+        <g class="nota-m"><text x="534" y="596" font-size="16" fill="#9a907f">Sube en los silencios y baja cuando hablas.</text></g>
+      </g>
+      <g class="cursor"><g class="punta" style="transform-box: fill-box; transform-origin: 0 0"><use href="#puntero"/></g></g>
+    </g>
+    <g class="kicker"><use href="#i-musica" x="150" y="693" width="32" height="32" style="color:#e8a33d"/><text x="194" y="720" font-size="30" font-weight="800" fill="#e8a33d" letter-spacing="4">MÚSICA</text></g>
+    <text class="partir-palabras" x="150" y="795" font-size="60" font-weight="800" fill="#ede6d6">Música de fondo</text>
+    <g class="linea"><text x="150" y="850" font-size="32" font-weight="500" fill="#9a907f">Se enciende en el menú «Voz» y baja sola cuando</text></g>
+    <g class="linea"><text x="150" y="895" font-size="32" font-weight="500" fill="#9a907f">hablas. Por ahora, en el video explicativo.</text></g>
+  </g></g>
+
+  <!-- 4 · El Diff y el Documental, más rápidos y más baratos -->
+  <g class="escena" id="e4"><g class="cuerpo">
+    <use href="#panel"/>
+    <g clip-path="url(#clipPanel)">
+      <g class="carreras"></g>
+    </g>
+    <g class="kicker"><use href="#i-zap" x="150" y="693" width="32" height="32" style="color:#e8a33d"/><text x="194" y="720" font-size="30" font-weight="800" fill="#e8a33d" letter-spacing="4">VELOCIDAD</text></g>
+    <text class="partir-palabras" x="150" y="795" font-size="60" font-weight="800" fill="#ede6d6">Más rápido y más barato</text>
+    <g class="linea"><text x="150" y="850" font-size="32" font-weight="500" fill="#9a907f">El Diff y el Documental ya usan el motor nuevo.</text></g>
+    <g class="linea"><text x="150" y="895" font-size="32" font-weight="500" fill="#9a907f">Y el chat nuevo dice cuánto cuesta cada modelo.</text></g>
+  </g></g>
+
+  <!-- 5 · El fondo de la comunidad: la mitad de la tarjeta, para quienes comparten estilos -->
+  <g class="escena" id="e5"><g class="cuerpo">
+    <use href="#panel"/>
+    <g clip-path="url(#clipPanel)">
+      <g class="bote">
+        <rect x="120" y="214" width="320" height="412" rx="18" fill="#12110f" stroke="#2e2a24" stroke-width="2"/>
+        <use href="#i-tarjeta" x="144" y="236" width="26" height="26" style="color:#ede6d6"/>
+        <text x="182" y="257" font-size="20" font-weight="800" fill="#ede6d6">Entra con tarjeta</text>
+        <g clip-path="url(#clipFrasco)">
+          <rect x="190" y="316" width="180" height="270" fill="#171512"/>
+          <rect class="abajo nivel" x="190" y="356" width="180" height="230" fill="#9a907f" fill-opacity=".4"/>
+          <g class="mitad a">
+            <rect x="190" y="356" width="180" height="115" fill="#e8a33d"/>
+            <text x="280" y="408" text-anchor="middle" font-size="26" font-weight="900" fill="#1b1408">La mitad</text>
+            <text x="280" y="436" text-anchor="middle" font-size="16" font-weight="700" fill="#1b1408">es el fondo</text>
+          </g>
+        </g>
+        <rect x="190" y="316" width="180" height="270" rx="22" fill="none" stroke="#f2e7cf" stroke-width="5"/>
+        <rect x="214" y="300" width="132" height="20" rx="8" fill="#9a907f" stroke="#171719" stroke-width="3"/>
+        <g class="caen"></g>
+      </g>
+      <g class="estilos-f"></g>
+      <g class="primer">
+        <use href="#i-reloj" x="474" y="574" width="24" height="24" style="color:#e8a33d"/>
+        <text x="508" y="593" font-size="18" font-weight="700" fill="#ede6d6">Primer reparto: <tspan fill="#e8a33d">1 de enero de 2027</tspan></text>
+      </g>
+      <g class="vuelan"></g>
+    </g>
+    <g class="kicker"><use href="#i-monedas" x="150" y="693" width="32" height="32" style="color:#e8a33d"/><text x="194" y="720" font-size="30" font-weight="800" fill="#e8a33d" letter-spacing="4">COMUNIDAD</text></g>
+    <text class="partir-palabras" x="150" y="795" font-size="60" font-weight="800" fill="#ede6d6">El fondo de la comunidad</text>
+    <g class="linea"><text x="150" y="850" font-size="32" font-weight="500" fill="#9a907f">La mitad de lo que entra con tarjeta se reparte</text></g>
+    <g class="linea"><text x="150" y="895" font-size="32" font-weight="500" fill="#9a907f">entre quienes comparten estilos, según su uso.</text></g>
+  </g></g>
+
+  <!-- 6 · Y además -->
+  <g class="escena" id="e6"><g class="cuerpo">
+    <use href="#panel"/>
+    <g clip-path="url(#clipPanel)">
+      <g class="lista"></g>
+    </g>
+    <g class="kicker"><use href="#i-mas" x="150" y="693" width="32" height="32" style="color:#e8a33d"/><text x="194" y="720" font-size="30" font-weight="800" fill="#e8a33d" letter-spacing="4">Y ADEMÁS</text></g>
+    <text class="partir-palabras" x="150" y="795" font-size="60" font-weight="800" fill="#ede6d6">Y todavía hay más</text>
+    <g class="linea"><text x="150" y="850" font-size="32" font-weight="500" fill="#9a907f">Todo esto también llega con la 0.4.3.</text></g>
+  </g></g>
+
+  <!-- 7 · Los arreglos: cada error muerde el polvo -->
+  <g class="escena" id="e7"><g class="cuerpo">
+    <use href="#panel"/>
+    <g clip-path="url(#clipPanel)">
+      <g class="lista"></g>
+    </g>
+    <g class="kicker"><use href="#i-llave" x="150" y="693" width="32" height="32" style="color:#e8a33d"/><text x="194" y="720" font-size="30" font-weight="800" fill="#e8a33d" letter-spacing="4">ARREGLOS</text></g>
+    <text class="partir-palabras" x="150" y="795" font-size="60" font-weight="800" fill="#ede6d6">Y otro muerde el polvo</text>
+    <g class="linea"><text x="150" y="850" font-size="32" font-weight="500" fill="#9a907f">Gracias por contarnos lo que fallaba.</text></g>
+  </g></g>
+
+  <!-- 8 · A crear: el mismo concierto, con el número en la pantalla -->
+  <g class="escena" id="e8"><g class="cuerpo">
+    <g class="tablado"></g>
+    <rect class="destello" width="1080" height="1080" fill="#f4b04a" opacity="0"/>
+    <g class="neon" style="transform-box: view-box; transform-origin: 540px 724px">
+      <text class="neon-glow" x="540" y="772" text-anchor="middle" font-size="140" font-weight="900" fill="none" stroke="#f4b04a" stroke-width="40" stroke-opacity=".22" stroke-linejoin="round">¡A crear!</text>
+      <text class="partir-letras" x="540" y="772" text-anchor="middle" font-size="140" font-weight="900" fill="#f2e7cf" stroke="#e8a33d" stroke-width="14" stroke-linejoin="round" paint-order="stroke">¡A crear!</text>
+    </g>
+    <g class="linea"><text x="540" y="838" text-anchor="middle" font-size="32" font-weight="600" fill="#ede6d6">Todo esto ya está en tu Sloth.</text></g>
+    <g class="linea"><text x="540" y="882" text-anchor="middle" font-size="28" font-weight="500" fill="#9a907f" class="despedida">Actualiza desde la app o en sloth.vancci.org</text></g>
+    <g class="publico"></g>
+  </g></g>
+</svg>
+<canvas id="chispas"></canvas>
+<video class="baile fuera" id="baile" src="baile.webm" muted loop playsinline preload="auto" aria-hidden="true"></video>
+<aside class="sonando fuera" id="sonando">
+  <div class="sonando-cab">
+    <div class="eq" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+    <div><span>Sonando</span><b>Another One Bites the Dust</b><small>Queen</small></div>
+  </div>
+  <div class="sonando-video"><iframe id="yt" title="Queen - Another One Bites the Dust (Official Video)" allow="autoplay; encrypted-media; picture-in-picture" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe></div>
+</aside>
+<nav class="controles">
+  <button id="anterior" class="oculto" type="button"><svg><use href="#i-izq"/></svg>Anterior</button>
+  <span id="cuenta"></span>
+  <button id="siguiente" type="button"><span id="sig-texto">Ver lo nuevo</span><svg><use id="sig-icono" href="#i-flecha"/></svg></button>
+</nav>
+</div>
+
+<script>
+'use strict';
+const NS = 'http://www.w3.org/2000/svg';
+const svg = document.getElementById('lienzo');
+const quieto = matchMedia('(prefers-reduced-motion: reduce)').matches;
+// Dentro de Sloth (web/src/Novedades.tsx, en un iframe): el final cierra la guía en vez de volver a empezar.
+const enSloth = window.parent !== window;
+const cerrarGuia = () => parent.postMessage('sloth-novedades-cerrar', location.origin);
+const escenas = [...svg.querySelectorAll('.escena')];
+const N = escenas.length, FIN = N - 1;
+const C = { amber: '#e8a33d', amber2: '#f4b04a', ok: '#8fc177', bad: '#e06c55', text: '#ede6d6', muted: '#9a907f', line: '#2e2a24', crema: '#f2e7cf', p2: '#221f1b' };
+const COLORES = [C.amber, C.amber2, C.ok, C.bad, C.text, C.crema];
+const REBOTE = 'cubic-bezier(.3,1.6,.5,1)';
+const SUAVE = 'cubic-bezier(.2,.8,.2,1)';
+
+const en = (e, s) => e.querySelector(s);
+const todos = (e, s) => [...e.querySelectorAll(s)];
+const azar = (a, b) => a + Math.random() * (b - a);
+const espera = (ms) => new Promise((r) => setTimeout(r, quieto ? 0 : ms));
+function A(el, kf, op = {}) {
+  const o = { duration: 600, easing: SUAVE, fill: 'both', ...op };
+  if (quieto) Object.assign(o, { duration: 1, delay: 0, iterations: 1, endDelay: 0 });
+  return el.animate(kf, o);
+}
+const oculto = (el) => A(el, [{ opacity: 0 }, { opacity: 0 }], { duration: 1 });
+const aparece = (el, op = {}) => A(el, [{ opacity: 0, transform: 'translateY(24px)' }, { opacity: 1, transform: 'none' }], op);
+const salta = (el, op = {}) => A(el, [{ opacity: 0, transform: 'scale(.3)' }, { opacity: 1, transform: 'scale(1)' }], { duration: 600, easing: REBOTE, ...op });
+function tween(ms, f, vivo, ease = (t) => 1 - Math.pow(1 - t, 3)) {
+  if (quieto) { f(1); return Promise.resolve(true); }
+  return new Promise((res) => {
+    const t0 = performance.now();
+    const paso = (now) => {
+      if (!vivo()) return res(false);
+      const t = Math.min(1, (now - t0) / ms);
+      f(ease(t));
+      if (t < 1) requestAnimationFrame(paso); else res(true);
+    };
+    requestAnimationFrame(paso);
+  });
+}
+function sacudir(el, f = 12) {
+  if (quieto) return;
+  el.animate([0, 1, 2, 3, 4, 5, 6].map((k) => ({ transform: k === 6 ? 'translate(0,0)' : `translate(${azar(-f, f) * (1 - k / 7)}px, ${azar(-f, f) * (1 - k / 7)}px)` })), { duration: 460, easing: 'linear' });
+}
+// De la pantalla a las coordenadas de 1080
+function aLienzo(el) {
+  const r = el.getBoundingClientRect(), s = svg.getBoundingClientRect();
+  return [((r.left + r.width / 2 - s.left) / s.width) * 1080, ((r.top + r.height / 2 - s.top) / s.height) * 1080];
+}
+
+/* ---------- Partículas en canvas: confeti, chispas, cohetes y polvo ---------- */
+const cv = document.getElementById('chispas');
+const cx = cv.getContext('2d');
+let esc = 1;
+function medir() {
+  const r = cv.getBoundingClientRect(), d = Math.min(devicePixelRatio || 1, 2);
+  cv.width = Math.round(r.width * d); cv.height = Math.round(r.height * d); esc = cv.width / 1080;
+}
+addEventListener('resize', medir); medir();
+const P = [];
+let corriendo = false, ultimo = 0;
+function arrancar() { if (!corriendo && !quieto) { corriendo = true; ultimo = performance.now(); requestAnimationFrame(cuadro); } }
+function confeti(x, y, n, ang = -90, abre = 70, fuerza = [9, 18]) {
+  if (quieto) return;
+  for (let i = 0; i < n; i++) {
+    const a = ((ang + azar(-abre / 2, abre / 2)) * Math.PI) / 180, v = azar(...fuerza);
+    P.push({ t: 'c', x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, r: azar(0, 6.3), vr: azar(-0.25, 0.25), f: azar(0, 6.3), vf: azar(0.08, 0.2), w: azar(11, 19), h: azar(6, 11), c: COLORES[i % 6], redondo: Math.random() < 0.28 });
+  }
+  arrancar();
+}
+// El polvo que levanta lo que cae: bolitas que se abren, suben un poco y se deshacen
+function polvo(x, y, n, abre = 40, radio = [8, 22]) {
+  if (quieto) return;
+  for (let i = 0; i < n; i++) P.push({ t: 'p', x: x + azar(-abre, abre), y: y + azar(-8, 8), vx: azar(-2.4, 2.4), vy: azar(-1.8, -0.2), r: azar(...radio), c: i % 3 ? C.crema : C.muted, vida: azar(0.6, 1), dv: azar(0.012, 0.022) });
+  arrancar();
+}
+function estallido(x, y, c, n = 80, fuerza = 9) {
+  if (quieto) return;
+  for (let i = 0; i < n; i++) {
+    const a = (i / n) * Math.PI * 2 + azar(-0.05, 0.05), v = azar(fuerza * 0.35, fuerza);
+    P.push({ t: 's', x, y, px: x, py: y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, c: Math.random() < 0.3 ? C.crema : c, vida: 1, dv: azar(0.007, 0.014) });
+  }
+  P.push({ t: 'o', x, y, r: 6, vida: 1, c });
+  arrancar();
+}
+function chispa(x, y, c = C.amber2) { P.push({ t: 's', x, y, px: x, py: y, vx: azar(-1.2, 1.2), vy: azar(-1.5, 0.5), c, vida: 0.9, dv: 0.035 }); arrancar(); }
+function cuadro(now) {
+  const dt = Math.min(3, (now - ultimo) / 16.67); ultimo = now;
+  cx.setTransform(1, 0, 0, 1, 0, 0); cx.clearRect(0, 0, cv.width, cv.height);
+  cx.setTransform(esc, 0, 0, esc, 0, 0);
+  for (let i = P.length - 1; i >= 0; i--) {
+    const p = P[i];
+    if (p.t === 'c') {
+      p.vy += 0.3 * dt; p.vx *= Math.pow(0.982, dt); p.vy *= Math.pow(0.985, dt);
+      if (p.vy > 3.6) p.vy = 3.6;
+      p.x += (p.vx + Math.sin(p.f) * 0.7) * dt; p.y += p.vy * dt; p.r += p.vr * dt; p.f += p.vf * dt;
+      if (p.y > 1120 || p.x < -60 || p.x > 1140) { P.splice(i, 1); continue; }
+      cx.globalCompositeOperation = 'source-over'; cx.globalAlpha = 1;
+      cx.save(); cx.translate(p.x, p.y); cx.rotate(p.r); cx.scale(1, Math.cos(p.f)); cx.fillStyle = p.c;
+      if (p.redondo) { cx.beginPath(); cx.arc(0, 0, p.h * 0.65, 0, 6.283); cx.fill(); } else cx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h);
+      cx.restore();
+    } else if (p.t === 's') {
+      p.px = p.x; p.py = p.y;
+      p.vy += 0.08 * dt; p.vx *= Math.pow(0.97, dt); p.vy *= Math.pow(0.97, dt);
+      p.x += p.vx * dt; p.y += p.vy * dt; p.vida -= p.dv * dt;
+      if (p.vida <= 0) { P.splice(i, 1); continue; }
+      cx.globalCompositeOperation = 'lighter'; cx.globalAlpha = p.vida;
+      cx.strokeStyle = p.c; cx.lineWidth = 1.5 + p.vida * 3; cx.lineCap = 'round';
+      cx.beginPath(); cx.moveTo(p.px - p.vx * 2, p.py - p.vy * 2); cx.lineTo(p.x, p.y); cx.stroke();
+    } else if (p.t === 'p') {
+      p.vx *= Math.pow(0.95, dt); p.vy *= Math.pow(0.96, dt);
+      p.x += p.vx * dt; p.y += p.vy * dt; p.r += 0.45 * dt; p.vida -= p.dv * dt;
+      if (p.vida <= 0) { P.splice(i, 1); continue; }
+      cx.globalCompositeOperation = 'source-over'; cx.globalAlpha = p.vida * 0.3;
+      cx.fillStyle = p.c; cx.beginPath(); cx.arc(p.x, p.y, p.r, 0, 6.283); cx.fill();
+    } else if (p.t === 'o') {
+      p.r += 7 * dt; p.vida -= 0.06 * dt;
+      if (p.vida <= 0) { P.splice(i, 1); continue; }
+      cx.globalCompositeOperation = 'lighter'; cx.globalAlpha = p.vida * 0.5;
+      cx.strokeStyle = p.c; cx.lineWidth = 4;
+      cx.beginPath(); cx.arc(p.x, p.y, p.r, 0, 6.283); cx.stroke();
+    }
+  }
+  cx.globalCompositeOperation = 'source-over'; cx.globalAlpha = 1;
+  if (P.length) requestAnimationFrame(cuadro); else { corriendo = false; cx.setTransform(1, 0, 0, 1, 0, 0); cx.clearRect(0, 0, cv.width, cv.height); }
+}
+// Una estela de chispas detrás de algo que vuela
+function estela(el, ms, c) {
+  if (quieto) return;
+  const t0 = performance.now();
+  const f = () => { if (performance.now() - t0 > ms) return; const [x, y] = aLienzo(el); chispa(x, y, c); chispa(x, y, c); requestAnimationFrame(f); };
+  requestAnimationFrame(f);
+}
+
+/* ---------- Piezas que se construyen una vez ---------- */
+function el(tag, attrs = {}, padre) {
+  const n = document.createElementNS(NS, tag);
+  for (const k in attrs) n.setAttribute(k, attrs[k]);
+  if (padre) padre.appendChild(n);
+  return n;
+}
+// Parte un texto en letras o palabras, cada una en su <g> para animarla
+function partir(t, modo) {
+  const s = t.textContent, g = el('g');
+  const unidades = [];
+  if (modo === 'letra') { for (let i = 0; i < s.length; i++) if (s[i] !== ' ') unidades.push([i, s[i]]); }
+  else { let i = 0; for (const w of s.split(' ')) { if (w) unidades.push([i, w]); i += w.length + 1; } }
+  for (const [i, u] of unidades) {
+    const x = t.getStartPositionOfChar(i).x;
+    const w = el('g', { class: (modo === 'letra' ? 'letra' : 'palabra') + ' a' }, g);
+    const n = t.cloneNode(false);
+    n.removeAttribute('class'); n.setAttribute('x', x.toFixed(1)); n.setAttribute('text-anchor', 'start'); n.textContent = u;
+    w.appendChild(n);
+  }
+  t.replaceWith(g);
+}
+/* ---------- El concierto: el escenario y el público ---------- */
+const COLOR_FOCO = [C.amber2, C.crema, C.ok, C.bad];
+// Focos, pantalla LED (con su texto), láseres, piso con luces y el perezoso de rockero que sube por el elevador
+function tablado(e, texto) {
+  const t = en(e, '.tablado');
+  const focos = el('g', { class: 'focos' }, t);
+  [190, 405, 675, 890].forEach((x, k) => {
+    const pos = el('g', { transform: `translate(${x} -30)` }, focos);
+    el('path', { class: 'foco arriba', d: 'M-14 0 L14 0 L170 980 L-170 980 Z', fill: `url(#foco${k})` }, pos);
+  });
+  const pantalla = el('g', { class: 'pantalla' }, t);
+  el('rect', { x: 370, y: 50, width: 340, height: 236, rx: 14, fill: '#0b0a09' }, pantalla);
+  const dentro = el('g', { 'clip-path': 'url(#clipPantalla)' }, pantalla);
+  for (let k = 0; k < 17; k++) el('rect', { class: 'barra-eq abajo', x: 374 + k * 20, y: 140, width: 14, height: 146, rx: 3, fill: COLORES[k % 4], 'fill-opacity': 0.4 }, dentro);
+  el('text', { class: 'titulo-pantalla', x: 540, y: 186, 'text-anchor': 'middle', 'font-size': 80, 'font-weight': 900, 'letter-spacing': 4, fill: C.amber }, dentro).textContent = texto;
+  el('rect', { x: 370, y: 50, width: 340, height: 236, fill: 'url(#led)' }, dentro);
+  el('rect', { x: 370, y: 50, width: 340, height: 236, rx: 14, fill: 'none', stroke: C.line, 'stroke-width': 4 }, pantalla);
+  const laseres = el('g', { class: 'laseres' }, t);
+  for (const [x, lado] of [[150, 1], [930, -1]]) {
+    const abanico = el('g', { class: 'abanico', 'data-lado': lado }, el('g', { transform: `translate(${x} 640)` }, laseres));
+    [-62, -48, -34, -20].forEach((a, j) => {
+      const r = ((-90 + lado * (90 + a)) * Math.PI) / 180;
+      el('line', { x1: 0, y1: 0, x2: Math.cos(r) * 1300, y2: Math.sin(r) * 1300, stroke: j % 2 ? C.ok : C.bad, 'stroke-width': 3, 'stroke-opacity': 0.75 }, abanico);
+    });
+  }
+  el('path', { d: 'M210 590 H870 L960 646 H120 Z', fill: '#171512', stroke: C.line, 'stroke-width': 3 }, t);
+  for (let x = 146; x < 940; x += 33) el('rect', { class: 'led', x, y: 638, width: 18, height: 6, rx: 3, fill: C.amber2 }, t);
+  el('ellipse', { class: 'sombra-idol a', cx: 540, cy: 594, rx: 110, ry: 13, fill: '#000', opacity: 0.55 }, t);
+  const idol = el('g', { class: 'sube-idol' }, el('g', { transform: 'translate(540 466) scale(.5) translate(-256 -270)' }, t));
+  el('use', { href: '#sloth-rock' }, el('g', { class: 'baila abajo' }, idol));
+}
+// La fila de cabezas de abajo; unos levantan su encendedor
+function publico(e, base) {
+  const pub = en(e, '.publico');
+  for (let k = 0; k < 15; k++) {
+    const x = 18 + k * 75 + azar(-8, 8), y = base + azar(-8, 8);
+    if (k % 2 === 0 || k % 5 === 3) {
+      el('line', { x1: x + 22, y1: y + 40, x2: x + 40, y2: y - 52, stroke: '#070706', 'stroke-width': 16, 'stroke-linecap': 'round' }, pub);
+      const vara = el('g', { class: 'vara', 'data-k': k }, el('g', { transform: `translate(${x + 40} ${y - 52})` }, pub));
+      el('rect', { x: -8, y: -30, width: 16, height: 38, rx: 4, fill: '#2e2a24', stroke: '#070706', 'stroke-width': 3 }, vara);
+      el('rect', { x: -8, y: -40, width: 16, height: 12, rx: 3, fill: C.muted, stroke: '#070706', 'stroke-width': 3 }, vara);
+      el('circle', { class: 'halo', cx: 0, cy: -64, r: 34, fill: C.amber, 'fill-opacity': 0.22 }, vara);
+      const llama = el('g', { class: 'llama abajo' }, vara);
+      el('path', { class: 'bulbo', d: 'M0 -92 C 15 -72 15 -54 0 -42 C -15 -54 -15 -72 0 -92 Z', fill: C.amber, stroke: '#070706', 'stroke-width': 3, 'stroke-linejoin': 'round' }, llama);
+      el('path', { d: 'M0 -68 C 6 -60 6 -52 0 -46 C -6 -52 -6 -60 0 -68 Z', fill: C.crema }, llama);
+    }
+    el('path', { d: `M${x - 60} 1090 Q${x - 54} ${y + 28} ${x} ${y + 26} Q${x + 54} ${y + 28} ${x + 60} 1090 Z`, fill: '#070706' }, pub);
+    el('circle', { cx: x, cy: y - 6, r: 30, fill: '#070706' }, pub);
+  }
+}
+const BEAT = 545; // Los tiempos de la canción: 110 por minuto
+const tono = () => [C.amber, C.ok, C.bad, C.crema, C.amber].map((c, k) => ({ fill: c, offset: k / 4, easing: 'steps(1)' }));
+const fuego = () => [C.amber, C.amber2, C.crema, C.amber2, C.amber].map((c, k) => ({ fill: c, offset: k / 4, easing: 'steps(1)' }));
+// Arranca el concierto: pantalla, focos, ecualizador, luces, encendedores y el perezoso subiendo
+function concierto(e) {
+  A(en(e, '.pantalla'), [{ opacity: 0 }, { opacity: 1, offset: 0.15 }, { opacity: 0.15, offset: 0.3 }, { opacity: 1, offset: 0.45 }, { opacity: 0.4, offset: 0.6 }, { opacity: 1 }], { duration: 800, easing: 'linear' });
+  A(en(e, '.focos'), [{ opacity: 0 }, { opacity: 1 }], { duration: 900 });
+  todos(e, '.foco').forEach((f, k) => A(f, [{ transform: `rotate(${k < 2 ? -26 : 26}deg)` }, { transform: `rotate(${k < 2 ? 16 : -16}deg)` }], { duration: 2100 + k * 380, iterations: Infinity, direction: 'alternate', easing: 'ease-in-out' }));
+  todos(e, '.barra-eq').forEach((b) => A(b, [{ transform: 'scaleY(.15)' }, { transform: `scaleY(${azar(0.5, 1)})` }], { duration: azar(240, 520), iterations: Infinity, direction: 'alternate', easing: 'steps(4)' }));
+  todos(e, '.led').forEach((l, k) => A(l, [{ opacity: 0.15 }, { opacity: 1 }, { opacity: 0.15 }], { duration: BEAT * 2, delay: -k * 60, iterations: Infinity, easing: 'steps(3)' }));
+  A(en(e, '.titulo-pantalla'), tono(), { duration: BEAT * 4, iterations: Infinity });
+  todos(e, '.vara').forEach((v) => {
+    A(v, [{ transform: 'rotate(-14deg)' }, { transform: 'rotate(14deg)' }], { duration: BEAT * 2, delay: -v.dataset.k * 70, iterations: Infinity, direction: 'alternate', easing: 'ease-in-out' });
+    for (const c of todos(v, '.halo, .bulbo')) A(c, fuego(), { duration: BEAT * 2, delay: -v.dataset.k * 90, iterations: Infinity });
+    A(en(v, '.llama'), [{ transform: 'scale(1, .82)' }, { transform: 'scale(.9, 1.12)' }], { duration: azar(260, 420), iterations: Infinity, direction: 'alternate', easing: 'steps(3)' });
+  });
+  oculto(en(e, '.laseres')); oculto(en(e, '.neon-glow'));
+  A(en(e, '.sube-idol'), [{ transform: 'translateY(560px)', opacity: 0 }, { opacity: 1, offset: 0.15 }, { transform: 'translateY(-50px)', offset: 0.72 }, { transform: 'none', opacity: 1 }], { duration: 1100, delay: 300, easing: 'cubic-bezier(.2,.8,.2,1)' });
+  A(en(e, '.sombra-idol'), [{ transform: 'scale(0)' }, { transform: 'scale(1)' }], { duration: 500, delay: 1050 });
+}
+// El golpe grande: polvo, confeti, destello, láseres y el neón que late
+function explota(e, neon) {
+  polvo(120, 1010, 46, 130, [16, 40]); polvo(960, 1010, 46, 130, [16, 40]);
+  confeti(-10, 1000, 80, -60, 30, [17, 28]); confeti(1090, 1000, 80, -120, 30, [17, 28]);
+  confeti(540, 640, 70, -90, 120, [12, 22]);
+  sacudir(en(e, '.cuerpo'), 14);
+  A(en(e, '.destello'), [{ opacity: 0 }, { opacity: 0.32, offset: 0.15 }, { opacity: 0 }], { duration: 700, easing: 'ease-out' });
+  A(en(e, '.laseres'), [{ opacity: 0.9 }, { opacity: 0.25 }, { opacity: 0.9 }], { duration: BEAT / 2, iterations: Infinity, easing: 'steps(2)' });
+  todos(e, '.abanico').forEach((a) => A(a, [{ transform: 'rotate(0deg)' }, { transform: `rotate(${a.dataset.lado * 22}deg)` }], { duration: BEAT * 2, iterations: Infinity, direction: 'alternate', easing: 'ease-in-out' }));
+  A(en(e, '.neon-glow'), [{ opacity: 1 }, { opacity: 0.35 }, { opacity: 1 }, { opacity: 0.8 }], { duration: BEAT * 2, iterations: Infinity, easing: 'steps(4)' });
+  A(neon, [{ transform: 'scale(1)' }, { transform: 'scale(1.07)', offset: 0.12 }, { transform: 'scale(1)', offset: 0.45 }, { transform: 'scale(1)' }], { duration: BEAT, iterations: Infinity, fill: 'none' });
+}
+// El público sigue lanzando confeti mientras la escena se ve
+async function sigueLaFiesta(vivo) {
+  while (vivo() && !quieto) {
+    confeti(azar(80, 1000), 960, 9, -90, 50, [7, 13]);
+    await espera(azar(500, 1000));
+  }
+}
+
+/* ---------- Las piezas de cada novedad ---------- */
+// 1 · El mundo en miniatura de Low-Poly: una losa de papel facetado, cuatro cosas y sus banderas numeradas
+function mundo(e) {
+  const m = en(e, '.mundo');
+  const pol = (p, points, fill, op = 1, mas = {}) => el('polygon', { points, fill, 'fill-opacity': op, ...mas }, p);
+  const base = el('g', { class: 'base' }, m);
+  pol(base, '200,420 540,572 540,600 200,448', '#12110f');
+  pol(base, '540,572 880,420 880,448 540,600', '#0b0a09');
+  pol(base, '540,268 880,420 540,572 200,420', C.p2);
+  pol(base, '540,268 880,420 540,420', C.ok, 0.3);
+  pol(base, '880,420 540,572 540,420', C.amber, 0.2);
+  pol(base, '540,572 200,420 540,420', C.crema, 0.16);
+  pol(base, '200,420 540,268 540,420', C.ok, 0.2);
+  pol(base, '540,268 880,420 540,572 200,420', 'none', 1, { stroke: C.line, 'stroke-width': 3, 'stroke-linejoin': 'round' });
+  for (const [x, y] of [[296, 442], [424, 452], [466, 500], [404, 492], [498, 462]]) el('path', { class: 'ola', d: `M${x} ${y} q7 -6 14 0 q7 6 14 0`, fill: 'none', stroke: C.crema, 'stroke-width': 3, 'stroke-linecap': 'round', 'stroke-opacity': 0.55 }, base);
+  for (const [x, y] of [[585, 372], [612, 340], [662, 365], [722, 380], [775, 402], [552, 398]]) {
+    pol(base, `${x - 13},${y} ${x},${y - 34} ${x},${y}`, C.ok, 0.95);
+    pol(base, `${x},${y - 34} ${x + 13},${y} ${x},${y}`, C.ok, 0.6);
+  }
+  const cosa = (clase = 'cosa abajo') => el('g', { class: clase }, m);
+  // El mar: un barquito y el vapor que sube
+  const mar = cosa();
+  pol(mar, '346,462 398,462 388,478 354,478', C.crema);
+  pol(mar, '372,462 398,462 388,478 372,478', C.muted, 0.6);
+  el('line', { x1: 372, y1: 462, x2: 372, y2: 420, stroke: C.crema, 'stroke-width': 3 }, mar);
+  pol(mar, '375,424 375,456 398,456', C.amber);
+  pol(mar, '369,430 369,456 352,456', C.amber2);
+  for (let k = 0; k < 3; k++) el('circle', { class: 'vapor', cx: 430 + k * 15, cy: 438 - k * 4, r: 6 + k, fill: C.crema, 'fill-opacity': 0.5 }, mar);
+  // El monte, con su nube y su lluvia
+  const monte = cosa();
+  pol(monte, '312,404 392,282 472,402 392,410', C.p2);
+  pol(monte, '312,404 392,282 392,410', C.muted);
+  pol(monte, '392,282 472,402 392,410', C.muted, 0.55);
+  pol(monte, '376,307 392,282 408,306 399,315 391,305 383,316', C.crema);
+  pol(monte, '436,406 486,334 530,408 486,412', C.p2);
+  pol(monte, '436,406 486,334 486,412', C.muted, 0.85);
+  pol(monte, '486,334 530,408 486,412', C.muted, 0.45);
+  pol(monte, '342,246 364,224 398,216 428,228 444,246 424,258 362,258', C.crema);
+  pol(monte, '398,216 428,228 444,246 424,258 398,246', C.muted, 0.45);
+  for (let k = 0; k < 5; k++) el('line', { class: 'gota', x1: 364 + k * 14, y1: 264, x2: 360 + k * 14, y2: 276, stroke: C.crema, 'stroke-width': 3, 'stroke-linecap': 'round' }, monte);
+  // El río, que baja del monte a las casas
+  el('path', { class: 'rio', d: 'M418 412 C 470 428 520 428 578 442 S 646 452 672 472', fill: 'none', stroke: C.crema, 'stroke-width': 11, 'stroke-linecap': 'round', pathLength: 1, 'stroke-dasharray': 1 }, cosa('cosa'));
+  // El pueblo
+  const pueblo = cosa();
+  const casa = (x, y, s) => {
+    const w = 17 * s, h = 20 * s, t = 16 * s;
+    pol(pueblo, `${x - w},${y} ${x - w},${y - h} ${x + w},${y - h} ${x + w},${y}`, C.crema);
+    pol(pueblo, `${x},${y} ${x},${y - h} ${x + w},${y - h} ${x + w},${y}`, C.muted, 0.6);
+    pol(pueblo, `${x - w - 4},${y - h} ${x},${y - h - t} ${x + w + 4},${y - h}`, C.bad);
+    pol(pueblo, `${x},${y - h - t} ${x + w + 4},${y - h} ${x},${y - h}`, '#171719', 0.28);
+    pol(pueblo, `${x - 8 * s},${y} ${x - 8 * s},${y - 11 * s} ${x - 1 * s},${y - 11 * s} ${x - 1 * s},${y}`, '#1b1408');
+  };
+  casa(748, 452, 0.9); casa(656, 446, 0.8); casa(702, 486, 1.25);
+  // Las banderas, una por etapa
+  [[318, 462], [288, 400], [610, 432], [792, 442]].forEach(([x, y], k) => {
+    const b = el('g', { class: 'bandera abajo' }, m);
+    el('line', { x1: x, y1: y, x2: x, y2: y - 66, stroke: C.crema, 'stroke-width': 3.5, 'stroke-linecap': 'round' }, b);
+    pol(b, `${x + 2},${y - 66} ${x + 38},${y - 60} ${x + 38},${y - 38} ${x + 2},${y - 44}`, C.amber, 1, { stroke: '#171719', 'stroke-width': 2, 'stroke-linejoin': 'round' });
+    el('text', { x: x + 20, y: y - 45, 'text-anchor': 'middle', 'font-size': 17, 'font-weight': 900, fill: '#1b1408' }, b).textContent = k + 1;
+    el('circle', { cx: x, cy: y, r: 4, fill: C.crema }, b);
+  });
+}
+// 3 · Las dos pistas: la voz, con sus silencios, y la música, que baja cuando hablan
+function pistas(e) {
+  const habla = (k) => (k >= 2 && k <= 11) || (k >= 17 && k <= 27);
+  for (let k = 0; k < 34; k++) {
+    const x = 536 + k * 11.8, hv = habla(k) ? azar(18, 60) : 5, hm = habla(k) ? azar(10, 18) : azar(44, 64);
+    el('rect', { class: 'a barra-voz', x, y: 350 - hv / 2, width: 8, height: hv, rx: 4, fill: habla(k) ? C.text : C.line }, en(e, '.pista-voz'));
+    el('rect', { class: 'a barra-musica', x, y: 500 - hm / 2, width: 8, height: hm, rx: 4, fill: C.amber }, en(e, '.pista-musica'));
+  }
+}
+// 4 · Antes y ahora de cada estilo: lo que tardaba y lo que costaba, contra lo de hoy
+function carreras(e) {
+  [['El Diff', 'i-claqueta', 7, 28, 'Con un solo agente, en vez de diez'], ['Documental', 'i-video', 6.8, 25, 'De 24,6 min y $9,93 a 3,6 min y $0,40']].forEach(([nombre, icono, rapido, barato, pie], k) => {
+    const x = 120 + k * 435, c = el('g', { class: 'carrera' }, en(e, '.carreras'));
+    el('rect', { x, y: 214, width: 405, height: 412, rx: 18, fill: '#12110f', stroke: C.line, 'stroke-width': 2 }, c);
+    el('use', { href: `#${icono}`, x: x + 24, y: 234, width: 28, height: 28, style: `color:${C.amber}` }, c);
+    el('text', { x: x + 64, y: 257, 'font-size': 23, 'font-weight': 800, fill: C.text }, c).textContent = nombre;
+    [['TIEMPO', rapido, 'más rápido', 296], ['COSTO', barato, 'más barato', 436]].forEach(([titulo, veces, que, y]) => {
+      el('text', { x: x + 24, y, 'font-size': 15, 'font-weight': 700, 'letter-spacing': 1.5, fill: C.muted }, c).textContent = titulo;
+      el('text', { x: x + 24, y: y + 30, 'font-size': 15, fill: C.muted }, c).textContent = 'Antes';
+      el('rect', { class: 'izq antes', x: x + 84, y: y + 17, width: 297, height: 16, rx: 6, fill: C.bad, 'fill-opacity': 0.75 }, c);
+      el('text', { x: x + 24, y: y + 56, 'font-size': 15, 'font-weight': 700, fill: C.text }, c).textContent = 'Ahora';
+      el('rect', { class: 'izq ahora', x: x + 84, y: y + 43, width: Math.max(12, 297 / veces), height: 16, rx: 6, fill: C.ok }, c);
+      el('text', { class: 'izq veces num', 'data-veces': veces, 'data-que': que, x: x + 24, y: y + 102, 'font-size': 36, 'font-weight': 900, fill: C.ok }, c);
+    });
+    el('text', { class: 'pie', x: x + 24, y: 602, 'font-size': 15, fill: C.muted }, c).textContent = pie;
+  });
+}
+// 5 · Los estilos que se llevan su parte del fondo, y las monedas que caen al frasco y vuelan a cada uno
+function fondo(e) {
+  [['Recetas con mi voz', 'i-microfono', 120, 0.6], ['Memes al instante', 'i-risa', 60, 0.3], ['Noticias en 30 s', 'i-claqueta', 20, 0.1]].forEach(([nombre, icono, usan, parte], k) => {
+    const x = 470, y = 222 + k * 112, f = el('g', { class: 'estilo-f', 'data-parte': parte }, en(e, '.estilos-f'));
+    el('rect', { class: 'estilo-borde', x, y, width: 490, height: 96, rx: 14, fill: '#12110f', stroke: C.line, 'stroke-width': 2 }, f);
+    el('rect', { x: x + 14, y: y + 14, width: 68, height: 68, rx: 10, fill: 'url(#telaB)' }, f);
+    el('use', { href: `#${icono}`, x: x + 34, y: y + 34, width: 28, height: 28, style: `color:${C.crema}` }, f);
+    el('text', { x: x + 98, y: y + 36, 'font-size': 19, 'font-weight': 800, fill: C.text }, f).textContent = nombre;
+    el('text', { x: x + 98, y: y + 60, 'font-size': 15, fill: C.muted }, f).textContent = `Lo usan ${usan} personas`;
+    el('rect', { x: x + 98, y: y + 72, width: 290, height: 10, rx: 5, fill: C.line }, f);
+    el('rect', { class: 'izq parte', x: x + 98, y: y + 72, width: 290, height: 10, rx: 5, fill: C.ok }, f);
+    el('text', { class: 'pct num', x: x + 474, y: y + 60, 'text-anchor': 'end', 'font-size': 28, 'font-weight': 900, fill: C.amber }, f).textContent = '0 %';
+  });
+  const moneda = (padre, clase) => {
+    const m = el('g', { class: clase }, el('g', { transform: 'translate(280 414)' }, padre));
+    el('circle', { r: 14, fill: C.amber, stroke: '#171719', 'stroke-width': 3 }, m);
+    el('text', { y: 6, 'text-anchor': 'middle', 'font-size': 17, 'font-weight': 900, fill: '#1b1408' }, m).textContent = '$';
+  };
+  for (let k = 0; k < 8; k++) moneda(en(e, '.caen'), 'cae');
+  for (let k = 0; k < 10; k++) moneda(en(e, '.vuelan'), 'vuela');
+}
+// 6 y 7 · Una lista de renglones, cada uno con su icono; en los arreglos es un bicho, y debajo espera su palomita
+function lista(e, filas, alto, bicho) {
+  filas.forEach(([texto, donde, icono], k) => {
+    const y = 222 + k * alto, h = alto - 10, cy = y + h / 2, f = el('g', { class: 'fila', 'data-y': cy }, en(e, '.lista'));
+    el('rect', { class: 'fila-borde', x: 120, y, width: 840, height: h, rx: 12, fill: '#12110f', stroke: C.line, 'stroke-width': 2 }, f);
+    el('rect', { x: 140, y: cy - 17, width: 34, height: 34, rx: 9, fill: 'none', stroke: C.muted, 'stroke-width': 2 }, f);
+    const t = el('g', { transform: `translate(157 ${cy})` }, f);
+    el('use', { href: `#${icono}`, x: -11, y: -11, width: 22, height: 22, style: `color:${bicho ? C.bad : C.amber}` }, el('g', { class: 'icono a' }, t));
+    if (bicho) {
+      const tic = el('g', { class: 'tic a' }, t);
+      el('rect', { x: -17, y: -17, width: 34, height: 34, rx: 9, fill: C.ok }, tic);
+      el('use', { href: '#i-palomita', x: -12, y: -12, width: 24, height: 24, style: 'color:#1b1408' }, tic);
+    }
+    el('text', { x: 194, y: cy + 7, 'font-size': 19, 'font-weight': 700, fill: C.text }, f).textContent = texto;
+    el('text', { x: 936, y: cy + 6, 'text-anchor': 'end', 'font-size': 15, 'font-weight': 700, fill: C.muted }, f).textContent = donde;
+  });
+}
+function construir() {
+  // Rayos de luz
+  const rg = document.getElementById('rayosG');
+  for (let k = 0; k < 18; k++) el('path', { d: 'M0 0 L-36 -680 L36 -680 Z', transform: `rotate(${(k / 18) * 360})` }, rg);
+  // Barritas de la cabecera, una por novedad
+  const bg = document.getElementById('barras'), cuantas = FIN - 1, w = (900 - (cuantas - 1) * 14) / cuantas;
+  for (let k = 0; k < cuantas; k++) {
+    const x = 90 + k * (w + 14);
+    el('rect', { x, y: 150, width: w, height: 8, rx: 4, fill: C.line }, bg);
+    el('rect', { x, y: 150, width: w, height: 8, rx: 4, fill: C.amber, class: 'izq barra-llena', style: 'transform: scaleX(0)' }, bg);
+  }
+  // Los focos (un degradado por color) y el escenario del concierto, al principio y al final
+  const defs = svg.querySelector('defs');
+  COLOR_FOCO.forEach((c, k) => {
+    const g = el('linearGradient', { id: `foco${k}`, x1: 0, y1: 0, x2: 0, y2: 1 }, defs);
+    el('stop', { offset: 0, 'stop-color': c, 'stop-opacity': 0.5 }, g);
+    el('stop', { offset: 1, 'stop-color': c, 'stop-opacity': 0 }, g);
+  });
+  tablado(escenas[0], 'SLOTH'); publico(escenas[0], 1050);
+  tablado(escenas[FIN], document.title.replace('Sloth ', '')); publico(escenas[FIN], 1075);
+  mundo(escenas[1]); pistas(escenas[3]); carreras(escenas[4]); fondo(escenas[5]);
+  lista(escenas[6], [
+    ['La portada con IA llega a Low-Poly, El Diff y el Documental', 'Portada', 'i-imagen'],
+    ['Mis videos: buscador, pestañas y vista previa al pasar', 'Mis videos', 'i-buscar'],
+    ['Nuevo chat: «/» cambia de estilo y Alt+N lo abre', 'Chat', 'i-mensaje'],
+    ['Modelos 3D: importa tu .glb o pídele uno al agente', 'Modelos 3D', 'i-cubo'],
+    ['«Sobre ti»: cuéntalo una vez y lo saben todos los agentes', 'Opciones', 'i-persona'],
+    ['Varias marcas en una card, una por canal', 'Marcas', 'i-bandera'],
+    ['Un solo apoyo de $10 al mes, con los estilos de la comunidad', 'Apoyo', 'i-corazon'],
+  ], 58, false);
+  lista(escenas[7], [
+    ['Los enlaces del chat ya abren: la web, un correo o un archivo', 'Chat', 'i-bicho'],
+    ['En Mac, los videos sí se borran y TikTok escribe su texto', 'Mac', 'i-bicho'],
+    ['Sin Visual C++, el Python de Sloth ya se instala', 'Windows', 'i-bicho'],
+    ['El buscador de la comunidad vuelve a contestar', 'Comunidad', 'i-bicho'],
+    ['Sloth ya no se cae al vigilar ciertas carpetas', 'Windows', 'i-bicho'],
+    ['La portada del explicativo es siempre la de su titular', 'Portada', 'i-bicho'],
+  ], 68, true);
+}
+
+/* ---------- Lo común de las novedades ---------- */
+function textos(e, base = 200) {
+  const k = en(e, '.kicker');
+  if (k) A(k, [{ opacity: 0, transform: 'translateX(-30px)' }, { opacity: 1, transform: 'none' }], { duration: 600, delay: base });
+  todos(e, '.palabra').forEach((w, i) => A(w, [{ opacity: 0, transform: 'translateY(60px) rotate(8deg) scale(.9)' }, { opacity: 1, transform: 'none' }], { duration: 800, delay: base + 120 + i * 80, easing: REBOTE }));
+  todos(e, '.linea').forEach((l, i) => aparece(l, { duration: 650, delay: base + 480 + i * 120 }));
+}
+async function mover(cur, de, a, ms) {
+  const [x0, y0] = de, [x1, y1] = a;
+  A(cur, [{ transform: `translate(${x0}px, ${y0}px)`, opacity: 0 }, { transform: `translate(${(x0 + x1) / 2 + 60}px, ${(y0 + y1) / 2 - 50}px)`, opacity: 1, offset: 0.45 }, { transform: `translate(${x1}px, ${y1}px)`, opacity: 1 }], { duration: ms, easing: 'cubic-bezier(.45,0,.2,1)' });
+  await espera(ms);
+}
+function clic(e, cur, x, y) {
+  en(cur, '.punta').animate([{ transform: 'scale(1)' }, { transform: 'scale(.8)' }, { transform: 'scale(1)' }], { duration: 260 });
+  const ondas = en(e, '.cuerpo');
+  for (const [r, d] of [[18, 0], [30, 90]]) {
+    const o = el('circle', { cx: x, cy: y, r, fill: 'none', stroke: C.amber2, 'stroke-width': 4, class: 'a temporal' }, ondas);
+    A(o, [{ transform: 'scale(.3)', opacity: 1 }, { transform: 'scale(2.4)', opacity: 0 }], { duration: 600, delay: d, easing: 'ease-out' });
+  }
+}
+
+/* ---------- Las escenas ---------- */
+const guiones = [
+  // 0 · El concierto
+  async (e, vivo) => {
+    concierto(e);
+    todos(en(e, '.titulo'), '.letra').forEach((l, k) => A(l, [{ opacity: 0, transform: 'translateY(34px) scale(.3)' }, { opacity: 1, transform: 'none' }], { duration: 520, delay: 1000 + k * 40, easing: REBOTE }));
+    // El número cae al ritmo del bajo, un golpe por cifra, y cada una levanta su polvo
+    const letras = todos(en(e, '.version-neon'), '.letra');
+    letras.forEach((l, k) => A(l, [{ opacity: 0, transform: 'scale(2.8) rotate(-8deg)' }, { opacity: 1, transform: 'scale(.9)', offset: 0.7 }, { opacity: 1, transform: 'none' }], { duration: 300, delay: 1700 + k * BEAT, easing: 'cubic-bezier(.6,0,.9,.45)' }));
+    await espera(1700); if (!vivo()) return;
+    for (const l of letras) {
+      await espera(240); if (!vivo()) return;
+      const b = l.getBBox(), x = b.x + b.width / 2, y = b.y + b.height / 2;
+      sacudir(en(e, '.cuerpo'), 6);
+      A(en(e, '.pantalla'), [{ opacity: 0.35 }, { opacity: 1 }], { duration: 200 });
+      estallido(x, y, C.amber2, 26, 6);
+      polvo(x, 884, 14, b.width / 2 + 10);
+      await espera(BEAT - 240); if (!vivo()) return;
+    }
+    explota(e, en(e, '.version-neon'));
+    await espera(1400); if (!vivo()) return;
+    pulsar();
+    sigueLaFiesta(vivo);
+  },
+  // 1 · Low-Poly: la grúa va de cosa en cosa, cada una brota con su bandera, y al final se ve el mundo entero
+  async (e, vivo) => {
+    textos(e);
+    const cam = en(e, '.camara'), cosas = todos(e, '.cosa'), banderas = todos(e, '.bandera'), rio = en(e, '.rio');
+    const toma = (x, y, s) => `translate(${540 - x * s}px, ${420 - y * s}px) scale(${s})`;
+    let ahora = toma(540, 420, 1);
+    const grua = (x, y, s, ms) => {
+      const a = toma(x, y, s);
+      A(cam, [{ transform: ahora }, { transform: a }], { duration: ms, easing: 'cubic-bezier(.45,0,.2,1)' });
+      ahora = a;
+    };
+    A(cam, [{ transform: ahora }, { transform: ahora }], { duration: 1 });
+    A(en(e, '.base'), [{ opacity: 0, transform: 'translateY(70px)' }, { opacity: 1, transform: 'none' }], { duration: 750, delay: 80, easing: REBOTE });
+    cosas.forEach(oculto); banderas.forEach(oculto); oculto(en(e, '.listo-lp'));
+    A(rio, [{ strokeDashoffset: 1 }, { strokeDashoffset: 1 }], { duration: 1 });
+    aparece(en(e, '.pedido-lp'), { duration: 500, delay: 350 });
+    todos(e, '.ola').forEach((o, k) => A(o, [{ transform: 'translateX(-5px)' }, { transform: 'translateX(5px)' }], { duration: 1300, delay: -k * 260, iterations: Infinity, direction: 'alternate', easing: 'steps(5)' }));
+    todos(e, '.gota').forEach((g, k) => A(g, [{ transform: 'translate(0, 0)', opacity: 1 }, { transform: 'translate(-5px, 16px)', opacity: 0 }], { duration: 560, delay: -k * 130, iterations: Infinity, easing: 'steps(4)' }));
+    todos(e, '.vapor').forEach((v, k) => A(v, [{ transform: 'translateY(0)', opacity: 0.9 }, { transform: 'translateY(-34px)', opacity: 0 }], { duration: 1500, delay: -k * 500, iterations: Infinity, easing: 'steps(6)' }));
+    await espera(1300); if (!vivo()) return;
+    const TOMAS = [[352, 446], [396, 332], [566, 440], [726, 452]];
+    for (let k = 0; k < 4; k++) {
+      grua(TOMAS[k][0], TOMAS[k][1], 1.8, 650);
+      await espera(520); if (!vivo()) return;
+      if (k === 2) {
+        A(cosas[k], [{ opacity: 1 }, { opacity: 1 }], { duration: 1 });
+        A(rio, [{ strokeDashoffset: 1 }, { strokeDashoffset: 0 }], { duration: 750, easing: 'ease-in-out' });
+      } else A(cosas[k], [{ opacity: 0, transform: 'scale(.2)' }, { opacity: 1, transform: 'scale(1)' }], { duration: 600, easing: REBOTE });
+      A(banderas[k], [{ opacity: 0, transform: 'scale(.2)' }, { opacity: 1, transform: 'scale(1)' }], { duration: 550, delay: 280, easing: REBOTE });
+      await espera(520); if (!vivo()) return;
+      const [x, y] = aLienzo(banderas[k]);
+      confeti(x, y, 16, -90, 130, [3, 8]);
+      await espera(560); if (!vivo()) return;
+    }
+    // El plano final: el mundo entero
+    grua(540, 420, 1, 950);
+    await espera(950); if (!vivo()) return;
+    banderas.forEach((b, k) => A(b, [{ transform: 'rotate(-5deg)' }, { transform: 'rotate(5deg)' }], { duration: BEAT, delay: -k * 140, iterations: Infinity, direction: 'alternate', easing: 'steps(4)' }));
+    salta(en(e, '.listo-lp'), { duration: 500 });
+    confeti(540, 560, 80, -90, 150, [8, 16]);
+  },
+  // 2 · Subtítulos: un clic, Sloth oye la voz ahí mismo y el video ya los trae, palabra por palabra
+  async (e, vivo) => {
+    textos(e);
+    A(en(e, '.vid-s'), [{ opacity: 0, transform: 'translateY(40px)' }, { opacity: 1, transform: 'none' }], { duration: 650, delay: 80, easing: REBOTE });
+    A(en(e, '.entrega'), [{ opacity: 0, transform: 'translateX(50px)' }, { opacity: 1, transform: 'none' }], { duration: 650, delay: 200 });
+    A(en(e, '.prog-v'), [{ transform: 'scaleX(0)' }, { transform: 'scaleX(1)' }], { duration: 3200, iterations: Infinity, easing: 'linear' });
+    A(en(e, '.sloth-v'), [{ transform: 'translateY(4px)' }, { transform: 'translateY(-14px)' }], { duration: BEAT, iterations: Infinity, direction: 'alternate', easing: 'cubic-bezier(.5,0,.5,1)' });
+    const sub = en(e, '.sub-t');
+    sub.textContent = '';
+    oculto(en(e, '.progreso-s')); oculto(en(e, '.hecho-s')); oculto(en(e, '.cursor'));
+    await espera(1400); if (!vivo()) return;
+    const cur = en(e, '.cursor');
+    await mover(cur, [900, 640], [680, 552], 750); if (!vivo()) return;
+    clic(e, cur, 680, 552);
+    A(en(e, '.progreso-s'), [{ opacity: 0 }, { opacity: 1 }], { duration: 250 });
+    A(en(e, '.barra-s'), [{ transform: 'scaleX(0)' }, { transform: 'scaleX(1)' }], { duration: 1400, delay: 200, easing: 'cubic-bezier(.4,0,.6,1)' });
+    A(cur, [{ opacity: 1 }, { opacity: 0 }], { duration: 300, delay: 300 });
+    await espera(1750); if (!vivo()) return;
+    A(en(e, '.hecho-s'), [{ opacity: 0, transform: 'scale(.94)' }, { opacity: 1, transform: 'none' }], { duration: 400, easing: REBOTE });
+    confeti(680, 540, 60, -90, 160, [6, 13]);
+    // Los subtítulos: pocas palabras grandes, y la que se dice, en ámbar
+    const TROZOS = [['Y', 'TODO', 'ESTO'], ['SALIÓ', 'GRATIS'], ['SIN', 'GASTAR'], ['NI UN', 'CRÉDITO']];
+    for (;;) {
+      for (const trozo of TROZOS) {
+        for (let k = 0; k < trozo.length; k++) {
+          if (!vivo()) return;
+          sub.textContent = '';
+          trozo.forEach((p, j) => { el('tspan', { fill: j === k ? C.amber : C.text }, sub).textContent = (j ? ' ' : '') + p; });
+          if (k === 0) sub.animate([{ transform: 'scale(.86)' }, { transform: 'scale(1)' }], { duration: 160, easing: 'ease-out' });
+          if (quieto) return;
+          await espera(k === trozo.length - 1 ? 560 : 340);
+        }
+      }
+    }
+  },
+  // 3 · Música de fondo: se enciende en el menú «Voz» y la pista baja sola donde hay voz
+  async (e, vivo) => {
+    textos(e);
+    A(en(e, '.menu-voz'), [{ opacity: 0, transform: 'translateX(-60px)' }, { opacity: 1, transform: 'none' }], { duration: 650, delay: 80 });
+    A(en(e, '.mezcla'), [{ opacity: 0, transform: 'translateY(40px)' }, { opacity: 1, transform: 'none' }], { duration: 650, delay: 200 });
+    const musica = todos(e, '.barra-musica'), borde = en(e, '.musica-borde');
+    todos(e, '.barra-voz').forEach((b, k) => A(b, [{ transform: 'scaleY(0)' }, { transform: 'scaleY(1)' }], { duration: 400, delay: 550 + k * 18, easing: REBOTE }));
+    musica.forEach(oculto);
+    oculto(en(e, '.con-musica')); oculto(en(e, '.casilla')); oculto(en(e, '.cursor')); oculto(en(e, '.nota-m'));
+    borde.setAttribute('stroke', C.line);
+    A(en(e, '.sin-musica'), [{ opacity: 1 }, { opacity: 1 }], { duration: 1 });
+    A(en(e, '.cabezal'), [{ transform: 'translateX(536px)' }, { transform: 'translateX(934px)' }], { duration: 4200, iterations: Infinity, easing: 'steps(70)' });
+    await espera(1500); if (!vivo()) return;
+    const cur = en(e, '.cursor');
+    await mover(cur, [540, 640], [440, 561], 750); if (!vivo()) return;
+    clic(e, cur, 440, 561);
+    salta(en(e, '.casilla'), { duration: 450 });
+    borde.setAttribute('stroke', C.amber);
+    aparece(en(e, '.con-musica'), { duration: 400 });
+    estallido(440, 561, C.amber, 36, 6);
+    A(cur, [{ opacity: 1 }, { opacity: 0 }], { duration: 300, delay: 300 });
+    // La música entra de izquierda a derecha: alta en los silencios, baja donde hay voz
+    A(en(e, '.sin-musica'), [{ opacity: 1 }, { opacity: 0 }], { duration: 300 });
+    musica.forEach((b, k) => A(b, [{ opacity: 0, transform: 'scaleY(0)' }, { opacity: 1, transform: 'scaleY(1)' }], { duration: 420, delay: 250 + k * 30, easing: REBOTE }));
+    await espera(250 + musica.length * 30 + 300); if (!vivo()) return;
+    aparece(en(e, '.nota-m'), { duration: 450 });
+    confeti(735, 520, 50, -90, 160, [5, 12]);
+  },
+  // 4 · Más rápido y más barato: la barra de antes se arrastra y la de ahora llega de golpe
+  async (e, vivo) => {
+    textos(e);
+    const cartas = todos(e, '.carrera');
+    cartas.forEach((c, k) => {
+      A(c, [{ opacity: 0, transform: 'translateY(40px)' }, { opacity: 1, transform: 'none' }], { duration: 650, delay: 80 + k * 140 });
+      todos(c, '.antes, .ahora').forEach((b) => A(b, [{ transform: 'scaleX(0)' }, { transform: 'scaleX(0)' }], { duration: 1 }));
+      todos(c, '.veces').forEach((t) => (t.textContent = ''));
+      oculto(en(c, '.pie'));
+    });
+    await espera(900); if (!vivo()) return;
+    cartas.forEach(async (c, k) => {
+      await espera(k * 450); if (!vivo()) return;
+      const antes = todos(c, '.antes'), ahora = todos(c, '.ahora'), veces = todos(c, '.veces');
+      for (let j = 0; j < 2; j++) {
+        A(antes[j], [{ transform: 'scaleX(0)' }, { transform: 'scaleX(1)' }], { duration: 850, easing: 'linear' });
+        await espera(900); if (!vivo()) return;
+        A(ahora[j], [{ transform: 'scaleX(0)' }, { transform: 'scaleX(1)' }], { duration: 200, easing: 'ease-out' });
+        const [x, y] = aLienzo(ahora[j]);
+        estallido(x + 10, y, C.ok, 30, 6);
+        const t = veces[j], hasta = +t.dataset.veces, cifras = Number.isInteger(hasta) ? 0 : 1;
+        tween(700, (p) => (t.textContent = `${(1 + (hasta - 1) * p).toFixed(cifras).replace('.', ',')}× ${t.dataset.que}`), vivo);
+        A(t, [{ opacity: 0, transform: 'scale(.6)' }, { opacity: 1, transform: 'scale(1)' }], { duration: 450, easing: REBOTE });
+        await espera(500); if (!vivo()) return;
+      }
+      aparece(en(c, '.pie'), { duration: 400 });
+    });
+    await espera(450 + 2 * 1400 + 300); if (!vivo()) return;
+    confeti(540, 650, 90, -90, 130, [10, 18]);
+  },
+  // 5 · El fondo: las monedas caen al frasco, la mitad es el fondo y se reparte según cuánto se usa cada estilo
+  async (e, vivo) => {
+    textos(e);
+    A(en(e, '.bote'), [{ opacity: 0, transform: 'translateX(-60px)' }, { opacity: 1, transform: 'none' }], { duration: 650, delay: 80 });
+    const filas = todos(e, '.estilo-f'), nivel = en(e, '.nivel'), mitad = en(e, '.mitad'), caen = todos(e, '.cae'), vuelan = todos(e, '.vuela');
+    filas.forEach((f, k) => {
+      aparece(f, { duration: 500, delay: 300 + k * 110 });
+      en(f, '.pct').textContent = '0 %';
+      A(en(f, '.parte'), [{ transform: 'scaleX(0)' }, { transform: 'scaleX(0)' }], { duration: 1 });
+    });
+    A(nivel, [{ transform: 'scaleY(0)' }, { transform: 'scaleY(0)' }], { duration: 1 });
+    oculto(mitad); oculto(en(e, '.primer')); caen.forEach(oculto); vuelan.forEach(oculto);
+    await espera(1100); if (!vivo()) return;
+    // Lo que entra con tarjeta cae al frasco
+    caen.forEach((m, k) => {
+      const x = azar(-55, 55);
+      A(m, [{ opacity: 0, transform: `translate(${x}px, -210px)` }, { opacity: 1, offset: 0.1 }, { opacity: 1, transform: `translate(${x * 0.6}px, ${90 - k * 14}px)`, offset: 0.85 }, { opacity: 0, transform: `translate(${x * 0.6}px, ${100 - k * 14}px)` }], { duration: 520, delay: k * 150, easing: 'cubic-bezier(.5,0,.9,.6)' });
+    });
+    A(nivel, [{ transform: 'scaleY(0)' }, { transform: 'scaleY(1)' }], { duration: 8 * 150, delay: 400, easing: 'steps(8)' });
+    await espera(8 * 150 + 750); if (!vivo()) return;
+    // La mitad es el fondo
+    A(mitad, [{ opacity: 0, transform: 'scale(.8)' }, { opacity: 1, transform: 'none' }], { duration: 500, easing: REBOTE });
+    sacudir(en(e, '.bote'), 7);
+    estallido(280, 414, C.amber, 40, 7);
+    await espera(1000); if (!vivo()) return;
+    // Y se reparte: más para el estilo que más gente usa
+    let n = 0;
+    for (const [k, f] of filas.entries()) {
+      const parte = +f.dataset.parte, cuantas = Math.round(parte * 10), y = 222 + k * 112 + 48;
+      for (let j = 0; j < cuantas; j++) {
+        A(vuelan[n++], [{ opacity: 0, transform: 'translate(0, 0) scale(.6)' }, { opacity: 1, transform: `translate(120px, ${(y - 414) / 2 - 70}px) scale(1.1)`, offset: 0.45 }, { opacity: 0, transform: `translate(238px, ${y - 414}px) scale(.5)` }], { duration: 700, delay: j * 90, easing: 'cubic-bezier(.45,0,.3,1)' });
+      }
+      setTimeout(() => {
+        if (!vivo()) return;
+        A(en(f, '.parte'), [{ transform: 'scaleX(0)' }, { transform: `scaleX(${parte})` }], { duration: 500 + cuantas * 90 });
+        tween(500 + cuantas * 90, (p) => (en(f, '.pct').textContent = `${Math.round(parte * 100 * p)} %`), vivo);
+        A(en(f, '.estilo-borde'), [{ stroke: C.amber }, { stroke: C.line }], { duration: 900 + cuantas * 90 });
+        confeti(518, y, 14, -90, 130, [3, 8]);
+      }, quieto ? 0 : 600);
+      await espera(cuantas * 90 + 450); if (!vivo()) return;
+    }
+    await espera(700); if (!vivo()) return;
+    aparece(en(e, '.primer'), { duration: 500 });
+    confeti(715, 600, 60, -90, 150, [6, 13]);
+  },
+  // 6 · Y además: los renglones entran uno por uno, cada icono con su brinco
+  async (e, vivo) => {
+    textos(e);
+    const filas = todos(e, '.fila');
+    filas.forEach((f, k) => {
+      A(f, [{ opacity: 0, transform: 'translateX(-40px)' }, { opacity: 1, transform: 'none' }], { duration: 500, delay: 100 + k * 90 });
+      A(en(f, '.icono'), [{ transform: 'scale(0)' }, { transform: 'scale(1)' }], { duration: 500, delay: 420 + k * 90, easing: REBOTE });
+    });
+    await espera(1100 + filas.length * 90); if (!vivo()) return;
+    for (const f of filas) {
+      A(en(f, '.fila-borde'), [{ stroke: C.amber }, { stroke: C.line }], { duration: 700 });
+      en(f, '.icono').animate([{ transform: 'scale(1)' }, { transform: 'scale(1.35)' }, { transform: 'scale(1)' }], { duration: 320, easing: 'ease-out' });
+      chispa(157, +f.dataset.y, C.amber2); chispa(157, +f.dataset.y, C.amber2);
+      await espera(170); if (!vivo()) return;
+    }
+    confeti(540, 650, 80, -90, 120, [10, 18]);
+  },
+  // 7 · Los arreglos: al ritmo del bajo, cada bicho muerde el polvo y deja su palomita
+  async (e, vivo) => {
+    textos(e);
+    const filas = todos(e, '.fila');
+    filas.forEach((f, k) => {
+      A(f, [{ opacity: 0, transform: 'translateX(-40px)' }, { opacity: 1, transform: 'none' }], { duration: 500, delay: 100 + k * 90 });
+      oculto(en(f, '.tic'));
+      A(en(f, '.icono'), [{ transform: 'rotate(-12deg)' }, { transform: 'rotate(12deg)' }], { duration: 300, delay: -k * 70, iterations: Infinity, direction: 'alternate', easing: 'steps(3)' });
+    });
+    await espera(1200); if (!vivo()) return;
+    for (const f of filas) {
+      const y = +f.dataset.y;
+      A(en(f, '.icono'), [{ opacity: 1, transform: 'none' }, { opacity: 1, transform: 'translateY(7px) rotate(180deg) scale(1.15, .5)', offset: 0.65 }, { opacity: 0, transform: 'translateY(9px) rotate(180deg) scale(1.3, .2)' }], { duration: 280, easing: 'ease-in' });
+      polvo(157, y + 10, 12, 16, [4, 11]);
+      sacudir(f, 5);
+      salta(en(f, '.tic'), { duration: 450, delay: 200 });
+      A(en(f, '.fila-borde'), [{ stroke: C.ok }, { stroke: C.line }], { duration: 700 });
+      confeti(157, y, 12, -60, 90, [3, 8]);
+      await espera(BEAT); if (!vivo()) return;
+    }
+    confeti(540, 650, 90, -90, 120, [10, 18]);
+  },
+  // 8 · A crear: el mismo concierto y las letras caen al ritmo
+  async (e, vivo) => {
+    concierto(e);
+    const letras = todos(en(e, '.neon'), '.letra');
+    letras.forEach((l, k) => A(l, [{ opacity: 0, transform: 'scale(2.6) rotate(-10deg)' }, { opacity: 1, transform: 'scale(.9)', offset: 0.7 }, { opacity: 1, transform: 'none' }], { duration: 300, delay: 1300 + k * (BEAT / 4), easing: 'cubic-bezier(.6,0,.9,.45)' }));
+    todos(e, '.linea').forEach((l, k) => aparece(l, { delay: 1300 + letras.length * (BEAT / 4) + 300 + k * 150 }));
+    await espera(1300 + letras.length * (BEAT / 4) + 200); if (!vivo()) return;
+    explota(e, en(e, '.neon'));
+    sigueLaFiesta(vivo);
+  },
+];
+
+/* ---------- Ir de una a otra ---------- */
+let actual = -1, token = 0, pulso = null;
+const cab = document.getElementById('cabecera');
+const sigBtn = document.getElementById('siguiente'), antBtn = document.getElementById('anterior');
+const sigTxt = document.getElementById('sig-texto'), sigIco = document.getElementById('sig-icono'), cuenta = document.getElementById('cuenta');
+const brilloStops = [...document.querySelectorAll('#brillo stop')];
+const TONO = [C.amber, C.ok, C.amber2, C.bad, C.ok, C.amber, C.amber2, C.bad, C.amber];
+
+function limpiar(e) {
+  e.getAnimations({ subtree: true }).forEach((a) => { if (!(a instanceof CSSAnimation)) a.cancel(); });
+  todos(e, '.temporal').forEach((n) => n.remove());
+}
+function pulsar() {
+  if (quieto) return;
+  pulso = sigBtn.animate([{ boxShadow: '0 0 0 0 rgba(232, 163, 61, .6)' }, { boxShadow: '0 0 0 16px rgba(232, 163, 61, 0)' }], { duration: 1400, iterations: Infinity });
+}
+// La canción: arranca con la fiesta (el reproductor oficial de YouTube, que se carga hasta entonces), sigue en las
+// novedades en chiquito y se quita con «Terminar» (el final). Dentro de Sloth suena sola (Electron deja reproducir sin
+// clic); en un navegador, que no deja sonar nada sin un clic, espera y arranca con el primer clic o tecla.
+const YT_ID = 'rY0WxgSXdEE'; // Queen - Another One Bites the Dust (Official Video)
+const YT_DESDE = 0; // El segundo de la canción donde arranca la fiesta: el bajo, desde el principio
+const sonando = document.getElementById('sonando'), yt = document.getElementById('yt'), baile = document.getElementById('baile');
+const ordenar = (func) => yt.contentWindow?.postMessage(JSON.stringify({ event: 'command', func, args: [] }), '*');
+// Sin este saludo, el reproductor no siempre atiende las órdenes de la página.
+yt.addEventListener('load', () => yt.contentWindow.postMessage(JSON.stringify({ event: 'listening', id: 1, channel: 'widget' }), '*'));
+const darSonido = () => {
+  removeEventListener('pointerdown', darSonido, true); removeEventListener('keydown', darSonido, true);
+  if (yt.src && actual < FIN) ordenar('playVideo');
+};
+if (!enSloth) { addEventListener('pointerdown', darSonido, true); addEventListener('keydown', darSonido, true); }
+function musica(i) {
+  const suena = i < FIN;
+  for (const el of [sonando, baile]) {
+    el.classList.toggle('fuera', !suena);
+    el.classList.toggle('mini', i >= 1 && i < FIN);
+  }
+  if (suena) baile.play().catch(() => {}); else baile.pause();
+  if (suena && !yt.src) {
+    const origen = location.origin !== 'null' ? `&origin=${encodeURIComponent(location.origin)}` : '';
+    yt.src = `https://www.youtube-nocookie.com/embed/${YT_ID}?autoplay=1&start=${YT_DESDE}&enablejsapi=1&playsinline=1&rel=0${origen}`;
+  } else if (yt.src) {
+    ordenar(suena ? 'playVideo' : 'pauseVideo');
+  }
+}
+function interfaz(i, antes) {
+  musica(i);
+  antBtn.classList.toggle('oculto', i === 0);
+  sigTxt.textContent = i === 0 ? 'Ver lo nuevo' : i === FIN - 1 ? 'Terminar' : i === FIN ? (enSloth ? 'Empezar a crear' : 'Ver otra vez') : 'Siguiente';
+  sigIco.setAttribute('href', i === FIN && !enSloth ? '#i-reabrir' : '#i-flecha');
+  cuenta.textContent = i >= 1 && i < FIN ? `${i} de ${FIN - 1}` : '';
+  brilloStops.forEach((s) => (s.style.stopColor = TONO[i]));
+  document.getElementById('rayos').style.opacity = i === 0 || i === FIN ? 0 : 0.3;
+  const dentro = (k) => k >= 1 && k < FIN;
+  if (dentro(i) && !dentro(antes)) A(cab, [{ opacity: 0, transform: 'translateY(-40px)' }, { opacity: 1, transform: 'none' }], { duration: 600, delay: 150 });
+  if (!dentro(i) && dentro(antes)) A(cab, [{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'translateY(-40px)' }], { duration: 350 });
+  todos(cab, '.barra-llena').forEach((b, k) => {
+    b.getAnimations().forEach((a) => a.cancel());
+    if (k === i - 1) A(b, [{ transform: 'scaleX(0)' }, { transform: 'scaleX(1)' }], { duration: 800, delay: 200 });
+    else b.style.transform = `scaleX(${k < i - 1 ? 1 : 0})`;
+  });
+}
+function ir(i, dir = 1) {
+  if (i < 0 || i >= N || i === actual) return;
+  if (pulso) { pulso.cancel(); pulso = null; }
+  const antes = actual, prev = antes >= 0 ? escenas[antes] : null;
+  const t = ++token, vivo = () => t === token;
+  if (prev) {
+    const s = A(prev, [{ opacity: 1, transform: 'translateX(0)' }, { opacity: 0, transform: `translateX(${-dir * 180}px)` }], { duration: 380, easing: 'cubic-bezier(.5,0,.8,.3)' });
+    s.finished.then(() => { if (escenas[actual] !== prev) { prev.classList.remove('visible'); limpiar(prev); } }, () => {});
+  }
+  const e = escenas[i];
+  limpiar(e); e.classList.add('visible');
+  A(e, [{ opacity: 0, transform: `translateX(${dir * 200}px)` }, { opacity: 1, transform: 'translateX(0)' }], { duration: 750, delay: prev ? 220 : 0, easing: 'cubic-bezier(.2,1.1,.3,1)' });
+  actual = i;
+  interfaz(i, antes);
+  guiones[i](e, vivo);
+}
+const siguiente = () => (actual === N - 1 ? (enSloth ? cerrarGuia() : ir(0, 1)) : ir(actual + 1, 1));
+if (enSloth) document.querySelector('.despedida').textContent = 'Gracias por crear con Sloth.';
+const anterior = () => ir(actual - 1, -1);
+sigBtn.addEventListener('click', siguiente);
+antBtn.addEventListener('click', anterior);
+addEventListener('keydown', (ev) => {
+  if (ev.key === 'ArrowRight' || ev.key === 'PageDown') { ev.preventDefault(); siguiente(); }
+  if (ev.key === 'ArrowLeft' || ev.key === 'PageUp') { ev.preventDefault(); anterior(); }
+  if (ev.key === 'Escape' && enSloth) cerrarGuia();
+});
+// Deslizar con el dedo
+let x0 = null;
+const esc_ = document.getElementById('escenario');
+esc_.addEventListener('pointerdown', (ev) => (x0 = ev.clientX));
+esc_.addEventListener('pointerup', (ev) => { if (x0 === null) return; const d = ev.clientX - x0; x0 = null; if (Math.abs(d) > 60) d < 0 ? siguiente() : anterior(); });
+
+document.fonts.ready.then(() => {
+  construir();
+  escenas.forEach((e) => e.classList.add('visible'));
+  todos(svg, '.partir-letras').forEach((t) => partir(t, 'letra'));
+  todos(svg, '.partir-palabras').forEach((t) => partir(t, 'palabra'));
+  escenas.forEach((e) => e.classList.remove('visible'));
+  const pedida = +new URLSearchParams(location.search).get('escena') || 0;
+  ir(Math.min(Math.max(pedida, 0), N - 1));
+});
+</script>
+</body>
+</html>
