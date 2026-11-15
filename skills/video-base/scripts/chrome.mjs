@@ -174,7 +174,9 @@ async function abrirUno({ ancho, alto, gpu = false, extra = [] } = {}) {
   const exe = buscarChrome()
   // El headless shell deja que quien lo maneja dé cada fotograma (HeadlessExperimental.beginFrame): dibuja y captura en
   // una pasada, sin esperar al vsync de Chrome (unos 50 ms por captura). Chrome normal no lo tiene: captura como siempre.
-  const marcos = /chrome-headless-shell/i.test(exe)
+  // En macOS el headless shell no admite ese control (con --deterministic-mode se cierra al arrancar, 30 de octubre de
+  // 2026): ahí captura como Chrome normal.
+  const marcos = /chrome-headless-shell/i.test(exe) && process.platform !== 'darwin'
   barrerPerfiles()
   const perfil = mkdtempSync(join(tmpdir(), 'video-base-chrome-'))
   const args = [
