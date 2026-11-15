@@ -38,6 +38,7 @@ import { comunidad, llaveDelCreador } from './comunidad.ts' // comunidad
 import { desempacar, estilos } from './estilos.ts' // estilos compartidos
 import { carpetaTrabajo } from './trabajo.ts'
 import { redes } from './redes/index.ts' // redes
+import { elegirNavegador, navegadorDeFuera, navegadorEn } from './chromium.ts'
 import { voz } from './voz/index.ts' // voz de AI Studio
 import { flow } from './flow/index.ts' // Google Flow
 import { youtube } from './youtube.ts'
@@ -247,6 +248,8 @@ avance = avances(sessions, cards, broadcast)
 const disco = espacio({ app: APP, sessions, cards, ocupado, python: () => pythonSlothEntero(APP) }) // espacio en disco
 // Opciones → Tu equipo: con qué transcribe la voz y cuánto tarda cada cosa en esta computadora.
 const maquina = equipo({ app: APP, ocupado }) // tu equipo
+// Opciones → Navegador: en cuál se entra con Google (la voz, Flow, las redes).
+navegadorEn(APP)
 // La voz de los videos, que los agentes piden a Sloth y Sloth genera en AI Studio con la cuenta de Google del usuario.
 // Voices Cloning va por el cobro: con tu cuenta o tu apoyo, o con la llave del creador en su computadora.
 const narrar = voz(APP, { credencial: () => llaveDelCreador() ?? suscripcion?.credencial(), creador: () => llaveDelCreador() as { llave: string } | undefined }) // voz de AI Studio
@@ -409,6 +412,19 @@ async function api(req: IncomingMessage, res: ServerResponse, url: URL): Promise
 
   if (path === '/api/opciones' && method === 'GET') {
     send(res, 200, opciones())
+    return true
+  }
+
+  // El navegador donde se entra con Google (`server/chromium.ts`): cuál se usa y, con POST, el que eliges (`null`: el de siempre).
+  if (path === '/api/navegador-de-fuera' && method === 'GET') return send(res, 200, navegadorDeFuera()), true
+  if (path === '/api/navegador-de-fuera' && method === 'POST') {
+    const { exe } = await body<{ exe: string | null }>(req)
+    try {
+      elegirNavegador(typeof exe === 'string' && exe ? exe : null)
+      send(res, 200, navegadorDeFuera())
+    } catch (error) {
+      send(res, 400, { error: error instanceof Error ? error.message : String(error) })
+    }
     return true
   }
 

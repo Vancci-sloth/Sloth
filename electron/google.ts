@@ -11,7 +11,7 @@ import { mkdirSync } from 'node:fs'
 import { join } from 'node:path'
 import type { Session, WebContents } from 'electron'
 import { WebSocket } from 'ws'
-import { chromiumDelSistema, lanzarChromium, nombreDe, SIN_CHROMIUM } from '../server/chromium.ts'
+import { chromiumDelSistema, lanzarChromium, navegadorEn, nombreDe, SIN_CHROMIUM } from '../server/chromium.ts'
 
 /** El de la voz es 9336 y el de las redes 9334. */
 const PUERTO = 9337
@@ -59,6 +59,8 @@ let reloj: ReturnType<typeof setInterval> | undefined
 let pasada = 0
 
 function entrar(perfil: Session, carpeta: string, wc: WebContents, url: string, en: EnGoogle) {
+  // El que elegiste en Opciones → Navegador lo guardó el servidor, en la misma carpeta.
+  navegadorEn(carpeta)
   const exe = chromiumDelSistema(process.platform === 'darwin')
   if (!exe) return en.listo(wc, url, SIN_CHROMIUM)
   esperando.set(wc, { url, en })

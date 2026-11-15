@@ -1,5 +1,5 @@
 import { type ReactNode, type Ref, useEffect, useRef, useState } from 'react'
-import { type CuentaClaude as Cuenta, type Opciones as Datos, type EstadoAgente, type LimitesClaude, type Model, NAVEGADOR_REDES, type Requisito, type VersionClaude } from '../../shared/types'
+import { type CuentaClaude as Cuenta, type Opciones as Datos, type EstadoAgente, type LimitesClaude, type Model, type NavegadorDeFuera, NAVEGADOR_REDES, type Requisito, type VersionClaude } from '../../shared/types'
 import { api } from './api'
 import { Arranque } from './Arranque'
 import { type Proveedor, proveedorDe } from '../../shared/providers'
@@ -118,6 +118,7 @@ function Ajustes({ onDone, iniciando, onIniciando }: { onDone(): void; iniciando
       >
         <FlowOpciones voz={voz} />
       </Grupo>
+      <NavegadorDeGoogle />
       {/* Solo sirven a Ideas: sin la de YouTube, las recomendaciones van con el canal conectado. */}
       {!VENTA && (
         <Grupo titulo="Llaves de API">
@@ -1432,6 +1433,50 @@ function Avisos() {
         </p>
       )}
     </div>
+  )
+}
+
+/**
+ * En qué navegador de tu computadora se entra con Google (`server/chromium.ts`): el que toma Sloth o el que elijas. Solo
+ * sale si hay más de uno entre los que elegir.
+ */
+function NavegadorDeGoogle() {
+  const [datos, setDatos] = useState<NavegadorDeFuera>()
+  const [error, setError] = useState('')
+  useEffect(() => {
+    api<NavegadorDeFuera>('/api/navegador-de-fuera').then(setDatos, () => {})
+  }, [])
+  if (!datos || datos.lista.length < 2) return null
+  const elegido = datos.lista.find((n) => n.exe === datos.elegido)
+  const elegir = (exe: string) => {
+    setError('')
+    api<NavegadorDeFuera>('/api/navegador-de-fuera', { exe: exe || null }).then(setDatos, (e) => setError(e.message))
+  }
+  return (
+    <Grupo
+      titulo="Navegador"
+      nota="Google no deja iniciar sesión dentro de una app: ese paso se da en un navegador de tu computadora, con un perfil aparte del tuyo, y la sesión pasa a Sloth. Si lo cambias, puede que Google te pida entrar otra vez en Voz y en Flow."
+    >
+      <div className="item">
+        <div className="fila">
+          <span className="logo" aria-hidden>
+            <Icono de="globo" />
+          </span>
+          <div className="fila-nombre">
+            <strong>Para entrar con Google</strong>
+            <span>{elegido ? `Siempre en ${elegido.nombre}.` : `Lo elige Sloth: ahora, ${datos.automatico}.`}</span>
+          </div>
+          <Picker
+            className="acciones"
+            label={<span className="estado">{elegido?.nombre ?? 'Automático'}</span>}
+            value={elegido?.exe ?? ''}
+            groups={[{ label: 'Navegador', options: [{ value: '', label: 'Automático', detalle: datos.automatico ?? undefined }, ...datos.lista.map((n) => ({ value: n.exe, label: n.nombre }))] }]}
+            onChange={elegir}
+          />
+        </div>
+        <Fallo error={error} />
+      </div>
+    </Grupo>
   )
 }
 

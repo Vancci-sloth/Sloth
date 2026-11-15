@@ -455,6 +455,17 @@ export interface Opciones {
   meta: { final: string; caduca?: number } | null
 }
 
+/**
+ * El navegador de tu computadora donde se entra con Google, que no deja hacerlo dentro de la app (`server/chromium.ts`).
+ * `elegido`: el programa del que elegiste en Opciones, o `null` si lo toma Sloth; `automatico`: el nombre del que toma
+ * entonces, o `null` si no hay ninguno; `lista`: los instalados que sirven.
+ */
+export interface NavegadorDeFuera {
+  elegido: string | null
+  automatico: string | null
+  lista: { exe: string; nombre: string }[]
+}
+
 /** La tarjeta de un enlace pegado en el inicio (`server/enlaces.ts`). Sin título, se enseña solo el sitio, o nada. */
 export interface Enlace {
   url: string
