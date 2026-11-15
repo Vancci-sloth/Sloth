@@ -323,6 +323,8 @@ export function startAcp(sabor: SaborAcp, opts: AgentOptions): AgentRun {
           ventana = u.size
           if (!sabor.contextoOpaco) emit({ t: 'context', used: u.used, max: u.size })
         }
+        // omp dice lo que lleva gastado el turno en dólares (los demás, en diezmilmillonésimas o nada).
+        if (u.cost?.currency === 'USD' && typeof u.cost.amount === 'number') costo = u.cost.amount
         return
     }
   }

@@ -2,7 +2,7 @@
  * Los agentes con que trabaja Sloth. Claude va sin prefijo; los demás llevan el suyo en el id del modelo
  * (`codex:gpt-5.6`, `grok:grok-build`) para no mezclar catálogos ni sesiones de proveedores.
  */
-export const PROVEEDORES = ['claude', 'codex', 'opencode', 'deepseek', 'grok', 'antigravity', 'gemini', 'cursor', 'muse', 'pi'] as const
+export const PROVEEDORES = ['claude', 'codex', 'opencode', 'deepseek', 'grok', 'antigravity', 'gemini', 'cursor', 'muse', 'pi', 'omp'] as const
 export type Proveedor = (typeof PROVEEDORES)[number]
 
 export const proveedorDe = (model: string): Proveedor => {
@@ -24,7 +24,8 @@ export const NOMBRE_AGENTE: Record<Proveedor, string> = {
   gemini: 'Gemini',
   cursor: 'Cursor',
   muse: 'Muse Code',
-  pi: 'Pi'
+  pi: 'Pi',
+  omp: 'omp'
 }
 
 /** El programa que corre a cada agente: DeepSeek usa el mismo Claude Code, con otra API (`server/deepseek.ts`). */

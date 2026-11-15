@@ -1,4 +1,4 @@
-import { execFile, type ExecFileException } from 'node:child_process'
+import { execFile, execFileSync, type ExecFileException } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { delimiter, dirname, join, resolve } from 'node:path'
@@ -63,6 +63,8 @@ const CODEX: Record<string, string> = {
 const OPENCODE = `@opencode/cli-${process.platform === 'win32' ? 'windows' : process.platform}-${process.arch}`
 /** El de Grok viene comprimido con brotli (`grok.exe.br`) para caber en npm: se descomprime al bajarlo. */
 const GROK = join('node_modules', '@xai-official', `grok-${plataforma}`, 'bin', WINDOWS ? 'grok.exe' : 'grok')
+/** omp publica un binario por sistema en su release de GitHub, con un `SHA256SUMS.txt` al lado. */
+const OMP = `omp-${process.platform === 'win32' ? 'windows' : process.platform}-${process.arch}${WINDOWS ? '.exe' : ''}`
 
 /**
  * El servidor ACP de Antigravity, la versión que usa T3 Code: de la 1.4.2 a la 1.4.4 escriben una skill suya en la
@@ -190,6 +192,30 @@ const AGENTES: Record<Programa, Agente> = {
     // baja otra vez.
     exe: (r) => (existsSync(join(r, WINDOWS ? 'localharness_external.exe' : 'localharness_external')) ? join(r, WINDOWS ? 'agy_acp_server.exe' : 'agy_acp_server.par') : null),
     pesa: '230 MB'
+  },
+  omp: {
+    nombre: 'omp',
+    version: '18.18.9',
+    // De GitHub: su paquete de npm es para Bun, y el binario es el que corre en todos los sistemas.
+    async instalar(dir) {
+      const base = `https://github.com/can1357/oh-my-pi/releases/download/v${this.version}`
+      const [res, sumas] = await Promise.all([fetch(`${base}/${OMP}`), fetch(`${base}/SHA256SUMS.txt`)])
+      if (!res.ok) throw new Error(`GitHub respondió ${res.status} al pedir omp.`)
+      const bin = Buffer.from(await res.arrayBuffer())
+      const esperado = sumas.ok
+        ? (await sumas.text())
+            .split('\n')
+            .map((l) => l.trim().split(/\s+/))
+            .find(([_, nombre]) => nombre === OMP)?.[0]
+        : undefined
+      if (!esperado || createHash('sha256').update(bin).digest('hex') !== esperado.toLowerCase())
+        throw new Error('El archivo de omp no es el que publica su autor. Vuelve a intentarlo.')
+      const exe = join(dir, WINDOWS ? 'omp.exe' : 'omp')
+      writeFileSync(exe, bin)
+      if (!WINDOWS) chmodSync(exe, 0o755)
+    },
+    exe: (r) => join(r, WINDOWS ? 'omp.exe' : 'omp'),
+    pesa: '215 MB'
   }
 }
 
@@ -207,7 +233,43 @@ const BAJANDO = '.bajando'
  */
 export const rutaAgente = (p: Proveedor): string | null => (instalando.has(programaDe(p)) ? null : buscar(programaDe(p)))
 
-const buscar = (p: Programa): string | null => elegido(p)?.exe ?? null
+/**
+ * El omp que ya está instalado en la computadora (Homebrew, bun, npm global): se usa tal cual, sin bajar otro. Comparte
+ * `~/.omp`, así que sus cuentas son las mismas que en la terminal; el binario de GitHub solo hace falta si no hay ninguno.
+ * Las apps abiertas desde el Finder no heredan el PATH de la terminal: `scripts/start.mjs` ya deja ahí Homebrew y lo de
+ * Sloth, y si aun así no aparece, se baja el de Sloth.
+ */
+let ompSistema: string | null | undefined
+export function ompDelSistema(): string | null {
+  if (ompSistema !== undefined) return ompSistema
+  try {
+    const [cmd, args] = WINDOWS ? ['where', ['omp.exe']] : ['which', ['omp']]
+    const ruta = execFileSync(cmd, args, { encoding: 'utf8', timeout: 5000, windowsHide: true, stdio: ['ignore', 'pipe', 'ignore'] })
+      .split(/\r?\n/)[0]
+      .trim()
+    ompSistema = ruta && existsSync(ruta) ? ruta : null
+  } catch {
+    ompSistema = null
+  }
+  return ompSistema
+}
+
+let versionOmp: string | undefined
+/** La versión del omp instalado, si lo hay (`omp/18.14.0` → `18.14.0`). */
+export function versionDeOmp(): string | undefined {
+  if (versionOmp !== undefined) return versionOmp
+  const exe = ompDelSistema()
+  if (!exe) return undefined
+  try {
+    versionOmp = /(\d+\.\d+\.\d+)/.exec(execFileSync(exe, ['--version'], { encoding: 'utf8', timeout: 10_000, windowsHide: true, stdio: ['ignore', 'pipe', 'ignore'] }))?.[1]
+  } catch {
+    // Se queda sin versión.
+  }
+  return versionOmp
+}
+
+/** El omp del sistema manda: sus cuentas son las de `~/.omp`. Si no hay, el que bajó Sloth. */
+const buscar = (p: Programa): string | null => (p === 'omp' ? (ompDelSistema() ?? elegido(p)?.exe) : elegido(p)?.exe) ?? null
 
 /** Las versiones que «Actualizar los agentes» bajó de uno (`AL_DIA`), cada una en su carpeta. */
 const versiones = (p: Programa) => join(carpeta(p), 'versiones')
@@ -275,6 +337,7 @@ export function cabe(v: string, base: string, fijas: number): boolean {
 /** La versión de un agente que no trae la app: la que fija Sloth o, la de Muse, la que dejó su instalador. */
 export function versionFija(p: Proveedor): string | undefined {
   const g = programaDe(p)
+  if (g === 'omp') return versionDeOmp() ?? AGENTES.omp.version
   if (g !== 'muse') return AGENTES[g].version
   try {
     return readFileSync(join(carpeta('muse'), 'muse', '.muse-version'), 'utf8').trim()
@@ -414,6 +477,11 @@ function preguntarANpm() {
 
 /** La versión que se enseña del agente que se usa; la de Claude Code, para Claude. `null` si no está. */
 export function versionVisible(p: Programa): string | null {
+  // El omp del sistema se anuncia con su propia versión, no con la que fija Sloth para bajarlo.
+  if (p === 'omp') {
+    const propia = versionDeOmp()
+    if (propia) return propia
+  }
   const e = elegido(p)
   if (!e) return null
   try {
