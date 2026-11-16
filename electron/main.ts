@@ -66,6 +66,8 @@ const CADA = 6 * 3600_000
  * una o se liberó para todos en un live, y se pregunta ya.
  */
 const VISTAZO = 5 * 60_000
+/** Cada cuánto se mira si cambió la clave de Sloth (se escribió la de un apoyo): el servidor la da sin salir a internet. */
+const CLAVE_NUEVA = 60_000
 /**
  * Si la descarga pasa este tiempo sin avanzar, está muerta: al irse el internet, la de Electron no siempre falla, se
  * queda esperando para siempre. Se corta y empieza otra.
@@ -672,17 +674,31 @@ function actualizaciones() {
     anotar('La descarga no avanza: se empieza otra')
     bajada.cancel()
   }, REINTENTO)
+  const credencial = () =>
+    fetch(`${URL_SLOTH}/api/licencia/credencial`)
+      .then((r) => r.json() as Promise<{ clave?: string; equipo?: string }>)
+      .catch(() => ({}) as { clave?: string; equipo?: string })
+  /** La clave con que se preguntó la última vez. */
+  let conClave: string | undefined
   const revisar = async () => {
     // Quien apoya recibe lo nuevo antes: el cobro lo reconoce por su clave y esta computadora, que da el servidor. Al
     // abrir Sloth, se espera a que arranque: sin la clave, la versión de quien apoya le llegaba 6 horas después. Si no
     // arranca en 2 minutos, se pregunta igual: una versión nueva puede ser el arreglo.
     await Promise.race([servidorListo, new Promise((ok) => setTimeout(ok, 120_000))])
-    const c = (await fetch(`${URL_SLOTH}/api/licencia/credencial`).then((r) => r.json()).catch(() => ({}))) as { clave?: string; equipo?: string }
+    const c = await credencial()
+    conClave = c.clave
     autoUpdater.requestHeaders = c.clave && c.equipo ? { 'x-sloth-clave': c.clave, 'x-sloth-equipo': c.equipo } : null
     await autoUpdater.checkForUpdates().catch(() => {})
   }
   primera = revisar()
   setInterval(revisar, CADA)
+  // Quien escribe la clave de su apoyo con Sloth abierta ve la versión nueva en un minuto: sin esto se preguntaba con la
+  // clave de antes (o sin ninguna) hasta la siguiente vuelta, y parecía que apoyar no la daba.
+  setInterval(async () => {
+    await primera
+    const c = await credencial()
+    if (c.clave && c.clave !== conClave && !bajada) void revisar()
+  }, CLAVE_NUEVA)
   // La primera vez solo se anota cómo está: la pregunta de al abrir ya la ve.
   let vista: string | undefined
   const vistazo = async () => {

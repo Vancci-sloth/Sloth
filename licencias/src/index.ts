@@ -582,30 +582,39 @@ const ULTIMA_EN_CACHE = 30
 /**
  * El vistazo de la app instalada (electron/main.ts): la última versión de `so` y desde cuándo es de todos. Si cambia
  * (salió una, o se liberó en un live), la app pregunta por ella de inmediato. Es igual para todos: va en caché.
+ * `yml` es la marca de su `latest.yml`, que se sube al final, después del instalador (y en Mac, de su .zip): cambia otra
+ * vez cuando llega, y la app que miró entre los dos, cuando aún no había nada que ofrecerle, vuelve a preguntar.
  */
 async function ultimaLigera(req: Request, env: Env, ctx: ExecutionContext, so: Sistema): Promise<Response> {
   const cache = typeof caches === 'undefined' ? undefined : caches.default
   const llave = new Request(new URL(`/ultima?so=${so}`, req.url))
   const guardada = await cache?.match(llave)
   if (guardada) return guardada
-  const u = await (await env.DESCARGAS.get(ULTIMAS[so]))?.json<Ultima>()
-  const r = json(u ? { version: u.version, ...(u.todos ? { todos: u.todos } : {}) } : {}, 200, { 'cache-control': `public, max-age=${ULTIMA_EN_CACHE}` })
+  const [u, yml] = await Promise.all([env.DESCARGAS.get(ULTIMAS[so]).then((o) => o?.json<Ultima>()), env.DESCARGAS.head(YML[so])])
+  const r = json(u ? { version: u.version, ...(u.todos ? { todos: u.todos } : {}), ...(yml ? { yml: yml.etag } : {}) } : {}, 200, { 'cache-control': `public, max-age=${ULTIMA_EN_CACHE}` })
   if (cache) ctx.waitUntil(cache.put(llave, r.clone()))
   return r
 }
 
 /**
- * Si quien pregunta apoya hoy: la app manda su clave y su computadora (`x-sloth-clave`, `x-sloth-equipo`), y la clave
- * es de un apoyo vigente (mensual, anual o de una vez), o de un lugar gratis de por vida, en esa computadora.
+ * Si quien pregunta apoya hoy: la app manda su clave y su computadora (`x-sloth-clave`, `x-sloth-equipo`); la clave vale
+ * en esa computadora y su correo tiene un apoyo vigente (mensual, anual o de una vez) o un lugar gratis de por vida. Va
+ * por el correo, como la insignia de la comunidad: quien apoyó desde la tienda de estilos sigue con la clave de su cuenta
+ * gratis, y con solo mirar el plan de esa clave no recibía lo nuevo antes.
  */
 async function apoya(req: Request, env: Env): Promise<boolean> {
   const clave = (req.headers.get('x-sloth-clave') ?? '').replace(/\s+/g, '').toUpperCase()
   const equipo = req.headers.get('x-sloth-equipo') ?? ''
   if (!CLAVE.test(clave) || !EQUIPO.test(equipo)) return false
-  const f = await env.DB.prepare("SELECT l.estado, l.pagado_hasta FROM licencias l JOIN equipos e ON e.clave = l.clave WHERE l.clave = ? AND e.equipo = ? AND l.plan IN ('mensual', 'anual', 'unico', 'gratis')")
+  const ahora = Date.now()
+  const suya = await env.DB.prepare('SELECT l.email, l.estado, l.pagado_hasta FROM licencias l JOIN equipos e ON e.clave = l.clave WHERE l.clave = ? AND e.equipo = ?')
     .bind(clave, equipo)
-    .first<Pick<Fila, 'estado' | 'pagado_hasta'>>()
-  return !!f && vigencia(f, Date.now()).activa
+    .first<Pick<Fila, 'email' | 'estado' | 'pagado_hasta'>>()
+  if (!suya || !vigencia(suya, ahora).activa) return false
+  const { results } = await env.DB.prepare("SELECT estado, pagado_hasta FROM licencias WHERE email = ? AND plan IN ('mensual', 'anual', 'unico', 'gratis')")
+    .bind(suya.email)
+    .all<Pick<Fila, 'estado' | 'pagado_hasta'>>()
+  return results.some((f) => vigencia(f, ahora).activa)
 }
 
 /**

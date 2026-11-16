@@ -111,6 +111,21 @@ los envíos a Apple.
    se usa, que lo pruebe y le diga qué tal; sin `[para todos]`, que sin apoyo le llega en 7 días) con
    `node scripts/mejoras.mjs <id> <archivo>`, que también la marca hecha.
 
+### Si quien apoya dice que no le llega la versión nueva
+
+La app busca la nueva en `/actualizaciones/latest*.yml` con su clave y su computadora (`x-sloth-clave`,
+`x-sloth-equipo`, que le da `/api/licencia/credencial`). El cobro (`apoya`) da la nueva si esa clave vale en esa
+computadora y **su correo** tiene un apoyo vigente, como la insignia de la comunidad: quien apoyó desde la tienda de
+estilos sigue con la clave de su cuenta gratis. `licencias/src/anticipo.test.ts` lo prueba de punta a punta.
+
+- El navegador no lleva la clave: durante los 7 días, `/descargar` y la página dan la anterior a todos, también a
+  quien apoya. La nueva le llega por «Actualizar» en su Sloth (en una Mac sin firma de Apple o una Windows 0.4.0–0.4.1,
+  que bajan a mano, primero la anterior y desde ella la nueva).
+- La app pregunta al abrir, cada 6 horas, al minuto de escribir otra clave y cuando cambia `/ultima` (cada 5 min; cambia
+  al subirse el instalador y otra vez al llegar su `latest.yml`). Quien apoya desde la tienda la ve en la siguiente.
+- El cobro no guarda qué versión tiene cada quien. Sí se ve quién usa qué clave: `equipos.visto` se renueva cada vez
+  que su Sloth pregunta por la licencia (`npm run licencias -- d1 execute sloth-licencias --remote --command "…"`).
+
 La llave `PUBLICAR` del workflow autoriza la subida, y solo vive en los secretos de GitHub: con ella se reparte una
 versión a todos. En la computadora del creador va otra, `ADMIN` (`%APPDATA%\sloth\licencias\admin.txt`), que administra
 la comunidad, las voces y los apoyos a mano, pero no publica, porque ahí la leen sus agentes. Los secretos de Apple y el comportamiento sin firma están en

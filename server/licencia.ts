@@ -64,7 +64,8 @@ export function licencia(app: string) {
   })
   let error = ''
 
-  void revisar()
+  /** La primera pregunta al cobro, la de al abrir: `credencial` la espera si lo guardado ya venció. */
+  const primera = revisar().catch(() => undefined)
   setInterval(() => void revisar(), CADA).unref()
 
   function leer(): Archivo {
@@ -198,9 +199,14 @@ export function licencia(app: string) {
     return false
   }
 
-  /** Con qué entra a la comunidad (`server/comunidad.ts`): la clave y esta computadora, mientras esté activa. */
+  /**
+   * Con qué entra a la comunidad (`server/comunidad.ts`): la clave y esta computadora, mientras esté activa. Lo guardado
+   * vale una semana: al abrir Sloth después de más días ya venció, y se espera a lo que diga el cobro. Sin esperar, la
+   * ventana preguntaba por la versión nueva sin la clave y quien apoya no la veía hasta 6 horas después.
+   */
   const credencial = async () => {
     await listo
+    if (a.clave && !activa()) await primera
     return activa() && a.clave ? { clave: a.clave, equipo } : undefined
   }
 
