@@ -6,6 +6,7 @@
 .opciones { padding: 56px 48px 72px; max-width: 720px; width: 100%; margin: 0 auto; overflow-y: auto; display: flex; flex-direction: column; gap: 26px; }
 .opciones h1 { margin: 0; font-size: 30px; font-weight: 700; letter-spacing: -0.02em; }
 .opciones-titulo { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.opciones-nombre { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
 .opciones-titulo-acciones { display: flex; align-items: center; gap: 10px; }
 .opciones > .ghost { align-self: flex-start; margin-bottom: -20px; }
 

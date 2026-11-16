@@ -11,7 +11,7 @@ import { ESPACIO_DISCO, EspacioDisco } from './Espacio' // espacio en disco
 import { discoLleno } from './items'
 import { TuEquipo } from './Equipo' // tu equipo
 import { Icono } from './Iconos'
-import { SuscripcionOpciones } from './Licencia' // apoyo
+import { SuscripcionOpciones, VersionYApoyo } from './Licencia' // apoyo
 import { Logo } from './Logos'
 import { BotonNavegador } from './Navegador'
 import { RadarOpciones } from './RadarOpciones' // radar
@@ -58,7 +58,10 @@ function Ajustes({ onDone, iniciando, onIniciando }: { onDone(): void; iniciando
         ← Volver
       </button>
       <div className="opciones-titulo">
-        <h1>Opciones</h1>
+        <div className="opciones-nombre">
+          <h1>Opciones</h1>
+          <VersionYApoyo className="muted small" />
+        </div>
         <div className="opciones-titulo-acciones">
           <button className="ghost small" onClick={abrirBienvenida}>
             Ver la bienvenida

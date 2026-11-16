@@ -23,6 +23,7 @@ import { EstiloCambio } from './EstiloCambio'
 import { Novedades } from './Novedades'
 import { avisarGanasteRifa, GanasteRifa } from './GanasteRifa'
 import { ActualizarSloth, AvisoAgentes } from './Actualizar' // versiones nuevas
+import { VersionYApoyo } from './Licencia' // la versión que tienes y hasta cuándo vale tu apoyo
 import { TarjetasEnlaces } from './Enlaces' // tarjeta de los enlaces
 import { esDeEstudio, Estudio } from './Estudio' // panel de etapas
 import { BotonNavegador, PanelNavegador, useNavegadorAbierto } from './Navegador' // navegador de cada hilo
@@ -1686,6 +1687,7 @@ function Pie({ running, connected, enOpciones, fallo, plegada }: { running: bool
           {error || fallo}
         </span>
       )}
+      <VersionYApoyo corta className="muted small pie-nota" />
     </div>
   )
 }
