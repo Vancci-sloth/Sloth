@@ -235,11 +235,24 @@ solo afecta al servidor local. `scripts/nube.mjs` usa una sesión de Cloudflare 
 `sloth.vancci.org` vive en **`Vancci-sloth/vancci-web`**, en `web/public/sloth/index.html`. Un checkout puede estar
 atrasado o tener cambios sin guardar: consulta
 `git status`, actualiza las referencias con `git fetch origin` y parte de `origin/main` en un worktree aparte si hace
-falta. El proyecto de Astro está dentro de `web/`: ahí se corre `npm ci` y `npm run build` antes de subir los cambios
-al `main` de ese repo. Vercel despliega ese push.
+falta. El proyecto de Astro está dentro de `web/`: ahí se corre `npm ci` y, con los cambios ya en el `main` de ese repo,
+`npm run publicar`, que arma el sitio y lo sube a Cloudflare con la sesión de Sloth (la de `npm run licencias`). Subir a
+`main` no publica nada: desde el 16 de noviembre de 2026 la página ya no está en Vercel, que la apagó
+(`402 DEPLOYMENT_DISABLED`) y tiró `sloth.vancci.org` y `vancci.org`.
 
-Comprueba el despliegue de Vercel y la página publicada en `https://sloth.vancci.org`, incluidos los enlaces de descarga
-y pago que hayas cambiado. Cambiar este repo o desplegar `licencias/` no modifica esa página.
+Son tres piezas, todas en la cuenta de Cloudflare de Sloth: el Worker `sloth-web` (`sloth.vancci.org`), el Worker
+`vancci-web` (`vancci.org` y `www`) y el bucket de R2 `vancci-web-videos` (`videos.vancci.org`), a donde redirigen los
+`.mp4`, porque los archivos de un Worker no se sirven por partes y sin eso Safari no reproduce un video. Los dos Workers
+son solo archivos, sin código: así no gastan las 100.000 peticiones diarias del plan gratis, de las que el cobro ya usa
+entre 60.000 y 80.000. No les pongas código (`main`) ni uses `wrangler pages` con esos nombres: `pages project create
+sloth-web` reemplazó al Worker y dejó la página en 530 hasta volver a publicar. Si un dominio ya tiene registros DNS de
+otro sitio, `wrangler deploy` no lo conecta (error 100117) y la sesión de wrangler no puede borrarlos: hace falta un
+token con «DNS Write» o quitarlos en el panel. Los que había de Vercel quedaron en
+`%APPDATA%\sloth\respaldos\dns-vancci-org-2026-11-16.json`.
+
+Comprueba la página publicada en `https://sloth.vancci.org`, incluidos los enlaces de descarga y pago que hayas cambiado
+y que un video conteste 206 a `curl -L -H "Range: bytes=0-1"`. Cambiar este repo o desplegar `licencias/` no modifica
+esa página.
 
 Con qué se paga lo dice el cobro (`/precio`): hasta que contesta, y si no contesta, la página ofrece solo tarjeta.
 PayPal sale solo si el cobro lo da (sin `sinPaypal`). Si la página enseña algo raro en el pago, mira primero `/precio`.
