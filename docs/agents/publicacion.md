@@ -156,8 +156,10 @@ fue `D1_ERROR: … exceeded D1's free tier daily row read limit`: el plan gratis
 leídas al día y se levanta a medianoche UTC (18:00 de México), o al pasar la cuenta a Workers Paid. Qué consultas las
 gastan: `npm run licencias -- d1 insights sloth-licencias --timePeriod 2d --sort-type sum --sort-by reads --json`. Ese
 día, la mayor parte de las filas eran de las que recorren `licencias` entera: los miembros y activos de la comunidad, los
-conteos de `/precio`, y la insignia en los votos del roadmap y en `/creditos`. Lo guardado en memoria (`GUARDADO`) las
-frena poco, porque cada copia del Worker vive poco. Las consultas a mano (`d1 execute --remote`) siguen contestando.
+conteos de `/precio`, y la insignia en los votos del roadmap y en `/creditos` (tres de cada cuatro filas). Desde
+entonces se calculan a lo más cada 10 minutos y se leen de la tabla `guardado` (`licencias/src/guardado.ts`): lo que
+sea igual para todos y recorra una tabla entera va ahí, no en una variable, porque cada copia del Worker vive poco.
+Las consultas a mano (`d1 execute --remote`) siguen contestando aunque el Worker esté en el tope.
 Las voces de Sloth se abren a todos con la marca `voz-mensual.json` en R2, que el Worker guarda cuando el script de
 publicación (que manda `vozMensual`) termina de subir el `latest*.yml`; sin ella, con `VOZ_SOLO_CREADOR=1`, son solo del
 creador.

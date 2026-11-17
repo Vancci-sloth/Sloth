@@ -68,6 +68,7 @@
  */
 import type { VersionLiberable } from '../../shared/types.ts'
 import { comunidad, creditos, olvidarSueltos } from './comunidad.ts'
+import { guardado } from './guardado.ts'
 import { cancelarStripe, firmaDeStripe, leerStripe, modoStripe, pagoDeSesion, sesion, sesionStripe, suscripcionStripe, type PagoStripe, type SesionStripe } from './stripe.ts'
 import { olvidarRegistroVoz, voz } from './voz.ts'
 import { entregarRifas } from './rifa.ts'
@@ -765,16 +766,19 @@ async function publicar(req: Request, env: Env, url: URL): Promise<Response> {
  * El precio de hoy. Las suscripciones de prueba y las cuentas gratis no cuentan: solo las pagadas de verdad y los lugares
  * gratis de por vida. `quedan`: los lugares públicos de Fundador libres. Con un enlace de Fundador en pie (`codigo`),
  * `fundador`: la página ofrece ese apoyo. `apoyan`: quienes tienen pagado y sin vencer el precio de Fundador o más, cada
- * mes o una vez.
+ * mes o una vez. Contarlos recorre `licencias` entera: la página los lee guardados (`guardado.ts`); al apoyar (`alDia`),
+ * que es cuando se decide quién es Fundador, se cuentan en el momento.
  */
-async function precios(env: Env, codigo?: unknown) {
-  const c = await env.DB.prepare(
-    `SELECT COUNT(CASE WHEN ${esFundador('licencias')} THEN 1 END) AS fundadores,
-            COUNT(CASE WHEN julianday(pagado_hasta) > julianday('now') AND ((moneda = ? AND monto >= ?) OR (moneda = 'MXN' AND monto >= ?)) THEN 1 END) AS apoyan
-     FROM licencias WHERE plan IN ('mensual', 'anual', 'unico') AND modo = 'produccion'`
-  )
-    .bind(env.MONEDA, Number(env.PRECIO_MENSUAL), Number(env.PRECIO_MENSUAL_MXN))
-    .first<Cuenta>()
+async function precios(env: Env, codigo?: unknown, alDia = false) {
+  const contar = () =>
+    env.DB.prepare(
+      `SELECT COUNT(CASE WHEN ${esFundador('licencias')} THEN 1 END) AS fundadores,
+              COUNT(CASE WHEN julianday(pagado_hasta) > julianday('now') AND ((moneda = ? AND monto >= ?) OR (moneda = 'MXN' AND monto >= ?)) THEN 1 END) AS apoyan
+       FROM licencias WHERE plan IN ('mensual', 'anual', 'unico') AND modo = 'produccion'`
+    )
+      .bind(env.MONEDA, Number(env.PRECIO_MENSUAL), Number(env.PRECIO_MENSUAL_MXN))
+      .first<Cuenta>()
+  const c = alDia ? await contar() : await guardado(env, 'precio', contar)
   // Mercado Pago solo se ofrece con su token del modo de hoy.
   const conMp = !!(env.MP_MODO === 'produccion' ? env.MP_ACCESS_TOKEN_PRODUCCION : env.MP_ACCESS_TOKEN)
   // Cripto, con la llave y la clave de los avisos de NOWPayments; cobra los mismos precios, en `MONEDA`, pero el monto
@@ -867,7 +871,7 @@ async function suscribir(env: Env, c: Record<string, unknown>, desde: string): P
     )
   const acepto = new Date().toISOString()
   if (plan === 'gratis') return unirse(env, email, equipo!, acepto, terminos, desde, c.porCorreo === true)
-  const t = await precios(env, c.fundador)
+  const t = await precios(env, c.fundador, true)
   if (pasa === 'paypal' && t.sinPaypal) throw new Rechazo(400, 'Por ahora no se puede pagar con PayPal: elige tarjeta, Mercado Pago o cripto.')
   if ((pasa === 'mercadopago' && !t.mxn) || (pasa === 'tarjeta' && !t.tarjeta) || (pasa === 'cripto' && !t.cripto)) throw new Rechazo(400, 'Por ahora no se puede pagar así: elige otra forma de pago.')
   // La página de la tarjeta de Mercado Pago (`/pagar`, hasta el 6 de noviembre de 2026) mandaba el monto en pesos y su
