@@ -22,6 +22,7 @@
  * Va con lo que hace y su guía de uso (`shared/guia.ts`): sin la plantilla completa no se publica (`estiloEnSuSitio`).
  * Los estilos son de quien apoya (`apoya`): a los demás no les salen en el feed, ni en el buscador, ni se les abre su
  * publicación ni se les entrega su paquete (402, `SOLO_APOYO`); lo suyo sí, que compartir un estilo es de cualquiera.
+ * Los que ya instaló quien deja de apoyar los cierra su app, con lo que dice su licencia firmada (`apoyaHoy`, `index.ts`).
  *
  * - `GET /comunidad?categoria=&orden=&antes=`: quién eres, los números de la comunidad y una página del feed: las fijadas
  *   y luego lo que tuvo actividad más reciente, lo último publicado o, para el creador, lo que no ha contestado

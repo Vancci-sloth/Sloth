@@ -38,6 +38,7 @@ import { abrirBorrador, CompartirEstilo, ImportarEstilo } from './Estilos' // es
 import { GuiaVista } from './Guia'
 import { PedirMejora } from './PedirMejora' // comunidad
 import { Icono } from './Iconos'
+import { SinApoyo } from './SinApoyo' // estilos de la comunidad, sin apoyo
 import { Bienvenida } from './Bienvenida'
 import { AvisoMacViejo } from './AvisoMacViejo'
 import { MarcaAgente } from './Logos'
@@ -1135,7 +1136,8 @@ function NewSession(props: {
         {sinClaude !== undefined && <CuentaClaude model={choice?.model} onFalta={setSinCuenta} aAgentes />}
         {/* Las herramientas de video solo hacen falta en los estilos de video, y de los paquetes, los de su skill. */}
         {card.etapas && <Requisitos skill={card.skill} />}
-        {composer}
+        {/* Un estilo de la comunidad, sin apoyo vigente: no hace videos nuevos hasta volver a apoyar. */}
+        {card.bloqueada ? <SinApoyo titulo={card.title} /> : composer}
         <TarjetasEnlaces enlaces={enlaces} />
       </div>
       {compartiendo && <CompartirEstilo card={compartiendo} onCerrar={() => setCompartiendo(null)} />}
@@ -1180,7 +1182,7 @@ const Carteles = memo(function Carteles({ cards, activa, previas, sessions, acci
       {cards.map((c) => (
         <button
           key={c.id}
-          className={`card ${c.id === activa ? 'active' : ''}`}
+          className={`card ${c.id === activa ? 'active' : ''}${c.bloqueada ? ' bloqueada' : ''}`}
           onClick={() => acciones.elegir(c)}
           title={c.description}
           onMouseEnter={(e) => e.currentTarget.querySelector('video')?.play().catch(() => {})}
@@ -1220,7 +1222,10 @@ const Carteles = memo(function Carteles({ cards, activa, previas, sessions, acci
             </span>
           )}
           <span className="card-pie">
-            <span className="card-title">{c.title}</span>
+            <span className="card-title">
+              {c.bloqueada && <Icono de="candadoCerrado" className="icon-trazo card-candado" />}
+              {c.title}
+            </span>
             <Uso hilos={sessions.filter((s) => s.cardId === c.id && !s.archived)} />
           </span>
         </button>
@@ -1387,7 +1392,8 @@ const SessionView = memo(function SessionView({ id, session, card, models }: { i
         )}
         {/* Lo elegido en el video (un elemento, una escena, un tramo): el mensaje lo lleva delante. */}
         {esDeEstudio(card) && <ReferenciaVideo sessionId={session.id} />}
-        <Composer
+        {/* El hilo de un estilo de la comunidad que se cerró se sigue viendo, pero no sigue trabajando. */}
+        {card?.bloqueada ? <SinApoyo titulo={card.title} /> : <Composer
           key={`composer:${session.id}`}
           models={models}
           initial={{ model: session.model, effort: session.effort }}
@@ -1404,7 +1410,7 @@ const SessionView = memo(function SessionView({ id, session, card, models }: { i
           onChoice={(c) => api(`/api/sessions/${session.id}/model`, c).then(() => elegidoAMano(c))}
           onStop={() => api(`/api/sessions/${session.id}/stop`, {})}
           onSend={(text, _choice, images) => api(`/api/sessions/${session.id}/send`, { text: conReferencia(session.id, text), images })}
-        />
+        />}
       </div>
     </>
   )

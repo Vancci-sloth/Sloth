@@ -79,6 +79,11 @@ export function abrirPublicacion(id: string) {
   location.hash = '/comunidad'
   dispatchEvent(new Event(ABRIR))
 }
+/** Lleva a la sección Estilos, la tienda: desde un estilo que se cerró al acabarse el apoyo (`SinApoyo.tsx`). */
+export function abrirTienda() {
+  localStorage.setItem('comunidad:seccion', 'estilos')
+  location.hash = '/comunidad'
+}
 
 const Icono = ({ de }: { de: NombreIcono }) => <IconoBase de={de} className="com-ico" />
 

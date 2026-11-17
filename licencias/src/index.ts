@@ -424,6 +424,19 @@ export function esFundador(t: string) {
   return `((${t}.fundador = 1 AND ${t}.autorizada IS NOT NULL AND julianday(${t}.pagado_hasta) > julianday('now')) OR (${t}.plan = 'gratis' AND ${t}.estado = 'gratis'))`
 }
 
+/**
+ * Si un correo apoya hoy, como lo ve la comunidad (la insignia de `comunidad.ts`, que abre la tienda de estilos): un
+ * apoyo suyo pagado y sin vencer, o su lugar gratis de por vida. Va firmado en su licencia (`firmada`).
+ */
+export async function apoyaHoy(env: Env, email: string): Promise<boolean> {
+  return !!(await env.DB.prepare(
+    `SELECT 1 FROM licencias l WHERE l.email = ? AND l.plan IN ('mensual', 'anual', 'unico', 'gratis') AND l.modo = 'produccion'
+     AND (${esFundador('l')} OR julianday(l.pagado_hasta) > julianday('now')) LIMIT 1`
+  )
+    .bind(email)
+    .first())
+}
+
 /** Un enlace de invitación de Fundador que sigue en pie (`enlaces_fundador`): sin revocar y sin que nadie haya pagado con él. */
 async function enlaceFundador(env: Env, codigo: unknown): Promise<boolean> {
   if (typeof codigo !== 'string' || !/^[A-Za-z0-9]{8,32}$/.test(codigo)) return false
@@ -1712,6 +1725,8 @@ async function firmada(env: Env, f: Fila, equipo: string, ahora: number): Promis
   // Fundador: un apoyo de su correo que entró entre los primeros y se llegó a pagar (`esFundador`), o su lugar gratis de por vida.
   const fundador = !!(await env.DB.prepare(`SELECT 1 FROM licencias l WHERE l.email = ? AND ${esFundador('l')} LIMIT 1`).bind(f.email).first())
   const datos = JSON.stringify({
+    // Si su correo apoya hoy. Siempre va, también `false`: con eso la app cierra los estilos que instaló de la comunidad.
+    apoya: await apoyaHoy(env, f.email),
     clave: f.clave,
     equipo,
     email: f.email,

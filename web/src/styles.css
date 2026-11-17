@@ -163,6 +163,16 @@ input, textarea, select { font: inherit; color: inherit; }
    si no, lo movía. */
 .card:has(.card-previa) .card-pie { background: linear-gradient(to top, rgba(15, 14, 12, 0.94) 55%, rgba(15, 14, 12, 0.7) 80%, transparent); }
 .card-title { font-size: 15px; font-weight: 650; line-height: 1.3; overflow-wrap: anywhere; }
+/* Un estilo de la comunidad sin apoyo vigente (`Card.bloqueada`): apagado, con su candado junto al nombre. */
+.card.bloqueada .card-previa, .card.bloqueada .card-fondo { opacity: 0.4; }
+.card-candado { margin-right: 5px; color: var(--amber); }
+/* Y en el sitio de su compositor, por qué no hace videos y cómo volver (SinApoyo.tsx). */
+.sin-apoyo { display: flex; align-items: center; gap: 14px; padding: 14px 16px; border: 1px solid var(--amber); border-radius: 12px; background: var(--amber-tinte); text-align: left; }
+.sin-apoyo > .icon-trazo { flex: none; width: 22px; height: 22px; color: var(--amber); }
+.sin-apoyo > div { flex: 1; min-width: 0; }
+.sin-apoyo p { margin: 3px 0 0; color: var(--suave); font-size: 13px; }
+.sin-apoyo .primary { flex: none; white-space: nowrap; }
+@media (max-width: 760px) { .sin-apoyo { flex-wrap: wrap; } }
 .card.active .card-title { color: var(--amber-2); }
 .card-uso { font-size: 15px; line-height: 1.35; color: var(--suave); overflow-wrap: anywhere; }
 .card-uso.vivo { color: var(--amber); }

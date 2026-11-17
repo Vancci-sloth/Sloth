@@ -48,6 +48,11 @@ export interface Card {
   /** Un estilo que instalaste de otro: de dónde vino. Al volver a instalarlo de ahí, se pone al día. */
   origen?: OrigenEstilo
   /**
+   * Un estilo instalado de la comunidad (`origen.publicacion`) en una computadora que ya no apoya a Sloth: lo pone el
+   * servidor. Lleva su candado y no hace videos hasta volver a apoyar (`web/src/SinApoyo.tsx`); los ya hechos se quedan.
+   */
+  bloqueada?: true
+  /**
    * Un estilo tuyo que salió de uno de la comunidad (lo copió «Nuevo estilo» de uno instalado): la publicación de aquel.
    * Al compartirlo, cuenta como su variante (`licencias/src/tienda.ts`).
    */

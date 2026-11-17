@@ -147,7 +147,9 @@ Este es el mapa:
   paso a paso para llevarse una parte con un estilo compartido. La sección Estilos es la tienda (`licencias/src/tienda.ts`,
   `Tienda.tsx`): buscar, favoritos, más usados, y los números públicos de cada estilo con sus puntos del mes, que mide
   la app (`server/estilos-usos.ts`). Los estilos son de quien apoya: a los demás, la tienda les enseña la invitación
-  a apoyar y el cobro no les entrega el paquete. El reparto (`licencias/src/reparto.ts`): participa quien pone su
+  a apoyar y el cobro no les entrega el paquete. Los ya instalados se cierran al acabarse el apoyo: la licencia firmada
+  dice si su correo apoya hoy (`apoyaHoy`), `server/licencia.ts` lo mira (`sinApoyo`) y el servidor marca esas cards
+  (`Card.bloqueada`: candado, sin videos nuevos, `SinApoyo.tsx`) hasta que vuelve a apoyar. El reparto (`licencias/src/reparto.ts`): participa quien pone su
   Binance ID (en el recuadro del fondo), el primero es el 1 de enero de 2027 y el creador cierra cada periodo y marca
   lo pagado en Administrador → Fondo (`FondoAdmin.tsx`); el envío es a mano, desde Binance.
 - `server/modelos3d.ts` y `web/src/Modelos3D.tsx`: «Modelos 3D» enseña la biblioteca `skills/modelos-3d` que usan los

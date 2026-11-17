@@ -102,7 +102,14 @@ if (VENTA) {
   process.env.CLAUDE_CONFIG_DIR ??= configClaudeDev(APP)
 }
 // Y su clave: la cuenta gratis de la comunidad o el apoyo, que quita el recordatorio. Sloth abre sin ella.
-const suscripcion = licencia(APP) // La clave de Sloth también conecta las voces en la copia de desarrollo.
+// Los estilos instalados de la comunidad son de quien apoya: cuando esta computadora deja de hacerlo, se cierran
+// (`Card.bloqueada`) hasta que vuelve. En la del creador, nunca.
+let sinApoyo = false
+const SIN_APOYO = 'Este estilo es de la comunidad, que es para quienes apoyan a Sloth. Vuelve a apoyar y sigue donde lo dejaste.'
+const suscripcion = licencia(APP, (cerrado) => {
+  sinApoyo = cerrado && !llaveDelCreador()
+  broadcast({ type: 'cards', cards: cards() })
+}) // La clave de Sloth también conecta las voces en la copia de desarrollo.
 
 const clients = new Set<WebSocket>()
 const suscripciones = new Map<WebSocket, string | null>()
@@ -164,23 +171,27 @@ setInterval(() => {
  * Se releen solo si alguno cambió. Si quedó a medio escribir o con un error, siguen las últimas buenas: una coma de más no
  * puede dejarte sin «Detener» ni «Reiniciar backend», que pasan por aquí. Un error en las tuyas no se lleva las de Sloth.
  */
-let leidas: { mtime: number; cards: Card[] } | undefined
+let leidas: { mtime: number; sinApoyo: boolean; cards: Card[] } | undefined
 let mala = 0 // la fecha del archivo que falló, para avisar una sola vez
 function cards(): Card[] {
   let mtime = 0
   try {
     const tuyas = existsSync(CARDS_TUYAS)
     mtime = statSync(CARDS).mtimeMs + (tuyas ? statSync(CARDS_TUYAS).mtimeMs : 0)
-    if (leidas?.mtime !== mtime && mala !== mtime) {
+    if ((leidas?.mtime !== mtime || leidas.sinApoyo !== sinApoyo) && mala !== mtime) {
       const deSloth = readCards(CARDS, APP)
       const ids = new Set(deSloth.map((c) => c.id))
       let suyas: Card[] = []
       try {
-        if (tuyas) suyas = readCards(CARDS_TUYAS, APP).filter((c) => !ids.has(c.id)).map((c) => ({ ...c, tuya: true, ...(c.etapas && !c.version ? { version: '1.0' } : {}) }))
+        // Las instaladas de la comunidad (`origen.publicacion`) se cierran cuando ya no se apoya.
+        if (tuyas)
+          suyas = readCards(CARDS_TUYAS, APP)
+            .filter((c) => !ids.has(c.id))
+            .map((c) => ({ ...c, tuya: true, ...(c.etapas && !c.version ? { version: '1.0' } : {}), ...(sinApoyo && c.origen?.publicacion ? { bloqueada: true as const } : {}) }))
       } catch (error) {
         console.error(`${CARDS_TUYAS} tiene un error; van solo las cards de Sloth. ${error instanceof Error ? error.message : error}`)
       }
-      leidas = { mtime, cards: [...deSloth, ...suyas] }
+      leidas = { mtime, sinApoyo, cards: [...deSloth, ...suyas] }
     }
   } catch (error) {
     if (mala !== mtime) console.error(`cards.json tiene un error; siguen las cards de antes. ${error instanceof Error ? error.message : error}`)
@@ -664,6 +675,7 @@ async function api(req: IncomingMessage, res: ServerResponse, url: URL): Promise
     const input = await body<{ cardId: string; model: string; effort?: string; text: string; images?: string[]; masDeDos?: boolean }>(req)
     const card = cards().find((c) => c.id === input.cardId)
     if (!card) return send(res, 404, { error: 'No existe esa card' }), true
+    if (card.bloqueada) return send(res, 402, { error: SIN_APOYO }), true
     if (card.etapas?.some((e) => e.fase) && pideConfirmar(res, input.masDeDos)) return true
     mkdirSync(card.cwd, { recursive: true })
     // Uno que sale de Ideas se llama como la idea (su línea `Título:`); los demás, como su primer mensaje, hasta que llegue
@@ -691,6 +703,7 @@ async function api(req: IncomingMessage, res: ServerResponse, url: URL): Promise
     const input = await body<{ cardId: string; model: string; effort?: string; text: string; enlaces: string[]; images?: string[]; masDeDos?: boolean }>(req)
     const card = cards().find((c) => c.id === input.cardId)
     if (!card?.lote) return send(res, 404, { error: 'Esa card no hace lotes' }), true
+    if (card.bloqueada) return send(res, 402, { error: SIN_APOYO }), true
     const n = input.enlaces.length
     if (n < 2) return send(res, 400, { error: 'Un lote lleva al menos dos enlaces' }), true
     // Todos los videos del lote copian a la misma carpeta, cada uno con el nombre de la suya.
@@ -714,6 +727,10 @@ async function api(req: IncomingMessage, res: ServerResponse, url: URL): Promise
     return true
   }
 
+  // Un hilo de un estilo de la comunidad que se cerró (`bloqueada`) no sigue: ni mensajes, ni otra versión, ni su turno
+  // del lote. Lo que ya trabaja acaba, y lo hecho se sigue viendo.
+  const sigue = method === 'POST' && /^\/api\/sessions\/([\w-]+)\/(send|empezar|version)$/.exec(path)
+  if (sigue && cards().find((c) => c.id === sessions.meta(sigue[1])?.cardId)?.bloqueada) return send(res, 402, { error: SIN_APOYO }), true
   // «Haz otra versión» pone a trabajar otra vez un video que estaba quieto.
   const otra = method === 'POST' && /^\/api\/sessions\/([\w-]+)\/version$/.exec(path)
   if (otra) {

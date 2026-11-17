@@ -60,6 +60,15 @@ export function Tienda({ version, creador, onAbrir, conNombre }: { version: numb
     )
   }, [orden, buscado, version, recargar])
 
+  // Al abrirse la tienda con el pago, lo instalado de antes también: Sloth vuelve a preguntar al cobro y quita el candado
+  // de esos estilos (`SinApoyo.tsx`) sin esperar a su vistazo de cada 6 horas.
+  const cerrada = useRef(false)
+  useEffect(() => {
+    if (!tienda) return
+    if (cerrada.current && !tienda.cerrada) void api('/api/licencia?fresco').catch(() => {})
+    cerrada.current = !!tienda.cerrada
+  }, [tienda])
+
   function ordenar(o: OrdenTienda) {
     setOrden(o)
     try {

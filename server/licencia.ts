@@ -5,7 +5,8 @@
  * (`/api/licencia/unirse`). El cobro es `licencias/`, un Worker de Cloudflare con
  * PayPal: aquí solo se le pregunta. Su respuesta llega firmada y se guarda en `data/licencia.json`. Sin
  * internet, vale hasta su `hasta` (una semana como mucho), y editar el archivo no la alarga. Se vuelve a preguntar al
- * abrir y cada 6 horas.
+ * abrir y cada 6 horas. Lo firmado dice también si su correo apoya hoy: cuando deja de hacerlo, los estilos que instaló
+ * de la comunidad se cierran (`sinApoyo`).
  */
 import { execFile } from 'node:child_process'
 import { createHash, createPublicKey, randomUUID, verify } from 'node:crypto'
@@ -41,6 +42,8 @@ interface Firmado extends Omit<Licencia, 'error'> {
   clave: string
   equipo: string
   hasta: string
+  /** Si su correo apoya hoy. Un cobro de antes no lo dice. */
+  apoya?: boolean
 }
 
 const correr = promisify(execFile)
@@ -53,7 +56,16 @@ class Rechazo extends Error {
   }
 }
 
-export function licencia(app: string) {
+/**
+ * Con lo firmado `d`, si ya no hay con qué usar los estilos instalados de la comunidad, que son de quien apoya
+ * (`Card.bloqueada`): sin nada firmado que valga (sin clave, o de otra computadora), con lo firmado vencido, o cuando el
+ * cobro dice que su correo no apoya hoy (por el correo: quien apoyó desde la tienda sigue con la clave de su cuenta
+ * gratis). Un cobro de antes, que no lo dice, no cierra nada.
+ */
+export const sinApoyoCon = (d: { hasta: string; apoya?: boolean } | undefined, ahora = Date.now()) => !d || ahora >= Date.parse(d.hasta) || d.apoya === false
+
+/** `alCambiar`: cuando esta computadora deja de apoyar a Sloth o vuelve a hacerlo (`sinApoyo`). */
+export function licencia(app: string, alCambiar?: (sinApoyo: boolean) => void) {
   const archivo = join(app, 'data', 'licencia.json')
   let a: Archivo = leer()
   // De Windows cada vez: copiada a otra computadora, la licencia no vale ahí hasta volver a preguntar, y cuenta como otra.
@@ -63,9 +75,20 @@ export function licencia(app: string) {
     equipo = id ?? a.equipo ?? nuevoEquipo()
   })
   let error = ''
+  /**
+   * Si esta computadora ya no tiene con qué usar los estilos que instaló de la comunidad (`sinApoyoCon`). Se mira cuando
+   * acaba la primera pregunta al cobro (antes no se sabe: nada se cierra) y cada vez que se guarda lo que dijo.
+   */
+  let sinApoyo = false
+  function mirarApoyo() {
+    const ahora = sinApoyoCon(firmado())
+    if (ahora !== sinApoyo) alCambiar?.((sinApoyo = ahora))
+  }
 
   /** La primera pregunta al cobro, la de al abrir: `credencial` la espera si lo guardado ya venció. */
-  const primera = revisar().catch(() => undefined)
+  const primera = revisar()
+    .catch(() => undefined)
+    .finally(mirarApoyo)
   setInterval(() => void revisar(), CADA).unref()
 
   function leer(): Archivo {
@@ -79,6 +102,7 @@ export function licencia(app: string) {
   function escribir() {
     mkdirSync(dirname(archivo), { recursive: true })
     guardar(archivo, `${JSON.stringify(a, null, 2)}\n`)
+    if (equipo) mirarApoyo()
   }
 
   function nuevoEquipo(): string {
@@ -210,7 +234,7 @@ export function licencia(app: string) {
     return activa() && a.clave ? { clave: a.clave, equipo } : undefined
   }
 
-  return { api, credencial }
+  return { api, credencial, sinApoyo: () => sinApoyo }
 }
 
 /**
