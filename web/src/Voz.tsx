@@ -5,6 +5,7 @@ import { api } from './api'
 import { Picker } from './Composer'
 import { ElegirVoz, itemsDeVoz, type Musica } from './ElegirVoz'
 import { Logo } from './Logos'
+import { claveEscrita } from './Respaldo'
 
 /**
  * La voz en la interfaz (`server/voz/`): conectar la cuenta de Google para AI Studio y poner las llaves de Fish Audio y
@@ -113,6 +114,7 @@ export function useVoz() {
     releerVc: () => aProveedor(api('/api/voz/vc', {})),
     claveSloth: async (clave: string) => {
       await api('/api/licencia/clave', { clave })
+      claveEscrita()
       await aProveedor(api('/api/voz/vc', {}))
     },
     conectar: () => void recibir(api('/api/voz/conectar', {})),

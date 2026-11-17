@@ -170,6 +170,8 @@ aviso a pantalla completa, ni Opciones → Voz, ni la tienda de estilos). No los
 Los créditos ahora llegan solo por la rifa o porque el creador los da (Administrador o `/voz/admin/regalo`). Lo
 entregado sigue en `voz_mensual` (migración 0024) y en Administrador → Créditos mensuales. La regla de quién paga el
 apoyo sugerido o más (`daCreditos` en `licencias/src/voz-mensual.ts`) la sigue usando la rifa para dejarlos fuera.
+La copia de cada Sloth (ADR 0020) necesita la migración `0031_respaldos.sql` y el Worker desplegado antes de publicar
+la versión de la app que la sube; hasta entonces la app solo anota que no pudo y lo vuelve a intentar.
 La rifa necesita la migración `0025_rifas.sql` y el Worker desplegado; con créditos, además, las voces ya abiertas.
 Su sección y su ruleta llegan a la Administrador instalada con la siguiente versión de la app.
 Un reparto en `enviando` o `revisar` requiere comprobar el movimiento en el proveedor antes de volver a sumarlo: su API

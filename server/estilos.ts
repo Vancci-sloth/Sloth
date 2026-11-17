@@ -37,7 +37,7 @@ const ABIERTO = 60 * 1024 * 1024
 const MAX_ARCHIVOS = 3000
 
 /** Lo que junta quien usa el estilo: sus videos, su banco, sus huellas. Las poses del reel son de su persona. */
-const PERSONALES = ['huellas', 'series/banco', 'modelos']
+export const PERSONALES = ['huellas', 'series/banco', 'modelos']
 const PERSONALES_DE: Record<string, string[]> = { 'reel-collage': ['personaje'] }
 /** Lo que se instala o se rehace solo. */
 const REHECHO = new Set(['node_modules', 'out', '__pycache__', '.git', '.cache', '.venv'])
@@ -75,8 +75,8 @@ const sirve = (ruta: string) => {
   return SIN_TIPO.has(nombre) || TIPOS.has(extension(nombre))
 }
 
-/** Los archivos de una carpeta, con su ruta relativa (con `/`), sin lo que no viaja. */
-function archivosDe(carpeta: string, fuera: string[]): string[] {
+/** Los archivos de una carpeta, con su ruta relativa (con `/`), sin lo que no viaja. También arma la copia de `server/respaldo.ts`. */
+export function archivosDe(carpeta: string, fuera: string[]): string[] {
   const lista: string[] = []
   const ver = (dir: string) => {
     for (const d of readdirSync(dir, { withFileTypes: true })) {

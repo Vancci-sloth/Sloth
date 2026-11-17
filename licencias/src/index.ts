@@ -64,7 +64,8 @@
  * automático: se aceptan sus términos y el pago único.
  *
  * Y la comunidad (`/comunidad/*`, en `comunidad.ts`), de quien tiene una licencia activa, y la voz de Voices Cloning
- * (`/voz/*`, en `voz.ts`), que guarda aquí la llave del socio.
+ * (`/voz/*`, en `voz.ts`), que guarda aquí la llave del socio. Y la copia de cada Sloth, para traerla a otra computadora
+ * con la misma clave (`/respaldo*`, en `respaldo.ts`).
  */
 import type { VersionLiberable } from '../../shared/types.ts'
 import { comunidad, creditos, olvidarSueltos } from './comunidad.ts'
@@ -74,6 +75,7 @@ import { olvidarRegistroVoz, voz } from './voz.ts'
 import { entregarRifas } from './rifa.ts'
 import { APERTURA_VOZ } from './voz-mensual.ts'
 import { bajarApoyo, reanudarPausadas } from './bajar-apoyo.ts'
+import { olvidarRespaldos, respaldo } from './respaldo.ts'
 
 export interface Env {
   DB: D1Database
@@ -500,6 +502,7 @@ export default {
     ctx.waitUntil(env.DB.prepare('DELETE FROM cupos WHERE creado < ?').bind(new Date(Date.now() - 2 * DIA).toISOString()).run())
     ctx.waitUntil(olvidarRegistroVoz(env).catch((e) => console.error('Registro de la voz', e instanceof Error ? e.message : e)))
     ctx.waitUntil(olvidarSueltos(env).catch((e) => console.error('Archivos sueltos de la comunidad', e instanceof Error ? e.message : e)))
+    ctx.waitUntil(olvidarRespaldos(env).catch((e) => console.error('Copias que nadie renueva', e instanceof Error ? e.message : e)))
   }
 } satisfies ExportedHandler<Env>
 
@@ -538,6 +541,7 @@ async function atender(req: Request, env: Env, ctx: ExecutionContext, url: URL):
     if (req.method === 'POST' && url.pathname === '/bajar-apoyo') return await bajarApoyo(req, env)
     if (url.pathname === '/comunidad' || url.pathname.startsWith('/comunidad/')) return await comunidad(req, env, url, ctx)
     if (url.pathname === '/voz' || url.pathname.startsWith('/voz/')) return await voz(req, env, ctx, url)
+    if (url.pathname === '/respaldo' || url.pathname.startsWith('/respaldo/')) return await respaldo(req, env, url)
     return json({ error: 'No existe' }, 404)
   } catch (error) {
     if (error instanceof Rechazo) return json({ error: error.message }, error.status)

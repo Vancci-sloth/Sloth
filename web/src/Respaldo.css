@@ -1,0 +1,6 @@
+/* «¿Traer tu Sloth de…?» (Respaldo.tsx): sale encima de cualquier otra ventana, también de donde se escribe la clave. */
+.traer-fondo { z-index: 96; }
+.traer-lista { display: flex; flex-direction: column; gap: 9px; margin: 12px 0 14px; padding: 12px 14px; list-style: none; border: 1px solid var(--line); border-radius: 12px; background: var(--panel-2); color: var(--text); }
+.traer-lista li { display: flex; align-items: flex-start; gap: 9px; }
+.traer-lista .icon-trazo { flex: none; margin-top: 2px; color: var(--amber); }
+.traer-lista strong { font-weight: 600; }

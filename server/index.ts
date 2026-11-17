@@ -33,6 +33,7 @@ import { miniaturas } from './miniaturas.ts' // panel de etapas
 import { guardarMeta, guardarYoutube, opciones } from './opciones.ts'
 import { previas } from './previas.ts' // previas de las cards
 import { guardarSobreTi, sobreTi } from './sobre-ti.ts'
+import { respaldo } from './respaldo.ts'
 import { radar } from './radar/index.ts' // radar
 import { comunidad, llaveDelCreador } from './comunidad.ts' // comunidad
 import { desempacar, estilos } from './estilos.ts' // estilos compartidos
@@ -242,6 +243,8 @@ const subtitular = subtitulos({
 const noticias = radar(APP) // radar
 // Tus estilos en un archivo para compartirlos, y los de otros, instalados entre los tuyos.
 const estilosLocal = estilos(APP, cards) // estilos compartidos
+// Tu Sloth en otra computadora: la copia que cada Sloth guarda sola con su clave, y traer la de otra.
+const copia = respaldo({ app: APP, cards, sessions, credencial: () => suscripcion.credencial(), sobreTi: { leer: sobreTi, guardar: guardarSobreTi } }) // tu Sloth en otra computadora
 // La comunidad: lo que la gente hace con Sloth y cómo. Entra cada cliente con su licencia, y el creador con su llave,
 // también desde su copia instalada (publica en Anuncios); un cliente no la tiene.
 const comunidadApi = comunidad(APP, {
@@ -751,6 +754,7 @@ async function api(req: IncomingMessage, res: ServerResponse, url: URL): Promise
   if (await comunidadApi.api(req, res, url)) return true // comunidad
   if (await narrar.admin(req, res, url)) return true // Administrador, solo en la computadora del creador
   if (await estilosLocal.api(req, res, url)) return true // estilos compartidos
+  if (await copia.api(req, res, url)) return true // tu Sloth en otra computadora
   if (await enlacesApi(req, res, url)) return true // tarjeta de los enlaces
 
   const m = /^\/api\/sessions\/([\w-]+)(?:\/(\w+))?$/.exec(path)

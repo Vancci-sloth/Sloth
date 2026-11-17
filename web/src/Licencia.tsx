@@ -4,6 +4,7 @@ import { version } from '../../package.json'
 import type { Licencia } from '../../shared/types'
 import { api } from './api'
 import { Confirm } from './Confirm'
+import { claveEscrita } from './Respaldo'
 import './Licencia.css'
 
 const dinero = (n: number) => `$${n.toLocaleString('es-MX')}`
@@ -127,6 +128,8 @@ function Clave({ licencia, aviso, onCambio, onVolver }: { licencia: Licencia; av
     setError('')
     try {
       const l = saber(await api<Licencia>('/api/licencia/clave', { clave }))
+      // Si esa clave ya se usa en otra computadora, Sloth ofrece traer lo de allá.
+      if (l.activa) claveEscrita()
       if (!l.activa) setError(l.estado === 'pending' ? 'Todavía no se confirma el pago de esa clave.' : 'Ese apoyo ya terminó. Puedes renovarlo en sloth.vancci.org.')
       onCambio(l)
     } catch (e) {

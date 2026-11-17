@@ -12,6 +12,7 @@ import { discoLleno } from './items'
 import { TuEquipo } from './Equipo' // tu equipo
 import { Icono } from './Iconos'
 import { SuscripcionOpciones, VersionYApoyo } from './Licencia' // apoyo
+import { RespaldoOpciones } from './Respaldo' // tu Sloth en otra computadora
 import { Logo } from './Logos'
 import { BotonNavegador } from './Navegador'
 import { RadarOpciones } from './RadarOpciones' // radar
@@ -94,6 +95,9 @@ function Ajustes({ onDone, iniciando, onIniciando }: { onDone(): void; iniciando
           <SuscripcionOpciones />
         </Grupo>
       )}
+      <Grupo titulo="Tu Sloth en otra computadora" nota="Con tu clave, Sloth guarda sola una copia de tus estilos, tus chats, «Sobre ti» y tus marcas. Escribe esa clave en otra computadora y te ofrece traerlo todo. Los videos y las cuentas conectadas no viajan.">
+        <RespaldoOpciones />
+      </Grupo>
       <Grupo ref={agentes} titulo="Agentes" nota="Cada agente se descarga la primera vez que lo eliges. Claude y ChatGPT necesitan un plan de pago o una llave de API; OpenCode, solo tu cuenta, que es gratis. Los demás, la cuenta o la llave de cada uno.">
         <Agentes />
         <CuentaCodex />

@@ -59,6 +59,12 @@ Este es el mapa:
   lo aprueba, o lo guarda como archivo; «Importar» o «Instalar» lo pone entre los tuyos, con su `origen`. Todo estilo
   compartido lleva su guía de uso, una plantilla igual para todos (`shared/guia.ts`, `web/src/Guia.tsx`): qué le das, qué
   te entrega, un ejemplo y qué necesita. El Worker no lo publica sin ella y queda en la card de quien lo instala (`guia`).
+- Tu Sloth en otra computadora (`server/respaldo.ts`, `web/src/Respaldo.tsx`, ADR 0020): con su clave, cada Sloth guarda
+  sola en el cobro (`licencias/src/respaldo.ts`, R2 y D1) una copia de sus estilos enteros, sus chats, «Sobre ti» y sus
+  marcas; los videos y las cuentas conectadas no. Al escribir esa clave en otra computadora, o al abrir una que ya la
+  tenía y a la que le faltan estilos, `TraerSloth` ofrece traerla, sin pisar lo que ya hay; un chat traído sigue con un
+  resumen (`Sessions.traer`). En Opciones se apaga la copia y se trae la de las otras. Los topes que la mantienen gratis
+  están en la cabecera del módulo del cobro.
 - Lo que el estudio ve en vivo: `server/claude.ts` saca los borradores de lo que escribe el agente (Write y los heredocs
   de Bash), el WebSocket los lleva a `web/src/App.tsx` y `Etapas.tsx` los dibuja.
 - El estudio de video (`web/src/Estudio.tsx`): toda card cuyas etapas tengan `fase` se ve igual, con las cinco fases

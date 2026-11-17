@@ -216,6 +216,18 @@ export class Sessions {
     return [...this.metas.values()].some((m) => m.running || m.background?.length)
   }
 
+  /**
+   * Un hilo que llega de otra computadora (`server/respaldo.ts`), con su historial: entra quieto, sin agente ni sesión
+   * que retomar. `false` si aquí ya hay uno con ese id, que no se toca.
+   */
+  traer(meta: SessionMeta, registro: string): boolean {
+    if (this.metas.has(meta.id)) return false
+    guardar(join(this.dir, `${meta.id}.jsonl`), registro)
+    this.metas.set(meta.id, meta)
+    this.save(meta)
+    return true
+  }
+
   /** Con `carpeta`, el hilo nace sabiendo dónde trabaja: la de su video, nuevo o que ya existe. */
   create(input: { cardId: string; title: string; model: string; effort?: string; cwd: string; carpeta?: string }): SessionMeta {
     const now = Date.now()
