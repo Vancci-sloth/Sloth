@@ -22,8 +22,10 @@ import { guardar } from './disco.ts'
  * Code. En una computadora lenta, o con el antivirus revisando cada archivo, pasa de los 3 min: se le esperan 10 (`DESEMPACAR`).
  *
  * Se conectan las cuentas que quieras (`cuentas.json`, y la sesión de cada una en `cuentas/<id>.json`): cada hilo
- * trabaja con la que esté en uso, y su proceso arranca con esa sesión copiada en `acp_token.json`. La cuota es semanal y
- * por grupo de modelos (`grupoDe`): cuando a una cuenta se le acaba, se anota hasta cuándo y el hilo sigue solo con la
+ * trabaja con la que esté en uso, y su proceso arranca con esa sesión copiada en `acp_token.json`. La cuota es la del
+ * plan de Google de cada cuenta (la gratis, semanal; con Google AI Pro o Ultra, la de ese plan, sin conectar nada más):
+ * Antigravity dice cuál es al iniciar sesión, y se guarda con la cuenta para enseñarlo en Opciones (`planDe`). Va por
+ * grupo de modelos (`grupoDe`): cuando a una cuenta se le acaba, se anota hasta cuándo y el hilo sigue solo con la
  * siguiente que tenga (`agotar`). Una cuenta nueva inicia sesión en su propia carpeta (`ENTRANDO`), para no tocar la
  * sesión de los procesos que ya trabajan.
  *
@@ -144,10 +146,26 @@ export function errorAntigravity(texto: string): { error: string; relevo?: boole
   }
 }
 
-/** Una cuenta conectada: su correo (si Google lo dio) y hasta cuándo no le queda cuota de cada grupo. */
+/** El plan de Google de una cuenta, con el nombre que le da Google («Antigravity Starter Quota» es el gratis, `free-tier`). */
+export interface PlanAgy {
+  id: string
+  nombre: string
+}
+
+/** El plan que dice la respuesta de `authenticate` (`_meta.antigravity.tier`). Otra versión podría no decirlo. */
+export function planDe(resultado: any): PlanAgy | undefined {
+  const t = resultado?._meta?.antigravity?.tier
+  return typeof t?.id === 'string' && t.id ? { id: t.id, nombre: typeof t.name === 'string' && t.name ? t.name : t.id } : undefined
+}
+
+/** Como se enseña: `gratis`, o el nombre que le da Google al plan de pago. */
+const planLlano = (p?: PlanAgy) => p && (p.id === 'free-tier' ? 'gratis' : p.nombre)
+
+/** Una cuenta conectada: su correo (si Google lo dio), su plan (si ya lo dijo) y hasta cuándo no le queda cuota de cada grupo. */
 export interface CuentaAgy {
   id: string
   correo?: string
+  plan?: PlanAgy
   agotada?: Partial<Record<Grupo, number>>
 }
 export interface ListaAgy {
@@ -276,6 +294,19 @@ const SABOR: SaborAcp = {
   clientInfo: { name: 'zed', version: '0.0.0' },
   leeArchivos: true,
   autenticar: METODO,
+  alAutenticar(resultado, cuenta) {
+    const plan = planDe(resultado)
+    if (!plan) return
+    // La que inicia sesión aún no está en la lista: se guarda con ella al terminar.
+    if (cuenta === NUEVA) return void (login && (login.plan = plan))
+    try {
+      const l = leerLista()
+      const c = l.cuentas.find((x) => x.id === cuenta)
+      if (c && (c.plan?.id !== plan.id || c.plan.nombre !== plan.nombre)) guardarLista({ ...l, cuentas: l.cuentas.map((x) => (x === c ? { ...x, plan } : x)) })
+    } catch {
+      // Sin apuntarlo: el hilo trabaja igual.
+    }
+  },
   modo: 'yolo',
   sinCuenta: 'Conecta tu cuenta de Google en Opciones → Antigravity.',
   alVerModelos: guardarModelos,
@@ -338,8 +369,8 @@ function buscarCorreos(l: ListaAgy) {
   }
 }
 
-/** Mientras se inicia sesión: el enlace de Google, si ya lo dio, el proceso que espera y lo que va escribiendo. */
-type Login = { url?: string; c?: Conexion; lineas: string[] }
+/** Mientras se inicia sesión: el enlace de Google, si ya lo dio, el proceso que espera, lo que va escribiendo y el plan de la cuenta. */
+type Login = { url?: string; c?: Conexion; lineas: string[]; plan?: PlanAgy }
 let login: Login | undefined
 let fallo = ''
 
@@ -356,10 +387,12 @@ export function cuentaAntigravity(): CuentaClaude {
       .filter((g) => !libre(c, g, ahora))
       .map((g) => ` · sin ${NOMBRE_GRUPO[g]} hasta el ${fecha(c.agotada![g]!)}`)
       .join('')
+  const conPlan = (c: CuentaAgy) => (c.plan ? ` · ${planLlano(c.plan)}` : '')
   return {
     conectada,
     quien: conectada ? `${nombre(l, activa?.id).replace(/^tu c/, 'C')}${l.cuentas.length > 1 ? ` (y ${l.cuentas.length - 1} más)` : ''}` : undefined,
-    cuentas: conectada ? l.cuentas.map((c) => ({ id: c.id, quien: `${nombre(l, c.id).replace(/^tu c/, 'C')}${estado(c)}`, activa: c.id === activa?.id })) : undefined,
+    plan: planLlano(activa?.plan),
+    cuentas: conectada ? l.cuentas.map((c) => ({ id: c.id, quien: `${nombre(l, c.id).replace(/^tu c/, 'C')}${conPlan(c)}${estado(c)}`, activa: c.id === activa?.id })) : undefined,
     conectando: login && { url: login.url, arranque },
     error: fallo || undefined
   }
@@ -393,7 +426,8 @@ export async function conectarAntigravity(): Promise<CuentaClaude> {
       const id = l.cuentas.find((x) => correo && x.correo === correo)?.id ?? randomBytes(4).toString('hex')
       mkdirSync(SESIONES, { recursive: true })
       guardar(join(SESIONES, `${id}.json`), sesion)
-      const cuentas = l.cuentas.some((x) => x.id === id) ? l.cuentas.map((x) => (x.id === id ? { id, correo } : x)) : [...l.cuentas, { id, correo }]
+      const esta = { id, correo, plan: este.plan }
+      const cuentas = l.cuentas.some((x) => x.id === id) ? l.cuentas.map((x) => (x.id === id ? esta : x)) : [...l.cuentas, esta]
       guardarLista({ activa: id, cuentas })
     } finally {
       c.rpc.close()
@@ -435,7 +469,7 @@ export function cancelarAntigravity(): CuentaClaude {
 export function usarAntigravity(id: string): CuentaClaude {
   const l = leerLista()
   if (!l.cuentas.some((c) => c.id === id)) throw new Error('Esa cuenta ya no está conectada.')
-  guardarLista({ activa: id, cuentas: l.cuentas.map((c) => (c.id === id ? { id: c.id, correo: c.correo } : c)) })
+  guardarLista({ activa: id, cuentas: l.cuentas.map((c) => (c.id === id ? { id: c.id, correo: c.correo, plan: c.plan } : c)) })
   return cuentaAntigravity()
 }
 

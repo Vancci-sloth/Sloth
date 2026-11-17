@@ -749,14 +749,14 @@ const OTROS: Record<OtroAgente, { titulo: string; logo: string; como: 'ventana' 
     como: 'navegador',
     beta: true,
     abreSolo: 'Abriendo Antigravity: al terminar se abre sola la página de Google',
-    texto: 'Sloth trabaja con tu cuenta de Google en Antigravity, con sus modelos de Gemini. La cuenta se autoriza en el navegador.'
+    texto: 'Sloth trabaja con tu cuenta de Google en Antigravity, con sus modelos de Gemini. Si esa cuenta paga Google AI Pro o Ultra, usa la cuota de tu plan; si no, la gratis. La cuenta se autoriza en el navegador.'
   },
   gemini: {
     titulo: 'Gemini · con tu llave de API',
     logo: 'gemini',
     como: 'llave',
     beta: true,
-    texto: 'Trabaja con Gemini CLI y tu llave de AI Studio: no con tu cuenta ni tu plan de Google, que Gemini CLI ya no acepta. La llave gratis alcanza para probar; para trabajar, actívale la facturación.',
+    texto: 'Trabaja con Gemini CLI y tu llave de AI Studio: no con tu cuenta ni tu plan de Google, que Gemini CLI ya no acepta. Si pagas Google AI Pro o Ultra, tu plan se usa en Antigravity. La llave gratis alcanza para probar; para trabajar, actívale la facturación.',
     ayuda: (
       <>
         Créala en{' '}
@@ -890,6 +890,15 @@ export function CuentaAgente({ p, aviso = false, onFalta }: { p: OtroAgente; avi
           )
         )}
       </div>
+      {p === 'antigravity' && activa && !aviso && (
+        <p className="fila-extra muted small">
+          {cuenta?.plan === 'gratis'
+            ? 'Esta cuenta va con la cuota gratis de Antigravity, que se renueva cada semana. Si le pones Google AI Pro o Ultra, Sloth usa la cuota de tu plan sin conectar nada más.'
+            : cuenta?.plan
+              ? `Esta cuenta tiene ${cuenta.plan}: Sloth usa la cuota de tu plan.`
+              : 'Si esta cuenta paga Google AI Pro o Ultra, Sloth usa la cuota de tu plan. Cuál tiene se sabe con su primer hilo.'}
+        </p>
+      )}
       {activa && !aviso && (
         <p className="fila-extra muted small">
           {otras.length

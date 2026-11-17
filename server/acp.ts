@@ -35,6 +35,8 @@ export interface SaborAcp {
   leeArchivos?: boolean
   /** Inicia sesión antes de abrirla, cada vez (Antigravity). */
   autenticar?: string
+  /** Lo que contestó ese inicio de sesión, con la cuenta del proceso (Antigravity dice ahí el plan de Google). */
+  alAutenticar?(resultado: any, cuenta?: string): void
   /** El modo que se elige al abrir la sesión, como opción o con `session/set_mode` (`yolo`: sin preguntar). */
   modo?: string
   /** No sabe compactar cuando se le pide (Gemini comprime solo). */
@@ -140,7 +142,10 @@ export function conectar(sabor: SaborAcp, opts: AgentOptions, cuenta = sabor.cue
       clientCapabilities: { fs: { readTextFile: !!sabor.leeArchivos, writeTextFile: false }, terminal: false },
       clientInfo: sabor.clientInfo ?? { name: 'sloth', version: '1' }
     }, sabor.esperaInicio?.() ?? 180_000)
-    if (sabor.autenticar) await c.rpc.request('authenticate', { methodId: sabor.autenticar }, 300_000)
+    if (sabor.autenticar) {
+      const sesion = await c.rpc.request('authenticate', { methodId: sabor.autenticar }, 300_000)
+      sabor.alAutenticar?.(sesion, cuenta)
+    }
     c.lista = true
     return ini
   })()
