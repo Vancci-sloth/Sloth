@@ -17,6 +17,7 @@ const OPCIONES = [
       ['claude', 'Claude'],
       ['codex', 'ChatGPT'],
       ['deepseek', 'DeepSeek'],
+      ['openrouter', 'OpenRouter'],
       ['gemini', 'Gemini'],
       ['cursor', 'Cursor'],
       ['muse', 'Muse Code'],
@@ -29,7 +30,8 @@ const OPCIONES = [
     agentes: [
       ['opencode', 'OpenCode'],
       ['antigravity', 'Antigravity'],
-      ['grok', 'Grok']
+      ['grok', 'Grok'],
+      ['freellmapi', 'FreeLLMAPI']
     ]
   }
 ]

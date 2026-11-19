@@ -9,7 +9,7 @@ import { mcpVoz } from './voz/index.ts'
 import { mcpFlow } from './flow/index.ts'
 import { alBajarAgente, descartarRoto, programaClaude, rutaAgente } from './agentes.ts'
 import { sitiosDeAgente } from './tope-agentes.ts'
-import { dolaresDeepSeek, entornoDeepSeek, modeloDeepSeek, SIN_LLAVE, tarifaDeepSeek } from './deepseek.ts'
+import { conConsejo, otraApi } from './otra-api.ts'
 import { llaveGuardada } from './acceso.ts'
 import { conSobreTi } from './sobre-ti.ts'
 import { proveedorDe } from '../shared/providers.ts'
@@ -125,20 +125,20 @@ async function apagarServidores(run: Query, quitar: string[] | undefined) {
  */
 export function startClaude(opts: AgentOptions): AgentRun {
   const inbox = new Inbox<SDKUserMessage>()
-  // DeepSeek es el mismo Claude Code contra la API de DeepSeek (`server/deepseek.ts`), que piensa a su manera.
-  const deepseek = proveedorDe(opts.model) === 'deepseek'
-  if (deepseek && !llaveGuardada('deepseek')) return sinArrancar(opts, SIN_LLAVE)
+  // DeepSeek, OpenRouter y FreeLLMAPI son el mismo Claude Code contra otra API (`server/otra-api.ts`), que piensa a su manera.
+  const otra = otraApi(opts.model)
+  if (otra && !llaveGuardada(proveedorDe(opts.model))) return sinArrancar(opts, otra.sinLlave)
   const agentes = sitiosDeAgente()
   const run = query({
     prompt: inbox,
     options: {
       ...programaClaude(),
       cwd: opts.cwd,
-      model: deepseek ? `${modeloDeepSeek(opts.model)}[1m]` : opts.model,
+      model: otra ? otra.modelo(opts.model) : opts.model,
       effort: opts.effort as never,
-      ...(deepseek ? { env: entornoDeepSeek(opts.model, opts.effort) } : {}),
+      ...(otra ? { env: otra.entorno(opts.model, opts.effort) } : {}),
       // Sin `summarized`, los modelos nuevos piensan en silencio: el texto del pensamiento llega vacío.
-      thinking: deepseek || sinAdaptativo.has(opts.model) ? undefined : { type: 'adaptive', display: 'summarized' },
+      thinking: otra || sinAdaptativo.has(opts.model) ? undefined : { type: 'adaptive', display: 'summarized' },
       resume: opts.resume,
       permissionMode: 'bypassPermissions',
       allowDangerouslySkipPermissions: true,
@@ -148,7 +148,7 @@ export function startClaude(opts: AgentOptions): AgentRun {
       systemPrompt: { type: 'preset', preset: 'claude_code', append: conSobreTi(`${OPCIONES}\n\n${UN_VIDEO_POR_HILO}`) },
       // El guionista: Opus que escribe un solo archivo de un resumen, sin más herramientas que Write. Con todas, el que
       // escribía el guion de un video arrancaba con 38 mil tokens y costaba $0,26 por 100 palabras (6-nov).
-      ...(deepseek ? {} : { agents: { guionista: GUIONISTA } }),
+      ...(otra ? {} : { agents: { guionista: GUIONISTA } }),
       // El navegador del agente, la voz de AI Studio, Google Flow y, en un canal de Ideas, sus herramientas (`parecidos`; en uno vertical,
       // también las de TikTok e Instagram): se suman a los MCP del usuario.
       mcpServers: { ...navegadorAgente(opts.lote, opts.hilo), ...mcpVoz(), ...mcpFlow(), ...herramientasIdeas(opts.cwd) },
@@ -196,10 +196,11 @@ export function startClaude(opts: AgentOptions): AgentRun {
   const state = { idle: true, max: 0, measure: () => {}, tareas: [] as string[], detenido: false, agentes }
   // Todo evento sale por aquí, para que los trozos de texto viajen juntos y nada se les adelante.
   const emit = juntarTrozos(opts.onEvent)
-  // Con DeepSeek, los dólares de Claude Code serían los de un modelo de Claude: se cuentan con los precios de DeepSeek, en
-  // hora valle, y el turno que acaba en hora pico cuesta el doble.
-  const read = deepseek
-    ? reader({ ...opts, onEvent: (e) => emit(e.t === 'turn_end' && e.costUsd ? { ...e, costUsd: e.costUsd * tarifaDeepSeek() } : e) }, state, dolaresDeepSeek)
+  // Con otra API, los dólares de Claude Code serían los de un modelo de Claude: se cuentan con los precios de esa API. Los
+  // de DeepSeek son de hora valle, y el turno que acaba en hora pico cuesta el doble (`tarifa`). Su error lleva qué hacer.
+  const conLoSuyo = (e: Extract<AgentEvent, { t: 'turn_end' }>) => ({ ...e, ...(e.costUsd && otra?.tarifa ? { costUsd: e.costUsd * otra.tarifa() } : {}), ...(e.error ? { error: conConsejo(e.error) } : {}) })
+  const read = otra
+    ? reader({ ...opts, onEvent: (e) => emit(e.t === 'turn_end' ? conLoSuyo(e) : e) }, state, otra.dolares)
     : reader({ ...opts, onEvent: emit }, state)
 
   /** Lo que ocupa la conversación, contado por Claude Code como en `/context`. */
@@ -439,6 +440,11 @@ export function reader(opts: AgentOptions, state: { idle: boolean; max: number; 
     if (path && text !== undefined) opts.onDraft?.({ id: w.id, path, text, at: w.sent })
   }
   let messageId = ''
+  // La llamada en curso empezó sin decir cuánto le entró: se espera a su final.
+  let sinEntrada = false
+  /** Lo que le entró a una llamada: lo nuevo y lo de la caché. */
+  const entrada = (u: { input_tokens?: number | null; cache_read_input_tokens?: number | null; cache_creation_input_tokens?: number | null }) =>
+    (u.input_tokens ?? 0) + (u.cache_read_input_tokens ?? 0) + (u.cache_creation_input_tokens ?? 0)
   // Los subagentes vivos: el id de su tarea y el de la herramienta `Agent` que los lanzó.
   const subagentes = new Map<string, string>()
   // El SDK da lo gastado acumulado (dólares y tokens de todas las llamadas, también las de los subagentes): lo de un turno
@@ -503,12 +509,18 @@ export function reader(opts: AgentOptions, state: { idle: boolean; max: number; 
         messageId = e.message.id
         // Durante el turno, cada llamada al modelo dice cuánto le entró: así el círculo se llena sin esperar al final.
         // Si aún no se sabe la ventana (primer turno, o tras reiniciar), se mide entera: trae las dos cosas.
-        const u = e.message.usage
+        // OpenRouter no lo dice al empezar (manda ceros) sino al acabar la llamada: ahí se lee, para no vaciar el círculo.
+        const entro = entrada(e.message.usage)
+        sinEntrada = !parent && !entro
         if (!parent && state.max) {
-          opts.onEvent({ t: 'context', used: u.input_tokens + (u.cache_read_input_tokens ?? 0) + (u.cache_creation_input_tokens ?? 0), max: state.max })
+          if (entro) opts.onEvent({ t: 'context', used: entro, max: state.max })
         } else if (!parent) {
           state.measure()
         }
+      }
+      if (e.type === 'message_delta' && sinEntrada && state.max) {
+        const entro = entrada(e.usage)
+        if (entro) opts.onEvent({ t: 'context', used: entro, max: state.max })
       }
       if (e.type === 'content_block_start' && e.content_block.type === 'tool_use' && (e.content_block.name === 'Write' || e.content_block.name === 'Bash')) {
         writing.set(`${messageId}:${e.index}`, { id: e.content_block.id, bash: e.content_block.name === 'Bash', json: '', sent: 0 })

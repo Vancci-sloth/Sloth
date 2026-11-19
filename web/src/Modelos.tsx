@@ -141,6 +141,7 @@ export function Modelos(props: {
                     label={modelo?.label ?? choice?.model ?? 'Modelo'}
                     value={choice?.model ?? ''}
                     menuWidth={340}
+                    buscar
                     groups={gruposModelos(models).map((g) => ({
                       ...g,
                       options: g.options.map((o) => ({

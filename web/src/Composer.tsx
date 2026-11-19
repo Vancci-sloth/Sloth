@@ -56,6 +56,9 @@ export function gruposModelos(models: Model[]) {
     // Los de pago de OpenCode, debajo de los gratis: se cobran del saldo de la cuenta.
     { id: 'opencode', label: 'OpenCode · de pago (de tu saldo, por millón de tokens)', pago: true },
     { id: 'deepseek', label: 'DeepSeek · beta' },
+    { id: 'freellmapi', label: 'FreeLLMAPI · beta · gratis' },
+    { id: 'openrouter', label: 'OpenRouter · beta · gratis' },
+    { id: 'openrouter', label: 'OpenRouter · beta · de pago (de tus créditos, por millón de tokens)', pago: true },
     { id: 'grok', label: 'Grok · beta' },
     { id: 'antigravity', label: 'Antigravity · beta' },
     { id: 'gemini', label: 'Gemini · beta' },
@@ -70,6 +73,9 @@ export function gruposModelos(models: Model[]) {
       .map((m) => ({ value: m.id, label: m.precio ? `${m.label} · ${m.precio}` : m.label })),
   })).filter((g) => g.options.length > 0)
 }
+
+/** Desde cuántas opciones un desplegable con `buscar` enseña su buscador (`Picker`). */
+const BUSCAR_DESDE = 20
 
 /** Las que Claude sabe leer. */
 const IMAGE = /^image\/(png|jpeg|gif|webp)$/
@@ -369,7 +375,8 @@ function TokensDelChat({ g }: { g: Resumen }) {
  * Un desplegable con la cara de la app, en vez del nativo: el del sistema no se deja pintar. Se abre hacia arriba
  * (el compositor suele vivir abajo), salvo que arriba no quepa: en «Nuevo chat» el compositor está cerca del borde.
  * Se cierra al elegir, al hacer clic fuera o con Escape. También lo usa Opciones → Redes. Donde antes iba un
- * `<select>`, se usa a través de `Desplegable.tsx`, que le pone el valor elegido de etiqueta.
+ * `<select>`, se usa a través de `Desplegable.tsx`, que le pone el valor elegido de etiqueta. Con `buscar` y una lista
+ * larga (los modelos, con el catálogo de OpenRouter) lleva arriba un buscador: lo escrito filtra por nombre y por grupo.
  */
 export function Picker(props: {
   label: ReactNode
@@ -385,6 +392,8 @@ export function Picker(props: {
   /** Qué se elige, para quien no ve; y la ayuda al pasar el ratón. */
   nombre?: string
   titulo?: string
+  /** Con más de `BUSCAR_DESDE` opciones, un buscador arriba de la lista. */
+  buscar?: boolean
   /** `detalle` va a la derecha de la opción, apagado (lo que cuesta y tarda cada modelo). */
   groups: { label: string; options: { value: string; label: string; detalle?: string }[] }[]
   onChange(value: string): void
@@ -394,8 +403,15 @@ export function Picker(props: {
   const [place, setPlace] = useState({ down: false, max: 360, left: 0, edge: 0, width: 280 })
   const root = useRef<HTMLDivElement>(null)
   const menu = useRef<HTMLDivElement>(null)
+  const [busca, setBusca] = useState('')
+  const largo = !!props.buscar && props.groups.reduce((n, g) => n + g.options.length, 0) > BUSCAR_DESDE
+  const palabras = largo ? busca.toLowerCase().split(/\s+/).filter(Boolean) : []
+  const groups = palabras.length
+    ? props.groups.map((g) => ({ ...g, options: g.options.filter((o) => palabras.every((p) => `${g.label} ${o.label}`.toLowerCase().includes(p))) })).filter((g) => g.options.length)
+    : props.groups
 
   const toggle = () => {
+    if (!open) setBusca('')
     if (!open && root.current) {
       const r = root.current.getBoundingClientRect()
       const above = r.top - 16
@@ -424,7 +440,9 @@ export function Picker(props: {
     // Que se vea la opción elegida aunque la lista sea larga.
     const elegido = menu.current?.querySelector<HTMLButtonElement>('.picker-option.on')
     elegido?.scrollIntoView({ block: 'nearest' })
-    if (props.flotante) (elegido ?? menu.current?.querySelector<HTMLButtonElement>('.picker-option'))?.focus({ preventScroll: true })
+    // Con buscador, el foco va a él para escribir: aquí y no con `autoFocus`, que en la capa superior llega antes de que se vea.
+    if (largo) menu.current?.querySelector<HTMLInputElement>('.picker-buscar')?.focus({ preventScroll: true })
+    else if (props.flotante) (elegido ?? menu.current?.querySelector<HTMLButtonElement>('.picker-option'))?.focus({ preventScroll: true })
     const mover = (e: Event) => {
       if (props.flotante && !menu.current?.contains(e.target as Node)) setOpen(false)
     }
@@ -458,13 +476,26 @@ export function Picker(props: {
             return
           }
           if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(e.key)) return
+          // En el buscador, Inicio y Fin mueven el cursor por lo escrito.
+          if (e.target instanceof HTMLInputElement && (e.key === 'Home' || e.key === 'End')) return
           e.preventDefault()
           const opciones = Array.from(menu.current?.querySelectorAll<HTMLButtonElement>('.picker-option') ?? [])
           const actual = opciones.indexOf(document.activeElement as HTMLButtonElement)
           const siguiente = e.key === 'Home' ? 0 : e.key === 'End' ? opciones.length - 1 : (actual + (e.key === 'ArrowDown' ? 1 : -1) + opciones.length) % opciones.length
           opciones[siguiente]?.focus()
         }}>
-          {props.groups.map((g) => (
+          {largo && (
+            <input
+              className="picker-buscar"
+              placeholder="Buscar"
+              aria-label="Buscar en la lista"
+              value={busca}
+              onChange={(e) => setBusca(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && menu.current?.querySelector<HTMLButtonElement>('.picker-option')?.click()}
+            />
+          )}
+          {largo && !groups.length && <span className="picker-label">Nada con ese nombre</span>}
+          {groups.map((g) => (
             <div key={g.label} className="picker-group">
               <span className="picker-label">{g.label}</span>
               {g.options.map((o) => (
@@ -857,6 +888,7 @@ export function Composer(props: {
         <Picker
           label={model?.label ?? choice?.model ?? 'Modelo'}
           disabled={props.running || props.lockModel}
+          buscar
           groups={gruposModelos(props.models)}
           value={model?.id ?? choice?.model ?? ''}
           onChange={(id) => {

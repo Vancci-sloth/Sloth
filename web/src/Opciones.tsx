@@ -715,14 +715,15 @@ export function CuentaOpenCode({ aviso = false, onFalta }: { aviso?: boolean; on
 }
 
 /** Los agentes que llegaron después de Claude, Codex y OpenCode (`server/proveedores.ts`), en el orden de Opciones. */
-export const OTROS_AGENTES = ['deepseek', 'grok', 'antigravity', 'gemini', 'cursor', 'muse', 'pi'] as const satisfies readonly Proveedor[]
+export const OTROS_AGENTES = ['deepseek', 'openrouter', 'freellmapi', 'grok', 'antigravity', 'gemini', 'cursor', 'muse', 'pi'] as const satisfies readonly Proveedor[]
 type OtroAgente = (typeof OTROS_AGENTES)[number]
 
 /**
  * Cómo se conecta cada uno y qué hay que saber antes, a la vista. `ventana`: el agente abre su propia ventana para
  * iniciar sesión; `navegador`: da un enlace que se autoriza en el navegador; `llave`: se pega una llave de API.
+ * `direccion`: con la llave se puede escribir dónde está (FreeLLMAPI en otra computadora); sin ella, se busca en esta.
  */
-const OTROS: Record<OtroAgente, { titulo: string; logo: string; como: 'ventana' | 'navegador' | 'llave'; texto: ReactNode; ayuda?: ReactNode; uso?: string; abreSolo?: string; beta?: boolean }> = {
+const OTROS: Record<OtroAgente, { titulo: string; logo: string; como: 'ventana' | 'navegador' | 'llave'; texto: ReactNode; ayuda?: ReactNode; uso?: string; abreSolo?: string; beta?: boolean; direccion?: string }> = {
   deepseek: {
     titulo: 'DeepSeek · con tu llave de API',
     logo: 'deepseek',
@@ -736,6 +737,40 @@ const OTROS: Record<OtroAgente, { titulo: string; logo: string; como: 'ventana' 
           platform.deepseek.com
         </a>{' '}
         y ponle saldo. Se guarda solo en Sloth, en esta computadora.
+      </>
+    )
+  },
+  openrouter: {
+    titulo: 'OpenRouter · con tu llave de API',
+    logo: 'openrouter',
+    como: 'llave',
+    beta: true,
+    texto: 'Trabaja en el mismo Claude Code de Sloth, con el modelo que elijas del catálogo de OpenRouter, de la marca que sea: las skills, los subagentes y el navegador van igual que con Claude. Se cobra por uso, de tus créditos de OpenRouter; sus modelos gratis no gastan.',
+    ayuda: (
+      <>
+        Créala en{' '}
+        <a href="https://openrouter.ai/settings/keys" target="_blank" rel="noreferrer">
+          openrouter.ai
+        </a>
+        . Para los modelos de pago, ponle créditos; los gratis tienen un tope de mensajes al día. Se guarda solo en Sloth, en esta computadora.
+      </>
+    )
+  },
+  freellmapi: {
+    titulo: 'FreeLLMAPI · gratis, en tu computadora',
+    logo: 'freellmapi',
+    como: 'llave',
+    beta: true,
+    direccion: 'Dirección, solo si está en otra computadora',
+    texto: 'Trabaja en el mismo Claude Code de Sloth, con los modelos gratis que juntes en FreeLLMAPI: un programa que instalas tú y que reparte lo que le pides entre los rangos gratis de Google, Groq, NVIDIA y otros. Tiene que estar abierto mientras Sloth trabaja.',
+    ayuda: (
+      <>
+        Instala{' '}
+        <a href="https://github.com/tashfeenahmed/freellmapi#readme" target="_blank" rel="noreferrer">
+          FreeLLMAPI
+        </a>
+        , ponle las llaves gratis de sus proveedores y pega aquí su llave única (en su icono de la bandeja, «Copy Key»). Sloth lo busca en esta computadora. Se guarda
+        solo en Sloth, en esta computadora.
       </>
     )
   },
@@ -810,13 +845,14 @@ export function CuentaAgente({ p, aviso = false, onFalta }: { p: OtroAgente; avi
   const version = useVersion(p, !aviso, a?.instalado)
   const [pegando, setPegando] = useState(false)
   const [llave, setLlave] = useState('')
+  const [direccion, setDireccion] = useState('')
   const cuenta = c.cuenta
   const falta = cuenta ? !cuenta.conectada : undefined
   useEffect(() => onFalta?.(falta), [falta])
   if (aviso && !falta) return null
   const espera = cuenta?.conectando
   const guardarLlave = (nueva: string | null) =>
-    c.pedir(`/api/${p}/acceso`, { api: !!nueva, llave: nueva }).then((x) => x && (setPegando(false), setLlave('')))
+    c.pedir(`/api/${p}/acceso`, { api: !!nueva, llave: nueva, ...(o.direccion ? { direccion } : {}) }).then((x) => x && (setPegando(false), setLlave(''), setDireccion('')))
   const conectar = () => {
     if (o.como === 'llave') return setPegando(true)
     if (o.como === 'ventana') return void c.conectar()
@@ -918,10 +954,15 @@ export function CuentaAgente({ p, aviso = false, onFalta }: { p: OtroAgente; avi
             <button className="primary" disabled={c.ocupado || !llave.trim()}>
               {c.ocupado ? 'Probando…' : 'Guardar'}
             </button>
-            <button type="button" className="ghost" onClick={() => (setPegando(false), setLlave(''))}>
+            <button type="button" className="ghost" onClick={() => (setPegando(false), setLlave(''), setDireccion(''))}>
               Cancelar
             </button>
           </div>
+          {o.direccion && (
+            <div className="opcion-fila">
+              <input type="text" placeholder={o.direccion} value={direccion} onChange={(e) => setDireccion(e.target.value)} autoComplete="off" spellCheck={false} />
+            </div>
+          )}
           {o.ayuda && <p className="muted small">{o.ayuda}</p>}
         </form>
       )}
