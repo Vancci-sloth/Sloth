@@ -57,8 +57,19 @@ Este es el mapa:
   (`server/estilos-perdidos.ts`). Son las únicas que la
   venta deja borrar (`tuya`); la skill sale a `data/skills-tuyas` (`guardarSkillTuya`). «Compartir» (en su card, junto a
   su nombre o en Comunidad → Estilos) abre `CompartirEstilo` (`web/src/Estilos.tsx`): una pantalla ya llena que lo
-  empaqueta en un `.sloth-estilo` (`server/estilos.ts`, ADR 0017) y lo publica en Estilos, donde sale cuando el creador
-  lo aprueba, o lo guarda como archivo; «Importar» o «Instalar» lo pone entre los tuyos, con su `origen`. Todo estilo
+  empaqueta en un `.sloth-estilo` (`server/estilos.ts`, ADR 0017) y lo publica en Estilos, donde sale al aprobarse, o lo
+  guarda como archivo; «Importar» o «Instalar» lo pone entre los tuyos, con su `origen`. Todo estilo de la comunidad
+  lleva lo mismo (`shared/guia.ts`): su guía (con qué de Sloth lo hace y con qué agentes funciona, de listas fijas), un
+  video entero y su prueba (agente, costo y tiempo, sacados del hilo donde se hizo: `server/prueba-estilo.ts`); sin eso
+  el cobro no lo publica, y al que ya estaba su autor lo ve en rojo, con lo que le falta (`incompleto`,
+  `marcarIncompletos`), hasta completarlo. La vara de todo estilo es
+  `skills/video-base/ESTILO.md`, 30 requisitos; los que Sloth comprueba solo están en `server/estilos-requisitos.ts`
+  (un test los empareja y pasa por ella los estilos de Sloth). Antes de mandarlo le dice a su autor los que no cumple, y
+  el que ya compartió pone al día su misma publicación (`data/estilos-compartidos.json`). En la computadora del creador,
+  su Claude lee cada estilo que llega, sin instalarlo y sin poder más que leer (`soloLeer`), y la revisión se cierra
+  sola (`server/estilos-revision.ts`, ADR 0022): se aprueba el que cumple todo y no añade nada de riesgo, a su autor se
+  le contesta en su publicación lo que le falta, y el hilo queda como «Aprobado», «Le falta», «Decide tú» (añade algo
+  que tiene que ver una persona) o «No lo aprobaría»; «Revisar», en la publicación, abre ese hilo. Todo estilo
   compartido lleva su guía de uso, una plantilla igual para todos (`shared/guia.ts`, `web/src/Guia.tsx`): qué le das, qué
   te entrega, un ejemplo y qué necesita. El Worker no lo publica sin ella y queda en la card de quien lo instala (`guia`).
 - Tu Sloth en otra computadora (`server/respaldo.ts`, `web/src/Respaldo.tsx`, ADR 0020): con su clave, cada Sloth guarda

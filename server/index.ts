@@ -36,7 +36,9 @@ import { guardarSobreTi, sobreTi } from './sobre-ti.ts'
 import { respaldo } from './respaldo.ts'
 import { radar } from './radar/index.ts' // radar
 import { comunidad, llaveDelCreador } from './comunidad.ts' // comunidad
-import { desempacar, estilos } from './estilos.ts' // estilos compartidos
+import { estilos } from './estilos.ts' // estilos compartidos
+import { CADA as CADA_REVISION, revisionDeEstilos } from './estilos-revision.ts' // revisión de estilos
+import { REVISION_CARD } from '../shared/revision.ts'
 import { carpetaTrabajo } from './trabajo.ts'
 import { redes } from './redes/index.ts' // redes
 import { elegirNavegador, navegadorDeFuera, navegadorEn } from './chromium.ts'
@@ -48,7 +50,7 @@ import { actualizarYtDlp, BANDERAS, instalandoAlgo, instalar, pythonSlothEntero,
 import { espacio } from './espacio.ts' // espacio en disco
 import { equipo } from './equipo.ts' // tu equipo
 import { licencia } from './licencia.ts' // suscripción
-import { Sessions } from './sessions.ts'
+import { Sessions, ultimoTexto } from './sessions.ts'
 import { mantenerVoz } from './voz-viva.ts'
 import { avisoDeVideos } from '../shared/limites.ts'
 import { eventosEnVivo } from './eventos-en-vivo.ts'
@@ -118,6 +120,8 @@ const suscripciones = new Map<WebSocket, string | null>()
 let avance: ReturnType<typeof avances> | undefined
 /** Lo que se mide de los estilos de la comunidad (`server/estilos-usos.ts`). Nace después que la comunidad. */
 let usosEstilos: ReturnType<typeof usosDeEstilos> | undefined
+/** En la computadora del creador, su Claude lee cada estilo que llega a la comunidad (`server/estilos-revision.ts`). Nace después que la comunidad. */
+let revision: ReturnType<typeof revisionDeEstilos> | undefined
 function broadcast(msg: ServerPush) {
   let text: string | undefined
   for (const ws of clients) {
@@ -133,6 +137,9 @@ const eventos = eventosEnVivo((sessionId, from, events) => {
   // que escribió el hilo, o una hecha con su SKILL.md), aunque el agente no la haya guardado o la haya puesto en cards.json.
   if (events.some((e) => e.t === 'turn_end') && sessions.meta(sessionId)?.cardId === 'nuevo-estilo') cuidarTuyas(cuidarEstilos)
   if (events.some((e) => e.t === 'turn_end') && usosEstilos?.deLaComunidad(sessions.meta(sessionId)?.cardId)) void usosEstilos.revisar()
+  // Al acabar de leer un estilo de la comunidad, se le contesta a su autor y, ya con el hilo quieto, va el siguiente que espera.
+  if (events.some((e) => e.t === 'turn_end') && revision?.esRevision(sessions.meta(sessionId)))
+    void revision.alAcabar(sessionId).then(() => setTimeout(() => void revision?.ronda(), 5000).unref())
 })
 const sessions = new Sessions(
   join(APP, 'data', 'sessions'),
@@ -155,6 +162,8 @@ sessions.esVideo = (meta) => !!cards().find((c) => c.id === meta.cardId)?.etapas
 // Con otra cuenta de Claude, los hilos quietos sueltan su Claude Code: el siguiente mensaje ya va con ella.
 alEntrarClaude(() => sessions.soltarQuietos('claude'))
 sessions.sinHerramientas = (meta) => cards().find((c) => c.id === meta.cardId)?.sinHerramientas
+// Quien lee un estilo de la comunidad por aprobar solo puede leer.
+sessions.soloLeer = (meta) => meta.cardId === REVISION_CARD.id
 // Mientras un video trabaja, Whisper se queda cargado: el primero que empieza lo carga, antes de que sus agentes llenen la memoria.
 setInterval(() => {
   if (sessions.videosTrabajando()) void mantenerVoz(SKILLS)
@@ -254,16 +263,39 @@ const comunidadApi = comunidad(APP, {
   cuadro,
   avisar: broadcast,
   estilos: estilosLocal,
-  // Un estilo por aprobar se abre en el trabajo, fuera de las skills: ahí nadie lo usa.
-  revisar: (paquete, publicacion) => {
-    const carpeta = join(carpetaTrabajo(APP), 'estilos-por-revisar', publicacion)
-    return { carpeta, manifiesto: desempacar(paquete, carpeta) }
-  },
+  revisar: (publicacion) => revision!.revisar(publicacion),
   deEstilo: (id) => {
     const card = cards().find((c) => c.id === id)
     return card?.origen?.publicacion ?? card?.deComunidad
   }
 }) // comunidad
+// En la computadora del creador, su Claude lee cada estilo que llega y deja dicho si se puede aprobar y qué le falta.
+// Se abre en el trabajo, fuera de las skills: ahí nadie lo usa. Lo ya leído se apunta junto a su llave, que comparten la
+// Sloth instalada y la del repo: así no lo leen las dos.
+revision = revisionDeEstilos({
+  archivo: process.env.APPDATA ? join(process.env.APPDATA, 'sloth', 'licencias', 'estilos-revisados.json') : join(APP, 'data', 'estilos-revisados.json'),
+  carpeta: join(carpetaTrabajo(APP), 'estilos-por-revisar'),
+  base: estilosLocal.base,
+  creador: () => !!llaveDelCreador(),
+  porAprobar: comunidadApi.porAprobar,
+  estilo: async (publicacion) => {
+    const { p, llave, paquete } = await comunidadApi.estiloDe(publicacion)
+    const estilo = p.adjuntos.find((a) => a.tipo === 'estilo')
+    const hilo = estilo?.prueba?.evidencia ? await comunidadApi.evidencia(estilo.prueba.evidencia) : undefined
+    return { titulo: estilo?.nombre || p.titulo, autor: p.autor.nombre, llave, paquete, guia: estilo?.guia, prueba: estilo?.prueba, hilo }
+  },
+  abrir: estilosLocal.abrir,
+  sessions,
+  modelo: () => {
+    const m = modelos.find((x) => proveedorDe(x.id) === 'claude')
+    return m && { model: m.id, effort: m.defaultEffort }
+  },
+  respuesta: (hilo) => ultimoTexto(sessions.get(hilo)?.events ?? []),
+  comentar: comunidadApi.comentar,
+  aprobar: comunidadApi.aprobar
+}) // revisión de estilos
+setTimeout(() => void revision?.ronda(), 90_000).unref()
+setInterval(() => void revision?.ronda(), CADA_REVISION).unref()
 // Los videos terminados con estilos de la comunidad cuentan en su tienda y en el fondo: al arrancar y al acabar cada turno.
 usosEstilos = usosDeEstilos(APP, { cards, videos: (card) => videosDe(card, sessions), prueba: comunidadApi.prueba, enviar: comunidadApi.usos })
 setTimeout(() => void usosEstilos?.revisar(), 60_000).unref()

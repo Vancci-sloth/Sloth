@@ -7,6 +7,7 @@ import { guiaDe } from '../shared/guia.ts'
 import type { Card, GuiaEstilo, OrigenEstilo } from '../shared/types.ts'
 import { guardar } from './disco.ts'
 import { bytes, json as enviar } from './http.ts'
+import { comprobar } from './estilos-requisitos.ts'
 import { huella, nombreCopia } from './originales.ts'
 
 /**
@@ -158,8 +159,12 @@ function cardLimpia(card: Partial<Card>): Partial<Card> {
   return limpia as Partial<Card>
 }
 
-/** Empaqueta un estilo tuyo. `carpeta` es su skill; `base`, la carpeta de video-base. */
-export function empaquetar(o: { card: Card; carpeta: string; sloth: string; base: string; deSloth: DeSloth[] }): { paquete: Buffer; manifiesto: Manifiesto } {
+/**
+ * Empaqueta un estilo tuyo. `carpeta` es su skill; `base`, la carpeta de video-base. `avisos`: lo que no cumple de lo que
+ * necesita todo estilo (`comprobar`, `server/estilos-requisitos.ts`). No impide compartirlo: se le enseña a su autor
+ * antes de mandarlo, para que no espere una revisión que ya se sabe cómo acaba.
+ */
+export function empaquetar(o: { card: Card; carpeta: string; sloth: string; base: string; deSloth: DeSloth[] }): { paquete: Buffer; manifiesto: Manifiesto; avisos: string[] } {
   const { card } = o
   if (!card.tuya || !card.skill) throw new EstiloMalo('Solo se comparten los estilos tuyos.')
   if (!existsSync(join(o.carpeta, 'SKILL.md'))) throw new EstiloMalo(`La skill de «${card.title}» no tiene SKILL.md.`)
@@ -184,7 +189,7 @@ export function empaquetar(o: { card: Card; carpeta: string; sloth: string; base
   largo.writeUInt32BE(cabeza.length)
   const paquete = gzipSync(Buffer.concat([largo, cabeza, ...rutas.map((r) => archivos.get(r)!)]), { level: 9 })
   if (paquete.length > PESO) throw new EstiloMalo(`Pesa ${mb(paquete.length)}; un estilo pesa hasta ${mb(PESO)}. Quita de su carpeta lo que no haga falta (videos de ejemplo, imágenes grandes).`)
-  return { paquete, manifiesto }
+  return { paquete, manifiesto, avisos: comprobar({ id: card.skill, card: manifiesto.card, basadoEn, archivos, base: o.base, deSloth: o.deSloth }).fallas.map((f) => f.texto) }
 }
 
 const mb = (b: number) => `${(b / 1024 ** 2).toFixed(1)} MB`
@@ -320,7 +325,8 @@ export function instalar(o: {
  * - `GET /api/estilos`: tus estilos, con de dónde vino cada uno (`origen`).
  * - `POST /api/estilos/<card>/archivo`: lo guarda en Descargas como `<id>.sloth-estilo`. Da `{ruta}`.
  * - `POST /api/estilos/importar`, con el archivo de cuerpo: lo instala (`Instalado`).
- * Lo de la comunidad (subirlo, instalarlo de una publicación, revisarlo) está en `server/comunidad.ts`, que usa este.
+ * Lo de la comunidad (subirlo, instalarlo de una publicación) está en `server/comunidad.ts`, que usa este; que el Claude
+ * del creador lo lea antes de aprobarlo, en `server/estilos-revision.ts` (`abrir`).
  */
 export function estilos(app: string, cards: () => Card[]) {
   const tusCards = join(app, 'data', 'tus-cards.json')
@@ -365,18 +371,58 @@ export function estilos(app: string, cards: () => Card[]) {
     }
   }
 
-  return { api, empaquetarCard, instalarPaquete }
+  /** Abre un paquete en `destino`, sin instalarlo, y dice lo que se sabe de él frente a esta Sloth (`desempacar`). */
+  const abrir = (paquete: Buffer, destino: string) => desempacar(paquete, destino, { sloth, base: base(), deSloth: deSloth() })
+
+  return { api, empaquetarCard, instalarPaquete, abrir, base }
 }
 
-/** Abre un paquete en `destino`, sin instalarlo: para leerlo antes de aprobarlo. */
-export function desempacar(paquete: Buffer, destino: string): Manifiesto {
-  const { manifiesto, archivos } = leerPaquete(paquete)
+/** Esta Sloth, para comparar un paquete con ella: su versión, su video-base y sus estilos. */
+export interface EstaSloth {
+  sloth: string
+  base: string
+  deSloth: DeSloth[]
+}
+
+/** Un paquete abierto para leerlo: lo que Sloth ya sabe de él (`notas`) y, de eso, lo que decide si se aprueba solo. */
+export interface Abierto {
+  manifiesto: Manifiesto
+  notas: string[]
+  /** Lo que no cumple de lo que necesita todo estilo: con alguna, no se aprueba. */
+  fallas: string[]
+  /** Lo que su autor añadió y pide que lo vea una persona: con alguno, no se aprueba solo. */
+  riesgos: string[]
+}
+
+/**
+ * Abre un paquete en `destino`, sin instalarlo: para leerlo antes de aprobarlo (`server/estilos-revision.ts`). Da también
+ * lo que Sloth ya sabe de él sin leer su código: cómo queda frente a esta Sloth y lo que comprueba de lo que necesita
+ * todo estilo (`comprobar`, `server/estilos-requisitos.ts`).
+ */
+export function desempacar(paquete: Buffer, destino: string, esta: EstaSloth): Abierto {
+  const { manifiesto: m, archivos } = leerPaquete(paquete)
   rmSync(destino, { recursive: true, force: true })
   for (const [ruta, datos] of archivos) {
     const a = join(destino, ...ruta.split('/'))
     mkdirSync(dirname(a), { recursive: true })
     writeFileSync(a, datos)
   }
-  writeFileSync(join(destino, 'estilo.json'), JSON.stringify({ ...manifiesto, archivos: undefined }, null, 2) + '\n')
-  return manifiesto
+  writeFileSync(join(destino, 'estilo.json'), JSON.stringify({ ...m, archivos: undefined }, null, 2) + '\n')
+
+  const notas = [`Trae ${archivos.size} archivos (${mb([...archivos.values()].reduce((s, b) => s + b.length, 0))}).`]
+  const fallas: string[] = []
+  if (compararVersion(m.sloth, esta.sloth) > 0) fallas.push(`Se hizo con Sloth ${m.sloth}, más nueva que la que lo revisa (${esta.sloth}).`)
+  else notas.push(`Se hizo con Sloth ${m.sloth}; esta es la ${esta.sloth}.`)
+  const usa = Object.keys(m.usa)
+  const cambiados = cambiadosDesde(m, esta.base)
+  if (!usa.length) notas.push('No nombra ningún archivo de video-base.')
+  else if (cambiados.length) notas.push(`De video-base nombra ${usa.length} archivos; ${cambiados.length} ya no son como cuando se hizo, o ya no están: ${cambiados.join(', ')}. Mira si lo que usa de ellos sigue igual.`)
+  else notas.push(`De video-base nombra ${usa.length} archivos, todos iguales a los de esta Sloth.`)
+  const c = comprobar({ id: m.id, card: m.card, basadoEn: m.basadoEn, archivos, base: esta.base, deSloth: esta.deSloth, npm: ajenos(archivos, esta.deSloth) })
+  if (c.frente) {
+    const lista = (rutas: string[]) => (rutas.length ? `${rutas.length} (${rutas.slice(0, 30).join(', ')}${rutas.length > 30 ? '…' : ''})` : 'ninguno')
+    notas.push(`Frente a ${c.frente.de}, el estilo de Sloth del que partió: ${c.frente.iguales} archivos iguales; cambiados, ${lista(c.frente.cambiados)}; nuevos, ${lista(c.frente.nuevos)}. Lo de su autor está en los cambiados y los nuevos.`)
+  }
+  fallas.push(...c.fallas.map((f) => f.texto))
+  return { manifiesto: m, notas, fallas, riesgos: c.riesgos.slice(0, 40) }
 }

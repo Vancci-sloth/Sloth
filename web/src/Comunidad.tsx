@@ -4,12 +4,13 @@ import { api, ErrorApi } from './api'
 import { abiertaGuardada, BORRADA, buscarAqui, conocidas, consulta as consultaDe, guardado, guardar as guardarVista, guardarAbierta, indiceListo, olvidar, olvidarTodo, palabrasDe, pedir, pedirIndice, pedirPublicacion, precargarPublicacion, precargarVista, recordar, ultimoFeed } from './comunidadDatos'
 import { Confirm } from './Confirm'
 import { Escribir, type Escrito, subirImagen } from './Escribir'
-import { abrirBorrador, CompartirTuyo, type Instalado, TrasInstalar } from './Estilos'
+import { abrirHilo, CompartirTuyo, type Instalado, TrasInstalar } from './Estilos'
 import { LINK } from './etiquetas'
 import { Unirse } from './Licencia'
 import { Icono as IconoBase, type NombreIcono, trazosDe } from './Iconos'
 import { Liberar } from './Liberar'
 import { Fondo } from './Fondo'
+import { VerEvidencia } from './Evidencia'
 import { GuiaVista } from './Guia'
 import { ApoyarParaInstalar, Tienda } from './Tienda'
 import { Desplegable } from './Desplegable'
@@ -146,6 +147,12 @@ export function Comunidad() {
   const [nueva, setNueva] = useState<string | null>(null)
   // «Compartir un estilo tuyo» (`CompartirTuyo`).
   const [compartiendo, setCompartiendo] = useState(false)
+  // Desde la tienda: «Completarlo», de un estilo tuyo al que le falta algo.
+  useEffect(() => {
+    const abrir = () => setCompartiendo(true)
+    addEventListener('sloth-compartir-tuyo', abrir)
+    return () => removeEventListener('sloth-compartir-tuyo', abrir)
+  }, [])
   const [arrastrando, setArrastrando] = useState(false)
   const [vistas, setVistas] = useState(leerVistas)
   const [, setReloj] = useState(0)
@@ -817,7 +824,7 @@ function Tarjeta({ p, yo, nueva, visto, onAbrir, onFoco, onMegusta }: { p: Publi
           </span>
         </div>
         <EstadoMejora p={p} />
-        {p.porAprobar && <span className="com-estado" title="Solo lo ven quien lo compartió y el creador de Sloth, hasta que lo apruebe">En revisión</span>}
+        <EstadoEstilo p={p} />
         {!!p.reportes && <span className="com-reportada">Reportada · {p.reportes}</span>}
         {p.fijada && (
           <span className="com-fijada">
@@ -984,20 +991,13 @@ function Abierta(props: {
   const estilo = p?.adjuntos.find((a) => a.tipo === 'estilo')
   const [revisando, setRevisando] = useState(false)
 
-  /** El creador lo abre en una carpeta (sin instalarlo) y le pide a «Nuevo estilo» que lo lea antes de aprobarlo. */
+  /** El creador abre el hilo donde su Claude leyó el estilo al llegar (sin instalarlo); si aún no lo leyó, lo lee ahora. */
   async function revisar() {
     if (!p) return
     setRevisando(true)
     setError('')
     try {
-      const { carpeta } = await api<{ carpeta: string }>('/api/comunidad/estilo/revisar', { publicacion: p.id })
-      abrirBorrador(
-        'nuevo-estilo',
-        [
-          `Revisa el estilo «${estilo?.nombre ?? p.titulo}» que compartió ${p.autor.nombre || 'alguien'} en la comunidad, antes de que yo lo apruebe. Está abierto en "${carpeta}" (no está instalado).`,
-          'Sigue «Revisar un estilo de la comunidad» de tu skill.'
-        ].join('\n\n')
-      )
+      abrirHilo((await api<{ hilo: string }>('/api/comunidad/estilo/revisar', { publicacion: p.id })).hilo)
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
     } finally {
@@ -1029,7 +1029,7 @@ function Abierta(props: {
                 </span>
               </div>
               <EstadoMejora p={p} />
-              {p.porAprobar && <span className="com-estado" title="Solo lo ven quien lo compartió y el creador de Sloth, hasta que lo apruebe">En revisión</span>}
+              <EstadoEstilo p={p} />
               {!!p.reportes && <span className="com-reportada">Reportada · {p.reportes}</span>}
               {!editando && (
                 <div className="com-acciones">
@@ -1087,7 +1087,8 @@ function Abierta(props: {
                 {video && (
                   <video className={`com-video${video.vertical ? ' vertical' : ''}`} src={video.url} poster={video.posterUrl} controls loop playsInline preload="metadata" />
                 )}
-                {estilo?.guia && <GuiaVista guia={estilo.guia} />}
+                {estilo?.guia && <GuiaVista guia={estilo.guia} prueba={estilo.prueba} />}
+                {estilo?.prueba && <VerEvidencia prueba={estilo.prueba} />}
                 {estilo && <ParaInstalar p={p} nombre={estilo.nombre ?? p.titulo} suya={suya} />}
                 {imagenes.length > 0 && (
                   <div className={`com-fotos n${Math.min(imagenes.length, 3)}`}>
@@ -1105,7 +1106,7 @@ function Abierta(props: {
             {yo.creador && (p.categoria === 'mejoras' || p.categoria === 'estilos' || !!p.reportes) && !editando && (
               <div className="com-creador-barra">
                 {estilo && (
-                  <button className="com-boton" disabled={revisando} title="Lo abre en una carpeta, sin instalarlo, y «Nuevo estilo» lo lee y te dice qué hace" onClick={() => void revisar()}>
+                  <button className="com-boton" disabled={revisando} title="Lo que tu Claude dijo de él al llegar: qué hace, qué le falta y por qué se aprobó o no. No lo instala" onClick={() => void revisar()}>
                     <Icono de="escudo" /> {revisando ? 'Abriendo…' : 'Revisar'}
                   </button>
                 )}
@@ -1825,9 +1826,11 @@ export function ParaInstalar(props: { p: PublicacionComunidad; nombre: string; s
     }
   }
   const alDia = !!mio && mio.llave === llave
-  const como = p.porAprobar
+  const como = p.incompleto
+    ? `Le falta completar: ${p.incompleto.join('; ')}. ${suya ? 'Mientras tanto no sale en la tienda: complétalo con «Compartir» en su card.' : 'Su autor lo tiene que completar.'}`
+    : p.porAprobar
     ? suya
-      ? 'En revisión: solo lo ven tú y el creador de Sloth. Cuando lo apruebe, te llega un aviso a la campana.'
+      ? 'En revisión: solo lo ven tú y el creador de Sloth. Sloth lo lee solo: si cumple todo se aprueba, y si le falta algo te lo dice aquí abajo, en los comentarios; para mandar el arreglo, «Compartir» otra vez en su card. Cuando se apruebe, te llega un aviso a la campana.'
       : 'Aún no lo apruebas: nadie más lo ve.'
     : alDia
       ? 'Ya está en tus estilos.'
@@ -1853,7 +1856,7 @@ export function ParaInstalar(props: { p: PublicacionComunidad; nombre: string; s
       )}
       <div className="com-instalar-texto">
         {!enVisor && <strong>{nombre}</strong>}
-        <span>{como}</span>
+        <span className={p.incompleto ? 'com-falta' : undefined}>{como}</span>
         {error && <span className="com-instalar-error">{error}</span>}
       </div>
       {!enVisor && boton}
@@ -1861,6 +1864,12 @@ export function ParaInstalar(props: { p: PublicacionComunidad; nombre: string; s
       {invitar && <ApoyarParaInstalar nombre={nombre} estilos={props.sinApoyo} onListo={() => (setInvitar(false), props.onApoyo?.())} onCerrar={() => setInvitar(false)} />}
     </div>
   )
+}
+
+/** Cómo está un estilo que aún no sale en la tienda: le falta algo de lo que lleva todo estilo (en rojo), o está en revisión. */
+export function EstadoEstilo({ p }: { p: PublicacionComunidad }) {
+  if (p.incompleto) return <span className="com-estado com-falta" title={`Le falta: ${p.incompleto.join('; ')}. No sale en la tienda hasta que se complete`}>Le falta completar</span>
+  return p.porAprobar ? <span className="com-estado" title="Solo lo ven quien lo compartió y el creador de Sloth, hasta que se apruebe">En revisión</span> : null
 }
 
 /** Lo que dice cada aviso. */
@@ -1875,6 +1884,7 @@ function fraseDe(a: AvisoComunidad) {
   if (a.tipo === 'reporte') return <>{quien} reportó {a.comentario ? 'un comentario en ' : ''}{sobre}: {a.texto}</>
   if (a.tipo === 'estilo') return <>{quien} compartió un estilo por aprobar: {sobre}</>
   if (a.tipo === 'aprobado') return <>{quien} aprobó tu estilo {sobre}: ya todos lo pueden instalar</>
+  if (a.tipo === 'incompleto') return <span className="com-falta">A tu estilo {sobre} le falta completar su guía, su video o su prueba: mientras tanto no sale en la tienda</span>
   return <>{quien} publicó un anuncio: {sobre}</>
 }
 

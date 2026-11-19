@@ -5,7 +5,7 @@ import { dirname, join } from 'node:path'
 import test from 'node:test'
 import { gzipSync } from 'node:zlib'
 import type { Card } from '../shared/types.ts'
-import { compararVersion, EstiloMalo, empaquetar, instalar, leerPaquete } from './estilos.ts'
+import { compararVersion, desempacar, EstiloMalo, empaquetar, instalar, leerPaquete } from './estilos.ts'
 
 /** Una Sloth de prueba: video-base, un estilo de Sloth y, si se pide, uno tuyo. */
 function sloth(conTuyo = true) {
@@ -131,6 +131,44 @@ test('pide una Sloth al menos tan nueva y avisa qué cambió de video-base desde
   } finally {
     de.fin()
     a.fin()
+  }
+})
+
+test('abierto para revisarlo no se instala, y dice lo que se sabe de él frente a esta Sloth', () => {
+  const de = sloth()
+  const a = sloth(false)
+  try {
+    de.poner('skills/receta-rapida/scripts/instalar.ps1', 'echo hola\n')
+    de.poner('skills/receta-rapida/scripts/subir.py', 'import requests\nrequests.post("https://otro.sitio/subir")\n')
+    const { paquete } = empacar(de, '0.3.44')
+    a.poner('skills/video-base/PORTADA.md', '# Portada nueva\n')
+    const destino = join(a.app, 'trabajo', 'estilos-por-revisar', 'pub1')
+    const { manifiesto, notas, fallas, riesgos } = desempacar(paquete, destino, { sloth: '0.4.0', base: a.base, deSloth: a.deSloth })
+    assert.equal(manifiesto.id, 'receta-rapida')
+    assert.ok(existsSync(join(destino, 'SKILL.md')) && existsSync(join(destino, 'estilo.json')))
+    assert.ok(!existsSync(join(a.app, 'skills', 'receta-rapida')))
+    const todo = notas.join('\n')
+    assert.match(todo, /Se hizo con Sloth 0\.3\.44; esta es la 0\.4\.0/)
+    assert.match(todo, /1 ya no son como cuando se hizo, o ya no están: PORTADA\.md/)
+    // Lo de su autor: lo que cambió y lo que añadió al estilo de Sloth del que partió.
+    assert.match(todo, /Frente a video-explicativo, el estilo de Sloth del que partió: 1 archivos iguales; cambiados, 2 \(SKILL\.md, plantilla\/package\.json\); nuevos, 2 \(scripts\/instalar\.ps1, scripts\/subir\.py\)/)
+    assert.ok(fallas.some((f) => /scripts de consola \(scripts\/instalar\.ps1\)/.test(f)))
+    assert.deepEqual(riesgos, ['scripts/subir.py:1 se conecta a internet: import requests', 'scripts/subir.py:2 se conecta a internet: requests.post("https://otro.sitio/subir")'])
+  } finally {
+    de.fin()
+    a.fin()
+  }
+})
+
+test('al empaquetarlo le dice a su autor lo que no cumple de lo que necesita todo estilo', () => {
+  const s = sloth()
+  try {
+    const avisos = empacar(s).avisos.join('\n')
+    assert.match(avisos, /tiene que empezar con `name: receta-rapida`/)
+    assert.match(avisos, /no dice qué hace con «Formato: horizontal»/)
+    assert.match(avisos, /Le falta la etapa de su portada/)
+  } finally {
+    s.fin()
   }
 })
 

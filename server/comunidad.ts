@@ -1,18 +1,20 @@
 import { execFile } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
-import { existsSync, readFileSync, rmSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, rmSync } from 'node:fs'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { tmpdir } from 'node:os'
 import { extname, join, resolve, sep } from 'node:path'
 import { promisify } from 'node:util'
-import { guiaDe } from '../shared/guia.ts'
+import { guiaDe, TIPO_HILO } from '../shared/guia.ts'
 import { NOMBRE_AGENTE, proveedorDe } from '../shared/providers.ts'
-import type { AdjuntoComunidad, AyudaMejora, GuiaEstilo, OrigenMejora, PublicacionComunidad, ServerPush, VideoHecho } from '../shared/types.ts'
+import type { AdjuntoComunidad, AyudaMejora, GuiaEstilo, OrigenMejora, PublicacionComunidad, ServerPush, TiendaEstilos, VideoHecho } from '../shared/types.ts'
+import { guardar } from './disco.ts'
 import { bytes, cuerpo, json as enviar } from './http.ts'
 import { EstiloMalo, type Instalado, type Manifiesto, PESO as PESO_ESTILO, TIPO as TIPO_ESTILO } from './estilos.ts'
 import { COBRO } from './licencia.ts'
 import type { UsoEstilo } from './estilos-usos.ts'
 import type { Sessions } from './sessions.ts'
+import { evidenciaDelHilo, pruebaDelHilo } from './prueba-estilo.ts'
 import { redactar as redactarConAgente } from './redactar.ts'
 
 /**
@@ -30,12 +32,22 @@ import { redactar as redactarConAgente } from './redactar.ts'
  *   en el hilo de donde sale) y propone el texto (`AyudaMejora`).
  * - `POST /api/comunidad/estilo` `{cardId}`: empaqueta un estilo tuyo (`server/estilos.ts`) y lo sube. Da su adjunto, que
  *   dice de qué estilo de la comunidad salió (`de`), si salió de uno: así cuenta como su variante; y su guía de uso
- *   (`guia`), si su card la trae: la plantilla que se revisa antes de publicar (`shared/guia.ts`).
+ *   (`guia`), si su card la trae: la plantilla que se revisa antes de publicar (`shared/guia.ts`). Con él, `avisos`: lo
+ *   que conviene arreglar antes de mandarlo (`avisosDe`).
+ * - `POST /api/comunidad/estilo/publicar` `{cardId, titulo, texto, adjuntos}`: lo publica en Estilos; si ya lo habías
+ *   compartido desde esta computadora (`data/estilos-compartidos.json`), pone al día esa publicación en vez de hacer
+ *   otra. `GET /api/comunidad/estilo/compartido?cardId=&titulo=` da esa publicación (`{publicacion}`), si sigue ahí;
+ *   la de antes de que se apuntara se busca por el nombre del estilo (`deAntes`).
+ * - `POST /api/comunidad/estilo/prueba` `{ruta}`: la prueba de un video de «Mis videos» (`PruebaEstilo`): con qué agente
+ *   se hizo, cuánto costó y cuánto tardó, sacado de su hilo (`server/prueba-estilo.ts`). 404 si su hilo ya no está.
+ * - `POST /api/comunidad/estilo/evidencia` `{ruta}`: sube el hilo completo de ese video (`EvidenciaEstilo`) y da su
+ *   llave (`{llave}`), que va en la prueba. Se pide al publicar, cuando su autor ya aceptó compartirlo. Se lee con
+ *   `GET /api/comunidad/archivo/<llave>`, que el cobro solo le da a quien lo subió y al creador.
  * - `POST /api/comunidad/estilo/instalar` `{publicacion}`: baja el estilo de esa publicación de Estilos y lo instala,
  *   con la guía de uso de la publicación en su card,
  *   y le avisa a la comunidad su descarga (`usos`, que también manda los videos de `server/estilos-usos.ts`).
- * - `POST /api/comunidad/estilo/revisar` `{publicacion}`: solo el creador. Lo abre en una carpeta, sin instalarlo, para
- *   leerlo (o que su agente lo lea) antes de aprobarlo.
+ * - `POST /api/comunidad/estilo/revisar` `{publicacion}`: solo el creador. Da el hilo (`{hilo}`) donde su Claude lo lee
+ *   antes de aprobarlo, sin instalarlo: el que ya se hizo solo al llegar, o uno nuevo (`server/estilos-revision.ts`).
  * - `POST /api/mejoras` `{texto, imagenes?, adjuntos?}`: publica una mejora. Lo usan «Pedir una mejora» de cada hilo y
  *   el agente; `imagenes` son rutas de `data/attachments`. El hilo de donde salió no se publica.
  */
@@ -91,11 +103,11 @@ interface Opciones {
   avisar(msg: ServerPush): void
   /** Los estilos de esta computadora (`estilos()` de `server/estilos.ts`). */
   estilos: {
-    empaquetarCard(id: string): { paquete: Buffer; manifiesto: Manifiesto }
+    empaquetarCard(id: string): { paquete: Buffer; manifiesto: Manifiesto; avisos: string[] }
     instalarPaquete(paquete: Buffer, origen: { publicacion: string; llave: string; autor?: string }, guia?: GuiaEstilo): Instalado
   }
-  /** Abre el paquete de una publicación para revisarlo, sin instalarlo. Da su carpeta. */
-  revisar(paquete: Buffer, publicacion: string): { carpeta: string; manifiesto: Manifiesto }
+  /** El hilo donde el agente del creador lee el estilo de esa publicación, sin instalarlo (`server/estilos-revision.ts`). */
+  revisar(publicacion: string): Promise<{ hilo: string }>
   /** La publicación de Estilos de la que salió el estilo de esa card (su `origen` o su `deComunidad`), si salió de una. */
   deEstilo(cardId: string): string | undefined
 }
@@ -143,6 +155,75 @@ export function comunidad(app: string, o: Opciones) {
     const paquete = Buffer.from(await r.arrayBuffer())
     if (paquete.length > PESO_ESTILO) throw new Rechazo(413, 'Ese estilo pesa de más.')
     return { p, llave, paquete }
+  }
+
+  /** En qué publicación de Estilos compartiste cada estilo tuyo, por su card: al volver a compartirlo, se pone al día esa. */
+  const archivoCompartidos = join(app, 'data', 'estilos-compartidos.json')
+  function compartidos(): Record<string, string> {
+    try {
+      return JSON.parse(readFileSync(archivoCompartidos, 'utf8')) as Record<string, string>
+    } catch {
+      return {}
+    }
+  }
+  /** Apunta la publicación de esa card o, sin ella, la olvida. */
+  function recordar(cardId: string, publicacion?: string) {
+    if (!cardId) return
+    const todos = compartidos()
+    if (publicacion) todos[cardId] = publicacion
+    else delete todos[cardId]
+    mkdirSync(join(app, 'data'), { recursive: true })
+    guardar(archivoCompartidos, JSON.stringify(todos, null, 2) + '\n')
+  }
+  /** Esa publicación, si sigue en Estilos y lleva un estilo; `undefined` si ya no está. */
+  async function suya(id: string): Promise<PublicacionComunidad | undefined> {
+    if (!/^[a-z0-9]+$/.test(id)) return undefined
+    try {
+      const { publicacion: p } = await nubeJson<{ publicacion: PublicacionComunidad }>(`/comunidad/p/${id}`)
+      return p.categoria === 'estilos' && p.adjuntos.some((a) => a.tipo === 'estilo') ? p : undefined
+    } catch (e) {
+      if (e instanceof Rechazo && e.status === 404) return undefined
+      throw e
+    }
+  }
+
+  /**
+   * La publicación de un estilo que compartiste antes de que Sloth apuntara dónde (o desde otra computadora): la tuya
+   * que no está en la tienda (por aprobar, o a la que le falta algo) y lleva un estilo con ese nombre. Las de otros que
+   * no están en la tienda no las ves, así que es tuya.
+   */
+  async function deAntes(titulo: string): Promise<string | undefined> {
+    if (!titulo || 'llave' in ((await o.credencial()) ?? {})) return undefined
+    const { estilos } = await nubeJson<TiendaEstilos>('/comunidad/estilos?orden=nuevos').catch(() => ({ estilos: [] }) as Pick<TiendaEstilos, 'estilos'>)
+    return estilos.find(({ publicacion: p }) => (p.porAprobar || p.incompleto) && p.adjuntos.some((a) => a.tipo === 'estilo' && a.nombre === titulo))?.publicacion.id
+  }
+
+  /** El hilo completo de una prueba, tal como se subió (JSON): lo bajan quien lo subió y el creador. Nada si ya no está. */
+  async function evidencia(llave: string): Promise<string | undefined> {
+    const r = await nube(`/comunidad/archivo/${llave}`).catch(() => undefined)
+    return r?.ok ? await r.text() : undefined
+  }
+
+  /** Un comentario en una publicación, a nombre de quien entra aquí. */
+  const comentar = (publicacion: string, texto: string) => nubeJson(`/comunidad/p/${publicacion}/comentar`, { cuerpo: JSON.stringify({ texto }) }).then(() => o.avisar({ type: 'comunidad' }))
+
+  /**
+   * Solo el creador: aprueba el estilo de esa publicación si su paquete sigue siendo `llave`, el que se revisó
+   * (`server/estilos-revision.ts`). `false` si su autor ya mandó otro, o si ya no está. La llave va también al cobro,
+   * que la vuelve a mirar al aprobar: entre esta lectura y ese instante pudo cambiar.
+   */
+  async function aprobar(publicacion: string, llave: string): Promise<boolean> {
+    const p = await suya(publicacion)
+    if (!p || p.adjuntos.find((a) => a.tipo === 'estilo')?.llave !== llave) return false
+    if (!p.porAprobar) return true
+    try {
+      await nubeJson(`/comunidad/p/${publicacion}`, { cuerpo: JSON.stringify({ aprobada: true, llave }) })
+    } catch (e) {
+      if (e instanceof Rechazo && (e.status === 409 || e.status === 404)) return false
+      throw e
+    }
+    o.avisar({ type: 'comunidad' })
+    return true
   }
 
   /**
@@ -300,12 +381,48 @@ export function comunidad(app: string, o: Opciones) {
       }
       if (ruta === '/api/comunidad/estilo' && metodo === 'POST') {
         const cardId = String((await cuerpo<{ cardId?: string }>(req)).cardId ?? '')
-        const { paquete, manifiesto } = o.estilos.empaquetarCard(cardId)
+        const { paquete, manifiesto, avisos } = o.estilos.empaquetarCard(cardId)
         // Si salió de un estilo de la comunidad, lo dice: cuenta como su variante.
         const de = o.deEstilo(cardId)
         const guia = manifiesto.card.guia
         const a: AdjuntoComunidad = { tipo: 'estilo', nombre: manifiesto.titulo, ...(de ? { de } : {}), ...(guia ? { guia } : {}), ...(await subir(paquete, TIPO_ESTILO)) }
-        return enviar(res, 200, a)
+        return enviar(res, 200, { ...a, avisos })
+      }
+      if (ruta === '/api/comunidad/estilo/compartido' && metodo === 'GET') {
+        const cardId = url.searchParams.get('cardId') ?? ''
+        const id = compartidos()[cardId] ?? (await deAntes(url.searchParams.get('titulo') ?? ''))
+        if (!id) return enviar(res, 200, {})
+        const p = await suya(id)
+        recordar(cardId, p?.id)
+        return enviar(res, 200, p ? { publicacion: p } : {})
+      }
+      if (ruta === '/api/comunidad/estilo/prueba' && metodo === 'POST') {
+        const v = o.video(String((await cuerpo<{ ruta?: string }>(req)).ruta ?? ''))
+        const hilo = v?.sessionId ? o.sessions.get(v.sessionId) : null
+        const prueba = v && hilo ? pruebaDelHilo(hilo.events, hilo.meta.model, v.t, v.segundos) : undefined
+        if (!prueba) throw new Rechazo(404, 'De ese video ya no está el hilo donde se hizo, y de ahí sale su prueba. Elige otro, o haz uno nuevo con este estilo.')
+        return enviar(res, 200, prueba)
+      }
+      if (ruta === '/api/comunidad/estilo/evidencia' && metodo === 'POST') {
+        const v = o.video(String((await cuerpo<{ ruta?: string }>(req)).ruta ?? ''))
+        const hilo = v?.sessionId ? o.sessions.get(v.sessionId) : null
+        if (!v || !hilo) throw new Rechazo(404, 'De ese video ya no está el hilo donde se hizo. Elige otro, o haz uno nuevo con este estilo.')
+        const evidencia = evidenciaDelHilo(hilo.events, hilo.meta.model, hilo.meta.title, v.t)
+        return enviar(res, 200, { llave: (await subir(Buffer.from(JSON.stringify(evidencia), 'utf8'), TIPO_HILO)).llave })
+      }
+      if (ruta === '/api/comunidad/estilo/publicar' && metodo === 'POST') {
+        const c = await cuerpo<{ cardId?: string; titulo?: string; texto?: string; adjuntos?: unknown }>(req)
+        const cardId = String(c.cardId ?? '')
+        const datos = { titulo: c.titulo ?? '', texto: c.texto ?? '', adjuntos: Array.isArray(c.adjuntos) ? c.adjuntos : [] }
+        // El que ya compartiste se pone al día en su misma publicación, con sus comentarios y sus números; si ya no está, va otra.
+        const ya = compartidos()[cardId]
+        const anterior = ya ? await suya(ya) : undefined
+        const p = anterior
+          ? await nubeJson<PublicacionComunidad>(`/comunidad/p/${anterior.id}`, { cuerpo: JSON.stringify(datos) })
+          : await nubeJson<PublicacionComunidad>('/comunidad/publicar', { cuerpo: JSON.stringify({ categoria: 'estilos', ...datos }) })
+        recordar(cardId, p.id)
+        o.avisar({ type: 'comunidad' })
+        return enviar(res, 200, p)
       }
       if (ruta === '/api/comunidad/estilo/instalar' && metodo === 'POST') {
         const { p, llave, paquete } = await estiloDe(String((await cuerpo<{ publicacion?: string }>(req)).publicacion ?? ''))
@@ -317,8 +434,7 @@ export function comunidad(app: string, o: Opciones) {
       if (ruta === '/api/comunidad/estilo/revisar' && metodo === 'POST') {
         const c = await o.credencial()
         if (!c || !('llave' in c)) throw new Rechazo(403, 'Eso solo lo hace el creador de Sloth.')
-        const { p, paquete } = await estiloDe(String((await cuerpo<{ publicacion?: string }>(req)).publicacion ?? ''))
-        return enviar(res, 200, o.revisar(paquete, p.id))
+        return enviar(res, 200, await o.revisar(String((await cuerpo<{ publicacion?: string }>(req)).publicacion ?? '')))
       }
       if (ruta === '/api/comunidad/video' && metodo === 'POST') {
         const c = await cuerpo<{ ruta?: string; entero?: boolean }>(req)
@@ -362,7 +478,17 @@ export function comunidad(app: string, o: Opciones) {
     return c ? (await subir(readFileSync(c), 'image/webp')).llave : undefined
   }
 
-  return { api, usos, prueba }
+  /** Solo el creador: los estilos que esperan su aprobación, con la llave de su paquete (los ve en la tienda, sin aprobar). */
+  async function porAprobar(): Promise<{ publicacion: string; llave: string }[]> {
+    const { estilos } = await nubeJson<TiendaEstilos>('/comunidad/estilos?orden=nuevos')
+    // Al que le falta algo de lo que lleva todo estilo no se le gasta una lectura: primero lo completa su autor.
+    return estilos.flatMap(({ publicacion: p }) => {
+      const llave = p.porAprobar && !p.incompleto && p.adjuntos.find((a) => a.tipo === 'estilo')?.llave
+      return llave ? [{ publicacion: p.id, llave }] : []
+    })
+  }
+
+  return { api, usos, prueba, estiloDe, porAprobar, comentar, aprobar, evidencia }
 }
 
 /**

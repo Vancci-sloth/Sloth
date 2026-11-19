@@ -14,6 +14,7 @@ Lo que comparten los estilos de vídeo: el lote, los errores ya vistos y los scr
 
 | Archivo | Qué es |
 |---|---|
+| [ESTILO.md](ESTILO.md) | Lo que necesita todo estilo: los 30 requisitos con que se hace, se comparte y se aprueba uno, y cuáles comprueba Sloth solo |
 | [MOTOR.md](MOTOR.md) | El motor: un video desde `momentos.json` (qué se ve en cada palabra) y un `hacer.py` que hace lo demás. El contrato que siguen el explicativo, el documental y El Diff, y con el que nace un estilo nuevo |
 | [FORMATO.md](FORMATO.md) | Vertical u horizontal: todo estilo hace los dos, y qué cambia de uno a otro (`Formato:` del mensaje) |
 | [LOTE.md](LOTE.md) | Lo que cambia cuando el vídeo es uno de un lote; solo se lee si el mensaje trae `Lote:` |
@@ -87,6 +88,7 @@ en el script.
 
 ## Un estilo nuevo
 
+Cumple [lo que necesita todo estilo](ESTILO.md); lo de abajo es por qué.
 Su skill dice lo suyo y usa de aquí lo que ya existe: si te ves copiando un párrafo o un script de otro estilo, va
 aquí. Nace con su card en `cards.json` de Sloth, con sus `etapas`, cada una con su `fase` (`idea`, `guion`, `sonido`,
 `video` o `entrega`: Idea · Guion · Sonido y voz · Video · Entrega, ver `FASES` en `shared/types.ts` de Sloth). `listo`

@@ -4,7 +4,7 @@ Vuelve una imagen un recorte de collage: borde blanco grueso y cortado a mano (u
     python -B scripts/sticker.py <entrada> <salida.png> [--caja] [--borde 0.035] [--lado 900]
 
 - Sin `--caja`: el borde sigue la silueta. Si la imagen no trae transparencia, la recorta primero con rembg
-  (`alfa()` de video-base/recorte.py, con el Python del sistema, que es el que tiene rembg).
+  (`alfa()` de video-base/scripts/recorte.py, con el Python del sistema, que es el que tiene rembg).
 - Con `--caja`: la imagen va sobre un pedazo de papel rectangular de bordes chuecos. Para logos de solo letras
   (Nasdaq, Balancer) y capturas, que con borde de silueta pierden los huecos entre letras.
 - `--borde`: grosor del borde en fracción del lado mayor. `--lado`: tamaño máximo de la salida.

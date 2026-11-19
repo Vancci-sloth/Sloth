@@ -135,7 +135,50 @@ export interface GuiaEstilo {
   ejemplo: string
   /** Lo que hace falta aparte de Sloth (cuentas, material propio), si algo. */
   necesita?: string
+  /** Con qué de Sloth hace el video (`HERRAMIENTAS` en `shared/guia.ts`): solo código, Google Flow, voz generada… */
+  herramientas?: string[]
+  /** Los agentes con que se probó y da buen resultado. */
+  agentes?: Proveedor[]
 }
+
+/**
+ * La prueba de un estilo compartido: lo que costó hacer el video con que se enseña, medido en el hilo donde se hizo
+ * (`server/prueba-estilo.ts`). Los números se ven en la tienda; `hilo`, su evidencia, solo su autor y el creador.
+ */
+export interface PruebaEstilo {
+  /** El agente que hizo el video y su modelo, como lo llama su proveedor. */
+  agente: Proveedor
+  modelo: string
+  /** Lo que costó el hilo hasta ese video, en dólares a precio de la API (con una suscripción no se cobra aparte). */
+  costo: number
+  /** Los segundos que trabajó el agente hasta dejarlo terminado, sin lo que esperó a quien lo usa. */
+  segundos: number
+  /** Cuánto dura el video. */
+  video?: number
+  /** El hilo, resumido: lo que se le pidió, cada turno con lo que tardó y costó, y lo que usó de Sloth. Sin sus archivos. */
+  hilo?: { pedido: string; turnos: { segundos: number; costo: number; herramientas: number }[]; usa: string[] }
+  /** La llave del hilo completo (`EvidenciaEstilo`), un archivo de la comunidad que solo bajan su autor y el creador. */
+  evidencia?: string
+}
+
+/**
+ * El hilo completo donde se hizo el video de una prueba, como lo guardó Sloth: lo que se le pidió al agente, lo que
+ * contestó y lo que hizo en cada turno, hasta el video terminado. Es la evidencia de la prueba: «Ver la evidencia», en
+ * la publicación del estilo, la enseña a su autor y al creador (`web/src/Evidencia.tsx`).
+ */
+export interface EvidenciaEstilo {
+  version: 1
+  titulo: string
+  modelo: string
+  pasos: PasoEvidencia[]
+}
+
+export type PasoEvidencia =
+  | { t: 'usuario'; texto: string }
+  | { t: 'agente'; texto: string }
+  /** `entrada` y `salida`, recortadas: lo que se le pasó a la herramienta y lo que devolvió. */
+  | { t: 'herramienta'; nombre: string; entrada: string; salida?: string; error?: true }
+  | { t: 'turno'; segundos: number; costo: number; ok: boolean; error?: string }
 
 /** De dónde vino un estilo instalado: de un archivo (sin `publicacion`) o de la comunidad, y de qué versión de Sloth. */
 export interface OrigenEstilo {
@@ -1220,6 +1263,8 @@ export interface AdjuntoComunidad {
   de?: string
   /** Cómo se usa el estilo: en Estilos no se publica sin ella (`shared/guia.ts`). */
   guia?: GuiaEstilo
+  /** Lo que costó hacer el video con que se enseña: en Estilos no se publica sin ella (`shared/guia.ts`). */
+  prueba?: PruebaEstilo
   /** La portada de un video: su llave y su URL. */
   poster?: string
   posterUrl?: string
@@ -1256,8 +1301,13 @@ export interface PublicacionComunidad {
   comentaron: Autor[]
   /** Cuántos la reportaron. Solo lo ve el creador; con 3 o más, los demás ya no la ven hasta que la revise. */
   reportes?: number
-  /** Un estilo que el creador aún no aprueba: solo lo ven quien lo compartió y él. */
+  /** Un estilo que aún no se aprueba: solo lo ven quien lo compartió y el creador. */
   porAprobar?: true
+  /**
+   * Un estilo al que le falta algo de lo que lleva todo estilo de la comunidad (`faltaEnEstilo` en `shared/guia.ts`): no
+   * sale en la tienda hasta que su autor lo complete. Solo lo ven él, en rojo, y el creador.
+   */
+  incompleto?: string[]
 }
 
 export interface ComentarioComunidad {
@@ -1278,7 +1328,8 @@ export interface ComentarioComunidad {
 /** Lo que le pasó a lo tuyo en la comunidad: te comentaron, te respondieron, te dieron me gusta… */
 export interface AvisoComunidad {
   id: string
-  tipo: 'comento' | 'respondio' | 'gusta' | 'gustaComentario' | 'estado' | 'reporte' | 'anuncio' | 'estilo' | 'aprobado'
+  /** `incompleto`: a un estilo tuyo le falta algo de lo que lleva todo estilo, y no sale en la tienda hasta que lo completes. */
+  tipo: 'comento' | 'respondio' | 'gusta' | 'gustaComentario' | 'estado' | 'reporte' | 'anuncio' | 'estilo' | 'aprobado' | 'incompleto'
   de: Autor
   publicacion: string
   /** El título de la publicación, o el principio de su texto. */

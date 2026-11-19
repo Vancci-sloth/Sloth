@@ -45,20 +45,34 @@ test('un estilo es un paquete de la comunidad, uno solo, con su nombre, y va en 
   assert.doesNotThrow(() => estiloEnSuSitio('general', adjuntosDe([imagen(1)]), ''))
 })
 
-test('un estilo no se publica sin decir qué hace y cómo se usa: su plantilla completa', () => {
-  const guia = { das: 'Solo el tema del video.', entrega: 'Un vertical de 30 segundos.', ejemplo: 'Hazme un video del ciclo del agua.' }
+test('un estilo no se publica sin lo que lleva todo estilo: qué hace, su guía completa, un video entero y su prueba', () => {
+  const guia = { das: 'Solo el tema del video.', entrega: 'Un vertical de 30 segundos.', ejemplo: 'Hazme un video del ciclo del agua.', herramientas: ['codigo', 'tu-voz'], agentes: ['claude'] }
+  const prueba = { agente: 'claude', modelo: 'claude-opus-5-5', costo: 0.49, segundos: 222, evidencia: 'hhhhhhhhhhhhhhhhhhhh.hilo' }
+  const video = { tipo: 'video', llave: 'eeeeeeeeeeeeeeeeeeee.mp4' }
   const estilo = { tipo: 'estilo', llave: 'ffffffffffffffffffff.estilo', nombre: 'Receta rápida' }
   const con = (g: unknown) => adjuntosDe([{ ...estilo, guia: g }])
+  /** Como lo manda «Compartir»: el estilo con su guía y su prueba, y su video. */
+  const completo = (g: unknown = guia, p: unknown = prueba) => adjuntosDe([{ ...estilo, guia: g, prueba: p }, video])
   // La guía se guarda limpia: recortada, sin lo que no es suyo ni los campos vacíos.
   assert.deepEqual(con({ ...guia, das: `  Solo el
  tema del video.  `, necesita: ' ', otro: 'x', ejemplo: 'e'.repeat(900) }), [{ ...estilo, guia: { ...guia, ejemplo: 'e'.repeat(400) } }])
   assert.deepEqual(con('nada'), [estilo])
-  assert.doesNotThrow(() => estiloEnSuSitio('estilos', con({ ...guia, necesita: 'Google Flow con créditos.' }), 'Recetas en 30 segundos.'))
-  assert.doesNotThrow(() => estiloEnSuSitio('estilos', con(guia), 'Recetas en 30 segundos.'))
-  // Una Sloth de antes no la manda: dice qué falta y que se actualice.
-  assert.throws(() => estiloEnSuSitio('estilos', adjuntosDe([estilo]), 'Recetas.'), /falta «Qué le das».*actualízala/)
-  assert.throws(() => estiloEnSuSitio('estilos', con({ ...guia, ejemplo: 'x' }), 'Recetas.'), /falta «Ejemplo de lo que le escribes»/)
-  assert.throws(() => estiloEnSuSitio('estilos', con(guia), ''), /falta «Qué hace»/)
+  // La prueba también se guarda limpia, y una que no dice con qué se hizo no se guarda.
+  assert.deepEqual(adjuntosDe([{ ...estilo, prueba: { ...prueba, costo: 0.487, otro: 'x' } }]), [{ ...estilo, prueba }])
+  assert.deepEqual(adjuntosDe([{ ...estilo, prueba: { costo: 1, segundos: 60 } }]), [estilo])
+  assert.doesNotThrow(() => estiloEnSuSitio('estilos', completo({ ...guia, necesita: 'Google Flow con créditos.' }), 'Recetas en 30 segundos.'))
+  assert.doesNotThrow(() => estiloEnSuSitio('estilos', completo(), 'Recetas en 30 segundos.'))
+  // Una Sloth de antes no manda todo: dice qué falta, todo de una vez, y que se actualice.
+  assert.throws(() => estiloEnSuSitio('estilos', adjuntosDe([estilo]), 'Recetas.'), /falta: Qué le das; Un video entero hecho con él; La prueba de con qué agente.*actualízala/)
+  assert.throws(() => estiloEnSuSitio('estilos', completo({ ...guia, ejemplo: 'x' }), 'Recetas.'), /falta: Ejemplo de lo que le escribes\./)
+  assert.throws(() => estiloEnSuSitio('estilos', completo({ ...guia, herramientas: [] }), 'Recetas.'), /falta: Con qué lo hace\./)
+  assert.throws(() => estiloEnSuSitio('estilos', completo({ ...guia, agentes: ['uno-inventado'] }), 'Recetas.'), /falta: Con qué agentes funciona bien\./)
+  // El hilo de una prueba no se adjunta suelto, ni como video: va dentro de la prueba.
+  assert.deepEqual(adjuntosDe([{ tipo: 'video', llave: prueba.evidencia }]), [])
+  assert.throws(() => estiloEnSuSitio('estilos', completo(guia, { ...prueba, evidencia: undefined }), 'Recetas.'), /falta: La prueba de con qué agente/)
+  assert.throws(() => estiloEnSuSitio('estilos', completo(guia, null), 'Recetas.'), /falta: La prueba de con qué agente se hizo, cuánto costó y cuánto tardó\./)
+  assert.throws(() => estiloEnSuSitio('estilos', adjuntosDe([{ ...estilo, guia, prueba }]), 'Recetas.'), /falta: Un video entero hecho con él\./)
+  assert.throws(() => estiloEnSuSitio('estilos', completo(), ''), /falta: Qué hace\./)
   assert.deepEqual(fotosDeComentario([estilo]), [])
 })
 

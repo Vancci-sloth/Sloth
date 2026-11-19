@@ -14,6 +14,9 @@
 .new-chat-icon { width: 18px; height: 18px; flex: none; display: grid; place-items: center; border: 1px solid var(--line); border-radius: 5px; font-size: 14px; line-height: 1; color: var(--amber); }
 .new-chat-icon .ico { width: 12px; height: 12px; stroke-width: 2.2; }
 /* comunidad: los avisos sin leer, a la derecha de «Comunidad»; plegada, un punto sobre su icono. */
+/* «Comunidad», cuando a un estilo tuyo le falta algo para estar en la tienda: en rojo, con su punto. */
+.new-chat.falta, .new-chat.falta .new-chat-icon { color: var(--bad); }
+.new-chat.falta .nav-cuenta { background: var(--bad); color: var(--bg); }
 .nav-cuenta { min-width: 18px; height: 18px; margin-left: auto; padding: 0 5px; display: grid; place-items: center; border-radius: 999px; background: var(--amber); color: var(--sobre-ambar); font-size: 10.5px; font-weight: 750; font-variant-numeric: tabular-nums; }
 .buscar { margin-bottom: 4px; color: var(--muted); cursor: text; }
 .buscar:hover { background: var(--panel-2); }

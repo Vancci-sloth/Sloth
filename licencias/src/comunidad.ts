@@ -30,7 +30,8 @@
  *   (`consultaFeed`).
  * - `POST /comunidad/publicar` `{categoria, titulo, texto, adjuntos}`.
  * - `GET /comunidad/p/<id>`: una, con sus comentarios. `POST /comunidad/p/<id>` `{categoria?, titulo?, texto?,
- *   adjuntos?, fijada?, estado?, aprobada?}` la cambia (`aprobada`, solo el creador); `/borrar`, `/megusta`, `/comentar` `{texto, responde?, adjuntos?}` (sus
+ *   adjuntos?, fijada?, estado?, aprobada?, llave?}` la cambia (`aprobada`, solo el creador; con `llave`, solo si su
+ *   paquete sigue siendo ese); `/borrar`, `/megusta`, `/comentar` `{texto, responde?, adjuntos?}` (sus
  *   imágenes, migración 0009), `/reportar`
  *   `{motivo}` y `/revisada` (el creador quita sus reportes).
  * - `POST /comunidad/c/<id>/borrar`, `/megusta`, `/reportar` y `/revisada`: lo mismo para un comentario.
@@ -48,7 +49,7 @@
  *   `POST` la da a todos ya (`liberar` en `index.ts`), cuando el chat de un live cumple su meta.
  */
 import type { AdjuntoComunidad, Autor, AvisoComunidad, CategoriaComunidad, ComentarioComunidad, FeedComunidad, OrdenComunidad, PublicacionComunidad, RifaGanada, RoadmapComunidad } from '../../shared/types.ts'
-import { faltaEnGuia, guiaDe } from '../../shared/guia.ts'
+import { faltaEnEstilo, guiaDe, pruebaDe, TIPO_HILO } from '../../shared/guia.ts'
 import { fondo } from './fondo.ts'
 import { cerrar, mio, pagado, participar, reparto, salir } from './reparto.ts'
 import { descartar, olvidarNumeros, pruebas, tienda, usos } from './tienda.ts'
@@ -77,9 +78,11 @@ const FOTOS_COMENTARIO = 4
  * Lo más que pesa un archivo. Un video son sus primeros segundos, unos pocos MB, o el de un estilo, entero: hasta 45 MB
  * (`PESO_ENTERO` en `server/comunidad.ts`). Un estilo, lo que topa `server/estilos.ts`.
  */
-const PESO = { imagen: 10 * 1024 * 1024, video: 50 * 1024 * 1024, estilo: 15 * 1024 * 1024 }
-const TIPOS: Record<string, { tipo: AdjuntoComunidad['tipo']; ext: string }> = {
+const PESO = { imagen: 10 * 1024 * 1024, video: 50 * 1024 * 1024, estilo: 15 * 1024 * 1024, hilo: 4 * 1024 * 1024 }
+const TIPOS: Record<string, { tipo: AdjuntoComunidad['tipo'] | 'hilo'; ext: string }> = {
   'application/x-sloth-estilo': { tipo: 'estilo', ext: 'estilo' },
+  // La evidencia de la prueba de un estilo: el hilo donde se hizo su video (`server/prueba-estilo.ts`).
+  [TIPO_HILO]: { tipo: 'hilo', ext: 'hilo' },
   'image/png': { tipo: 'imagen', ext: 'png' },
   'image/jpeg': { tipo: 'imagen', ext: 'jpg' },
   'image/webp': { tipo: 'imagen', ext: 'webp' },
@@ -88,9 +91,10 @@ const TIPOS: Record<string, { tipo: AdjuntoComunidad['tipo']; ext: string }> = {
   'video/webm': { tipo: 'video', ext: 'webm' },
   'video/quicktime': { tipo: 'video', ext: 'mov' }
 }
-const LLAVE = /^[a-z0-9]{20}\.(png|jpg|webp|gif|mp4|webm|mov|estilo)$/
+const LLAVE = /^[a-z0-9]{20}\.(png|jpg|webp|gif|mp4|webm|mov|estilo|hilo)$/
 const IMAGEN = /\.(png|jpg|webp|gif)$/
 const ESTILO = /\.estilo$/
+const HILO = /\.hilo$/
 const ID = /^[a-z0-9]+$/
 /**
  * Lo más que publica, comenta, reporta o sube cada miembro en un día (`cupo`): que un error o un abuso no llene la
@@ -164,7 +168,7 @@ interface ComentarioGuardado {
 }
 
 /** Un adjunto como se guarda: sin URLs, que dependen de `ORIGEN`. */
-type Adjunto = Pick<AdjuntoComunidad, 'tipo' | 'llave' | 'poster' | 'previa' | 'vertical' | 'nombre' | 'de' | 'guia'>
+type Adjunto = Pick<AdjuntoComunidad, 'tipo' | 'llave' | 'poster' | 'previa' | 'vertical' | 'nombre' | 'de' | 'guia' | 'prueba'>
 
 export async function comunidad(req: Request, env: Env, url: URL, ctx: ExecutionContext): Promise<Response> {
   const ruta = url.pathname
@@ -485,7 +489,11 @@ async function feed(env: Env, yo: Miembro, url: URL): Promise<FeedComunidad> {
 }
 
 /** Las publicaciones como las ve `yo`: con su autor, si le gustan y las caras de los últimos que comentaron. */
-export async function armar(env: Env, yo: Miembro, filas: Guardada[]): Promise<PublicacionComunidad[]> {
+/**
+ * Las publicaciones como las ve `yo`. De un estilo, a su autor y al creador les dice lo que le falta (`incompleto`). La
+ * evidencia de su prueba (el resumen del hilo donde se hizo su video) solo va al abrirla (`entera`), y solo a ellos dos.
+ */
+export async function armar(env: Env, yo: Miembro, filas: Guardada[], entera = false): Promise<PublicacionComunidad[]> {
   if (!filas.length) return []
   const ids = filas.map((f) => f.id)
   const marcas = ids.map(() => '?').join(', ')
@@ -501,13 +509,17 @@ export async function armar(env: Env, yo: Miembro, filas: Guardada[]): Promise<P
   const caras = comentaron.results as { publicacion: string; autor: string }[]
   const autores = await miembros(env, [...filas.map((f) => f.autor), ...caras.map((c) => c.autor)])
   const leGustan = new Set((gustan.results as { publicacion: string }[]).map((g) => g.publicacion))
-  return filas.map((f) => ({
+  return filas.map((f) => {
+    const adjuntos = conUrls(env, f.adjuntos)
+    const suya = f.autor === yo.id || esCreador(yo)
+    const falta = f.categoria === 'estilos' && suya ? faltaEnEstilo(adjuntos, f.texto) : []
+    return {
     id: f.id,
     autor: autores.get(f.autor) ?? { id: f.autor, nombre: '' },
     categoria: f.categoria,
     titulo: f.titulo,
     texto: f.texto,
-    adjuntos: conUrls(env, f.adjuntos),
+    adjuntos: entera && suya ? adjuntos : adjuntos.map((a) => (a.prueba ? { ...a, prueba: { ...a.prueba, hilo: undefined, evidencia: undefined } } : a)),
     fijada: !!f.fijada,
     ...(f.estado ? { estado: f.estado } : {}),
     creada: f.creada,
@@ -519,8 +531,10 @@ export async function armar(env: Env, yo: Miembro, filas: Guardada[]): Promise<P
     ...(f.ultimo_comentario ? { ultimoComentario: f.ultimo_comentario } : {}),
     comentaron: caras.filter((c) => c.publicacion === f.id).flatMap((c) => autores.get(c.autor) ?? []),
     ...(esCreador(yo) && f.reportes ? { reportes: f.reportes } : {}),
-    ...(!f.aprobada ? { porAprobar: true as const } : {})
-  }))
+    ...(!f.aprobada ? { porAprobar: true as const } : {}),
+    ...(falta.length ? { incompleto: falta } : {})
+    }
+  })
 }
 
 export async function miembros(env: Env, ids: string[]): Promise<Map<string, Autor>> {
@@ -546,7 +560,7 @@ async function abrir(env: Env, yo: Miembro, id: string): Promise<{ publicacion: 
   const comentarios = (todos.results as unknown as ComentarioGuardado[]).filter((c) => laVe(c, yo))
   const leGustan = new Set((gustan.results as { comentario: string }[]).map((g) => g.comentario))
   const autores = await miembros(env, comentarios.map((c) => c.autor))
-  const [publicacion] = await armar(env, yo, [f])
+  const [publicacion] = await armar(env, yo, [f], true)
   return {
     publicacion,
     comentarios: comentarios
@@ -587,12 +601,14 @@ export function adjuntosDe(valor: unknown): Adjunto[] {
   if (!Array.isArray(valor)) return []
   const lista = valor.flatMap((a): Adjunto[] => {
     if (!a || typeof a !== 'object') return []
-    const { tipo, llave, poster, previa, vertical, nombre, de, guia } = a as Record<string, unknown>
+    const { tipo, llave, poster, previa, vertical, nombre, de, guia, prueba } = a as Record<string, unknown>
     if ((tipo !== 'imagen' && tipo !== 'video' && tipo !== 'estilo') || typeof llave !== 'string' || !LLAVE.test(llave)) return []
-    if ((tipo === 'imagen') !== IMAGEN.test(llave) || (tipo === 'estilo') !== ESTILO.test(llave)) return []
+    // El hilo de una prueba no es un adjunto: va dentro de la prueba de su estilo.
+    if ((tipo === 'imagen') !== IMAGEN.test(llave) || (tipo === 'estilo') !== ESTILO.test(llave) || HILO.test(llave)) return []
     if (tipo === 'estilo') {
       const g = guiaDe(guia)
-      return [{ tipo, llave, nombre: texto(nombre, 80) || 'Estilo', ...(typeof de === 'string' && ID.test(de) ? { de } : {}), ...(g ? { guia: g } : {}) }]
+      const p = pruebaDe(prueba)
+      return [{ tipo, llave, nombre: texto(nombre, 80) || 'Estilo', ...(typeof de === 'string' && ID.test(de) ? { de } : {}), ...(g ? { guia: g } : {}), ...(p ? { prueba: p } : {}) }]
     }
     return [
       {
@@ -611,8 +627,10 @@ export function adjuntosDe(valor: unknown): Adjunto[] {
 }
 
 /**
- * Un estilo va en Estilos, y en Estilos va siempre uno, con lo que hace (`texto`) y su guía de uso completa: la plantilla
- * de `shared/guia.ts`, la misma para todos, para que quien lo instala sepa cómo usarlo.
+ * Un estilo va en Estilos, y en Estilos va siempre uno, con lo que lleva todo estilo de la comunidad (`shared/guia.ts`,
+ * igual para todos): lo que hace (`texto`), su guía de uso completa, un video entero hecho con él y la prueba de con qué
+ * agente se hizo, cuánto costó y cuánto tardó. Los que ya estaban sin eso dejaron de verse (migración 0033) hasta que su
+ * autor los complete.
  */
 export function estiloEnSuSitio(categoria: CategoriaComunidad, adjuntos: Adjunto[], cuerpoTexto: string) {
   const estilo = adjuntos.find((a) => a.tipo === 'estilo')
@@ -621,8 +639,8 @@ export function estiloEnSuSitio(categoria: CategoriaComunidad, adjuntos: Adjunto
     return
   }
   if (!estilo) throw new Rechazo(400, 'En Estilos se comparte un estilo: elígelo con «Estilo», o usa «Compartir» en su card.')
-  const falta = cuerpoTexto ? faltaEnGuia(estilo.guia) : 'Qué hace'
-  if (falta) throw new Rechazo(400, `Para compartir un estilo hay que decir cómo se usa: falta «${falta}». Se llena con «Compartir» en su card; si tu Sloth no te lo pide, actualízala.`)
+  const falta = faltaEnEstilo(adjuntos, cuerpoTexto)
+  if (falta.length) throw new Rechazo(400, `Para compartir un estilo falta: ${falta.join('; ')}. Se llena con «Compartir» en su card; si tu Sloth no te lo pide, actualízala.`)
 }
 
 const llaveDelEstilo = (adjuntos: string) => (JSON.parse(adjuntos) as Adjunto[]).find((a) => a.tipo === 'estilo')?.llave
@@ -717,6 +735,13 @@ async function cambiar(env: Env, yo: Miembro, f: Guardada, c: Record<string, unk
   // Lo que se aprobó es ese paquete: otro (o el mismo, al pasar a Estilos) vuelve a esperar.
   const otroPaquete = nueva.categoria === 'estilos' && (f.categoria !== 'estilos' || llaveDelEstilo(nueva.adjuntos) !== llaveDelEstilo(f.adjuntos))
   if (otroPaquete && !creador) nueva.aprobada = 0
+  // Se aprueba el paquete que se revisó (`llave`, la que manda la revisión automática): si su autor ya puso otro, no.
+  if (c.aprobada && typeof c.llave === 'string' && llaveDelEstilo(nueva.adjuntos) !== c.llave) throw new Rechazo(409, 'El estilo cambió mientras se revisaba: se revisa de nuevo.')
+  // Ni el creador aprueba uno de otro al que le falta lo que lleva todo estilo: no sale en la tienda hasta que lo complete.
+  if (c.aprobada && nueva.categoria === 'estilos' && !suya) {
+    const falta = faltaEnEstilo(JSON.parse(nueva.adjuntos) as Adjunto[], nueva.texto)
+    if (falta.length) throw new Rechazo(409, `A este estilo le falta: ${falta.join('; ')}. Su autor lo completa con «Compartir».`)
+  }
   if (c.aprobada !== undefined) nueva.aprobada = c.aprobada ? 1 : 0
   if (nueva.categoria !== 'estilos') nueva.aprobada = 1
   await env.DB.batch([
@@ -941,12 +966,12 @@ export function creditos(env: Env): Promise<string[]> {
 }
 
 /** El tipo de un archivo y su llave nueva, si se acepta y no pesa de más. */
-function aceptar(contentType: string, bytes: number): { tipo: AdjuntoComunidad['tipo']; llave: string; contentType: string } {
+function aceptar(contentType: string, bytes: number): { tipo: AdjuntoComunidad['tipo'] | 'hilo'; llave: string; contentType: string } {
   const ct = contentType.split(';')[0].trim().toLowerCase()
   const t = TIPOS[ct]
   if (!t) throw new Rechazo(415, 'Solo se suben imágenes (PNG, JPG, WebP, GIF), videos (MP4, WebM, MOV) y estilos de Sloth.')
   if (!bytes) throw new Rechazo(411, 'Falta el tamaño del archivo.')
-  if (bytes > PESO[t.tipo]) throw new Rechazo(413, `${t.tipo === 'video' ? 'El video' : t.tipo === 'estilo' ? 'El estilo' : 'La imagen'} pesa más de ${pesoLegible(PESO[t.tipo])}.`)
+  if (bytes > PESO[t.tipo]) throw new Rechazo(413, `${t.tipo === 'video' ? 'El video' : t.tipo === 'estilo' ? 'El estilo' : t.tipo === 'hilo' ? 'El hilo de la prueba' : 'La imagen'} pesa más de ${pesoLegible(PESO[t.tipo])}.`)
   return { tipo: t.tipo, llave: `${letras(20).toLowerCase()}.${t.ext}`, contentType: ct }
 }
 const pesoLegible = (b: number) => `${b / 1024 ** 2} MB`
@@ -1022,14 +1047,20 @@ async function servirArchivo(req: Request, env: Env, llave: string): Promise<Res
     const yo = await quien(req, env)
     if (!apoya(yo) && !esDe(cabeza.customMetadata, yo.id)) throw new Rechazo(402, SOLO_APOYO)
   }
+  // El hilo donde se hizo el video de una prueba es de quien lo subió: lo leen él y el creador, nadie más.
+  const hilo = HILO.test(llave)
+  if (hilo) {
+    const yo = await quien(req, env)
+    if (!esCreador(yo) && !esDe(cabeza.customMetadata, yo.id)) throw new Rechazo(404, 'No existe')
+  }
   return servir(req, env, `comunidad/${llave}`, cabeza.size, {
-    'content-type': cabeza.httpMetadata?.contentType ?? 'application/octet-stream',
-    'cache-control': estilo ? 'private, no-store' : 'public, max-age=31536000, immutable'
+    'content-type': hilo ? 'application/json' : (cabeza.httpMetadata?.contentType ?? 'application/octet-stream'),
+    'cache-control': estilo || hilo ? 'private, no-store' : 'public, max-age=31536000, immutable'
   })
 }
 
 function llavesDe(adjuntos: string): string[] {
-  return (JSON.parse(adjuntos) as Adjunto[]).flatMap((a) => [a.llave, ...(a.poster ? [a.poster] : []), ...(a.previa ? [a.previa] : [])])
+  return (JSON.parse(adjuntos) as Adjunto[]).flatMap((a) => [a.llave, ...(a.poster ? [a.poster] : []), ...(a.previa ? [a.previa] : []), ...(a.prueba?.evidencia ? [a.prueba.evidencia] : [])])
 }
 
 async function quitarArchivos(env: Env, llaves: string[]) {

@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { extname } from 'node:path'
-import { query, type AgentDefinition, type McpServerStatus, type ModelInfo, type Query, type SDKMessage, type SDKUserMessage } from '@anthropic-ai/claude-agent-sdk'
+import { query, type AgentDefinition, type McpServerStatus, type ModelInfo, type Options, type Query, type SDKMessage, type SDKUserMessage } from '@anthropic-ai/claude-agent-sdk'
 import type { AgentEvent, Model, Tokens } from '../shared/types.ts'
 import { IMAGE_TYPES, Inbox, sinArrancar, stringify, type AgentOptions, type AgentRun, type SkillRef } from './agent.ts'
 import { herramientasIdeas } from './ideas/mcp.ts' // ideas
@@ -120,6 +120,20 @@ async function apagarServidores(run: Query, quitar: string[] | undefined) {
 }
 
 /**
+ * Quien lee algo ajeno (`AgentOptions.soloLeer`): solo Read, Grep y Glob, sin ningún MCP (ni los de Sloth ni los del
+ * usuario), sin subagentes y sin la configuración de ninguna carpeta: el CLAUDE.md o el `.claude/settings.json` que
+ * traiga lo que lee no se cargan. Si lo que lee intenta mandarlo, no tiene con qué escribir, ejecutar ni sacar nada.
+ */
+export const SOLO_LEER = {
+  tools: ['Read', 'Grep', 'Glob'],
+  disallowedTools: ['mcp__*'],
+  mcpServers: {},
+  strictMcpConfig: true,
+  settingSources: [],
+  agents: {}
+} satisfies Partial<Options>
+
+/**
  * Claude con el Agent SDK, como lo usa T3 Code: el mismo Claude Code, con tus skills, tu CLAUDE.md y sin pedir
  * permisos. Los mensajes del usuario entran por una cola, así la sesión sigue viva entre turnos.
  */
@@ -152,6 +166,7 @@ export function startClaude(opts: AgentOptions): AgentRun {
       // El navegador del agente, la voz de AI Studio, Google Flow y, en un canal de Ideas, sus herramientas (`parecidos`; en uno vertical,
       // también las de TikTok e Instagram): se suman a los MCP del usuario.
       mcpServers: { ...navegadorAgente(opts.lote, opts.hilo), ...mcpVoz(), ...mcpFlow(), ...herramientasIdeas(opts.cwd) },
+      ...(opts.soloLeer ? SOLO_LEER : {}),
       includePartialMessages: true,
       // Un subagente espera su sitio en la máquina antes de arrancar (`TOPE_AGENTES`). El que lanza otro subagente ya tiene
       // el suyo: si esperara, ninguno soltaría nada.

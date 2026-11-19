@@ -225,6 +225,8 @@
 .com-estado .com-ico { width: 14px; height: 14px; stroke-width: 3; }
 .com-estado.haciendo { color: var(--amber); }
 .com-estado.hecha { color: var(--ok); }
+/* A un estilo tuyo le falta algo para estar en la tienda. */
+.com-falta, .com-estado.com-falta { color: var(--bad); }
 
 .com-post-cuerpo { display: flex; gap: 16px; margin-top: 12px; }
 .com-post-textos { flex: 1; min-width: 0; }
@@ -288,7 +290,7 @@
 .com-instalar-texto { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .com-instalar-texto strong { font-size: 15px; overflow-wrap: anywhere; }
 .com-instalar-texto span { color: var(--com-suave); font-size: 14px; }
-.com-instalar-texto .com-instalar-error { color: var(--bad); }
+.com-instalar-texto .com-instalar-error, .com-instalar-texto .com-falta, .visor-instalar .com-falta { color: var(--bad); }
 
 /* Una publicación abierta, sobre un velo. */
 .com-velo { --com-suave: color-mix(in srgb, var(--muted) 55%, var(--text)); position: fixed; inset: 0; z-index: 70; display: grid; place-items: start center; padding: 40px 24px; overflow-y: auto; background: rgba(15, 14, 12, 0.72); backdrop-filter: blur(3px); animation: com-velo 0.15s ease-out; }

@@ -1,10 +1,10 @@
 import { type ReactNode, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { faltaEnGuia, guiaDe } from '../../shared/guia'
-import type { AdjuntoComunidad, Card, FeedComunidad, GuiaEstilo, PublicacionComunidad, VideoHecho } from '../../shared/types'
+import type { AdjuntoComunidad, Card, FeedComunidad, GuiaEstilo, PruebaEstilo, PublicacionComunidad, VideoHecho } from '../../shared/types'
 import { api, ErrorApi } from './api'
 import { abrirPublicacion } from './Comunidad'
-import { GuiaCampos } from './Guia'
+import { GuiaCampos, pruebaEnLinea } from './Guia'
 import { Icono } from './Iconos'
 import './Estilos.css'
 
@@ -28,6 +28,36 @@ export interface Instalado {
 /** Abre un borrador de esa card con el texto ya escrito, para revisarlo antes de mandarlo (lo atiende `App`). */
 export function abrirBorrador(cardId: string, texto: string) {
   dispatchEvent(new CustomEvent('sloth-borrador', { detail: { cardId, texto } }))
+}
+
+/** Abre ese hilo, desde cualquier parte de la app (lo atiende `App`). */
+export function abrirHilo(id: string) {
+  dispatchEvent(new CustomEvent('sloth-hilo', { detail: id }))
+}
+
+const INCOMPLETOS = 'estilos-incompletos'
+
+/**
+ * Cuántos estilos tuyos de la comunidad no salen en la tienda porque les falta algo de lo que lleva todo estilo
+ * (`PublicacionComunidad.incompleto`). Lo dice la tienda al cargar, o el aviso que te llega a la campana; se recuerda
+ * para pintar «Comunidad» en rojo en la barra (`App`) hasta que los completes.
+ */
+export function marcarIncompletos(n: number) {
+  try {
+    if (n) localStorage.setItem(INCOMPLETOS, String(n))
+    else localStorage.removeItem(INCOMPLETOS)
+  } catch {
+    // Sin almacenamiento: dura lo que la ventana.
+  }
+  dispatchEvent(new CustomEvent('sloth-estilos-incompletos', { detail: n }))
+}
+
+export function incompletosGuardados(): number {
+  try {
+    return Number(localStorage.getItem(INCOMPLETOS)) || 0
+  } catch {
+    return 0
+  }
 }
 
 /** Lo que se le pide a «Nuevo estilo» para que un estilo instalado use lo de esta versión de video-base. */
@@ -90,16 +120,30 @@ export function TrasInstalar({ r, onCerrar }: { r: Instalado; onCerrar(): void }
   )
 }
 
-/** Cómo va el paquete del estilo: se arma y se sube al abrir «Compartir», para saber antes de publicar si se puede. */
-type Paquete = { listo: AdjuntoComunidad } | { error: string; arreglable: boolean } | { sinCuenta: true } | null
+/**
+ * Cómo va el paquete del estilo: se arma y se sube al abrir «Compartir», para saber antes de publicar si se puede. Con
+ * él llega lo que conviene arreglar antes de mandarlo (`avisos`, de `avisosDe` en `server/estilos.ts`).
+ */
+type Paquete = { listo: AdjuntoComunidad & { avisos?: string[] } } | { error: string; arreglable: boolean } | { sinCuenta: true } | null
+
+/** En «Un video hecho con él», al poner al día uno ya compartido: se queda el que ya lleva su publicación. */
+const EL_MISMO = ':el-mismo'
 
 /**
  * «Compartir» de un estilo tuyo, en una sola pantalla y sin salir de donde estás (como «Publish to Community» de Figma):
  * ya trae su título, lo que hace, su último video (que sube entero) y su guía de uso si «Nuevo estilo» la dejó en su card; tú solo revisas y
  * publicas. La guía es la plantilla de `shared/guia.ts`, la misma para todos: sin ella completa no se publica. Al abrir se empaqueta y se sube, así lo
  * que impide compartirlo sale antes de escribir nada, con un botón para que «Nuevo estilo» lo arregle. Si aún no te
- * pusiste nombre en la comunidad, se pide aquí. Al terminar dice que está en revisión y que te llega un aviso cuando el
- * creador lo apruebe. Abajo, guardarlo como archivo para pasarlo a mano.
+ * pusiste nombre en la comunidad, se pide aquí. Abajo, guardarlo como archivo para pasarlo a mano.
+ *
+ * Lo que su autor ve de la revisión, que nadie tenga que explicarle:
+ * - Antes de publicar, lo que no cumple de lo que necesita todo estilo y Sloth comprueba solo (`avisos`,
+ *   `skills/video-base/ESTILO.md`): se arregla ahí mismo con «Nuevo estilo», o se manda igual y se lo piden.
+ * - Uno que ya compartiste desde aquí no hace otra publicación: se pone al día la misma (`anterior`), con lo que ya
+ *   decía, y se vuelve a revisar. Así se arregla lo que le faltaba sin perder sus comentarios ni sus números.
+ * - Su evidencia es el hilo completo de ese video, que lee el creador: sube al publicar, y solo si marca que lo comparte.
+ * - Al terminar, los pasos que siguen: Sloth lo lee solo (`server/estilos-revision.ts`); si le falta algo se lo dice en
+ *   su publicación, y si cumple todo se aprueba.
  */
 export function CompartirEstilo({ card, onCerrar }: { card: Card; onCerrar(): void }) {
   const [paquete, setPaquete] = useState<Paquete>(null)
@@ -116,10 +160,35 @@ export function CompartirEstilo({ card, onCerrar }: { card: Card; onCerrar(): vo
   const [error, setError] = useState('')
   const [hecha, setHecha] = useState<PublicacionComunidad | null>(null)
   const [archivo, setArchivo] = useState<{ ruta?: string; guardando?: boolean; error?: string }>({})
+  // La publicación donde ya lo compartiste desde aquí, si sigue en la comunidad: se pone al día esa.
+  const [anterior, setAnterior] = useState<PublicacionComunidad | null>(null)
+  const videoAnterior = anterior?.adjuntos.find((a) => a.tipo === 'video')
+  const pruebaAnterior = anterior?.adjuntos.find((a) => a.tipo === 'estilo')?.prueba
+  // La prueba del video elegido, que sale de su hilo: `undefined` mientras se mide; `null`, su hilo ya no está.
+  const [prueba, setPrueba] = useState<PruebaEstilo | null>()
+  // Su evidencia es el hilo completo de ese video: va solo si su autor marca que lo comparte.
+  const [acepto, setAcepto] = useState(false)
+
+  useEffect(() => {
+    api<{ publicacion?: PublicacionComunidad }>(`/api/comunidad/estilo/compartido?cardId=${encodeURIComponent(card.id)}&titulo=${encodeURIComponent(card.title)}`).then(
+      ({ publicacion: p }) => {
+        if (!p) return
+        // Lo que ya decía allá es lo último que revisaste: va eso, no lo de la card.
+        setAnterior(p)
+        setTitulo(p.titulo)
+        setTexto(p.texto)
+        const g = p.adjuntos.find((a) => a.tipo === 'estilo')?.guia
+        if (g) setGuia(g)
+        // Su video se queda si ya lleva su prueba; si no (uno de antes), hay que elegir uno con su hilo.
+        if (p.adjuntos.some((a) => a.tipo === 'video') && p.adjuntos.some((a) => a.prueba)) setVideo(EL_MISMO)
+      },
+      () => {}
+    )
+  }, [card.id])
 
   useEffect(() => {
     setPaquete(null)
-    api<AdjuntoComunidad>('/api/comunidad/estilo', { cardId: card.id }).then(
+    api<AdjuntoComunidad & { avisos?: string[] }>('/api/comunidad/estilo', { cardId: card.id }).then(
       (a) => setPaquete({ listo: a }),
       (e: unknown) =>
         setPaquete(e instanceof ErrorApi && e.status === 401 ? { sinCuenta: true } : { error: e instanceof Error ? e.message : String(e), arreglable: e instanceof ErrorApi && e.status === 400 })
@@ -130,14 +199,32 @@ export function CompartirEstilo({ card, onCerrar }: { card: Card; onCerrar(): vo
       (f) => setNombreActual(f.yo.nombre),
       () => setNombreActual(null)
     )
-    // Sus videos, del más nuevo al más viejo: el primero ya va elegido.
+    // Sus videos, del más nuevo al más viejo: el primero ya va elegido, salvo que su publicación ya lleve uno.
     api<VideoHecho[]>(`/api/cards/${card.id}/videos`).then(
-      (l) => (setVideos(l.slice(0, 4)), setVideo(l[0]?.ruta ?? null)),
+      (l) => (setVideos(l.slice(0, 4)), setVideo((v) => v ?? l[0]?.ruta ?? null)),
       () => setVideos([])
     )
   }, [card.id])
 
+  useEffect(() => {
+    if (!video) return setPrueba(null)
+    if (video === EL_MISMO) return setPrueba(pruebaAnterior ?? null)
+    let vivo = true
+    setPrueba(undefined)
+    api<PruebaEstilo>('/api/comunidad/estilo/prueba', { ruta: video }).then(
+      (medida) => {
+        if (!vivo) return
+        setPrueba(medida)
+        // Lo que se ve en su hilo ya va marcado; su autor añade lo que no deja rastro (su voz grabada) y quita lo que no.
+        setGuia((g) => ({ ...g, herramientas: g.herramientas?.length ? g.herramientas : medida.hilo?.usa, agentes: g.agentes?.length ? g.agentes : [medida.agente] }))
+      },
+      () => vivo && setPrueba(null)
+    )
+    return () => void (vivo = false)
+  }, [video, pruebaAnterior])
+
   const sinCuenta = !!paquete && 'sinCuenta' in paquete
+  const avisos = (paquete && 'listo' in paquete && paquete.listo.avisos) || []
   const sinGuia = faltaEnGuia(guia)
   const falta = !titulo.trim()
     ? 'Ponle un título.'
@@ -147,8 +234,16 @@ export function CompartirEstilo({ card, onCerrar }: { card: Card; onCerrar(): vo
         ? 'Di qué hace tu estilo.'
         : sinGuia
           ? `Falta «${sinGuia}»: es lo que lee quien lo instala.`
-          : ''
-  const puede = !!paquete && 'listo' in paquete && !falta && !publicando && nombreActual !== undefined
+          : !video
+            ? 'Elige un video hecho con este estilo: todo estilo se enseña con uno entero.'
+            : prueba === undefined
+              ? 'Midiendo lo que costó hacer ese video…'
+              : !prueba
+                ? 'De ese video ya no está el hilo donde se hizo, y de ahí sale su prueba. Elige otro.'
+                : !acepto
+                  ? 'Marca que compartes el hilo de ese video: es la evidencia de su prueba.'
+                  : ''
+  const puede = !!paquete && 'listo' in paquete && !falta && !!prueba && !publicando && nombreActual !== undefined
 
   async function publicar() {
     if (!paquete || !('listo' in paquete) || !puede) return
@@ -159,9 +254,14 @@ export function CompartirEstilo({ card, onCerrar }: { card: Card; onCerrar(): vo
         await api('/api/comunidad/perfil', { nombre: nombre.trim() })
         setNombreActual(nombre.trim())
       }
-      // El video sube al publicar, entero: en la tienda se ve completo. Comprimirlo y subirlo tarda un poco.
-      const adjuntos = [{ ...paquete.listo, guia: guiaDe(guia) }, ...(video ? [await api<AdjuntoComunidad>('/api/comunidad/video', { ruta: video, entero: true })] : [])]
-      const p = await api<PublicacionComunidad>('/api/comunidad/publicar', { categoria: 'estilos', titulo: titulo.trim(), texto: texto.trim(), adjuntos })
+      const { avisos: _, ...estilo } = paquete.listo
+      // El video sube al publicar, entero: en la tienda se ve completo. Comprimirlo y subirlo tarda un poco. Al poner al
+      // día uno ya compartido se quedan su video, si no eliges otro, y sus imágenes.
+      const suVideo = video === EL_MISMO ? videoAnterior : video ? await api<AdjuntoComunidad>('/api/comunidad/video', { ruta: video, entero: true }) : undefined
+      // Su evidencia, el hilo completo de ese video: sube ahora, que ya aceptó compartirlo. El del video que se queda ya está allá.
+      const evidencia = video && video !== EL_MISMO ? (await api<{ llave: string }>('/api/comunidad/estilo/evidencia', { ruta: video })).llave : prueba?.evidencia
+      const adjuntos = [{ ...estilo, guia: guiaDe(guia), prueba: { ...prueba, evidencia } }, ...(suVideo ? [suVideo] : []), ...(anterior?.adjuntos.filter((a) => a.tipo === 'imagen') ?? [])]
+      const p = await api<PublicacionComunidad>('/api/comunidad/estilo/publicar', { cardId: card.id, titulo: titulo.trim(), texto: texto.trim(), adjuntos })
       dispatchEvent(new Event('sloth-comunidad'))
       setHecha(p)
     } catch (e) {
@@ -183,7 +283,7 @@ export function CompartirEstilo({ card, onCerrar }: { card: Card; onCerrar(): vo
   if (hecha)
     return (
       <Modal
-        titulo={hecha.porAprobar ? 'Listo: tu estilo está en revisión' : 'Listo: tu estilo ya está en la comunidad'}
+        titulo={hecha.porAprobar ? (anterior ? 'Listo: tu versión nueva está en revisión' : 'Listo: tu estilo está en revisión') : 'Listo: tu estilo ya está en la comunidad'}
         onCerrar={onCerrar}
         acciones={
           <>
@@ -199,10 +299,28 @@ export function CompartirEstilo({ card, onCerrar }: { card: Card; onCerrar(): vo
         {hecha.porAprobar ? (
           <ol className="compartir-pasos">
             <li className="hecho">
-              <Icono de="palomita" className="icon-trazo" /> Publicaste «{hecha.titulo}». Por ahora solo lo ven tú y el creador de Sloth.
+              <Icono de="palomita" className="icon-trazo" />
+              <span>
+                <strong>{anterior ? 'Mandaste la versión nueva' : 'Publicado'}.</strong> Por ahora «{hecha.titulo}» solo lo ven tú y el creador de Sloth.
+              </span>
             </li>
             <li>
-              <Icono de="campana" className="icon-trazo" /> Cuando lo apruebe, te llega un aviso a la campana de Comunidad y todos lo pueden instalar. No hace falta que lo vuelvas a mandar.
+              <Icono de="escudo" className="icon-trazo" />
+              <span>
+                <strong>Sloth lo lee solo,</strong> contra lo que necesita todo estilo. No es al instante: puede tardar unas horas.
+              </span>
+            </li>
+            <li>
+              <Icono de="claqueta" className="icon-trazo" />
+              <span>
+                <strong>Si le falta algo,</strong> te lo dice en los comentarios de tu publicación. Lo arreglas y pulsas «Compartir» otra vez en su card: se pone al día esta misma publicación.
+              </span>
+            </li>
+            <li>
+              <Icono de="campana" className="icon-trazo" />
+              <span>
+                <strong>Si cumple todo, se aprueba</strong> y sale en la tienda para todos. Lo que añadas para conectarse a internet o lanzar otros programas lo aprueba el creador a mano. Todo te llega a la campana de Comunidad.
+              </span>
             </li>
           </ol>
         ) : (
@@ -213,7 +331,7 @@ export function CompartirEstilo({ card, onCerrar }: { card: Card; onCerrar(): vo
 
   return (
     <Modal
-      titulo={`Compartir «${card.title}»`}
+      titulo={anterior ? `Poner al día «${card.title}» en la comunidad` : `Compartir «${card.title}»`}
       ancho
       onCerrar={onCerrar}
       acciones={
@@ -233,17 +351,43 @@ export function CompartirEstilo({ card, onCerrar }: { card: Card; onCerrar(): vo
             </button>
           ) : (
             <button className="primary" disabled={!puede} title={falta || undefined} onClick={() => void publicar()}>
-              {publicando ? (video ? 'Subiendo el video entero…' : 'Publicando…') : !paquete ? 'Preparando…' : 'Publicar en la comunidad'}
+              {publicando ? (video && video !== EL_MISMO ? 'Subiendo el video entero…' : 'Publicando…') : !paquete ? 'Preparando…' : anterior ? 'Mandar la versión nueva' : 'Publicar en la comunidad'}
             </button>
           )}
         </>
       }
     >
-      <div className={`compartir-paquete${paquete && 'error' in paquete ? ' mal' : paquete && 'listo' in paquete ? ' bien' : ''}`}>
+      {anterior && (
+        <div className="compartir-anterior">
+          <span>
+            Ya lo compartiste: {anterior.porAprobar ? 'está en revisión' : 'está en la tienda'}. No se hace otra publicación: se pone al día esa misma, con sus comentarios, y se vuelve a revisar
+            {anterior.porAprobar ? '.' : '; mientras tanto deja de verse en la tienda.'}
+          </span>
+          <button className="ghost small" onClick={() => (abrirPublicacion(anterior.id), onCerrar())}>
+            Ver la publicación
+          </button>
+        </div>
+      )}
+      <div className={`compartir-paquete${paquete && 'error' in paquete ? ' mal' : avisos.length ? ' ojo' : paquete && 'listo' in paquete ? ' bien' : ''}`}>
         {!paquete ? (
           <>
             <span className="spinner" /> Revisando que tu estilo se pueda compartir…
           </>
+        ) : avisos.length ? (
+          <div>
+            <strong>Se puede mandar, pero así no se aprueba. Le falta esto:</strong>
+            <ul className="compartir-avisos">
+              {avisos.map((a) => (
+                <li key={a}>{conCodigo(a)}</li>
+              ))}
+            </ul>
+            <div className="compartir-arreglar">
+              <button className="primary" onClick={() => (abrirBorrador('nuevo-estilo', mejorar(card, avisos)), onCerrar())}>
+                Que «Nuevo estilo» lo arregle
+              </button>
+              <span>Es lo que Sloth comprueba solo de lo que necesita todo estilo. Si lo mandas así, te lo va a pedir.</span>
+            </div>
+          </div>
         ) : 'listo' in paquete ? (
           <>
             <Icono de="palomita" className="icon-trazo" /> Se puede compartir. Viajan su skill y su card; tus huellas, tu banco y tus poses se quedan aquí.
@@ -287,27 +431,43 @@ export function CompartirEstilo({ card, onCerrar }: { card: Card; onCerrar(): vo
           {/* La plantilla de uso: la misma para todos los estilos, para que quien lo instala sepa cómo usarlo. */}
           <div className="compartir-guia">
             <strong>Cómo se usa</strong>
-            <span>Lo lee quien lo instala, en la comunidad y bajo el nombre del estilo. Todos los estilos lo llevan.</span>
+            <span>Lo lee quien lo instala, en la comunidad y bajo el nombre del estilo. Es igual para todos los estilos y va completa.</span>
           </div>
           <GuiaCampos valor={guia} onCambio={setGuia} />
           <div className="compartir-video">
-            <span>Un video hecho con él · se sube entero, es lo que ven en la tienda</span>
+            <span>Un video entero hecho con él · es lo que ven en la tienda, y de su hilo sale su prueba</span>
             {videos === null ? (
               <p className="small">Buscando tus videos…</p>
-            ) : videos.length ? (
+            ) : videos.length || (videoAnterior && pruebaAnterior) ? (
               <div className="compartir-videos">
+                {/* El que ya lleva su publicación, si ya tiene su prueba: el de un estilo de antes no la tiene, y hay que elegir otro. */}
+                {videoAnterior && pruebaAnterior && (
+                  <button className={video === EL_MISMO ? 'on' : ''} title="El que ya lleva tu publicación" onClick={() => setVideo(EL_MISMO)}>
+                    {videoAnterior.posterUrl ? <img src={videoAnterior.posterUrl} alt="" /> : 'El de ahora'}
+                    {video === EL_MISMO && <Icono de="palomita" className="icon-trazo" />}
+                  </button>
+                )}
                 {videos.map((v) => (
                   <button key={v.ruta} className={video === v.ruta ? 'on' : ''} title={v.titulo} onClick={() => setVideo(v.ruta)}>
                     <img src={`${v.src}&cuadro`} alt="" />
                     {video === v.ruta && <Icono de="palomita" className="icon-trazo" />}
                   </button>
                 ))}
-                <button className={`sin${video === null ? ' on' : ''}`} onClick={() => setVideo(null)}>
-                  Sin video
-                </button>
               </div>
             ) : (
-              <p className="small">Aún no terminas un video con este estilo. Puedes publicarlo igual; con un video, más gente lo instala.</p>
+              <p className="small">Aún no terminas un video con este estilo. Haz uno y vuelve: todo estilo de la comunidad se enseña con un video entero y con lo que costó hacerlo.</p>
+            )}
+            {prueba && (
+              <div className="compartir-prueba">
+                <strong>{pruebaEnLinea(prueba)}</strong>
+                <span>Sale del hilo donde se hizo, no lo escribes tú.</span>
+                <label className="compartir-acepto">
+                  <input type="checkbox" checked={acepto} onChange={(e) => setAcepto(e.target.checked)} />
+                  <span>
+                    <strong>Comparto ese hilo completo como evidencia:</strong> lo que le escribí al agente, lo que contestó y lo que hizo en cada turno. Lo ven el creador de Sloth y yo, nadie más.
+                  </span>
+                </label>
+              </div>
             )}
           </div>
         </div>
@@ -323,6 +483,17 @@ const arreglar = (card: Card, error: string) =>
   [
     `Mi estilo «${card.title}» (la skill ${card.skill ?? card.id}) no se puede compartir en la comunidad. Sloth dice: ${error}`,
     'Arréglalo para que se pueda compartir sin cambiar lo que hace. Sigue «Compartir un estilo» de tu skill.'
+  ].join('\n\n')
+
+/** Un aviso, con lo que va entre acentos graves (un archivo, un campo) como código. */
+const conCodigo = (texto: string) => texto.split('`').map((t, i) => (i % 2 ? <code key={i}>{t}</code> : t))
+
+/** Lo que se le pide a «Nuevo estilo» con lo que Sloth avisó antes de compartirlo. */
+const mejorar = (card: Card, avisos: string[]) =>
+  [
+    `Antes de compartir mi estilo «${card.title}» (la skill ${card.skill ?? card.id}) en la comunidad, Sloth me avisó esto:`,
+    avisos.map((a) => `- ${a}`).join('\n'),
+    'Arréglalo sin cambiar lo que hace. Sigue «Compartir un estilo» de tu skill.'
   ].join('\n\n')
 
 /**

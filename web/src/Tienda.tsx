@@ -4,6 +4,8 @@ import type { AdjuntoComunidad, EstiloTienda, FondoComunidad, OrdenTienda, Prueb
 import { api } from './api'
 import { hace, ParaInstalar, Texto } from './Comunidad'
 import { Desplegable } from './Desplegable'
+import { marcarIncompletos } from './Estilos'
+import { VerEvidencia } from './Evidencia'
 import { GuiaVista } from './Guia'
 import { Icono, type NombreIcono } from './Iconos'
 import { PRINCIPIO, useMuroVivo } from './muroVivo'
@@ -80,6 +82,12 @@ export function Tienda(props: {
   useEffect(() => {
     if (tienda) anotarVistos(tienda.estilos.map((e) => e.publicacion.id))
   }, [tienda])
+  // Los tuyos a los que les falta algo de lo que lleva todo estilo. Lo que falta solo te llega de los tuyos; al creador
+  // le llega de todos, y a él no se le pinta. La barra lateral lo recuerda en rojo hasta que no quede ninguno.
+  const incompletos = useMemo(() => (creador ? [] : (tienda?.estilos ?? []).filter((e) => e.publicacion.incompleto)), [tienda, creador])
+  useEffect(() => {
+    if (tienda && !creador) marcarIncompletos(incompletos.length)
+  }, [tienda, creador, incompletos])
   const visibles = useMemo(() => enOrden(fichas.filter((x) => pasa(x, filtros)).map((x) => x.e), orden), [fichas, filtros, orden])
   const opciones = useMemo(() => opcionesDe(fichas, filtros), [fichas, filtros])
   const filtrando = hayFiltros(filtros)
@@ -116,6 +124,15 @@ export function Tienda(props: {
 
   return (
     <section className="tienda" aria-label="Tienda de estilos">
+      {/* A los tuyos que no salen en la tienda porque les falta algo de lo que lleva todo estilo: en rojo, con qué. */}
+      {incompletos.map(({ publicacion: p }) => (
+        <div key={p.id} className="tienda-falta" role="alert">
+          <span>
+            <strong>A tu estilo «{p.adjuntos.find((a) => a.tipo === 'estilo')?.nombre ?? p.titulo}» le falta:</strong> {p.incompleto!.join('; ')}. Mientras tanto no sale en la tienda ni suma en el fondo.
+          </span>
+          <button onClick={() => dispatchEvent(new Event('sloth-compartir-tuyo'))}>Completarlo</button>
+        </div>
+      ))}
       <div className="tienda-barra">
         <label className="tienda-buscar">
           <Icono de="buscar" />
@@ -501,7 +518,7 @@ function Portada({ e, orden, elegida, nuevo, onVer }: { e: EstiloTienda; orden: 
       <span className="muro-portada">
         {imagen ? <img src={imagen} alt="" loading="lazy" decoding="async" /> : video ? <video src={video.url} muted preload="metadata" /> : <Icono de="claqueta" />}
         {video && <video className="muro-vivo" data-src={video.previaUrl ?? video.url} data-tope={video.previaUrl ? undefined : PRINCIPIO} muted loop playsInline preload="none" />}
-        {p.porAprobar ? <span className="tienda-revision">En revisión</span> : nuevo && <span className="tienda-revision nuevo">Nuevo</span>}
+        {p.incompleto ? <span className="tienda-revision falta">Le falta completar</span> : p.porAprobar ? <span className="tienda-revision">En revisión</span> : nuevo && <span className="tienda-revision nuevo">Nuevo</span>}
       </span>
       <span className="muro-nombre">{nombreDe(e)}</span>
       <span className="muro-autor">{p.autor.nombre || 'alguien'}</span>
@@ -618,7 +635,8 @@ function Visor(props: {
         </div>
       )}
       {p.texto && <LoQueHace key={`hace:${p.id}`} texto={p.texto} />}
-      {estilo?.guia && <GuiaVista guia={estilo.guia} />}
+      {estilo?.guia && <GuiaVista guia={estilo.guia} prueba={estilo.prueba} />}
+                {estilo?.prueba && <VerEvidencia prueba={estilo.prueba} />}
       {props.onPruebas && (
         <button className="small tienda-pruebas-boton" onClick={props.onPruebas}>
           <Icono de="escudo" /> Revisar pruebas
