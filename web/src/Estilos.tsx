@@ -95,7 +95,7 @@ type Paquete = { listo: AdjuntoComunidad } | { error: string; arreglable: boolea
 
 /**
  * «Compartir» de un estilo tuyo, en una sola pantalla y sin salir de donde estás (como «Publish to Community» de Figma):
- * ya trae su título, lo que hace, su último video y su guía de uso si «Nuevo estilo» la dejó en su card; tú solo revisas y
+ * ya trae su título, lo que hace, su último video (que sube entero) y su guía de uso si «Nuevo estilo» la dejó en su card; tú solo revisas y
  * publicas. La guía es la plantilla de `shared/guia.ts`, la misma para todos: sin ella completa no se publica. Al abrir se empaqueta y se sube, así lo
  * que impide compartirlo sale antes de escribir nada, con un botón para que «Nuevo estilo» lo arregle. Si aún no te
  * pusiste nombre en la comunidad, se pide aquí. Al terminar dice que está en revisión y que te llega un aviso cuando el
@@ -159,8 +159,8 @@ export function CompartirEstilo({ card, onCerrar }: { card: Card; onCerrar(): vo
         await api('/api/comunidad/perfil', { nombre: nombre.trim() })
         setNombreActual(nombre.trim())
       }
-      // El video sube al publicar: solo sus primeros segundos, como en «Lo que hice».
-      const adjuntos = [{ ...paquete.listo, guia: guiaDe(guia) }, ...(video ? [await api<AdjuntoComunidad>('/api/comunidad/video', { ruta: video })] : [])]
+      // El video sube al publicar, entero: en la tienda se ve completo. Comprimirlo y subirlo tarda un poco.
+      const adjuntos = [{ ...paquete.listo, guia: guiaDe(guia) }, ...(video ? [await api<AdjuntoComunidad>('/api/comunidad/video', { ruta: video, entero: true })] : [])]
       const p = await api<PublicacionComunidad>('/api/comunidad/publicar', { categoria: 'estilos', titulo: titulo.trim(), texto: texto.trim(), adjuntos })
       dispatchEvent(new Event('sloth-comunidad'))
       setHecha(p)
@@ -233,7 +233,7 @@ export function CompartirEstilo({ card, onCerrar }: { card: Card; onCerrar(): vo
             </button>
           ) : (
             <button className="primary" disabled={!puede} title={falta || undefined} onClick={() => void publicar()}>
-              {publicando ? 'Publicando…' : !paquete ? 'Preparando…' : 'Publicar en la comunidad'}
+              {publicando ? (video ? 'Subiendo el video entero…' : 'Publicando…') : !paquete ? 'Preparando…' : 'Publicar en la comunidad'}
             </button>
           )}
         </>
@@ -291,7 +291,7 @@ export function CompartirEstilo({ card, onCerrar }: { card: Card; onCerrar(): vo
           </div>
           <GuiaCampos valor={guia} onCambio={setGuia} />
           <div className="compartir-video">
-            <span>Un video hecho con él</span>
+            <span>Un video hecho con él · se sube entero, es lo que ven en la tienda</span>
             {videos === null ? (
               <p className="small">Buscando tus videos…</p>
             ) : videos.length ? (

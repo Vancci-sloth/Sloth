@@ -5,6 +5,7 @@ import { NOMBRE_AGENTE, type Proveedor } from '../../shared/providers'
 import type { AdjuntoComunidad, AyudaMejora, OrigenMejora, VideoHecho, VideosDeTodos } from '../../shared/types'
 import { api } from './api'
 import { GuiaCampos } from './Guia'
+import { Desplegable } from './Desplegable'
 import { Icono as IconoBase, type NombreIcono } from './Iconos'
 import { MarcaAgente } from './Logos'
 import './Escribir.css'
@@ -14,7 +15,7 @@ import './Escribir.css'
  * (`PedirMejora.tsx`). Crece con el texto; Enter lo manda y Mayús+Enter es otra línea (en el título, Enter baja al texto).
  * Las capturas se pegan, se sueltan o se eligen, y suben a la comunidad en cuanto llegan (`/api/comunidad/archivo`); un
  * video se elige de «Mis videos» y suben sus primeros 5 segundos con su portada (`/api/comunidad/video`): el entero se
- * enlaza en el texto. En Estilos se elige además uno de tus estilos, que se empaqueta y sube (`/api/comunidad/estilo`),
+ * enlaza en el texto. El de un estilo (`conEstilo`) sube entero: es lo que se ve en la tienda. En Estilos se elige además uno de tus estilos, que se empaqueta y sube (`/api/comunidad/estilo`),
  * y bajo el texto va su guía de uso (`Guia.tsx`): sin la plantilla completa no se guarda.
  * «Ayúdame a decirlo» (el símbolo del agente) le pide al agente del hilo (sin hilo, Claude) que
  * entienda lo escrito y proponga cómo decirlo; desde un hilo, con lo que pasaba en él.
@@ -142,7 +143,7 @@ export function Escribir(props: {
   function elegirVideo(v: VideoHecho) {
     setEligiendo(false)
     setError('')
-    void conSubida(`${v.src}&cuadro`, api<AdjuntoComunidad>('/api/comunidad/video', { ruta: v.ruta }))
+    void conSubida(`${v.src}&cuadro`, api<AdjuntoComunidad>('/api/comunidad/video', { ruta: v.ruta, entero: !!props.conEstilo }))
   }
 
   const vacio = !titulo.trim() && !texto.trim() && !adjuntos.length
@@ -282,7 +283,7 @@ export function Escribir(props: {
             <div
               key={s.id}
               className={`esc-miniatura subiendo${s.poster ? ' video' : s.estilo ? ' estilo' : ''}`}
-              title={s.poster ? 'Subiendo sus primeros 5 segundos…' : s.estilo ? 'Empaquetando el estilo…' : 'Subiendo…'}
+              title={s.poster ? (props.conEstilo ? 'Subiendo el video entero…' : 'Subiendo sus primeros 5 segundos…') : s.estilo ? 'Empaquetando el estilo…' : 'Subiendo…'}
             >
               {s.poster && <img src={s.poster} alt="" />}
               {s.estilo && <span className="esc-estilo">Empaquetando…</span>}
@@ -345,11 +346,11 @@ export function Escribir(props: {
         />
         {props.conVideo && (
           <span className="esc-video">
-            <button className={`esc-adjuntar${eligiendo ? ' on' : ''}`} title="Los primeros 5 segundos de un video que hiciste con Sloth" onClick={() => setEligiendo(!eligiendo)}>
+            <button className={`esc-adjuntar${eligiendo ? ' on' : ''}`} title={props.conEstilo ? 'Un video que hiciste con este estilo: sube entero' : 'Los primeros 5 segundos de un video que hiciste con Sloth'} onClick={() => setEligiendo(!eligiendo)}>
               <Icono de="video" />
               <span>Video</span>
             </button>
-            {eligiendo && <MisVideosParaElegir onElegir={elegirVideo} onCerrar={() => setEligiendo(false)} />}
+            {eligiendo && <MisVideosParaElegir entero={props.conEstilo} onElegir={elegirVideo} onCerrar={() => setEligiendo(false)} />}
           </span>
         )}
         {props.conEstilo && <ElegirEstilo onElegir={(cardId) => (setError(''), void conSubida(undefined, api<AdjuntoComunidad>('/api/comunidad/estilo', { cardId }), true))} />}
@@ -386,22 +387,22 @@ function ElegirEstilo({ onElegir }: { onElegir(cardId: string): void }) {
     api<{ id: string; title: string }[]>('/api/estilos').then(setTuyos, () => setTuyos([]))
   }, [])
   return (
-    <label className="esc-adjuntar esc-elegir-estilo" title={tuyos?.length === 0 ? 'Aún no haces ningún estilo: créalo con «Nuevo estilo»' : 'Uno de tus estilos, para que otros lo instalen'}>
-      <Icono de="claqueta" />
-      <select value="" disabled={!tuyos?.length} onChange={(e) => e.target.value && onElegir(e.target.value)}>
-        <option value="">{tuyos?.length === 0 ? 'Sin estilos tuyos' : 'Estilo'}</option>
-        {tuyos?.map((t) => (
-          <option key={t.id} value={t.id}>
-            {t.title}
-          </option>
-        ))}
-      </select>
-    </label>
+    <Desplegable
+      className="esc-elegir-estilo"
+      nombre="Tus estilos"
+      titulo={tuyos?.length === 0 ? 'Aún no haces ningún estilo: créalo con «Nuevo estilo»' : 'Uno de tus estilos, para que otros lo instalen'}
+      icono={<Icono de="claqueta" />}
+      valor=""
+      vacio={tuyos?.length === 0 ? 'Sin estilos tuyos' : 'Estilo'}
+      disabled={!tuyos?.length}
+      opciones={(tuyos ?? []).map((t) => ({ value: t.id, label: t.title }))}
+      onCambio={onElegir}
+    />
   )
 }
 
 /** Los videos terminados, del más nuevo al más viejo, para elegir uno. */
-function MisVideosParaElegir({ onElegir, onCerrar }: { onElegir(v: VideoHecho): void; onCerrar(): void }) {
+function MisVideosParaElegir({ entero, onElegir, onCerrar }: { entero?: boolean; onElegir(v: VideoHecho): void; onCerrar(): void }) {
   const [videos, setVideos] = useState<VideoHecho[] | null>(null)
   const [error, setError] = useState('')
   const caja = useRef<HTMLDivElement>(null)
@@ -446,7 +447,7 @@ function MisVideosParaElegir({ onElegir, onCerrar }: { onElegir(v: VideoHecho): 
       {createPortal(
         <div ref={caja} className="esc-elegir" style={lugar} role="dialog" aria-label="Elige un video">
           <div className="esc-elegir-titulo">Tus videos</div>
-          <p className="esc-elegir-nota">Se suben sus primeros 5 segundos. Para enseñarlo entero, pega su enlace en el texto.</p>
+          <p className="esc-elegir-nota">{entero ? 'Se sube entero: es el que se ve en la tienda.' : 'Se suben sus primeros 5 segundos. Para enseñarlo entero, pega su enlace en el texto.'}</p>
           {error && <p className="esc-elegir-nada">{error}</p>}
           {videos === null && !error && <p className="esc-elegir-nada">Cargando…</p>}
           {videos?.length === 0 && <p className="esc-elegir-nada">Aún no terminas ningún video con Sloth.</p>}

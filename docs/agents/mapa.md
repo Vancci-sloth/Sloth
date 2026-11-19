@@ -149,11 +149,15 @@ Este es el mapa:
   `docs/agents/anuncios.md`. La rifa (`licencias/src/rifa.ts`): arriba de la comunidad «Participa en la rifa» (`Rifa.tsx`,
   solo quien usa Sloth gratis), en Administrador se arma y se sortea con la ruleta (`RifaAdmin.tsx`); el ganador recibe
   sus créditos de voz, un correo y el aviso a pantalla completa (`GanasteRifa.tsx`). Debajo, el fondo de la comunidad
-  (`licencias/src/fondo.ts`, `Fondo.tsx`, ADR 0019): la mitad de lo que cae por Stripe en el mes, sin IVA, en vivo, y el
+  (`licencias/src/fondo.ts`, `Fondo.tsx`, ADR 0019): la mitad de lo que cae por Stripe en el mes, sin IVA, en vivo (casi siempre un
+  renglón con la raya del reparto; en grande solo cuando trae noticia, `web/src/fondoNoticia.ts`), y el
   paso a paso para llevarse una parte con un estilo compartido. La sección Estilos es la tienda (`licencias/src/tienda.ts`,
-  `Tienda.tsx`): buscar, favoritos, más usados, y los números públicos de cada estilo con sus puntos del mes, que mide
-  la app (`server/estilos-usos.ts`). Los estilos son de quien apoya: a los demás, la tienda les enseña la invitación
-  a apoyar y el cobro no les entrega el paquete. Los ya instalados se cierran al acabarse el apoyo: la licencia firmada
+  `Tienda.tsx`): llega entera y se filtra en la app, al instante (`web/src/tiendaFiltros.ts`: buscador, temas que salen
+  del título y el texto de cada estilo, su forma, los nuevos para ti y el orden), un muro de portadas con la forma de cada video y, a la derecha (en el
+  sitio de la tarjeta de la comunidad), un visor fijo con el video entero del estilo elegido, Instalar y sus números
+  públicos con sus puntos del mes, que mide la app (`server/estilos-usos.ts`). El video de un estilo sube entero
+  (`calidadEntero` en `server/comunidad.ts`); los demás de la comunidad, sus primeros 5 segundos. La tienda la ve cualquiera; instalar es de quien apoya: a los demás,
+  «Instalar» les abre la invitación a apoyar (`ApoyarParaInstalar`) y el cobro no les entrega el paquete. Los ya instalados se cierran al acabarse el apoyo: la licencia firmada
   dice si su correo apoya hoy (`apoyaHoy`), `server/licencia.ts` lo mira (`sinApoyo`) y el servidor marca esas cards
   (`Card.bloqueada`: candado, sin videos nuevos, `SinApoyo.tsx`) hasta que vuelve a apoyar. El reparto (`licencias/src/reparto.ts`): participa quien pone su
   Binance ID (en el recuadro del fondo), el primero es el 1 de enero de 2027 y el creador cierra cada periodo y marca
@@ -201,7 +205,8 @@ Este es el mapa:
   `server/acceso.ts`: si Claude y Codex pagan con la suscripción o con una llave de API (Opciones → Agentes), guardada en
   `data/agentes.json`.
 - `web/src`: React. `api.ts` habla con el servidor; `eventos.ts` guarda los eventos fuera de `App`, `items.ts` los junta
-  en bloques y `Timeline.tsx` los dibuja; `Composer.tsx` es el campo de texto.
+  en bloques y `Timeline.tsx` los dibuja; `Composer.tsx` es el campo de texto. Un desplegable es siempre `Desplegable`
+  (`Desplegable.tsx`, sobre el `Picker` del compositor), nunca un `<select>`: un test lo para.
 - «Nuevo chat» (`NewSession` en `App.tsx`): los carteles de los estilos caben enteros en cualquier ventana
   (`encajar.ts`), `/` en el campo cambia de estilo (`menu-estilos.ts`), Alt+N (Cmd+N en Mac) o Ctrl+Mayús+O abren uno
   desde cualquier parte, y lo que llega del servidor arranca con lo último sabido (`recordado.ts`) para que nada salte.

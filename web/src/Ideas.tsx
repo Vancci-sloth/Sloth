@@ -44,6 +44,7 @@ import type {
   VideoYT
 } from '../../shared/types'
 import { api } from './api'
+import { Desplegable } from './Desplegable'
 import { Icon, type Choice } from './Composer'
 import { Confirm } from './Confirm'
 import { Logo } from './Logos'
@@ -1385,11 +1386,17 @@ function Outliers({
           />
         )}
         <span className="muted">Ordenar por</span>
-        <select value={orden} onChange={(e) => setOrden(e.target.value as typeof orden)}>
-          <option value="x">{vertical ? '× su cuenta' : '× su canal'}</option>
-          <option value="vistas">vistas</option>
-          <option value="fecha">más recientes</option>
-        </select>
+        <Desplegable
+          campo
+          nombre="Ordenar por"
+          valor={orden}
+          opciones={[
+            { value: 'x', label: vertical ? '× su cuenta' : '× su canal' },
+            { value: 'vistas', label: 'vistas' },
+            { value: 'fecha', label: 'más recientes' }
+          ]}
+          onCambio={(o) => setOrden(o as typeof orden)}
+        />
         <label title="Muchas vistas y casi ningún comentario (menos de 0,15 por mil). Puede ser publicidad pagada, o no">
           <input type="checkbox" checked={ocultarRaros} onChange={(e) => setOcultarRaros(e.target.checked)} /> Ocultar los de comentarios inusualmente bajos
         </label>

@@ -6,6 +6,7 @@ import type { BorradorYoutube, CatalogoYoutube, MiniaturaYoutube, VideoParaYoutu
 import { resumenRitmo } from '../../shared/ritmo'
 import { fechaLocalYoutube, fechasYoutube, type RitmoYoutube } from '../../shared/youtube-fechas'
 import { api } from './api'
+import { Desplegable } from './Desplegable'
 import './Youtube.css'
 import { YoutubeRecomendaciones } from './YoutubeRecomendaciones'
 import { YoutubeEliminar } from './YoutubeEliminar'
@@ -200,20 +201,27 @@ export function RevisionYoutube({ cardId, ruta, cerrar, onCambio }: { cardId?: s
       </header>
       <div className="youtube-revision-controles">
         <div className="youtube-herramientas">
-          <label>Agente y modelo para las recomendaciones<select aria-label="Agente y modelo para YouTube" value={agente.model} disabled={!modelos.length} onChange={(e) => elegirAgente(e.target.value, modelos.find((m) => m.id === e.target.value)?.defaultEffort)}>
-            <option value="">Elegir agente y modelo…</option>
-            {(['claude', 'codex'] as const).map((p) => <optgroup label={p === 'claude' ? 'Claude' : 'Codex'} key={p}>{modelos.filter((m) => proveedorDe(m.id) === p).map((m) => <option value={m.id} key={m.id}>{p === 'claude' ? 'Claude' : 'Codex'} · {m.label.replace(/^(?:Codex|Claude)(?:\s*·\s*|\s+)/, '')}</option>)}</optgroup>)}
-          </select></label>
-          {!!modelo?.efforts.length && <label>Esfuerzo<select aria-label="Esfuerzo para YouTube" value={agente.effort ?? ''} onChange={(e) => elegirAgente(agente.model, e.target.value)}>{modelo.efforts.map((e) => <option key={e} value={e}>{ESFUERZOS[e] ?? e}</option>)}</select></label>}
+          <label>Agente y modelo para las recomendaciones<Desplegable
+            campo
+            nombre="Agente y modelo para YouTube"
+            valor={agente.model}
+            vacio="Elegir agente y modelo…"
+            disabled={!modelos.length}
+            opciones={(['claude', 'codex'] as const)
+              .map((p) => ({ label: p === 'claude' ? 'Claude' : 'Codex', options: modelos.filter((m) => proveedorDe(m.id) === p).map((m) => ({ value: m.id, label: `${p === 'claude' ? 'Claude' : 'Codex'} · ${m.label.replace(/^(?:Codex|Claude)(?:\s*·\s*|\s+)/, '')}` })) }))
+              .filter((g) => g.options.length)}
+            onCambio={(id) => elegirAgente(id, modelos.find((m) => m.id === id)?.defaultEffort)}
+          /></label>
+          {!!modelo?.efforts.length && <label>Esfuerzo<Desplegable campo nombre="Esfuerzo para YouTube" valor={agente.effort ?? ''} opciones={modelo.efforts.map((e) => ({ value: e, label: ESFUERZOS[e] ?? e }))} onCambio={(e) => elegirAgente(agente.model, e)} /></label>}
           <span className="muted small">Tu elección se usa para título, miniatura y descripción, y se recuerda para la próxima vez.</span>
           {errorModelos && <p className="bad small">{errorModelos}</p>}
         </div>
         {!catalogo?.conexion.programar && catalogo && <p className="youtube-nota">Puedes guardar la revisión. Para programar, <a href="#/opciones" onClick={(e) => { e.preventDefault(); void cerrarGuardando(true) }}>vuelve a conectar YouTube en Opciones → Redes</a> y concede el permiso de editar las publicaciones.</p>}
-        <div className="youtube-herramientas"><label>Buscar<input aria-label="Buscar videos para YouTube" value={busqueda} onChange={(e) => setBusqueda(e.target.value)} placeholder="Título o estilo…" /></label><label>Ver<select aria-label="Filtrar publicaciones" value={filtro} onChange={(e) => setFiltro(e.target.value)}><option value="todos">Todos</option><option value="pendientes">Pendientes</option><option value="revisados">Revisados</option><option value="programados">Programados</option><option value="errores">Fallaron</option></select></label>
+        <div className="youtube-herramientas"><label>Buscar<input aria-label="Buscar videos para YouTube" value={busqueda} onChange={(e) => setBusqueda(e.target.value)} placeholder="Título o estilo…" /></label><label>Ver<Desplegable campo nombre="Filtrar publicaciones" valor={filtro} opciones={[{ value: 'todos', label: 'Todos' }, { value: 'pendientes', label: 'Pendientes' }, { value: 'revisados', label: 'Revisados' }, { value: 'programados', label: 'Programados' }, { value: 'errores', label: 'Fallaron' }]} onCambio={setFiltro} /></label>
           <button className="boton" disabled={ocupado} onClick={() => setElegidos(new Set(pendientes.map((v) => v.huella)))}>Seleccionar pendientes ({pendientes.length})</button>
           <button className="ghost" onClick={() => setElegidos(new Set())}>Quitar selección</button>
         </div>
-        <div className="youtube-herramientas">{ritmo === 'semana' && <label>Primera publicación<input aria-label="Primera publicación" type="datetime-local" value={inicio} onChange={(e) => setInicio(e.target.value)} /></label>}<label>Ritmo<select aria-label="Ritmo de publicación" value={ritmo} onChange={(e) => setRitmo(e.target.value as RitmoYoutube)}><option value="tuyo">Tu ritmo{catalogo ? `: ${resumenRitmo(catalogo.ritmo)}` : ''}</option><option value="semana">Lunes, miércoles y viernes</option><option value="manual">Fechas a mano</option></select></label>
+        <div className="youtube-herramientas">{ritmo === 'semana' && <label>Primera publicación<input aria-label="Primera publicación" type="datetime-local" value={inicio} onChange={(e) => setInicio(e.target.value)} /></label>}<label>Ritmo<Desplegable campo nombre="Ritmo de publicación" valor={ritmo} opciones={[{ value: 'tuyo', label: `Tu ritmo${catalogo ? `: ${resumenRitmo(catalogo.ritmo)}` : ''}` }, { value: 'semana', label: 'Lunes, miércoles y viernes' }, { value: 'manual', label: 'Fechas a mano' }]} onCambio={(r) => setRitmo(r as RitmoYoutube)} /></label>
           <button className="boton" disabled={ritmo === 'manual' || !seleccionados.length || ocupado || (ritmo === 'semana' && !inicio)} onClick={distribuir}>Asignar fechas a la selección</button><span className="muted small">Hora local · {Intl.DateTimeFormat().resolvedOptions().timeZone}</span>
         </div>
       </div>
@@ -232,7 +240,16 @@ export function RevisionYoutube({ cardId, ruta, cerrar, onCambio }: { cardId?: s
               <strong className="youtube-titulo-previa">{b.titulo || 'Título pendiente'}</strong>
               <span className="muted small">{v.estilo} · {Math.floor(v.duracion / 60)}:{String(Math.floor(v.duracion % 60)).padStart(2, '0')}</span>
               <div className="youtube-portada-acciones"><label className={`youtube-importar${cerrado ? ' desactivado' : ''}`}>{importando === v.huella ? 'Importando…' : 'Importar miniatura'}<input type="file" accept="image/png,image/jpeg" hidden disabled={cerrado || !!importando} onChange={(e) => { void importar(v, e.target.files?.[0]); e.target.value = '' }} /></label><button className="ghost" onClick={() => setPrevia({ src: v.src, video: true })}>Ver video</button></div>
-              {v.miniaturas.length > 0 && <select aria-label={`Miniatura para ${b.titulo}`} value={m?.ruta ?? ''} disabled={cerrado} onChange={(e) => { const m = v.miniaturas.find((m) => m.ruta === e.target.value); cambiar(v, { miniatura: m?.ruta, huellaMiniatura: m?.huella }) }}><option value="">Elegir miniatura…</option>{v.miniaturas.map((m) => <option key={m.ruta} value={m.ruta}>{m.nombre}</option>)}</select>}
+              {v.miniaturas.length > 0 && <Desplegable
+                campo
+                nombre={`Miniatura para ${b.titulo}`}
+                valor={m?.ruta ?? ''}
+                vacio="Elegir miniatura…"
+                disabled={cerrado}
+                // Como antes, la primera opción deja el video sin miniatura elegida.
+                opciones={[{ value: '', label: 'Sin miniatura' }, ...v.miniaturas.map((m) => ({ value: m.ruta, label: m.nombre }))]}
+                onCambio={(ruta) => { const m = v.miniaturas.find((m) => m.ruta === ruta); cambiar(v, { miniatura: m?.ruta, huellaMiniatura: m?.huella }) }}
+              />}
             </div>
             <fieldset className="youtube-publicacion-campos" disabled={cerrado}>
               <label>Título<input aria-label={`Título de ${v.titulo}`} value={b.titulo} maxLength={100} onChange={(e) => cambiar(v, { titulo: e.target.value })} /><span className="muted small">{[...b.titulo].length}/100</span></label>

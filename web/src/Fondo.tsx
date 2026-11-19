@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useState } from 'react'
-import type { FondoComunidad, MiFondo } from '../../shared/types'
+import { type ReactNode, useCallback, useEffect, useRef, useState } from 'react'
+import type { FondoComunidad, MiFondo, TiendaEstilos } from '../../shared/types'
 import { api } from './api'
+import { avanceDe, diasPara, guardarVisto, leerVisto, noticiaDe, subioDe, vistoDe } from './fondoNoticia'
 import { Icono } from './Iconos'
 import { dinero } from './Tienda'
 import './Fondo.css'
@@ -12,18 +13,32 @@ import './Fondo.css'
  * reparto es el 1 de enero de 2027 y junta lo que entra desde el 15 de noviembre (`desde`; lo de antes no cuenta), para
  * que haya tiempo de prepararse.
  *
+ * Casi siempre es un renglón: el monto sobre la raya del reparto, que va del día en que empieza a contar al día en que
+ * se reparte, y lo que subió desde que lo abriste. Un clic lo abre entero. Sale en grande solo cuando trae noticia
+ * (`fondoNoticia.ts`: la primera vez de cada reparto, un salto del monto, los últimos días) y al cerrarlo vuelve al
+ * renglón.
+ *
  * Participar es de quien quiera (`licencias/src/reparto.ts`): «¿Quieres participar?» abre el paso a paso (hacer un
  * estilo, compartirlo en Estilos, que otros lo usen y poner tu Binance ID, adonde se te paga). Quien ya participa ve
- * sus puntos, lo que lleva y sus partes de antes. Abajo, apoyar, que es lo que hace crecer el fondo.
+ * sus puntos, lo que lleva y sus partes de antes. «Cómo se cuentan los puntos» enseña las reglas del reparto, con lo que
+ * vale cada cosa (lo dice la tienda, `reglas`). Abajo, apoyar, que es lo que hace crecer el fondo.
  */
 const PAGINA = 'https://sloth.vancci.org'
 const dia = (iso: string) => new Intl.DateTimeFormat('es-MX', { day: 'numeric', month: 'long', timeZone: 'America/Mexico_City' }).format(new Date(iso))
+/** «15 nov», para los extremos de la raya. */
+const diaCorto = (iso: string) => new Intl.DateTimeFormat('es-MX', { day: 'numeric', month: 'short', timeZone: 'America/Mexico_City' }).format(new Date(iso)).replace('.', '')
 
 /** `onEstilos`: ir a la tienda de estilos (fuera de ella). */
 export function Fondo({ onEstilos }: { onEstilos?(): void }) {
   const [fondo, setFondo] = useState<FondoComunidad | null>(null)
   const [mio, setMio] = useState<MiFondo | null>(null)
-  const [abierto, setAbierto] = useState(false)
+  const [pasos, setPasos] = useState(false)
+  const [reglas, setReglas] = useState(false)
+  // Lo que viste la última vez que cerraste el recuadro, y si ahora va en grande: hasta que lo abres o lo cierras, lo
+  // decide si hay noticia al entrar (no a media visita, que sería abrirse solo mientras lees otra cosa).
+  const [visto, setVisto] = useState(leerVisto)
+  const [grande, setGrande] = useState<boolean | null>(null)
+  const alEntrar = useRef<boolean | null>(null)
 
   const cargar = useCallback(() => {
     void api<FondoComunidad>('/api/comunidad/fondo').then(setFondo, () => {})
@@ -36,18 +51,59 @@ export function Fondo({ onEstilos }: { onEstilos?(): void }) {
   }, [cargar])
 
   if (!fondo) return null
-  const dias = Math.max(1, Math.ceil((Date.parse(fondo.cierra) - Date.now()) / 86_400_000))
+  const ahora = Date.now()
+  alEntrar.current ??= !!noticiaDe(fondo, visto, ahora)
+  const dias = diasPara(fondo, ahora)
   const reparto = dia(fondo.cierra)
   const faltan = `Faltan ${dias} ${dias === 1 ? 'día' : 'días'}.`
+  const monto = fondo.montos.length ? fondo.montos.map(dinero).join(' + ') : '$0.00'
+  const subio = subioDe(fondo, visto)
+    .map((m) => `+${dinero(m)}`)
+    .join(' ')
+
+  function cerrar() {
+    if (!fondo) return
+    const v = vistoDe(fondo, Date.now())
+    guardarVisto(v)
+    setVisto(v)
+    setGrande(false)
+    setPasos(false)
+    setReglas(false)
+  }
+
+  if (!(grande ?? alEntrar.current))
+    return (
+      <button className="fondo-renglon" aria-expanded={false} title="El fondo de la comunidad: ver sus cuentas y cómo participar" onClick={() => setGrande(true)}>
+        {/* Solo «Fondo»: lo que quepa de más es de la raya. */}
+        <span className="fondo-renglon-nombre">
+          <Icono de="personas" /> <span>Fondo</span>
+        </span>
+        <Via fondo={fondo} ahora={ahora}>
+          <b className="fondo-renglon-monto">{monto}</b>
+          {subio && (
+            <span className="fondo-subio" title="Lo que subió desde la última vez que lo abriste">
+              {subio}
+            </span>
+          )}
+        </Via>
+        <span className="fondo-renglon-faltan">{faltan.replace('.', '').toLowerCase()}</span>
+        <Icono de="siguiente" />
+      </button>
+    )
 
   return (
     <section className="fondo" aria-labelledby="fondo-titulo">
       <p className="fondo-antetitulo">
         <Icono de="personas" /> Fondo de la comunidad · {fondo.primero ? 'primer reparto' : fondo.mes.replace(/ de \d+$/, '')}
         <span className="fondo-vivo">en vivo</span>
+        <button className="fondo-cerrar" title="Dejarlo en un renglón" aria-label="Cerrar el fondo" onClick={cerrar}>
+          <Icono de="cerrar" />
+        </button>
       </p>
       <h2 id="fondo-titulo">{fondo.primero ? 'Para el primer reparto, la comunidad lleva' : 'Este mes la comunidad se lleva'}</h2>
-      <p className="fondo-monto">{fondo.montos.length ? fondo.montos.map(dinero).join(' + ') : '$0.00'}</p>
+      <p className="fondo-monto">{monto}</p>
+      {subio && <p className="fondo-noticia">{subio} desde la última vez que lo viste</p>}
+      <Via fondo={fondo} ahora={ahora} />
       <p className="fondo-texto">
         {fondo.primero ? (
           <>
@@ -94,15 +150,18 @@ export function Fondo({ onEstilos }: { onEstilos?(): void }) {
 
       {mio && (mio.participa || mio.puntos > 0 || mio.partes.length > 0) && <Mio mio={mio} onCambio={setMio} />}
 
-      {!abierto ? (
-        !mio?.participa && (
-          <div className="fondo-acciones">
-            <button className="fondo-boton" onClick={() => setAbierto(true)}>
-              ¿Quieres participar? <Icono de="flecha" />
-            </button>
-          </div>
-        )
-      ) : (
+      <div className="fondo-acciones">
+        {!pasos && !mio?.participa && (
+          <button className="fondo-boton" onClick={() => setPasos(true)}>
+            ¿Quieres participar? <Icono de="flecha" />
+          </button>
+        )}
+        <button className="fondo-reglas-boton" aria-expanded={reglas} onClick={() => setReglas(!reglas)}>
+          <Icono de="pregunta" /> Cómo se cuentan los puntos
+        </button>
+      </div>
+      {reglas && <Reglas />}
+      {pasos && (
         <ol className="fondo-pasos">
           <li>
             <strong>Haz tu estilo</strong>
@@ -145,6 +204,54 @@ export function Fondo({ onEstilos }: { onEstilos?(): void }) {
         </button>
       </p>
     </section>
+  )
+}
+
+/**
+ * Las reglas del reparto: cuánto suma cada cosa y qué no cuenta. Lo que vale cada una lo dice la tienda (`reglas` en
+ * `/api/comunidad/estilos`): se pide al abrirlas, no antes.
+ */
+function Reglas() {
+  const [r, setR] = useState<TiendaEstilos['reglas'] | null>(null)
+  const [error, setError] = useState('')
+  useEffect(() => {
+    api<TiendaEstilos>('/api/comunidad/estilos').then(
+      (t) => setR(t.reglas),
+      (e: Error) => setError(e.message)
+    )
+  }, [])
+  if (error) return <p className="fondo-error">{error}</p>
+  if (!r) return <p className="fondo-reglas">Cargando…</p>
+  return (
+    <div className="fondo-reglas">
+      <p>
+        En cada reparto, cada estilo suma <b>{r.persona} puntos</b> por cada persona distinta que termina un video con él, <b>{r.video} punto</b> por cada video (hasta {r.tope}{' '}
+        por persona) y <b>{r.variante} puntos</b> por cada variante que otra persona comparte en la comunidad a partir de él. El fondo se reparte según los puntos entre
+        quienes pusieron su Binance ID: un estilo con la mitad de los puntos se lleva la mitad del fondo. Participar es opcional.
+      </p>
+      <p>
+        Para que sea justo con todos: lo que haces con tu propio estilo no cuenta, ni desde tus otras cuentas; varias computadoras en la misma conexión son una persona; una
+        cuenta suma videos si apoya a Sloth y después de sus primeros {r.dias} días, y cada video manda su portada como prueba, que solo ve el creador de Sloth y revisa antes
+        de pagar. Del video no sale nada más. Las descargas y los me gusta se ven, pero no dan puntos.
+      </p>
+    </div>
+  )
+}
+
+/**
+ * La raya del reparto: de cuándo empieza a contar a cuándo se reparte, llena hasta hoy. Sobre el día de hoy va lo que le
+ * pongan (en el renglón, el monto); sin nada, un punto.
+ */
+function Via({ fondo, ahora, children }: { fondo: FondoComunidad; ahora: number; children?: ReactNode }) {
+  const { desde, avance } = avanceDe(fondo, ahora)
+  return (
+    <span className="fondo-via">
+      <span>{diaCorto(desde)}</span>
+      <i className="fondo-via-hecho" style={{ flexGrow: avance }} />
+      {children ?? <i className="fondo-via-hoy" />}
+      <i className="fondo-via-falta" style={{ flexGrow: 100 - avance }} />
+      <span>{diaCorto(fondo.cierra)}</span>
+    </span>
   )
 }
 

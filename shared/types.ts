@@ -1223,6 +1223,12 @@ export interface AdjuntoComunidad {
   /** La portada de un video: su llave y su URL. */
   poster?: string
   posterUrl?: string
+  /**
+   * El adelanto del video de un estilo: mudo, chico y de unos segundos, con tramos de todo el video. Es lo que se mueve
+   * en el muro de la tienda (`web/src/Tienda.tsx`); sin él, se mueve el principio del video.
+   */
+  previa?: string
+  previaUrl?: string
   vertical?: boolean
 }
 
@@ -1415,8 +1421,8 @@ export interface TiendaEstilos {
   fondo: FondoComunidad | null
   /** Los puntos de los estilos que se llevan del fondo en este periodo. */
   puntos: number
-  /** A quien no apoya: la tienda está cerrada (solo ve sus estilos), y cuántos estilos hay dentro. */
-  cerrada?: { estilos: number }
+  /** A quien no apoya: ve la tienda entera, pero no instala; y cuántos estilos hay, para la invitación a apoyar. */
+  sinApoyo?: { estilos: number }
   /** Cuánto vale cada cosa, y los días que tiene que llevar una cuenta para que sus videos sumen. */
   reglas: { persona: number; video: number; tope: number; variante: number; dias: number }
 }

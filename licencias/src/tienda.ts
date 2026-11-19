@@ -17,9 +17,9 @@
  * - El creador ve las pruebas de cada estilo y descarta lo que no es de verdad (`/pruebas`, `/descartar`) antes de pagar.
  * - Solo cuentan los estilos aprobados, y los del creador de Sloth no se llevan del fondo. Tampoco los de quien no
  *   quiso participar (sin Binance ID, `reparto.ts`): sus puntos se ven, pero el fondo se reparte entre los demás.
- * - Los estilos son de quien apoya (`apoya` en `comunidad.ts`): solo quien apoya los ve, los instala y suma videos.
- *   Para que cada persona falsa cueste un apoyo de verdad. A los demás la tienda les dice cuántos hay (`cerrada`) y les
- *   enseña solo los suyos, que cualquiera puede compartir.
+ * - La tienda la ve cualquiera, pero instalar un estilo y sumarle videos es de quien apoya (`apoya` en
+ *   `comunidad.ts`): así cada persona falsa cuesta un apoyo de verdad. A quien no apoya la tienda se lo dice
+ *   (`sinApoyo`, con cuántos estilos hay), para que la app le enseñe la invitación a apoyar al querer instalar uno.
  *
  * Los puntos del periodo (`puntosDelMes`; un mes, y el primero junta dos: `periodoFondo`) son públicos: `PUNTOS.persona` por persona que terminó un video con él,
  * `PUNTOS.video` por video (hasta `PUNTOS.tope` por persona al mes) y `PUNTOS.variante` por variante aprobada ese mes.
@@ -227,16 +227,14 @@ export const olvidarNumeros = () => void (guardados = undefined)
 
 /**
  * `GET /comunidad/estilos`: los que `yo` puede ver (lo suyo por aprobar también), con sus números, buscados y ordenados.
- * A quien no apoya, solo los suyos, y cuántos hay (`cerrada`).
+ * A quien no apoya, los mismos, y que no los puede instalar (`sinApoyo`).
  */
 export async function tienda(env: Env, yo: Miembro, url: URL): Promise<TiendaEstilos> {
   const orden = (url.searchParams.get('orden') || 'favoritos') as OrdenTienda
   if (!ORDENES_TIENDA.includes(orden)) throw new Rechazo(400, 'Ese orden no existe.')
   const donde = ["categoria = 'estilos'"]
   const valores: (string | number)[] = []
-  const abierta = apoya(yo)
-  if (!abierta) donde.push('autor = ?'), valores.push(yo.id)
-  else if (!esCreador(yo)) donde.push('((reportes < ? AND aprobada = 1) OR autor = ?)'), valores.push(OCULTAR, yo.id)
+  if (!esCreador(yo)) donde.push('((reportes < ? AND aprobada = 1) OR autor = ?)'), valores.push(OCULTAR, yo.id)
   // Las palabras solo llevan letras y números (`palabrasDe`): ni `%` ni `_` llegan al LIKE.
   for (const p of palabrasDe(url.searchParams.get('q') ?? '')) {
     donde.push(`(${sinAcentos('titulo')} LIKE ? OR ${sinAcentos('texto')} LIKE ? OR ${sinAcentos('adjuntos')} LIKE ?)`)
@@ -281,7 +279,7 @@ export async function tienda(env: Env, yo: Miembro, url: URL): Promise<TiendaEst
     const y = clave(b)
     return x === y ? b.publicacion.creada.localeCompare(a.publicacion.creada) : x < y ? 1 : -1
   })
-  return { estilos, fondo: f, puntos: n.total, reglas: { ...PUNTOS, dias: ANTIGUEDAD / 86_400_000 }, ...(abierta ? {} : { cerrada: { estilos: n.estilos.size } }) }
+  return { estilos, fondo: f, puntos: n.total, reglas: { ...PUNTOS, dias: ANTIGUEDAD / 86_400_000 }, ...(apoya(yo) ? {} : { sinApoyo: { estilos: n.estilos.size } }) }
 }
 
 /** `POST /comunidad/estilos/uso`: lo que se hizo con estilos de la comunidad en la computadora de `yo`. */

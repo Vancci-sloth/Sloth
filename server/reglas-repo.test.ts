@@ -28,6 +28,16 @@ test('la interfaz no suma emojis', () => {
   }
 })
 
+/**
+ * Un `<select>` lo pinta el sistema: su lista sale blanca y con otra letra, y cada pantalla lo disfrazaba a su manera.
+ * Los desplegables son todos el mismo, `Desplegable` (`web/src/Desplegable.tsx`).
+ */
+test('la interfaz no usa el <select> del sistema: sus desplegables son `Desplegable`', () => {
+  const web = join(REPO, 'web', 'src')
+  for (const f of readdirSync(web).filter((f) => /\.tsx$/.test(f)))
+    assert.doesNotMatch(readFileSync(join(web, f), 'utf8'), /(?<!`)<(select|option|optgroup)[\s>]/, `web/src/${f} usa un <select> nativo: usa <Desplegable> de Desplegable.tsx`)
+})
+
 test('cada estilo dice su versión, y el que cambió a fondo, también la de antes', () => {
   const cards: Card[] = JSON.parse(readFileSync(join(REPO, 'cards.json'), 'utf8'))
   for (const card of cards.filter((c) => c.etapas)) {

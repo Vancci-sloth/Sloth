@@ -53,6 +53,8 @@ const TRAZOS = {
   // La biblioteca: copiar su nombre, el orden, pasar al de al lado y girarlo arrastrando.
   copiar: ['M10 8h10a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H10a2 2 0 0 1-2-2V10a2 2 0 0 1 2-2z', 'M4 16a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2'],
   ordenar: ['m21 16-4 4-4-4', 'M17 20V4', 'm3 8 4-4 4 4', 'M7 4v16'],
+  // Dos deslizadores, como el de «Opciones» de la barra: lo que se ajusta (el orden de la tienda).
+  filtros: ['M4 7h9', 'M17 7h3', 'M15 5a2 2 0 1 0 0 4 2 2 0 0 0 0-4z', 'M4 17h3', 'M11 17h9', 'M9 15a2 2 0 1 0 0 4 2 2 0 0 0 0-4z'],
   anterior: ['m15 18-6-6 6-6'],
   siguiente: ['m9 18 6-6-6-6'],
   girar: ['M3 12a9 3 0 0 0 18 0', 'M3 12a9 3 0 0 1 15.5-2.1', 'm16 7 2.5 2.9-3.3 1.6'],

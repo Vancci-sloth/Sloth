@@ -27,6 +27,11 @@ test('un solo video, a lo más diez adjuntos, y la portada solo si es una imagen
   assert.deepEqual(adjuntosDe([video, otro]), [video])
   assert.equal(adjuntosDe(Array.from({ length: 14 }, (_, i) => imagen(i))).length, 10)
   assert.deepEqual(adjuntosDe([{ ...video, poster: 'eeeeeeeeeeeeeeeeeeee.mp4' }]), [{ tipo: 'video', llave: video.llave, vertical: true }])
+  // El adelanto del video de un estilo es otro MP4 de la comunidad; lo que no lo sea, no se guarda.
+  assert.deepEqual(adjuntosDe([{ ...video, previa: 'dddddddddddddddddddd.mp4' }]), [{ ...video, previa: 'dddddddddddddddddddd.mp4' }])
+  assert.deepEqual(adjuntosDe([{ ...video, previa: 'dddddddddddddddddddd.webp' }]), [video])
+  assert.deepEqual(adjuntosDe([{ ...video, previa: 'https://otro.com/x.mp4' }]), [video])
+  assert.deepEqual(adjuntosDe([{ ...imagen(1), previa: 'dddddddddddddddddddd.mp4' }]), [imagen(1)])
 })
 
 test('un estilo es un paquete de la comunidad, uno solo, con su nombre, y va en Estilos', () => {
@@ -151,25 +156,24 @@ test('el índice del buscador trae lo que cada quien ve, sin lo oculto ni lo que
   assert.deepEqual(filas({ id: 'yo', creador: true }).map((f) => f.id), ['a', 'b', 'c'])
 })
 
-test('los estilos de otros no le salen a quien no apoya: ni en el feed, ni en el buscador, ni en su índice', () => {
+test('los estilos de otros le salen a cualquiera, apoye o no: en el feed, en el buscador y en su índice', () => {
   const db = new DatabaseSync(':memory:', COMO_D1)
   for (const m of ['0004_comunidad', '0009_comentarios_adjuntos', '0019_estilos', '0026_comunidad_recientes']) db.exec(readFileSync(new URL(`../migrations/${m}.sql`, import.meta.url), 'utf8'))
   const pub = db.prepare("INSERT INTO publicaciones (id, autor, categoria, titulo, texto, creada, actividad) VALUES (?, ?, ?, ?, '', ?, ?)")
   pub.run('g', 'ana', 'general', 'Hola receta', '2026-11-01', '2026-11-01')
   pub.run('e1', 'ana', 'estilos', 'Receta rápida', '2026-11-02', '2026-11-02')
   pub.run('e2', 'beto', 'estilos', 'Receta lenta', '2026-11-03', '2026-11-03')
-  const ver = (yo: { id: string; creador: boolean; apoya?: boolean }) => {
+  const ver = (yo: { id: string; creador: boolean }) => {
     const feed = consultaFeed(yo, { categoria: '', antes: '', orden: 'recientes' })
     const buscar = consultaBuscar(yo, 'receta')
     const indice = consultaIndice(yo)
     return [feed, buscar, indice].map((c) => (db.prepare(c.sql).all(...c.valores) as { id: string }[]).map((f) => f.id).sort().join())
   }
-  // Quien apoya y el creador, todo. Quien no, lo demás y sus propios estilos (compartir es de cualquiera).
-  assert.deepEqual(ver({ id: 'caro', creador: false, apoya: true }), ['e1,e2,g', 'e1,e2,g', 'e1,e2,g'])
+  // Las consultas ya no preguntan si apoyas: lo que es de quien apoya es instalarlos (el paquete, `servirArchivo`).
+  assert.deepEqual(ver({ id: 'caro', creador: false }), ['e1,e2,g', 'e1,e2,g', 'e1,e2,g'])
   assert.deepEqual(ver({ id: 'yo', creador: true }), ['e1,e2,g', 'e1,e2,g', 'e1,e2,g'])
-  assert.deepEqual(ver({ id: 'caro', creador: false, apoya: false }), ['g', 'g', 'g'])
-  assert.deepEqual(ver({ id: 'ana', creador: false }), ['e1,g', 'e1,g', 'e1,g'])
-  // Y la sección Estilos, vacía de lo ajeno.
+  assert.deepEqual(ver({ id: 'ana', creador: false }), ['e1,e2,g', 'e1,e2,g', 'e1,e2,g'])
+  // Y la sección Estilos, con los de todos.
   const estilos = consultaFeed({ id: 'caro', creador: false }, { categoria: 'estilos', antes: '', orden: '' })
-  assert.deepEqual(db.prepare(estilos.sql).all(...estilos.valores), [])
+  assert.deepEqual((db.prepare(estilos.sql).all(...estilos.valores) as { id: string }[]).map((f) => f.id).sort(), ['e1', 'e2'])
 })

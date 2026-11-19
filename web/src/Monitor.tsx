@@ -2,6 +2,7 @@ import { type ReactNode, useCallback, useEffect, useRef, useState, useSyncExtern
 import type { Avance, Card } from '../../shared/types'
 import type { Pasos } from './Etapas'
 import { Icono } from './Iconos'
+import { Desplegable } from './Desplegable'
 import { Segmento } from './Segmento'
 
 /**
@@ -400,14 +401,14 @@ export function Monitor({ m, escena, antes, despues, vertical, label, children }
           />
         )}
         {modo === 'render' && m.renders.length > 1 && (
-          <select className="monitor-cual" aria-label="Qué video se ve" value={render?.ruta} onChange={(e) => m.elegirRender(e.target.value)}>
-            {m.renders.map((v) => (
-              <option key={v.ruta} value={v.ruta}>
-                {v.ruta.split('/').pop()!.replace(/\.\w+$/, '')}
-                {v.vertical === undefined ? '' : v.vertical ? ' · vertical' : ' · horizontal'}
-              </option>
-            ))}
-          </select>
+          <Desplegable
+            campo
+            className="monitor-cual"
+            nombre="Qué video se ve"
+            valor={render?.ruta ?? ''}
+            opciones={m.renders.map((v) => ({ value: v.ruta, label: v.ruta.split('/').pop()!.replace(/\.\w+$/, ''), ...(v.vertical === undefined ? {} : { detalle: v.vertical ? 'vertical' : 'horizontal' }) }))}
+            onCambio={m.elegirRender}
+          />
         )}
         {modo === 'render' && render?.viejo && <span className="small render-viejo">Desactualizado: cambió {render.viejo.ruta}</span>}
         <button className={`transporte-boton ${m.silencio ? 'on' : ''}`} title={m.silencio ? 'Con sonido' : 'Sin sonido'} onClick={() => m.setSilencio(!m.silencio)}>

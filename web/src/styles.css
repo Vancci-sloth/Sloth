@@ -344,6 +344,17 @@ a.link-chip:hover { border-color: var(--amber); }
 .picker-option.on .picker-detalle { color: inherit; }
 .picker-detalle + svg { margin-left: -4px; }
 .picker-menu.down { bottom: auto; top: calc(100% + 8px); animation-name: drop; }
+/*
+ * El desplegable de toda la app (Desplegable.tsx): donde iría un <select>, que el sistema pinta a su manera. Toma la
+ * letra y el color de donde está; con `campo`, la cara de un campo de formulario.
+ */
+.desplegable { display: inline-flex; min-width: 0; }
+.desplegable > .picker-trigger { gap: 6px; max-width: 100%; height: auto; min-height: 28px; padding: 3px 6px 3px 8px; color: inherit; font: inherit; }
+.desplegable > .picker-trigger:disabled { opacity: 0.6; cursor: default; }
+.desplegable > .picker-trigger:focus-visible { outline: 1px solid var(--amber); outline-offset: 2px; }
+.desplegable-valor { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.desplegable.campo > .picker-trigger { width: 100%; min-height: 34px; justify-content: space-between; padding: 6px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--text); }
+.desplegable.campo > .picker-trigger:hover:not(:disabled), .desplegable.campo.open > .picker-trigger { border-color: var(--muted); background: var(--bg); }
 /* La lista de modelos dentro de Avanzado conserva el menú de Sloth y sale por encima de su panel. */
 .picker-menu.picker-flotante { position: fixed; margin: 0; min-width: 0; color: var(--text); }
 .modelos-selector > .picker-trigger { gap: 10px; padding: 0 8px 0 10px; height: 28px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel-2); color: var(--text); white-space: nowrap; }

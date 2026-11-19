@@ -23,8 +23,9 @@ import { redactar as redactarConAgente } from './redactar.ts'
  *
  * Aquí se queda lo que es de esta computadora:
  * - `POST /api/comunidad/archivo?tipo=<mime>`, con la imagen de cuerpo: la sube.
- * - `POST /api/comunidad/video` `{ruta}`: uno de «Mis videos». Sube solo sus primeros `SEGUNDOS`, con su primer cuadro
- *   de portada; quien quiera enseñarlo entero pega su enlace en el texto.
+ * - `POST /api/comunidad/video` `{ruta, entero?}`: uno de «Mis videos», con su primer cuadro de portada. Sube solo sus
+ *   primeros `SEGUNDOS` (quien quiera enseñarlo entero pega su enlace en el texto); el de un estilo (`entero`) sube
+ *   completo, comprimido para que quepa (`calidadEntero`): en la tienda se ve el video, no un adelanto.
  * - `POST /api/comunidad/redactar` `{texto, origen?}`: «Ayúdame a decirlo». El agente del hilo lee lo que escribiste (y lo que pasaba
  *   en el hilo de donde sale) y propone el texto (`AyudaMejora`).
  * - `POST /api/comunidad/estilo` `{cardId}`: empaqueta un estilo tuyo (`server/estilos.ts`) y lo sube. Da su adjunto, que
@@ -45,8 +46,31 @@ const NUBE = process.env.SLOTH_COBRO || COBRO
 const SIN_CONEXION = 'No hay conexión con la comunidad. Revisa tu internet e intenta otra vez.'
 const SIN_LICENCIA = 'Para entrar a la comunidad, crea tu cuenta gratis de Sloth.'
 const IMAGENES: Record<string, string> = { '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.gif': 'image/gif' }
-/** Lo que sube de un video: sus primeros segundos (lo dice también `web/src/Escribir.tsx`). */
+/** Lo que sube de un video fuera de Estilos: sus primeros segundos (lo dice también `web/src/Escribir.tsx`). */
 const SEGUNDOS = 5
+/**
+ * El adelanto del video de un estilo, lo que se mueve en el muro de la tienda: cuatro tramos de segundo y medio repartidos
+ * por el video, mudos y con 320 px de lado corto, como las previas de las cards (`server/previas.ts`). Pesa unos cientos
+ * de KB: con quince a la vista, el muro no ahoga la conexión ni la computadora de nadie.
+ */
+const TRAMOS = [0.1, 0.35, 0.6, 0.85]
+const TRAMO = 1.5
+const LADO_ADELANTO = 320
+/** Lo más que pesa el video entero de un estilo: bajo el tope de un video en el Worker (`PESO` en `licencias/src/comunidad.ts`). */
+const PESO_ENTERO = 45 * 1024 * 1024
+/** El video entero, cuando cabe holgado: 720 px de lado corto y hasta estos kbps (más `AUDIO`). Cabe así hasta unos 2:25. */
+const KBPS = 2500
+const AUDIO = 96
+
+/**
+ * Cómo se comprime el video entero de un estilo para que quepa en `PESO_ENTERO`: su tope de kbps y su lado corto, que
+ * baja cuando el video es largo (con pocos bits, un cuadro más chico se ve mejor). Sin duración, la calidad de siempre.
+ */
+export function calidadEntero(segundos: number | undefined): { lado: number; kbps: number } {
+  const cabe = segundos && segundos > 0 ? Math.floor((PESO_ENTERO * 8) / segundos / 1000) - AUDIO : KBPS
+  const kbps = Math.max(150, Math.min(KBPS, cabe))
+  return { lado: kbps >= 900 ? 720 : kbps >= 400 ? 480 : 360, kbps }
+}
 const execFileP = promisify(execFile)
 
 class Rechazo extends Error {
@@ -89,8 +113,8 @@ export function comunidad(app: string, o: Opciones) {
         method: init.metodo ?? (init.cuerpo === undefined ? 'GET' : 'POST'),
         headers: { ...quien, ...(init.cuerpo !== undefined ? { 'content-type': init.tipo ?? 'application/json' } : {}) },
         body: typeof init.cuerpo === 'object' ? new Uint8Array(init.cuerpo) : init.cuerpo,
-        // Un archivo tarda en subir.
-        signal: AbortSignal.timeout(typeof init.cuerpo === 'object' ? 120_000 : 30_000)
+        // Un archivo tarda en subir, y más el video entero de un estilo: dos minutos, más lo que tarde a 50 KB por segundo.
+        signal: AbortSignal.timeout(typeof init.cuerpo === 'object' ? 120_000 + Math.ceil(init.cuerpo.length / 50) : 30_000)
       })
     } catch {
       throw new Rechazo(502, SIN_CONEXION)
@@ -121,35 +145,83 @@ export function comunidad(app: string, o: Opciones) {
     return { p, llave, paquete }
   }
 
-  /** Los primeros `SEGUNDOS` de un video, en un MP4 que cualquier navegador reproduce y empieza a ver antes de bajarlo. */
-  async function recortar(ruta: string): Promise<Buffer> {
+  /**
+   * Un video en un MP4 que cualquier navegador reproduce y empieza a ver antes de bajarlo: sus primeros `SEGUNDOS` o,
+   * con `entero` (el de un estilo), todo, comprimido según lo que dura (`calidadEntero`).
+   */
+  async function recortar(ruta: string, entero?: { segundos?: number }): Promise<Buffer> {
     const tmp = join(tmpdir(), `sloth-comunidad-${randomUUID()}.mp4`)
+    const c = entero && calidadEntero(entero.segundos)
+    // El lado corto baja a `lado` (nunca sube) y los dos quedan pares, que es lo que pide H.264.
+    const imagen = c
+      ? ['-vf', `scale=w='if(lt(iw,ih),trunc(min(iw,${c.lado})/2)*2,-2)':h='if(lt(iw,ih),-2,trunc(min(ih,${c.lado})/2)*2)'`, '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '26', '-maxrate', `${c.kbps}k`, '-bufsize', `${c.kbps * 2}k`]
+      : ['-t', String(SEGUNDOS), '-vf', 'scale=trunc(iw/2)*2:trunc(ih/2)*2', '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '23']
     try {
       await execFileP(
         'ffmpeg',
-        ['-nostdin', '-v', 'error', '-y', '-i', ruta, '-t', String(SEGUNDOS), '-map', '0:v:0', '-map', '0:a:0?', '-vf', 'scale=trunc(iw/2)*2:trunc(ih/2)*2', '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '23', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '128k', '-movflags', '+faststart', tmp],
-        { timeout: 120_000, windowsHide: true }
+        ['-nostdin', '-v', 'error', '-y', '-i', ruta, '-map', '0:v:0', '-map', '0:a:0?', ...imagen, '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', c ? `${AUDIO}k` : '128k', '-movflags', '+faststart', tmp],
+        { timeout: entero ? 20 * 60_000 : 120_000, windowsHide: true }
       )
-      return readFileSync(tmp)
     } catch {
-      throw new Rechazo(500, 'No se pudo recortar el video.')
+      rmSync(tmp, { force: true })
+      throw new Rechazo(500, entero ? 'No se pudo preparar el video.' : 'No se pudo recortar el video.')
+    }
+    try {
+      const b = readFileSync(tmp)
+      // Solo pasa con un video de más de media hora: ni con la calidad más baja cabe.
+      if (entero && b.length > PESO_ENTERO * 1.1) throw new Rechazo(413, 'Ese video es muy largo para subirlo entero. Elige uno más corto de este estilo.')
+      return b
     } finally {
       rmSync(tmp, { force: true })
     }
   }
 
-  /** Uno de «Mis videos»: sus primeros segundos, con su portada: el primer cuadro (en un vertical, su portada de verdad). */
-  async function subirVideo(ruta: string): Promise<AdjuntoComunidad> {
+  /** El adelanto de un video (`TRAMOS`). Uno corto, o del que no se sabe cuánto dura, da sus primeros segundos. */
+  async function adelanto(ruta: string, segundos?: number): Promise<Buffer> {
+    const tmp = join(tmpdir(), `sloth-comunidad-${randomUUID()}.mp4`)
+    const inicios = segundos && segundos >= 8 ? TRAMOS.map((f) => f * segundos) : [0]
+    const largo = inicios.length > 1 ? TRAMO : TRAMOS.length * TRAMO
+    const escala = `scale=${LADO_ADELANTO}:${LADO_ADELANTO}:force_original_aspect_ratio=increase:force_divisible_by=2,fps=24,setsar=1`
+    const filtro = `${inicios.map((_, i) => `[${i}:v]${escala}[v${i}]`).join(';')};${inicios.map((_, i) => `[v${i}]`).join('')}concat=n=${inicios.length}:v=1:a=0[clip]`
+    try {
+      await execFileP(
+        'ffmpeg',
+        ['-nostdin', '-v', 'error', '-y', ...inicios.flatMap((s) => ['-ss', s.toFixed(2), '-t', String(largo), '-i', ruta]), '-filter_complex', filtro, '-map', '[clip]', '-an', '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '30', '-pix_fmt', 'yuv420p', '-movflags', '+faststart', tmp],
+        { timeout: 120_000, windowsHide: true }
+      )
+      return readFileSync(tmp)
+    } finally {
+      rmSync(tmp, { force: true })
+    }
+  }
+
+  /**
+   * Uno de «Mis videos», con su portada: el primer cuadro (en un vertical, su portada de verdad). Sus primeros segundos
+   * o, si es el de un estilo, entero y con su adelanto para el muro; si el adelanto falla, va sin él.
+   */
+  async function subirVideo(ruta: string, entero = false): Promise<AdjuntoComunidad> {
     const v = o.video(ruta)
     if (!v || !existsSync(ruta)) throw new Rechazo(404, 'Ese video ya no está.')
-    const [video, poster] = await Promise.all([
-      recortar(ruta).then((b) => subir(b, 'video/mp4')),
+    const [video, previa, poster] = await Promise.all([
+      recortar(ruta, entero ? { segundos: v.segundos } : undefined).then((b) => subir(b, 'video/mp4')),
+      entero
+        ? adelanto(ruta, v.segundos)
+            .then((b) => subir(b, 'video/mp4'))
+            .catch(() => undefined)
+        : undefined,
       o
         .cuadro(ruta)
         .then((c) => (c ? subir(readFileSync(c), 'image/webp') : undefined))
         .catch(() => undefined)
     ])
-    return { tipo: 'video', llave: video.llave, url: video.url, ...(poster ? { poster: poster.llave, posterUrl: poster.url } : {}), ...(v.vertical !== undefined ? { vertical: v.vertical } : {}) }
+    return {
+      tipo: 'video',
+      llave: video.llave,
+      url: video.url,
+      ...(poster ? { poster: poster.llave, posterUrl: poster.url } : {}),
+      ...(previa ? { previa: previa.llave, previaUrl: previa.url } : {}),
+      ...(v.vertical !== undefined ? { vertical: v.vertical } : {})
+    }
   }
 
   /** Las imágenes de `data/attachments` (las que pega el agente o un hilo), subidas. */
@@ -248,7 +320,10 @@ export function comunidad(app: string, o: Opciones) {
         const { p, paquete } = await estiloDe(String((await cuerpo<{ publicacion?: string }>(req)).publicacion ?? ''))
         return enviar(res, 200, o.revisar(paquete, p.id))
       }
-      if (ruta === '/api/comunidad/video' && metodo === 'POST') return enviar(res, 200, await subirVideo(String((await cuerpo<{ ruta?: string }>(req)).ruta ?? '')))
+      if (ruta === '/api/comunidad/video' && metodo === 'POST') {
+        const c = await cuerpo<{ ruta?: string; entero?: boolean }>(req)
+        return enviar(res, 200, await subirVideo(String(c.ruta ?? ''), c.entero === true))
+      }
       if (ruta === '/api/comunidad/redactar' && metodo === 'POST') {
         const { texto, origen } = await cuerpo<{ texto?: string; origen?: unknown }>(req)
         try {

@@ -25,11 +25,9 @@
 .m3d-tipos button.on { color: var(--amber-2); border-bottom-color: var(--amber); }
 .m3d-tipos button:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; border-radius: 4px; }
 .m3d-tipos button span { font-size: 14.5px; font-weight: 500; font-variant-numeric: tabular-nums; color: var(--suave); }
-.m3d-orden { flex-shrink: 0; display: inline-flex; align-items: center; gap: 6px; margin-bottom: 5px; padding: 4px 8px; border-radius: 10px; color: var(--suave); font-size: 14.5px; font-weight: 600; cursor: pointer; transition: color 0.15s, background 0.15s; }
-.m3d-orden:hover { color: var(--text); background: var(--panel); }
+.m3d-orden { flex-shrink: 0; margin-bottom: 5px; color: var(--suave); font-size: 14.5px; font-weight: 600; }
+.m3d-orden > .picker-trigger { padding: 4px 8px; border-radius: 10px; }
 .m3d-orden svg { width: 15px; height: 15px; }
-.m3d-orden select { appearance: none; padding: 0; border: 0; outline: none; background: none; color: inherit; font: inherit; cursor: pointer; }
-.m3d-orden select option { background: var(--panel); color: var(--text); }
 .m3d-pista { color: var(--suave); }
 /* Los atajos, a la vista en la cabeza (en angosto, sin teclado, no se dicen). */
 .m3d-teclas { color: var(--suave); }

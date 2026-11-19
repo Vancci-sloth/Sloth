@@ -1,4 +1,23 @@
 /* El fondo de la comunidad (Fondo.tsx): un panel con borde ámbar, para no competir con el bloque de la rifa. */
+/* Casi siempre, un renglón: su nombre, la raya del reparto con el monto sobre el día de hoy, y cuánto falta. */
+.fondo-renglon { display: flex; align-items: center; gap: 14px; width: 100%; padding: 10px 16px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); color: var(--muted); font-size: 12.5px; font-weight: 650; text-align: left; white-space: nowrap; }
+.fondo-renglon:hover { border-color: color-mix(in srgb, var(--amber) 55%, var(--line)); color: var(--suave); }
+.fondo-renglon > .ico, .fondo-renglon-nombre .ico { flex: none; width: 15px; height: 15px; }
+.fondo-renglon-nombre { display: inline-flex; align-items: center; gap: 7px; color: var(--amber); font-weight: 750; letter-spacing: 0.08em; text-transform: uppercase; }
+.fondo-renglon-monto { color: var(--amber-2); font-size: 17px; font-weight: 850; letter-spacing: -0.02em; }
+.fondo-subio { color: var(--ok); font-weight: 750; }
+.fondo-via { display: flex; flex: 1; align-items: center; gap: 8px; min-width: 0; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.fondo-via i { flex-basis: 0; min-width: 0; height: 3px; border-radius: 2px; }
+.fondo-via-hecho { background: var(--amber); }
+.fondo-via-falta { background: var(--line); }
+.fondo-via i.fondo-via-hoy { flex: none; width: 9px; height: 9px; border-radius: 50%; background: var(--amber); }
+.fondo .fondo-via { flex: none; max-width: 620px; color: var(--muted); font-size: 12.5px; font-weight: 650; }
+.fondo-noticia { margin: 0; color: var(--ok); font-size: 14px; font-weight: 750; font-variant-numeric: tabular-nums; }
+.fondo-cerrar { display: grid; place-items: center; width: 28px; height: 28px; margin: -6px -8px -6px 0; border-radius: 8px; background: none; color: var(--muted); }
+.fondo-cerrar:hover { background: var(--panel-2); color: var(--text); }
+@media (max-width: 760px) {
+  .fondo-renglon-nombre span, .fondo-renglon-faltan { display: none; }
+}
 .fondo { display: flex; flex-direction: column; gap: 10px; padding: 24px 28px; border: 1px solid var(--amber); border-radius: 16px; background: linear-gradient(135deg, var(--amber-tinte), transparent 70%), var(--panel); }
 .fondo-antetitulo { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin: 0; color: var(--amber); font-size: 12.5px; font-weight: 750; letter-spacing: 0.08em; text-transform: uppercase; }
 .fondo-antetitulo .ico { width: 16px; height: 16px; }
@@ -6,7 +25,15 @@
 .fondo h2 { margin: 2px 0 0; color: var(--suave); font-size: 16px; font-weight: 650; }
 .fondo-monto { margin: 0; color: var(--amber-2); font-size: 44px; font-weight: 850; line-height: 1; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 .fondo-texto { margin: 0; max-width: 620px; color: var(--text); font-size: 14.5px; line-height: 1.5; }
-.fondo-acciones { margin-top: 4px; }
+.fondo-acciones { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 20px; margin-top: 4px; }
+/* Cómo se cuentan los puntos: una pregunta que abre las reglas del reparto. */
+.fondo-reglas-boton { display: inline-flex; align-items: center; gap: 6px; padding: 0; background: none; color: var(--suave); font-size: 13.5px; font-weight: 600; }
+.fondo-reglas-boton:hover { color: var(--text); }
+.fondo-reglas-boton .ico { width: 15px; height: 15px; }
+.fondo-reglas { max-width: 720px; margin: 0; padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel-2); color: var(--suave); font-size: 13.5px; line-height: 1.55; }
+.fondo-reglas p { margin: 0; }
+.fondo-reglas p + p { margin-top: 8px; }
+.fondo-reglas b { color: var(--amber-2); }
 .fondo-boton { display: inline-flex; align-items: center; gap: 10px; padding: 12px 22px; border-radius: 12px; background: var(--amber); color: var(--sobre-ambar); font-size: 15px; font-weight: 800; transition: transform 0.12s ease; }
 .fondo-boton:hover { transform: translateY(-2px); }
 .fondo-boton .ico { width: 18px; height: 18px; }

@@ -25,9 +25,10 @@ y no medía nada de lo que se hace con un estilo compartido (ADR 0017).
 - **El creador cierra cada periodo en Administrador → Fondo** (`web/src/FondoAdmin.tsx`), cuando ya terminó y después
   de revisar las pruebas. Al cerrar queda una foto: el fondo, los puntos y el Binance ID de ese momento. Paga cada parte
   y la marca con su referencia, que le avisa por correo a quien cobró.
-- **Los estilos de la comunidad son de quien apoya.** A quien no apoya, la sección Estilos le dice cuántos hay y lo que
-  recibe quien apoya, con el botón para apoyar; no ve los estilos de otros en el feed ni en el buscador, no se le abre
-  su publicación y el cobro no le entrega el paquete. Compartir un estilo sí es de cualquiera, y cada quien ve los suyos.
+- **Los estilos de la comunidad los ve cualquiera; instalarlos es de quien apoya** (desde el 19 de noviembre de 2026).
+  Quien no apoya recorre la tienda entera, con el video y los números de cada estilo, y los ve en el feed y en el
+  buscador; al pulsar «Instalar» le sale la invitación a apoyar, y el cobro no le entrega el paquete. Antes no veía
+  nada: la sección solo le decía cuántos había, y no sabía qué se perdía. Compartir un estilo sigue siendo de cualquiera.
 - **Los puntos de cada estilo son públicos** y se reparten por partes (`licencias/src/tienda.ts`, `PUNTOS`): 3 por
   persona distinta que termina un video con él, 1 por video (hasta 10 por persona al mes) y 10 por variante aprobada de
   otra persona. Las descargas y los me gusta se ven, pero no dan puntos: se inflan fácil.

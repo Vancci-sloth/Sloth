@@ -73,7 +73,8 @@
 .transporte-velocidad button { padding: 2px 7px; border-radius: 6px; font-size: 11.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
 .transporte-velocidad button:hover { color: var(--text); }
 .transporte-velocidad button.on { background: var(--line); color: var(--text); }
-.monitor-cual { padding: 3px 6px; border-radius: 7px; background: var(--panel-2); border: 1px solid var(--line); font-size: 12.5px; }
+.monitor-cual { font-size: 12.5px; }
+.monitor-cual.campo > .picker-trigger { min-height: 26px; padding: 3px 6px 3px 8px; border-radius: 7px; background: var(--panel-2); }
 /* El render quedó viejo: cambió una de sus entradas después de él. */
 .render-viejo { color: var(--amber-2); }
 

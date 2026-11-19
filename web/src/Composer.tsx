@@ -368,7 +368,8 @@ function TokensDelChat({ g }: { g: Resumen }) {
 /**
  * Un desplegable con la cara de la app, en vez del nativo: el del sistema no se deja pintar. Se abre hacia arriba
  * (el compositor suele vivir abajo), salvo que arriba no quepa: en «Nuevo chat» el compositor está cerca del borde.
- * Se cierra al elegir, al hacer clic fuera o con Escape. También lo usa Opciones → Redes.
+ * Se cierra al elegir, al hacer clic fuera o con Escape. También lo usa Opciones → Redes. Donde antes iba un
+ * `<select>`, se usa a través de `Desplegable.tsx`, que le pone el valor elegido de etiqueta.
  */
 export function Picker(props: {
   label: ReactNode
@@ -379,6 +380,11 @@ export function Picker(props: {
   flotante?: boolean
   value: string
   disabled?: boolean
+  /** En una página, no en el compositor: se abre hacia abajo si cabe, y su lista es al menos tan ancha como el botón. */
+  abajo?: boolean
+  /** Qué se elige, para quien no ve; y la ayuda al pasar el ratón. */
+  nombre?: string
+  titulo?: string
   /** `detalle` va a la derecha de la opción, apagado (lo que cuesta y tarda cada modelo). */
   groups: { label: string; options: { value: string; label: string; detalle?: string }[] }[]
   onChange(value: string): void
@@ -394,8 +400,8 @@ export function Picker(props: {
       const r = root.current.getBoundingClientRect()
       const above = r.top - 16
       const below = innerHeight - r.bottom - 16
-      const down = above < 360 && below > above
-      const width = Math.min(props.menuWidth ?? 280, innerWidth - 24)
+      const down = props.abajo ? below >= 220 || below > above : above < 360 && below > above
+      const width = Math.min(props.menuWidth ?? (props.abajo ? Math.max(220, r.width) : 280), innerWidth - 24)
       setPlace({ down, max: Math.max(0, Math.min(360, down ? below : above)), left: Math.max(12, Math.min(r.left, innerWidth - width - 12)), edge: down ? r.bottom + 8 : innerHeight - r.top + 8, width })
     }
     setOpen(!open)
@@ -434,7 +440,7 @@ export function Picker(props: {
 
   return (
     <div ref={root} className={`picker ${props.className ?? ''} ${open ? 'open' : ''}`}>
-      <button className="picker-trigger" disabled={props.disabled} aria-haspopup="listbox" aria-expanded={open} onClick={toggle} onKeyDown={(e) => {
+      <button type="button" className="picker-trigger" disabled={props.disabled} aria-label={props.nombre} title={props.titulo} aria-haspopup="listbox" aria-expanded={open} onClick={toggle} onKeyDown={(e) => {
         if (!open && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) { e.preventDefault(); toggle() }
       }}>
         {props.label}
@@ -463,6 +469,7 @@ export function Picker(props: {
               <span className="picker-label">{g.label}</span>
               {g.options.map((o) => (
                 <button
+                  type="button"
                   key={o.value}
                   role="option"
                   aria-selected={o.value === props.value}

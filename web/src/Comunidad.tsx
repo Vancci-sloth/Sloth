@@ -11,7 +11,8 @@ import { Icono as IconoBase, type NombreIcono, trazosDe } from './Iconos'
 import { Liberar } from './Liberar'
 import { Fondo } from './Fondo'
 import { GuiaVista } from './Guia'
-import { Tienda } from './Tienda'
+import { ApoyarParaInstalar, Tienda } from './Tienda'
+import { Desplegable } from './Desplegable'
 import { Rifa } from './Rifa'
 import './Comunidad.css'
 
@@ -88,7 +89,7 @@ export function abrirTienda() {
 const Icono = ({ de }: { de: NombreIcono }) => <IconoBase de={de} className="com-ico" />
 
 /** «hace 5 min», «hace 3 h», «hace 2 d» y luego la fecha. */
-function hace(iso: string) {
+export function hace(iso: string) {
   const ms = Date.parse(iso)
   const min = Math.floor((Date.now() - ms) / 60_000)
   if (min < 1) return 'ahora'
@@ -131,6 +132,8 @@ export function Comunidad() {
   const [abierta, setAbierta] = useState<string | null>(null)
   // La tienda de estilos se vuelve a pedir al cerrar una publicación: sus me gusta y su estado pudieron cambiar.
   const [tiendaVersion, setTiendaVersion] = useState(0)
+  // Donde la tienda pone su visor: a la derecha, en el sitio de la tarjeta de la comunidad.
+  const [sitioVisor, setSitioVisor] = useState<HTMLDivElement | null>(null)
   // El compositor abierto: en qué sección y, si llega de «Mis videos», con qué. `clave` lo vuelve a armar.
   const [escribiendo, setEscribiendo] = useState<{
     seccion: CategoriaComunidad
@@ -491,20 +494,15 @@ export function Comunidad() {
               ))}
             </nav>
             {seccion !== 'estilos' && (
-            <label className="com-orden" title="Cómo se ordena lo que ves">
-              <Icono de={ORDENES.find((o) => o.id === orden)?.icono ?? 'hilo'} />
-              <select
-                aria-label="Orden"
-                value={orden}
-                onChange={(e) => irA(seccion, e.target.value as OrdenComunidad)}
-              >
-                {ORDENES.filter((o) => o.id !== 'sin-contestar' || yo?.creador || orden === o.id).map((o) => (
-                  <option key={o.id} value={o.id}>
-                    {o.nombre}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <Desplegable
+              className="com-orden"
+              nombre="Orden"
+              titulo="Cómo se ordena lo que ves"
+              icono={<Icono de={ORDENES.find((o) => o.id === orden)?.icono ?? 'hilo'} />}
+              valor={orden}
+              opciones={ORDENES.filter((o) => o.id !== 'sin-contestar' || yo?.creador || orden === o.id).map((o) => ({ value: o.id, label: o.nombre }))}
+              onCambio={(o) => irA(seccion, o as OrdenComunidad)}
+            />
             )}
           </div>
 
@@ -525,7 +523,9 @@ export function Comunidad() {
               <button onClick={() => void cargar()}>Reintentar</button>
             </div>
           )}
-          {seccion === 'estilos' && feed && <Tienda version={tiendaVersion} creador={!!yo?.creador} onAbrir={setAbierta} conNombre={conNombre} />}
+          {seccion === 'estilos' && feed && (
+            <Tienda version={tiendaVersion} creador={!!yo?.creador} yo={yo?.id} visorEn={sitioVisor} quieta={ocupada} onAbrir={setAbierta} conNombre={conNombre} />
+          )}
           {seccion !== 'estilos' && lista === null && !error && <div className="com-cargando">Cargando…</div>}
           {seccion !== 'estilos' && lista?.length === 0 && (
             <div className="com-vacio">
@@ -572,6 +572,8 @@ export function Comunidad() {
         </main>
 
         <aside className="com-lado">
+          {/* En Estilos, aquí va el visor de la tienda (`Tienda.tsx`); mientras enseña un estilo, lo demás de este lado no sale. */}
+          <div className="com-visor" ref={setSitioVisor} />
           <div className="com-comunidad">
             <div className="com-comunidad-portada">
               <img src="/icon.svg" alt="" />
@@ -721,16 +723,15 @@ function IconoInsignia({ de, colores }: { de: 'corona' | 'estrella'; colores: re
 /** La sección donde va una publicación: Anuncios, solo para el creador. */
 function ElegirSeccion({ valor, creador, onCambio }: { valor: CategoriaComunidad; creador: boolean; onCambio(s: CategoriaComunidad): void }) {
   return (
-    <label className="com-elegir" title="La sección donde se publica">
-      <Icono de={seccionDe(valor).icono} />
-      <select value={valor} onChange={(e) => onCambio(e.target.value as CategoriaComunidad)}>
-        {SECCIONES.filter((s) => creador || s.id !== 'anuncios').map((s) => (
-          <option key={s.id} value={s.id}>
-            {s.nombre}
-          </option>
-        ))}
-      </select>
-    </label>
+    <Desplegable
+      className="com-elegir"
+      nombre="Sección"
+      titulo="La sección donde se publica"
+      icono={<Icono de={seccionDe(valor).icono} />}
+      valor={valor}
+      opciones={SECCIONES.filter((s) => creador || s.id !== 'anuncios').map((s) => ({ value: s.id, label: s.nombre }))}
+      onCambio={(s) => onCambio(s as CategoriaComunidad)}
+    />
   )
 }
 
@@ -872,7 +873,7 @@ function Tarjeta({ p, yo, nueva, visto, onAbrir, onFoco, onMegusta }: { p: Publi
 }
 
 /** El texto de una publicación o un comentario, con sus enlaces. */
-function Texto({ texto, className }: { texto: string; className: string }) {
+export function Texto({ texto, className }: { texto: string; className: string }) {
   const partes = texto.split(new RegExp(`(${LINK.source})`, 'g'))
   return (
     <p className={className}>
@@ -1790,9 +1791,13 @@ function Avisos({ sinLeer, onAbrir, onLeidos }: { sinLeer: number; onAbrir(id: s
 
 /**
  * El estilo de una publicación de Estilos: instalarlo, o ponerlo al día si ya lo tienes de aquí y su paquete cambió. Sin
- * aprobar, solo lo ven quien lo compartió y el creador.
+ * aprobar, solo lo ven quien lo compartió y el creador. En el visor de la tienda (`enVisor`), solo el botón y cómo está:
+ * el nombre ya va arriba. Instalar es de quien apoya: a quien no (`sinApoyo`, si ya se sabe; si no, lo dice el cobro con
+ * un 402), «Instalar» le abre la invitación a apoyar, y al apoyar (`onApoyo`) ya lo puede instalar.
  */
-function ParaInstalar({ p, nombre, suya }: { p: PublicacionComunidad; nombre: string; suya: boolean }) {
+export function ParaInstalar(props: { p: PublicacionComunidad; nombre: string; suya: boolean; enVisor?: boolean; sinApoyo?: number; onApoyo?(): void }) {
+  const { p, nombre, suya, enVisor } = props
+  const [invitar, setInvitar] = useState(false)
   const llave = p.adjuntos.find((a) => a.tipo === 'estilo')?.llave
   // Tu estilo de aquí, si ya lo instalaste: con qué paquete.
   const [mio, setMio] = useState<{ llave?: string } | null | undefined>(undefined)
@@ -1806,44 +1811,54 @@ function ParaInstalar({ p, nombre, suya }: { p: PublicacionComunidad; nombre: st
     )
   }, [p.id, instalado])
   async function instalar() {
+    if (props.sinApoyo !== undefined) return setInvitar(true)
     setOcupado(true)
     setError('')
     try {
       setInstalado(await api<Instalado>('/api/comunidad/estilo/instalar', { publicacion: p.id }))
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e))
+      // 402: instalar es de quien apoya.
+      if (e instanceof ErrorApi && e.status === 402) setInvitar(true)
+      else setError(e instanceof Error ? e.message : String(e))
     } finally {
       setOcupado(false)
     }
   }
   const alDia = !!mio && mio.llave === llave
+  const como = p.porAprobar
+    ? suya
+      ? 'En revisión: solo lo ven tú y el creador de Sloth. Cuando lo apruebe, te llega un aviso a la campana.'
+      : 'Aún no lo apruebas: nadie más lo ve.'
+    : alDia
+      ? 'Ya está en tus estilos.'
+      : mio
+        ? 'Hay una versión nueva.'
+        : props.sinApoyo !== undefined && !suya
+          ? 'Instalarlo es para quienes apoyan a Sloth.'
+          : 'Sale entre tus estilos, como uno tuyo.'
+  // El tuyo ya lo tienes: instalarlo chocaría con él.
+  const boton = mio !== undefined && !alDia && !suya && (
+    <button className={enVisor ? 'visor-boton' : 'com-boton ok'} disabled={ocupado} onClick={() => void instalar()}>
+      <Icono de="descargar" /> {ocupado ? 'Instalando…' : mio ? 'Actualizar' : 'Instalar'}
+    </button>
+  )
   return (
-    <div className="com-instalar">
-      <span className="com-instalar-icono">
-        <Icono de="claqueta" />
-      </span>
-      <div className="com-instalar-texto">
-        <strong>{nombre}</strong>
-        <span>
-          {p.porAprobar
-            ? suya
-              ? 'En revisión: solo lo ven tú y el creador de Sloth. Cuando lo apruebe, te llega un aviso a la campana.'
-              : 'Aún no lo apruebas: nadie más lo ve.'
-            : alDia
-              ? 'Ya está en tus estilos.'
-              : mio
-                ? 'Hay una versión nueva.'
-                : 'Sale entre tus estilos, como uno tuyo.'}
+    <div className={enVisor ? 'visor-instalar' : 'com-instalar'}>
+      {enVisor ? (
+        boton
+      ) : (
+        <span className="com-instalar-icono">
+          <Icono de="claqueta" />
         </span>
+      )}
+      <div className="com-instalar-texto">
+        {!enVisor && <strong>{nombre}</strong>}
+        <span>{como}</span>
         {error && <span className="com-instalar-error">{error}</span>}
       </div>
-      {/* El tuyo ya lo tienes: instalarlo chocaría con él. */}
-      {mio !== undefined && !alDia && !suya && (
-        <button className="com-boton ok" disabled={ocupado} onClick={() => void instalar()}>
-          <Icono de="descargar" /> {ocupado ? 'Instalando…' : mio ? 'Actualizar' : 'Instalar'}
-        </button>
-      )}
+      {!enVisor && boton}
       {instalado && <TrasInstalar r={instalado} onCerrar={() => setInstalado(null)} />}
+      {invitar && <ApoyarParaInstalar nombre={nombre} estilos={props.sinApoyo} onListo={() => (setInvitar(false), props.onApoyo?.())} onCerrar={() => setInvitar(false)} />}
     </div>
   )
 }

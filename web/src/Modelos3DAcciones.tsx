@@ -1,6 +1,7 @@
 import { type ReactNode, useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { api } from './api'
+import { Desplegable } from './Desplegable'
 import { Icono } from './Iconos'
 import './Modelos3DAcciones.css'
 
@@ -108,11 +109,7 @@ function Importar({ tipos, onCerrar, onHecho }: { tipos: string[]; onCerrar(): v
       </label>
       <label className="m3d-campo">
         <span>Tipo</span>
-        <select value={tipo} disabled={trabajando} onChange={(e) => setTipo(e.target.value)}>
-          {(tipos.length ? tipos : ['Objetos']).map((t) => (
-            <option key={t}>{t}</option>
-          ))}
-        </select>
+        <Desplegable campo nombre="Tipo" valor={tipo} disabled={trabajando} opciones={(tipos.length ? tipos : ['Objetos']).map((t) => ({ value: t, label: t }))} onCambio={setTipo} />
       </label>
       <label className="m3d-campo">
         <span>Licencia (opcional)</span>
