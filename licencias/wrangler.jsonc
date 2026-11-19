@@ -47,6 +47,13 @@
     "FUNDADORES": 25,
     "PRECIO_MENSUAL": 10,
     "PRECIO_ANUAL": 100,
+    // La escalera (src/escalera.ts), desde el 18 de noviembre de 2026: por cada PRECIO_CADA personas que apoyan hoy, el
+    // apoyo de cada mes cuesta PRECIO_SUBE más que PRECIO_MENSUAL ($10 hasta 49, $15 de 50 a 99, $20 de 100 a 149…; en
+    // pesos, PRECIO_SUBE_MXN más que PRECIO_MENSUAL_MXN). A quien entra con ese precio le baja PRECIO_SUBE cada mes
+    // hasta PRECIO_MENSUAL. Para quitarla, quita PRECIO_CADA: las que ya bajan siguen bajando con PRECIO_SUBE.
+    "PRECIO_CADA": 50,
+    "PRECIO_SUBE": 5,
+    "PRECIO_SUBE_MXN": 100,
     // El mensual y el de una vez también van con el monto que elija cada quien, desde APOYO_MINIMO; desde APOYO_GRANDE al
     // mes, con la insignia de apoyo grande (Donador PRO) en la comunidad, aunque la página ya no lo ofrece aparte.
     "APOYO_MINIMO": 1,

@@ -97,9 +97,10 @@ export function pagoDeSesion(s: SesionStripe): PagoStripe {
 
 /**
  * La sesión de pago de una fila: el mensual, una suscripción; el año o el apoyo de una vez, un pago suelto. Su `url` es
- * adonde va el cliente; al pagar, vuelve a `/gracias`, y si sale, a la página de Sloth.
+ * adonde va el cliente; al pagar, vuelve a `/gracias`, y si sale, a la página de Sloth. `nota` sale bajo el nombre de lo
+ * que se paga: cómo baja el apoyo que baja cada mes (`escalera.ts`), porque Stripe solo enseña el monto del primero.
  */
-export function sesionStripe(env: Env, f: Pick<Fila, 'id' | 'email' | 'plan' | 'monto' | 'moneda'>): Promise<SesionStripe> {
+export function sesionStripe(env: Env, f: Pick<Fila, 'id' | 'email' | 'plan' | 'monto' | 'moneda'>, nota?: string): Promise<SesionStripe> {
   const mensual = f.plan === 'mensual'
   const nombre = { mensual: 'Sloth - apoyo mensual', anual: 'Sloth - plan anual', unico: 'Sloth - apoyo de una vez' }[f.plan as 'mensual' | 'anual' | 'unico']
   return stripe(env, 'POST', '/v1/checkout/sessions', {
@@ -112,6 +113,7 @@ export function sesionStripe(env: Env, f: Pick<Fila, 'id' | 'email' | 'plan' | '
     'line_items[0][price_data][unit_amount]': String(Math.round(f.monto * 100)),
     ...(mensual ? { 'line_items[0][price_data][recurring][interval]': 'month' } : {}),
     'line_items[0][price_data][product_data][name]': nombre,
+    ...(nota ? { 'line_items[0][price_data][product_data][description]': nota } : {}),
     // El precio ya trae el IVA, como dice la página: con Stripe Tax (encendido en la cuenta) se desglosa, no se suma.
     'line_items[0][price_data][tax_behavior]': 'inclusive',
     // Quien paga desde otro país lo ve y lo paga en su moneda.

@@ -277,6 +277,11 @@ export function SuscripcionOpciones() {
   const [cancelando, setCancelando] = useState(false)
   const [copiada, setCopiada] = useState(false)
   const [clave, setClave] = useState(false)
+  // Lo que paga hoy quien entra (el apoyo sube con la gente): al cancelar se dice, porque quien vuelve entra con ese.
+  const [hoy, setHoy] = useState<{ mensual: number; paso: number }>()
+  useEffect(() => {
+    if (cancelando) api<{ mensual: number; paso: number }>('/api/licencia/precio').then(setHoy, () => {})
+  }, [cancelando])
 
   if (!l) return <div className="fila"><span className="muted small">{error || 'Mirando…'}</span></div>
   // Un año pagado de una vez: el pago del siguiente.
@@ -374,6 +379,7 @@ export function SuscripcionOpciones() {
         >
           Dejamos de cobrarte desde ahora, sin penalización. Sloth sigue siendo gratis; lo que ya pagaste vale hasta el{' '}
           {fecha(l.pagadaHasta)}. Te damos un folio de la cancelación.
+          {!!hoy?.paso && ` Tu precio se queda contigo solo mientras sigas: si después vuelves, entras con el precio de ese día (hoy, ${dinero(hoy.mensual)} USD el primer mes).`}
         </Confirm>
       )}
     </div>

@@ -230,10 +230,28 @@ function Opcion({ on, n, titulo, onClick, children }: { on: boolean; n: number; 
 
 const PAGINA = 'https://sloth.vancci.org'
 /** La versión de los términos que acepta quien apoya desde aquí: la de `TERMINOS` en la página (su «Última actualización»). */
-const TERMINOS = '2026-11-13'
+const TERMINOS = '2026-11-18'
 /** Cada cuánto se mira si el pago ya entró, y durante cuánto, después de abrir el cobro. */
 const MIRAR_CADA = 8000
 const MIRAR_DURANTE = 10 * 60_000
+
+/** El apoyo de hoy, en dólares: lo que se paga el primer mes, hasta dónde baja y cuánto cada mes (`/api/licencia/precio`). */
+interface Precio {
+  mensual: number
+  base: number
+  paso: number
+}
+
+/**
+ * Lo que se cobra, dicho junto al botón: el apoyo sube con la gente y a cada quien le baja cada mes hasta `base`. Sin
+ * respuesta del cobro no se dice un número: se cobra el de hoy, que se ve en la página de pago.
+ */
+export function cobroDe(p: Precio | undefined): string {
+  if (!p) return 'El apoyo de cada mes, al precio de hoy (lo ves antes de pagar)'
+  if (p.mensual <= p.base) return `$${p.base} USD al mes`
+  if (p.mensual - p.paso <= p.base) return `$${p.mensual} USD el primer mes y $${p.base} USD cada mes desde el segundo`
+  return `$${p.mensual} USD el primer mes y $${p.paso} menos cada mes hasta quedar en $${p.base} USD al mes`
+}
 
 /**
  * Lo que sale cuando quien no apoya quiere instalar un estilo (`ParaInstalar`, en el visor o en su publicación): la
@@ -272,12 +290,17 @@ export function ApoyarParaInstalar({ nombre, estilos, onListo, onCerrar }: { nom
  * «Desbloquea N estilos» abre de una vez el pago con tarjeta en Stripe, con el correo de su cuenta
  * (`/api/licencia/apoyar`): al pagarse, la comunidad lo reconoce por ese correo y la tienda se abre sola (`onRevisar`
  * vuelve a pedirla al regresar a Sloth y cada pocos segundos). Las otras formas de pago siguen en la página; quien
- * apoyó con otro correo pega su clave en Opciones.
+ * apoyó con otro correo pega su clave en Opciones. Lo que se cobra lo dice el cobro (`precio`), y con la escalera va
+ * también lo que más pesa: su precio se queda con él mientras siga, y si cancela y vuelve entra con el del día.
  */
 function Cerrada({ para, estilos, onRevisar }: { para: string; estilos: number; onRevisar(): void }) {
   const [ocupado, setOcupado] = useState(false)
   const [esperando, setEsperando] = useState(false)
   const [error, setError] = useState('')
+  const [precio, setPrecio] = useState<Precio>()
+  useEffect(() => {
+    api<Precio>('/api/licencia/precio').then(setPrecio, () => {})
+  }, [])
   // «Más de 10», «más de 20»…; con pocos, uno menos de los que hay.
   const mas = estilos > 10 ? Math.floor((estilos - 1) / 10) * 10 : estilos - 1
 
@@ -297,7 +320,7 @@ function Cerrada({ para, estilos, onRevisar }: { para: string; estilos: number; 
     setOcupado(true)
     setError('')
     try {
-      const { enlace } = await api<{ enlace: string }>('/api/licencia/apoyar', { terminos: TERMINOS })
+      const { enlace } = await api<{ enlace: string }>('/api/licencia/apoyar', { terminos: TERMINOS, ...(precio ? { monto: precio.mensual } : {}) })
       window.open(enlace, '_blank')
       setEsperando(true)
     } catch (e) {
@@ -335,11 +358,11 @@ function Cerrada({ para, estilos, onRevisar }: { para: string; estilos: number; 
         <p className="tienda-cerrada-nota">Se abrió el pago en tu navegador. En cuanto pagues, esto se cierra solo y ya puedes instalarlo.</p>
       ) : (
         <p className="tienda-cerrada-nota">
-          $10 USD al mes, con tarjeta. Al desbloquear aceptas ese cobro automático de cada mes, que cancelas cuando quieras, y los{' '}
+          {cobroDe(precio)}, con tarjeta. Al desbloquear aceptas ese cobro automático de cada mes, que cancelas cuando quieras, y los{' '}
           <a href={`${PAGINA}/terminos`} target="_blank" rel="noreferrer">
             términos
           </a>
-          .
+          .{!!precio?.paso && ' Tu precio se queda contigo: mientras sigas no te sube, aunque suba para quien llegue después. Si cancelas y vuelves, entras con el precio de ese día.'}
         </p>
       )}
       <div className="tienda-cerrada-acciones">

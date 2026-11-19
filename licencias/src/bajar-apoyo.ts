@@ -78,11 +78,12 @@ export async function bajarApoyo(req: Request, env: Env): Promise<Response> {
   const antes = String(c.antes ?? '')
   if (!/^\d{4}-\d{2}-\d{2}T/.test(antes) || Number.isNaN(Date.parse(antes))) throw new Rechazo(400, 'Falta `antes`: la fecha del cambio, en ISO.')
   const limite = Math.min(10, Math.max(1, Number(c.limite) || 3))
-  // Las rifas dan apoyos con un correo de Sloth: no son de nadie que haya pagado.
+  // Las rifas dan apoyos con un correo de Sloth: no son de nadie que haya pagado. Las que bajan cada mes (`piso`,
+  // `escalera.ts`) no pagaron de más: su primer mes cuesta eso.
   const { results } = await env.DB.prepare(
     `SELECT * FROM licencias WHERE modo = 'produccion' AND plan IN ('mensual', 'unico') AND autorizada IS NOT NULL AND autorizada < ?
        AND estado IN ('authorized', 'paused', 'cancelled', 'pagado') AND julianday(pagado_hasta) > julianday('now')
-       AND extra_avisado IS NULL AND email NOT LIKE '%@sloth.vancci.org' ORDER BY autorizada`
+       AND extra_avisado IS NULL AND piso IS NULL AND email NOT LIKE '%@sloth.vancci.org' ORDER BY autorizada`
   )
     .bind(antes)
     .all<Fila>()
@@ -142,8 +143,12 @@ async function unaFila(env: Env, f: Fila, precio: number, cancelarPaypal: boolea
 
 const PRODUCTO_STRIPE = 'sloth-apoyo-mensual'
 
-/** Baja el cobro de la suscripción a `precio` y lo aplaza a `hasta`. Cada paso se puede repetir si el anterior falló a medias. */
-async function aplazarCobro(env: Env, f: Fila, accion: Accion, precio: number, hasta: string) {
+/**
+ * Deja la suscripción cobrando `precio` desde su siguiente cobro, sin cobrar ni abonar la diferencia. `deStripe`: lo
+ * demás que se le cambia a la de Stripe en la misma llamada. Pedirlo dos veces da lo mismo. También lo usa el apoyo que
+ * baja cada mes (`escalera.ts`).
+ */
+export async function cambiarMonto(env: Env, f: Pick<Fila, 'stripe' | 'paypal' | 'preapproval' | 'moneda'>, accion: Accion, precio: number, deStripe: Record<string, string> = {}) {
   if (accion === 'stripe') {
     const s = await stripe<{ items: { data: { id: string }[] } }>(env, 'GET', `/v1/subscriptions/${encodeURIComponent(f.stripe!)}`)
     const item = s.items.data[0]
@@ -158,18 +163,26 @@ async function aplazarCobro(env: Env, f: Fila, accion: Accion, precio: number, h
       'items[0][price_data][unit_amount]': String(Math.round(precio * 100)),
       'items[0][price_data][recurring][interval]': 'month',
       'items[0][price_data][tax_behavior]': 'inclusive',
-      // Sin cobrar ni abonar la diferencia: lo pagado de más ya vale como estos días.
       proration_behavior: 'none',
-      trial_end: String(Math.floor(Date.parse(hasta) / 1000))
+      ...deStripe
     })
   } else if (accion === 'paypal') {
-    const ruta = `/v1/billing/subscriptions/${encodeURIComponent(f.paypal!)}`
-    await paypal(env, 'PATCH', ruta, [
+    await paypal(env, 'PATCH', `/v1/billing/subscriptions/${encodeURIComponent(f.paypal!)}`, [
       { op: 'replace', path: '/plan/billing_cycles/@sequence==1/pricing_scheme/fixed_price', value: { currency_code: f.moneda, value: precio.toFixed(2) } }
     ])
+  } else if (accion === 'mp') {
+    await mp(env, 'PUT', `/preapproval/${encodeURIComponent(f.preapproval!)}`, { auto_recurring: { transaction_amount: precio, currency_id: f.moneda } })
+  }
+}
+
+/** Baja el cobro de la suscripción a `precio` y lo aplaza a `hasta`. Cada paso se puede repetir si el anterior falló a medias. */
+async function aplazarCobro(env: Env, f: Fila, accion: Accion, precio: number, hasta: string) {
+  // Lo pagado de más ya vale como los días hasta `hasta`: la de Stripe no cobra antes (`trial_end`).
+  await cambiarMonto(env, f, accion, precio, { trial_end: String(Math.floor(Date.parse(hasta) / 1000)) })
+  if (accion === 'paypal') {
     // Ya suspendida (una vuelta anterior que no llegó a guardarse), PayPal contesta 422.
     if (f.estado === 'authorized')
-      await paypal(env, 'POST', `${ruta}/suspend`, { reason: 'El apoyo bajo a 10 USD: lo pagado de mas vale hasta que se reanude' }).catch((e) => {
+      await paypal(env, 'POST', `/v1/billing/subscriptions/${encodeURIComponent(f.paypal!)}/suspend`, { reason: 'El apoyo bajo a 10 USD: lo pagado de mas vale hasta que se reanude' }).catch((e) => {
         if (!(e instanceof Rechazo) || e.status !== 422) throw e
       })
   } else if (accion === 'paypal-cancelada') {
@@ -178,9 +191,7 @@ async function aplazarCobro(env: Env, f: Fila, accion: Accion, precio: number, h
       if (!(e instanceof Rechazo) || e.status !== 422 || (await refrescar(env, f)).estado !== 'cancelled') throw e
     })
   } else if (accion === 'mp') {
-    const ruta = `/preapproval/${encodeURIComponent(f.preapproval!)}`
-    await mp(env, 'PUT', ruta, { auto_recurring: { transaction_amount: precio, currency_id: f.moneda } })
-    if (f.estado === 'authorized') await mp(env, 'PUT', ruta, { status: 'paused' })
+    if (f.estado === 'authorized') await mp(env, 'PUT', `/preapproval/${encodeURIComponent(f.preapproval!)}`, { status: 'paused' })
   }
 }
 

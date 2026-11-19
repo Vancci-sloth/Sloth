@@ -196,6 +196,21 @@ bajaron a $10 con el cobro aplazado; las de Mercado Pago, a 199 MXN y en pausa, 
 PayPal no deja cambiarlas ni pausarlas (`USER_ACCOUNT_RESTRICTED`), y si quieren seguir apoyan otra vez. Si el apoyo
 vuelve a bajar, se cambia el precio, se despliega y se corre igual con la fecha del cambio (`--probar` primero).
 
+Desde el 18 de noviembre de 2026 ese precio es una escalera (`licencias/src/escalera.ts`, migración 0032): por cada 50
+personas que apoyan hoy (`apoyan` en `/precio`) el apoyo sube $5 USD ($100 MXN), y a quien entra con el precio del día
+le baja $5 cada mes que paga, hasta $10 (199 MXN): con 50 personas, $15 el primer mes y $10 después; con 100, $20, $15
+y $10. Los números son `PRECIO_CADA`, `PRECIO_SUBE` y `PRECIO_SUBE_MXN` en `wrangler.jsonc`; `PRECIO_MENSUAL` es el
+piso, el de Fundador y lo que cuenta en `apoyan`. `/precio` da `mensual` (el de hoy), `base`, `paso` y `cada`. Quien
+elige su monto en «Lo que gustes» no baja. La app de antes de esto (su tienda dice «$10 USD al mes» y no manda monto)
+también cobra el precio del día, por decisión del creador: el monto y cómo baja se ven en la página de pago de Stripe.
+Lo que más se le dice a la gente, porque es lo que vende: su precio se queda con cada quien mientras siga apoyando, y
+quien cancela y vuelve entra con el precio de ese día. Va en la página, en el correo de la clave, en el aviso de cada
+cobro, al cancelar (el correo y el aviso de la app) y en la tienda; al escribir anuncios o textos del apoyo, dilo también.
+Cómo va cada una: `monto` es lo que cobra su siguiente mes, `piso` hasta dónde baja y `bajado` con qué mes bajó
+(`d1 execute … "SELECT email, monto, piso, bajado, pagado_hasta FROM licencias WHERE piso IS NOT NULL"`). Si la pasarela
+no deja cambiar el monto (PayPal en revisión), queda en el registro como «Bajar el apoyo del mes» y se reintenta en cada
+lectura; el aviso de cobro dice siempre lo que de verdad se va a cobrar.
+
 Cuando el usuario pida un link de Fundador, dale uno nuevo con `npm run fundador -- nuevo <para quién>`. Es de una sola
 persona: quien apoya con $10 o más con él es Fundador aunque los 25 lugares públicos estén ocupados; sin link, lo es
 mientras quede alguno de los 25. Con `lista` ves los que se han dado y quién usó cada uno, y con `revocar <código>` uno deja de servir.

@@ -204,11 +204,22 @@ export function licencia(app: string, alCambiar?: (sinApoyo: boolean) => void) {
       // «Desbloquea N estilos» (`web/src/Tienda.tsx`): quien ya tiene su cuenta apoya con tarjeta sin pasar por la página.
       // El cobro abre el pago de Stripe con el correo de la cuenta y, al pagarse, la comunidad lo reconoce por ese
       // correo (su insignia), sin escribir otra clave. Los términos y el cobro de cada mes se aceptan junto al botón.
+      // `monto`: el apoyo de hoy que enseñó la tienda (`/api/licencia/precio`), que baja cada mes (`sugerido`). Sin él
+      // (no pudo leer el precio), el cobro cobra el de hoy, que se ve en la página de pago.
       if (ruta === '/api/licencia/apoyar' && metodo === 'POST') {
         const email = estado().email
         if (!email) throw new Rechazo(400, 'Primero crea tu cuenta de Sloth, con tu correo.')
-        const { terminos } = await cuerpo<{ terminos?: string }>(req)
-        return enviar(res, 200, await cobro<{ enlace: string }>('/suscribir', { email, plan: 'mensual', pasarela: 'tarjeta', acepto: true, terminos }))
+        const { terminos, monto } = await cuerpo<{ terminos?: string; monto?: number }>(req)
+        const elegido = Number.isInteger(monto) ? { monto, sugerido: true } : {}
+        return enviar(res, 200, await cobro<{ enlace: string }>('/suscribir', { email, plan: 'mensual', pasarela: 'tarjeta', acepto: true, terminos, ...elegido }))
+      }
+      // Lo que cuesta hoy apoyar con tarjeta: el cobro lo sube por cada 50 personas que apoyan y se lo baja a cada quien
+      // cada mes, hasta `base` (`licencias/src/escalera.ts`).
+      if (ruta === '/api/licencia/precio' && metodo === 'GET') {
+        const r = await fetch(`${COBRO}/precio`, { signal: AbortSignal.timeout(10_000) })
+        const p = (await r.json()) as { mensual?: number; base?: number; paso?: number }
+        if (!r.ok || !p.mensual) throw new Rechazo(502, SIN_CONEXION)
+        return enviar(res, 200, { mensual: p.mensual, base: p.base ?? p.mensual, paso: p.paso ?? 0 })
       }
       // Para la ventana de Electron, al buscar la versión nueva: quien apoya la recibe antes (licencias/, `ANTICIPO`).
       if (ruta === '/api/licencia/credencial' && metodo === 'GET') return enviar(res, 200, (await credencial()) ?? {})
