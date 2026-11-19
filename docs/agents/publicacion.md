@@ -79,6 +79,13 @@ Pendiente al 8-nov-2026 ([#23](https://github.com/Vancci-sloth/Sloth/issues/23))
 antes de la primera publicación con esto hay que desplegar el cobro, o ignora `sinTicket`. Ahí está también el estado de
 los envíos a Apple.
 
+Toda versión avisa lo que trae, sin excepción: su `novedad.txt` (paso 1) y su anuncio en la comunidad (paso 5). Las que
+salen para todos (`[para todos]`) son de dos clases, y el aviso dice cuál es (pedido del creador, 18 de noviembre de 2026):
+
+- **Normal:** trae cosas nuevas. Lleva su guía animada, la del creador bailando (paso 1), y el anuncio de siempre.
+- **Express:** un arreglo urgente. Sin guía, y `Novedades.tsx` no se toca: solo avisa, claro y corto, qué fallaba y que
+  ya quedó, en `novedad.txt` y en un anuncio titulado `ACTUALIZACION EXPRESS (…)` ([anuncios.md](anuncios.md)).
+
 1. Actualiza `novedad.txt`: un renglón corto con lo que trae la versión, que se ve al pasar el cursor sobre «Actualizar».
    Una versión puede llevar además su guía animada (`web/src/Novedades.tsx`, la 0.4.3 en
    `web/public/novedades/0.4.3.html`, que reemplaza a la de antes), que sale una vez al abrirla a quien actualizó. Su
