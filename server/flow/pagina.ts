@@ -231,11 +231,14 @@ async function subir(page: Page, hueco: Locator, ruta: string): Promise<boolean>
   const nombre = `sloth-${randomBytes(4).toString('hex')}${ext}`
   await selector.setFiles({ name: nombre, mimeType: ext === '.png' ? 'image/png' : ext === '.webp' ? 'image/webp' : 'image/jpeg', buffer: readFileSync(ruta) })
   await page.locator('mat-dialog-container button').last().click({ timeout: 3000 }).catch(() => {})
-  // Elegirla mientras sube la deja marcada sin entrar al compositor: se espera a que su miniatura venga ya de Flow.
-  const item = panel.locator('button[role=option]').filter({ hasText: nombre }).first()
-  const subida = await item.locator('img[src^="https://"]').waitFor({ timeout: 60_000 }).then(() => true, () => false)
-  if (subida) await item.click({ timeout: 10_000 })
-  return subida
+  // Elegirla mientras sube la deja marcada sin entrar al compositor. Subiendo, su renglón lleva una rueda (antes, una
+  // miniatura suya); al acabar, un icono: la miniatura de Flow ya no llega hasta recargar la lista (18 de noviembre de
+  // 2026), y esperarla dejó a todos sin referencias ni fotogramas. Si la rueda no se va, se elige igual: quien llama
+  // mira si entró al compositor.
+  const item = panel.locator('button[role=option]').filter({ hasText: nombre })
+  const yaSubio = item.filter({ hasNot: page.locator('[role=progressbar], img:not([src^="https://"])') }).first()
+  await yaSubio.waitFor({ timeout: 60_000 }).catch(() => {})
+  return item.first().click({ timeout: 10_000 }).then(() => true, () => false)
 }
 
 /** Pone las referencias en el compositor («Ingredientes»), tras quitar las que hubiera. */
@@ -340,7 +343,9 @@ export async function generarEnFlow(b: Browser, page: Page, proyecto: string | u
   // compositor (el clic en la caja del prompt fallaba). Entrar al proyecto recarga la página y lo cierra.
   const saldoAntes = p.tipo === 'video' ? await saldoEnFlow(page).catch(() => null) : null
   const creditos = await prepararEnFlow(page, proyecto, p, alEntrar)
-  // Después de preparar: cada imagen subida también es una tarjeta del proyecto.
+  // Después de preparar: cada imagen subida también es una tarjeta del proyecto, y se queda en su «100 %» un momento
+  // más. Se espera a que acabe: si cambia después, parecería la tarjeta del pedido.
+  await page.waitForFunction(() => !/\d+\s*%/.test(document.querySelector<HTMLElement>('flow-tile-container')?.innerText ?? ''), null, { timeout: 15_000 }).catch(() => {})
   const tarjeta = page.locator('flow-tile-container').first()
   const antes = (await tarjeta.count()) ? await tarjeta.evaluate((d) => `${(d as HTMLElement).innerText} ${d.querySelector('img')?.src ?? ''}`) : ''
   await page.locator('.base-prompt-box [role=textbox]').first().click({ timeout: 10_000 })
