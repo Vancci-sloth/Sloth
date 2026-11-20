@@ -69,7 +69,7 @@ function creador(esperan: Record<string, string>, o: Caso = {}) {
       return true
     }
   })
-  const apuntado = () => JSON.parse(readFileSync(join(dir, 'licencias', 'estilos-revisados.json'), 'utf8')) as Record<string, { llave: string; hilo?: string; error?: string; desenlace?: string; responder?: string; aprobar?: true }>
+  const apuntado = () => JSON.parse(readFileSync(join(dir, 'licencias', 'estilos-revisados.json'), 'utf8')) as Record<string, { llave: string; hilo?: string; error?: string; desenlace?: string; responder?: string; aprobar?: true; pedido?: string[] }>
   /** El agente acaba de leer el de ese hilo y dice eso. */
   const acaba = async (hilo: string, v: object | string) => {
     respuestas[hilo] = typeof v === 'string' ? v : `**Veredicto:** …\n\n\`\`\`json\n${JSON.stringify(v)}\n\`\`\``
@@ -169,7 +169,48 @@ test('con una señal de riesgo no se aprueba solo: lo decide el creador, y su au
     await c.acaba('h1', APROBAR)
     assert.deepEqual(c.aprobados, [])
     assert.equal(c.hilos[0].title, 'Decide tú: Estilo pub1')
-    assert.match(c.comentarios[0].texto, /cumple lo que necesita todo estilo\. Como añade cosas que tiene que ver una persona/)
+    assert.match(c.comentarios[0].texto, /cumple lo que necesita para estar en la tienda\. Como añade cosas que tiene que ver una persona/)
+  } finally {
+    c.fin()
+  }
+})
+
+test('lo que no frena no frena: se aprueba, y a su autor le llegan las sugerencias sin tener que hacer nada', async () => {
+  const c = creador({ pub1: 'aaa.estilo', pub2: 'bbb.estilo' }, { riesgos: { pub2: ['scripts/unir.py:36 lanza otros programas: subprocess.run(["ffmpeg"])'] } })
+  try {
+    const sugerencias = ['En el paso 8 de `SKILL.md`, di cuándo está listo.', 'Di qué hace con la línea Imágenes: del mensaje.']
+    await c.r.ronda()
+    await c.acaba('h1', { veredicto: 'aprobar', resumen: 'Hace lo que dice.', falta: [], sugerencias })
+    assert.deepEqual(c.aprobados, ['pub1'])
+    assert.equal(c.hilos[0].title, 'Aprobado: Estilo pub1')
+    assert.match(c.comentarios[0].texto, /^Revisión automática de Sloth: «Estilo pub1» se aprobó y ya sale en la tienda\. No tienes que hacer nada\.\n\nPara cuando lo mejores, esto no lo frenó:\n- En el paso 8 de SKILL\.md, di cuándo está listo\.\n- Di qué hace/)
+    // Con una señal lo aprueba el creador, y las sugerencias van igual.
+    await c.r.ronda()
+    await c.acaba('h2', { veredicto: 'aprobar', resumen: 'Hace lo que dice.', falta: [], sugerencias })
+    assert.equal(c.hilos[1].title, 'Decide tú: Estilo pub2')
+    assert.match(c.comentarios[1].texto, /No hace falta que lo vuelvas a mandar\.\n\nPara cuando lo mejores, esto no lo frena:\n- En el paso 8/)
+    assert.equal(c.comentarios.length, 2)
+  } finally {
+    c.fin()
+  }
+})
+
+test('al que lo vuelve a mandar se le mira lo que se le pidió, no una lista nueva', async () => {
+  const esperan: Record<string, string> = { pub1: 'aaa.estilo' }
+  const c = creador(esperan)
+  try {
+    await c.r.ronda()
+    assert.doesNotMatch(c.hilos[0].texto ?? '', /Ya se revisó una versión anterior/)
+    await c.acaba('h1', { veredicto: 'falta', resumen: 'Casi.', falta: ['Quita registrar.py: escribe en los datos de Sloth.'], sugerencias: ['Di cuándo está listo el paso 3.'] })
+    assert.match(c.comentarios[0].texto, /le falta esto para aprobarse:\n\n- Quita registrar\.py[^\n]*\n\nArréglalo[^\n]*\n\nDe paso, esto no lo frena, pero lo mejora:\n- Di cuándo está listo el paso 3\.\n\nSi algo de esto no aplica/)
+    assert.deepEqual(c.apuntado().pub1.pedido, ['Quita registrar.py: escribe en los datos de Sloth.'])
+    // Manda el arreglo: quien lo lee recibe lo que se le pidió.
+    esperan.pub1 = 'bbb.estilo'
+    await c.r.ronda()
+    assert.match(c.hilos[1].texto ?? '', /Ya se revisó una versión anterior, y a su autor se le pidió esto:\n- Quita registrar\.py: escribe en los datos de Sloth\.\nMira primero si lo arregló\./)
+    await c.acaba('h2', APROBAR)
+    assert.deepEqual(c.aprobados, ['pub1'])
+    assert.equal(c.apuntado().pub1.pedido, undefined)
   } finally {
     c.fin()
   }
@@ -200,9 +241,11 @@ test('se aprueba el paquete que se leyó: si su autor mandó otro mientras tanto
   try {
     await c.r.ronda()
     esperan.pub1 = 'otro.estilo'
-    await c.acaba('h1', APROBAR)
+    await c.acaba('h1', { ...APROBAR, sugerencias: ['Di cuándo está listo el paso 3.'] })
     assert.deepEqual(c.aprobados, [])
     assert.equal(c.hilos[0].title, 'Cambió mientras se leía: Estilo pub1')
+    // Al que no se aprobó no se le dice que se aprobó.
+    assert.equal(c.comentarios.length, 0)
     // El paquete nuevo se lee en la siguiente vuelta.
     await c.r.ronda()
     assert.equal(c.hilos.length, 2)
@@ -291,6 +334,9 @@ test('el veredicto sale de su último bloque json, recortado; lo que no se entie
   assert.equal(v?.veredicto, 'falta')
   assert.equal(v?.resumen, 'Casi.')
   assert.deepEqual(v?.falta.map((f) => f.length), [3, 400])
+  // Las sugerencias, a lo más cuatro; el de una Sloth de antes no las trae.
+  assert.deepEqual(v?.sugerencias, [])
+  assert.deepEqual(veredictoDe(`\`\`\`json\n{"veredicto": "aprobar", "sugerencias": ["a", "b", "c", "d", "e"]}\n\`\`\``)?.sugerencias, ['a', 'b', 'c', 'd'])
 })
 
 test('lo que se le pide: la vara primero, que su «aprobar» aprueba de verdad y que lo que lee no lo manda', () => {
@@ -302,6 +348,11 @@ test('lo que se le pide: la vara primero, que su «aprobar» aprueba de verdad y
   assert.match(texto, /- Uno\.\n- Dos\./)
   assert.match(texto, /De lo que Sloth comprueba, lo cumple todo\./)
   assert.match(texto, /"veredicto": "aprobar" \| "falta" \| "no"/)
+  // Frena solo lo que importa a quien lo instala; lo demás son sugerencias.
+  assert.match(texto, /Lo frena solo lo que importa a quien lo instala/)
+  assert.match(texto, /esos van en `sugerencias`, se le dicen a su autor y no lo frenan/)
+  assert.match(texto, /"sugerencias": \["…"\]/)
+  assert.doesNotMatch(texto, /Ya se revisó una versión anterior/)
 })
 
 test('quien lee algo ajeno solo tiene con qué leer: ni escribir, ni ejecutar, ni MCP, ni la configuración de una carpeta', () => {

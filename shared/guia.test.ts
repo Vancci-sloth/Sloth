@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { CAMPOS_GUIA, CON_QUE, faltaEnEstilo, faltaEnGuia, guiaDe, PARA_QUE_AGENTES, PRUEBA, pruebaDe, VIDEO_ENTERO } from './guia.ts'
+import { CAMPOS_GUIA, CON_QUE, faltaEnEstilo, faltaEnGuia, guiaConSuPrueba, guiaDe, PARA_QUE_AGENTES, PRUEBA, pruebaDe, VIDEO_ENTERO } from './guia.ts'
 import type { GuiaEstilo } from './types.ts'
 
 const textos = { das: 'Solo el tema del video.', entrega: 'Un vertical de 30 segundos.', ejemplo: 'Hazme un video del ciclo del agua.' }
@@ -27,6 +27,17 @@ test('dice qué falta en la guía, en el orden de la plantilla; lo opcional no f
   assert.equal(faltaEnGuia(textos), CON_QUE)
   assert.equal(faltaEnGuia({ ...textos, herramientas: ['codigo'] }), PARA_QUE_AGENTES)
   assert.equal(faltaEnGuia({ ...guia, agentes: [] }), PARA_QUE_AGENTES)
+})
+
+test('lo que su prueba demuestra va en su guía sin que su autor lo marque: el agente con que se hizo y lo que usó', () => {
+  const hecha = pruebaDe({ ...prueba, agente: 'antigravity', hilo: { pedido: 'Hazme uno.', turnos: [{ segundos: 60, costo: 0, herramientas: 3 }], usa: ['codigo', 'flow-imagenes'] } })!
+  assert.deepEqual(guiaConSuPrueba(guia, hecha), { ...textos, herramientas: ['codigo', 'tu-voz', 'flow-imagenes'], agentes: ['claude', 'antigravity'] })
+  // Los acentos rotos de su guía también se arreglan solos.
+  assert.equal(guiaDe({ ...textos, necesita: 'Google Flow con crÃ©ditos.' })?.necesita, 'Google Flow con créditos.')
+  // Lo que ya dice no se repite, y sin guía o sin prueba no se inventa nada.
+  assert.deepEqual(guiaConSuPrueba(guia, pruebaDe(prueba)), guia)
+  assert.equal(guiaConSuPrueba(undefined, hecha), undefined)
+  assert.deepEqual(guiaConSuPrueba(guia, undefined), guia)
 })
 
 test('la prueba dice con qué agente se hizo, cuánto costó y cuánto tardó; sin eso no es una prueba', () => {

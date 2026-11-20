@@ -48,8 +48,9 @@
  * - `GET /comunidad/liberar`, solo el creador: la última versión de cada sistema y si aún es solo de quien apoya.
  *   `POST` la da a todos ya (`liberar` en `index.ts`), cuando el chat de un live cumple su meta.
  */
-import type { AdjuntoComunidad, Autor, AvisoComunidad, CategoriaComunidad, ComentarioComunidad, FeedComunidad, OrdenComunidad, PublicacionComunidad, RifaGanada, RoadmapComunidad } from '../../shared/types.ts'
-import { faltaEnEstilo, guiaDe, pruebaDe, TIPO_HILO } from '../../shared/guia.ts'
+import type { AdjuntoComunidad, Autor, AvisoComunidad, CategoriaComunidad, ComentarioComunidad, FeedComunidad, GuiaEstilo, OrdenComunidad, PublicacionComunidad, RifaGanada, RoadmapComunidad } from '../../shared/types.ts'
+import { acentosBien } from '../../shared/acentos.ts'
+import { faltaEnEstilo, guiaConSuPrueba, guiaDe, pruebaDe, TIPO_HILO } from '../../shared/guia.ts'
 import { fondo } from './fondo.ts'
 import { cerrar, mio, pagado, participar, reparto, salir } from './reparto.ts'
 import { descartar, olvidarNumeros, pruebas, tienda, usos } from './tienda.ts'
@@ -489,6 +490,12 @@ async function feed(env: Env, yo: Miembro, url: URL): Promise<FeedComunidad> {
 }
 
 /** Las publicaciones como las ve `yo`: con su autor, si le gustan y las caras de los últimos que comentaron. */
+/** La guía de un estilo ya guardado, como se guardaría hoy (`adjuntosDe`). Sin guía, nada. */
+function alDia(guia: unknown, prueba: unknown): { guia?: GuiaEstilo } {
+  const g = guiaConSuPrueba(guiaDe(guia), pruebaDe(prueba))
+  return g ? { guia: g } : {}
+}
+
 /**
  * Las publicaciones como las ve `yo`. De un estilo, a su autor y al creador les dice lo que le falta (`incompleto`). La
  * evidencia de su prueba (el resumen del hilo donde se hizo su video) solo va al abrirla (`entera`), y solo a ellos dos.
@@ -510,15 +517,16 @@ export async function armar(env: Env, yo: Miembro, filas: Guardada[], entera = f
   const autores = await miembros(env, [...filas.map((f) => f.autor), ...caras.map((c) => c.autor)])
   const leGustan = new Set((gustan.results as { publicacion: string }[]).map((g) => g.publicacion))
   return filas.map((f) => {
-    const adjuntos = conUrls(env, f.adjuntos)
+    // Lo guardado antes de que Sloth arreglara esto sola sale ya arreglado: los acentos, y la guía con lo de su prueba.
+    const adjuntos = conUrls(env, f.adjuntos).map((a) => (a.tipo === 'estilo' ? { ...a, ...(a.nombre ? { nombre: acentosBien(a.nombre) } : {}), ...alDia(a.guia, a.prueba) } : a))
     const suya = f.autor === yo.id || esCreador(yo)
     const falta = f.categoria === 'estilos' && suya ? faltaEnEstilo(adjuntos, f.texto) : []
     return {
     id: f.id,
     autor: autores.get(f.autor) ?? { id: f.autor, nombre: '' },
     categoria: f.categoria,
-    titulo: f.titulo,
-    texto: f.texto,
+    titulo: acentosBien(f.titulo),
+    texto: acentosBien(f.texto),
     adjuntos: entera && suya ? adjuntos : adjuntos.map((a) => (a.prueba ? { ...a, prueba: { ...a.prueba, hilo: undefined, evidencia: undefined } } : a)),
     fijada: !!f.fijada,
     ...(f.estado ? { estado: f.estado } : {}),
@@ -584,9 +592,9 @@ function comentarioComo(env: Env, yo: Miembro, c: ComentarioGuardado, a: Autor |
   }
 }
 
-/** Lo que se escribe, ya limpio y recortado. */
+/** Lo que se escribe, ya limpio y recortado, y con sus acentos bien si llegaron rotos (`shared/acentos.ts`). */
 function texto(valor: unknown, max: number): string {
-  return String(valor ?? '').replace(/\r\n/g, '\n').trim().slice(0, max)
+  return acentosBien(String(valor ?? '')).replace(/\r\n/g, '\n').trim().slice(0, max)
 }
 
 function categoriaDe(valor: unknown, yo: Miembro): CategoriaComunidad {
@@ -606,8 +614,9 @@ export function adjuntosDe(valor: unknown): Adjunto[] {
     // El hilo de una prueba no es un adjunto: va dentro de la prueba de su estilo.
     if ((tipo === 'imagen') !== IMAGEN.test(llave) || (tipo === 'estilo') !== ESTILO.test(llave) || HILO.test(llave)) return []
     if (tipo === 'estilo') {
-      const g = guiaDe(guia)
       const p = pruebaDe(prueba)
+      // Lo que su prueba demuestra va en su guía: no se le devuelve a su autor para que lo marque.
+      const g = guiaConSuPrueba(guiaDe(guia), p)
       return [{ tipo, llave, nombre: texto(nombre, 80) || 'Estilo', ...(typeof de === 'string' && ID.test(de) ? { de } : {}), ...(g ? { guia: g } : {}), ...(p ? { prueba: p } : {}) }]
     }
     return [
@@ -731,6 +740,12 @@ async function cambiar(env: Env, yo: Miembro, f: Guardada, c: Record<string, unk
   if (c.fijada !== undefined) nueva.fijada = c.fijada ? 1 : 0
   if (c.estado !== undefined) nueva.estado = c.estado === 'haciendo' || c.estado === 'hecha' ? c.estado : null
   if (nueva.categoria !== 'mejoras') nueva.estado = null
+  // Un estilo guardado con los acentos rotos, o sin lo de su prueba en su guía, queda bien en cuanto se toca: al aprobarlo, sobre todo.
+  if (nueva.categoria === 'estilos') {
+    nueva.titulo = acentosBien(nueva.titulo)
+    nueva.texto = acentosBien(nueva.texto)
+    nueva.adjuntos = JSON.stringify((JSON.parse(nueva.adjuntos) as Adjunto[]).map((a) => (a.tipo === 'estilo' ? { ...a, ...alDia(a.guia, a.prueba) } : a)))
+  }
   if (contenido) estiloEnSuSitio(nueva.categoria, JSON.parse(nueva.adjuntos) as Adjunto[], nueva.texto)
   // Lo que se aprobó es ese paquete: otro (o el mismo, al pasar a Estilos) vuelve a esperar.
   const otroPaquete = nueva.categoria === 'estilos' && (f.categoria !== 'estilos' || llaveDelEstilo(nueva.adjuntos) !== llaveDelEstilo(f.adjuntos))
@@ -906,7 +921,7 @@ async function avisos(env: Env, yo: Miembro, soloCuenta: boolean): Promise<{ avi
       tipo: a.tipo,
       de: autores.get(a.de) ?? { id: a.de, nombre: '' },
       publicacion: a.publicacion,
-      sobre: a.titulo || (a.ptexto ?? '').slice(0, 80) || 'una publicación',
+      sobre: acentosBien(a.titulo || (a.ptexto ?? '').slice(0, 80)) || 'una publicación',
       ...(a.comentario ? { comentario: a.comentario } : {}),
       ...(a.texto ? { texto: a.texto } : {}),
       creado: a.creado,

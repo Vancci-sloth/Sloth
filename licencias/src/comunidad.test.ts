@@ -66,7 +66,11 @@ test('un estilo no se publica sin lo que lleva todo estilo: qué hace, su guía 
   assert.throws(() => estiloEnSuSitio('estilos', adjuntosDe([estilo]), 'Recetas.'), /falta: Qué le das; Un video entero hecho con él; La prueba de con qué agente.*actualízala/)
   assert.throws(() => estiloEnSuSitio('estilos', completo({ ...guia, ejemplo: 'x' }), 'Recetas.'), /falta: Ejemplo de lo que le escribes\./)
   assert.throws(() => estiloEnSuSitio('estilos', completo({ ...guia, herramientas: [] }), 'Recetas.'), /falta: Con qué lo hace\./)
-  assert.throws(() => estiloEnSuSitio('estilos', completo({ ...guia, agentes: ['uno-inventado'] }), 'Recetas.'), /falta: Con qué agentes funciona bien\./)
+  // El agente de su prueba y lo que su hilo usó van en su guía sin que los marque; y lo que llega con los acentos rotos se guarda bien.
+  assert.deepEqual(completo({ ...guia, agentes: ['uno-inventado'] })[0].guia?.agentes, ['claude'])
+  const usada = { ...prueba, agente: 'antigravity', hilo: { pedido: 'Hazme uno.', turnos: [{ segundos: 60, costo: 0, herramientas: 2 }], usa: ['flow-imagenes'] } }
+  assert.deepEqual(completo({ ...guia, necesita: 'Google Flow con crÃ©ditos.' }, usada)[0].guia, { ...guia, necesita: 'Google Flow con créditos.', herramientas: ['codigo', 'tu-voz', 'flow-imagenes'], agentes: ['claude', 'antigravity'] })
+  assert.throws(() => estiloEnSuSitio('estilos', adjuntosDe([{ ...estilo, guia: { ...guia, agentes: [] } }, video]), 'Recetas.'), /falta: Con qué agentes funciona bien; La prueba/)
   // El hilo de una prueba no se adjunta suelto, ni como video: va dentro de la prueba.
   assert.deepEqual(adjuntosDe([{ tipo: 'video', llave: prueba.evidencia }]), [])
   assert.throws(() => estiloEnSuSitio('estilos', completo(guia, { ...prueba, evidencia: undefined }), 'Recetas.'), /falta: La prueba de con qué agente/)

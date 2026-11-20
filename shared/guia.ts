@@ -1,3 +1,4 @@
+import { acentosBien } from './acentos.ts'
 import { PROVEEDORES, type Proveedor } from './providers.ts'
 import type { GuiaEstilo, PruebaEstilo } from './types.ts'
 
@@ -14,6 +15,9 @@ import type { GuiaEstilo, PruebaEstilo } from './types.ts'
  *   acepta compartir y solo ven él y el creador.
  * Sin las tres el Worker no lo publica (`estiloEnSuSitio` en `licencias/src/comunidad.ts`) y el que ya estaba deja de
  * verse en la tienda hasta completarlo (`faltaEnEstilo`, `PublicacionComunidad.incompleto`).
+ *
+ * Lo que Sloth sabe arreglar no se le devuelve a su autor: los acentos rotos de su guía (`acentosBien`) y lo que su
+ * prueba demuestra y su guía calla (`guiaConSuPrueba`).
  */
 export const CAMPOS_GUIA: { id: 'das' | 'entrega' | 'ejemplo' | 'necesita'; titulo: string; pista: string; max: number; opcional?: true }[] = [
   { id: 'das', titulo: 'Qué le das', pista: 'Lo que pones tú cada vez. Por ejemplo: solo el tema; la voz la grabas cuando te da el guion.', max: 200 },
@@ -57,7 +61,7 @@ export function guiaDe(valor: unknown): GuiaEstilo | undefined {
   const g: Record<string, string | string[]> = {}
   for (const c of CAMPOS_GUIA) {
     const v = de[c.id]
-    const t = typeof v === 'string' ? v.replace(/\s+/g, ' ').trim().slice(0, c.max) : ''
+    const t = typeof v === 'string' ? acentosBien(v).replace(/\s+/g, ' ').trim().slice(0, c.max) : ''
     if (t) g[c.id] = t
   }
   const herramientas = unicos(Array.isArray(de.herramientas) ? de.herramientas : []).filter((h) => HERRAMIENTAS.some((x) => x.id === h))
@@ -106,6 +110,17 @@ export function pruebaDe(valor: unknown): PruebaEstilo | undefined {
         }
       : {})
   }
+}
+
+/**
+ * La guía con lo que su prueba demuestra: el agente con que se hizo su video funciona con él, y lo que ese hilo usó de
+ * Sloth es con lo que lo hace. Antes era una falla que su autor tenía que corregir a mano y volver a mandar; la prueba
+ * no se escribe, sale del hilo, así que lo pone Sloth. Sin guía no inventa una.
+ */
+export function guiaConSuPrueba(guia: GuiaEstilo | undefined, prueba: PruebaEstilo | undefined): GuiaEstilo | undefined {
+  if (!guia || !prueba) return guia
+  const herramientas = unicos([...(guia.herramientas ?? []), ...(prueba.hilo?.usa ?? [])])
+  return { ...guia, ...(herramientas.length ? { herramientas } : {}), agentes: unicos([...(guia.agentes ?? []), prueba.agente]) }
 }
 
 /**

@@ -3,6 +3,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 import { homedir } from 'node:os'
 import { dirname, join, relative, sep } from 'node:path'
 import { gunzipSync, gzipSync } from 'node:zlib'
+import { acentosBien } from '../shared/acentos.ts'
 import { guiaDe } from '../shared/guia.ts'
 import type { Card, GuiaEstilo, OrigenEstilo } from '../shared/types.ts'
 import { guardar } from './disco.ts'
@@ -140,18 +141,24 @@ function usaDe(archivos: Map<string, Buffer>, base: string): Record<string, stri
   return Object.fromEntries(Object.entries(usa).sort(([a], [b]) => a.localeCompare(b)))
 }
 
-/** Lo que viaja de la card, sin lo de esta computadora. */
+/**
+ * Lo que viaja de la card, sin lo de esta computadora. Lo que se lee de ella (su título, qué hace, los nombres de sus
+ * etapas, su guía) va con sus acentos bien aunque su autor la tenga con ellos rotos (`shared/acentos.ts`): así sale del
+ * paquete, y así queda al instalar o revisar uno que ya venía mal.
+ */
 function cardLimpia(card: Partial<Card>): Partial<Card> {
   const limpia: Record<string, unknown> = {}
   for (const k of CAMPOS) if (card[k] !== undefined) limpia[k] = card[k]
   if (typeof limpia.title !== 'string' || !limpia.title.trim()) throw new EstiloMalo('El estilo no tiene título.')
-  limpia.title = String(limpia.title).slice(0, 80)
-  limpia.description = String(limpia.description ?? '').slice(0, 400)
+  limpia.title = acentosBien(String(limpia.title)).slice(0, 80)
+  limpia.description = acentosBien(String(limpia.description ?? '')).slice(0, 400)
   // Su guía de uso, limpia; una que no dice nada no viaja.
   const guia = guiaDe(limpia.guia)
   if (guia) limpia.guia = guia
   else delete limpia.guia
   if (limpia.etapas !== undefined && !Array.isArray(limpia.etapas)) throw new EstiloMalo('Las etapas del estilo no son una lista.')
+  // En una copia: la card de su autor no se toca.
+  if (limpia.etapas) limpia.etapas = (limpia.etapas as Record<string, unknown>[]).map((e) => (e && typeof e.nombre === 'string' ? { ...e, nombre: acentosBien(e.nombre) } : e))
   // Lo que `listo` y `muestra` buscan es dentro de la carpeta del video.
   for (const e of (limpia.etapas ?? []) as Record<string, unknown>[]) {
     for (const k of ['listo', 'muestra']) if (typeof e[k] === 'string' && ((e[k] as string).includes('..') || /^([a-z]:|[\\/])/i.test(e[k] as string))) throw new EstiloMalo('Una etapa del estilo busca fuera de su carpeta.')
@@ -174,13 +181,14 @@ export function empaquetar(o: { card: Card; carpeta: string; sloth: string; base
   const archivos = new Map(rutas.map((r) => [r, readFileSync(join(o.carpeta, ...r.split('/')))]))
   const npm = ajenos(archivos, o.deSloth)
   if (npm.length) throw new EstiloMalo(`Usa paquetes de npm que Sloth no trae (${npm.join(', ')}). Un estilo compartido solo usa lo que ya usan los de Sloth.`)
+  const limpia = cardLimpia(card)
   const manifiesto: Manifiesto = {
     formato: FORMATO,
     id: card.skill,
-    titulo: card.title,
+    titulo: limpia.title!,
     sloth: o.sloth,
     ...(basadoEn ? { basadoEn } : {}),
-    card: cardLimpia(card),
+    card: limpia,
     usa: usaDe(archivos, o.base),
     archivos: rutas.map((ruta) => ({ ruta, bytes: archivos.get(ruta)!.length }))
   }

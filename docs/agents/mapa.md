@@ -67,8 +67,9 @@ Este es el mapa:
   (un test los empareja y pasa por ella los estilos de Sloth). Antes de mandarlo le dice a su autor los que no cumple, y
   el que ya compartió pone al día su misma publicación (`data/estilos-compartidos.json`). En la computadora del creador,
   su Claude lee cada estilo que llega, sin instalarlo y sin poder más que leer (`soloLeer`), y la revisión se cierra
-  sola (`server/estilos-revision.ts`, ADR 0022): se aprueba el que cumple todo y no añade nada de riesgo, a su autor se
-  le contesta en su publicación lo que le falta, y el hilo queda como «Aprobado», «Le falta», «Decide tú» (añade algo
+  sola (`server/estilos-revision.ts`, ADR 0022): se aprueba el que no falla en lo que frena (ADR 0023: lo demás son
+  sugerencias, y los acentos rotos y lo que su prueba demuestra los arregla Sloth, `shared/acentos.ts`) y no añade nada
+  de riesgo, a su autor se le contesta en su publicación lo que le falta, y el hilo queda como «Aprobado», «Le falta», «Decide tú» (añade algo
   que tiene que ver una persona) o «No lo aprobaría»; «Revisar», en la publicación, abre ese hilo. Todo estilo
   compartido lleva su guía de uso, una plantilla igual para todos (`shared/guia.ts`, `web/src/Guia.tsx`): qué le das, qué
   te entrega, un ejemplo y qué necesita. El Worker no lo publica sin ella y queda en la card de quien lo instala (`guia`).

@@ -52,6 +52,39 @@ test('empaqueta la skill sin lo personal, lo rehecho ni programas, y sabe de cu�
   }
 })
 
+test('una card con los acentos rotos sale del paquete, y se instala, con ellos bien; la de su autor no se toca', () => {
+  const de = sloth()
+  const a = sloth(false)
+  try {
+    de.tuya.title = 'Cuentos 3D CinematogrÃ¡ficos'
+    de.tuya.description = 'Cortos con diÃ¡logos y crÃ©ditos.'
+    de.tuya.etapas = [{ nombre: 'RevisiÃ³n', listo: 'guion.md', fase: 'guion' }, { nombre: 'Video', listo: 'out/final.mp4', fase: 'video' }]
+    de.tuya.guia = { das: 'Solo el tema; genera tÃº los personajes.', entrega: 'Un cuento de 60 segundos.', ejemplo: 'Hazme uno de un portal.' }
+    const { paquete, manifiesto } = empacar(de)
+    assert.equal(manifiesto.titulo, 'Cuentos 3D Cinematográficos')
+    assert.equal(manifiesto.card.description, 'Cortos con diálogos y créditos.')
+    assert.equal(manifiesto.card.etapas![0].nombre, 'Revisión')
+    assert.equal(manifiesto.card.guia!.das, 'Solo el tema; genera tú los personajes.')
+    assert.equal(de.tuya.etapas[0].nombre, 'RevisiÃ³n')
+    // Uno que ya se compartió con ellos rotos (hecho con una Sloth de antes) queda bien al abrirlo: al instalarlo o revisarlo.
+    const roto = (() => {
+      const cabeza = Buffer.from(JSON.stringify({ ...manifiesto, titulo: de.tuya.title, card: { ...manifiesto.card, title: de.tuya.title, description: de.tuya.description } }), 'utf8')
+      const largo = Buffer.alloc(4)
+      largo.writeUInt32BE(cabeza.length)
+      const { archivos } = leerPaquete(paquete)
+      return gzipSync(Buffer.concat([largo, cabeza, ...manifiesto.archivos.map((x) => archivos.get(x.ruta)!)]))
+    })()
+    const tusCards = join(a.app, 'data', 'tus-cards.json')
+    assert.equal(instalar({ paquete: roto, app: a.app, tusCards, cards: a.cards, sloth: '0.3.44', base: a.base, deSloth: a.deSloth }).titulo, 'Cuentos 3D Cinematográficos')
+    const [card] = JSON.parse(readFileSync(tusCards, 'utf8')) as Card[]
+    assert.equal(card.title, 'Cuentos 3D Cinematográficos')
+    assert.equal(card.description, 'Cortos con diálogos y créditos.')
+  } finally {
+    de.fin()
+    a.fin()
+  }
+})
+
 test('no empaqueta un estilo con paquetes de npm que Sloth no trae', () => {
   const s = sloth()
   try {

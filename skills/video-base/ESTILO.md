@@ -1,7 +1,8 @@
 # Lo que necesita todo estilo
 
 La vara de un estilo de vídeo, sea de Sloth o de cada quien. Con ella se hace (`crear-estilo`), se le avisa a su autor
-al compartirlo y se revisa antes de que salga en la comunidad. Un estilo se aprueba cuando cumple los 30.
+al compartirlo y se revisa antes de que salga en la comunidad. Uno bien hecho cumple los 30; para salir en la comunidad
+no puede fallar en los que frenan (abajo, «Cómo se aprueba en la comunidad»).
 
 Los marcados **(Sloth)** los comprueba Sloth sin leer lo que el estilo hace, y los dice todos de una vez al pulsar
 «Compartir». Los demás los juzga quien lo lee. Lo que Sloth comprueba manda: un estilo con uno de esos sin cumplir no
@@ -89,9 +90,16 @@ Sin el 10, el 29 o el 30 no se publica, y el que ya estaba deja de verse en la t
 
 ## Cómo se aprueba en la comunidad
 
-- **Se aprueba solo** si cumple todo lo de (Sloth), quien lo lee dice que cumple lo demás y no hay ninguna señal.
-- **Le falta algo:** se le dice a su autor, en su publicación, qué cambiar. Lo arregla y pulsa «Compartir» otra vez: se
-  revisa de nuevo.
+Frena lo que le importa a quien lo instala: los marcados (Sloth); el 17, que le salga el vídeo sin programar nada, en
+Windows, Mac o Linux; «Lo que no hace», del 22 al 26; y el 28 cuando promete lo que no hace o gasta lo que no dice. Lo
+demás (el 2, el 15, el 16, el 27, un detalle del 28) no frena: se le dice a su autor como sugerencia, y sale igual.
+
+Lo que Sloth sabe arreglar no se le devuelve a su autor: los acentos rotos de su card y de su guía («CinematogrÃ¡ficos»)
+se arreglan solos, y a su guía se le pone el agente con que hizo el vídeo de su prueba y lo que ese hilo usó.
+
+- **Se aprueba solo** si cumple todo lo de (Sloth), quien lo lee dice que nada lo frena y no hay ninguna señal.
+- **Le falta algo** de lo que frena: se le dice a su autor, en su publicación, qué cambiar. Lo arregla y pulsa
+  «Compartir» otra vez: se revisa de nuevo, mirando primero lo que se le pidió, sin una lista nueva de detalles.
 - **Trae una señal:** aunque cumpla todo, lo aprueba el creador de Sloth a mano.
 - **No se aprobaría** (hace algo de «Lo que no hace»): lo decide el creador.
 
