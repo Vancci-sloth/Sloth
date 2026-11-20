@@ -57,7 +57,7 @@ const DE_LA_BASE = /video-base\/([\w./-]+\.[a-z0-9]+)/gi
 const SENALES: [RegExp, string][] = [
   [/\b(requests|urllib|httpx|aiohttp|socket|ftplib|smtplib)\b|\bhttp\.client\b|\bfetch\(|\bXMLHttpRequest\b|\bWebSocket\b|\bhttps?\.(get|request)\(|\b(curl|wget|Invoke-WebRequest|Invoke-RestMethod)\b/, 'se conecta a internet'],
   [/\bsubprocess\b|\bos\.(system|popen|exec\w*|spawn\w*)\b|\bchild_process\b|\b(execSync|spawnSync|execFile\w*|spawn)\(|\bStart-Process\b/, 'lanza otros programas'],
-  [/\beval\(|\bexec\(|\bnew Function\(|\b__import__\(|\bcompile\(|\bb64decode\b|\batob\(|\bfromCharCode\b|\bimportlib\b/, 'arma código al vuelo'],
+  [/\beval\(|\bexec\(|\bnew Function\(|\b__import__\(|(?<!\.)\bcompile\(|\bb64decode\b|\batob\(|\bfromCharCode\b|\bimportlib\b/, 'arma código al vuelo'],
   [/\bos\.environ\b|\bprocess\.env\b|\$env:|\bgetenv\(|\bexpanduser\(|\bPath\.home\(|\bhomedir\(|\bAPPDATA\b|\.ssh\b|\.aws\b|\bkeyring\b|\bcredential|\bcookies?\b/i, 'lee lo de tu usuario'],
   [/\b(rmtree|unlink|rmdir|removedirs|rmSync|unlinkSync|Remove-Item)\b|\bos\.remove\(|\brm -rf?\b/, 'borra archivos']
 ]

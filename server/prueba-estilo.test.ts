@@ -50,6 +50,32 @@ test('dice el agente por el modelo del hilo, y sin un turno cerrado antes del vi
   assert.equal(pruebaDelHilo(hilo.map((e) => (e.t === 'turn_end' ? { ...e, costUsd: undefined } : e)), 'opencode:grok-code', 25 * MIN)!.costo, 0)
 })
 
+test('un turno que cortó una caída cuenta hasta lo último que hizo, no hasta que Sloth se volvió a abrir', () => {
+  // Trabajó 10 minutos, se cerró Sloth y se abrió al día siguiente (el caso de un estilo de la comunidad: 1.297 min en un turno).
+  const cortado: AgentEvent[] = [
+    { t: 'user', text: 'Edita este video.', at: 0 },
+    { t: 'turn_start', at: 0 },
+    herramienta('Bash', { command: 'python scripts/hacer.py' }),
+    { t: 'thinking', id: 'p', delta: 'Renderizando.', at: 10 * MIN },
+    { t: 'turn_end', at: 1297 * MIN, ok: false, error: 'el servidor se cerró a mitad del turno.', caida: true },
+    { t: 'user', text: 'Sigue.', at: 1298 * MIN },
+    { t: 'turn_start', at: 1298 * MIN },
+    { t: 'thinking', id: 'q', delta: 'Sigo.', at: 1299 * MIN },
+    { t: 'turn_end', at: 1320 * MIN, ok: true, costUsd: 0.16 }
+  ]
+  const p = pruebaDelHilo(cortado, 'codex:gpt-5.6', 1319 * MIN)!
+  assert.deepEqual(p.hilo!.turnos.map((t) => t.segundos), [600, 22 * 60])
+  assert.equal(p.segundos, 32 * 60)
+  // Los hilos de antes de la marca `caida` traen solo la frase; sin nada que diga cuándo trabajó, ese turno no suma.
+  const viejo = cortado.filter((e) => e.t !== 'thinking').map((e) => (e.t === 'turn_end' ? { ...e, caida: undefined } : e))
+  assert.deepEqual(pruebaDelHilo(viejo, 'codex:gpt-5.6', 1319 * MIN)!.hilo!.turnos.map((t) => t.segundos), [0, 22 * 60])
+  const turnos = evidenciaDelHilo(cortado, 'codex:gpt-5.6', 'Edición', 1319 * MIN).pasos.filter((x) => x.t === 'turno')
+  assert.deepEqual(turnos.map((t) => t.segundos), [600, 22 * 60])
+  // Un error que no es una caída (se acabó la cuota) sí cuenta hasta su cierre: trabajó todo ese tiempo.
+  const cuota = cortado.map((e) => (e.t === 'turn_end' && !e.ok ? { ...e, at: 38 * MIN, error: 'Se acabó la cuota.', caida: undefined } : e))
+  assert.equal(pruebaDelHilo(cuota, 'codex:gpt-5.6', 1319 * MIN)!.hilo!.turnos[0].segundos, 38 * 60)
+})
+
 test('lo que el hilo de su prueba usó y su guía no dice, no cuadra: es una falla', () => {
   const prueba = pruebaDelHilo(hilo, 'claude-opus-5-5', 25 * MIN, 45)!
   const guia = { das: '', entrega: '', ejemplo: '', herramientas: ['codigo', 'flow-imagenes', 'internet', 'tu-voz'], agentes: ['claude' as const] }
@@ -61,6 +87,10 @@ test('lo que el hilo de su prueba usó y su guía no dice, no cuadra: es una fal
   assert.match(calla.fallas[0], /usó Imágenes de Google Flow, Material de internet, y tu guía no lo dice/)
   assert.match(calla.fallas[1], /se hizo con Claude, y tu guía no lo pone entre los agentes/)
   assert.deepEqual(deSuPublicacion(undefined, undefined), { notas: [], fallas: [] })
+  // Lo que escribió en su guía le llega a quien lo lee: en el paquete no siempre viene.
+  const escrita = deSuPublicacion({ ...guia, das: 'Solo el tema.', entrega: 'Un vertical de un minuto.', ejemplo: 'Hazme uno del sol.', necesita: 'Google Flow con créditos.' }, prueba)
+  assert.match(escrita.notas[1], /Qué le das: «Solo el tema\.» Qué te entrega: «Un vertical de un minuto\.» Ejemplo de lo que le escribes: «Hazme uno del sol\.» Qué necesita: «Google Flow con créditos\.»/)
+  assert.equal(bien.notas.length, 2)
 })
 
 test('la evidencia es el hilo completo hasta el video terminado: lo que se dijo, lo que se hizo y cómo acabó cada turno', () => {

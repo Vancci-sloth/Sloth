@@ -1,6 +1,6 @@
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
-import { HERRAMIENTAS } from '../shared/guia.ts'
+import { CAMPOS_GUIA, HERRAMIENTAS } from '../shared/guia.ts'
 import { NOMBRE_AGENTE } from '../shared/providers.ts'
 import { REVISION_CARD } from '../shared/revision.ts'
 import type { GuiaEstilo, PruebaEstilo, SessionMeta } from '../shared/types.ts'
@@ -62,6 +62,9 @@ export function deSuPublicacion(guia: GuiaEstilo | undefined, prueba: PruebaEsti
   const notas: string[] = []
   const fallas: string[] = []
   if (guia) notas.push(`Su guía dice que hace el video con: ${nombres(guia.herramientas ?? [])}; y que funciona bien con: ${(guia.agentes ?? []).map((a) => NOMBRE_AGENTE[a]).join(', ') || 'ninguno'}.`)
+  // Lo que escribió al compartirlo va en su publicación, no siempre en `estilo.json`: sin esto, quien lo lee no lo ve.
+  const escrito = CAMPOS_GUIA.flatMap((c) => (guia?.[c.id] ? [`${c.titulo}: «${guia[c.id]}»`] : []))
+  if (escrito.length) notas.push(`Su guía de uso, como la escribió al compartirlo (es la que ve quien lo instala; no la busques en \`estilo.json\`). ${escrito.join(' ')}`)
   if (!prueba) return { notas, fallas }
   const h = prueba.hilo
   notas.push(

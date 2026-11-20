@@ -8,7 +8,8 @@ import type { AgentEvent, EvidenciaEstilo, PasoEvidencia, PruebaEstilo } from '.
  * ser uno hecho en Sloth cuyo hilo siga ahí.
  *
  * Cuenta los turnos que empezaron antes de que el video quedara terminado: lo que trabajó el agente en cada uno (sin lo
- * que esperó a quien lo usa, por ejemplo a que grabara su voz) y lo que costó, a precio de la API. Con ellos va el
+ * que esperó a quien lo usa, por ejemplo a que grabara su voz, ni lo que Sloth estuvo cerrada tras una caída: `finDe`)
+ * y lo que costó, a precio de la API. Con ellos va el
  * resumen del hilo: lo que se le pidió, cada turno con su tiempo, su costo y cuántas herramientas usó, y lo que usó de
  * Sloth (`HERRAMIENTAS`). Con él se compara su guía al revisarlo.
  *
@@ -22,6 +23,12 @@ const PESO_EVIDENCIA = 3 * 1024 * 1024
 const corto = (texto: string, max: number) => (texto.length > max ? `${texto.slice(0, max)}… (${texto.length - max} caracteres más)` : texto)
 
 /**
+ * Cuándo acabó de trabajar un turno. Al que lo cortó una caída lo cierra Sloth al volver a abrirse, quizá un día
+ * después: ese cuenta hasta lo último que se supo de él (`visto`), no hasta su cierre.
+ */
+const finDe = (e: Extract<AgentEvent, { t: 'turn_end' }>, visto: number) => (e.caida || /^el servidor se cerró/.test(e.error ?? '') ? visto : e.at)
+
+/**
  * La evidencia de una prueba (`EvidenciaEstilo`): el hilo completo donde se hizo el video, hasta el turno en que quedó
  * terminado. Lo que se dijo va entero; lo de cada herramienta, recortado, y si aun así pesa de más, sin lo que
  * devolvieron. La leen su autor y el creador, con «Ver la evidencia» en la publicación del estilo.
@@ -31,10 +38,12 @@ export function evidenciaDelHilo(eventos: AgentEvent[], modelo: string, titulo: 
   const textos = new Map<string, Extract<PasoEvidencia, { t: 'agente' }>>()
   const herramientas = new Map<string, Extract<PasoEvidencia, { t: 'herramienta' }>>()
   let inicio: number | undefined
+  let visto = 0
   for (const e of eventos) {
+    if (e.t === 'thinking' && e.at) visto = Math.max(visto, e.at)
     if (e.t === 'turn_start') {
       if (e.at > terminado) break
-      inicio = e.at
+      inicio = visto = e.at
     } else if (e.t === 'user') {
       if (e.at > terminado) break
       pasos.push({ t: 'usuario', texto: e.text })
@@ -54,7 +63,7 @@ export function evidenciaDelHilo(eventos: AgentEvent[], modelo: string, titulo: 
       else if (e.delta && (paso.salida?.length ?? 0) < SALIDA) paso.salida = corto((paso.salida ?? '') + e.delta, SALIDA)
       if (e.error) paso.error = true
     } else if (e.t === 'turn_end' && inicio !== undefined) {
-      pasos.push({ t: 'turno', segundos: Math.round(Math.max(0, e.at - inicio) / 1000), costo: e.costUsd ?? 0, ok: e.ok, ...(e.error ? { error: e.error } : {}) })
+      pasos.push({ t: 'turno', segundos: Math.round(Math.max(0, finDe(e, visto) - inicio) / 1000), costo: e.costUsd ?? 0, ok: e.ok, ...(e.error ? { error: e.error } : {}) })
       inicio = undefined
     }
   }
@@ -84,18 +93,20 @@ export function pruebaDelHilo(eventos: AgentEvent[], modelo: string, terminado: 
   const turnos: { segundos: number; costo: number; herramientas: number }[] = []
   const usa = new Set<string>()
   let inicio: number | undefined
+  let visto = 0
   let herramientas = 0
   for (const e of eventos) {
+    if (e.t === 'thinking' && e.at) visto = Math.max(visto, e.at)
     if (e.t === 'turn_start') {
       // El turno en que se terminó cuenta entero: el archivo se escribe a la mitad, y lo que sigue (medirlo, su portada) es parte de hacerlo.
       if (e.at > terminado) break
-      inicio = e.at
+      inicio = visto = e.at
       herramientas = 0
     } else if (e.t === 'tool' && inicio !== undefined) {
       herramientas++
       for (const u of usaDe(e.name, typeof e.input === 'string' ? e.input : JSON.stringify(e.input ?? ''))) usa.add(u)
     } else if (e.t === 'turn_end' && inicio !== undefined) {
-      turnos.push({ segundos: Math.max(0, (e.at - inicio) / 1000), costo: e.costUsd ?? 0, herramientas })
+      turnos.push({ segundos: Math.max(0, (finDe(e, visto) - inicio) / 1000), costo: e.costUsd ?? 0, herramientas })
       inicio = undefined
     }
   }
