@@ -81,7 +81,7 @@ export function YoutubeOpciones() {
           <button className="boton" disabled={ocupado} onClick={() => conectar(false)}>Conectar canal</button>
         ) : <button className="primary" disabled={ocupado || !conexion} onClick={() => setAbierto(true)}>Configurar</button>}
       </div>
-      {conSloth && !conexion?.conSloth && <p className="fila-extra small"><Legal /></p>}
+      {conSloth && !conexion?.conSloth && <div className="fila-extra small"><p><Legal /></p></div>}
       {conexion?.conSloth && conexion.sloth && !conexion.sloth.apoya && (
         <p className="fila-extra small">Tu canal está conectado con la app de Sloth, que es para quienes apoyan. Vuelve a apoyar para seguir subiendo, o conéctalo con tu propia app de Google en «Conexión y ayuda».</p>
       )}
