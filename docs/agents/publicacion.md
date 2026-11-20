@@ -220,7 +220,8 @@ dice) y le manda su clave por correo; si ya tenía uno así, se le suman. Con 0 
 ### YouTube con la app de Sloth
 
 Quien apoya conecta su canal con la app de Google de Sloth ([ADR 0021](../adr/0021-youtube-con-la-app-de-sloth.md)):
-el proyecto de Google Cloud de Sloth, con su cliente OAuth de tipo «App de escritorio». Su id y su secreto van en el cobro
+el proyecto de Google Cloud de Sloth (`sloth-515321`, número 918300411652, creado el 20-nov-2026), con su cliente OAuth
+de tipo «App de escritorio» (`Sloth`, en producción). Su id y su secreto van en el cobro
 (`npm run licencias -- secret put YOUTUBE_CLIENT_ID` y `YOUTUBE_CLIENT_SECRET`, desde Git Bash como arriba). Sin los
 dos, `/youtube` responde `{}` y la app solo ofrece la propia de cada quien. Comprueba con
 `curl https://api.sloth.vancci.org/youtube`: debe traer `cliente`.
