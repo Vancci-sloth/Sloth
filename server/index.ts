@@ -44,7 +44,7 @@ import { redes } from './redes/index.ts' // redes
 import { elegirNavegador, navegadorDeFuera, navegadorEn } from './chromium.ts'
 import { voz } from './voz/index.ts' // voz de AI Studio
 import { flow } from './flow/index.ts' // Google Flow
-import { youtube } from './youtube.ts'
+import { appSloth, youtube } from './youtube.ts'
 import { peticionDeConfianza } from './origen.ts'
 import { actualizarYtDlp, BANDERAS, instalandoAlgo, instalar, pythonSlothEntero, requisitos, rutaPythonSloth } from './requisitos.ts'
 import { espacio } from './espacio.ts' // espacio en disco
@@ -212,7 +212,8 @@ function cards(): Card[] {
 
 // Publicar los videos verticales terminados en TikTok, Instagram y YouTube Shorts, y los largos en YouTube. Los Shorts
 // van con el canal que conecta YouTube.
-const subirLargos = youtube(APP, sessions, cards, `http://127.0.0.1:${PORT}/api/youtube/oauth`, undefined, () => modelos)
+// Quien apoya conecta su canal con la app de Google de Sloth, que vive en el cobro; los demás, con la suya.
+const subirLargos = youtube(APP, sessions, cards, `http://127.0.0.1:${PORT}/api/youtube/oauth`, undefined, () => modelos, undefined, appSloth(() => llaveDelCreador() ?? suscripcion.credencial()))
 const publicar = redes(APP, sessions, cards, broadcast, subirLargos.lectura) // redes
 
 // Cada card de estilo enseña su último video terminado, en pequeño.

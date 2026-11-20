@@ -217,6 +217,24 @@ mientras quede alguno de los 25. Con `lista` ves los que se han dado y quién us
 Si alguien apoyó por transferencia, `npm run fundador -- dar <correo> [meses]` lo hace Fundador esos meses (1 si no se
 dice) y le manda su clave por correo; si ya tenía uno así, se le suman. Con 0 meses, solo se le vuelve a mandar.
 
+### YouTube con la app de Sloth
+
+Quien apoya conecta su canal con la app de Google de Sloth ([ADR 0021](../adr/0021-youtube-con-la-app-de-sloth.md)):
+el proyecto de Google Cloud de Sloth, con su cliente OAuth de tipo «App de escritorio». Su id y su secreto van en el cobro
+(`npm run licencias -- secret put YOUTUBE_CLIENT_ID` y `YOUTUBE_CLIENT_SECRET`, desde Git Bash como arriba). Sin los
+dos, `/youtube` responde `{}` y la app solo ofrece la propia de cada quien. Comprueba con
+`curl https://api.sloth.vancci.org/youtube`: debe traer `cliente`.
+
+Lo que pide Google, en el proyecto de Sloth:
+
+- Google Auth Platform → Público: «En producción». En «Prueba», el permiso caduca cada 7 días.
+- Verificar la app (Centro de verificación): página de inicio y aviso de privacidad en `sloth.vancci.org` (dominio
+  verificado en Search Console), la justificación de cada permiso (`SCOPES` en `server/youtube.ts`) y un video «No
+  listado» del flujo de «Conectar canal» y de una subida. Sin verificar, son 100 usuarios en toda la vida del proyecto.
+- Más de 100 subidas al día entre todos: auditoría y cuota en el
+  [formulario de YouTube](https://support.google.com/youtube/contact/yt_api_form) (aparte `videos.insert`, con su cuenta).
+  Una sola app de Sloth: varios proyectos para sumar cuota violan las políticas (III.D.1).
+
 ## Publicaciones de Instagram: nube/
 
 El Worker `sloth-redes`, con R2 y su cron, se configura en `nube/wrangler.jsonc`. Desde la raíz:

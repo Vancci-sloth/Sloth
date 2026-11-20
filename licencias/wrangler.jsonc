@@ -9,6 +9,8 @@
 // STRIPE_WEBHOOK_SECRET (la tarjeta, con Stripe: `npm run stripe` pone las dos con la llave secreta; sin ellas no se ofrece),
 // VOICES_PK_LIVE, VOICES_PK_LIVE_2, VOICES_PK_LIVE_3… (las llaves de socio `pk_live_…` de Voices Cloning, una por secreto,
 // para las voces de src/voz.ts; una nueva va en el siguiente número libre y nunca encima de otra, que tiene sus usuarios),
+// YOUTUBE_CLIENT_ID y YOUTUBE_CLIENT_SECRET (el cliente OAuth «App de escritorio» del proyecto de Google de Sloth: con
+// ellos, quien apoya conecta su canal de YouTube con la app de Sloth, src/youtube.ts; sin ellos, no se ofrece),
 // FIRMA (la llave privada Ed25519 en PKCS8 y base64; la pública va en server/licencia.ts), PUBLICAR (la llave de
 // `npm run publicar`, solo en los secretos de GitHub: sube versiones) y ADMIN (la del creador, en
 // %APPDATA%\sloth\licencias\admin.txt: administra la comunidad, las voces y los apoyos a mano, no publica). La base de datos se crea con

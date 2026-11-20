@@ -79,6 +79,7 @@ import { APERTURA_VOZ } from './voz-mensual.ts'
 import { bajarApoyo, reanudarPausadas } from './bajar-apoyo.ts'
 import { bajarCadaMes, comoBaja, comoSigue, pasoEn, precioDe, siVuelves, tuPrecioSeQueda } from './escalera.ts'
 import { olvidarRespaldos, respaldo } from './respaldo.ts'
+import { youtube } from './youtube.ts'
 
 export interface Env {
   DB: D1Database
@@ -112,6 +113,9 @@ export interface Env {
   NOWPAYMENTS_IPN_SECRET?: string
   /** La llave privada Ed25519 en PKCS8 y base64. */
   FIRMA: string
+  /** La app de Google de Sloth para YouTube (`src/youtube.ts`), solo para quien apoya. Sin las dos, no se ofrece. */
+  YOUTUBE_CLIENT_ID?: string
+  YOUTUBE_CLIENT_SECRET?: string
   /** La dirección de este Worker, para la página a la que vuelve el cliente tras pagar. */
   ORIGEN: string
   /** El apoyo de cada mes con menos de `PRECIO_CADA` personas, y hasta donde le baja a cada quien (`escalera.ts`). */
@@ -562,6 +566,7 @@ async function atender(req: Request, env: Env, ctx: ExecutionContext, url: URL):
     if (url.pathname === '/comunidad' || url.pathname.startsWith('/comunidad/')) return await comunidad(req, env, url, ctx)
     if (url.pathname === '/voz' || url.pathname.startsWith('/voz/')) return await voz(req, env, ctx, url)
     if (url.pathname === '/respaldo' || url.pathname.startsWith('/respaldo/')) return await respaldo(req, env, url)
+    if (url.pathname === '/youtube' || url.pathname.startsWith('/youtube/')) return await youtube(req, env, url)
     return json({ error: 'No existe' }, 404)
   } catch (error) {
     if (error instanceof Rechazo) return json({ error: error.message }, error.status)
@@ -640,7 +645,7 @@ async function ultimaLigera(req: Request, env: Env, ctx: ExecutionContext, so: S
  * por el correo, como la insignia de la comunidad: quien apoyó desde la tienda de estilos sigue con la clave de su cuenta
  * gratis, y con solo mirar el plan de esa clave no recibía lo nuevo antes.
  */
-async function apoya(req: Request, env: Env): Promise<boolean> {
+export async function apoya(req: Request, env: Env): Promise<boolean> {
   const clave = (req.headers.get('x-sloth-clave') ?? '').replace(/\s+/g, '').toUpperCase()
   const equipo = req.headers.get('x-sloth-equipo') ?? ''
   if (!CLAVE.test(clave) || !EQUIPO.test(equipo)) return false

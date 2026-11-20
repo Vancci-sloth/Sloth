@@ -13,6 +13,10 @@ export interface ConexionYoutube {
   error?: string
   /** El canal concedió el permiso para editar la fecha después de poner la miniatura. */
   programar?: boolean
+  /** La app de Google de Sloth ya está lista; `apoya`, si esta computadora la puede usar (es para quien apoya). */
+  sloth?: { apoya: boolean }
+  /** El canal se conectó con la app de Sloth, no con la tuya. */
+  conSloth?: boolean
 }
 
 export interface DatosYoutube {
