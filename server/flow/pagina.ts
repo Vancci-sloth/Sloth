@@ -72,10 +72,21 @@ export interface PedidoFlow {
 
 export const paginaFlow = (b: Browser): Promise<Page> => paginaNueva(b, { ancho: ANCHO, alto: ALTO })
 
+/** Lo que espera, tras cargar, a que Flow enseñe sus novedades. */
+const NOVEDADES = 2500
+
+/**
+ * Abre `url` sin el aviso de novedades de Flow encima. Ese aviso («A faster, easier-to-reach Flow Agent», 20 de noviembre
+ * de 2026) tapa toda la página, no se cierra con Escape y su botón de cerrar se apaga hasta pasar sus hojas; todo clic
+ * fallaba con «locator.click: Timeout». Sale una vez por cuenta: al recargar ya no está (puede haber otro en cola).
+ */
 async function ir(page: Page, url: string) {
-  await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60_000 })
-  await page.waitForLoadState('networkidle', { timeout: 20_000 }).catch(() => {})
-  if (page.url().startsWith('https://accounts.google.com/')) throw new SinEmpezar('Flow ya no tiene la sesión de esta cuenta de Google: vuelve a conectarla (la de la voz en Opciones → Voz; las demás, agregándola otra vez en Opciones → Google Flow).', '', true)
+  for (let i = 0; i < 3; i++) {
+    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60_000 })
+    await page.waitForLoadState('networkidle', { timeout: 20_000 }).catch(() => {})
+    if (page.url().startsWith('https://accounts.google.com/')) throw new SinEmpezar('Flow ya no tiene la sesión de esta cuenta de Google: vuelve a conectarla (la de la voz en Opciones → Voz; las demás, agregándola otra vez en Opciones → Google Flow).', '', true)
+    if (!(await page.locator('mat-dialog-container').first().waitFor({ timeout: NOVEDADES }).then(() => true, () => false))) return
+  }
 }
 
 const icono = (page: Page | Locator, nombre: string) => page.locator(`button:has(mat-icon:text-is("${nombre}"))`)
