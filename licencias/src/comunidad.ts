@@ -50,6 +50,7 @@
  */
 import type { AdjuntoComunidad, Autor, AvisoComunidad, CategoriaComunidad, ComentarioComunidad, FeedComunidad, GuiaEstilo, OrdenComunidad, PublicacionComunidad, RifaGanada, RoadmapComunidad } from '../../shared/types.ts'
 import { acentosBien } from '../../shared/acentos.ts'
+import { AVISO_BINANCE, COMO_PONER_BINANCE } from '../../shared/fondo.ts'
 import { faltaEnEstilo, guiaConSuPrueba, guiaDe, pruebaDe, TIPO_HILO } from '../../shared/guia.ts'
 import { fondo } from './fondo.ts'
 import { cerrar, mio, pagado, participar, reparto, salir } from './reparto.ts'
@@ -652,6 +653,13 @@ export function estiloEnSuSitio(categoria: CategoriaComunidad, adjuntos: Adjunto
   if (falta.length) throw new Rechazo(400, `Para compartir un estilo falta: ${falta.join('; ')}. Se llena con «Compartir» en su card; si tu Sloth no te lo pide, actualízala.`)
 }
 
+/**
+ * Si a ese autor hay que decirle cómo poner su Binance ID (`shared/fondo.ts`): no lo ha puesto, no es el creador y no se
+ * le ha dicho ya en ninguna publicación suya. Da una fila si sí. Lleva el autor y cómo empieza el aviso (con `%`).
+ */
+export const FALTA_BINANCE = `SELECT 1 FROM miembros m WHERE m.id = ?1 AND m.binance IS NULL AND m.clave != 'admin'
+  AND NOT EXISTS (SELECT 1 FROM comentarios c JOIN publicaciones p ON p.id = c.publicacion WHERE p.autor = ?1 AND c.texto LIKE ?2)`
+
 const llaveDelEstilo = (adjuntos: string) => (JSON.parse(adjuntos) as Adjunto[]).find((a) => a.tipo === 'estilo')?.llave
 
 /** Un aviso al creador: hay un estilo que aprobar. */
@@ -759,6 +767,9 @@ async function cambiar(env: Env, yo: Miembro, f: Guardada, c: Record<string, unk
   }
   if (c.aprobada !== undefined) nueva.aprobada = c.aprobada ? 1 : 0
   if (nueva.categoria !== 'estilos') nueva.aprobada = 1
+  // Al aprobarse un estilo de alguien que no ha puesto su Binance ID, se le dice cómo: una vez por autor.
+  const ahora = new Date().toISOString()
+  const comoCobrar = nueva.aprobada && !f.aprobada && nueva.categoria === 'estilos' && !suya && !!(await env.DB.prepare(FALTA_BINANCE).bind(f.autor, `${AVISO_BINANCE}%`).first()) ? nuevoId() : ''
   await env.DB.batch([
     env.DB.prepare('UPDATE publicaciones SET categoria = ?, titulo = ?, texto = ?, adjuntos = ?, fijada = ?, estado = ?, editada = ?, aprobada = ? WHERE id = ?').bind(
       nueva.categoria,
@@ -773,7 +784,14 @@ async function cambiar(env: Env, yo: Miembro, f: Guardada, c: Record<string, unk
     ),
     ...(nueva.estado && nueva.estado !== f.estado ? aviso(env, f.autor, yo, 'estado', f.id, { texto: nueva.estado }) : []),
     ...(nueva.aprobada && !f.aprobada ? aviso(env, f.autor, yo, 'aprobado', f.id) : []),
-    ...(!nueva.aprobada && f.aprobada ? [porAprobar(env, yo, f.id)] : [])
+    ...(!nueva.aprobada && f.aprobada ? [porAprobar(env, yo, f.id)] : []),
+    ...(comoCobrar
+      ? [
+          env.DB.prepare("INSERT INTO comentarios (id, publicacion, autor, texto, creada, responde, adjuntos) VALUES (?, ?, ?, ?, ?, NULL, '[]')").bind(comoCobrar, f.id, yo.id, COMO_PONER_BINANCE, ahora),
+          env.DB.prepare('UPDATE publicaciones SET comentarios = comentarios + 1, actividad = ?, ultimo_comentario = ? WHERE id = ?').bind(ahora, ahora, f.id),
+          ...aviso(env, f.autor, yo, 'comento', f.id, { comentario: comoCobrar })
+        ]
+      : [])
   ])
   // Un estilo que entra o sale de la tienda: sus números se vuelven a contar.
   if (nueva.aprobada !== f.aprobada || nueva.categoria !== f.categoria) olvidarNumeros()

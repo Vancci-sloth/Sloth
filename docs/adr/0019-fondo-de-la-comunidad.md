@@ -18,7 +18,10 @@ y no medía nada de lo que se hace con un estilo compartido (ADR 0017).
   a cuentas de México. Mientras Binance Pay no abra la cuenta de comerciante, el creador lo manda a mano desde Binance.
 - **Participar es de quien quiera** (`licencias/src/reparto.ts`): quien pone su Binance ID se lleva del fondo la parte
   de los puntos de sus estilos; sin él, sus puntos se ven pero el fondo se reparte entre los demás. Lo que gana cada
-  quien depende de cuánta gente usa su estilo.
+  quien depende de cuánta gente usa su estilo. Como casi nadie lo ponía (el 19 de noviembre de 2026, 8 de 29 autores,
+  y 1 de los 4 con un estilo en la tienda), **a quien le aprueban un estilo sin haberlo puesto se le dice cómo**, una
+  vez, con un comentario del creador en su publicación (`shared/fondo.ts`, `cambiar` en `licencias/src/comunidad.ts`),
+  y «Compartir» lo dice entre lo que sigue (`web/src/Estilos.tsx`). Sigue sin ser obligatorio.
 - **El primer reparto es el 1 de enero de 2027** y junta lo que entra desde el 15 de noviembre de 2026 a las 14:45 de
   Ciudad de México (`DESDE` en `fondo.ts`): hay tiempo para hacer un estilo y compartirlo. Lo que Stripe había cobrado
   antes, también lo de noviembre, es del creador y no entra. Después, cada mes.

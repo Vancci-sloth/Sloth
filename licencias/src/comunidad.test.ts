@@ -1,8 +1,9 @@
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
+import { readdirSync, readFileSync } from 'node:fs'
 import test from 'node:test'
 import { DatabaseSync } from 'node:sqlite'
-import { adjuntosDe, consultaBuscar, consultaFeed, consultaIndice, estiloEnSuSitio, fotosDeComentario, palabrasDe } from './comunidad.ts'
+import { AVISO_BINANCE, COMO_PONER_BINANCE } from '../../shared/fondo.ts'
+import { adjuntosDe, consultaBuscar, consultaFeed, consultaIndice, estiloEnSuSitio, FALTA_BINANCE, fotosDeComentario, palabrasDe } from './comunidad.ts'
 
 const imagen = (n: number) => ({ tipo: 'imagen', llave: `${String(n).padStart(20, 'a')}.png` })
 const video = { tipo: 'video', llave: 'bbbbbbbbbbbbbbbbbbbb.mp4', poster: 'cccccccccccccccccccc.webp', vertical: true }
@@ -194,4 +195,25 @@ test('los estilos de otros le salen a cualquiera, apoye o no: en el feed, en el 
   // Y la sección Estilos, con los de todos.
   const estilos = consultaFeed({ id: 'caro', creador: false }, { categoria: 'estilos', antes: '', orden: '' })
   assert.deepEqual((db.prepare(estilos.sql).all(...estilos.valores) as { id: string }[]).map((f) => f.id).sort(), ['e1', 'e2'])
+})
+
+test('a quien le aprueban un estilo y no ha puesto su Binance ID se le dice cómo, una vez por autor; al creador y a quien ya lo puso, no', () => {
+  const db = new DatabaseSync(':memory:')
+  const carpeta = new URL('../migrations/', import.meta.url)
+  for (const m of readdirSync(carpeta).sort()) db.exec(readFileSync(new URL(m, carpeta), 'utf8'))
+  for (const [id, clave, binance] of [['creador', 'admin', null], ['ana', 'SLOTH-ana', null], ['beto', 'SLOTH-beto', '123456789']])
+    db.prepare("INSERT INTO miembros (id, clave, nombre, creado, visto, binance) VALUES (?, ?, ?, '2026-11-01', '2026-11-01', ?)").run(id, clave, id, binance)
+  for (const [id, autor] of [['e1', 'ana'], ['e2', 'ana'], ['e3', 'beto']])
+    db.prepare("INSERT INTO publicaciones (id, autor, categoria, titulo, texto, adjuntos, creada, actividad, aprobada) VALUES (?, ?, 'estilos', ?, 'Qué hace', '[]', '2026-11-10', '2026-11-10', 1)").run(id, autor, id)
+  const falta = (autor: string) => !!db.prepare(FALTA_BINANCE).get(autor, `${AVISO_BINANCE}%`)
+  assert.deepEqual(['ana', 'beto', 'creador'].map(falta), [true, false, false])
+  // Ya se le dijo en uno de sus estilos: en el otro no se repite. Un comentario cualquiera no cuenta.
+  db.prepare("INSERT INTO comentarios (id, publicacion, autor, texto, creada, adjuntos) VALUES ('c0', 'e2', 'creador', 'Qué buen estilo.', '2026-11-20', '[]')").run()
+  assert.equal(falta('ana'), true)
+  db.prepare("INSERT INTO comentarios (id, publicacion, autor, texto, creada, adjuntos) VALUES ('c1', 'e1', 'creador', ?, '2026-11-20', '[]')").run(COMO_PONER_BINANCE)
+  assert.equal(falta('ana'), false)
+  // Lo que se le dice: dónde se pone, paso a paso, y qué es.
+  assert.match(COMO_PONER_BINANCE, /^Aviso automático de Sloth: tu estilo ya está en la tienda\. /)
+  assert.match(COMO_PONER_BINANCE, /1\. En Sloth, abre Comunidad y dale clic al renglón «Fondo», arriba\.\n2\. Pulsa «¿Quieres participar\?» y baja a «Pon tu Binance ID y cobra»\.\n3\. Escribe tu Binance ID y pulsa «Participar»\./)
+  db.close()
 })

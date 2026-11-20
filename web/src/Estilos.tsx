@@ -322,6 +322,13 @@ export function CompartirEstilo({ card, onCerrar }: { card: Card; onCerrar(): vo
                 <strong>Si cumple todo, se aprueba</strong> y sale en la tienda para todos. Lo que añadas para conectarse a internet o lanzar otros programas lo aprueba el creador a mano. Todo te llega a la campana de Comunidad.
               </span>
             </li>
+            <li>
+              <Icono de="personas" className="icon-trazo" />
+              <span>
+                <strong>Para cobrar tu parte del fondo, pon tu Binance ID:</strong> en Comunidad, arriba, abre «Fondo», pulsa «¿Quieres participar?» y escríbelo en «Pon tu Binance ID y cobra». Es el número de tu
+                cuenta de Binance, el de tu perfil. Sin él tu estilo sale igual, pero no se lleva nada.
+              </span>
+            </li>
           </ol>
         ) : (
           <p>Ya todos lo ven en Estilos y lo pueden instalar con un clic.</p>
