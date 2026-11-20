@@ -655,10 +655,11 @@ export function estiloEnSuSitio(categoria: CategoriaComunidad, adjuntos: Adjunto
 
 /**
  * Si a ese autor hay que decirle cómo poner su Binance ID (`shared/fondo.ts`): no lo ha puesto, no es el creador y no se
- * le ha dicho ya en ninguna publicación suya. Da una fila si sí. Lleva el autor y cómo empieza el aviso (con `%`).
+ * le ha dicho ya en ninguna publicación suya. Da una fila si sí. Lleva el autor y cómo empieza el aviso (`AVISO_BINANCE`).
+ * Sin `LIKE`: D1 no acepta un patrón de más de 50 bytes («LIKE or GLOB pattern too complex»), y SQLite en las pruebas sí.
  */
 export const FALTA_BINANCE = `SELECT 1 FROM miembros m WHERE m.id = ?1 AND m.binance IS NULL AND m.clave != 'admin'
-  AND NOT EXISTS (SELECT 1 FROM comentarios c JOIN publicaciones p ON p.id = c.publicacion WHERE p.autor = ?1 AND c.texto LIKE ?2)`
+  AND NOT EXISTS (SELECT 1 FROM comentarios c JOIN publicaciones p ON p.id = c.publicacion WHERE p.autor = ?1 AND substr(c.texto, 1, length(?2)) = ?2)`
 
 const llaveDelEstilo = (adjuntos: string) => (JSON.parse(adjuntos) as Adjunto[]).find((a) => a.tipo === 'estilo')?.llave
 
@@ -769,7 +770,7 @@ async function cambiar(env: Env, yo: Miembro, f: Guardada, c: Record<string, unk
   if (nueva.categoria !== 'estilos') nueva.aprobada = 1
   // Al aprobarse un estilo de alguien que no ha puesto su Binance ID, se le dice cómo: una vez por autor.
   const ahora = new Date().toISOString()
-  const comoCobrar = nueva.aprobada && !f.aprobada && nueva.categoria === 'estilos' && !suya && !!(await env.DB.prepare(FALTA_BINANCE).bind(f.autor, `${AVISO_BINANCE}%`).first()) ? nuevoId() : ''
+  const comoCobrar = nueva.aprobada && !f.aprobada && nueva.categoria === 'estilos' && !suya && !!(await env.DB.prepare(FALTA_BINANCE).bind(f.autor, AVISO_BINANCE).first()) ? nuevoId() : ''
   await env.DB.batch([
     env.DB.prepare('UPDATE publicaciones SET categoria = ?, titulo = ?, texto = ?, adjuntos = ?, fijada = ?, estado = ?, editada = ?, aprobada = ? WHERE id = ?').bind(
       nueva.categoria,

@@ -205,7 +205,7 @@ test('a quien le aprueban un estilo y no ha puesto su Binance ID se le dice cóm
     db.prepare("INSERT INTO miembros (id, clave, nombre, creado, visto, binance) VALUES (?, ?, ?, '2026-11-01', '2026-11-01', ?)").run(id, clave, id, binance)
   for (const [id, autor] of [['e1', 'ana'], ['e2', 'ana'], ['e3', 'beto']])
     db.prepare("INSERT INTO publicaciones (id, autor, categoria, titulo, texto, adjuntos, creada, actividad, aprobada) VALUES (?, ?, 'estilos', ?, 'Qué hace', '[]', '2026-11-10', '2026-11-10', 1)").run(id, autor, id)
-  const falta = (autor: string) => !!db.prepare(FALTA_BINANCE).get(autor, `${AVISO_BINANCE}%`)
+  const falta = (autor: string) => !!db.prepare(FALTA_BINANCE).get(autor, AVISO_BINANCE)
   assert.deepEqual(['ana', 'beto', 'creador'].map(falta), [true, false, false])
   // Ya se le dijo en uno de sus estilos: en el otro no se repite. Un comentario cualquiera no cuenta.
   db.prepare("INSERT INTO comentarios (id, publicacion, autor, texto, creada, adjuntos) VALUES ('c0', 'e2', 'creador', 'Qué buen estilo.', '2026-11-20', '[]')").run()
@@ -214,6 +214,8 @@ test('a quien le aprueban un estilo y no ha puesto su Binance ID se le dice cóm
   assert.equal(falta('ana'), false)
   // Lo que se le dice: dónde se pone, paso a paso, y qué es.
   assert.match(COMO_PONER_BINANCE, /^Aviso automático de Sloth: tu estilo ya está en la tienda\. /)
+  // D1 no acepta un patrón de LIKE de más de 50 bytes, y este aviso empieza con más: la consulta no lo usa.
+  assert.doesNotMatch(FALTA_BINANCE, /LIKE|GLOB/i)
   assert.match(COMO_PONER_BINANCE, /1\. En Sloth, abre Comunidad y dale clic al renglón «Fondo», arriba\.\n2\. Pulsa «¿Quieres participar\?» y baja a «Pon tu Binance ID y cobra»\.\n3\. Escribe tu Binance ID y pulsa «Participar»\./)
   db.close()
 })
