@@ -514,8 +514,8 @@ export function youtube(app: string, sessions: Sessions, cards: () => Card[], re
             : await canjear({ code, code_verifier: p.verifier, redirect_uri: retorno, grant_type: 'authorization_code' }, false)
           if (!j.refresh_token) throw new Error('Google no devolvió el permiso para futuras subidas. Vuelve a conectar el canal.')
           const canal = await cuenta()
-          // El permiso de la otra app ya no se usa: Google lo olvida. Con la misma app no, que retiraría también el nuevo.
-          if (!!p.sloth !== conSloth()) await revocar()
+          // El permiso de antes no se retira: las variables las comparten la Sloth instalada y la de desarrollo, y la otra
+          // seguiría usándolo. Se retira al pulsar «Desconectar canal».
           credenciales.escribir(REFRESH, j.refresh_token)
           credenciales.escribir(CON_SLOTH, p.sloth ? '1' : null)
           credenciales.escribir(PERMISOS, j.scope ?? SCOPES)
