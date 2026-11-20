@@ -182,10 +182,15 @@ export function licencia(app: string, alCambiar?: (sinApoyo: boolean) => void) {
         return enviar(res, 200, estado())
       }
       // La cuenta gratis, con su correo: el cobro le manda su clave, que se escribe luego en `/api/licencia/clave`
-      // (`enviada`). Solo la da aquí si esta computadora ya tenía una.
+      // (`enviada`). Solo la da aquí si esta computadora ya tenía una. Si ese correo ya apoya (409), no se le hace
+      // otra: entra con la clave de su apoyo, y `yaTiene` dice dónde está, junto al campo para escribirla.
       if (ruta === '/api/licencia/unirse' && metodo === 'POST') {
         const { email, terminos } = await cuerpo<{ email?: string; terminos?: string }>(req)
-        const { clave } = await cobro<{ clave?: string }>('/suscribir', { email, plan: 'gratis', equipo, acepto: true, terminos, porCorreo: true })
+        const { clave, yaTiene } = await cobro<{ clave?: string; yaTiene?: string }>('/suscribir', { email, plan: 'gratis', equipo, acepto: true, terminos, porCorreo: true }).catch((e) => {
+          if (e instanceof Rechazo && e.status === 409) return { clave: undefined, yaTiene: e.message }
+          throw e
+        })
+        if (yaTiene) return enviar(res, 200, { ...estado(), yaTiene })
         if (!clave) return enviar(res, 200, { ...estado(), enviada: true })
         const { datos, firma } = await cobro<{ datos: string; firma: string }>('/licencia', { clave, equipo })
         a = { clave, datos, firma, equipo: a.equipo }

@@ -176,8 +176,8 @@ export function Unirse({ onListo }: { onListo(): void }) {
   const [acepto, setAcepto] = useState(false)
   const [ocupado, setOcupado] = useState(false)
   const [error, setError] = useState('')
-  // La clave va al correo: se escribe aquí para entrar.
-  const [enviada, setEnviada] = useState<Licencia>()
+  // La clave va al correo: se escribe aquí para entrar. Quien ya apoya entra con la de su apoyo (`yaTiene`: dónde está).
+  const [enviada, setEnviada] = useState<Licencia & { yaTiene?: string }>()
 
   async function unirse(e: FormEvent) {
     e.preventDefault()
@@ -185,8 +185,8 @@ export function Unirse({ onListo }: { onListo(): void }) {
     setOcupado(true)
     setError('')
     try {
-      const l = await api<Licencia & { enviada?: boolean }>('/api/licencia/unirse', { email, terminos: TERMINOS })
-      if (!l.enviada) return onListo()
+      const l = await api<Licencia & { enviada?: boolean; yaTiene?: string }>('/api/licencia/unirse', { email, terminos: TERMINOS })
+      if (!l.enviada && !l.yaTiene) return onListo()
       setEnviada(l)
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
@@ -200,9 +200,11 @@ export function Unirse({ onListo }: { onListo(): void }) {
         <Clave
           licencia={enviada}
           aviso={
-            <>
-              <b>Te la mandamos a {email.trim()}</b>, en «Tu cuenta de Sloth» (si no lo ves, revisa spam o promociones).
-            </>
+            enviada.yaTiene ?? (
+              <>
+                <b>Te la mandamos a {email.trim()}</b>, en «Tu cuenta de Sloth» (si no lo ves, revisa spam o promociones).
+              </>
+            )
           }
           onCambio={(l) => l.activa && onListo()}
           onVolver={() => setEnviada(undefined)}

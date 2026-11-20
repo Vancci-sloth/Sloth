@@ -1193,12 +1193,14 @@ async function unirse(env: Env, email: string, equipo: string, acepto: string, t
     await vigilar(env, email, 'pidió otra cuenta con su correo bloqueado', true)
     throw new Rechazo(403, BLOQUEADA)
   }
+  let clave = (await env.DB.prepare("SELECT clave FROM licencias WHERE email = ? AND plan = 'cuenta' AND estado = 'gratis' LIMIT 1").bind(email).first<{ clave: string }>())?.clave
+  // Antes de los cupos: a quien ya apoya no se le hace cuenta ni se le manda correo, así que insistir no gasta nada y
+  // siempre lee que use su clave (la app le abre dónde escribirla), no que pidió muchas cuentas.
+  if (!clave) await sinOtra(env, email, false)
   if (!(await cupo(env, desde, 'cuenta', CUENTAS_AL_DIA))) throw new Rechazo(429, 'Desde esta conexión ya se pidieron muchas cuentas hoy. Prueba mañana.')
   if (!(await cupo(env, await resumen(`correo:${email}`), 'correo', CORREOS_AL_DIA)))
     throw new Rechazo(429, `Ya te mandamos tu clave a ${email} varias veces hoy. Búscala en ese correo (también en spam o promociones).`)
-  let clave = (await env.DB.prepare("SELECT clave FROM licencias WHERE email = ? AND plan = 'cuenta' AND estado = 'gratis' LIMIT 1").bind(email).first<{ clave: string }>())?.clave
   if (!clave) {
-    await sinOtra(env, email, false)
     clave = nuevaClave()
     await env.DB.prepare(
       `INSERT INTO licencias (id, clave, email, plan, monto, fundador, estado, autorizada, creada, acepto, terminos, modo)
@@ -1231,7 +1233,7 @@ async function sinOtra(env: Env, email: string, apoyar: boolean) {
   if (results.some((f) => f.plan === 'gratis'))
     throw new Rechazo(409, 'Ese correo ya tiene Sloth gratis de por vida. Usa su clave: está en Opciones de Sloth, en la computadora donde te uniste.')
   if (results.some((f) => f.estado === 'authorized' || f.estado === 'pagado'))
-    throw new Rechazo(409, 'Ya hay un apoyo activo con ese correo. Usa su clave: te la mandamos por correo y está en Opciones de Sloth.')
+    throw new Rechazo(409, 'Ya hay un apoyo activo con ese correo. Usa su clave: te llegó a ese correo al apoyar, en «Tu clave de Sloth» (si no lo ves, revisa spam o promociones).')
   if (!apoyar && results.length) throw new Rechazo(409, 'Ese correo ya tiene una cuenta de Sloth. Su clave te llegó por correo, en «Tu cuenta de Sloth».')
 }
 

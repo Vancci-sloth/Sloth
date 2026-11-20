@@ -1,1 +1,1 @@
-La tienda de estilos de la comunidad, nueva: las portadas se mueven solas, hay filtros por tema y un visor fijo para verlos sin entrar a cada uno. Los estilos nuevos suben su video entero, y cualquiera puede verlos todos: instalarlos es para quien apoya.
+Si ya apoyas y quieres entrar a la comunidad, ahora te deja escribir tu clave ahí mismo, en vez de decirte que «ya se pidieron muchas cuentas». Llegan también OpenRouter y FreeLLMAPI como agentes (en beta), y los estilos de la comunidad se revisan solos y traen su guía, su video entero y cuánto costó hacerlo.
