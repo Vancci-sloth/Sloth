@@ -31,6 +31,8 @@ La tienda se quedó en cero estilos y sus autores, con una lista tras otra.
   - a su guía se le pone el agente de su prueba y lo que ese hilo usó (`guiaConSuPrueba`).
 - **Al que vuelve se le mira lo que se le pidió**: la lista queda apuntada (`pedido`) y quien lee el paquete nuevo la
   recibe; lo que ya estaba entonces y no se le dijo no se le pide ahora, salvo que frene.
+- **Los que se quedaron en «Le falta» con la regla de antes se leen otra vez con esta** (`REGLA`), una vez y sin que su
+  autor los vuelva a mandar.
 - Las señales no cambian: con una línea que lanza otro programa, se conecta o borra, lo aprueba el creador a mano.
 
 ## Consecuencias

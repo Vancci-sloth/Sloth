@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { test } from 'node:test'
@@ -230,6 +230,24 @@ test('lo que le falta según quien lo leyó se le contesta a su autor, una vez; 
     assert.equal(c.hilos[1].title, 'No lo aprobaría: Estilo pub2')
     assert.equal(c.comentarios.length, 1)
     assert.deepEqual(c.aprobados, [])
+  } finally {
+    c.fin()
+  }
+})
+
+test('al que se quedó en «Le falta» con la regla de antes se le lee otra vez con la nueva, una sola vez y sin que lo vuelva a mandar', async () => {
+  const c = creador({ pub1: 'aaa.estilo', pub2: 'bbb.estilo' })
+  try {
+    // Como los dejó la Sloth de antes: uno al que le faltaba algo y otro que esperaba al creador.
+    mkdirSync(join(c.dir, 'licencias'), { recursive: true })
+    writeFileSync(join(c.dir, 'licencias', 'estilos-revisados.json'), JSON.stringify({ pub1: { llave: 'aaa.estilo', hilo: 'viejo', titulo: 'Estilo pub1', desenlace: 'falta' }, pub2: { llave: 'bbb.estilo', hilo: 'otro', titulo: 'Estilo pub2', desenlace: 'decide' } }))
+    await c.r.ronda()
+    assert.deepEqual(c.bajados, ['pub1'])
+    assert.doesNotMatch(c.hilos[0].texto ?? '', /Ya se revisó una versión anterior/)
+    await c.acaba('h1', { veredicto: 'falta', resumen: 'Casi.', falta: ['Quita registrar.py.'] })
+    await c.r.ronda()
+    assert.equal(c.hilos.length, 1)
+    assert.deepEqual(c.bajados, ['pub1'])
   } finally {
     c.fin()
   }

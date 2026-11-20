@@ -134,10 +134,16 @@ export type Desenlace = 'aprobado' | 'decide' | 'falta' | 'no'
  * acabar, su desenlace. `responder` y `aprobar` son lo que aún no se pudo hacer (sin conexión): va en la siguiente vuelta.
  * `pedido`: lo que se le pidió a su autor la última vez que le faltó algo; sigue ahí cuando manda otro paquete.
  */
-type Revisados = Record<string, { llave: string; hilo?: string; error?: string; titulo?: string; fallas?: string[]; riesgos?: string[]; desenlace?: Desenlace; responder?: string; aprobar?: true; pedido?: string[] }>
+type Revisados = Record<string, { llave: string; hilo?: string; error?: string; titulo?: string; fallas?: string[]; riesgos?: string[]; desenlace?: Desenlace; responder?: string; aprobar?: true; pedido?: string[]; regla?: number }>
 
 /** Cada cuánto se pregunta si llegó un estilo. */
 export const CADA = 15 * 60_000
+
+/**
+ * Con qué regla se leyó (`regla` en lo apuntado). La 2 es la del ADR 0023, que frena solo lo que importa: al que se
+ * quedó en «Le falta» con la de antes se le lee otra vez con esta, sin que su autor lo vuelva a mandar.
+ */
+const REGLA = 2
 
 const lista = (cosas: string[]) => cosas.map((c) => `- ${c}`).join('\n')
 
@@ -327,7 +333,7 @@ export function revisionDeEstilos(o: Opciones) {
       const texto = respuestaAlAutor(desenlace, falta, titulo, v.sugerencias)
       o.sessions.rename(hilo, tituloCon(desenlace, titulo))
       const { pedido: _, ...resto } = r
-      apuntar(publicacion, { ...resto, desenlace, ...(desenlace === 'aprobado' ? { aprobar: true as const } : {}), ...(texto ? { responder: texto } : {}), ...(desenlace === 'falta' ? { pedido: falta } : {}) })
+      apuntar(publicacion, { ...resto, desenlace, regla: REGLA, ...(desenlace === 'aprobado' ? { aprobar: true as const } : {}), ...(texto ? { responder: texto } : {}), ...(desenlace === 'falta' ? { pedido: falta } : {}) })
       await cerrar(publicacion)
     } catch {
       // Sin conexión: lo que falta por hacer sale en la siguiente vuelta.
@@ -339,7 +345,10 @@ export function revisionDeEstilos(o: Opciones) {
     for (const [publicacion, r] of Object.entries(leer())) if (r.aprobar || r.responder) await cerrar(publicacion).catch(() => {})
     if (!o.modelo() || trabajando()) return
     const revisados = leer()
-    const nuevo = (await o.porAprobar()).find((p) => revisados[p.publicacion]?.llave !== p.llave)
+    const nuevo = (await o.porAprobar()).find((p) => {
+      const r = revisados[p.publicacion]
+      return r?.llave !== p.llave || (r.desenlace === 'falta' && r.regla !== REGLA)
+    })
     if (!nuevo) return
     // Lo que se le pidió por el paquete de antes sigue apuntado: es lo primero que se mira en este.
     const pedido = revisados[nuevo.publicacion]?.pedido?.length ? { pedido: revisados[nuevo.publicacion].pedido } : undefined
