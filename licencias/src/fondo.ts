@@ -1,5 +1,6 @@
 /**
- * El fondo de la comunidad: la mitad de lo que cae por Stripe (la tarjeta) en el mes de Ciudad de México, ya sin su
+ * El fondo de la comunidad: la mitad de los apoyos de Sloth que cobra Stripe (la tarjeta: las suscripciones, el año y el
+ * apoyo de una vez, no otros cobros de la cuenta como un link de pago) en el mes de Ciudad de México, ya sin su
  * comisión, sin lo devuelto y sin el IVA, se reparte al cerrar el mes entre quienes comparten en Estilos lo que la gente
  * usa (los puntos de `tienda.ts`) y quisieron participar con su Binance ID (`reparto.ts`). Lo decidió el creador el 13
  * de noviembre de 2026. Arriba de la comunidad sale cuánto va, en vivo, y el paso a paso para participar
@@ -12,7 +13,7 @@
  * - `GET /comunidad/fondo`: el periodo y lo que se lleva la comunidad, por moneda.
  *
  * Lo cobrado sale de los movimientos del saldo de Stripe (`balance_transactions`) del periodo, que ya vienen sin su
- * comisión. El IVA no viene ahí: los precios lo llevan dentro (Stripe Tax, `tax_behavior: inclusive`), así que se saca
+ * comisión, y solo de los que son de Sloth (`deSloth`). El IVA no viene ahí: los precios lo llevan dentro (Stripe Tax, `tax_behavior: inclusive`), así que se saca
  * qué parte de lo cobrado en el mes fue impuesto, de las sesiones de los pagos sueltos y de las facturas de los
  * mensuales (`proporcionDeImpuesto`), y se quita en esa misma proporción. Se lee a lo más cada minuto (en la memoria del
  * isolate).
@@ -37,19 +38,19 @@ export interface Movimiento {
   net: number
   currency: string
   reporting_category: string
+  /** De dónde viene, abierto (`expand[]=data.source`): el cobro, la devolución o el contracargo, con su pago. */
+  source?: string | { payment_intent?: string | null } | null
 }
 
 /**
- * Cobros de la cuenta de Stripe que no son de Sloth y no entran al fondo, por decisión del creador: su moneda, su monto
- * en centavos y el minuto (UTC) en que se cobró. El del 20 de noviembre de 2026 fue un link de pago de 1.000 MXN.
+ * Si un movimiento es de Sloth: su pago (`payment_intent`) es de un apoyo, y no de un link de pago u otro cobro de la
+ * cuenta de Stripe, que no entran al fondo (decisión del creador, 20 de noviembre de 2026). Las comisiones sueltas
+ * (`fee`, de Stripe Tax y Billing) no dicen de qué cobro son y se quitan igual.
  */
-const FUERA = [{ currency: 'mxn', amount: 100_000, minuto: '2026-11-20T20:23' }]
-
-/** Si un movimiento es el cobro de uno de `FUERA` (con su comisión, que va en el mismo movimiento). */
-export function fueraDelFondo(m: Pick<Movimiento, 'amount' | 'currency' | 'reporting_category'> & { created?: number }): boolean {
-  if (m.reporting_category !== 'charge' || m.created === undefined) return false
-  const minuto = new Date(m.created * 1000).toISOString().slice(0, 16)
-  return FUERA.some((f) => f.currency === m.currency && f.amount === m.amount && f.minuto === minuto)
+export function deSloth(m: Pick<Movimiento, 'reporting_category' | 'source'>, pagos: Set<string>): boolean {
+  if (m.reporting_category === 'fee') return true
+  const pago = m.source && typeof m.source === 'object' ? m.source.payment_intent : null
+  return !!pago && pagos.has(pago)
 }
 
 /** Lo que es devolver: devoluciones y contracargos (y lo que regresa de ellos). */
@@ -164,13 +165,23 @@ export function periodosHasta(ahora = new Date()): string[] {
   }
 }
 
+/**
+ * La versión de la API con que se leen las facturas y los movimientos: en ella la factura dice su pago
+ * (`payment_intent`), que desde la de 2025-03-31 ya no trae.
+ */
+const VERSION = '2024-06-20'
+/** Cuánto atrás se buscan los pagos de Sloth, para reconocer la devolución o el contracargo de uno de meses antes. */
+const ATRAS = 120 * 24 * 3600
+/** Desde cuándo cobra Stripe los apoyos de Sloth: el 6 de noviembre de 2026. */
+const INICIO = Date.UTC(2026, 10, 6) / 1000
+
 /** Todas las páginas de una lista de Stripe creadas en ese tramo. */
-async function todos<T extends { id: string }>(env: Env, ruta: string, tramo: { desde: number; hasta: number }, extra: Record<string, string> = {}): Promise<T[]> {
+async function todos<T extends { id: string }>(env: Env, ruta: string, tramo: { desde: number; hasta: number }, extra: Record<string, string> = {}, version?: string): Promise<T[]> {
   const lista: T[] = []
   let despues = ''
   for (let i = 0; i < PAGINAS; i++) {
     const q = new URLSearchParams({ 'created[gte]': String(tramo.desde), 'created[lt]': String(tramo.hasta), limit: '100', ...extra, ...(despues ? { starting_after: despues } : {}) })
-    const r = await stripe<{ data: T[]; has_more: boolean }>(env, 'GET', `${ruta}?${q}`)
+    const r = await stripe<{ data: T[]; has_more: boolean }>(env, 'GET', `${ruta}?${q}`, undefined, version)
     lista.push(...r.data)
     if (!r.has_more || !r.data.length) break
     despues = r.data[r.data.length - 1].id
@@ -178,37 +189,51 @@ async function todos<T extends { id: string }>(env: Env, ruta: string, tramo: { 
   return lista
 }
 
-interface Sesion {
+export interface Sesion {
   id: string
+  created: number
   mode: string
   payment_status: string
+  /** La licencia que la abrió (`sesionStripe`); un link de pago no la trae. */
+  client_reference_id?: string | null
+  payment_link?: string | null
+  payment_intent?: string | null
   amount_total: number | null
   total_details?: { amount_tax?: number } | null
   currency_conversion?: { amount_total: number } | null
 }
-interface Factura {
+export interface Factura {
   id: string
+  created: number
   total: number
+  payment_intent?: string | null
+  /** Lo de la suscripción: las de Sloth llevan su licencia (`subscription_data[metadata][licencia]`). */
+  subscription_details?: { metadata?: Record<string, string> | null } | null
   tax?: number | null
   total_taxes?: { amount: number }[] | null
 }
 
 /**
- * Los pagos del mes con su impuesto: los sueltos (el año, el apoyo de una vez) en sus sesiones de Checkout, y los
- * mensuales (el primero y cada renovación) en sus facturas. La sesión de un mensual no: su factura ya lo cuenta.
+ * Los pagos de Sloth: los sueltos (el año, el apoyo de una vez) en las sesiones de Checkout que abrió una licencia, y los
+ * mensuales (el primero y cada renovación) en las facturas de sus suscripciones. La sesión de un mensual no: su factura
+ * ya lo cuenta. De ellos, `pagos` (para reconocer los movimientos) y, los del tramo, su impuesto.
  */
-async function pagosDelMes(env: Env, desde: { desde: number; hasta: number }): Promise<Cobrado[]> {
-  const [sesiones, facturas] = await Promise.all([
-    todos<Sesion>(env, '/v1/checkout/sessions', desde, { status: 'complete' }),
-    todos<Factura>(env, '/v1/invoices', desde, { status: 'paid' })
-  ])
-  return [
-    ...sesiones
-      .filter((s) => s.mode === 'payment' && s.payment_status === 'paid')
-      .map((s) => ({ total: s.amount_total ?? 0, impuesto: s.total_details?.amount_tax ?? 0, peso: s.currency_conversion?.amount_total ?? s.amount_total ?? 0 })),
-    // Desde la API de 2025-03-31 el impuesto va en `total_taxes`; antes, en `tax`.
-    ...facturas.map((f) => ({ total: f.total, impuesto: f.total_taxes ? f.total_taxes.reduce((s, t) => s + (t.amount ?? 0), 0) : (f.tax ?? 0), peso: f.total }))
-  ]
+export function pagosDeSloth(sesiones: Sesion[], facturas: Factura[], tramo: { desde: number; hasta: number }): { pagos: Set<string>; cobrados: Cobrado[] } {
+  const sueltos = sesiones.filter((s) => s.client_reference_id && !s.payment_link && s.mode === 'payment' && s.payment_status === 'paid')
+  const mensuales = facturas.filter((f) => f.subscription_details?.metadata?.licencia)
+  const enTramo = (c: number) => c >= tramo.desde && c < tramo.hasta
+  return {
+    pagos: new Set([...sueltos, ...mensuales].flatMap((p) => (p.payment_intent ? [p.payment_intent] : []))),
+    cobrados: [
+      ...sueltos
+        .filter((s) => enTramo(s.created))
+        .map((s) => ({ total: s.amount_total ?? 0, impuesto: s.total_details?.amount_tax ?? 0, peso: s.currency_conversion?.amount_total ?? s.amount_total ?? 0 })),
+      // Desde la API de 2025-03-31 el impuesto va en `total_taxes`; antes, en `tax`.
+      ...mensuales
+        .filter((f) => enTramo(f.created))
+        .map((f) => ({ total: f.total, impuesto: f.total_taxes ? f.total_taxes.reduce((s, t) => s + (t.amount ?? 0), 0) : (f.tax ?? 0), peso: f.total }))
+    ]
+  }
 }
 
 /** Lo último que se leyó de cada periodo. */
@@ -232,8 +257,17 @@ export async function fondoDe(env: Env, periodo: string, ahora = new Date()): Pr
   }
   if (!env.STRIPE_SECRET_KEY) return vacio
   try {
-    const [movimientos, pagos] = await Promise.all([todos<Movimiento & { id: string; created: number }>(env, '/v1/balance_transactions', tramo), pagosDelMes(env, tramo)])
-    const cuentas = cuentasDelFondo(movimientos.filter((m) => !fueraDelFondo(m)), proporcionDeImpuesto(pagos))
+    const antes = { desde: Math.max(INICIO, tramo.desde - ATRAS), hasta: tramo.hasta }
+    const [movimientos, sesiones, facturas] = await Promise.all([
+      todos<Movimiento & { id: string }>(env, '/v1/balance_transactions', tramo, { 'expand[]': 'data.source' }, VERSION),
+      todos<Sesion>(env, '/v1/checkout/sessions', antes, { status: 'complete' }),
+      todos<Factura>(env, '/v1/invoices', antes, { status: 'paid' }, VERSION)
+    ])
+    const { pagos, cobrados } = pagosDeSloth(sesiones, facturas, tramo)
+    const cuentas = cuentasDelFondo(
+      movimientos.filter((m) => deSloth(m, pagos)),
+      proporcionDeImpuesto(cobrados)
+    )
     const fondo = { ...vacio, montos: montosDe(cuentas), cuentas }
     guardados.set(periodo, { leido: ahora.getTime(), fondo })
     return fondo

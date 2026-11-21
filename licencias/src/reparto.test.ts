@@ -81,8 +81,11 @@ function preparar(t: { after(fn: () => void): void }) {
     }
     const u = new URL(url)
     assert.equal(u.hostname, 'api.stripe.com')
-    const cobros = [{ id: 'txn_1', amount: 10000, fee: 0, net: 10000, currency: 'usd', reporting_category: 'charge' }]
-    return Response.json({ data: u.pathname === '/v1/balance_transactions' ? cobros : [], has_more: false })
+    // Un mensual de Sloth: su factura lleva la licencia, y el cobro, su pago.
+    const cobros = [{ id: 'txn_1', amount: 10000, fee: 0, net: 10000, currency: 'usd', reporting_category: 'charge', source: { payment_intent: 'pi_1' } }]
+    const facturas = [{ id: 'in_1', created: 0, total: 10000, tax: 0, payment_intent: 'pi_1', subscription_details: { metadata: { licencia: 'l-1' } } }]
+    const datos = { '/v1/balance_transactions': cobros, '/v1/invoices': facturas }[u.pathname] ?? []
+    return Response.json({ data: datos, has_more: false })
   }) as typeof fetch
   t.after(() => {
     globalThis.fetch = anterior

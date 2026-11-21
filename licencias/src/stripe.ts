@@ -145,11 +145,12 @@ export function cancelarStripe(env: Env, id: string): Promise<SuscripcionStripe>
 /** El modo de la llave: con `sk_live_` (o `rk_live_`) cobra de verdad. */
 export const modoStripe = (env: Pick<Env, 'STRIPE_SECRET_KEY'>) => (/^[sr]k_live_/.test(env.STRIPE_SECRET_KEY ?? '') ? 'produccion' : 'prueba')
 
-export async function stripe<T>(env: Env, metodo: string, ruta: string, formulario?: Record<string, string>): Promise<T> {
+/** Con `version`, la respuesta llega con la forma de esa versión de su API; sin ella, con la de la cuenta. */
+export async function stripe<T>(env: Env, metodo: string, ruta: string, formulario?: Record<string, string>, version?: string): Promise<T> {
   if (!env.STRIPE_SECRET_KEY) throw new Error('Falta STRIPE_SECRET_KEY.')
   const r = await fetch(`${API}${ruta}`, {
     method: metodo,
-    headers: { authorization: `Bearer ${env.STRIPE_SECRET_KEY}`, 'content-type': 'application/x-www-form-urlencoded' },
+    headers: { authorization: `Bearer ${env.STRIPE_SECRET_KEY}`, 'content-type': 'application/x-www-form-urlencoded', ...(version ? { 'stripe-version': version } : {}) },
     body: formulario && new URLSearchParams(formulario)
   })
   const datos = (await r.json().catch(() => ({}))) as { error?: { message?: string } }

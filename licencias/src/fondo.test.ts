@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { cuentasDelFondo, esPeriodo, fueraDelFondo, inicioDelMes, montosDe, nombreDe, periodoFondo, periodosHasta, PRIMER_PERIODO, proporcionDeImpuesto, tramoDe } from './fondo.ts'
+import { cuentasDelFondo, deSloth, esPeriodo, inicioDelMes, montosDe, nombreDe, pagosDeSloth, periodoFondo, periodosHasta, PRIMER_PERIODO, proporcionDeImpuesto, tramoDe, type Factura, type Sesion } from './fondo.ts'
 
 const cobro = (amount: number, fee: number, currency = 'usd') => ({ amount, fee, net: amount - fee, currency, reporting_category: 'charge' })
 
@@ -43,12 +43,29 @@ test('la parte de impuesto se pesa por lo que vale cada pago, aunque se haya pag
   assert.equal(proporcionDeImpuesto([{ total: 0, impuesto: 0, peso: 0 }]), 0)
 })
 
-test('el link de pago del 20 de noviembre no entra al fondo; otro cobro igual en otro minuto, sí', () => {
-  const link = { ...cobro(100_000, 3_800, 'mxn'), created: Date.UTC(2026, 10, 20, 20, 23, 41) / 1000 }
-  assert.equal(fueraDelFondo(link), true)
-  assert.equal(fueraDelFondo({ ...link, created: link.created + 60 }), false)
-  assert.equal(fueraDelFondo({ ...link, amount: 99_999 }), false)
-  assert.equal(fueraDelFondo({ ...link, reporting_category: 'refund' }), false)
+test('solo cuentan los apoyos de Sloth: sus pagos sueltos y sus mensuales, no un link de pago ni otra suscripción', () => {
+  const tramo = { desde: 1000, hasta: 2000 }
+  const sesion = (id: string, created: number, extra: Partial<Sesion> = {}): Sesion => ({ id, created, mode: 'payment', payment_status: 'paid', client_reference_id: 'lic', payment_intent: `pi_${id}`, amount_total: 1160, total_details: { amount_tax: 160 }, ...extra })
+  const factura = (id: string, created: number, licencia?: string): Factura => ({ id, created, total: 1000, tax: 0, payment_intent: `pi_${id}`, subscription_details: { metadata: licencia ? { licencia } : {} } })
+  const { pagos, cobrados } = pagosDeSloth(
+    [sesion('unico', 1500), sesion('viejo', 500), sesion('link', 1500, { client_reference_id: null, payment_link: 'plink_1' }), sesion('mensual', 1500, { mode: 'subscription', payment_intent: null })],
+    [factura('mes', 1500, 'lic'), factura('ajena', 1500)],
+    tramo
+  )
+  // El suelto de antes del tramo sirve para reconocer su devolución, pero su impuesto no es del mes.
+  assert.deepEqual([...pagos].sort(), ['pi_mes', 'pi_unico', 'pi_viejo'])
+  assert.deepEqual(cobrados, [
+    { total: 1160, impuesto: 160, peso: 1160 },
+    { total: 1000, impuesto: 0, peso: 1000 }
+  ])
+  const de = (pago: string | null, reporting_category = 'charge') => ({ reporting_category, source: { payment_intent: pago } })
+  assert.equal(deSloth(de('pi_unico'), pagos), true)
+  assert.equal(deSloth(de('pi_viejo', 'refund'), pagos), true)
+  assert.equal(deSloth(de('pi_link'), pagos), false)
+  assert.equal(deSloth(de(null), pagos), false)
+  assert.equal(deSloth({ reporting_category: 'charge', source: 'ch_1' }, pagos), false)
+  // Las comisiones sueltas de Stripe Tax y Billing se quitan igual.
+  assert.equal(deSloth({ reporting_category: 'fee', source: null }, pagos), true)
 })
 
 test('sin cobros no sale nada', () => {

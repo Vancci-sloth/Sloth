@@ -37,7 +37,7 @@
  * - `POST /comunidad/c/<id>/borrar`, `/megusta`, `/reportar` y `/revisada`: lo mismo para un comentario.
  * - `GET /comunidad/avisos` (`?cuenta`: solo cuántos sin leer, y lo que ganaste en la rifa) y `POST /comunidad/avisos/leidos`.
  * - `/comunidad/rifa*`: la rifa del creador (`rifa.ts`).
- * - `GET /comunidad/fondo`: lo que este mes se lleva la comunidad, la mitad de lo que cae por Stripe (`fondo.ts`).
+ * - `GET /comunidad/fondo`: lo que este mes se lleva la comunidad, la mitad de los apoyos que cobra Stripe (`fondo.ts`).
  * - `GET /comunidad/estilos` y `POST /comunidad/estilos/uso`: la tienda de estilos y lo que se mide de cada uno (`tienda.ts`).
  * - `/comunidad/fondo/*`: participar en el fondo con tu Binance ID, y su reparto, que cierra y paga el creador (`reparto.ts`).
  * - `POST /comunidad/roadmap` `{meta}`: tu voto de qué sigue (uno por miembro; el de un Fundador vale dos). Da la votación.

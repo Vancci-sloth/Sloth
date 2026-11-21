@@ -10,7 +10,8 @@ y no medía nada de lo que se hace con un estilo compartido (ADR 0017).
 
 ## Decisión
 
-- **La bolsa es la mitad de lo que cae por Stripe en el mes de Ciudad de México**, ya sin la comisión de Stripe, sin lo
+- **La bolsa es la mitad de los apoyos de Sloth que cobra Stripe en el mes de Ciudad de México** (desde el 20-nov-2026, no
+  otros cobros de la cuenta, como un link de pago), ya sin la comisión de Stripe, sin lo
   devuelto y sin el IVA (`licencias/src/fondo.ts`). El IVA se saca de las sesiones y las facturas del mes, porque los
   precios lo llevan dentro. Arriba de la comunidad se ve en vivo (`web/src/Fondo.tsx`), con las cuentas ya hechas:
   entró, comisión, devuelto, IVA, queda y la mitad.

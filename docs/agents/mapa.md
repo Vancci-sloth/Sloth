@@ -163,7 +163,7 @@ Este es el mapa:
   `docs/agents/anuncios.md`. La rifa (`licencias/src/rifa.ts`): arriba de la comunidad «Participa en la rifa» (`Rifa.tsx`,
   solo quien usa Sloth gratis), en Administrador se arma y se sortea con la ruleta (`RifaAdmin.tsx`); el ganador recibe
   sus créditos de voz, un correo y el aviso a pantalla completa (`GanasteRifa.tsx`). Debajo, el fondo de la comunidad
-  (`licencias/src/fondo.ts`, `Fondo.tsx`, ADR 0019): la mitad de lo que cae por Stripe en el mes, sin IVA, en vivo (casi siempre un
+  (`licencias/src/fondo.ts`, `Fondo.tsx`, ADR 0019): la mitad de los apoyos que cobra Stripe en el mes, sin IVA, en vivo (casi siempre un
   renglón con la raya del reparto; en grande solo cuando trae noticia, `web/src/fondoNoticia.ts`), y el
   paso a paso para llevarse una parte con un estilo compartido. La sección Estilos es la tienda (`licencias/src/tienda.ts`,
   `Tienda.tsx`): llega entera y se filtra en la app, al instante (`web/src/tiendaFiltros.ts`: buscador, temas que salen
