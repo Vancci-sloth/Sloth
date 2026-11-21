@@ -315,18 +315,14 @@ Por pedido del creador, la app del celular sale ya, como **SOLO VERSIÓN GAMMA**
 continuos, y quien no quiera presenciarlos, que no la descargue. Lo dicen la app (`Gamma` en `movil/src/ui.tsx`: la
 bienvenida, Inicio y Más) y la página de venta (`#celular`). Mientras sea gamma, todo texto sobre ella lo dice igual.
 
-Se compila aquí, sin EAS, y se reparte desde el release `celular-gamma` de este repo (prerelease), siempre con el mismo
+Se compila en Linux con `App del celular (Android)` (`.github/workflows/celular.yml`), sin EAS: en Windows no compila,
+porque las rutas de C++ de React Native pasan de 260 caracteres (ni desde `C:\s\m` ni con `CMAKE_OBJECT_PATH_MAX`), y
+activar las rutas largas pide administrador. En una PR que toca `movil/` deja el `.apk` como artefacto; corrido a mano
+desde `main` (`gh workflow run celular.yml`) lo sube encima del release `celular-gamma` (prerelease), siempre con el mismo
 nombre: la página enlaza `releases/download/celular-gamma/Sloth-gamma.apk`.
 
-```bash
-cd movil && npx expo prebuild -p android --no-install   # luego deja package.json como estaba: prebuild le cambia los scripts
-cd android && ./gradlew.bat assembleRelease -PreactNativeArchitectures=arm64-v8a,armeabi-v7a,x86_64
-# con JAVA_HOME en %LOCALAPPDATA%\Android\jdk\jdk-17.0.21.1+2 y ANDROID_HOME en %LOCALAPPDATA%\Android\Sdk
-```
-
-Gradle la firma con la llave de depuración; se vuelve a firmar con la de Sloth (`apksigner` de las build-tools):
-`%APPDATA%\sloth\movil\sloth-android.keystore`, con su contraseña en `llave-android.json` al lado. **Sin esa llave no
-se puede actualizar la app ya instalada** (Android rechaza una firma distinta): respáldala y no la subas a ningún lado.
-Cada versión nueva sube `version` en `app.json` y `versionCode` (lo pone `prebuild` desde `android.versionCode`), y se
-sube encima: `gh release upload celular-gamma Sloth-gamma.apk --clobber`. Pruébala antes en el emulador con
-`adb install -r`.
+Se firma con la llave de Sloth, en los secretos `SLOTH_ANDROID_KEYSTORE` (base64) y `SLOTH_ANDROID_CLAVE`; el original
+está en `%APPDATA%\sloth\movil\` (`sloth-android.keystore` y su contraseña en `llave-android.json`). **Sin esa llave no
+se puede actualizar la app ya instalada** (Android rechaza una firma distinta): respáldala. Cada versión nueva sube
+`version` y `android.versionCode` en `app.json`. Antes de correrlo a mano, prueba el artefacto de la PR en el emulador
+(`adb install -r`).
