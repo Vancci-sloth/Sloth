@@ -21,6 +21,7 @@
     },
     "android": {
       "package": "org.vancci.sloth",
+      "versionCode": 1,
       "adaptiveIcon": {
         "backgroundColor": "#0f0e0c",
         "foregroundImage": "./assets/android-icon-foreground.png",

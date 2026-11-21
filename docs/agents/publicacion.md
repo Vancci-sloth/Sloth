@@ -308,3 +308,25 @@ Compilar, con la cuenta de Expo de Vancci-sloth (`npx eas-cli@latest login`; la 
   (equipo MP48S4LXVU) y pide su sesión la primera vez; Google Play pide la cuenta de desarrollador y el primer `.aab`
   se sube a mano.
 - Sube `version` en `movil/app.json` con cada cambio que se note; `tiendas` sube solo el número de compilación.
+
+### La versión GAMMA de Android (desde el 21-nov-2026)
+
+Por pedido del creador, la app del celular sale ya, como **SOLO VERSIÓN GAMMA**: una prueba súper temprana con fallos
+continuos, y quien no quiera presenciarlos, que no la descargue. Lo dicen la app (`Gamma` en `movil/src/ui.tsx`: la
+bienvenida, Inicio y Más) y la página de venta (`#celular`). Mientras sea gamma, todo texto sobre ella lo dice igual.
+
+Se compila aquí, sin EAS, y se reparte desde el release `celular-gamma` de este repo (prerelease), siempre con el mismo
+nombre: la página enlaza `releases/download/celular-gamma/Sloth-gamma.apk`.
+
+```bash
+cd movil && npx expo prebuild -p android --no-install   # luego deja package.json como estaba: prebuild le cambia los scripts
+cd android && ./gradlew.bat assembleRelease -PreactNativeArchitectures=arm64-v8a,armeabi-v7a,x86_64
+# con JAVA_HOME en %LOCALAPPDATA%\Android\jdk\jdk-17.0.21.1+2 y ANDROID_HOME en %LOCALAPPDATA%\Android\Sdk
+```
+
+Gradle la firma con la llave de depuración; se vuelve a firmar con la de Sloth (`apksigner` de las build-tools):
+`%APPDATA%\sloth\movil\sloth-android.keystore`, con su contraseña en `llave-android.json` al lado. **Sin esa llave no
+se puede actualizar la app ya instalada** (Android rechaza una firma distinta): respáldala y no la subas a ningún lado.
+Cada versión nueva sube `version` en `app.json` y `versionCode` (lo pone `prebuild` desde `android.versionCode`), y se
+sube encima: `gh release upload celular-gamma Sloth-gamma.apk --clobber`. Pruébala antes en el emulador con
+`adb install -r`.
