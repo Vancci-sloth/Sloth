@@ -1,1 +1,1 @@
-Sloth en la nube: sin computadora, la misma Sloth corre en un Codespace de GitHub con tu cuenta y se usa desde el navegador, también en el celular.
+Sloth en la nube ya no se detiene mientras la usas: deja abierta la pestaña de tu Codespace y Sloth le avisa a GitHub.
