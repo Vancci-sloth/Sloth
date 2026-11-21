@@ -8,6 +8,7 @@
  * Todo lo que en la computadora abriría algo en su pantalla (una terminal para iniciar sesión, un Edge de Google) va
  * como desde la web (`remoto`): ahí no hay nadie que vea esa pantalla.
  */
+import { appendFileSync, statSync, writeFileSync } from 'node:fs'
 import type { IncomingMessage } from 'node:http'
 
 /** La dirección pública de esta Sloth en la nube, o `null` en una computadora. */
@@ -27,4 +28,32 @@ export function deLaNube(req: Pick<IncomingMessage, 'headers'>, host: string | n
   if (origen && origen !== `https://${host}`) return false
   const sitio = req.headers['sec-fetch-site']
   return !sitio || sitio === 'same-origin' || sitio === 'none'
+}
+
+/**
+ * El latido: GitHub detiene el Codespace tras un rato sin que nadie lo toque, y usar Sloth por su dirección no cuenta
+ * (se probó: con visitas cada 15 s se detuvo igual). Sí cuenta lo que escribe una terminal con alguien conectado. Así
+ * que, mientras la usas (tocas o tecleas en su página: `POST /api/nube/latido`, uno por minuto a lo más) o algo
+ * trabaja, aquí se anota una línea por minuto en `archivo`, y la terminal de la pestaña del Codespace la muestra
+ * (`.devcontainer/latido.sh`). Sin uso, calla: GitHub la detiene como siempre y no se gastan tus horas.
+ */
+export const USO_MS = 3 * 60_000
+
+/** Por qué Sloth sigue en uso, o `null` si ya no: tocada hace poco, o algo trabajando (lo que dice `ocupado`). */
+export function enUso(tocada: number, ahora: number, ocupado: () => string | null): string | null {
+  return ahora - tocada < USO_MS ? 'la estás usando' : ocupado()
+}
+
+export function latir(archivo: string, ocupado: () => string | null): { tocar: () => void } {
+  let tocada = Date.now()
+  setInterval(() => {
+    const motivo = enUso(tocada, Date.now(), ocupado)
+    if (!motivo) return
+    try {
+      // Que no crezca sin fin: la terminal lo sigue con `tail -F`, que aguanta que se vacíe.
+      if ((statSync(archivo, { throwIfNoEntry: false })?.size ?? 0) > 100_000) writeFileSync(archivo, '')
+      appendFileSync(archivo, `[${new Date().toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })}] Sloth en uso: ${motivo}\n`)
+    } catch { /* Sin el archivo no hay latido: GitHub la detendrá a su tiempo, nada más. */ }
+  }, 60_000).unref()
+  return { tocar: () => void (tocada = Date.now()) }
 }

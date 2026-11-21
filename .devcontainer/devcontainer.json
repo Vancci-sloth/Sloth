@@ -8,6 +8,8 @@
   // Los videos se arman aquí: 4 núcleos y 16 GB.
   "hostRequirements": { "cpus": 4, "memory": "16gb", "storage": "32gb" },
   "postStartCommand": "bash .devcontainer/sloth-nube.sh",
+  // El latido en una terminal de la pestaña: GitHub cuenta como uso lo que escribe, no lo que haces en Sloth.
+  "postAttachCommand": "bash .devcontainer/latido.sh",
   // Para revisarlo desde una terminal: `gh codespace ssh` y `gh codespace ports` lo necesitan.
   "features": { "ghcr.io/devcontainers/features/sshd:1": {} },
   // Publicado desde que enciende, aunque no haya un editor abierto que lo detecte.

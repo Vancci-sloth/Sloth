@@ -102,7 +102,7 @@ function Ajustes({ onDone, iniciando, onIniciando }: { onDone(): void; iniciando
       {enLaNube ? (
         <Grupo
           titulo="Sloth en la nube"
-          nota="Esta Sloth corre en tu Codespace de GitHub, sin tu computadora. Entra desde cualquier navegador con tu cuenta de GitHub en esta misma dirección. GitHub la detiene tras un rato sin uso (en sus opciones lo subes hasta 4 horas) y la enciendes otra vez en github.com/codespaces: tus chats y tus videos se quedan."
+          nota="Esta Sloth corre en tu Codespace de GitHub, sin tu computadora. Entra desde cualquier navegador con tu cuenta de GitHub en esta misma dirección. Deja abierta la pestaña de tu Codespace: mientras usas Sloth o algo trabaja, ahí le avisa a GitHub. Sin ella, GitHub la detiene tras un rato sin uso (en sus opciones lo subes hasta 4 horas) y la enciendes otra vez en github.com/codespaces: tus chats y tus videos se quedan."
         >
           <p className="small">
             <a href="https://github.com/settings/codespaces" target="_blank" rel="noreferrer">

@@ -11,6 +11,9 @@ import { enLaNube, entrada } from './web'
  */
 const ESPERA = 8000
 
+/** El Codespace de esta Sloth: su dirección es `<nombre>-4848.app.github.dev`, y abrir `<nombre>.github.dev` lo enciende. */
+const CODESPACE = location.hostname.match(/^(.+)-\d+\.app\.github\.dev$/)?.[1]
+
 export function ConexionWeb() {
   const [caida, setCaida] = useState<'no' | 'caida' | 'quitado'>('no')
   useEffect(() => {
@@ -40,13 +43,13 @@ export function ConexionWeb() {
           <>
             <h2>Se perdió la conexión con tu Sloth</h2>
             <div className="modal-body">
-              <p>Puede que se esté actualizando o reiniciando, o que tu Codespace se haya detenido tras un rato sin uso. Tus chats y tus videos siguen ahí.</p>
+              <p>Puede que se esté actualizando o reiniciando, o que GitHub haya detenido tu Codespace tras un rato sin uso. Tus chats y tus videos siguen ahí.</p>
               <p className="small muted">
-                Si no vuelve, enciéndelo en{' '}
-                <a href="https://github.com/codespaces" target="_blank" rel="noreferrer">
-                  github.com/codespaces
-                </a>{' '}
-                y vuelve a esta página.
+                Si no vuelve,{' '}
+                <a href={CODESPACE ? `https://${CODESPACE}.github.dev` : 'https://github.com/codespaces'} target="_blank" rel="noreferrer">
+                  enciende tu Codespace
+                </a>
+                : al arrancar, Sloth se abre sola otra vez.
               </p>
             </div>
           </>

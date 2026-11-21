@@ -36,6 +36,18 @@ export const entrada = () => `${enlaceEntrada(equipo)}${location.hash.startsWith
 // En la nube la dirección no cambia: lo guardado se queda en cada navegador, como en cualquier página.
 if (!enLaNube) guardarEnLaComputadora()
 
+// En la nube, tocar o teclear aquí le dice a Sloth que la usas, y ella a GitHub, que si no la detiene (server/nube.ts,
+// el latido). Uno por minuto basta.
+if (enLaNube) {
+  let avisado = 0
+  const aqui = () => {
+    if (Date.now() - avisado < 60_000) return
+    avisado = Date.now()
+    void fetch('/api/nube/latido', { method: 'POST' }).catch(() => {})
+  }
+  for (const e of ['pointerdown', 'keydown', 'wheel']) addEventListener(e, aqui, { capture: true, passive: true })
+}
+
 function guardarEnLaComputadora() {
   const ls = window.localStorage
   let reloj: ReturnType<typeof setTimeout> | undefined

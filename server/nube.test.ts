@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { deLaNube, nubeDe } from './nube.ts'
+import { deLaNube, enUso, nubeDe, USO_MS } from './nube.ts'
 
 const HOST = 'feliz-perezoso-abc123-4848.app.github.dev'
 
@@ -24,4 +24,11 @@ test('deLaNube atiende la página de Sloth por su dirección y nada más', () =>
   assert.equal(pide({ host: 'otro-4848.app.github.dev' }), false)
   // En una computadora (sin SLOTH_NUBE) no hay nube.
   assert.equal(deLaNube({ headers: { host: HOST } }, null), false)
+})
+
+test('enUso: tocada hace poco, o algo trabajando; si no, calla', () => {
+  const nada = () => null
+  assert.equal(enUso(1000, 1000 + USO_MS - 1, nada), 'la estás usando')
+  assert.equal(enUso(1000, 1000 + USO_MS, nada), null)
+  assert.equal(enUso(0, 10 * USO_MS, () => 'Hay un agente trabajando.'), 'Hay un agente trabajando.')
 })

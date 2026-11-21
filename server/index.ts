@@ -67,7 +67,7 @@ import { cargarPreciosCodex } from './precios.ts'
 import { slothWeb } from './web.ts' // Sloth en la web
 import { navegadorRemoto } from './navegador-remoto.ts' // Sloth en la web
 import { ventanasRemotas } from './ventanas-remotas.ts' // Sloth en la web
-import { deLaNube, NUBE } from './nube.ts' // Sloth en la nube
+import { deLaNube, latir, NUBE } from './nube.ts' // Sloth en la nube
 
 const APP = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const PORT = Number(process.env.PORT ?? 4848)
@@ -1050,6 +1050,9 @@ function remoto(req: IncomingMessage): boolean {
   return !!NUBE || !!web.sesionDe(req)
 }
 
+/** En la nube, lo que le dice a GitHub que Sloth sigue en uso (server/nube.ts). */
+const latido = NUBE && process.env.SLOTH_LATIDO ? latir(process.env.SLOTH_LATIDO, ocupado) : null
+
 server.on('request', async (req, res) => {
   // Por la web (server/web.ts) solo entra un dispositivo con su sesión; sin ella, la página de entrada.
   const porWeb = deConfianza(req) ? null : web.confianza(req)
@@ -1061,6 +1064,7 @@ server.on('request', async (req, res) => {
   if (porWeb) res.setHeader('content-security-policy', "frame-ancestors 'self'")
   try {
     if (url.pathname.startsWith('/api/')) {
+      if (url.pathname === '/api/nube/latido' && req.method === 'POST') return latido?.tocar(), send(res, 200, {})
       if (url.pathname.startsWith('/api/web') && ((await ventanas.api(req, res, url)) || (await web.api(req, res, url)))) return
       if ((url.pathname.startsWith('/api/navegador/') || url.pathname.startsWith('/api/ventana/')) && (await navegadorRemoto(req, res, url))) return
       if (suscripcion && (await suscripcion.api(req, res, url))) return // suscripción

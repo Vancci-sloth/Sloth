@@ -44,6 +44,8 @@ if [ -n "${CODESPACE_NAME:-}" ]; then
 fi
 : "${SLOTH_NUBE:?Falta SLOTH_NUBE: la dirección pública del puerto ${PUERTO}}"
 export PORT=$PUERTO
+# El latido (server/nube.ts): lo que Sloth escribe aquí mientras la usas, y que la terminal de la pestaña muestra.
+export SLOTH_LATIDO="$NUBE_DIR/latido.log"
 
 if [ ! -s "$APPIMAGE_SLOTH" ]; then
   anotar "Bajando Sloth"
