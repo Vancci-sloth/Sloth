@@ -13,6 +13,7 @@ import { YoutubeLote } from './YoutubeProgramar'
 import { CalendarioYoutube } from './YoutubeCalendario'
 import { CalendarioRedes, type EstadoRedes, estadoEnRedes, Marcas, ResumenRedes } from './Redes' // redes
 import './MisVideos.css'
+import { abrirRuta, bajar as bajarAlDispositivo, enLaWeb } from './web'
 
 /**
  * «Mis videos»: los videos terminados de todos los estilos, del más nuevo al más viejo. Se buscan por título, archivo o
@@ -232,6 +233,13 @@ export function MisVideos({ cards, sessions, estilo, onEstilo }: { cards: Card[]
   const bajando = useRef(false)
   async function bajar(vs: VideoHecho[]) {
     if (bajando.current) return
+    // Desde la web, al dispositivo: uno tras otro, que el navegador no corta varias descargas juntas.
+    if (enLaWeb) {
+      setFallo('')
+      vs.forEach((v, i) => setTimeout(() => bajarAlDispositivo(`/api/web/archivo?ruta=${encodeURIComponent(v.ruta)}`), i * 700))
+      setAviso({ texto: vs.length === 1 ? 'Bajando el video a este dispositivo…' : `Bajando ${vs.length} videos a este dispositivo…` })
+      return
+    }
     bajando.current = true
     setFallo('')
     setAviso({ texto: vs.length === 1 ? 'Copiando a Descargas…' : `Copiando ${vs.length} videos a Descargas…` })
@@ -398,7 +406,7 @@ export function MisVideos({ cards, sessions, estilo, onEstilo }: { cards: Card[]
             <div className="mis-aviso" role="status">
               <Icono de="descargar" /> {aviso.texto}
               {aviso.ruta && (
-                <button className="link" onClick={() => api('/api/open', { path: aviso.ruta })}>
+                <button className="link" onClick={() => void abrirRuta(aviso.ruta!).catch(() => {})}>
                   Mostrar
                 </button>
               )}

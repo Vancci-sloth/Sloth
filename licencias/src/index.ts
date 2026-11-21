@@ -79,6 +79,7 @@ import { APERTURA_VOZ } from './voz-mensual.ts'
 import { bajarApoyo, reanudarPausadas } from './bajar-apoyo.ts'
 import { bajarCadaMes, comoBaja, comoSigue, pasoEn, precioDe, siVuelves, tuPrecioSeQueda } from './escalera.ts'
 import { olvidarRespaldos, respaldo } from './respaldo.ts'
+import { HOST_ENTRADA, olvidarWeb, web } from './web.ts'
 import { youtube } from './youtube.ts'
 
 export interface Env {
@@ -504,6 +505,11 @@ export class Rechazo extends Error {
 export default {
   async fetch(req: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(req.url)
+    // La entrada de Sloth en la web tiene su propio dominio, donde no vive nada más (src/web.ts).
+    if (url.hostname === HOST_ENTRADA) {
+      url.pathname = `/web${url.pathname === '/' ? '' : url.pathname}`
+      return web(req, env, url).catch((e) => (e instanceof Rechazo ? json({ error: e.message }, e.status) : json({ error: 'Algo falló. Intenta otra vez en un momento.' }, 500)))
+    }
     if (!PUBLICAS.has(url.pathname)) return atender(req, env, ctx, url)
     // La página de Sloth (sloth.vancci.org) enseña el precio y la versión, y suscribe: también sus errores se leen.
     const r =
@@ -527,6 +533,7 @@ export default {
     ctx.waitUntil(olvidarRegistroVoz(env).catch((e) => console.error('Registro de la voz', e instanceof Error ? e.message : e)))
     ctx.waitUntil(olvidarSueltos(env).catch((e) => console.error('Archivos sueltos de la comunidad', e instanceof Error ? e.message : e)))
     ctx.waitUntil(olvidarRespaldos(env).catch((e) => console.error('Copias que nadie renueva', e instanceof Error ? e.message : e)))
+    ctx.waitUntil(olvidarWeb(env).catch((e) => console.error('Sloth en la web', e instanceof Error ? e.message : e)))
   }
 } satisfies ExportedHandler<Env>
 
@@ -567,6 +574,7 @@ async function atender(req: Request, env: Env, ctx: ExecutionContext, url: URL):
     if (url.pathname === '/voz' || url.pathname.startsWith('/voz/')) return await voz(req, env, ctx, url)
     if (url.pathname === '/respaldo' || url.pathname.startsWith('/respaldo/')) return await respaldo(req, env, url)
     if (url.pathname === '/youtube' || url.pathname.startsWith('/youtube/')) return await youtube(req, env, url)
+    if (url.pathname === '/web' || url.pathname.startsWith('/web/')) return await web(req, env, url)
     return json({ error: 'No existe' }, 404)
   } catch (error) {
     if (error instanceof Rechazo) return json({ error: error.message }, error.status)
@@ -1898,7 +1906,7 @@ export async function vigilar(env: Env, email: string, motivo: string, bloqueada
 }
 
 /** La conexión de quien pide, resumida: para su cupo, sin guardar su IP. */
-async function conexion(req: Request): Promise<string> {
+export async function conexion(req: Request): Promise<string> {
   return `ip:${await resumen(`sloth:${redDe(req.headers.get('cf-connecting-ip') ?? '')}`)}`
 }
 

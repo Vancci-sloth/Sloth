@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { Modelo3D } from '../../shared/types'
+import { enLaWeb } from './web'
 
 /**
  * El visor 3D de «Modelos 3D» (`skills/modelos-3d/visor.tsx`): uno solo mientras la sección está abierta, en un iframe
@@ -17,7 +18,8 @@ import type { Modelo3D } from '../../shared/types'
 
 /** En angosto la ficha se desplaza: ahí la rueda la desplaza, y acerca solo con Ctrl (o pellizcando el panel táctil). */
 export const ANGOSTO = '(max-width: 860px)'
-const aparte = (ruta: string) => `${location.protocol}//${location.hostname === '127.0.0.1' ? 'localhost' : '127.0.0.1'}:${location.port}${ruta}`
+// Desde la web no hay otra dirección: `127.0.0.1` sería la del dispositivo. Va en la misma, en un marco del túnel.
+const aparte = (ruta: string) => (enLaWeb ? ruta : `${location.protocol}//${location.hostname === '127.0.0.1' ? 'localhost' : '127.0.0.1'}:${location.port}${ruta}`)
 
 /** Lo que dice el visor. */
 export type AvisoVisor = { que: 'hola' | 'listo' | 'falta' | 'toca' | 'tecla' | 'rueda'; id?: string; key?: string; dy?: number }

@@ -13,6 +13,8 @@ import { TuEquipo } from './Equipo' // tu equipo
 import { Icono } from './Iconos'
 import { SuscripcionOpciones, VersionYApoyo } from './Licencia' // apoyo
 import { RespaldoOpciones } from './Respaldo' // tu Sloth en otra computadora
+import { SlothWebOpciones } from './SlothWeb' // Sloth en la web
+import { enLaWeb } from './web'
 import { Logo } from './Logos'
 import { BotonNavegador } from './Navegador'
 import { RadarOpciones } from './RadarOpciones' // radar
@@ -73,6 +75,8 @@ function Ajustes({ onDone, iniciando, onIniciando }: { onDone(): void; iniciando
           {iniciando && <BotonNavegador hilo={NAVEGADOR_REDES} trabajando={false} />}
         </div>
       </div>
+      {/* Desde la web, los inicios de sesión de las cuentas se abren en la pantalla de la computadora (server/cuenta.ts). */}
+      {enLaWeb && <p className="grupo-nota">Estás usando Sloth desde la web. Conectar una cuenta (un agente, Google, una red) abre su inicio de sesión en la pantalla de tu computadora: eso se hace allá.</p>}
       {/* Las redes, lo primero: es por donde salen los videos. Cada quien las conecta con sus propias credenciales. */}
       <section className="grupo redes-grupo">
         <div className="redes-cabeza">
@@ -95,6 +99,12 @@ function Ajustes({ onDone, iniciando, onIniciando }: { onDone(): void; iniciando
           <SuscripcionOpciones />
         </Grupo>
       )}
+      <Grupo
+        titulo="Sloth en la web"
+        nota="Usa tu Sloth desde el navegador del celular o de otra computadora, con tus mismos chats, agentes y videos. Todo sigue trabajando en esta computadora: tiene que estar encendida, con internet y con Sloth abierto. La conexión va cifrada por un túnel de Cloudflare, y solo entran los dispositivos que conectes aquí."
+      >
+        <SlothWebOpciones />
+      </Grupo>
       <Grupo titulo="Tu Sloth en otra computadora" nota="Con tu clave, Sloth guarda sola una copia de tus estilos, tus chats, «Sobre ti» y tus marcas. Escribe esa clave en otra computadora y te ofrece traerlo todo. Los videos y las cuentas conectadas no viajan.">
         <RespaldoOpciones />
       </Grupo>

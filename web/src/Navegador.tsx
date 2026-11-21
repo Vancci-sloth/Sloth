@@ -2,6 +2,8 @@ import { type CSSProperties, type FormEvent, type PointerEvent as EventoPuntero,
 import { type EstadoNavegador, NAVEGADOR_REDES, type PantallaNavegador } from '../../shared/types'
 import { Icono } from './Iconos'
 import { arrastrarBorde, colocarPantalla, type Lugar, limitar, PANTALLAS } from './navegador-medidas'
+import { PaginaRemota, puenteWeb } from './NavegadorWeb'
+import { enLaWeb } from './web'
 import './Navegador.css'
 
 /**
@@ -9,13 +11,14 @@ import './Navegador.css'
  * el estudio, en el centro). La página la pone la ventana de Sloth (`electron/navegador.ts`) encima de la interfaz, en la
  * caja del panel; aquí van su barra y lo que se ve sin página. La usa también el agente: cuando empieza a usarla, el
  * panel de ese hilo se abre solo. Fuera de la ventana de Sloth (en Edge) no hay navegador, y el agente usa el suyo.
+ * Desde la web (ADR 0025) es el de la ventana de la computadora, visto en capturas y usado a distancia (`NavegadorWeb.tsx`).
  *
  * El borde izquierdo del panel se arrastra. Cada pestaña puede tener su tamaño fijo (fila del móvil), con bordes que
  * también se arrastran. La primera pestaña es la del hilo, la del agente; las demás son tuyas, y la de las redes no
  * tiene: es una sola página, la que maneja Sloth al publicar.
  */
 
-const puente = window.sloth?.navegador
+const puente = window.sloth?.navegador ?? (enLaWeb ? puenteWeb() : undefined)
 export const hayNavegador = !!puente
 
 const CLAVE = 'sloth-navegador'
@@ -365,22 +368,25 @@ export function PanelNavegador({ hilo, trabajando }: { hilo: string; trabajando:
             <button className="navegador-boton" title="Nueva pestaña" onClick={() => nuevaPestana(hilo)}>
               <Icono de="mas" />
             </button>
-            <button
+            {/* El tamaño fijo encoge la página de la ventana: desde la web se mide a la caja de aquí. */}
+            {!enLaWeb && <button
               className={`navegador-boton${conFila ? ' on' : ''}`}
               title={conFila ? 'Volver al tamaño del panel' : 'Tamaño de la página y zoom'}
               aria-pressed={conFila}
               onClick={() => (conFila ? (setFila(false), ponerPantalla(activa, null)) : setFila(true))}
             >
               <Icono de="movil" />
-            </button>
+            </button>}
           </>
         )}
         <button className="navegador-boton" disabled={!e?.url} title="Abrir en tu navegador" onClick={() => hacer('fuera')}>
           <Icono de="fuera" />
         </button>
-        <button className="navegador-boton" disabled={!e?.url} title="Más" onClick={() => hacer('menu')}>
-          <Icono de="puntos" />
-        </button>
+        {!enLaWeb && (
+          <button className="navegador-boton" disabled={!e?.url} title="Más" onClick={() => hacer('menu')}>
+            <Icono de="puntos" />
+          </button>
+        )}
         <button className="navegador-boton" title="Esconder el navegador" onClick={() => abrirNavegador(hilo, false)}>
           <Icono de="cerrar" />
         </button>
@@ -418,6 +424,7 @@ export function PanelNavegador({ hilo, trabajando }: { hilo: string; trabajando:
         </div>
       )}
       <div className="navegador-pagina" ref={caja}>
+        {enLaWeb && e?.url && !e.error && !e.google && <PaginaRemota key={activa} id={activa} />}
         <div className="navegador-marco" ref={marco}>
           {pantalla && (
             <>

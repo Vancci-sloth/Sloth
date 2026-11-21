@@ -5,6 +5,7 @@ import { SobreTi } from './SobreTi'
 import { AvisoPrimerAgente, Requisitos, useConAgente } from './Opciones'
 import type { Model } from '../../shared/types'
 import './Bienvenida.css'
+import { enLaWeb } from './web'
 
 const VISTA = 'bienvenida'
 const EVENTO = 'sloth-bienvenida'
@@ -40,6 +41,8 @@ const OPCIONES = [
 export const abrirBienvenida = () => dispatchEvent(new Event(EVENTO))
 /** Si la primera bienvenida aún no se cerró: lo que quiera salir al abrir Sloth (`EstiloCambio.tsx`) espera a `BIENVENIDA_CERRADA`. */
 export const bienvenidaPendiente = () => {
+  // Desde la web, la computadora ya se preparó: la bienvenida no sale sola en cada dispositivo nuevo.
+  if (enLaWeb) return false
   try {
     return !localStorage.getItem(VISTA)
   } catch {
@@ -54,7 +57,7 @@ export const BIENVENIDA_CERRADA = 'sloth-bienvenida-cerrada'
  * y qué cuesta.
  */
 export function Bienvenida({ models }: { models: Model[] }) {
-  const [abierta, setAbierta] = useState(() => !localStorage.getItem(VISTA))
+  const [abierta, setAbierta] = useState(bienvenidaPendiente)
   const conAgente = useConAgente(models)
   const [listo, setListo] = useState<boolean>()
   // En la app instalada en Windows: si Sloth está anclada a la barra de tareas. `null`, aquí no se ofrece.

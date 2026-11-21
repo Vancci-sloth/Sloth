@@ -1,7 +1,8 @@
 import { spawn } from 'node:child_process'
-import { createReadStream, createWriteStream, existsSync, mkdirSync, readdirSync, statSync, watch } from 'node:fs'
+import { createReadStream, createWriteStream, existsSync, mkdirSync, readdirSync, renameSync, rmSync, statSync, watch } from 'node:fs'
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http'
 import { pipeline } from 'node:stream'
+import { pipeline as pipelineP } from 'node:stream/promises'
 import { createServer as servidorTcp } from 'node:net'
 import { basename, dirname, extname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -63,6 +64,8 @@ import { cambiosDeCard, carpetaSkill, configClaudeDev, duplicateCard, enlazarSki
 import { estaticos } from './estaticos.ts'
 import { type Agente, version } from './version.ts'
 import { cargarPreciosCodex } from './precios.ts'
+import { slothWeb } from './web.ts' // Sloth en la web
+import { navegadorRemoto } from './navegador-remoto.ts' // Sloth en la web
 
 const APP = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const PORT = Number(process.env.PORT ?? 4848)
@@ -117,6 +120,19 @@ const suscripcion = licencia(APP, (cerrado) => {
 
 const clients = new Set<WebSocket>()
 const suscripciones = new Map<WebSocket, string | null>()
+/** Los WebSockets que llegaron por la web, con su dispositivo: al quitarlo en Opciones se cierran. */
+const deLaWeb = new Map<WebSocket, string>()
+// Sloth en la web (server/web.ts, ADR 0025): esta misma interfaz desde otro dispositivo, por un túnel de Cloudflare.
+const web = slothWeb({
+  app: APP,
+  puerto: PORT,
+  // Para probar con el cobro corriendo aquí, que sirve también la entrada.
+  cobro: process.env.SLOTH_COBRO_WEB,
+  entrada: process.env.SLOTH_COBRO_WEB,
+  alQuitar: (id) => {
+    for (const [ws, d] of deLaWeb) if (d === id) ws.close(4001, 'Este dispositivo ya no está conectado')
+  }
+})
 /** Barra lateral: el avance de cada video, que oye lo que se manda para saber cuándo mirarlo. Nace después que los hilos. */
 let avance: ReturnType<typeof avances> | undefined
 /** Lo que se mide de los estilos de la comunidad (`server/estilos-usos.ts`). Nace después que la comunidad. */
@@ -872,6 +888,30 @@ async function api(req: IncomingMessage, res: ServerResponse, url: URL): Promise
 
   if (path === '/api/upload' && method === 'POST') {
     mkdirSync(ATTACHMENTS, { recursive: true })
+    // Desde la web, lo que pasa de lo que deja Cloudflare en una petición (100 MB) llega por trozos (`subir` en
+    // web/src/web.ts): `subida` lo junta en un temporal, en orden, y con `fin` queda como cualquier otro.
+    const subida = url.searchParams.get('subida')
+    if (subida !== null) {
+      // `desde`: dónde empieza el trozo. Uno repetido o fuera de orden no se pega: el archivo saldría roto.
+      const desde = Number(url.searchParams.get('desde'))
+      if (!/^[\w-]{8,40}$/.test(subida) || !Number.isInteger(desde) || desde < 0) return send(res, 400, { error: 'Trozo inválido.' }), true
+      const temporal = join(ATTACHMENTS, `.subida-${subida}`)
+      if (desde === 0) olvidarSubidas()
+      const tiene = existsSync(temporal) ? statSync(temporal).size : 0
+      if (desde !== tiene) return send(res, 409, { error: 'La subida se cortó: vuelve a intentarlo.' }), true
+      // Si se corta a la mitad, `pipeline` falla y el temporal se borra.
+      try {
+        await pipelineP(req, createWriteStream(temporal, { flags: desde === 0 ? 'w' : 'a' }))
+      } catch {
+        rmSync(temporal, { force: true })
+        return true
+      }
+      if (!url.searchParams.has('fin')) return send(res, 200, { ok: true }), true
+      const file = join(ATTACHMENTS, `${Date.now()}-${nombreAdjunto(basename(url.searchParams.get('name') ?? 'archivo'))}`)
+      renameSync(temporal, file)
+      const wav = url.searchParams.has('wav') && extname(file).toLowerCase() !== '.wav' ? await aWav(file) : null
+      return send(res, 200, { path: wav ?? file }), true
+    }
     const file = join(ATTACHMENTS, `${Date.now()}-${nombreAdjunto(basename(url.searchParams.get('name') ?? 'archivo'))}`)
     await new Promise((ok, fail) => req.pipe(createWriteStream(file)).on('finish', ok).on('error', fail))
     // `wav`: la voz de una etapa que pide un WAV, como la grabó el celular (m4a, mp3…). Si FFmpeg no puede, va tal cual.
@@ -893,15 +933,31 @@ async function api(req: IncomingMessage, res: ServerResponse, url: URL): Promise
 
   if (path === '/api/open' && method === 'POST') {
     const pedido = await body<{ path: string; sessionId?: string }>(req)
-    // Una ruta relativa (un enlace del agente: `out/video.mp4`) es de donde trabaja su hilo, o de la carpeta de su video.
-    const meta = pedido.sessionId ? sessions.meta(pedido.sessionId) : undefined
-    const bases = meta ? [meta.cwd, folderOf(meta)] : []
-    const target = bases.map((b) => resolve(b, pedido.path)).find((r) => existsSync(r)) ?? (bases[0] ? resolve(bases[0], pedido.path) : pedido.path)
+    const target = rutaPedida(pedido.path, pedido.sessionId)
     // Señalado en su carpeta: el Explorador y el Finder saben; en Linux se abre la carpeta que lo tiene.
     const [programa, ...args] =
       process.platform === 'win32' ? ['explorer.exe', `/select,${target}`] : process.platform === 'darwin' ? ['open', '-R', target] : ['xdg-open', existsSync(target) && statSync(target).isDirectory() ? target : dirname(target)]
     spawn(programa, args, { detached: true, stdio: 'ignore' }).on('error', () => {}).unref()
     send(res, 200, { ok: true })
+    return true
+  }
+
+  // Desde la web, «abrir» un archivo es bajarlo al dispositivo: el Explorador se abriría en la computadora.
+  if (path === '/api/web/archivo' && method === 'GET') {
+    const target = rutaPedida(url.searchParams.get('ruta') ?? '', url.searchParams.get('sesion') ?? undefined)
+    if (!existsSync(target)) return send(res, 404, { error: 'Ese archivo ya no está en tu computadora.' }), true
+    const st = statSync(target)
+    if (st.isDirectory()) return send(res, 400, { error: `Es una carpeta de tu computadora: ${target}`, carpeta: true }), true
+    const nombre = basename(target)
+    // Antes de bajarlo, la interfaz mira si se puede: un error en la descarga no se ve.
+    if (url.searchParams.has('mirar')) return send(res, 200, { nombre, bytes: st.size }), true
+    res.writeHead(200, {
+      'content-type': ATTACHMENT_TYPES[extname(target).toLowerCase()] ?? 'application/octet-stream',
+      'content-length': st.size,
+      'content-disposition': `attachment; filename="${nombre.replace(/[^ -~]|"/g, '_')}"; filename*=UTF-8''${encodeURIComponent(nombre)}`,
+      'cache-control': 'no-store'
+    })
+    pipeline(createReadStream(target), res, () => {})
     return true
   }
 
@@ -916,6 +972,23 @@ async function api(req: IncomingMessage, res: ServerResponse, url: URL): Promise
   }
 
   return false
+}
+
+/** Lo que quedó de subidas por trozos que no acabaron, de hace más de un día. */
+function olvidarSubidas() {
+  try {
+    for (const f of readdirSync(ATTACHMENTS)) {
+      const r = join(ATTACHMENTS, f)
+      if (f.startsWith('.subida-') && Date.now() - statSync(r).mtimeMs > 24 * 3600_000) rmSync(r, { force: true })
+    }
+  } catch {}
+}
+
+/** La ruta de un archivo que se pide abrir. Una relativa (un enlace del agente: `out/video.mp4`) es de donde trabaja su hilo, o de la carpeta de su video. */
+function rutaPedida(ruta: string, sessionId?: string): string {
+  const meta = sessionId ? sessions.meta(sessionId) : undefined
+  const bases = meta ? [meta.cwd, folderOf(meta)] : []
+  return bases.map((b) => resolve(b, ruta)).find((r) => existsSync(r)) ?? (bases[0] ? resolve(bases[0], ruta) : ruta)
 }
 
 const server = createServer()
@@ -945,7 +1018,8 @@ async function interfazDelRepo(vite: typeof import('vite'), react: typeof import
       // a armar en cada arranque, y recargaba la página.
       optimizeDeps: { rolldownOptions: { transform: { define: produccion } } },
       environments: { client: { keepProcessEnv: true } },
-      server: { middlewareMode: true, hmr: { server } },
+      // Por la web llega con el host del túnel (server/web.ts), que Vite no deja pasar si no lo conoce.
+      server: { middlewareMode: true, hmr: { server }, allowedHosts: ['.trycloudflare.com'] },
       appType: 'spa'
     })
     return servidor.middlewares
@@ -966,10 +1040,18 @@ function deConfianza(req: IncomingMessage): boolean {
 }
 
 server.on('request', async (req, res) => {
-  if (!deConfianza(req)) return send(res, 403, { error: 'Sloth solo atiende a su propia ventana.' })
+  // Por la web (server/web.ts) solo entra un dispositivo con su sesión; sin ella, la página de entrada.
+  const porWeb = deConfianza(req) ? null : web.confianza(req)
+  if (porWeb === null && !deConfianza(req)) return send(res, 403, { error: 'Sloth solo atiende a su propia ventana.' })
   const url = new URL(req.url ?? '/', `http://${req.headers.host}`)
+  if (porWeb === 'fuera') return web.aEntrar(req, res)
+  if (porWeb === 'publica') return void web.publica(req, res, url).catch((e) => send(res, 500, { error: e instanceof Error ? e.message : String(e) }))
+  // Ninguna otra página la mete en un marco: con la sesión puesta, un clic ahí sería tuyo.
+  if (porWeb) res.setHeader('content-security-policy', "frame-ancestors 'self'")
   try {
     if (url.pathname.startsWith('/api/')) {
+      if (url.pathname.startsWith('/api/web') && (await web.api(req, res, url))) return
+      if (url.pathname.startsWith('/api/navegador/') && (await navegadorRemoto(req, res, url))) return
       if (suscripcion && (await suscripcion.api(req, res, url))) return // suscripción
       if (await api(req, res, url)) return
     }
@@ -981,18 +1063,22 @@ server.on('request', async (req, res) => {
 
 const wss = new WebSocketServer({ noServer: true })
 server.on('upgrade', (req, socket, head) => {
-  if (req.url !== '/ws') return
-  // El WebSocket lleva todo lo que pasa en los hilos: ninguna otra página lo puede abrir.
-  if (!deConfianza(req)) return void socket.destroy()
+  // Otro WebSocket (el de Vite, en el repo) solo desde esta computadora o con sesión de la web: si no, se cierra y no se
+  // queda colgado.
+  if (req.url !== '/ws') return void (deConfianza(req) || web.confianza(req) === 'sesion' || socket.destroy())
+  // El WebSocket lleva todo lo que pasa en los hilos: ninguna otra página lo puede abrir. Por la web, solo con sesión.
+  const dispositivo = deConfianza(req) ? null : web.confianza(req) === 'sesion' ? web.sesionDe(req)?.dispositivo : undefined
+  if (dispositivo === undefined) return void socket.destroy()
   wss.handleUpgrade(req, socket, head, (ws) => {
     clients.add(ws)
+    if (dispositivo) deLaWeb.set(ws, dispositivo)
     ws.on('message', (data) => {
       try {
         const msg = JSON.parse(data.toString())
         if (msg.type === 'subscribe' && (msg.sessionId === null || (typeof msg.sessionId === 'string' && /^[\w-]+$/.test(msg.sessionId)))) suscripciones.set(ws, msg.sessionId)
       } catch { /* Un mensaje inválido no cambia la suscripción. */ }
     })
-    ws.on('close', () => { clients.delete(ws); suscripciones.delete(ws) })
+    ws.on('close', () => { clients.delete(ws); suscripciones.delete(ws); deLaWeb.delete(ws) })
   })
 })
 

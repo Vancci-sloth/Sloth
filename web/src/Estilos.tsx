@@ -7,6 +7,7 @@ import { abrirPublicacion } from './Comunidad'
 import { GuiaCampos, pruebaEnLinea } from './Guia'
 import { Icono } from './Iconos'
 import './Estilos.css'
+import { abrirRuta } from './web'
 
 /**
  * Compartir tus estilos y usar los de otros (`server/estilos.ts`). «Compartir» de un estilo tuyo (en su card, junto a su
@@ -369,7 +370,7 @@ export function CompartirEstilo({ card, onCerrar }: { card: Card; onCerrar(): vo
       acciones={
         <>
           {archivo.ruta ? (
-            <button className="ghost compartir-archivo" onClick={() => void api('/api/open', { path: archivo.ruta })} title={archivo.ruta}>
+            <button className="ghost compartir-archivo" onClick={() => void abrirRuta(archivo.ruta!).catch(() => {})} title={archivo.ruta}>
               Guardado en Descargas · Ver
             </button>
           ) : (

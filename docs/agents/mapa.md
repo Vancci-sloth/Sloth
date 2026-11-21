@@ -33,6 +33,14 @@ Este es el mapa:
 - «Sobre ti» (`server/sobre-ti.ts`, `web/src/SobreTi.tsx`): lo que cada quien cuenta de sí en la bienvenida o en
   Opciones, en `data/sobre-ti.json`. Va con las instrucciones de Sloth a todos los agentes (`conSobreTi`: el `append`
   de Claude, las `developerInstructions` de Codex e `instrucciones()` de los demás), leído al empezar cada hilo.
+- Sloth en la web (`server/web.ts`, `web/src/web.ts`, `web/src/SlothWeb.tsx`, ADR 0025): la misma interfaz desde el
+  navegador de otro dispositivo, por un túnel rápido de Cloudflare (cloudflared se baja al encenderla). El cobro
+  (`licencias/src/web.ts`) solo dice dónde está el túnel de cada computadora; la entrada es `web.sloth.vancci.org`, que
+  crea en cada navegador una llave que no se puede sacar y firma un reto del túnel. Entra solo un dispositivo conectado
+  desde Opciones; `confianza` decide qué se atiende por el túnel. Lo que en la web no
+  aplica (abrir en el Explorador, `127.0.0.1`) usa `abrirRuta` y `enLaWeb`; lo grande sube por trozos (`subir`). El
+  navegador del hilo se ve en capturas y se usa a distancia (`server/navegador-remoto.ts`, `web/src/NavegadorWeb.tsx`,
+  `remoto` en `electron/navegador.ts`). Para probarla con el cobro local: `SLOTH_COBRO_WEB`.
 - `server/sessions.ts`: cada hilo es `data/sessions/<id>.json` (qué es) y `<id>.jsonl` (lo que pasó). Retoma la sesión
   del proveedor tras reiniciar, reparte los lotes según la máquina y cierra el proceso de un video del lote al acabar.
   Un chat de Claude, DeepSeek, Codex u OpenCode con su sesión guardada suelta el proceso a la media hora; los demás

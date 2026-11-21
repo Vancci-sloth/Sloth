@@ -1936,6 +1936,20 @@ export interface PuenteNavegador {
   estados(): Promise<EstadoNavegador[]>
 }
 
+/**
+ * Lo que la web le hace a la página de un hilo (ADR 0025, `server/navegador-remoto.ts`): ahí no hay vista nativa, así
+ * que se ve en capturas y se usa con esto. `x` e `y`, en píxeles CSS de la página.
+ */
+export type EntradaNavegador =
+  | { tipo: 'clic'; x: number; y: number }
+  | { tipo: 'rueda'; x: number; y: number; dx: number; dy: number }
+  | { tipo: 'texto'; texto: string }
+  | { tipo: 'tecla'; tecla: TeclaNavegador }
+
+/** Las teclas que no son texto y que la web manda una a una. */
+export const TECLAS_NAVEGADOR = ['Enter', 'Backspace', 'Tab', 'Escape', 'Delete', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End', 'PageUp', 'PageDown'] as const
+export type TeclaNavegador = (typeof TECLAS_NAVEGADOR)[number]
+
 /** Lo que se puede borrar sin perder nada tuyo, en Opciones → Espacio en disco (`server/espacio.ts`). */
 export type IdEspacio = 'temporales' | 'renders' | 'modulos' | 'caches' | 'perfiles' | 'fuentes' | 'python' | 'adjuntos'
 

@@ -21,7 +21,11 @@
   "compatibility_date": "2026-10-01",
   // workers.dev sigue para las apps de antes, que llaman ahí; las nuevas, a api.sloth.vancci.org (zona vancci.org de esta cuenta).
   "workers_dev": true,
-  "routes": [{ "pattern": "api.sloth.vancci.org", "custom_domain": true }],
+  // web.sloth.vancci.org: la entrada de Sloth en la web (src/web.ts), sola en su dominio.
+  "routes": [
+    { "pattern": "api.sloth.vancci.org", "custom_domain": true },
+    { "pattern": "web.sloth.vancci.org", "custom_domain": true }
+  ],
   "observability": { "enabled": true },
   // Cada mañana (9:00 de la Ciudad de México): el aviso de los cobros que vienen. Cada 10 minutos: las claves que no
   // salieron por correo al confirmarse el pago (`reenviarClaves`) y los premios de la rifa que quedaron a medias.

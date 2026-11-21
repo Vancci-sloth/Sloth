@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import type { Card, CambiosCard } from '../../shared/types'
 import { api } from './api'
 import { Confirm } from './Confirm'
+import { abrirRuta } from './web'
 
 /**
  * «Con tus cambios (N)», bajo la card elegida: lo que tú o tu agente cambiaron en su skill (y en video-base, que lee), que
@@ -25,7 +26,7 @@ export function TusCambios({ card, clave }: { card: Card; clave: string }) {
     }
   }, [card.id, clave])
 
-  const abrir = (ruta: string) => void api('/api/open', { path: ruta })
+  const abrir = (ruta: string) => void abrirRuta(ruta).catch(() => {})
   async function quitar(uno?: { skill: string; archivo: string }) {
     const e = await api<CambiosCard | null>(`/api/cards/${card.id}/original`, uno ?? {})
     setEstado(e)

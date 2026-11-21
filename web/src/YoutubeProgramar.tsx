@@ -10,6 +10,7 @@ import { Desplegable } from './Desplegable'
 import './Youtube.css'
 import { YoutubeRecomendaciones } from './YoutubeRecomendaciones'
 import { YoutubeEliminar } from './YoutubeEliminar'
+import { subir } from './web'
 
 /** La revisión por lote de YouTube: guarda borradores, exige revisar título y miniatura y confirma las fechas juntas. */
 const enCurso = (v: VideoParaYoutube) => !!v.subida && ['cola', 'subiendo', 'preparando'].includes(v.subida.estado)
@@ -180,7 +181,7 @@ export function RevisionYoutube({ cardId, ruta, cerrar, onCambio }: { cardId?: s
     setError('')
     try {
       if (file.size > 50 * 1024 * 1024 || !/\.(png|jpe?g)$/i.test(file.name)) throw new Error('Elige una miniatura PNG o JPEG de hasta 50 MB.')
-      const res = await fetch(`/api/upload?name=${encodeURIComponent(file.name)}`, { method: 'POST', body: file })
+      const res = await subir(`/api/upload?name=${encodeURIComponent(file.name)}`, file)
       const j = await res.json()
       if (!res.ok) throw new Error(j.error ?? 'No se pudo importar la miniatura.')
       const m = await api<MiniaturaYoutube>('/api/youtube/elegir-miniatura', { cardId: v.cardId, ruta: v.ruta, imagen: j.path })

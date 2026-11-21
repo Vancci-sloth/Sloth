@@ -1,0 +1,5 @@
+/* Opciones → Sloth en la web (SlothWeb.tsx). */
+.web-codigo-corto { margin: 2px 0 4px; font-size: 26px; font-weight: 700; letter-spacing: 4px; color: var(--amber); }
+.web-enlace { display: flex; gap: 8px; align-items: center; }
+.web-enlace input { flex: 1; min-width: 0; padding: 7px 10px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; color: var(--text); font-size: 12px; }
+.web-enlace button { display: inline-flex; align-items: center; gap: 6px; flex: none; }

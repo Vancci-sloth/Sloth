@@ -9,6 +9,7 @@ import { imageUrl } from './Images'
 import { buildTimeline } from './items'
 import { GenerarVoz } from './Voz' // voz de AI Studio
 import './Etapas.css'
+import { subir } from './web'
 
 /**
  * El avance de la sesión, leído de sus archivos al abrirla y cada vez que el servidor avisa de que cambió su carpeta
@@ -226,7 +227,7 @@ function Entrega({ sessionId, etapa }: { sessionId: string; etapa: Avance['etapa
     setBusy(true)
     setError('')
     try {
-      const res = await fetch(`/api/upload?name=${encodeURIComponent(file.name)}${voz ? '&wav' : ''}`, { method: 'POST', body: file })
+      const res = await subir(`/api/upload?name=${encodeURIComponent(file.name)}${voz ? '&wav' : ''}`, file)
       // Sin ruta no se manda nada: el agente recibiría "undefined" como archivo.
       const { path, error } = await res.json().catch(() => ({}))
       if (!res.ok || typeof path !== 'string') throw new Error(`No se pudo subir «${file.name}»: ${error ?? `el servidor respondió ${res.status}`}`)

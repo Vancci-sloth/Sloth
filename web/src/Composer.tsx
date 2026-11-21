@@ -8,6 +8,7 @@ import { FlowEnUso, LimitesContexto } from './LimitesContexto'
 import type { Resumen } from './eventos'
 import { compact } from './items'
 import { invocacion, LINK, LINK_ICON, linkParts, QUOTE_EVENT, QUOTE_ICON, quoteRef, THREAD, THREAD_ICON, threadIconOf } from './etiquetas'
+import { subir } from './web'
 
 /**
  * El aviso con el que el inicio le pasa al compositor lo que se soltó fuera de él (`Soltar.tsx`): los archivos y el texto
@@ -905,7 +906,7 @@ export function Composer(props: {
     for (const [i, file] of files.entries()) {
       const src = srcs[i]
       try {
-        const res = await fetch(`/api/upload?name=${encodeURIComponent(file.name || 'imagen.png')}`, { method: 'POST', body: file })
+        const res = await subir(`/api/upload?name=${encodeURIComponent(file.name || 'imagen.png')}`, file)
         // Si el servidor no la guardó, no hay ruta: adjuntarla le mandaría al agente "undefined".
         const { path, error } = await res.json().catch(() => ({}))
         if (!res.ok || typeof path !== 'string') throw new Error(`No se pudo subir «${file.name || 'imagen.png'}»: ${error ?? `el servidor respondió ${res.status}`}`)

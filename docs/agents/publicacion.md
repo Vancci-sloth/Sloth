@@ -179,6 +179,10 @@ entregado sigue en `voz_mensual` (migración 0024) y en Administrador → Crédi
 apoyo sugerido o más (`daCreditos` en `licencias/src/voz-mensual.ts`) la sigue usando la rifa para dejarlos fuera.
 La copia de cada Sloth (ADR 0020) necesita la migración `0031_respaldos.sql` y el Worker desplegado antes de publicar
 la versión de la app que la sube; hasta entonces la app solo anota que no pudo y lo vuelve a intentar.
+Sloth en la web (ADR 0025) necesita la migración `0036_web.sql` y el Worker desplegado antes de publicar la versión de
+la app que la trae: sin ellos, el túnel abre pero la entrada `api.sloth.vancci.org/web` no sabe adónde mandar.
+La entrada vive en su propio dominio, `web.sloth.vancci.org` (una ruta `custom_domain` más del mismo Worker en
+`wrangler.jsonc`, que `deploy` crea). Comprueba con `curl https://web.sloth.vancci.org` (la página de entrada, 200).
 La rifa necesita la migración `0025_rifas.sql` y el Worker desplegado; con créditos, además, las voces ya abiertas.
 Su sección y su ruleta llegan a la Administrador instalada con la siguiente versión de la app.
 Un reparto en `enviando` o `revisar` requiere comprobar el movimiento en el proveedor antes de volver a sumarlo: su API

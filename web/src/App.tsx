@@ -192,6 +192,7 @@ export function App() {
         const socket = ws
         socket.send(JSON.stringify({ type: 'subscribe', sessionId: abierto.current }))
         setConnected(true)
+        dispatchEvent(new CustomEvent('sloth-conexion', { detail: true }))
         try {
           const state = await api('/api/state')
           setCards(state.cards)
@@ -210,8 +211,10 @@ export function App() {
           socket.close()
         }
       }
-      ws.onclose = () => {
+      ws.onclose = (e) => {
         setConnected(false)
+        // Desde la web, `ConexionWeb` lo dice si tarda (4001: este dispositivo se quitó en Opciones).
+        dispatchEvent(new CustomEvent('sloth-conexion', { detail: e.code === 4001 ? 'quitado' : false }))
         eventos.conexion(false)
         retry = setTimeout(connect, 800)
       }
