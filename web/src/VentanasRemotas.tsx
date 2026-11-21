@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { Icono } from './Iconos'
 import { PaginaRemota } from './NavegadorWeb'
 import './VentanasRemotas.css'
+import { ALLA, enLaNube } from './web'
 
 /**
  * Desde la web (ADR 0025): lo que conectar una cuenta abre en la pantalla de la computadora, aquí, en un panel abajo a
@@ -41,11 +42,11 @@ export function VentanasRemotas() {
   if (!visibles.length) return null
   const v = visibles.find((x) => x.id === abierta) ?? visibles[0]
   return createPortal(
-    <section className="ventanas-remotas" aria-label="Inicio de sesión en tu computadora">
+    <section className="ventanas-remotas" aria-label={`Inicio de sesión en ${ALLA}`}>
       <header>
         <Icono de="pantalla" className="icon-trazo" />
         <div>
-          <strong>En tu computadora</strong>
+          <strong>{enLaNube ? 'En tu Sloth en la nube' : 'En tu computadora'}</strong>
           <span className="muted small">{v.tipo === 'terminal' ? 'Un inicio de sesión espera' : 'Una ventana de Edge está abierta'}</span>
         </div>
         <button className="ghost small" title="Esconder" onClick={() => setEscondidas((s) => new Set(s).add(v.id))}>

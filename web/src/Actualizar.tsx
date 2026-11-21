@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import type { ActualizacionSloth, AgentesAlDia } from '../../shared/types'
 import { api } from './api'
 import { Confirm } from './Confirm'
+import { enLaNube } from './web'
 
 /**
  * Mientras baja, cada cuánto se pregunta cómo va; si no, cada cuánto se mira si la ventana ya sabe de una versión nueva
@@ -13,9 +14,17 @@ const CADA = 60_000
 /**
  * Abajo de la barra lateral de la app que se vende: si hay una versión nueva de Sloth, el botón que la pone. Lo sabe la
  * ventana de Sloth (electron/main.ts): al confirmar baja solo lo que cambió, cierra Sloth y la vuelve a abrir actualizada.
+ * En la nube (ADR 0026) esa ventana no la ve nadie: se le pregunta por el servidor (`/api/ventana/…`).
  */
+const ventanaDeLaNube = enLaNube
+  ? {
+      actualizacion: () => api<ActualizacionSloth>('/api/ventana/actualizacion'),
+      actualizar: () => api<ActualizacionSloth>('/api/ventana/actualizar', {})
+    }
+  : undefined
+
 export function ActualizarSloth() {
-  const sloth = window.sloth
+  const sloth = window.sloth ?? ventanaDeLaNube
   const [a, setA] = useState<ActualizacionSloth>()
   const [preguntar, setPreguntar] = useState(false)
   const bajando = a?.avance !== undefined

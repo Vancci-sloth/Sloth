@@ -1,0 +1,25 @@
+// Sloth en la nube (docs/adr/0026-sloth-en-la-nube.md): un Codespace de GitHub con la Sloth de Linux, que se usa desde
+// el navegador sin computadora. Se crea desde web.sloth.vancci.org («Sin computadora») o con
+// https://codespaces.new/Vancci-sloth/sloth?quickstart=1. Al encenderse, sloth-nube.sh la arranca y la pestaña de Sloth
+// se abre sola (el puerto 4848).
+{
+  "name": "Sloth en la nube",
+  "build": { "dockerfile": "Dockerfile" },
+  // Los videos se arman aquí: 4 núcleos y 16 GB.
+  "hostRequirements": { "cpus": 4, "memory": "16gb", "storage": "32gb" },
+  "postStartCommand": "bash .devcontainer/sloth-nube.sh",
+  "portsAttributes": {
+    "4848": { "label": "Sloth", "onAutoForward": "openBrowser", "requireLocalPort": false }
+  },
+  // Sloth abre otros puertos por dentro (el relevo del navegador, los agentes): ninguno se publica ni avisa.
+  "otherPortsAttributes": { "onAutoForward": "ignore" },
+  "customizations": {
+    "codespaces": { "openFiles": [".devcontainer/LEEME.md"] },
+    "vscode": {
+      "settings": {
+        "workbench.startupEditor": "none",
+        "remote.autoForwardPortsSource": "process"
+      }
+    }
+  }
+}

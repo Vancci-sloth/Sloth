@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { entrada } from './web'
+import { enLaNube, entrada } from './web'
 
 /**
  * Desde la web (ADR 0025): si la conexión con la computadora se pierde y no vuelve sola en unos segundos, lo dice. Pasa
  * al apagarse la computadora o cerrarse Sloth, al reiniciarse (el túnel cambia de dirección y la sesión de esta se
  * pierde) o al quitar este dispositivo en Opciones. «Volver a entrar» va a la entrada del cobro, que busca la dirección
- * de ahora y regresa a esta misma vista. En cuanto vuelve, se va solo.
+ * de ahora y regresa a esta misma vista. En cuanto vuelve, se va solo. En la nube (ADR 0026) la dirección es siempre la
+ * misma: se recarga, y si el Codespace se detuvo, se enciende en GitHub.
  */
 const ESPERA = 8000
 
@@ -35,6 +36,20 @@ export function ConexionWeb() {
               <p>Se quitó en Opciones de Sloth. Para volver a usarlo, conéctalo otra vez desde tu computadora.</p>
             </div>
           </>
+        ) : enLaNube ? (
+          <>
+            <h2>Se perdió la conexión con tu Sloth</h2>
+            <div className="modal-body">
+              <p>Puede que se esté actualizando o reiniciando, o que tu Codespace se haya detenido tras un rato sin uso. Tus chats y tus videos siguen ahí.</p>
+              <p className="small muted">
+                Si no vuelve, enciéndelo en{' '}
+                <a href="https://github.com/codespaces" target="_blank" rel="noreferrer">
+                  github.com/codespaces
+                </a>{' '}
+                y vuelve a esta página.
+              </p>
+            </div>
+          </>
         ) : (
           <>
             <h2>Se perdió la conexión con tu Sloth</h2>
@@ -45,8 +60,8 @@ export function ConexionWeb() {
           </>
         )}
         <div className="modal-actions">
-          <button className="primary" autoFocus onClick={() => (location.href = entrada())}>
-            Volver a entrar
+          <button className="primary" autoFocus onClick={() => (enLaNube ? location.reload() : (location.href = entrada()))}>
+            {enLaNube ? 'Volver a intentar' : 'Volver a entrar'}
           </button>
         </div>
       </div>

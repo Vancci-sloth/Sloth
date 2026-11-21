@@ -13,7 +13,7 @@ import { YoutubeLote } from './YoutubeProgramar'
 import { CalendarioYoutube } from './YoutubeCalendario'
 import { CalendarioRedes, type EstadoRedes, estadoEnRedes, Marcas, ResumenRedes } from './Redes' // redes
 import './MisVideos.css'
-import { abrirRuta, bajar as bajarAlDispositivo, enLaWeb } from './web'
+import { abrirRuta, bajar as bajarAlDispositivo, enLaNube, enLaWeb } from './web'
 
 /**
  * «Mis videos»: los videos terminados de todos los estilos, del más nuevo al más viejo. Se buscan por título, archivo o
@@ -231,8 +231,14 @@ export function MisVideos({ cards, sessions, estilo, onEstilo }: { cards: Card[]
   }
   /** Copia los videos a Descargas y lo dice, con un enlace que los señala en su carpeta. */
   const bajando = useRef(false)
+  const v0 = (vs: VideoHecho[]) => vs[0].ruta.split(/[\\/]/).pop()
   async function bajar(vs: VideoHecho[]) {
     if (bajando.current) return
+    // En la nube no hay Descargas de una computadora: van directo a este dispositivo, uno tras otro.
+    if (enLaNube) {
+      vs.forEach((v, i) => setTimeout(() => bajarAlDispositivo(`/api/web/archivo?ruta=${encodeURIComponent(v.ruta)}`), i * 700))
+      return setAviso({ texto: vs.length === 1 ? `Bajando «${v0(vs)}» a este dispositivo.` : `Bajando ${vs.length} videos a este dispositivo.` })
+    }
     bajando.current = true
     setFallo('')
     setAviso({ texto: vs.length === 1 ? 'Copiando a Descargas…' : `Copiando ${vs.length} videos a Descargas…` })

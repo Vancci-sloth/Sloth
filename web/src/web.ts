@@ -9,15 +9,21 @@
  * - `abrirRuta`: un archivo se señala en el Explorador o el Finder de la computadora, como en la ventana; desde la web,
  *   además, se baja al dispositivo.
  * - `entrada()`: adónde volver a entrar si se pierde la conexión (`ConexionWeb.tsx`).
+ * - `enLaNube`: Sloth corre en un Codespace de GitHub (ADR 0026), no en una computadora de quien la usa: no hay
+ *   Explorador que abrir ni túnel; lo que se abre o se descarga se baja a este dispositivo.
  */
-import { enlaceEntrada, esDeLaWeb, type EstadoWeb } from '../../shared/web'
+import { enlaceEntrada, esDeLaWeb, TUNEL, type EstadoWeb } from '../../shared/web'
 import { api } from './api'
 
 export const enLaWeb = esDeLaWeb(location)
+/** En la nube: por la web y no por un túnel a una computadora (`server/nube.ts`). */
+export const enLaNube = enLaWeb && !TUNEL.test(location.origin)
+/** Dónde corre esta Sloth, para los textos de la web: la computadora de quien la usa o su Sloth en la nube. */
+export const ALLA = enLaNube ? 'tu Sloth en la nube' : 'tu computadora'
 
 /** El id de esta computadora ante el cobro, para volver a entrar. Se pregunta al abrir. */
 let equipo = ''
-export const estadoWeb: Promise<EstadoWeb | null> = enLaWeb
+export const estadoWeb: Promise<EstadoWeb | null> = enLaWeb && !enLaNube
   ? api<EstadoWeb>('/api/web').then(
       (e) => ((equipo = e.equipo), e),
       () => null
@@ -27,7 +33,8 @@ export const estadoWeb: Promise<EstadoWeb | null> = enLaWeb
 /** La entrada del cobro, que manda a la dirección de ahora y vuelve a esta misma vista. */
 export const entrada = () => `${enlaceEntrada(equipo)}${location.hash.startsWith('#/') ? `#h=${encodeURIComponent(location.hash)}` : ''}`
 
-guardarEnLaComputadora()
+// En la nube la dirección no cambia: lo guardado se queda en cada navegador, como en cualquier página.
+if (!enLaNube) guardarEnLaComputadora()
 
 function guardarEnLaComputadora() {
   const ls = window.localStorage
@@ -70,14 +77,16 @@ function guardarEnLaComputadora() {
 /**
  * Abre un archivo de la computadora: señalado en su Explorador o su Finder, igual desde la ventana que desde la web. Desde
  * la web, además, un archivo (no una carpeta) se baja al dispositivo que se está usando; `bajar: false` si ya se bajó
- * (el «Mostrar» de lo recién descargado en Mis videos).
+ * (el «Mostrar» de lo recién descargado en Mis videos). En la nube no hay Explorador que ver: solo se baja, y una
+ * carpeta dice por qué no.
  */
 export async function abrirRuta(ruta: string, sessionId?: string, o: { bajar?: boolean } = {}): Promise<void> {
-  await api('/api/open', { path: ruta, sessionId })
+  if (!enLaNube) await api('/api/open', { path: ruta, sessionId })
   if (!enLaWeb || o.bajar === false) return
   const q = new URLSearchParams({ ruta, ...(sessionId ? { sesion: sessionId } : {}) })
   const r = await fetch(`/api/web/archivo?${q}&mirar=1`)
   if (r.ok) bajar(`/api/web/archivo?${q}`)
+  else if (enLaNube) throw new Error(((await r.json().catch(() => ({}))) as { error?: string }).error ?? 'No se pudo bajar.')
 }
 
 /** Lo que se sube de una vez: Cloudflare no deja pasar una petición de más de 100 MB. */

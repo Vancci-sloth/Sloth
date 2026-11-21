@@ -5,7 +5,7 @@ import { SobreTi } from './SobreTi'
 import { AvisoPrimerAgente, Requisitos, useConAgente } from './Opciones'
 import type { Model } from '../../shared/types'
 import './Bienvenida.css'
-import { enLaWeb } from './web'
+import { enLaNube, enLaWeb } from './web'
 
 const VISTA = 'bienvenida'
 const EVENTO = 'sloth-bienvenida'
@@ -41,8 +41,9 @@ const OPCIONES = [
 export const abrirBienvenida = () => dispatchEvent(new Event(EVENTO))
 /** Si la primera bienvenida aún no se cerró: lo que quiera salir al abrir Sloth (`EstiloCambio.tsx`) espera a `BIENVENIDA_CERRADA`. */
 export const bienvenidaPendiente = () => {
-  // Desde la web, la computadora ya se preparó: la bienvenida no sale sola en cada dispositivo nuevo.
-  if (enLaWeb) return false
+  // Desde la web, la computadora ya se preparó: la bienvenida no sale sola en cada dispositivo nuevo. En la nube no hay
+  // otra computadora que la haya visto (ADR 0026).
+  if (enLaWeb && !enLaNube) return false
   try {
     return !localStorage.getItem(VISTA)
   } catch {

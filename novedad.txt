@@ -1,1 +1,1 @@
-En el celular (Sloth en la web), la barra lateral desplegada va encima de todo y se pliega sola al elegir algo o al tocar fuera, como en una app de teléfono.
+Sloth en la nube: sin computadora, la misma Sloth corre en un Codespace de GitHub con tu cuenta y se usa desde el navegador, también en el celular.

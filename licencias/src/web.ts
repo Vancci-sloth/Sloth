@@ -176,6 +176,10 @@ li{display:flex;align-items:center;gap:10px;background:var(--panel-2);border:1px
 li span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .acciones{display:flex;gap:8px;flex-wrap:wrap}
 small{color:var(--muted);font-size:13px}
+.nube{margin-top:22px;padding-top:18px;border-top:1px solid var(--line)}
+.nube small{display:block}
+a.boton{display:inline-block;background:var(--panel-2);color:var(--text);border:1px solid var(--line);border-radius:10px;font:600 15px system-ui,sans-serif;padding:12px 16px;text-decoration:none;margin-bottom:10px}
+a.boton:hover{border-color:var(--amber);color:var(--amber-2)}
 </style></head>
 <body><main>
 <header>${LOGO}<h1>Sloth en la web</h1></header>
@@ -296,6 +300,15 @@ small{color:var(--muted);font-size:13px}
     return [el('p', { className: 'fuerte', textContent: 'Usa tu Sloth desde este navegador.' }), el('p', { textContent: 'En tu computadora, abre Sloth → Opciones → Sloth en la web → «Conectar», y escribe aquí el código que te da.' }), f, msg]
   }
 
+  // Sin computadora (docs/adr/0026): Sloth corre en un Codespace de GitHub de cada quien. «quickstart» abre el que ya
+  // tenga, o crea uno.
+  const NUBE = 'https://codespaces.new/Vancci-sloth/sloth?quickstart=1'
+  const nube = () => el('section', { className: 'nube' },
+    el('p', { className: 'fuerte', textContent: '¿Sin computadora? Usa Sloth en la nube.' }),
+    el('p', { textContent: 'Corre en un Codespace de GitHub con tu cuenta: la misma Sloth, con sus agentes y sus videos, aunque no tengas computadora. GitHub regala unas 30 horas al mes; la primera vez tarda unos minutos en prepararse.' }),
+    el('a', { className: 'boton', href: NUBE, target: '_blank', rel: 'noopener', textContent: 'Abrir Sloth en la nube' }),
+    el('small', { textContent: 'Al abrir, guarda la dirección que termina en -4848.app.github.dev: es tu Sloth.' }))
+
   async function inicio(lista) {
     let l = []
     try { l = (await todos()).sort((a, b) => (b.ultimo || 0) - (a.ultimo || 0)) } catch {
@@ -303,10 +316,10 @@ small{color:var(--muted);font-size:13px}
     }
     if (!lista && parte && ID.test(parte) && (codigo || l.some((x) => x.equipo === parte))) return entrar(parte, codigo)
     if (!lista && l.length === 1) return entrar(l[0].equipo)
-    if (!l.length) return ver(...formulario(parte && ID.test(parte) ? 'Este navegador aún no está conectado a esa computadora.' : ''))
+    if (!l.length) return ver(...formulario(parte && ID.test(parte) ? 'Este navegador aún no está conectado a esa computadora.' : ''), nube())
     const ul = el('ul')
     for (const e of l) ul.append(el('li', {}, el('span', { textContent: e.nombre || 'Tu computadora' }), el('button', { textContent: 'Entrar', onclick: () => entrar(e.equipo) }), el('button', { className: 'otro', textContent: 'Olvidar', title: 'Este navegador deja de entrar a esa computadora', onclick: () => olvidar(e.equipo) })))
-    ver(el('p', { className: 'fuerte', textContent: 'Tus computadoras con Sloth' }), ul, el('small', { textContent: '¿Otra computadora? Escribe su código:' }), ...formulario().slice(2))
+    ver(el('p', { className: 'fuerte', textContent: 'Tus computadoras con Sloth' }), ul, el('small', { textContent: '¿Otra computadora? Escribe su código:' }), ...formulario().slice(2), nube())
   }
   inicio()
 })()

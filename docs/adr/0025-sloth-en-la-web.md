@@ -72,5 +72,5 @@ resuelve igual (T3 Connect y app.t3.codes): la máquina sigue trabajando y los d
   ya conectados), y Opciones lista y quita dispositivos.
 - Si una computadora pasa 90 días sin encender la web, el directorio la olvida y otro podría tomar su id: al volver,
   la computadora lo ve (403) y estrena otro; sus dispositivos se conectan de nuevo.
-- Sin la computadora no hay web. Una Sloth que corra sola en la nube sería otra decisión: servidores pagados por cada
-  quien y sus cuentas fuera de su computadora.
+- Sin la computadora no hay web por aquí. Sin ella, Sloth corre en la nube, en un Codespace de GitHub de cada quien
+  (ADR 0026).

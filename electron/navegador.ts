@@ -131,9 +131,20 @@ const enGoogle: EnGoogle = {
   }
 }
 
+/**
+ * Lo de la ventana que la web también pide por el relevo (`/<secreto>/ventana/…`, `server/navegador-remoto.ts`): la
+ * versión nueva de Sloth y ponerla. En la nube (ADR 0026) nadie ve la ventana, y es lo único que la sabe.
+ */
+export interface DeLaVentana {
+  actualizacion: () => Promise<unknown>
+  actualizar: () => unknown
+}
+let deLaVentana: DeLaVentana | undefined
+
 /** Pone el navegador: lo que pide la interfaz, el perfil de las páginas y el relevo para el agente. */
-export function iniciarNavegador(appDir: string) {
+export function iniciarNavegador(appDir: string, ventana?: DeLaVentana) {
   carpeta = appDir
+  deLaVentana = ventana
   for (const p of [PARTICION, PARTICION_REDES, PARTICION_VOZ]) prepararPerfil(session.fromPartition(p))
 
   ipcMain.on('navegador:ver', (_e, hilo: string | null, caja?: Caja, pantalla?: PantallaNavegador | null) => ver(hilo, caja, pantalla))
@@ -564,7 +575,8 @@ function leerCuerpo(req: IncomingMessage): Promise<Record<string, unknown>> {
  * - `GET <hilo>/captura`: una captura en JPEG, con su medida en píxeles CSS (`x-ancho`, `x-alto`). 204 si no hay
  *   página.
  * - `POST <hilo>/ir {url}`, `POST <hilo>/hacer {accion}` y `POST <hilo>/entrada` (`EntradaNavegador`).
- * Solo el servidor de esta computadora: con el secreto y sin `Origin`.
+ * Solo el servidor de esta computadora: con el secreto y sin `Origin`. También `GET ventana/actualizacion` y
+ * `POST ventana/actualizar` (`DeLaVentana`).
  */
 async function remoto(req: IncomingMessage, res: ServerResponse, secreto: string) {
   const u = new URL(req.url ?? '/', 'http://x')
@@ -573,7 +585,14 @@ async function remoto(req: IncomingMessage, res: ServerResponse, secreto: string
     res.writeHead(status, { 'content-type': 'application/json', 'cache-control': 'no-store' })
     res.end(datos === undefined ? '' : JSON.stringify(datos))
   }
-  if (s !== secreto || que !== 'remoto' || req.headers.origin || !uno) return responder(404)
+  if (s !== secreto || req.headers.origin || !uno) return responder(404)
+  if (que === 'ventana') {
+    if (!deLaVentana) return responder(404)
+    if (uno === 'actualizacion' && req.method === 'GET') return responder(200, await deLaVentana.actualizacion())
+    if (uno === 'actualizar' && req.method === 'POST') return responder(200, await deLaVentana.actualizar())
+    return responder(404)
+  }
+  if (que !== 'remoto') return responder(404)
   if (uno === 'estados' && req.method === 'GET') return responder(200, [...hojas.values()].map(estado))
   const hilo = decodeURIComponent(uno)
   if (!/^[\w~-]+$/.test(hilo)) return responder(400)

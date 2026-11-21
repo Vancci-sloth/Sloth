@@ -14,7 +14,7 @@ import { Icono } from './Iconos'
 import { SuscripcionOpciones, VersionYApoyo } from './Licencia' // apoyo
 import { RespaldoOpciones } from './Respaldo' // tu Sloth en otra computadora
 import { SlothWebOpciones } from './SlothWeb' // Sloth en la web
-import { enLaWeb } from './web'
+import { ALLA, enLaNube, enLaWeb } from './web'
 import { Logo } from './Logos'
 import { BotonNavegador } from './Navegador'
 import { RadarOpciones } from './RadarOpciones' // radar
@@ -99,12 +99,25 @@ function Ajustes({ onDone, iniciando, onIniciando }: { onDone(): void; iniciando
           <SuscripcionOpciones />
         </Grupo>
       )}
-      <Grupo
-        titulo="Sloth en la web"
-        nota="Usa tu Sloth desde el navegador del celular o de otra computadora, con tus mismos chats, agentes y videos. Todo sigue trabajando en esta computadora: tiene que estar encendida, con internet y con Sloth abierto. La conexión va cifrada por un túnel de Cloudflare, y solo entran los dispositivos que conectes aquí."
-      >
-        <SlothWebOpciones />
-      </Grupo>
+      {enLaNube ? (
+        <Grupo
+          titulo="Sloth en la nube"
+          nota="Esta Sloth corre en tu Codespace de GitHub, sin tu computadora. Entra desde cualquier navegador con tu cuenta de GitHub en esta misma dirección. GitHub la detiene tras un rato sin uso (en sus opciones lo subes hasta 4 horas) y la enciendes otra vez en github.com/codespaces: tus chats y tus videos se quedan."
+        >
+          <p className="small">
+            <a href="https://github.com/settings/codespaces" target="_blank" rel="noreferrer">
+              Cambiar cuánto espera GitHub antes de detenerla
+            </a>
+          </p>
+        </Grupo>
+      ) : (
+        <Grupo
+          titulo="Sloth en la web"
+          nota="Usa tu Sloth desde el navegador del celular o de otra computadora, con tus mismos chats, agentes y videos. Todo sigue trabajando en esta computadora: tiene que estar encendida, con internet y con Sloth abierto. La conexión va cifrada por un túnel de Cloudflare, y solo entran los dispositivos que conectes aquí. ¿Sin computadora? Sloth también corre en la nube, en web.sloth.vancci.org."
+        >
+          <SlothWebOpciones />
+        </Grupo>
+      )}
       <Grupo titulo="Tu Sloth en otra computadora" nota="Con tu clave, Sloth guarda sola una copia de tus estilos, tus chats, «Sobre ti» y tus marcas. Escribe esa clave en otra computadora y te ofrece traerlo todo. Los videos y las cuentas conectadas no viajan.">
         <RespaldoOpciones />
       </Grupo>
@@ -383,7 +396,7 @@ function Autorizando({ c }: { c: UsoCuenta }) {
   if (enLaWeb)
     return (
       <div className="fila-extra">
-        <p className="small">Sigue los pasos en el panel «En tu computadora», abajo a la derecha: abre el enlace, entra con tu cuenta y pega ahí el código que te da. Al terminar, esto se actualiza solo.</p>
+        <p className="small">Sigue los pasos en el panel «En {ALLA}», abajo a la derecha: abre el enlace, entra con tu cuenta y pega ahí el código que te da. Al terminar, esto se actualiza solo.</p>
       </div>
     )
   return (
@@ -1571,7 +1584,7 @@ function VueltaWeb() {
     setAviso('')
     try {
       const r = await api<{ ok: boolean }>('/api/web/vuelta', { url: url.trim() })
-      setAviso(r.ok ? 'Listo: tu computadora terminó el inicio de sesión.' : 'Tu computadora la abrió, pero no terminó: vuelve a conectar.')
+      setAviso(r.ok ? `Listo: ${ALLA} terminó el inicio de sesión.` : 'Sloth la abrió, pero no terminó: vuelve a conectar.')
       setUrl('')
     } catch (e) {
       setAviso(e instanceof Error ? e.message : String(e))
@@ -1579,7 +1592,7 @@ function VueltaWeb() {
   }
   return (
     <div className="grupo-nota vuelta-web">
-      <p>Estás usando Sloth desde la web. Lo que conectar una cuenta abre en tu computadora (su terminal o su ventana de Edge) sale aquí, en el panel «En tu computadora», abajo a la derecha.</p>
+      <p>Estás usando Sloth desde la web. Lo que conectar una cuenta abre en {ALLA} (su terminal o su navegador para Google) sale aquí, en el panel «En {ALLA}», abajo a la derecha.</p>
       <form onSubmit={(ev) => void mandar(ev)}>
         <input value={url} placeholder="¿Terminó en una página que no carga (localhost o 127.0.0.1)? Pega aquí su dirección" aria-label="Dirección de vuelta" onChange={(ev) => setUrl(ev.target.value)} />
         <button className="ghost small" type="submit" disabled={!url.trim()}>

@@ -43,6 +43,11 @@ Este es el mapa:
   `remoto` en `electron/navegador.ts`). Las cuentas se conectan desde la web con `server/ventanas-remotas.ts`
   (terminales sin ventana, los Edge de Google a distancia, la vuelta a `localhost`) y `web/src/VentanasRemotas.tsx`. Para
   probarla con el cobro local: `SLOTH_COBRO_WEB`.
+- Sloth en la nube (`.devcontainer/`, `server/nube.ts`, ADR 0026): sin computadora, la Sloth de Linux corre en un
+  Codespace de GitHub de cada quien, con su ventana en una pantalla virtual. `sloth-nube.sh` la baja, guarda lo tuyo en
+  `/workspaces/.sloth-nube` y la vigila; se entra por la dirección privada del puerto 4848 (`SLOTH_NUBE`), que el
+  servidor atiende como a su ventana. La interfaz va como desde la web (`enLaNube`): todo se baja al dispositivo y
+  «Actualizar» va por `/api/ventana/…`. La entrada (`licencias/src/web.ts`) ofrece «Abrir Sloth en la nube».
 - `server/sessions.ts`: cada hilo es `data/sessions/<id>.json` (qué es) y `<id>.jsonl` (lo que pasó). Retoma la sesión
   del proveedor tras reiniciar, reparte los lotes según la máquina y cierra el proceso de un video del lote al acabar.
   Un chat de Claude, DeepSeek, Codex u OpenCode con su sesión guardada suelta el proceso a la media hora; los demás

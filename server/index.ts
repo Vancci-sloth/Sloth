@@ -67,6 +67,7 @@ import { cargarPreciosCodex } from './precios.ts'
 import { slothWeb } from './web.ts' // Sloth en la web
 import { navegadorRemoto } from './navegador-remoto.ts' // Sloth en la web
 import { ventanasRemotas } from './ventanas-remotas.ts' // Sloth en la web
+import { deLaNube, NUBE } from './nube.ts' // Sloth en la nube
 
 const APP = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const PORT = Number(process.env.PORT ?? 4848)
@@ -512,7 +513,7 @@ async function api(req: IncomingMessage, res: ServerResponse, url: URL): Promise
     return true
   }
   if (path === '/api/codex/conectar' && method === 'POST') {
-    send(res, 200, await conectarCodex(!!web.sesionDe(req)))
+    send(res, 200, await conectarCodex(remoto(req)))
     pedirModelos()
     return true
   }
@@ -553,7 +554,7 @@ async function api(req: IncomingMessage, res: ServerResponse, url: URL): Promise
       const id = String(datos.id ?? '')
       const hacer = {
         cuenta: () => o.cuenta(url.searchParams.has('fresco')),
-        conectar: o.conectar && (() => o.conectar!(!!web.sesionDe(req))),
+        conectar: o.conectar && (() => o.conectar!(remoto(req))),
         cancelar: o.cancelar,
         salir: o.salir,
         llaves: llaves && (() => llaves(!!datos.usar)),
@@ -588,7 +589,7 @@ async function api(req: IncomingMessage, res: ServerResponse, url: URL): Promise
   }
 
   if (path === '/api/claude/conectar' && method === 'POST') {
-    send(res, 200, await conectarClaude(APP, !!web.sesionDe(req)))
+    send(res, 200, await conectarClaude(APP, remoto(req)))
     return true
   }
   if (path === '/api/claude/salir' && method === 'POST') {
@@ -1041,7 +1042,12 @@ async function interfazDelRepo(vite: typeof import('vite'), react: typeof import
  * peticiones que vienen de otra página.
  */
 function deConfianza(req: IncomingMessage): boolean {
-  return peticionDeConfianza(req, PORT)
+  return peticionDeConfianza(req, PORT) || deLaNube(req)
+}
+
+/** Si quien pide no ve la pantalla donde corre Sloth: un dispositivo por la web, o cualquiera en la nube (ADR 0026). */
+function remoto(req: IncomingMessage): boolean {
+  return !!NUBE || !!web.sesionDe(req)
 }
 
 server.on('request', async (req, res) => {
@@ -1056,7 +1062,7 @@ server.on('request', async (req, res) => {
   try {
     if (url.pathname.startsWith('/api/')) {
       if (url.pathname.startsWith('/api/web') && ((await ventanas.api(req, res, url)) || (await web.api(req, res, url)))) return
-      if (url.pathname.startsWith('/api/navegador/') && (await navegadorRemoto(req, res, url))) return
+      if ((url.pathname.startsWith('/api/navegador/') || url.pathname.startsWith('/api/ventana/')) && (await navegadorRemoto(req, res, url))) return
       if (suscripcion && (await suscripcion.api(req, res, url))) return // suscripción
       if (await api(req, res, url)) return
     }

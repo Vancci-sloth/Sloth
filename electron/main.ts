@@ -32,6 +32,11 @@ import type { ActualizacionSloth } from '../shared/types.ts'
 
 /** En el repo: la dirección del servidor que ya levantó `npm start`. */
 const SOLO_VENTANA = process.env.SLOTH_VENTANA
+/**
+ * En la nube (ADR 0026, `.devcontainer/sloth-nube.sh`): la ventana está en una pantalla que nadie ve. Ningún aviso que
+ * espere un clic: lo que diría queda en el registro, y si el servidor se cae, Sloth sale y la nube la vuelve a abrir.
+ */
+const NUBE = !!process.env.SLOTH_NUBE
 const URL_SLOTH = SOLO_VENTANA ?? `http://localhost:${process.env.PORT ?? '4848'}`
 const WINDOWS = process.platform === 'win32'
 const MAC = process.platform === 'darwin'
@@ -119,15 +124,7 @@ else {
     await primera
     return actualizacion
   })
-  ipcMain.handle('actualizar', () => {
-    if (A_MANO) fuera(`${COBRO}/descargar?so=${SO}&visto`)
-    else if (actualizacion.nueva && actualizacion.avance === undefined) {
-      actualizacion = { ...actualizacion, avance: 0, error: undefined }
-      fallos = 0
-      bajar()
-    }
-    return actualizacion
-  })
+  ipcMain.handle('actualizar', () => actualizar())
   ipcMain.handle('anclada', () => anclada())
   ipcMain.handle('anclar', () => anclar())
   ipcMain.handle('disco:donde', () => (SOLO_VENTANA ? null : donde(APP)))
@@ -135,10 +132,24 @@ else {
   void app.whenReady().then(iniciar)
 }
 
+/** «Actualizar»: baja la versión nueva (o, en un Mac sin firma, abre su descarga). Lo pide la interfaz de la ventana o la web. */
+function actualizar() {
+  if (A_MANO) fuera(`${COBRO}/descargar?so=${SO}&visto`)
+  else if (actualizacion.nueva && actualizacion.avance === undefined) {
+    actualizacion = { ...actualizacion, avance: 0, error: undefined }
+    fallos = 0
+    bajar()
+  }
+  return actualizacion
+}
+
 async function iniciar() {
   permisos()
   Menu.setApplicationMenu(menu())
-  iniciarNavegador(APP)
+  iniciarNavegador(APP, {
+    actualizacion: async () => (await primera, actualizacion),
+    actualizar
+  })
   abrir()
   if (SOLO_VENTANA) return
   mkdirSync(join(APP, 'data'), { recursive: true })
@@ -192,7 +203,7 @@ function abrir() {
     if (d.reason === 'clean-exit') return
     caidas = [...caidas.filter((t) => Date.now() - t < 60_000), Date.now()]
     if (caidas.length <= 3) v.reload()
-    else if (caidas.length === 4) dialog.showErrorBox('Sloth', 'La ventana se cerró varias veces seguidas. Recárgala con Ctrl+R: los agentes y tus archivos siguen trabajando.')
+    else if (caidas.length === 4 && !NUBE) dialog.showErrorBox('Sloth', 'La ventana se cerró varias veces seguidas. Recárgala con Ctrl+R: los agentes y tus archivos siguen trabajando.')
   })
   v.on('close', (e) => {
     if (mudando) {
@@ -434,7 +445,8 @@ function arrancar() {
   s.stdout!.on('data', escribir)
   s.stderr!.on('data', escribir)
   s.on('error', (e) => {
-    dialog.showErrorBox('Sloth', `No se pudo abrir Sloth: ${e.message}`)
+    if (NUBE) anotar(`No se pudo abrir Sloth: ${e.message}`)
+    else dialog.showErrorBox('Sloth', `No se pudo abrir Sloth: ${e.message}`)
     salir()
   })
   // Solo el que sigue siendo el de Sloth: el que se paró para mudarse ya no cuenta.
@@ -465,6 +477,7 @@ function termino(codigo: number | null) {
     if (!ventana) app.quit()
     return
   }
+  if (NUBE) return (anotar('El servidor se cayó: Sloth sale y la nube la vuelve a abrir'), app.exit(1))
   dialog.showMessageBoxSync({ type: 'warning', title: 'Sloth', message: 'Sloth se cerró.', detail: `Lo que pasó está en el registro:\n${REGISTRO}` })
   salir()
 }

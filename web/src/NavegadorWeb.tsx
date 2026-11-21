@@ -1,5 +1,6 @@
 import { type FormEvent, type KeyboardEvent, type MouseEvent, useEffect, useRef, useState, type WheelEvent } from 'react'
 import { type EntradaNavegador, type EstadoNavegador, type PuenteNavegador, TECLAS_NAVEGADOR, type TeclaNavegador } from '../../shared/types'
+import { ALLA } from './web'
 
 /**
  * El navegador de cada hilo desde la web (ADR 0025): la página vive en la ventana de Sloth de la computadora y aquí se
@@ -194,7 +195,7 @@ export function PaginaRemota({ id, base }: { id: string; base?: string }) {
         ref={caja}
         className="navegador-remota-pagina"
         tabIndex={0}
-        aria-label="La página, en tu computadora"
+        aria-label={`La página, en ${ALLA}`}
         onClick={clic}
         onWheel={girar}
         onKeyDown={tecla}
