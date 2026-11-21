@@ -404,7 +404,7 @@ export function MisVideos({ cards, sessions, estilo, onEstilo }: { cards: Card[]
             <div className="mis-aviso" role="status">
               <Icono de="descargar" /> {aviso.texto}
               {aviso.ruta && (
-                <button className="link" onClick={() => void abrirRuta(aviso.ruta!).catch(() => {})}>
+                <button className="link" onClick={() => void abrirRuta(aviso.ruta!, undefined, { bajar: false }).catch(() => {})}>
                   Mostrar
                 </button>
               )}

@@ -69,11 +69,12 @@ function guardarEnLaComputadora() {
 
 /**
  * Abre un archivo de la computadora: señalado en su Explorador o su Finder, igual desde la ventana que desde la web. Desde
- * la web, además, un archivo (no una carpeta) se baja al dispositivo que se está usando.
+ * la web, además, un archivo (no una carpeta) se baja al dispositivo que se está usando; `bajar: false` si ya se bajó
+ * (el «Mostrar» de lo recién descargado en Mis videos).
  */
-export async function abrirRuta(ruta: string, sessionId?: string): Promise<void> {
+export async function abrirRuta(ruta: string, sessionId?: string, o: { bajar?: boolean } = {}): Promise<void> {
   await api('/api/open', { path: ruta, sessionId })
-  if (!enLaWeb) return
+  if (!enLaWeb || o.bajar === false) return
   const q = new URLSearchParams({ ruta, ...(sessionId ? { sesion: sessionId } : {}) })
   const r = await fetch(`/api/web/archivo?${q}&mirar=1`)
   if (r.ok) bajar(`/api/web/archivo?${q}`)

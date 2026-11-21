@@ -100,7 +100,7 @@
   /* Angosta, cada barra de publicar se parte en líneas: el botón baja y nada se sale de lado. */
   .mis-publicar .resumen-redes.lote, .mis-publicar .youtube-lote-barra, .mis-publicar .youtube-lote-barra > div { flex-wrap: wrap; white-space: normal; }
   .mis-publicar .youtube-lote-barra { padding: 10px 14px; }
-  .mis-eleccion { flex-wrap: wrap; white-space: normal; }
+  .mis-eleccion, .mis-aviso { flex-wrap: wrap; white-space: normal; }
   /* Angosta, la página entera hace scroll (no solo la rejilla, que quedaba de 230 px), y lo elegido flota sobre la ventana. */
   .mis-videos { overflow-y: auto; }
   .mis-videos .videos { flex: none; overflow: visible; }

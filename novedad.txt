@@ -1,1 +1,1 @@
-Sloth en la web: desde el celular, abrir un archivo lo enseña en tu computadora como siempre y además lo baja al celular; «Descargar» en Mis videos los copia a Descargas de tu computadora y también los baja al dispositivo.
+Arreglos de Sloth en la web y de «Mostrar»: el Explorador ya abre en su carpeta un archivo con espacios o paréntesis en el nombre (antes abría Documentos), el aviso de Mis videos se lee entero en el celular y, sin conexión con tu Sloth, la web lo dice claro.

@@ -937,10 +937,12 @@ async function api(req: IncomingMessage, res: ServerResponse, url: URL): Promise
   if (path === '/api/open' && method === 'POST') {
     const pedido = await body<{ path: string; sessionId?: string }>(req)
     const target = rutaPedida(pedido.path, pedido.sessionId)
-    // Señalado en su carpeta: el Explorador y el Finder saben; en Linux se abre la carpeta que lo tiene.
+    // Señalado en su carpeta: el Explorador y el Finder saben; en Linux se abre la carpeta que lo tiene. El Explorador
+    // quiere `/select,"<ruta>"` tal cual: con la ruta entera entre comillas (como las pone Node si lleva un espacio, «video
+    // (2).mp4») no la entiende y abre Documentos.
     const [programa, ...args] =
-      process.platform === 'win32' ? ['explorer.exe', `/select,${target}`] : process.platform === 'darwin' ? ['open', '-R', target] : ['xdg-open', existsSync(target) && statSync(target).isDirectory() ? target : dirname(target)]
-    spawn(programa, args, { detached: true, stdio: 'ignore' }).on('error', () => {}).unref()
+      process.platform === 'win32' ? ['explorer.exe', `/select,"${target.replaceAll('"', '')}"`] : process.platform === 'darwin' ? ['open', '-R', target] : ['xdg-open', existsSync(target) && statSync(target).isDirectory() ? target : dirname(target)]
+    spawn(programa, args, { detached: true, stdio: 'ignore', windowsVerbatimArguments: process.platform === 'win32' }).on('error', () => {}).unref()
     send(res, 200, { ok: true })
     return true
   }

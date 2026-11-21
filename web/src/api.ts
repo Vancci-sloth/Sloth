@@ -30,6 +30,8 @@ export async function api<T = any>(path: string, body?: unknown): Promise<T> {
   // Sin JSON es que el servidor no conoce la ruta: casi siempre, un cambio en server/ que aún no se ha reiniciado. Vite
   // contesta esas rutas con la página (200, HTML) o con un 404.
   const data = await res.json().catch(() => {
+    // Desde la web, un error de Cloudflare (502, 530…) en HTML es que el túnel no llega: Sloth se reinicia o se cerró.
+    if (res.status >= 500 && location.protocol === 'https:' && location.hostname !== 'localhost') throw new Error('No hay conexión con tu Sloth: puede que se esté reiniciando o que tu computadora se haya apagado.')
     const desconocida = res.status === 404 || res.headers.get('content-type')?.includes('text/html')
     throw new Error(desconocida ? 'El servidor aún no conoce esta función: pulsa «Reiniciar backend».' : `El servidor respondió ${res.status}`)
   })
