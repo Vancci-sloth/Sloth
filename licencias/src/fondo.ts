@@ -39,6 +39,19 @@ export interface Movimiento {
   reporting_category: string
 }
 
+/**
+ * Cobros de la cuenta de Stripe que no son de Sloth y no entran al fondo, por decisión del creador: su moneda, su monto
+ * en centavos y el minuto (UTC) en que se cobró. El del 20 de noviembre de 2026 fue un link de pago de 1.000 MXN.
+ */
+const FUERA = [{ currency: 'mxn', amount: 100_000, minuto: '2026-11-20T20:23' }]
+
+/** Si un movimiento es el cobro de uno de `FUERA` (con su comisión, que va en el mismo movimiento). */
+export function fueraDelFondo(m: Pick<Movimiento, 'amount' | 'currency' | 'reporting_category'> & { created?: number }): boolean {
+  if (m.reporting_category !== 'charge' || m.created === undefined) return false
+  const minuto = new Date(m.created * 1000).toISOString().slice(0, 16)
+  return FUERA.some((f) => f.currency === m.currency && f.amount === m.amount && f.minuto === minuto)
+}
+
 /** Lo que es devolver: devoluciones y contracargos (y lo que regresa de ellos). */
 const DEVUELTO = new Set(['refund', 'dispute', 'dispute_reversal', 'refund_failure', 'partial_capture_reversal'])
 
@@ -219,8 +232,8 @@ export async function fondoDe(env: Env, periodo: string, ahora = new Date()): Pr
   }
   if (!env.STRIPE_SECRET_KEY) return vacio
   try {
-    const [movimientos, pagos] = await Promise.all([todos<Movimiento & { id: string }>(env, '/v1/balance_transactions', tramo), pagosDelMes(env, tramo)])
-    const cuentas = cuentasDelFondo(movimientos, proporcionDeImpuesto(pagos))
+    const [movimientos, pagos] = await Promise.all([todos<Movimiento & { id: string; created: number }>(env, '/v1/balance_transactions', tramo), pagosDelMes(env, tramo)])
+    const cuentas = cuentasDelFondo(movimientos.filter((m) => !fueraDelFondo(m)), proporcionDeImpuesto(pagos))
     const fondo = { ...vacio, montos: montosDe(cuentas), cuentas }
     guardados.set(periodo, { leido: ahora.getTime(), fondo })
     return fondo

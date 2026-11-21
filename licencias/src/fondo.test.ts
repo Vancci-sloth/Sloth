@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { cuentasDelFondo, esPeriodo, inicioDelMes, montosDe, nombreDe, periodoFondo, periodosHasta, PRIMER_PERIODO, proporcionDeImpuesto, tramoDe } from './fondo.ts'
+import { cuentasDelFondo, esPeriodo, fueraDelFondo, inicioDelMes, montosDe, nombreDe, periodoFondo, periodosHasta, PRIMER_PERIODO, proporcionDeImpuesto, tramoDe } from './fondo.ts'
 
 const cobro = (amount: number, fee: number, currency = 'usd') => ({ amount, fee, net: amount - fee, currency, reporting_category: 'charge' })
 
@@ -41,6 +41,14 @@ test('la parte de impuesto se pesa por lo que vale cada pago, aunque se haya pag
   assert.ok(Math.abs(p - 0.16 / 1.16 / 2) < 0.001)
   // Un total en cero no rompe la cuenta.
   assert.equal(proporcionDeImpuesto([{ total: 0, impuesto: 0, peso: 0 }]), 0)
+})
+
+test('el link de pago del 20 de noviembre no entra al fondo; otro cobro igual en otro minuto, sí', () => {
+  const link = { ...cobro(100_000, 3_800, 'mxn'), created: Date.UTC(2026, 10, 20, 20, 23, 41) / 1000 }
+  assert.equal(fueraDelFondo(link), true)
+  assert.equal(fueraDelFondo({ ...link, created: link.created + 60 }), false)
+  assert.equal(fueraDelFondo({ ...link, amount: 99_999 }), false)
+  assert.equal(fueraDelFondo({ ...link, reporting_category: 'refund' }), false)
 })
 
 test('sin cobros no sale nada', () => {
