@@ -1,1 +1,1 @@
-Arreglos de Sloth en la web y de «Mostrar»: el Explorador ya abre en su carpeta un archivo con espacios o paréntesis en el nombre (antes abría Documentos), el aviso de Mis videos se lee entero en el celular y, sin conexión con tu Sloth, la web lo dice claro.
+El estudio de video ya se usa en el celular (Sloth en la web): el video, la línea de tiempo y el chat van uno debajo del otro, y deslizar baja al chat.
