@@ -92,7 +92,7 @@ export function Tienda(props: {
   const opciones = useMemo(() => opcionesDe(fichas, filtros), [fichas, filtros])
   const filtrando = hayFiltros(filtros)
   /** Cambia un filtro; el mismo otra vez lo quita. */
-  const alternar = <K extends 'tema' | 'forma' | 'nuevos' | 'revision'>(k: K, v: Filtros[K]) => setFiltros((x) => ({ ...x, [k]: x[k] === v ? undefined : v }))
+  const alternar = <K extends 'tema' | 'forma' | 'nuevos' | 'aprobacion'>(k: K, v: Filtros[K]) => setFiltros((x) => ({ ...x, [k]: x[k] === v ? undefined : v }))
 
   // Al entrar el pago, lo instalado de antes se abre también: Sloth vuelve a preguntar al cobro y quita el candado de
   // esos estilos (`SinApoyo.tsx`) sin esperar a su vistazo de cada 6 horas.
@@ -171,8 +171,13 @@ export function Tienda(props: {
           <Opcion on={filtros.forma === 'horizontal'} n={opciones.horizontal} titulo="Para YouTube" onClick={() => alternar('forma', 'horizontal')}>
             Horizontales
           </Opcion>
-          {creador && (opciones.revision > 0 || filtros.revision) && (
-            <Opcion on={!!filtros.revision} n={opciones.revision} titulo="Los que faltan por aprobar: solo los ves tú y quien los compartió" onClick={() => alternar('revision', true)}>
+          {creador && (
+            <Opcion on={filtros.aprobacion === 'publicos'} n={opciones.publicos} titulo="Los que ve toda la comunidad: la tienda como la ven los demás" onClick={() => alternar('aprobacion', 'publicos')}>
+              Aprobados
+            </Opcion>
+          )}
+          {creador && (opciones.revision > 0 || filtros.aprobacion === 'revision') && (
+            <Opcion on={filtros.aprobacion === 'revision'} n={opciones.revision} titulo="Los que faltan por aprobar: solo los ves tú y quien los compartió" onClick={() => alternar('aprobacion', 'revision')}>
               En revisión
             </Opcion>
           )}
@@ -518,7 +523,17 @@ function Portada({ e, orden, elegida, nuevo, onVer }: { e: EstiloTienda; orden: 
       <span className="muro-portada">
         {imagen ? <img src={imagen} alt="" loading="lazy" decoding="async" /> : video ? <video src={video.url} muted preload="metadata" /> : <Icono de="claqueta" />}
         {video && <video className="muro-vivo" data-src={video.previaUrl ?? video.url} data-tope={video.previaUrl ? undefined : PRINCIPIO} muted loop playsInline preload="none" />}
-        {p.incompleto ? <span className="tienda-revision falta">Le falta completar</span> : p.porAprobar ? <span className="tienda-revision">En revisión</span> : nuevo && <span className="tienda-revision nuevo">Nuevo</span>}
+        {p.incompleto ? (
+          <span className="tienda-revision falta">Le falta completar</span>
+        ) : p.porAprobar ? (
+          <span className="tienda-revision">En revisión</span>
+        ) : p.preaprobada ? (
+          <span className="tienda-revision pre" title="Sloth le hizo la prueba, lo completó y lo arregló">
+            Pre-aprobado por Sloth
+          </span>
+        ) : (
+          nuevo && <span className="tienda-revision nuevo">Nuevo</span>
+        )}
       </span>
       <span className="muro-nombre">{nombreDe(e)}</span>
       <span className="muro-autor">{p.autor.nombre || 'alguien'}</span>

@@ -4,7 +4,7 @@ import { api, ErrorApi } from './api'
 import { abiertaGuardada, BORRADA, buscarAqui, conocidas, consulta as consultaDe, guardado, guardar as guardarVista, guardarAbierta, indiceListo, olvidar, olvidarTodo, palabrasDe, pedir, pedirIndice, pedirPublicacion, precargarPublicacion, precargarVista, recordar, ultimoFeed } from './comunidadDatos'
 import { Confirm } from './Confirm'
 import { Escribir, type Escrito, subirImagen } from './Escribir'
-import { abrirHilo, CompartirTuyo, type Instalado, TrasInstalar } from './Estilos'
+import { abrirBorrador, abrirHilo, CompartirTuyo, type Instalado, TrasInstalar } from './Estilos'
 import { LINK } from './etiquetas'
 import { Unirse } from './Licencia'
 import { Icono as IconoBase, type NombreIcono, trazosDe } from './Iconos'
@@ -31,7 +31,9 @@ import './Comunidad.css'
  * En Estilos, cada publicación trae un estilo que se instala con un clic. Se publica con «Compartir» de uno tuyo, en un
  * solo paso (`CompartirEstilo` en `Estilos.tsx`), que aquí abre «Compartir un estilo tuyo» o elegir Estilos al escribir.
  * Nadie más lo ve hasta que el creador lo aprueba («En revisión»); antes lo revisa: «Revisar» lo abre en una carpeta y le
- * pide a «Nuevo estilo» que lo lea.
+ * pide a «Nuevo estilo» que lo lea. O lo pre-aprueba (ADR 0024): «Pre-aprobar» lo instala como card suya para hacerle la
+ * prueba y arreglarlo, y al compartirlo desde ahí todos lo ven como «Pre-aprobado por Sloth»; su autor lo deja así
+ * («Así está bien», en `ParaInstalar`) o manda su versión.
  *
  * Todo sale al instante de lo que ya se pidió (`comunidadDatos.ts`) y se pone al día por detrás: la comunidad al abrirla,
  * cada sección (se adelanta al pasar por su pestaña), una publicación con sus comentarios (al detenerte en ella) y la
@@ -990,6 +992,30 @@ function Abierta(props: {
   const imagenes = p?.adjuntos.filter((a) => a.tipo === 'imagen') ?? []
   const estilo = p?.adjuntos.find((a) => a.tipo === 'estilo')
   const [revisando, setRevisando] = useState(false)
+  const [preaprobando, setPreaprobando] = useState(false)
+  // Lo que Sloth encontró en un estilo que se va a correr para pre-aprobarlo: se mira antes de seguir.
+  const [riesgo, setRiesgo] = useState('')
+
+  /**
+   * El creador lo instala como card suya para hacerle la prueba y arreglarlo (ADR 0024), con lo que se le pide a su agente
+   * ya escrito en un borrador. Al compartirlo desde esa card, sube a esta misma publicación como «Pre-aprobado por Sloth».
+   */
+  async function preaprobar(aunAsi = false) {
+    if (!p) return
+    setPreaprobando(true)
+    setError('')
+    setRiesgo('')
+    try {
+      const r = await api<{ cardId: string; texto: string }>('/api/comunidad/estilo/preaprobar', { publicacion: p.id, ...(aunAsi ? { aunAsi } : {}) })
+      abrirBorrador(r.cardId, r.texto)
+      props.onCerrar()
+    } catch (e) {
+      if (e instanceof ErrorApi && e.status === 409) setRiesgo(e.message)
+      else setError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setPreaprobando(false)
+    }
+  }
 
   /** El creador abre el hilo donde su Claude leyó el estilo al llegar (sin instalarlo); si aún no lo leyó, lo lee ahora. */
   async function revisar() {
@@ -1089,7 +1115,7 @@ function Abierta(props: {
                 )}
                 {estilo?.guia && <GuiaVista guia={estilo.guia} prueba={estilo.prueba} />}
                 {estilo?.prueba && <VerEvidencia prueba={estilo.prueba} />}
-                {estilo && <ParaInstalar p={p} nombre={estilo.nombre ?? p.titulo} suya={suya} />}
+                {estilo && <ParaInstalar p={p} nombre={estilo.nombre ?? p.titulo} suya={suya} onCambio={cambiar} />}
                 {imagenes.length > 0 && (
                   <div className={`com-fotos n${Math.min(imagenes.length, 3)}`}>
                     {imagenes.map((a) => (
@@ -1108,6 +1134,16 @@ function Abierta(props: {
                 {estilo && (
                   <button className="com-boton" disabled={revisando} title="Lo que tu Claude dijo de él al llegar: qué hace, qué le falta y por qué se aprobó o no. No lo instala" onClick={() => void revisar()}>
                     <Icono de="escudo" /> {revisando ? 'Abriendo…' : 'Revisar'}
+                  </button>
+                )}
+                {estilo && p.porAprobar && !p.autor.creador && (
+                  <button
+                    className="com-boton"
+                    disabled={preaprobando}
+                    title="Lo instalas como card tuya para hacerle la prueba, completarlo y arreglarlo. Al compartirlo desde esa card, lo ve toda la comunidad como «Pre-aprobado por Sloth»"
+                    onClick={() => void preaprobar()}
+                  >
+                    <Icono de="claqueta" /> {preaprobando ? 'Instalando…' : 'Pre-aprobar'}
                   </button>
                 )}
                 {estilo &&
@@ -1147,6 +1183,14 @@ function Abierta(props: {
               </div>
             )}
 
+            {riesgo && (
+              <div className="com-creador-barra">
+                <span className="com-falta">{riesgo}</span>
+                <button className="com-boton" disabled={preaprobando} onClick={() => void preaprobar(true)}>
+                  Ya lo revisé: pre-aprobar
+                </button>
+              </div>
+            )}
             {error && p && <div className="com-error">{error}</div>}
 
             <div className="com-abierta-pie">
@@ -1796,7 +1840,7 @@ function Avisos({ sinLeer, onAbrir, onLeidos }: { sinLeer: number; onAbrir(id: s
  * el nombre ya va arriba. Instalar es de quien apoya: a quien no (`sinApoyo`, si ya se sabe; si no, lo dice el cobro con
  * un 402), «Instalar» le abre la invitación a apoyar, y al apoyar (`onApoyo`) ya lo puede instalar.
  */
-export function ParaInstalar(props: { p: PublicacionComunidad; nombre: string; suya: boolean; enVisor?: boolean; sinApoyo?: number; onApoyo?(): void }) {
+export function ParaInstalar(props: { p: PublicacionComunidad; nombre: string; suya: boolean; enVisor?: boolean; sinApoyo?: number; onApoyo?(): void; onCambio?(p: PublicacionComunidad): void }) {
   const { p, nombre, suya, enVisor } = props
   const [invitar, setInvitar] = useState(false)
   const llave = p.adjuntos.find((a) => a.tipo === 'estilo')?.llave
@@ -1825,13 +1869,31 @@ export function ParaInstalar(props: { p: PublicacionComunidad; nombre: string; s
       setOcupado(false)
     }
   }
+  /** Su autor deja como está el estilo que pre-aprobó Sloth: pasa a aprobado. */
+  async function conforme() {
+    setOcupado(true)
+    setError('')
+    try {
+      props.onCambio?.(await api<PublicacionComunidad>(`/api/comunidad/p/${p.id}/conforme`, {}))
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setOcupado(false)
+    }
+  }
   const alDia = !!mio && mio.llave === llave
   const como = p.incompleto
     ? `Le falta completar: ${p.incompleto.join('; ')}. ${suya ? 'Mientras tanto no sale en la tienda: complétalo con «Compartir» en su card.' : 'Su autor lo tiene que completar.'}`
     : p.porAprobar
-    ? suya
-      ? 'En revisión: solo lo ven tú y el creador de Sloth. Sloth lo lee solo: si cumple todo se aprueba, y si le falta algo te lo dice aquí abajo, en los comentarios; para mandar el arreglo, «Compartir» otra vez en su card. Cuando se apruebe, te llega un aviso a la campana.'
-      : 'Aún no lo apruebas: nadie más lo ve.'
+    ? p.publicaAun
+      ? suya
+        ? 'Tu versión nueva está en revisión. Mientras tanto la comunidad sigue viendo la de antes, y cuando se apruebe esta la reemplaza. Si le falta algo, te lo dice aquí abajo, en los comentarios.'
+        : 'Versión nueva sin aprobar: los demás siguen viendo la de antes.'
+      : suya
+        ? 'En revisión: solo lo ven tú y el creador de Sloth. Sloth lo lee solo: si cumple todo se aprueba, y si le falta algo te lo dice aquí abajo, en los comentarios; para mandar el arreglo, «Compartir» otra vez en su card. Cuando se apruebe, te llega un aviso a la campana.'
+        : 'Aún no lo apruebas: nadie más lo ve.'
+    : p.preaprobada && suya
+      ? 'Pre-aprobado por Sloth: le hizo la prueba, le completó lo que faltaba y le arregló sus errores, y ya lo ve toda la comunidad. Si te gusta así, «Así está bien». Si no, cámbialo y pulsa «Compartir» en su card: mientras se revisa tu versión, la comunidad sigue viendo esta.'
     : alDia
       ? 'Ya está en tus estilos.'
       : mio
@@ -1860,16 +1922,34 @@ export function ParaInstalar(props: { p: PublicacionComunidad; nombre: string; s
         {error && <span className="com-instalar-error">{error}</span>}
       </div>
       {!enVisor && boton}
+      {p.preaprobada && suya && props.onCambio && (
+        <button className={enVisor ? 'visor-boton' : 'com-boton ok'} disabled={ocupado} title="Queda aprobado tal como lo dejó Sloth" onClick={() => void conforme()}>
+          <Icono de="palomita" /> Así está bien
+        </button>
+      )}
       {instalado && <TrasInstalar r={instalado} onCerrar={() => setInstalado(null)} />}
       {invitar && <ApoyarParaInstalar nombre={nombre} estilos={props.sinApoyo} onListo={() => (setInvitar(false), props.onApoyo?.())} onCerrar={() => setInvitar(false)} />}
     </div>
   )
 }
 
-/** Cómo está un estilo que aún no sale en la tienda: le falta algo de lo que lleva todo estilo (en rojo), o está en revisión. */
+/**
+ * Cómo está un estilo: le falta algo de lo que lleva todo estilo (en rojo), está en revisión (y si la comunidad aún ve su
+ * versión de antes), o lo pre-aprobó Sloth.
+ */
 export function EstadoEstilo({ p }: { p: PublicacionComunidad }) {
   if (p.incompleto) return <span className="com-estado com-falta" title={`Le falta: ${p.incompleto.join('; ')}. No sale en la tienda hasta que se complete`}>Le falta completar</span>
-  return p.porAprobar ? <span className="com-estado" title="Solo lo ven quien lo compartió y el creador de Sloth, hasta que se apruebe">En revisión</span> : null
+  if (p.porAprobar)
+    return (
+      <span className="com-estado" title={p.publicaAun ? 'Su versión nueva espera su aprobación: mientras tanto la comunidad ve la de antes' : 'Solo lo ven quien lo compartió y el creador de Sloth, hasta que se apruebe'}>
+        En revisión
+      </span>
+    )
+  return p.preaprobada ? (
+    <span className="com-estado hecha" title="Sloth le hizo la prueba, lo completó y lo arregló; su autor aún no dice si así está bien">
+      <Icono de="escudo" /> Pre-aprobado por Sloth
+    </span>
+  ) : null
 }
 
 /** Lo que dice cada aviso. */
@@ -1884,6 +1964,7 @@ function fraseDe(a: AvisoComunidad) {
   if (a.tipo === 'reporte') return <>{quien} reportó {a.comentario ? 'un comentario en ' : ''}{sobre}: {a.texto}</>
   if (a.tipo === 'estilo') return <>{quien} compartió un estilo por aprobar: {sobre}</>
   if (a.tipo === 'aprobado') return <>{quien} aprobó tu estilo {sobre}: ya todos lo pueden instalar</>
+  if (a.tipo === 'preaprobado') return <>Sloth pre-aprobó tu estilo {sobre}: le hizo la prueba, lo arregló y ya lo ve toda la comunidad. Ábrelo para ver qué le cambió</>
   if (a.tipo === 'incompleto') return <span className="com-falta">A tu estilo {sobre} le falta completar su guía, su video o su prueba: mientras tanto no sale en la tienda</span>
   return <>{quien} publicó un anuncio: {sobre}</>
 }

@@ -144,6 +144,9 @@ const EL_MISMO = ':el-mismo'
  * - Su evidencia es el hilo completo de ese video, que lee el creador: sube al publicar, y solo si marca que lo comparte.
  * - Al terminar, los pasos que siguen: Sloth lo lee solo (`server/estilos-revision.ts`); si le falta algo se lo dice en
  *   su publicación, y si cumple todo se aprueba.
+ * - Al creador que manda el estilo de otro (lo instaló con «Pre-aprobar», ADR 0024) le pone al día esa publicación y la
+ *   deja «Pre-aprobado por Sloth» (`server/comunidad.ts`). Dice qué le cambió (`cambios`), y eso le llega a su autor en
+ *   un comentario.
  */
 export function CompartirEstilo({ card, onCerrar }: { card: Card; onCerrar(): void }) {
   const [paquete, setPaquete] = useState<Paquete>(null)
@@ -168,6 +171,10 @@ export function CompartirEstilo({ card, onCerrar }: { card: Card; onCerrar(): vo
   const [prueba, setPrueba] = useState<PruebaEstilo | null>()
   // Su evidencia es el hilo completo de ese video: va solo si su autor marca que lo comparte.
   const [acepto, setAcepto] = useState(false)
+  // Quién eres en la comunidad: el creador que pone al día el estilo de otro lo pre-aprueba, y le dice qué le cambió.
+  const [yo, setYo] = useState<FeedComunidad['yo'] | null>(null)
+  const preaprueba = !!anterior && !!yo?.creador && !anterior.autor.creador
+  const [cambios, setCambios] = useState('')
 
   useEffect(() => {
     api<{ publicacion?: PublicacionComunidad }>(`/api/comunidad/estilo/compartido?cardId=${encodeURIComponent(card.id)}&titulo=${encodeURIComponent(card.title)}`).then(
@@ -196,7 +203,7 @@ export function CompartirEstilo({ card, onCerrar }: { card: Card; onCerrar(): vo
   }, [card.id, intento])
   useEffect(() => {
     api<FeedComunidad>('/api/comunidad?categoria=estilos').then(
-      (f) => setNombreActual(f.yo.nombre),
+      (f) => (setNombreActual(f.yo.nombre), setYo(f.yo)),
       () => setNombreActual(null)
     )
     // Sus videos, del más nuevo al más viejo: el primero ya va elegido, salvo que su publicación ya lleve uno.
@@ -242,7 +249,9 @@ export function CompartirEstilo({ card, onCerrar }: { card: Card; onCerrar(): vo
                 ? 'De ese video ya no está el hilo donde se hizo, y de ahí sale su prueba. Elige otro.'
                 : !acepto
                   ? 'Marca que compartes el hilo de ese video: es la evidencia de su prueba.'
-                  : ''
+                  : preaprueba && !cambios.trim()
+                    ? 'Di qué le cambiaste: se lo contamos a su autor.'
+                    : ''
   const puede = !!paquete && 'listo' in paquete && !falta && !!prueba && !publicando && nombreActual !== undefined
 
   async function publicar() {
@@ -262,6 +271,11 @@ export function CompartirEstilo({ card, onCerrar }: { card: Card; onCerrar(): vo
       const evidencia = video && video !== EL_MISMO ? (await api<{ llave: string }>('/api/comunidad/estilo/evidencia', { ruta: video })).llave : prueba?.evidencia
       const adjuntos = [{ ...estilo, guia: guiaDe(guia), prueba: { ...prueba, evidencia } }, ...(suVideo ? [suVideo] : []), ...(anterior?.adjuntos.filter((a) => a.tipo === 'imagen') ?? [])]
       const p = await api<PublicacionComunidad>('/api/comunidad/estilo/publicar', { cardId: card.id, titulo: titulo.trim(), texto: texto.trim(), adjuntos })
+      // A su autor le llega qué le cambió Sloth, en su publicación. Si no llega, el estilo ya quedó: se lo puedes decir tú.
+      if (preaprueba)
+        await api(`/api/comunidad/p/${p.id}/comentar`, {
+          texto: `Sloth pre-aprobó tu estilo: le hizo la prueba, y para que a quien lo instale le salga a la primera le cambió esto:\n\n${cambios.trim()}\n\nYa lo ve toda la comunidad. Si te gusta así, pulsa «Así está bien» en esta publicación. Si no, cámbialo y pulsa «Compartir» en su card: mientras se revisa tu versión, la comunidad sigue viendo esta.`
+        }).catch(() => {})
       dispatchEvent(new Event('sloth-comunidad'))
       setHecha(p)
     } catch (e) {
@@ -283,7 +297,15 @@ export function CompartirEstilo({ card, onCerrar }: { card: Card; onCerrar(): vo
   if (hecha)
     return (
       <Modal
-        titulo={hecha.porAprobar ? (anterior ? 'Listo: tu versión nueva está en revisión' : 'Listo: tu estilo está en revisión') : 'Listo: tu estilo ya está en la comunidad'}
+        titulo={
+          hecha.preaprobada
+            ? 'Listo: pre-aprobado por Sloth'
+            : hecha.porAprobar
+              ? anterior
+                ? 'Listo: tu versión nueva está en revisión'
+                : 'Listo: tu estilo está en revisión'
+              : 'Listo: tu estilo ya está en la comunidad'
+        }
         onCerrar={onCerrar}
         acciones={
           <>
@@ -301,7 +323,8 @@ export function CompartirEstilo({ card, onCerrar }: { card: Card; onCerrar(): vo
             <li className="hecho">
               <Icono de="palomita" className="icon-trazo" />
               <span>
-                <strong>{anterior ? 'Mandaste la versión nueva' : 'Publicado'}.</strong> Por ahora «{hecha.titulo}» solo lo ven tú y el creador de Sloth.
+                <strong>{anterior ? 'Mandaste la versión nueva' : 'Publicado'}.</strong>{' '}
+                {hecha.publicaAun ? `Mientras se revisa, la comunidad sigue viendo la versión de antes de «${hecha.titulo}».` : `Por ahora «${hecha.titulo}» solo lo ven tú y el creador de Sloth.`}
               </span>
             </li>
             <li>
@@ -330,6 +353,8 @@ export function CompartirEstilo({ card, onCerrar }: { card: Card; onCerrar(): vo
               </span>
             </li>
           </ol>
+        ) : hecha.preaprobada ? (
+          <p>Ya todos lo ven en Estilos como «Pre-aprobado por Sloth». A {hecha.autor.nombre || 'su autor'} le llegó un aviso con lo que le cambiaste: lo deja así o manda su versión.</p>
         ) : (
           <p>Ya todos lo ven en Estilos y lo pueden instalar con un clic.</p>
         )}
@@ -358,7 +383,7 @@ export function CompartirEstilo({ card, onCerrar }: { card: Card; onCerrar(): vo
             </button>
           ) : (
             <button className="primary" disabled={!puede} title={falta || undefined} onClick={() => void publicar()}>
-              {publicando ? (video && video !== EL_MISMO ? 'Subiendo el video entero…' : 'Publicando…') : !paquete ? 'Preparando…' : anterior ? 'Mandar la versión nueva' : 'Publicar en la comunidad'}
+              {publicando ? (video && video !== EL_MISMO ? 'Subiendo el video entero…' : 'Publicando…') : !paquete ? 'Preparando…' : preaprueba ? 'Pre-aprobar y publicar' : anterior ? 'Mandar la versión nueva' : 'Publicar en la comunidad'}
             </button>
           )}
         </>
@@ -366,10 +391,17 @@ export function CompartirEstilo({ card, onCerrar }: { card: Card; onCerrar(): vo
     >
       {anterior && (
         <div className="compartir-anterior">
-          <span>
-            Ya lo compartiste: {anterior.porAprobar ? 'está en revisión' : 'está en la tienda'}. No se hace otra publicación: se pone al día esa misma, con sus comentarios, y se vuelve a revisar
-            {anterior.porAprobar ? '.' : '; mientras tanto deja de verse en la tienda.'}
-          </span>
+          {preaprueba ? (
+            <span>
+              Es el estilo de {anterior.autor.nombre || 'alguien de la comunidad'}. Se pone al día su misma publicación, con sus comentarios, y queda «Pre-aprobado por Sloth»: ya lo ve toda la
+              comunidad. Sigue siendo suyo, y le llega un aviso con lo que le cambiaste.
+            </span>
+          ) : (
+            <span>
+              Ya lo compartiste: {anterior.porAprobar ? 'está en revisión' : 'está en la tienda'}. No se hace otra publicación: se pone al día esa misma, con sus comentarios, y se vuelve a revisar
+              {anterior.porAprobar ? '.' : '; mientras tanto la comunidad sigue viendo la versión de ahora.'}
+            </span>
+          )}
           <button className="ghost small" onClick={() => (abrirPublicacion(anterior.id), onCerrar())}>
             Ver la publicación
           </button>
@@ -441,6 +473,18 @@ export function CompartirEstilo({ card, onCerrar }: { card: Card; onCerrar(): vo
             <span>Lo lee quien lo instala, en la comunidad y bajo el nombre del estilo. Es igual para todos los estilos y va completa.</span>
           </div>
           <GuiaCampos valor={guia} onCambio={setGuia} />
+          {preaprueba && (
+            <label>
+              <span>Qué le cambiaste · se lo contamos a su autor</span>
+              <textarea
+                value={cambios}
+                rows={3}
+                maxLength={3000}
+                placeholder="Por ejemplo: le puse su guía de uso, corregí el paso de las imágenes que fallaba en Mac y le hice su video de prueba."
+                onChange={(e) => setCambios(e.target.value)}
+              />
+            </label>
+          )}
           <div className="compartir-video">
             <span>Un video entero hecho con él · es lo que ven en la tienda, y de su hilo sale su prueba</span>
             {videos === null ? (

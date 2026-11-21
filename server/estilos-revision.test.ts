@@ -380,3 +380,25 @@ test('quien lee algo ajeno solo tiene con qué leer: ni escribir, ni ejecutar, n
   assert.deepEqual(SOLO_LEER.settingSources, [])
   assert.deepEqual(SOLO_LEER.agents, {})
 })
+
+test('antes de pre-aprobar uno, Sloth lo vuelve a comprobar y junta lo que su revisión dijo de él', async () => {
+  const c = creador({ pub1: 'aaa.estilo', pub2: 'bbb.estilo' }, { riesgos: { pub2: ['scripts/subir.py:2 se conecta a internet'] }, fallas: { pub1: ['Nombra carpetas de tu computadora.'] } })
+  try {
+    // Sin revisión aún: lo que Sloth comprueba ahora mismo, sin correrlo.
+    assert.deepEqual(c.r.antesDePreaprobar('pub2', Buffer.from('pub2')), { riesgos: ['scripts/subir.py:2 se conecta a internet'], fallas: [], no: false, pide: [] })
+    // Con su revisión: lo que lo frenó y las sugerencias, para que el agente del creador lo arregle.
+    await c.r.ronda()
+    await c.acaba('h1', { veredicto: 'falta', resumen: 'x', falta: ['Su paso 3 no dice qué hacer en Mac.'], sugerencias: ['Ponle «listo» al paso 2.'] })
+    const antes = c.r.antesDePreaprobar('pub1', Buffer.from('pub1'))
+    assert.deepEqual(antes.fallas, ['Nombra carpetas de tu computadora.'])
+    assert.deepEqual(antes.pide, ['Nombra carpetas de tu computadora.', 'Su paso 3 no dice qué hacer en Mac.', 'Ponle «listo» al paso 2.'])
+    assert.equal(antes.no, false)
+    // El que quien lo leyó no aprobaría lo dice, para que el creador lo mire antes de correrlo.
+    c.hilos[0].running = false
+    await c.r.ronda()
+    await c.acaba('h2', { veredicto: 'no', resumen: 'Manda tus archivos a otro sitio.', falta: [] })
+    assert.equal(c.r.antesDePreaprobar('pub2', Buffer.from('pub2')).no, true)
+  } finally {
+    c.fin()
+  }
+})

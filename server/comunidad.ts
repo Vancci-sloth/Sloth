@@ -7,7 +7,7 @@ import { extname, join, resolve, sep } from 'node:path'
 import { promisify } from 'node:util'
 import { guiaDe, TIPO_HILO } from '../shared/guia.ts'
 import { NOMBRE_AGENTE, proveedorDe } from '../shared/providers.ts'
-import type { AdjuntoComunidad, AyudaMejora, GuiaEstilo, OrigenMejora, PublicacionComunidad, ServerPush, TiendaEstilos, VideoHecho } from '../shared/types.ts'
+import type { AdjuntoComunidad, AyudaMejora, GuiaEstilo, OrigenMejora, PruebaEstilo, PublicacionComunidad, ServerPush, TiendaEstilos, VideoHecho } from '../shared/types.ts'
 import { guardar } from './disco.ts'
 import { bytes, cuerpo, json as enviar } from './http.ts'
 import { EstiloMalo, type Instalado, type Manifiesto, PESO as PESO_ESTILO, TIPO as TIPO_ESTILO } from './estilos.ts'
@@ -48,6 +48,11 @@ import { redactar as redactarConAgente } from './redactar.ts'
  *   y le avisa a la comunidad su descarga (`usos`, que también manda los videos de `server/estilos-usos.ts`).
  * - `POST /api/comunidad/estilo/revisar` `{publicacion}`: solo el creador. Da el hilo (`{hilo}`) donde su Claude lo lee
  *   antes de aprobarlo, sin instalarlo: el que ya se hizo solo al llegar, o uno nuevo (`server/estilos-revision.ts`).
+ * - `POST /api/comunidad/estilo/preaprobar` `{publicacion, aunAsi?}`: solo el creador (ADR 0024). Instala ese estilo
+ *   entre los suyos y apunta que su card es de esa publicación: su «Compartir» la pone al día y la deja pre-aprobada
+ *   (`aprobada: 2` en `estilo/publicar`). Da `{cardId, texto}`: lo que se le pide a su agente, para el borrador. Como
+ *   hacer su video corre su código, con señales de riesgo, o si su revisión dijo que no lo aprobaría, responde 409 con
+ *   lo que encontró, hasta que el creador lo mire y lo pida `aunAsi`.
  * - `POST /api/mejoras` `{texto, imagenes?, adjuntos?}`: publica una mejora. Lo usan «Pedir una mejora» de cada hilo y
  *   el agente; `imagenes` son rutas de `data/attachments`. El hilo de donde salió no se publica.
  */
@@ -108,6 +113,8 @@ interface Opciones {
   }
   /** El hilo donde el agente del creador lee el estilo de esa publicación, sin instalarlo (`server/estilos-revision.ts`). */
   revisar(publicacion: string): Promise<{ hilo: string }>
+  /** Lo que se sabe de un estilo antes de pre-aprobarlo (`antesDePreaprobar` de `server/estilos-revision.ts`). */
+  antesDePreaprobar(publicacion: string, paquete: Buffer, guia?: GuiaEstilo, prueba?: PruebaEstilo): { riesgos: string[]; fallas: string[]; no: boolean; pide: string[] }
   /** La publicación de Estilos de la que salió el estilo de esa card (su `origen` o su `deComunidad`), si salió de una. */
   deEstilo(cardId: string): string | undefined
 }
@@ -417,8 +424,15 @@ export function comunidad(app: string, o: Opciones) {
         // El que ya compartiste se pone al día en su misma publicación, con sus comentarios y sus números; si ya no está, va otra.
         const ya = compartidos()[cardId]
         const anterior = ya ? await suya(ya) : undefined
+        // El creador que manda el estilo de otro (lo instaló con «Pre-aprobar») lo pre-aprueba: sigue siendo de su autor, y
+        // variante de lo que ya era, no de sí mismo.
+        const preaprueba = !!anterior && !anterior.autor.creador && 'llave' in ((await o.credencial()) ?? {})
+        if (anterior && preaprueba) {
+          const de = anterior.adjuntos.find((a) => a.tipo === 'estilo')?.de
+          datos.adjuntos = datos.adjuntos.map((a: unknown) => (a && typeof a === 'object' && (a as AdjuntoComunidad).tipo === 'estilo' ? { ...a, de } : a))
+        }
         const p = anterior
-          ? await nubeJson<PublicacionComunidad>(`/comunidad/p/${anterior.id}`, { cuerpo: JSON.stringify(datos) })
+          ? await nubeJson<PublicacionComunidad>(`/comunidad/p/${anterior.id}`, { cuerpo: JSON.stringify(preaprueba ? { ...datos, aprobada: 2 } : datos) })
           : await nubeJson<PublicacionComunidad>('/comunidad/publicar', { cuerpo: JSON.stringify({ categoria: 'estilos', ...datos }) })
         recordar(cardId, p.id)
         o.avisar({ type: 'comunidad' })
@@ -430,6 +444,12 @@ export function comunidad(app: string, o: Opciones) {
         // Su descarga cuenta en la tienda (una por computadora); si no llega, no se reintenta.
         void usos([{ publicacion: p.id, tipo: 'descarga' }]).catch(() => {})
         return enviar(res, 200, instalado)
+      }
+      if (ruta === '/api/comunidad/estilo/preaprobar' && metodo === 'POST') {
+        const c = await o.credencial()
+        if (!c || !('llave' in c)) throw new Rechazo(403, 'Eso solo lo hace el creador de Sloth.')
+        const pide = await cuerpo<{ publicacion?: string; aunAsi?: boolean }>(req)
+        return enviar(res, 200, await preaprobar(String(pide.publicacion ?? ''), pide.aunAsi === true))
       }
       if (ruta === '/api/comunidad/estilo/revisar' && metodo === 'POST') {
         const c = await o.credencial()
@@ -464,6 +484,33 @@ export function comunidad(app: string, o: Opciones) {
       return true
     } catch (e) {
       return enviar(res, e instanceof Rechazo ? e.status : e instanceof EstiloMalo ? 400 : 500, { error: e instanceof Error ? e.message : String(e) })
+    }
+  }
+
+  /**
+   * Solo el creador: instala el estilo de esa publicación para probarlo y arreglarlo (ADR 0024), y apunta que su card es de
+   * ahí, así su «Compartir» la pone al día pre-aprobada. Da su card y lo que se le pide a su agente.
+   */
+  async function preaprobar(id: string, aunAsi: boolean): Promise<{ cardId: string; texto: string }> {
+    const { p, llave, paquete } = await estiloDe(id)
+    if (p.autor.creador) throw new Rechazo(400, 'Este estilo es tuyo: apruébalo.')
+    const estilo = p.adjuntos.find((a) => a.tipo === 'estilo')
+    const guia = guiaDe(estilo?.guia)
+    const antes = o.antesDePreaprobar(p.id, paquete, guia, estilo?.prueba)
+    if (!aunAsi && (antes.no || antes.riesgos.length)) {
+      const que = [...(antes.no ? ['quien lo leyó dijo que no lo aprobaría'] : []), ...antes.riesgos.slice(0, 8)]
+      throw new Rechazo(409, `Para hacer su video de prueba se corre su código, y Sloth encontró esto: ${que.join(' · ')}. Míralo antes con «Revisar».`)
+    }
+    let instalado
+    try {
+      instalado = o.estilos.instalarPaquete(paquete, { publicacion: p.id, llave, ...(p.autor.nombre ? { autor: p.autor.nombre } : {}) }, guia)
+    } catch (e) {
+      throw new Rechazo(400, e instanceof Error ? e.message : String(e))
+    }
+    recordar(instalado.id, p.id)
+    return {
+      cardId: instalado.id,
+      texto: paraPreaprobar({ titulo: estilo?.nombre || p.titulo, autor: p.autor.nombre, skill: instalado.id, ejemplo: guia?.ejemplo, falta: [...(p.incompleto ?? []), ...antes.fallas], pide: antes.pide })
     }
   }
 
@@ -508,6 +555,26 @@ export function llaveDelCreador(): Credencial | undefined {
     }
 }
 
+
+/**
+ * Lo que se le pide al agente del creador en la card de un estilo que va a pre-aprobar (ADR 0024): hacer su video de
+ * prueba como lo haría quien lo instala, arreglar lo que falle y lo que su revisión pidió, sin cambiarle lo demás, y decir
+ * qué cambió, que es lo que se le cuenta a su autor.
+ */
+export function paraPreaprobar(e: { titulo: string; autor: string; skill: string; ejemplo?: string; falta: string[]; pide: string[] }): string {
+  const lista = (cosas: string[]) => cosas.map((c) => `- ${c.replaceAll('`', '')}`).join('\n')
+  return [
+    `Vamos a pre-aprobar «${e.titulo}», un estilo que compartió ${e.autor || 'alguien'} en la comunidad. Lo instalé desde su publicación como esta card (su skill es ${e.skill}). Cuando quede bien, lo subo a su misma publicación como «Pre-aprobado por Sloth» y lo ve toda la comunidad.`,
+    [
+      '1. Haz su video de prueba como lo haría quien lo instala, siguiendo su skill' + (e.ejemplo ? `, con el ejemplo de su guía: «${e.ejemplo}»` : '') + '.',
+      '2. Lo que falle al hacerlo, arréglalo en su skill, para que a quien lo instale le salga a la primera.',
+      ...(e.pide.length ? [`3. Arregla también lo que le pidió la revisión:\n${lista(e.pide)}`] : [])
+    ].join('\n'),
+    ...(e.falta.length ? [`Le falta esto para la comunidad. Lo que es de su skill o de su card, complétalo; su guía de uso, su video y su prueba los pongo yo al compartirlo:\n${lista(e.falta)}`] : []),
+    'Cambia solo lo necesario: el estilo sigue siendo de su autor, con su idea y su forma.',
+    'Al terminar, dime en una lista corta qué le cambiaste y por qué, sin rutas de esta computadora: se la mando a su autor. Luego pulso «Compartir» en esta card.'
+  ].join('\n\n')
+}
 
 /** La forma de la ayuda, que Codex respeta al pie de la letra (`outputSchema`). */
 const ESQUEMA_AYUDA = {

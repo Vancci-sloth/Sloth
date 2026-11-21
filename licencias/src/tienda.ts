@@ -32,7 +32,7 @@
  *   `{publicacion, periodo?, videos?: [{equipo, huella}], miembro?, descartado}`.
  */
 import type { Autor, EstiloTienda, FondoComunidad, OrdenTienda, PruebasEstilo, TiendaEstilos } from '../../shared/types.ts'
-import { apoya, armar, conCupo, esCreador, esDe, type Guardada, type Miembro, miembros, OCULTAR, palabrasDe, sinAcentos, urlDe } from './comunidad.ts'
+import { aLaVista, apoya, armar, conCupo, esCreador, esDe, type Guardada, type Miembro, miembros, OCULTAR, palabrasDe, sinAcentos, urlDe } from './comunidad.ts'
 import { esPeriodo, fondo, periodoFondo } from './fondo.ts'
 import { cuerpo, type Env, Rechazo } from './index.ts'
 
@@ -176,17 +176,20 @@ export async function numerosActuales(env: Env): Promise<Numeros> {
   return guardados
 }
 
-/** Los números de todos los estilos aprobados, con los puntos de un periodo (el reparto los pide del que cerró). */
+/**
+ * Los números de todos los estilos que ve la comunidad (aprobados, pre-aprobados o con una versión a la vista mientras se
+ * revisa otra: `aLaVista`), con los puntos de un periodo (el reparto los pide del que cerró).
+ */
 export async function numerosDe(env: Env, periodo: string): Promise<Numeros> {
   const [estilos, descargas, videos, variantes] = await env.DB.batch([
-    // Los aprobados, con su autor. Del fondo se llevan los de quien participa (dio su Binance ID) y no es el creador.
+    // Los que están a la vista, con su autor. Del fondo se llevan los de quien participa (dio su Binance ID) y no es el creador.
     env.DB.prepare(
-      "SELECT p.id, p.titulo, p.autor, (m.clave != 'admin' AND m.binance IS NOT NULL) AS participa FROM publicaciones p LEFT JOIN miembros m ON m.id = p.autor WHERE p.categoria = 'estilos' AND p.aprobada = 1"
+      `SELECT p.id, p.titulo, p.autor, (m.clave != 'admin' AND m.binance IS NOT NULL) AS participa FROM publicaciones p LEFT JOIN miembros m ON m.id = p.autor WHERE p.categoria = 'estilos' AND ${aLaVista('p.')}`
     ),
     env.DB.prepare("SELECT publicacion, COUNT(*) AS n FROM estilo_usos WHERE tipo = 'descarga' GROUP BY publicacion"),
     env.DB.prepare("SELECT publicacion, equipo, red, periodo, COUNT(*) AS videos FROM estilo_usos WHERE tipo = 'video' AND descartado = 0 GROUP BY publicacion, equipo, red, periodo"),
     env.DB.prepare(
-      "SELECT p.id, json_extract(j.value, '$.de') AS de, p.autor, p.creada FROM publicaciones p, json_each(p.adjuntos) j WHERE p.categoria = 'estilos' AND p.aprobada = 1 AND json_extract(j.value, '$.tipo') = 'estilo' AND json_extract(j.value, '$.de') IS NOT NULL"
+      `SELECT p.id, json_extract(j.value, '$.de') AS de, p.autor, p.creada FROM publicaciones p, json_each(p.adjuntos) j WHERE p.categoria = 'estilos' AND ${aLaVista('p.')} AND json_extract(j.value, '$.tipo') = 'estilo' AND json_extract(j.value, '$.de') IS NOT NULL`
     )
   ])
   const filas = (estilos.results as { id: string; titulo: string; autor: string; participa: number | null }[]).map((f) => ({ ...f, participa: !!f.participa }))
@@ -234,7 +237,7 @@ export async function tienda(env: Env, yo: Miembro, url: URL): Promise<TiendaEst
   if (!ORDENES_TIENDA.includes(orden)) throw new Rechazo(400, 'Ese orden no existe.')
   const donde = ["categoria = 'estilos'"]
   const valores: (string | number)[] = []
-  if (!esCreador(yo)) donde.push('((reportes < ? AND aprobada = 1) OR autor = ?)'), valores.push(OCULTAR, yo.id)
+  if (!esCreador(yo)) donde.push(`((reportes < ? AND ${aLaVista()}) OR autor = ?)`), valores.push(OCULTAR, yo.id)
   // Las palabras solo llevan letras y números (`palabrasDe`): ni `%` ni `_` llegan al LIKE.
   for (const p of palabrasDe(url.searchParams.get('q') ?? '')) {
     donde.push(`(${sinAcentos('titulo')} LIKE ? OR ${sinAcentos('texto')} LIKE ? OR ${sinAcentos('adjuntos')} LIKE ?)`)
@@ -251,7 +254,7 @@ export async function tienda(env: Env, yo: Miembro, url: URL): Promise<TiendaEst
   const titulos = new Map<string, string>()
   const faltan = [...new Set(pubs.map((p) => n.origen.get(p.id)).filter((d): d is string => !!d))]
   if (faltan.length)
-    for (const r of (await env.DB.prepare(`SELECT id, titulo FROM publicaciones WHERE aprobada = 1 AND id IN (${faltan.map(() => '?').join(', ')})`).bind(...faltan).all<{ id: string; titulo: string }>()).results)
+    for (const r of (await env.DB.prepare(`SELECT id, titulo FROM publicaciones WHERE ${aLaVista()} AND id IN (${faltan.map(() => '?').join(', ')})`).bind(...faltan).all<{ id: string; titulo: string }>()).results)
       titulos.set(r.id, r.titulo)
   const estilos: EstiloTienda[] = pubs.map((p) => {
     const s = n.siempre.get(p.id) ?? { descargas: 0, videos: 0, personas: 0, variantes: 0 }
@@ -307,13 +310,13 @@ export async function usos(req: Request, env: Env, yo: Miembro): Promise<{ ok: t
   if (!(await conCupo(env, yo, 'usos'))) throw new Rechazo(429, 'Ya se mandó mucho hoy desde esta computadora. Mañana sigue.')
   const periodo = periodoFondo(ahora)
   const red = await redDe(req, env)
-  // Solo de un estilo aprobado y de alguien más: ni el autor, ni una computadora de las cuentas de su correo.
+  // Solo de un estilo a la vista y de alguien más: ni el autor, ni una computadora de las cuentas de su correo.
   const resultado = await env.DB.batch(
     lista.map((u) =>
       env.DB.prepare(
         `INSERT OR IGNORE INTO estilo_usos (publicacion, tipo, equipo, huella, miembro, red, prueba, periodo, creado)
         SELECT ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9 FROM publicaciones p
-        WHERE p.id = ?1 AND p.categoria = 'estilos' AND p.aprobada = 1 AND p.autor != ?5
+        WHERE p.id = ?1 AND p.categoria = 'estilos' AND ${aLaVista('p.')} AND p.autor != ?5
           AND NOT EXISTS (
             SELECT 1 FROM equipos e JOIN licencias l ON l.clave = e.clave
             WHERE e.equipo = ?3 AND l.email IN (SELECT la.email FROM miembros ma JOIN licencias la ON la.clave = ma.clave WHERE ma.id = p.autor)

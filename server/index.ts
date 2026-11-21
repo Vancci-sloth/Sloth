@@ -265,6 +265,7 @@ const comunidadApi = comunidad(APP, {
   avisar: broadcast,
   estilos: estilosLocal,
   revisar: (publicacion) => revision!.revisar(publicacion),
+  antesDePreaprobar: (...a) => revision!.antesDePreaprobar(...a),
   deEstilo: (id) => {
     const card = cards().find((c) => c.id === id)
     return card?.origen?.publicacion ?? card?.deComunidad

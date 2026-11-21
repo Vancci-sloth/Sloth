@@ -90,7 +90,7 @@ test('un comentario lleva solo imágenes de la comunidad, a lo más cuatro', () 
 
 test('el feed por actividad, por lo más reciente y, para el creador, lo que no ha contestado', () => {
   const db = new DatabaseSync(':memory:', COMO_D1)
-  for (const m of ['0004_comunidad', '0009_comentarios_adjuntos', '0019_estilos', '0026_comunidad_recientes']) db.exec(readFileSync(new URL(`../migrations/${m}.sql`, import.meta.url), 'utf8'))
+  for (const m of ['0004_comunidad', '0009_comentarios_adjuntos', '0019_estilos', '0026_comunidad_recientes', '0035_preaprobados']) db.exec(readFileSync(new URL(`../migrations/${m}.sql`, import.meta.url), 'utf8'))
   const pub = db.prepare("INSERT INTO publicaciones (id, autor, categoria, titulo, texto, creada, actividad, fijada) VALUES (?, ?, 'general', '', '', ?, ?, ?)")
   const com = db.prepare("INSERT INTO comentarios (id, publicacion, autor, texto, creada) VALUES (?, ?, ?, '', ?)")
   // a: de Ana, sin comentarios. b: de Beto, ya le contestó el creador. c: de Ana, le contestó y luego Beto volvió a
@@ -122,7 +122,7 @@ test('el feed por actividad, por lo más reciente y, para el creador, lo que no 
 
 test('el buscador encuentra cada palabra sin importar acentos ni mayúsculas, en el título, el texto o un comentario', () => {
   const db = new DatabaseSync(':memory:', COMO_D1)
-  for (const m of ['0004_comunidad', '0009_comentarios_adjuntos', '0019_estilos', '0026_comunidad_recientes']) db.exec(readFileSync(new URL(`../migrations/${m}.sql`, import.meta.url), 'utf8'))
+  for (const m of ['0004_comunidad', '0009_comentarios_adjuntos', '0019_estilos', '0026_comunidad_recientes', '0035_preaprobados']) db.exec(readFileSync(new URL(`../migrations/${m}.sql`, import.meta.url), 'utf8'))
   const pub = db.prepare("INSERT INTO publicaciones (id, autor, categoria, titulo, texto, creada, actividad, reportes, aprobada) VALUES (?, ?, 'ayuda', ?, ?, ?, ?, ?, ?)")
   pub.run('a', 'ana', 'La voz clonada suena ROBÓTICA', 'Grabé 30 segundos.', '2026-11-01', '2026-11-01', 0, 1)
   pub.run('b', 'beto', 'Música que no se oye', 'En el mp4 no suena; parece robótica la mezcla', '2026-11-02', '2026-11-09', 0, 1)
@@ -157,7 +157,7 @@ test('el buscador encuentra cada palabra sin importar acentos ni mayúsculas, en
 
 test('el índice del buscador trae lo que cada quien ve, sin lo oculto ni lo que no se aprobó', () => {
   const db = new DatabaseSync(':memory:', COMO_D1)
-  for (const m of ['0004_comunidad', '0009_comentarios_adjuntos', '0019_estilos', '0026_comunidad_recientes']) db.exec(readFileSync(new URL(`../migrations/${m}.sql`, import.meta.url), 'utf8'))
+  for (const m of ['0004_comunidad', '0009_comentarios_adjuntos', '0019_estilos', '0026_comunidad_recientes', '0035_preaprobados']) db.exec(readFileSync(new URL(`../migrations/${m}.sql`, import.meta.url), 'utf8'))
   db.prepare("INSERT INTO miembros (id, clave, nombre, creado, visto) VALUES ('ana', 'k1', 'Ana', '2026-11-01', '2026-11-01')").run()
   const pub = db.prepare("INSERT INTO publicaciones (id, autor, categoria, titulo, texto, creada, actividad, reportes, aprobada) VALUES (?, ?, 'general', ?, ?, ?, ?, ?, ?)")
   pub.run('a', 'ana', 'Visible', 'x'.repeat(500), '2026-11-01', '2026-11-03', 0, 1)
@@ -177,7 +177,7 @@ test('el índice del buscador trae lo que cada quien ve, sin lo oculto ni lo que
 
 test('los estilos de otros le salen a cualquiera, apoye o no: en el feed, en el buscador y en su índice', () => {
   const db = new DatabaseSync(':memory:', COMO_D1)
-  for (const m of ['0004_comunidad', '0009_comentarios_adjuntos', '0019_estilos', '0026_comunidad_recientes']) db.exec(readFileSync(new URL(`../migrations/${m}.sql`, import.meta.url), 'utf8'))
+  for (const m of ['0004_comunidad', '0009_comentarios_adjuntos', '0019_estilos', '0026_comunidad_recientes', '0035_preaprobados']) db.exec(readFileSync(new URL(`../migrations/${m}.sql`, import.meta.url), 'utf8'))
   const pub = db.prepare("INSERT INTO publicaciones (id, autor, categoria, titulo, texto, creada, actividad) VALUES (?, ?, ?, ?, '', ?, ?)")
   pub.run('g', 'ana', 'general', 'Hola receta', '2026-11-01', '2026-11-01')
   pub.run('e1', 'ana', 'estilos', 'Receta rápida', '2026-11-02', '2026-11-02')

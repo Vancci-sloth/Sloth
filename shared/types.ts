@@ -1304,6 +1304,16 @@ export interface PublicacionComunidad {
   /** Un estilo que aún no se aprueba: solo lo ven quien lo compartió y el creador. */
   porAprobar?: true
   /**
+   * Un estilo pre-aprobado por Sloth (ADR 0024): el creador le hizo la prueba, le completó lo que faltaba y le arregló sus
+   * errores. Ya lo ve toda la comunidad; su autor lo deja así («Así está bien») o manda otra versión.
+   */
+  preaprobada?: true
+  /**
+   * Solo a su autor y al creador, de un estilo en revisión: la comunidad sigue viendo la versión de antes, que ya estaba a
+   * la vista, hasta que se apruebe esta.
+   */
+  publicaAun?: true
+  /**
    * Un estilo al que le falta algo de lo que lleva todo estilo de la comunidad (`faltaEnEstilo` en `shared/guia.ts`): no
    * sale en la tienda hasta que su autor lo complete. Solo lo ven él, en rojo, y el creador.
    */
@@ -1328,8 +1338,11 @@ export interface ComentarioComunidad {
 /** Lo que le pasó a lo tuyo en la comunidad: te comentaron, te respondieron, te dieron me gusta… */
 export interface AvisoComunidad {
   id: string
-  /** `incompleto`: a un estilo tuyo le falta algo de lo que lleva todo estilo, y no sale en la tienda hasta que lo completes. */
-  tipo: 'comento' | 'respondio' | 'gusta' | 'gustaComentario' | 'estado' | 'reporte' | 'anuncio' | 'estilo' | 'aprobado' | 'incompleto'
+  /**
+   * `incompleto`: a un estilo tuyo le falta algo de lo que lleva todo estilo, y no sale en la tienda hasta que lo completes.
+   * `preaprobado`: Sloth lo probó, lo completó y lo arregló, y ya lo ve toda la comunidad.
+   */
+  tipo: 'comento' | 'respondio' | 'gusta' | 'gustaComentario' | 'estado' | 'reporte' | 'anuncio' | 'estilo' | 'aprobado' | 'preaprobado' | 'incompleto'
   de: Autor
   publicacion: string
   /** El título de la publicación, o el principio de su texto. */

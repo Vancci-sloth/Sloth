@@ -101,6 +101,9 @@ se arreglan solos, y a su guía se le pone el agente con que hizo el vídeo de s
 - **Le falta algo** de lo que frena: se le dice a su autor, en su publicación, qué cambiar. Lo arregla y pulsa
   «Compartir» otra vez: se revisa de nuevo, mirando primero lo que se le pidió, sin una lista nueva de detalles.
 - **Trae una señal:** aunque cumpla todo, lo aprueba el creador de Sloth a mano.
+- **Pre-aprobado por Sloth:** el creador de Sloth le hizo la prueba, le completó lo que faltaba y le arregló sus
+  errores, y ya lo ve toda la comunidad. Su autor lo deja así o manda su versión; mientras se revisa, la comunidad sigue
+  viendo la que estaba.
 - **No se aprobaría** (hace algo de «Lo que no hace»): lo decide el creador.
 
 Cambiar esta vara cambia qué se aprueba: lo que se añada a (Sloth) va también en `server/estilos-requisitos.ts`, y un

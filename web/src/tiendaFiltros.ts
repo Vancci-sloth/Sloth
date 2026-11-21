@@ -14,8 +14,11 @@ export interface Filtros {
   forma?: 'vertical' | 'horizontal'
   /** Los que aún no habías visto en la tienda. */
   nuevos?: boolean
-  /** Solo el creador: los que faltan por aprobar. */
-  revision?: boolean
+  /**
+   * Solo el creador, que lo ve todo: los que faltan por aprobar, o los que ve toda la comunidad (aprobados y sin
+   * ocultar por reportes), para ver la tienda como la ven los demás.
+   */
+  aprobacion?: 'revision' | 'publicos'
   /** Los de una persona: se llega desde su nombre en el visor. */
   autor?: { id: string; nombre: string }
 }
@@ -60,17 +63,29 @@ export function fichasDe(estilos: EstiloTienda[], vistos: Set<string> | null): F
   })
 }
 
+/** Con tantos reportes una publicación se oculta a los demás (`OCULTAR` en `licencias/src/comunidad.ts`). */
+const OCULTAR = 3
+
+/**
+ * Lo que pide cada opción. Los demás ven lo aprobado o pre-aprobado, y lo que tiene una versión a la vista mientras se
+ * revisa otra (`publicaAun`), sin lo oculto por reportes, que solo le llegan al creador.
+ */
+const APROBACION = {
+  revision: (e: EstiloTienda) => !!e.publicacion.porAprobar,
+  publicos: (e: EstiloTienda) => (!e.publicacion.porAprobar || !!e.publicacion.publicaAun) && (e.publicacion.reportes ?? 0) < OCULTAR
+}
+
 export function pasa(f: Ficha, x: Filtros): boolean {
   if (x.tema && !f.temas.includes(x.tema)) return false
   if (x.forma && f.forma !== x.forma) return false
   if (x.nuevos && !f.nuevo) return false
-  if (x.revision && !f.e.publicacion.porAprobar) return false
+  if (x.aprobacion && !APROBACION[x.aprobacion](f.e)) return false
   if (x.autor && f.e.publicacion.autor.id !== x.autor.id) return false
   return !x.q.trim() || coincide(f.buscable, x.q)
 }
 
 /** Si hay algo elegido o escrito. */
-export const hayFiltros = (x: Filtros) => !!(x.q.trim() || x.tema || x.forma || x.nuevos || x.revision || x.autor)
+export const hayFiltros = (x: Filtros) => !!(x.q.trim() || x.tema || x.forma || x.nuevos || x.aprobacion || x.autor)
 
 /** Cuántos estilos da cada opción con lo demás que ya está elegido. Los temas que no dan ninguno no salen. */
 export function opcionesDe(fichas: Ficha[], x: Filtros) {
@@ -80,7 +95,8 @@ export function opcionesDe(fichas: Ficha[], x: Filtros) {
     vertical: con({ forma: 'vertical' }),
     horizontal: con({ forma: 'horizontal' }),
     nuevos: con({ nuevos: true }),
-    revision: con({ revision: true })
+    revision: con({ aprobacion: 'revision' }),
+    publicos: con({ aprobacion: 'publicos' })
   }
 }
 

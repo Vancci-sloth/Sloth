@@ -69,7 +69,7 @@ test('los filtros se suman, y cada opción dice cuántos da con lo demás ya ele
   assert.deepEqual(id(fichas.filter((f) => pasa(f, { q: '', autor: { id: 'Beto', nombre: 'Beto' }, tema: 'historias' }))), ['Animal Drama', 'La Jaula'])
   const libres = opcionesDe(fichas, { q: '' })
   assert.deepEqual(libres.temas.map((t) => [t.id, t.n]), [['3d', 2], ['historias', 2], ['explicar', 1], ['humor', 1], ['animales', 1]])
-  assert.deepEqual([libres.vertical, libres.horizontal, libres.revision, libres.nuevos], [2, 1, 1, 0])
+  assert.deepEqual([libres.vertical, libres.horizontal, libres.revision, libres.publicos, libres.nuevos], [2, 1, 1, 3, 0])
   // Con «Historias» elegido: las formas cuentan solo las historias, y los temas, lo que hay en cada forma.
   const historias = opcionesDe(fichas, { q: '', tema: 'historias' })
   assert.deepEqual([historias.vertical, historias.horizontal], [1, 1])

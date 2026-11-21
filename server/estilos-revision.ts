@@ -36,6 +36,9 @@ import { EstiloMalo } from './estilos.ts'
  * - Lo ya leído se apunta en `archivo`, por publicación y con la llave de su paquete, antes de bajarlo: con la Sloth
  *   instalada y la del repo abiertas a la vez (las dos leen el mismo archivo), lo revisa una sola.
  * - «Revisar», en la publicación, abre ese hilo; si no lo hay en esta computadora, lo hace ahí mismo (`revisar`).
+ * - Antes de pre-aprobar uno (ADR 0024), que sí corre su código para hacer su video de prueba, Sloth lo vuelve a
+ *   comprobar y junta lo que ya se sabe de él (`antesDePreaprobar`): sus señales de riesgo, si quien lo leyó dijo que no
+ *   lo aprobaría, y lo que se le pidió a su autor.
  */
 
 export interface PorAprobar {
@@ -372,5 +375,22 @@ export function revisionDeEstilos(o: Opciones) {
   /** Si el hilo es una revisión: su agente solo lee, y al acabar se mira si espera otro estilo. */
   const esRevision = (meta: SessionMeta | undefined) => meta?.cardId === REVISION_CARD.id
 
-  return { revisar, ronda, esRevision, alAcabar }
+  /**
+   * Lo que se sabe de un estilo antes de pre-aprobarlo: Sloth lo abre y lo comprueba otra vez, sin correrlo (`riesgos`,
+   * `fallas`), y de su revisión, si quien lo leyó dijo que no lo aprobaría (`no`) y lo que le pidió (`pide`: lo que lo
+   * frena y las sugerencias).
+   */
+  function antesDePreaprobar(publicacion: string, paquete: Buffer, guia?: GuiaEstilo, prueba?: PruebaEstilo): { riesgos: string[]; fallas: string[]; no: boolean; pide: string[] } {
+    const abierto = o.abrir(paquete, join(o.carpeta, publicacion))
+    const r = leer()[publicacion]
+    const v = r?.hilo && o.sessions.meta(r.hilo) ? veredictoDe(o.respuesta(r.hilo)) : undefined
+    return {
+      riesgos: abierto.riesgos,
+      fallas: [...abierto.fallas, ...deSuPublicacion(guia, prueba).fallas],
+      no: r?.desenlace === 'no' || v?.veredicto === 'no',
+      pide: [...new Set([...(r?.pedido ?? []), ...(v?.falta ?? []), ...(v?.sugerencias ?? [])])]
+    }
+  }
+
+  return { revisar, ronda, esRevision, alAcabar, antesDePreaprobar }
 }

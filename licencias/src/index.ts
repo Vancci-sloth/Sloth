@@ -70,7 +70,7 @@
  * con la misma clave (`/respaldo*`, en `respaldo.ts`).
  */
 import type { VersionLiberable } from '../../shared/types.ts'
-import { comunidad, creditos, olvidarSueltos } from './comunidad.ts'
+import { aLaVista, comunidad, creditos, olvidarSueltos } from './comunidad.ts'
 import { guardado } from './guardado.ts'
 import { cancelarStripe, firmaDeStripe, leerStripe, modoStripe, pagoDeSesion, sesion, sesionStripe, suscripcionStripe, type PagoStripe, type SesionStripe } from './stripe.ts'
 import { olvidarRegistroVoz, voz } from './voz.ts'
@@ -818,9 +818,9 @@ async function precios(env: Env, codigo?: unknown, alDia = false) {
   const fundador = codigo !== undefined && (await enlaceFundador(env, codigo))
   // La tarjeta, con Stripe y la clave de sus avisos, a los mismos precios en `MONEDA`.
   const conTarjeta = !!(env.STRIPE_SECRET_KEY && env.STRIPE_WEBHOOK_SECRET)
-  // Cuántos estilos tiene la tienda de la comunidad (los aprobados, como `sinApoyo` en `tienda.ts`), para que la página
+  // Cuántos estilos tiene la tienda de la comunidad (los que ven todos, como `sinApoyo` en `tienda.ts`), para que la página
   // diga «Más de N estilos». Si la consulta falla, no va: el precio no depende de ella.
-  const estilos = await env.DB.prepare("SELECT COUNT(*) AS n FROM publicaciones WHERE categoria = 'estilos' AND aprobada = 1")
+  const estilos = await env.DB.prepare(`SELECT COUNT(*) AS n FROM publicaciones WHERE categoria = 'estilos' AND ${aLaVista()}`)
     .first<{ n: number }>()
     .then((f) => f?.n ?? 0, () => 0)
   return {
