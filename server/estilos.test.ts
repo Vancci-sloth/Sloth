@@ -167,6 +167,19 @@ test('pide una Sloth al menos tan nueva y avisa qué cambió de video-base desde
   }
 })
 
+test('el repo instala el de una Sloth más nueva: va por delante de lo publicado aunque su package.json diga una de antes', () => {
+  const de = sloth()
+  const a = sloth(false)
+  try {
+    const { paquete } = empacar(de, '0.3.44')
+    const tusCards = join(a.app, 'data', 'tus-cards.json')
+    assert.equal(instalar({ paquete, app: a.app, tusCards, cards: a.cards, sloth: '0.3.9', alDia: true, base: a.base, deSloth: a.deSloth }).sloth, '0.3.44')
+  } finally {
+    de.fin()
+    a.fin()
+  }
+})
+
 test('abierto para revisarlo no se instala, y dice lo que se sabe de él frente a esta Sloth', () => {
   const de = sloth()
   const a = sloth(false)

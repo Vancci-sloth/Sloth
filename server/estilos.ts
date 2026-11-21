@@ -6,6 +6,7 @@ import { gunzipSync, gzipSync } from 'node:zlib'
 import { acentosBien } from '../shared/acentos.ts'
 import { guiaDe } from '../shared/guia.ts'
 import type { Card, GuiaEstilo, OrigenEstilo } from '../shared/types.ts'
+import { VENTA } from '../shared/venta.ts'
 import { guardar } from './disco.ts'
 import { bytes, json as enviar } from './http.ts'
 import { comprobar } from './estilos-requisitos.ts'
@@ -285,9 +286,11 @@ export function instalar(o: {
   origen?: Omit<OrigenEstilo, 'sloth'>
   /** La guía de uso de su publicación en la comunidad: es la que su autor revisó al compartirlo. */
   guia?: GuiaEstilo
+  /** Esta Sloth va por delante de toda versión publicada (el repo): no se frena el que viene de una más nueva. */
+  alDia?: boolean
 }): Instalado {
   const { manifiesto: m, archivos } = leerPaquete(o.paquete)
-  if (compararVersion(o.sloth, m.sloth) < 0) throw new EstiloMalo(`Este estilo se hizo con Sloth ${m.sloth} y tienes la ${o.sloth}: actualiza Sloth para instalarlo.`)
+  if (!o.alDia && compararVersion(o.sloth, m.sloth) < 0) throw new EstiloMalo(`Este estilo se hizo con Sloth ${m.sloth} y tienes la ${o.sloth}: actualiza Sloth para instalarlo.`)
   const npm = ajenos(archivos, o.deSloth)
   if (npm.length) throw new EstiloMalo(`Usa paquetes de npm que Sloth no trae (${npm.join(', ')}). No se instala.`)
   const ya = o.cards.find((c) => c.id === m.id || c.skill === m.id)
@@ -339,6 +342,9 @@ export function instalar(o: {
 export function estilos(app: string, cards: () => Card[]) {
   const tusCards = join(app, 'data', 'tus-cards.json')
   const sloth = (JSON.parse(readFileSync(join(app, 'package.json'), 'utf8')) as { version: string }).version
+  // En el repo, package.json se queda en la versión de antes (la sube `scripts/version-venta.mjs` al compilar), pero su
+  // código va por delante de toda versión publicada: el creador instala y revisa los estilos que se hicieron con ellas.
+  const alDia = !VENTA
   const skills = join(app, 'skills')
   const base = () => join(skills, 'video-base')
   const deSloth = (): DeSloth[] =>
@@ -353,7 +359,7 @@ export function estilos(app: string, cards: () => Card[]) {
   }
 
   const instalarPaquete = (paquete: Buffer, origen?: Omit<OrigenEstilo, 'sloth'>, guia?: GuiaEstilo) =>
-    instalar({ paquete, app, tusCards, cards: cards(), sloth, base: base(), deSloth: deSloth(), origen, guia })
+    instalar({ paquete, app, tusCards, cards: cards(), sloth, alDia, base: base(), deSloth: deSloth(), origen, guia })
 
   async function api(req: IncomingMessage, res: ServerResponse, url: URL): Promise<boolean> {
     const ruta = url.pathname
@@ -380,7 +386,7 @@ export function estilos(app: string, cards: () => Card[]) {
   }
 
   /** Abre un paquete en `destino`, sin instalarlo, y dice lo que se sabe de él frente a esta Sloth (`desempacar`). */
-  const abrir = (paquete: Buffer, destino: string) => desempacar(paquete, destino, { sloth, base: base(), deSloth: deSloth() })
+  const abrir = (paquete: Buffer, destino: string) => desempacar(paquete, destino, { sloth, alDia, base: base(), deSloth: deSloth() })
 
   return { api, empaquetarCard, instalarPaquete, abrir, base }
 }
@@ -388,6 +394,8 @@ export function estilos(app: string, cards: () => Card[]) {
 /** Esta Sloth, para comparar un paquete con ella: su versión, su video-base y sus estilos. */
 export interface EstaSloth {
   sloth: string
+  /** Va por delante de toda versión publicada (el repo): que el estilo venga de una más nueva no es una falla. */
+  alDia?: boolean
   base: string
   deSloth: DeSloth[]
 }
@@ -419,7 +427,7 @@ export function desempacar(paquete: Buffer, destino: string, esta: EstaSloth): A
 
   const notas = [`Trae ${archivos.size} archivos (${mb([...archivos.values()].reduce((s, b) => s + b.length, 0))}).`]
   const fallas: string[] = []
-  if (compararVersion(m.sloth, esta.sloth) > 0) fallas.push(`Se hizo con Sloth ${m.sloth}, más nueva que la que lo revisa (${esta.sloth}).`)
+  if (!esta.alDia && compararVersion(m.sloth, esta.sloth) > 0) fallas.push(`Se hizo con Sloth ${m.sloth}, más nueva que la que lo revisa (${esta.sloth}).`)
   else notas.push(`Se hizo con Sloth ${m.sloth}; esta es la ${esta.sloth}.`)
   const usa = Object.keys(m.usa)
   const cambiados = cambiadosDesde(m, esta.base)
