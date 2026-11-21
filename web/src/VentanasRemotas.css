@@ -1,0 +1,12 @@
+/* Desde la web (VentanasRemotas.tsx): lo que se abrió en la pantalla de la computadora, abajo a la derecha. */
+.ventanas-remotas { position: fixed; right: 16px; bottom: 16px; z-index: 90; width: min(520px, calc(100vw - 32px)); max-height: calc(100vh - 32px); display: flex; flex-direction: column; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 20px 48px rgba(0, 0, 0, 0.5); overflow: hidden; }
+.ventanas-remotas header { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-bottom: 1px solid var(--line); }
+.ventanas-remotas header > div { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.ventanas-remotas nav { display: flex; gap: 6px; padding: 6px 12px; overflow-x: auto; border-bottom: 1px solid var(--line); }
+.ventanas-remotas-edge { position: relative; height: min(560px, calc(100vh - 140px)); }
+.ventanas-remotas-terminal { display: flex; flex-direction: column; gap: 10px; padding: 12px; }
+.ventanas-remotas-terminal p { margin: 0; }
+.ventanas-remotas-terminal a.boton { align-self: flex-start; flex: none; white-space: nowrap; display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px; border-radius: 8px; background: var(--amber); color: var(--sobre-ambar); font-weight: 600; text-decoration: none; }
+.ventanas-remotas-terminal pre { margin: 0; max-height: 180px; overflow: auto; padding: 8px 10px; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; font: 11.5px/1.45 var(--mono); color: var(--muted); white-space: pre-wrap; word-break: break-all; }
+.ventanas-remotas-terminal form { display: flex; gap: 8px; }
+.ventanas-remotas-terminal input { flex: 1; min-width: 0; height: 34px; padding: 0 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--panel-2); color: var(--text); font: 13px var(--mono); }

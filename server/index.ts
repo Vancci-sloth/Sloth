@@ -66,6 +66,7 @@ import { type Agente, version } from './version.ts'
 import { cargarPreciosCodex } from './precios.ts'
 import { slothWeb } from './web.ts' // Sloth en la web
 import { navegadorRemoto } from './navegador-remoto.ts' // Sloth en la web
+import { ventanasRemotas } from './ventanas-remotas.ts' // Sloth en la web
 
 const APP = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const PORT = Number(process.env.PORT ?? 4848)
@@ -133,6 +134,8 @@ const web = slothWeb({
     for (const [ws, d] of deLaWeb) if (d === id) ws.close(4001, 'Este dispositivo ya no está conectado')
   }
 })
+// Los inicios de sesión que se abren en la pantalla de la computadora, a la vista en la web (server/ventanas-remotas.ts).
+const ventanas = ventanasRemotas(APP)
 /** Barra lateral: el avance de cada video, que oye lo que se manda para saber cuándo mirarlo. Nace después que los hilos. */
 let avance: ReturnType<typeof avances> | undefined
 /** Lo que se mide de los estilos de la comunidad (`server/estilos-usos.ts`). Nace después que la comunidad. */
@@ -509,7 +512,7 @@ async function api(req: IncomingMessage, res: ServerResponse, url: URL): Promise
     return true
   }
   if (path === '/api/codex/conectar' && method === 'POST') {
-    send(res, 200, await conectarCodex())
+    send(res, 200, await conectarCodex(!!web.sesionDe(req)))
     pedirModelos()
     return true
   }
@@ -550,7 +553,7 @@ async function api(req: IncomingMessage, res: ServerResponse, url: URL): Promise
       const id = String(datos.id ?? '')
       const hacer = {
         cuenta: () => o.cuenta(url.searchParams.has('fresco')),
-        conectar: o.conectar,
+        conectar: o.conectar && (() => o.conectar!(!!web.sesionDe(req))),
         cancelar: o.cancelar,
         salir: o.salir,
         llaves: llaves && (() => llaves(!!datos.usar)),
@@ -585,7 +588,7 @@ async function api(req: IncomingMessage, res: ServerResponse, url: URL): Promise
   }
 
   if (path === '/api/claude/conectar' && method === 'POST') {
-    send(res, 200, await conectarClaude(APP))
+    send(res, 200, await conectarClaude(APP, !!web.sesionDe(req)))
     return true
   }
   if (path === '/api/claude/salir' && method === 'POST') {
@@ -1050,7 +1053,7 @@ server.on('request', async (req, res) => {
   if (porWeb) res.setHeader('content-security-policy', "frame-ancestors 'self'")
   try {
     if (url.pathname.startsWith('/api/')) {
-      if (url.pathname.startsWith('/api/web') && (await web.api(req, res, url))) return
+      if (url.pathname.startsWith('/api/web') && ((await ventanas.api(req, res, url)) || (await web.api(req, res, url)))) return
       if (url.pathname.startsWith('/api/navegador/') && (await navegadorRemoto(req, res, url))) return
       if (suscripcion && (await suscripcion.api(req, res, url))) return // suscripción
       if (await api(req, res, url)) return

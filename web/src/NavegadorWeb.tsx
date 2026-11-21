@@ -71,8 +71,12 @@ export function puenteWeb(): PuenteNavegador {
 /** En un celular no hay teclado físico: una barra para escribir en la página. */
 const tactil = () => matchMedia('(pointer: coarse)').matches
 
-/** La página de una pestaña, en vivo: la última captura, y lo que haces en ella va a la de la computadora. */
-export function PaginaRemota({ id }: { id: string }) {
+/**
+ * La página de una pestaña, en vivo: la última captura, y lo que haces en ella va a la de la computadora. `base`: otra
+ * página que no es del navegador de un hilo, como una ventana de Edge para entrar con Google (`VentanasRemotas.tsx`).
+ */
+export function PaginaRemota({ id, base }: { id: string; base?: string }) {
+  const en = (que: string) => (base ? `${base}/${que}` : ruta(id, que))
   const caja = useRef<HTMLDivElement>(null)
   const [src, setSrc] = useState<string>()
   /** La medida de la página en píxeles CSS, para pasar el clic de la captura a la página. */
@@ -92,7 +96,7 @@ export function PaginaRemota({ id }: { id: string }) {
         if (el && document.visibilityState === 'visible') {
           const r = el.getBoundingClientRect()
           try {
-            const res = await fetch(ruta(id, 'captura'))
+            const res = await fetch(en('captura'))
             if (res.status === 200) {
               medida.current = { ancho: Number(res.headers.get('x-ancho')) || r.width, alto: Number(res.headers.get('x-alto')) || r.height }
               const nueva = URL.createObjectURL(await res.blob())
@@ -118,7 +122,7 @@ export function PaginaRemota({ id }: { id: string }) {
       despertar?.()
       if (actual) URL.revokeObjectURL(actual)
     }
-  }, [id])
+  }, [id, base])
 
   /** Dónde cae un punto de la caja en la página: la captura va encogida, centrada a lo ancho y arriba (`object-fit: contain`). */
   function enLaPagina(ev: { clientX: number; clientY: number }) {
@@ -130,7 +134,10 @@ export function PaginaRemota({ id }: { id: string }) {
     const y = (ev.clientY - r.top) / escala
     return x >= 0 && y >= 0 && x <= ancho && y <= alto ? { x: Math.round(x), y: Math.round(y) } : null
   }
-  const entrada = (e: EntradaNavegador) => void mandar(id, 'entrada', e).then(otraCaptura)
+  const entrada = (e: EntradaNavegador) =>
+    void fetch(en('entrada'), { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(e) })
+      .catch(() => undefined)
+      .then(otraCaptura)
 
   function clic(ev: MouseEvent) {
     caja.current?.focus()

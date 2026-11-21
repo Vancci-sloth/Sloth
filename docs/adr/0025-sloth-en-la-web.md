@@ -39,9 +39,14 @@ resuelve igual (T3 Connect y app.t3.codes): la máquina sigue trabajando y los d
   versiones corren en la computadora con todos sus permisos.
 - **Lo que la web no puede hacer igual, lo hace a su manera.** Abrir un archivo en el Explorador lo baja al dispositivo;
   «Descargar» en Mis videos baja al dispositivo y no a Descargas de la computadora; la vista en vivo del estudio y el
-  visor 3D van en la misma dirección (en la ventana van en `127.0.0.1` para no frenar la interfaz). Conectar una cuenta
-  (agentes, Google, redes) abre su inicio de sesión en la pantalla de la computadora: eso se hace allá, y Opciones lo
-  dice.
+  visor 3D van en la misma dirección (en la ventana van en `127.0.0.1` para no frenar la interfaz).
+- **Las cuentas también se conectan desde la web** (`server/ventanas-remotas.ts`, `web/src/VentanasRemotas.tsx`). Lo
+  que en la computadora abre algo en su pantalla, desde la web sale en el panel «En tu computadora»: el inicio de sesión
+  que va en su propia terminal (Claude Code, Grok, Muse, Pi) corre sin ventana y el panel enseña lo que dice, su enlace
+  para abrirlo en el dispositivo y dónde pegar el código que pide, como se escribiría en esa terminal; las ventanas de
+  Edge con que se entra con Google (la voz, Flow, el navegador integrado) o a las redes se ven y se usan a distancia, como
+  el navegador del hilo. Codex usa su código de dispositivo, y OpenCode ya lo hacía. Lo que vuelve a `localhost` (YouTube,
+  Antigravity) no carga en el dispositivo: se pega esa dirección en Opciones y la computadora la termina.
 - **El navegador de cada hilo también se ve y se usa.** La página vive en la ventana de la computadora; la web la ve en
   capturas seguidas mientras el panel está a la vista y le manda los clics, la rueda y el teclado (en el celular, con una
   barra para escribir), por el mismo servidor local del relevo del agente (`electron/navegador.ts`,

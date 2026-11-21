@@ -116,3 +116,8 @@
 .creditos-sloth { font-size: 12px; }
 .creditos-sloth > .limite-nombre:first-child { align-items: baseline; color: var(--text); }
 .creditos-sloth > .limite-nombre > strong { font-size: 24px; line-height: 1.2; font-weight: 600; }
+/* Desde la web: pegar la dirección de vuelta de un inicio de sesión (VueltaWeb). */
+.vuelta-web { display: flex; flex-direction: column; gap: 6px; }
+.vuelta-web p { margin: 0; }
+.vuelta-web form { display: flex; gap: 8px; }
+.vuelta-web input { flex: 1; min-width: 0; height: 30px; padding: 0 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--panel-2); color: var(--text); font-size: 12px; }

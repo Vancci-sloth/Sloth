@@ -75,8 +75,8 @@ function Ajustes({ onDone, iniciando, onIniciando }: { onDone(): void; iniciando
           {iniciando && <BotonNavegador hilo={NAVEGADOR_REDES} trabajando={false} />}
         </div>
       </div>
-      {/* Desde la web, los inicios de sesión de las cuentas se abren en la pantalla de la computadora (server/cuenta.ts). */}
-      {enLaWeb && <p className="grupo-nota">Estás usando Sloth desde la web. Conectar una cuenta (un agente, Google, una red) abre su inicio de sesión en la pantalla de tu computadora: eso se hace allá.</p>}
+      {/* Desde la web, los inicios de sesión de la computadora se ven aquí (server/ventanas-remotas.ts). */}
+      {enLaWeb && <VueltaWeb />}
       {/* Las redes, lo primero: es por donde salen los videos. Cada quien las conecta con sus propias credenciales. */}
       <section className="grupo redes-grupo">
         <div className="redes-cabeza">
@@ -379,6 +379,13 @@ type UsoCuenta = ReturnType<typeof useCuenta>
  */
 function Autorizando({ c }: { c: UsoCuenta }) {
   if (!c.cuenta?.conectando) return null
+  // Desde la web, el inicio de sesión sale en el panel de abajo a la derecha (`VentanasRemotas.tsx`).
+  if (enLaWeb)
+    return (
+      <div className="fila-extra">
+        <p className="small">Sigue los pasos en el panel «En tu computadora», abajo a la derecha: abre el enlace, entra con tu cuenta y pega ahí el código que te da. Al terminar, esto se actualiza solo.</p>
+      </div>
+    )
   return (
     <div className="fila-extra">
       <p className="small">Autoriza a Claude Code en la pestaña que se abrió. Al terminar, esto se actualiza solo.</p>
@@ -1141,7 +1148,7 @@ function CuentaCodex({ aviso = false, onFalta }: { aviso?: boolean; onFalta?(fal
       </div>
       {!aviso && cuenta && llave.selector}
       {llave.formulario}
-      {url && <p className="fila-extra small"><a href={url} target="_blank" rel="noreferrer">Abrir inicio de sesión de ChatGPT ↗</a>. Vuelve aquí después de autorizar.</p>}
+      {url && <p className="fila-extra small"><a href={url} target="_blank" rel="noreferrer">Abrir inicio de sesión de ChatGPT ↗</a>{cuenta?.conectando?.codigo ? <> y escribe este código: <strong className="mono">{cuenta.conectando.codigo}</strong></> : null}. Vuelve aquí después de autorizar.</p>}
       {!aviso && cuenta?.conectada && <Limites proveedor="codex" />}
       <Fallo error={c.error} />
       {version.aviso}
@@ -1549,5 +1556,37 @@ function Interruptor({ on, onCambiar, etiqueta, disabled }: { on: boolean; onCam
         <span />
       </button>
     </label>
+  )
+}
+
+/**
+ * Desde la web: un inicio de sesión que vuelve a `localhost` (YouTube, Antigravity) no carga en este dispositivo. Pegando
+ * esa dirección, la computadora la abre y termina (`/api/web/vuelta`, `server/ventanas-remotas.ts`).
+ */
+function VueltaWeb() {
+  const [url, setUrl] = useState('')
+  const [aviso, setAviso] = useState('')
+  async function mandar(ev: React.FormEvent) {
+    ev.preventDefault()
+    setAviso('')
+    try {
+      const r = await api<{ ok: boolean }>('/api/web/vuelta', { url: url.trim() })
+      setAviso(r.ok ? 'Listo: tu computadora terminó el inicio de sesión.' : 'Tu computadora la abrió, pero no terminó: vuelve a conectar.')
+      setUrl('')
+    } catch (e) {
+      setAviso(e instanceof Error ? e.message : String(e))
+    }
+  }
+  return (
+    <div className="grupo-nota vuelta-web">
+      <p>Estás usando Sloth desde la web. Lo que conectar una cuenta abre en tu computadora (su terminal o su ventana de Edge) sale aquí, en el panel «En tu computadora», abajo a la derecha.</p>
+      <form onSubmit={(ev) => void mandar(ev)}>
+        <input value={url} placeholder="¿Terminó en una página que no carga (localhost o 127.0.0.1)? Pega aquí su dirección" aria-label="Dirección de vuelta" onChange={(ev) => setUrl(ev.target.value)} />
+        <button className="ghost small" type="submit" disabled={!url.trim()}>
+          Terminar
+        </button>
+      </form>
+      {aviso && <p className="small">{aviso}</p>}
+    </div>
   )
 }

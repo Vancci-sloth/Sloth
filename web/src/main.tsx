@@ -6,6 +6,7 @@ import { App } from './App'
 import { ConexionWeb } from './ConexionWeb'
 import { Recordatorio } from './Licencia'
 import { TraerSloth } from './Respaldo'
+import { VentanasRemotas } from './VentanasRemotas'
 import './styles.css'
 
 // La app que se vende recuerda, cada tantos inicios, que se puede apoyar a Sloth.
@@ -17,5 +18,7 @@ createRoot(document.getElementById('root')!).render(
     <TraerSloth />
     {/* Desde la web, si se pierde la conexión con la computadora. */}
     {enLaWeb && <ConexionWeb />}
+    {/* Desde la web, los inicios de sesión que se abren en la pantalla de la computadora. */}
+    {enLaWeb && <VentanasRemotas />}
   </>
 )

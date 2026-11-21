@@ -26,7 +26,8 @@ export interface Otro {
   como: 'ventana' | 'navegador' | 'llave'
   start(opts: AgentOptions): AgentRun
   cuenta(fresco?: boolean): Promise<CuentaClaude> | CuentaClaude
-  conectar?(): Promise<CuentaClaude>
+  /** `remoto`: se pidió desde la web (ADR 0025). */
+  conectar?(remoto?: boolean): Promise<CuentaClaude>
   cancelar?(): Promise<CuentaClaude> | CuentaClaude
   salir?(): Promise<CuentaClaude> | CuentaClaude
   conectando?(): string | null

@@ -40,7 +40,9 @@ Este es el mapa:
   desde Opciones; `confianza` decide qué se atiende por el túnel. Lo que en la web no
   aplica (abrir en el Explorador, `127.0.0.1`) usa `abrirRuta` y `enLaWeb`; lo grande sube por trozos (`subir`). El
   navegador del hilo se ve en capturas y se usa a distancia (`server/navegador-remoto.ts`, `web/src/NavegadorWeb.tsx`,
-  `remoto` en `electron/navegador.ts`). Para probarla con el cobro local: `SLOTH_COBRO_WEB`.
+  `remoto` en `electron/navegador.ts`). Las cuentas se conectan desde la web con `server/ventanas-remotas.ts`
+  (terminales sin ventana, los Edge de Google a distancia, la vuelta a `localhost`) y `web/src/VentanasRemotas.tsx`. Para
+  probarla con el cobro local: `SLOTH_COBRO_WEB`.
 - `server/sessions.ts`: cada hilo es `data/sessions/<id>.json` (qué es) y `<id>.jsonl` (lo que pasó). Retoma la sesión
   del proveedor tras reiniciar, reparte los lotes según la máquina y cierra el proceso de un video del lote al acabar.
   Un chat de Claude, DeepSeek, Codex u OpenCode con su sesión guardada suelta el proceso a la media hora; los demás

@@ -36,7 +36,8 @@ import { guardar } from '../server/disco.ts'
 import { crearRelevo, type Relevo } from './relevo.ts'
 import { actividadNavegador } from './actividad-navegador.ts'
 import { type EnGoogle, vigilarGoogle } from './google.ts'
-import { type AccionNavegador, type EntradaNavegador, type EstadoNavegador, NAVEGADOR_REDES, NAVEGADOR_VOZ, type PantallaNavegador, TECLAS_NAVEGADOR } from '../shared/types.ts'
+import { type AccionNavegador, type EntradaNavegador, type EstadoNavegador, NAVEGADOR_REDES, NAVEGADOR_VOZ, type PantallaNavegador } from '../shared/types.ts'
+import { entradaCdp } from '../shared/entrada-cdp.ts'
 
 const PARTICION = 'persist:navegador'
 const PARTICION_REDES = 'persist:redes'
@@ -537,23 +538,6 @@ async function conectar(ws: WebSocket, hilo: string) {
 
 /** Lo más que se espera una captura para la web. */
 const CAPTURA_TOPE = 8000
-/** El código de cada tecla en Windows (`windowsVirtualKeyCode`), que Chromium necesita para Enter, borrar y las flechas. */
-const CODIGOS: Record<(typeof TECLAS_NAVEGADOR)[number], number> = {
-  Enter: 13,
-  Backspace: 8,
-  Tab: 9,
-  Escape: 27,
-  Delete: 46,
-  ArrowLeft: 37,
-  ArrowUp: 38,
-  ArrowRight: 39,
-  ArrowDown: 40,
-  Home: 36,
-  End: 35,
-  PageUp: 33,
-  PageDown: 34
-}
-
 /** El depurador de la página, el mismo que comparte con el agente (`conectar`). */
 function depurador(wc: WebContents) {
   if (!wc.debugger.isAttached()) wc.debugger.attach('1.3')
@@ -638,26 +622,8 @@ async function remoto(req: IncomingMessage, res: ServerResponse, secreto: string
     const e = c as unknown as EntradaNavegador
     const wc = h.vista.webContents
     h.usada = Date.now()
-    await h.actividad.usar(async () => {
-      const d = depurador(wc)
-      // Con la página encogida, Chromium toma los clics en píxeles de la caja, como los del agente (`conectar`).
-      const x = Number((e as { x?: number }).x) * h.escala
-      const y = Number((e as { y?: number }).y) * h.escala
-      if (e.tipo === 'clic' && Number.isFinite(x) && Number.isFinite(y)) {
-        await d.sendCommand('Input.dispatchMouseEvent', { type: 'mouseMoved', x, y })
-        await d.sendCommand('Input.dispatchMouseEvent', { type: 'mousePressed', x, y, button: 'left', clickCount: 1 })
-        await d.sendCommand('Input.dispatchMouseEvent', { type: 'mouseReleased', x, y, button: 'left', clickCount: 1 })
-      }
-      if (e.tipo === 'rueda' && Number.isFinite(x) && Number.isFinite(y))
-        await d.sendCommand('Input.dispatchMouseEvent', { type: 'mouseWheel', x, y, deltaX: Number(e.dx) || 0, deltaY: Number(e.dy) || 0 })
-      if (e.tipo === 'texto' && typeof e.texto === 'string' && e.texto) await d.sendCommand('Input.insertText', { text: e.texto.slice(0, 5000) })
-      if (e.tipo === 'tecla' && (TECLAS_NAVEGADOR as readonly string[]).includes(e.tecla)) {
-        const codigo = CODIGOS[e.tecla]
-        const base = { key: e.tecla, code: e.tecla, windowsVirtualKeyCode: codigo, nativeVirtualKeyCode: codigo }
-        await d.sendCommand('Input.dispatchKeyEvent', { type: e.tecla === 'Enter' ? 'keyDown' : 'rawKeyDown', ...base, ...(e.tecla === 'Enter' ? { text: '\r' } : {}) })
-        await d.sendCommand('Input.dispatchKeyEvent', { type: 'keyUp', ...base })
-      }
-    })
+    // Con la página encogida, Chromium toma los clics en píxeles de la caja, como los del agente (`conectar`).
+    await h.actividad.usar(() => entradaCdp((metodo, params) => depurador(wc).sendCommand(metodo, params), e, h.escala))
     return responder(200, { ok: true })
   }
   responder(404)

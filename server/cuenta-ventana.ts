@@ -5,6 +5,7 @@ import { execFile } from 'node:child_process'
 import { entornoSinLlaves } from './acceso.ts'
 import { asegurarAgente, rutaAgente } from './agentes.ts'
 import { enVentana } from './cuenta.ts'
+import { enTubo } from './ventanas-remotas.ts'
 
 /**
  * La cuenta de un agente que inicia sesión en su propio programa (`grok login`, `muse login`, `/login` de Pi), como la de
@@ -38,7 +39,8 @@ export function cuentaConVentana(
     return c
   }
 
-  function conectar(): Promise<CuentaClaude> {
+  /** `remoto`: se pidió desde la web, y la ventana va sin ventana, a la vista en la web (`enTubo`). */
+  function conectar(remoto = false): Promise<CuentaClaude> {
     if (!login) {
       login = true
       fallo = ''
@@ -46,7 +48,7 @@ export function cuentaConVentana(
       void asegurarAgente(p)
         .then((exe) => {
           const c = o.comando(exe)
-          return enVentana(NOMBRE_AGENTE[p], c.command, c.env)
+          return remoto ? enTubo(NOMBRE_AGENTE[p], c.command, { ...entornoSinLlaves(), ...c.env }) : enVentana(NOMBRE_AGENTE[p], c.command, c.env)
         })
         .then(
           async () => {

@@ -7,12 +7,14 @@ import type { CuentaClaude, LimitesClaude } from '../shared/types.ts'
 import { conLlave, entornoSinLlaves, llaveDe, llaveEnUso } from './acceso.ts'
 import { Inbox } from './agent.ts'
 import { asegurarAgente, descartarRoto, programaClaude, rutaAgente } from './agentes.ts'
+import { enTubo } from './ventanas-remotas.ts'
 
 /**
  * La cuenta de Claude con la que trabaja Sloth. Es la del Claude Code que trae el SDK, que la guarda en `~/.claude`: si ya
  * usas Claude Code en esta computadora, ya está conectada. Si no, «Conectar con Claude» abre `claude auth login` en su
  * propia ventana, que abre el navegador para autorizarla, como `/login` en la terminal. Si el navegador no se abre, esa
- * ventana da el enlace y pide ahí el código. Sloth no toca ni el código ni la sesión: Anthropic pide que el inicio de
+ * ventana da el enlace y pide ahí el código. Desde la web (`remoto`) corre sin ventana (`enTubo`): la web enseña lo que
+ * dice y le pasa lo que escribes, como lo haría esa ventana. Sloth no toca ni el código ni la sesión: Anthropic pide que el inicio de
  * sesión se complete en su propio flujo, sin que una app lo maneje por el usuario.
  */
 
@@ -80,7 +82,7 @@ export async function cuentaClaude(app: string, fresco = false): Promise<CuentaC
  * devuelve con qué código salió Claude Code: al cerrarse, se mira si la cuenta quedó conectada. En Mac y Linux va en una
  * terminal (`enTerminal`).
  */
-export function conectarClaude(app: string): Promise<CuentaClaude> {
+export function conectarClaude(app: string, remoto = false): Promise<CuentaClaude> {
   if (!login) {
     login = true
     fallo = ''
@@ -88,6 +90,7 @@ export function conectarClaude(app: string): Promise<CuentaClaude> {
     // Sin el programa de Claude Code, primero se baja (mientras, Opciones dice que se está conectando).
     const ventana = asegurarAgente('claude').then((exe) => {
       const comando = [exe, 'auth', 'login', '--claudeai']
+      if (remoto) return enTubo('Claude Code', comando, process.env)
       return process.platform === 'win32'
         ? new Promise<void>((ok, falla) => spawn('cmd', ['/c', 'start', 'Claude Code', '/wait', ...comando], { stdio: 'ignore' }).on('error', falla).on('exit', () => ok()))
         : enTerminal(comando)
