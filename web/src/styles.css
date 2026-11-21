@@ -322,6 +322,25 @@ input, textarea, select { font: inherit; color: inherit; }
 .quote-chip .chip-name { font-weight: 400; font-style: italic; }
 .link-chip small { margin-left: 1px; }
 a.link-chip:hover { border-color: var(--amber); }
+/* «Afinar» (Composer.tsx): el botón, la línea de encima del campo y los huecos del pedido afinado, subrayados en ámbar. */
+.afinar { display: flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px; border-radius: 8px; font-size: 15px; color: var(--amber-2); background: var(--amber-tinte); white-space: nowrap; transition: background 0.15s; }
+.afinar:hover:not(:disabled) { background: color-mix(in srgb, var(--amber) 22%, transparent); }
+.afinar:disabled { opacity: 0.65; cursor: default; }
+.afinar .icon-trazo { width: 16px; height: 16px; vertical-align: 0; }
+.afinado { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 14px; margin-bottom: -6px; padding: 0 6px; font-size: 14px; color: var(--suave); }
+.afinado-quien { display: flex; align-items: center; gap: 7px; font-weight: 600; color: var(--text); }
+.afinado-quien .icon-trazo { width: 16px; height: 16px; color: var(--amber); }
+.afinado-falta { color: var(--amber-2); }
+.afinado button { display: flex; align-items: center; gap: 5px; font-size: 14px; color: var(--suave); }
+.afinado button:hover { color: var(--text); }
+.afinado button .icon-trazo { width: 15px; height: 15px; }
+.afinado-escrito { margin: 0 6px -6px; padding-left: 10px; border-left: 2px solid var(--line); color: var(--suave); white-space: pre-wrap; overflow-wrap: anywhere; }
+.chip.hueco-chip { gap: 1px; margin: 0 1px; padding: 0 1px; border: 0; border-bottom: 1.5px dashed color-mix(in srgb, var(--amber) 70%, transparent); border-radius: 0; background: none; color: var(--amber-2); font-size: inherit; font-weight: inherit; line-height: inherit; vertical-align: baseline; user-select: none; cursor: pointer; }
+.chip.hueco-chip:hover, .chip.hueco-chip.abierto { border-bottom-style: solid; border-bottom-color: var(--amber); }
+.hueco-flecha { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; opacity: 0.7; }
+.hueco-menu .picker-option { white-space: normal; }
+.hueco-otra { display: block; width: calc(100% + 8px); margin: 4px -4px -4px; padding: 9px 14px; border: 0; border-top: 1px solid var(--line); border-radius: 0 0 12px 12px; background: none; color: var(--text); font: inherit; font-size: 13px; outline: 0; }
+.hueco-otra::placeholder { color: var(--muted); }
 .composer-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 6px; }
 .composer-bar .picker-trigger { white-space: nowrap; }
 /* Un grupo de botones donde solo uno está elegido (`Segmento`): el formato, la duración, el modo del modelo… */

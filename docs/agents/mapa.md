@@ -228,3 +228,6 @@ Este es el mapa:
 - «Nuevo chat» (`NewSession` en `App.tsx`): los carteles de los estilos caben enteros en cualquier ventana
   (`encajar.ts`), `/` en el campo cambia de estilo (`menu-estilos.ts`), Alt+N (Cmd+N en Mac) o Ctrl+Mayús+O abren uno
   desde cualquier parte, y lo que llega del servidor arranca con lo último sabido (`recordado.ts`) para que nada salte.
+  «Afinar», junto a enviar (`server/afinar.ts`, `POST /api/afinar`): el agente elegido reescribe el pedido con la card, su
+  SKILL.md, la marca y «Sobre ti»; lo que solo decide el usuario queda como hueco en el campo (`huecoChip` en
+  `Composer.tsx`), con sus opciones. Un hueco sin llenar le llega al agente como «Decídelo tú».

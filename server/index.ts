@@ -36,6 +36,7 @@ import { guardarSobreTi, sobreTi } from './sobre-ti.ts'
 import { respaldo } from './respaldo.ts'
 import { radar } from './radar/index.ts' // radar
 import { comunidad, llaveDelCreador } from './comunidad.ts' // comunidad
+import { afinar } from './afinar.ts'
 import { estilos } from './estilos.ts' // estilos compartidos
 import { CADA as CADA_REVISION, revisionDeEstilos } from './estilos-revision.ts' // revisión de estilos
 import { REVISION_CARD } from '../shared/revision.ts'
@@ -650,6 +651,18 @@ async function api(req: IncomingMessage, res: ServerResponse, url: URL): Promise
   if (mar && method === 'GET') {
     const card = cards().find((c) => c.id === mar[1])
     return send(res, 200, card ? marcasDe(card.cwd) : { otras: [] }), true
+  }
+  // «Afinar» en el hilo nuevo: el agente elegido reescribe el pedido para el estilo, con huecos (`server/afinar.ts`).
+  if (path === '/api/afinar' && method === 'POST') {
+    const { card: id, texto, model, marca } = await body<{ card?: string; texto?: string; model?: string; marca?: string }>(req)
+    const card = cards().find((c) => c.id === id)
+    if (!card?.skill) return send(res, 404, { error: 'Esa card no tiene estilo que afinar.' }), true
+    if (!String(texto ?? '').trim()) return send(res, 400, { error: 'Escribe primero qué quieres.' }), true
+    try {
+      return send(res, 200, await afinar(card, String(texto).trim(), typeof model === 'string' ? model : undefined, typeof marca === 'string' ? marca : undefined)), true
+    } catch (e) {
+      return send(res, 502, { error: e instanceof Error ? e.message : String(e) }), true
+    }
   }
 
   // «Con tus cambios»: lo que el usuario (o su agente) cambió en la skill de una card, y volver a la original, entera o un

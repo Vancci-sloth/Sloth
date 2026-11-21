@@ -1,6 +1,6 @@
 import { type ReactNode, useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
 import { consultaBarra, filtrarBarra, type OpcionBarra } from './menu-estilos'
-import type { GastoFlow, Model } from '../../shared/types'
+import type { Afinado, GastoFlow, Hueco, Model } from '../../shared/types'
 import { proveedorDe, type Proveedor } from '../../shared/providers'
 import { imageUrl, Thumbs, type Attached } from './Images'
 import { esIcono, Icono } from './Iconos'
@@ -257,6 +257,91 @@ function withLinks(text: string): Node[] {
     // Un espacio tras la etiqueta solo si cierra lo pegado: ahí hace falta para que el cursor quede después.
     ...(i < links.length ? [linkChip(links[i]), ...(parts[i + 1] ? [] : [document.createTextNode(' ')])] : []),
   ])
+}
+
+/**
+ * Un hueco del pedido afinado: lo que solo decide quien pide el video. Se ve como su pregunta corta, subrayada; al
+ * agente, si nadie lo llena, le llega como «decídelo tú». Guarda su pregunta y sus opciones, que siguen en el borrador.
+ */
+function huecoChip(h: Hueco): HTMLElement {
+  const el = document.createElement('span')
+  el.className = 'chip hueco-chip'
+  el.contentEditable = 'false'
+  el.dataset.ref = `[${h.pregunta} Decídelo tú.]`
+  el.dataset.pregunta = h.pregunta
+  el.dataset.opciones = JSON.stringify(h.opciones)
+  el.title = h.pregunta
+  el.innerHTML = '<span class="chip-name"></span><svg class="hueco-flecha" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>'
+  el.querySelector('.chip-name')!.textContent = h.etiqueta
+  return el
+}
+
+/** El pedido afinado para el campo: su texto (con enlaces y hilos vueltos etiqueta) y sus huecos en su sitio. */
+function conHuecos(a: Afinado): Node[] {
+  return a.texto.split(/\{\{(\d+)\}\}/).flatMap((parte, i) => {
+    if (i % 2) {
+      const h = a.huecos[Number(parte) - 1]
+      return h ? [huecoChip(h)] : []
+    }
+    if (!parte) return []
+    const nodos = withChips(parte)
+    return nodos.length ? nodos : [document.createTextNode(parte)]
+  })
+}
+
+/** Las opciones de un hueco, encima de él, y una respuesta propia. Lo elegido entra al campo como texto. */
+function MenuHueco({ hueco, onElegir, onCerrar }: { hueco: HTMLElement; onElegir(texto: string): void; onCerrar(): void }) {
+  const menu = useRef<HTMLDivElement>(null)
+  const [otra, setOtra] = useState('')
+  const [lugar, setLugar] = useState({ left: 12, bottom: 0 })
+  const opciones = JSON.parse(hueco.dataset.opciones ?? '[]') as string[]
+  const ancho = Math.min(300, innerWidth - 24)
+  useLayoutEffect(() => {
+    const r = hueco.getBoundingClientRect()
+    setLugar({ left: Math.max(12, Math.min(r.left - 8, innerWidth - ancho - 12)), bottom: innerHeight - r.top + 8 })
+    hueco.classList.add('abierto')
+    menu.current?.showPopover()
+    menu.current?.querySelector<HTMLElement>('.picker-option')?.focus({ preventScroll: true })
+    return () => hueco.classList.remove('abierto')
+  }, [hueco])
+  useEffect(() => {
+    const fuera = (e: PointerEvent) => !menu.current?.contains(e.target as Node) && !hueco.contains(e.target as Node) && onCerrar()
+    addEventListener('pointerdown', fuera, true)
+    return () => removeEventListener('pointerdown', fuera, true)
+  }, [hueco, onCerrar])
+  return (
+    <div
+      ref={menu}
+      popover="manual"
+      className="picker-menu picker-flotante hueco-menu"
+      style={{ left: lugar.left, bottom: lugar.bottom, top: 'auto', width: ancho }}
+      role="listbox"
+      aria-label={hueco.dataset.pregunta}
+      onKeyDown={(e) => {
+        if (e.key === 'Escape') return e.preventDefault(), e.stopPropagation(), onCerrar()
+        if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return
+        e.preventDefault()
+        const lista = Array.from(menu.current!.querySelectorAll<HTMLElement>('.picker-option, .hueco-otra'))
+        const i = lista.indexOf(document.activeElement as HTMLElement)
+        lista[(i + (e.key === 'ArrowDown' ? 1 : lista.length - 1)) % lista.length]?.focus()
+      }}
+    >
+      <span className="picker-label">{hueco.dataset.pregunta}</span>
+      {opciones.map((o) => (
+        <button key={o} type="button" role="option" aria-selected={false} className="picker-option" onClick={() => onElegir(o)}>
+          {o}
+        </button>
+      ))}
+      <input
+        className="hueco-otra"
+        placeholder="Otra respuesta…"
+        aria-label="Otra respuesta"
+        value={otra}
+        onChange={(e) => setOtra(e.target.value)}
+        onKeyDown={(e) => e.key === 'Enter' && otra.trim() && (e.preventDefault(), onElegir(otra.trim()))}
+      />
+    </div>
+  )
 }
 
 /**
@@ -567,6 +652,11 @@ export function Composer(props: {
   /** En el inicio: `/` y unas letras al principio del campo abren el menú para cambiar de estilo (`menu-estilos.ts`). */
   estilos?: OpcionBarra[]
   onEstilo?(id: string): void
+  /**
+   * En el hilo nuevo de un estilo, «Afinar»: el agente reescribe el pedido para `para` (`server/afinar.ts`) y lo que solo
+   * tú decides queda como hueco en el campo, con sus opciones. «Deshacer» vuelve a lo que escribiste.
+   */
+  afinar?: { para: string; pedir(texto: string, choice: Choice): Promise<Afinado> }
   /** Con el agente trabajando, le llega ya, en mitad del turno. */
   onSend(text: string, choice: Choice, images: string[]): Promise<unknown>
   /** Si falla, el modelo vuelve al de antes y el error sale en la barra, como los de mandar. Lo mismo al detener. */
@@ -583,6 +673,14 @@ export function Composer(props: {
   const [dragging, setDragging] = useState(false)
   const box = useRef<HTMLDivElement>(null)
   const picker = useRef<HTMLInputElement>(null)
+  // «Afinar»: lo que había antes (para deshacer y verlo), los huecos que quedan y el que tiene su menú abierto.
+  const [afinando, setAfinando] = useState(false)
+  const [afinado, setAfinado] = useState<{ antes: string; escrito: string } | null>(null)
+  const [verEscrito, setVerEscrito] = useState(false)
+  const [huecos, setHuecos] = useState(0)
+  const [abierto, setAbierto] = useState<HTMLElement | null>(null)
+  // Otro estilo: lo afinado era para el de antes.
+  useEffect(() => setAfinado(null), [props.afinar?.para])
 
   useEffect(() => {
     if (!own && props.initial) setChoice(props.initial)
@@ -619,9 +717,64 @@ export function Composer(props: {
   function sync() {
     const el = box.current!
     etiquetarInvocacion(el)
-    setText(read(el))
+    const leido = read(el)
+    setText(leido)
     const shown = new Set(Array.from(el.querySelectorAll<HTMLElement>('[data-src]'), (c) => c.dataset.src))
     setImages((list) => list.filter((i) => !i.chip || shown.has(i.src)))
+    setHuecos(el.querySelectorAll('.hueco-chip').length)
+    if (!leido.trim()) setAfinado(null)
+  }
+
+  /** El agente reescribe lo escrito; las imágenes del texto se quedan, al final. Se abre el primer hueco. */
+  async function afinarPedido() {
+    const el = box.current!
+    if (!props.afinar || !choice || afinando || !text.trim()) return
+    setAfinando(true)
+    setError('')
+    setAbierto(null)
+    try {
+      const a = await props.afinar.pedir(text.trim(), choice)
+      const antes = el.innerHTML
+      const imagenes = Array.from(el.querySelectorAll<HTMLElement>('[data-src]'))
+      el.replaceChildren(...conHuecos(a), ...imagenes.flatMap((n) => [document.createTextNode(' '), n]))
+      // Afinar otra vez lo ya afinado: deshacer vuelve a lo que escribiste tú.
+      setAfinado((ya) => ya ?? { antes, escrito: text.trim() })
+      sync()
+      el.focus()
+      getSelection()?.selectAllChildren(el)
+      getSelection()?.collapseToEnd()
+      setAbierto(el.querySelector<HTMLElement>('.hueco-chip'))
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setAfinando(false)
+    }
+  }
+
+  function deshacer() {
+    const el = box.current!
+    el.innerHTML = afinado!.antes
+    setAfinado(null)
+    setAbierto(null)
+    sync()
+    el.focus()
+    getSelection()?.selectAllChildren(el)
+    getSelection()?.collapseToEnd()
+  }
+
+  /** Lo elegido en un hueco entra como texto, y el cursor queda detrás. */
+  function llenarHueco(hueco: HTMLElement, respuesta: string) {
+    const nodo = document.createTextNode(respuesta)
+    hueco.replaceWith(nodo)
+    setAbierto(null)
+    // El cursor antes de `sync`: al juntar el texto, `nodo` deja de existir, y el cursor se conserva por su posición.
+    box.current!.focus()
+    const r = document.createRange()
+    r.setStartAfter(nodo)
+    r.collapse(true)
+    getSelection()?.removeAllRanges()
+    getSelection()?.addRange(r)
+    sync()
   }
 
   /** Pone algo donde está el cursor, o al final si el cursor no está en el campo. */
@@ -708,6 +861,9 @@ export function Composer(props: {
       box.current!.replaceChildren()
       setText('')
       setImages([])
+      setAfinado(null)
+      setAbierto(null)
+      setHuecos(0)
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
     } finally {
@@ -773,6 +929,35 @@ export function Composer(props: {
   }
 
   return (
+    <>
+      {afinado && props.afinar && (
+        <div className="afinado">
+          <span className="afinado-quien">
+            <Icono de="lapiz" className="icon-trazo" />
+            Afinado para {props.afinar.para}
+          </span>
+          {huecos > 0 && <span className="afinado-falta">{huecos === 1 ? 'Falta 1 hueco: si lo dejas, lo decide el agente' : `Faltan ${huecos} huecos: si los dejas, los decide el agente`}</span>}
+          <span className="spacer" />
+          <button type="button" aria-expanded={verEscrito} onClick={() => setVerEscrito((v) => !v)}>
+            {verEscrito ? 'Ocultar lo que escribiste' : 'Ver lo que escribiste'}
+          </button>
+          <button type="button" onClick={deshacer}>
+            <Icono de="reabrir" className="icon-trazo" />
+            Deshacer
+          </button>
+        </div>
+      )}
+      {afinado && verEscrito && <p className="afinado-escrito">{afinado.escrito}</p>}
+      {abierto && box.current?.contains(abierto) && (
+        <MenuHueco
+          hueco={abierto}
+          onElegir={(t) => llenarHueco(abierto, t)}
+          onCerrar={() => {
+            setAbierto(null)
+            box.current?.focus()
+          }}
+        />
+      )}
     <div
       className={`composer ${dragging ? 'dragging' : ''}`}
       onDragOver={(e) => (e.preventDefault(), setDragging(true))}
@@ -831,13 +1016,19 @@ export function Composer(props: {
         <div
           ref={box}
           className="field"
-          contentEditable="plaintext-only"
+          // Mientras afina, lo escrito no cambia: la respuesta lo reemplaza.
+          contentEditable={afinando ? 'false' : 'plaintext-only'}
+          aria-busy={afinando}
           role="textbox"
           aria-multiline
           aria-label={props.placeholder.replace(/…$/, '').replace(/… /g, ', ')}
           aria-controls={opcionActiva ? idMenu : undefined}
           aria-activedescendant={opcionActiva ? `${idMenu}-${opcionActiva.id}` : undefined}
           onInput={sync}
+          onClick={(e) => {
+            const hueco = (e.target as HTMLElement).closest<HTMLElement>('.hueco-chip')
+            if (hueco) setAbierto(hueco === abierto ? null : hueco)
+          }}
           onPaste={(e) => {
             const files = Array.from(e.clipboardData.files)
             if (files.length) {
@@ -860,6 +1051,9 @@ export function Composer(props: {
               if ((e.key === 'Enter' && !e.shiftKey) || e.key === 'Tab') return e.preventDefault(), elegirEstilo(opcionActiva)
               if (e.key === 'Escape') return e.preventDefault(), e.stopPropagation(), setMenuCerrado(true)
             }
+            // Tab abre el primer hueco que queda.
+            const hueco = e.key === 'Tab' && !e.shiftKey ? box.current!.querySelector<HTMLElement>('.hueco-chip') : null
+            if (hueco) return e.preventDefault(), setAbierto(hueco)
             if (e.key === 'Enter' && !e.shiftKey) {
               e.preventDefault()
               submit()
@@ -912,6 +1106,18 @@ export function Composer(props: {
         {props.context && <Uso {...props.context} proveedor={proveedorDe(choice?.model ?? '')} flow={props.flow} gasto={props.gasto} onCompactar={props.onCompactar} />}
         {uploading > 0 && <span className="muted small">Subiendo…</span>}
         {error && <span className="bad small">{error}</span>}
+        {props.afinar && !props.running && (!!text.trim() || afinando) && (
+          <button
+            type="button"
+            className="afinar"
+            title={`Reescribe tu pedido como lo necesita ${props.afinar.para}; lo que solo tú decides queda como hueco`}
+            disabled={afinando || busy || uploading > 0}
+            onClick={() => void afinarPedido()}
+          >
+            <Icono de="lapiz" className="icon-trazo" />
+            {afinando ? 'Afinando…' : 'Afinar'}
+          </button>
+        )}
         {(!trabajando || !empty) && (
           <button
             className="send"
@@ -929,5 +1135,6 @@ export function Composer(props: {
         )}
       </div>
     </div>
+    </>
   )
 }

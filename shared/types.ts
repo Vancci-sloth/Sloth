@@ -1232,6 +1232,24 @@ export interface AyudaMejora {
   preguntas: string[]
 }
 
+/**
+ * Lo que propone «Afinar» en el hilo nuevo (`POST /api/afinar`, `server/afinar.ts`): el pedido reescrito para el estilo,
+ * con `{{1}}`, `{{2}}`… donde va lo que solo decide quien lo pide. Cada uno es el hueco de ese número (empieza en 1).
+ */
+export interface Afinado {
+  texto: string
+  huecos: Hueco[]
+}
+
+/** Un hueco del pedido afinado: se ve como `etiqueta` en el campo y, al pulsarlo, pregunta y ofrece sus opciones. */
+export interface Hueco {
+  /** Lo que se ve en el campo, corto y en forma de pregunta: «¿qué ciudad?». */
+  etiqueta: string
+  /** La pregunta entera, arriba de las opciones. */
+  pregunta: string
+  opciones: string[]
+}
+
 /** Las secciones de la comunidad (`licencias/src/comunidad.ts`). En Anuncios solo publica el creador. */
 export type CategoriaComunidad = 'general' | 'hice' | 'ayuda' | 'mejoras' | 'estilos' | 'anuncios'
 /** Cómo se ordena el feed: por actividad, lo último publicado o, solo el creador, lo que no ha contestado. */

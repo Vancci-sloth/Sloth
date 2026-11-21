@@ -2,7 +2,7 @@ import { memo, type ReactNode, useCallback, useEffect, useMemo, useRef, useState
 import { CANAL_CARD, IDEAS_CARD } from '../../shared/ideas' // ideas
 import { MODELO3D_CARD } from '../../shared/modelos3d' // modelos 3D
 import { REVISION_CARD } from '../../shared/revision' // revisión de estilos
-import type { AvanceCorto, AvisoComunidad, Card, Marcas, RifaGanada, Model, Previa, Serie, ServerPush, SessionMeta, VideoHecho } from '../../shared/types'
+import type { Afinado, AvanceCorto, AvisoComunidad, Card, Marcas, RifaGanada, Model, Previa, Serie, ServerPush, SessionMeta, VideoHecho } from '../../shared/types'
 import { NOMBRE_AGENTE, PROVEEDORES, proveedorDe } from '../../shared/providers'
 import { AvisoVideos } from './AvisoVideos'
 import { VENTA } from '../../shared/venta'
@@ -994,6 +994,7 @@ function NewSession(props: {
           const c = props.cards.find((x) => x.id === id)
           if (c) props.onPick(c)
         }}
+        afinar={card.skill ? { para: card.title, pedir: (texto, c) => api<Afinado>('/api/afinar', { card: card.id, texto, model: c.model, marca: laMarca || undefined }) } : undefined}
         modelos={<Modelos conf={card.modelos} models={models} avanzado={avanzado} choice={choice} tareas={tareas} sinClaude={sinClaude} onAvanzado={cambiarModelos} />}
         extra={
           <>
