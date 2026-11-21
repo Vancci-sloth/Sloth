@@ -12,6 +12,8 @@ export async function navegadorRemoto(req: IncomingMessage, res: ServerResponse,
   const m = /^\/api\/navegador\/(estados|[\w~-]+\/(captura|ir|hacer|entrada))$/.exec(url.pathname)
   if (!m) return false
   const ventana = integrado()
+  // Sin la ventana no hay páginas: la lista va vacía (la web la pregunta seguido) y lo demás dice por qué no.
+  if (!ventana && m[1] === 'estados') return json(res, 200, [])
   if (!ventana) return json(res, 404, { error: 'La ventana de Sloth está cerrada en tu computadora: ahí vive el navegador.', sinVentana: true })
   const destino = `http://127.0.0.1:${ventana.puerto}/${ventana.secreto}/remoto/${m[1]}${url.search}`
   const post = req.method === 'POST'
