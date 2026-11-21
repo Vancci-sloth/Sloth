@@ -41,9 +41,12 @@ versión de Linux (ADR 0006) y todo lo que la web necesita para usarla sin ver s
 
 - Hace falta una cuenta de GitHub (gratis). Lo gratis alcanza para unas 30 horas al mes en 4 núcleos; luego, GitHub
   cobra a esa cuenta si la deja (por defecto no: se detiene).
-- GitHub detiene el Codespace tras un rato sin uso (30 minutos, hasta 4 horas en sus opciones), aunque un agente siga
-  trabajando: un video largo conviene con el tiempo subido. Se enciende otra vez en github.com/codespaces y todo sigue
-  ahí; la web lo dice al perder la conexión.
+- GitHub detiene el Codespace tras un rato sin uso (30 minutos, hasta 4 horas en sus opciones), y a las 12 horas
+  pase lo que pase. Probado el 21-nov-2026 con 5 minutos: las visitas a su dirección no cuentan como uso (con una cada
+  15 s se detuvo igual), ni lo que escribe una terminal sin nadie conectado; una conexión abierta (SSH) sí lo mantiene.
+  De ahí el latido (`latir` en `server/nube.ts`): mientras se toca la página o algo trabaja, una línea por minuto en la
+  terminal que `postAttachCommand` abre en la pestaña del Codespace, que por eso se deja abierta. Detenido, su
+  dirección da 404 y no se enciende sola: la web, al perder la conexión, enlaza a `<codespace>.github.dev`, que sí.
 - Las cuentas de los agentes quedan en el Codespace de cada quien, en GitHub, no en su computadora. Google puede pedir
   más verificación al entrar desde una máquina de un centro de datos.
 - Sin GPU: la voz va con Parakeet y el render con CPU, como en una computadora sin NVIDIA (ADR 0007).
