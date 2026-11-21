@@ -5,7 +5,7 @@ Una app local donde cada skill es una card: describes el trabajo y el agente lo 
 ## Dónde buscar
 
 Antes de explorar un área, lee su entrada en `docs/agents/mapa.md`: servidor y proveedores, sesiones, estudio de video,
-galerías, redes, navegador, Ideas, radar, comunidad, requisitos y React. Cada módulo amplía lo suyo en su cabecera.
+galerías, redes, navegador, Ideas, radar, comunidad, requisitos, React y la app del celular (`movil/`). Cada módulo amplía lo suyo en su cabecera.
 Los campos de una card están en `Card` (`shared/types.ts`).
 
 Para mirar o mover la cola de TikTok e Instagram, o decidir qué se publica, lee `docs/agents/redes.md`. Para ver cómo va

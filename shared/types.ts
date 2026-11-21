@@ -514,6 +514,26 @@ export interface Lote {
 }
 
 
+/** Una dirección de esta computadora a la que puede llegar el celular: la red de la casa, Tailscale u otra. */
+export interface DireccionCelular {
+  ip: string
+  /** El nombre de su red en el sistema («Wi-Fi», «Ethernet», «Tailscale»). */
+  red: string
+  tipo: 'casa' | 'tailscale' | 'otra'
+  url: string
+}
+
+/** `GET /api/celular`: la puerta del celular (`server/celular.ts`, ADR 0025). `enlace` es lo que lleva el QR. */
+export interface Celular {
+  activo: boolean
+  escuchando: boolean
+  puerto: number
+  llave: string
+  direcciones: DireccionCelular[]
+  enlace: string
+  error?: string
+}
+
 /** Lo que enseña la pantalla de Opciones. De una llave solo viaja el final, para reconocerla. */
 export interface Opciones {
   /** La de la API de YouTube (Data API v3), opcional: la sección Ideas saca con ella fechas y comentarios. */

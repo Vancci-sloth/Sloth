@@ -7,7 +7,7 @@
   "description": "Sloth 2.0: cada skill es una card; el agente trabaja a la vista, como en T3 Code",
   "scripts": {
     "start": "node scripts/start.mjs",
-    "test": "node --import tsx --test server/*.test.ts shared/*.test.ts web/src/*.test.ts electron/*.test.ts licencias/src/*.test.ts",
+    "test": "node --import tsx --test server/*.test.ts shared/*.test.ts web/src/*.test.ts electron/*.test.ts licencias/src/*.test.ts movil/src/*.test.ts movil/src/local/*.test.ts",
     "typecheck": "tsc --noEmit && tsc --noEmit -p nube && tsc --noEmit -p licencias",
     "comprobar-skills": "node scripts/comprobar-skills.mjs",
     "hilo": "node scripts/hilo.mjs",
@@ -32,6 +32,7 @@
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
     "tsx": "^4.23.15",
+    "uqr": "0.1.3",
     "vite": "^8.3.3",
     "ws": "^8.22.0"
   },

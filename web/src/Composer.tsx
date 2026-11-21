@@ -2,6 +2,7 @@ import { type ReactNode, useEffect, useId, useLayoutEffect, useRef, useState } f
 import { consultaBarra, filtrarBarra, type OpcionBarra } from './menu-estilos'
 import type { Afinado, GastoFlow, Hueco, Model } from '../../shared/types'
 import { proveedorDe, type Proveedor } from '../../shared/providers'
+import { gruposModelos } from '../../shared/modelos'
 import { imageUrl, Thumbs, type Attached } from './Images'
 import { esIcono, Icono } from './Iconos'
 import { FlowEnUso, LimitesContexto } from './LimitesContexto'
@@ -43,37 +44,9 @@ export interface Draft {
   images: (Attached & { chip: boolean })[]
 }
 
-export interface Choice {
-  model: string
-  effort?: string
-}
-
-/** Los desplegables separan las dos familias para encontrar cada modelo de un vistazo. */
-export function gruposModelos(models: Model[]) {
-  return [
-    { id: 'claude', label: 'Anthropic' },
-    { id: 'codex', label: 'OpenAI' },
-    { id: 'opencode', label: 'OpenCode · gratis' },
-    // Los de pago de OpenCode, debajo de los gratis: se cobran del saldo de la cuenta.
-    { id: 'opencode', label: 'OpenCode · de pago (de tu saldo, por millón de tokens)', pago: true },
-    { id: 'deepseek', label: 'DeepSeek · beta' },
-    { id: 'freellmapi', label: 'FreeLLMAPI · beta · gratis' },
-    { id: 'openrouter', label: 'OpenRouter · beta · gratis' },
-    { id: 'openrouter', label: 'OpenRouter · beta · de pago (de tus créditos, por millón de tokens)', pago: true },
-    { id: 'grok', label: 'Grok · beta' },
-    { id: 'antigravity', label: 'Antigravity · beta' },
-    { id: 'gemini', label: 'Gemini · beta' },
-    { id: 'cursor', label: 'Cursor' },
-    { id: 'muse', label: 'Muse Code (Meta)' },
-    { id: 'pi', label: 'Pi · beta · gratis' },
-    { id: 'pi', label: 'Pi · beta · de pago (por millón de tokens)', pago: true },
-  ].map((p) => ({
-    label: p.label,
-    options: models
-      .filter((m) => proveedorDe(m.id) === p.id && !!m.precio === !!p.pago)
-      .map((m) => ({ value: m.id, label: m.precio ? `${m.label} · ${m.precio}` : m.label })),
-  })).filter((g) => g.options.length > 0)
-}
+export type { Choice } from '../../shared/modelos'
+import type { Choice } from '../../shared/modelos'
+export { gruposModelos }
 
 /** Desde cuántas opciones un desplegable con `buscar` enseña su buscador (`Picker`). */
 const BUSCAR_DESDE = 20

@@ -10,6 +10,7 @@ import { Picker } from './Composer'
 import { ESPACIO_DISCO, EspacioDisco } from './Espacio' // espacio en disco
 import { discoLleno } from './items'
 import { TuEquipo } from './Equipo' // tu equipo
+import { TuCelular } from './Celular' // tu celular
 import { Icono } from './Iconos'
 import { SuscripcionOpciones, VersionYApoyo } from './Licencia' // apoyo
 import { RespaldoOpciones } from './Respaldo' // tu Sloth en otra computadora
@@ -155,6 +156,7 @@ function Ajustes({ onDone, iniciando, onIniciando }: { onDone(): void; iniciando
       <Grupo titulo="Avisos">
         <Avisos />
       </Grupo>
+      <TuCelular />
       <TuEquipo />
       <EspacioDisco />
       <Herramientas req={req} />

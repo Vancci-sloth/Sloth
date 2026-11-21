@@ -24,6 +24,8 @@ import { redactar as redactarConAgente } from './redactar.ts'
  * fijar, borrar lo de cualquiera y decir cómo va cada mejora. `SLOTH_COBRO` cambia a qué Worker se habla (`wrangler dev`).
  *
  * Aquí se queda lo que es de esta computadora:
+ * - `GET /api/comunidad/credencial`: con qué entra esta computadora (su clave o la llave del creador). La guarda la app del
+ *   celular, que entra por su puerta (`server/celular.ts`), para ver la comunidad cuando va sin computadora (ADR 0025).
  * - `POST /api/comunidad/archivo?tipo=<mime>`, con la imagen de cuerpo: la sube.
  * - `POST /api/comunidad/video` `{ruta, entero?}`: uno de «Mis videos», con su primer cuadro de portada. Sube solo sus
  *   primeros `SEGUNDOS` (quien quiera enseñarlo entero pega su enlace en el texto); el de un estilo (`entero`) sube
@@ -381,6 +383,7 @@ export function comunidad(app: string, o: Opciones) {
     if (ruta !== '/api/mejoras' && ruta !== '/api/comunidad' && !ruta.startsWith('/api/comunidad/')) return false
     const metodo = req.method ?? 'GET'
     try {
+      if (ruta === '/api/comunidad/credencial' && metodo === 'GET') return enviar(res, 200, (await o.credencial()) ?? {})
       if (ruta === '/api/comunidad/archivo' && metodo === 'POST') {
         const tipo = url.searchParams.get('tipo') ?? ''
         if (!tipo.startsWith('image/')) throw new Rechazo(415, 'Aquí solo se suben imágenes; un video, elígelo de «Mis videos».')
