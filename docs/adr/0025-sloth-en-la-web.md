@@ -37,8 +37,9 @@ resuelve igual (T3 Connect y app.t3.codes): la máquina sigue trabajando y los d
 - **Se confía en quien maneja el Worker como en la app.** El Worker sirve la página que usa las llaves: un despliegue
   malicioso podría usarlas mientras está abierta. Es la misma confianza que ya se le da a quien publica Sloth, cuyas
   versiones corren en la computadora con todos sus permisos.
-- **Lo que la web no puede hacer igual, lo hace a su manera.** Abrir un archivo en el Explorador lo baja al dispositivo;
-  «Descargar» en Mis videos baja al dispositivo y no a Descargas de la computadora; la vista en vivo del estudio y el
+- **Lo que hace la ventana, la web lo hace igual, y lo acerca al dispositivo.** Abrir un archivo lo señala en el
+  Explorador de la computadora, como siempre, y además lo baja al dispositivo; «Descargar» en Mis videos los copia a
+  Descargas de la computadora y además los baja al dispositivo; la vista en vivo del estudio y el
   visor 3D van en la misma dirección (en la ventana van en `127.0.0.1` para no frenar la interfaz).
 - **Las cuentas también se conectan desde la web** (`server/ventanas-remotas.ts`, `web/src/VentanasRemotas.tsx`). Lo
   que en la computadora abre algo en su pantalla, desde la web sale en el panel «En tu computadora»: el inicio de sesión

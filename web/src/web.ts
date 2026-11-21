@@ -6,7 +6,8 @@
  * - Lo que se guarda en `localStorage` sube a la computadora (`/api/web/guardado`): la dirección del túnel cambia cada
  *   vez que se abre, y con ella lo guardado; la página de entrada lo pone de vuelta. La ventana de la computadora sube
  *   lo suyo también, y cada dispositivo empieza con eso: los avisos ya leídos allá no salen otra vez.
- * - `abrirRuta`: en la ventana, un archivo se señala en el Explorador o el Finder; desde la web se baja al dispositivo.
+ * - `abrirRuta`: un archivo se señala en el Explorador o el Finder de la computadora, como en la ventana; desde la web,
+ *   además, se baja al dispositivo.
  * - `entrada()`: adónde volver a entrar si se pierde la conexión (`ConexionWeb.tsx`).
  */
 import { enlaceEntrada, esDeLaWeb, type EstadoWeb } from '../../shared/web'
@@ -67,19 +68,15 @@ function guardarEnLaComputadora() {
 }
 
 /**
- * Abre un archivo de la computadora: en la ventana, señalado en el Explorador o el Finder; desde la web, bajándolo al
- * dispositivo. Una carpeta no se puede bajar: se dice dónde está.
+ * Abre un archivo de la computadora: señalado en su Explorador o su Finder, igual desde la ventana que desde la web. Desde
+ * la web, además, un archivo (no una carpeta) se baja al dispositivo que se está usando.
  */
 export async function abrirRuta(ruta: string, sessionId?: string): Promise<void> {
-  if (!enLaWeb) return void (await api('/api/open', { path: ruta, sessionId }))
+  await api('/api/open', { path: ruta, sessionId })
+  if (!enLaWeb) return
   const q = new URLSearchParams({ ruta, ...(sessionId ? { sesion: sessionId } : {}) })
   const r = await fetch(`/api/web/archivo?${q}&mirar=1`)
-  const j = (await r.json().catch(() => ({}))) as { error?: string; carpeta?: boolean }
-  if (!r.ok) {
-    if (j.carpeta) return void alert(`${j.error ?? 'Es una carpeta.'}\n\nLas carpetas se abren en la computadora; desde aquí se bajan los archivos.`)
-    throw new Error(j.error ?? 'No se pudo bajar.')
-  }
-  bajar(`/api/web/archivo?${q}`)
+  if (r.ok) bajar(`/api/web/archivo?${q}`)
 }
 
 /** Lo que se sube de una vez: Cloudflare no deja pasar una petición de más de 100 MB. */

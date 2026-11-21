@@ -233,13 +233,6 @@ export function MisVideos({ cards, sessions, estilo, onEstilo }: { cards: Card[]
   const bajando = useRef(false)
   async function bajar(vs: VideoHecho[]) {
     if (bajando.current) return
-    // Desde la web, al dispositivo: uno tras otro, que el navegador no corta varias descargas juntas.
-    if (enLaWeb) {
-      setFallo('')
-      vs.forEach((v, i) => setTimeout(() => bajarAlDispositivo(`/api/web/archivo?ruta=${encodeURIComponent(v.ruta)}`), i * 700))
-      setAviso({ texto: vs.length === 1 ? 'Bajando el video a este dispositivo…' : `Bajando ${vs.length} videos a este dispositivo…` })
-      return
-    }
     bajando.current = true
     setFallo('')
     setAviso({ texto: vs.length === 1 ? 'Copiando a Descargas…' : `Copiando ${vs.length} videos a Descargas…` })
@@ -247,6 +240,11 @@ export function MisVideos({ cards, sessions, estilo, onEstilo }: { cards: Card[]
       const r = await api<{ carpeta: string; copias: string[] }>('/api/videos/descargar', { rutas: vs.map((v) => v.ruta) })
       const nombre = r.copias[0].split(/[\\/]/).pop()
       setAviso({ texto: r.copias.length === 1 ? `«${nombre}» está en Descargas.` : `${r.copias.length} videos están en Descargas.`, ruta: r.copias[0] })
+      // Desde la web, además, a este dispositivo: uno tras otro, que el navegador no corta varias descargas juntas.
+      if (enLaWeb) {
+        r.copias.forEach((c, i) => setTimeout(() => bajarAlDispositivo(`/api/web/archivo?ruta=${encodeURIComponent(c)}`), i * 700))
+        setAviso({ texto: `${r.copias.length === 1 ? `«${nombre}» está` : `${r.copias.length} videos están`} en Descargas de tu computadora, y se bajan también a este dispositivo.`, ruta: r.copias[0] })
+      }
     } catch (e) {
       setAviso(null)
       setFallo(e instanceof Error ? e.message : String(e))

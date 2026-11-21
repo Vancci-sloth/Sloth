@@ -13,13 +13,13 @@ import { imageUrl, Thumbs } from './Images'
 import { buildTimeline, compact, delHilo, duration, errorLlano, finDeRuta, REINTENTAR, toolSummary, type Item, type Subagente } from './items'
 import { bloquesDeMarkdown } from './markdown'
 import { BarraSubagente, FilaSubagente, GrupoSubagentes } from './Subagentes'
-import { abrirRuta, enLaWeb } from './web'
+import { abrirRuta } from './web'
 
 /** Una ruta del disco: `C:\…` en Windows; en Mac y Linux, de las carpetas de la gente (no `/api/…` y parecidas). */
 const RUTA = /^([A-Za-z]:[\\/]|\/(Users|home|Volumes|media|mnt|tmp)\/)/
 
 /** Desde la web, el archivo se baja al dispositivo (`abrirRuta`). */
-const abrirEnDisco = (path: string, sessionId?: string) => abrirRuta(path, sessionId).catch((e: Error) => enLaWeb && alert(e.message))
+const abrirEnDisco = (path: string, sessionId?: string) => abrirRuta(path, sessionId).catch(() => {})
 
 /**
  * Un enlace del agente: la web y el correo, fuera (en la app, al navegador); un archivo, señalado en el Explorador o el
