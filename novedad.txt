@@ -1,1 +1,1 @@
-Express: Google Flow puso un aviso de novedades que tapaba su página, y las imágenes y los videos de Flow fallaban con «Timeout». Ya quedó: Sloth lo quita sola y sigue.
+Sloth en la web: usa tu Sloth desde el celular o desde otra computadora, en web.sloth.vancci.org (enciéndela en Opciones → Sloth en la web). Además, «Afinar» junto a enviar, estilos pre-aprobados por Sloth y YouTube conectado con un clic para quien apoya.
