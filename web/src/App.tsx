@@ -171,7 +171,8 @@ export function App() {
   const draftId = view.kind === 'draft' ? view.id : view.kind === 'new' ? freshId : null
 
   useEffect(() => {
-    const onHash = () => setView(readHash())
+    // En el celular la barra desplegada va encima de todo: al elegir algo se pliega sola, como en una app de teléfono.
+    const onHash = () => (setView(readHash()), matchMedia('(max-width: 760px)').matches && plegar(true))
     addEventListener('hashchange', onHash)
     return () => removeEventListener('hashchange', onHash)
   }, [])
@@ -791,6 +792,8 @@ export function App() {
           />
         )}
       </main>
+      {/* En el celular, con la barra desplegada encima: tocar fuera la pliega (Barra.css). */}
+      {!plegada && <div className="barra-velo" aria-hidden onClick={() => plegar(true)} />}
       <Novedades />
       <GanasteRifa />
       <EstiloCambio cards={cards} activa={newCard?.id} />

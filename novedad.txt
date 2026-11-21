@@ -1,1 +1,1 @@
-El estudio de video ya se usa en el celular (Sloth en la web): el video, la línea de tiempo y el chat van uno debajo del otro, y deslizar baja al chat.
+En el celular (Sloth en la web), la barra lateral desplegada va encima de todo y se pliega sola al elegir algo o al tocar fuera, como en una app de teléfono.

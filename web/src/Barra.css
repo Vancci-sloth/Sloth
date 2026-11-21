@@ -109,6 +109,15 @@ button.barra-seccion:hover { color: var(--text); }
  * una raya, y el punto de cada hilo (trabajando, terminó) va sobre su icono.
  */
 .app.plegada { grid-template-columns: 56px 1fr; }
+.barra-velo { display: none; }
+/* En el celular (Sloth en la web), desplegada no cabe al lado: flota encima de lo demás, que se queda donde estaba, y se
+   pliega sola al elegir algo (App.tsx). */
+@media (max-width: 760px) {
+  .app, .app:not(.plegada) { position: relative; grid-template-columns: 56px 1fr; }
+  .app:not(.plegada) > .sidebar { position: absolute; z-index: 60; top: 0; bottom: 0; left: 0; width: min(280px, 85vw); }
+  .barra-velo { display: block; position: absolute; inset: 0; z-index: 59; background: rgba(0, 0, 0, 0.45); }
+  .app:not(.plegada) > .sidebar + * { grid-column: 2; }
+}
 .plegada .select-bar { left: 70px; }
 .plegada .brand-fila { flex-direction: column; }
 .plegada .brand { justify-content: center; gap: 0; padding: 14px 0 6px; font-size: 0; }
