@@ -14,7 +14,7 @@ import './LineaDeTiempo.css'
 export type Clip = { id: string; marca: string; nombre: string; desde: number; hasta: number; cuadro?: ReactNode; title?: string }
 
 /** Lo que suena, ya como archivo de la carpeta del hilo. */
-export type Pista = Omit<AudioMotor, 'src'> & { ruta: string }
+export type Pista = Omit<AudioMotor, 'src'> & { ruta: string; t?: number }
 
 const MAX_POR_SEGUNDO = 240
 /** Los carriles de piezas, como mucho: lo que no cabe se pone encima del que acaba antes. */
@@ -300,19 +300,21 @@ type Onda = { porSegundo: number; picos: number[] }
 function Ondas({ sessionId, pistas, porSeg, izq, ancho }: { sessionId: string; pistas: Pista[]; porSeg: number; izq: number; ancho: number }) {
   const lienzo = useRef<HTMLCanvasElement>(null)
   const [datos, setDatos] = useState<Record<string, Onda>>({})
+  const [fallos, setFallos] = useState<Record<string, boolean>>({})
   const orden = [...pistas].sort((a, b) => Number(/voz|narr|voice/i.test(b.ruta)) - Number(/voz|narr|voice/i.test(a.ruta)))
-  const clave = orden.map((p) => p.ruta).join('|')
+  const clave = orden.map((p) => `${p.ruta}@${p.t ?? ''}`).join('|')
 
   useEffect(() => {
     const corte = new AbortController()
     const rutas = [...new Set(pistas.map((p) => p.ruta))]
-    setDatos((d) => Object.fromEntries(rutas.filter((r) => d[r]).map((r) => [r, d[r]])))
+    setDatos({})
+    setFallos({})
     for (const ruta of rutas) {
-      const url = `/api/sessions/${sessionId}/onda?ruta=${encodeURIComponent(ruta)}`
+      const url = `/api/sessions/${sessionId}/onda?ruta=${encodeURIComponent(ruta)}&t=${pistas.find((p) => p.ruta === ruta)?.t ?? ''}`
       fetch(url, { signal: corte.signal })
         .then((r) => r.ok ? r.json() as Promise<Onda> : Promise.reject(new Error(String(r.status))))
         .then((o) => { if (!corte.signal.aborted) setDatos((d) => ({ ...d, [ruta]: o })) })
-        .catch(() => {})
+        .catch(() => { if (!corte.signal.aborted) setFallos((f) => ({ ...f, [ruta]: true })) })
     }
     return () => corte.abort()
   }, [sessionId, pistas])
@@ -353,6 +355,7 @@ function Ondas({ sessionId, pistas, porSeg, izq, ancho }: { sessionId: string; p
 
   return (
     <div className="pista pista-audio">
+      {!pistas.length ? <span className="pista-vacia muted small">Sin pistas de audio informadas.</span> : !Object.keys(datos).length && <span className="pista-vacia muted small">{Object.keys(fallos).length === new Set(pistas.map((p) => p.ruta)).size ? 'Sin onda disponible: el archivo no tiene audio o no se pudo analizar.' : 'Calculando la onda de audio…'}</span>}
       <canvas ref={lienzo} style={{ left: izq, width: ancho }} />
     </div>
   )

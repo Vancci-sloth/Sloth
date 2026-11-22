@@ -5,6 +5,8 @@ import { type Clip, LineaDeTiempo, type Pista } from './LineaDeTiempo'
 import { type Elemento, Monitor, type PiezaMotor, type PropsDeVideo, reloj, type Reloj, useMonitor } from './Monitor'
 import { ponerReferencia, useReferencia } from './Referencia'
 import './Editor.css'
+import { pistasDeRender } from './pistas-render'
+import { TiraVideo } from './TiraVideo'
 
 /**
  * La fase Video del estudio, la misma para todos los estilos: el monitor en vivo (`Monitor.tsx`) y la línea de tiempo
@@ -37,6 +39,7 @@ export function Editor(props: PropsDeVideo) {
   const ref = useReferencia(sessionId)
   const al = useRef({ elegido: (_e: Elemento | null) => {}, tecla: (_c: string, _s: boolean) => {} })
   const m = useMonitor(props, { elegido: (e) => al.current.elegido(e), tecla: (c, s) => al.current.tecla(c, s) })
+  const renderizado = useMemo(() => pistasDeRender(m.modo === 'render' ? m.render : undefined, m.duracion), [m.modo, m.render?.ruta, m.render?.t, m.duracion])
 
   // Las escenas: las del guion si el estilo lo tiene (con su miniatura), y si no, las que dice el motor.
   const clips: Clip[] = useMemo(
@@ -54,8 +57,8 @@ export function Editor(props: PropsDeVideo) {
               cuadro: cuadro ? <img src={archivo(cuadro.ruta, cuadro.t)} alt="" loading="lazy" /> : <Cuadro v={b.v} pub={pub} />
             }
           })
-        : m.escenas.map((e, i) => ({ id: `${i}:${e.desde}`, marca: String(i + 1), nombre: e.nombre || `Escena ${i + 1}`, desde: e.desde, hasta: e.hasta })),
-    [tomas, m.escenas, files.cuadros, archivo, pub]
+        : m.modo === 'render' ? renderizado.escenas.map((e) => ({ ...e, cuadro: m.render && <TiraVideo src={archivo(m.render.ruta, m.render.t)} /> })) : m.escenas.map((e, i) => ({ id: `${i}:${e.desde}`, marca: String(i + 1), nombre: e.nombre || `Escena ${i + 1}`, desde: e.desde, hasta: e.hasta })),
+    [tomas, m.modo, m.render?.ruta, m.render?.t, m.escenas, renderizado, files.cuadros, archivo, pub]
   )
   const clipsRef = useRef(clips)
   clipsRef.current = clips
@@ -84,8 +87,8 @@ export function Editor(props: PropsDeVideo) {
   // Lo que suena, como archivo de la carpeta: la onda de la línea de tiempo y el sonido al recorrerla.
   const base = `/api/sessions/${sessionId}/vivo/`
   const pistas: Pista[] = useMemo(
-    () => m.audios.filter((a) => a.src.startsWith(base)).map(({ src, ...a }) => ({ ...a, ruta: decodeURIComponent(src.slice(base.length)) })),
-    [m.audios, base]
+    () => m.modo === 'render' ? renderizado.pistas : m.audios.filter((a) => a.src.startsWith(base)).map(({ src, ...a }) => ({ ...a, ruta: decodeURIComponent(src.slice(base.length)) })),
+    [m.modo, renderizado, m.audios, base]
   )
   const sonar = useSonido(sessionId, pistas, m.silencio)
 
@@ -266,9 +269,11 @@ function useSonido(sessionId: string, pistas: Pista[], silencio: boolean) {
       if (!p || silencio || ahora - ultimo.current < 70) return
       ultimo.current = ahora
       const a = (audio.current ??= new Audio())
-      if (a.dataset.ruta !== p.ruta) {
-        a.src = `/api/sessions/${sessionId}/vivo/${p.ruta.split('/').map(encodeURIComponent).join('/')}`
-        a.dataset.ruta = p.ruta
+      // Con la ruta y su versión: el render que se rehace con el mismo nombre suena el nuevo.
+      const clave = `${p.ruta}@${p.t ?? ''}`
+      if (a.dataset.ruta !== clave) {
+        a.src = `/api/sessions/${sessionId}/archivo?ruta=${encodeURIComponent(p.ruta)}&t=${p.t ?? ''}`
+        a.dataset.ruta = clave
       }
       a.currentTime = t - p.desde + p.recorte
       a.play().catch(() => {})

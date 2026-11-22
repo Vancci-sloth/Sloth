@@ -29,6 +29,9 @@
 .clip-texto b { color: var(--text); font-weight: 650; }
 .clip.elegida .clip-texto { color: var(--amber-2); }
 .clip > img, .clip > .cuadro { flex: none; height: 100%; width: auto; aspect-ratio: 16 / 9; object-fit: cover; border: 0; border-radius: 0; }
+.tira-video { position: absolute; inset: 0; overflow: hidden; background: var(--panel-2); pointer-events: none; }
+.tira-video img { position: absolute; top: 0; height: 100%; object-fit: cover; border-right: 1px solid color-mix(in srgb, var(--bg) 40%, transparent); }
+.clip:has(.tira-video) .clip-texto { position: absolute; left: 3px; bottom: 3px; max-width: calc(100% - 6px); padding: 2px 6px; border-radius: 4px; background: color-mix(in srgb, var(--bg) 88%, transparent); color: var(--text); }
 
 /* Las piezas: una barra por cada tramo en que se ve, en carriles. La elegida, en ámbar. */
 .pista-piezas { border-bottom: 1px solid var(--line); }
