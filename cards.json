@@ -676,6 +676,44 @@
     ]
   },
   {
+    "id": "motion-graphics",
+    "title": "Motion Graphics",
+    "description": "Campañas con montaje musical o narración, tipografía cinética, cámara y profundidad. Composiciones a medida y preview antes del render.",
+    "skill": "motion-graphics",
+    "version": "1.1",
+    "basadoEn": "video-el-diff",
+    "icon": "escena",
+    "guia": {
+      "das": "Producto, público, mensaje y referencias. Elige formato; puedes pedir solo música, sin voz.",
+      "entrega": "Preview HTML o Remotion, video final con audio y portada.",
+      "ejemplo": "Crea una campaña musical sin voz, con portadas en profundidad, cambios de escala, tipografía cinética y transiciones conectadas al ritmo."
+    },
+    "etapas": [
+      {
+        "nombre": "Guion",
+        "listo": "guion.md",
+        "copiar": true,
+        "fase": "guion"
+      },
+      {
+        "nombre": "Sonido",
+        "listo": "fuentes/{voz/original,audio/mezcla}.wav",
+        "espera": "Prepara la música o mezcla final; añade narración solo si la pediste.",
+        "fase": "sonido"
+      },
+      {
+        "nombre": "Video",
+        "listo": "out/{motion-graphics,pulso-visual}.mp4",
+        "fase": "video"
+      },
+      {
+        "nombre": "Portada",
+        "listo": "portada.png",
+        "fase": "entrega"
+      }
+    ]
+  },
+  {
     "id": "nuevo-estilo",
     "title": "Nuevo estilo",
     "description": "Cuéntale el video que quieres hacer, o pásale ejemplos, y Sloth arma tu propio estilo con su card, listo para usarlo como los demás.",

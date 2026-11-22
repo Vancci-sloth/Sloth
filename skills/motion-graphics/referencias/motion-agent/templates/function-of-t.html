@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Plantilla · función de t (sin librerías)</title>
+<!-- Fuentes locales: ejecuta  node tools/fetch-fonts.mjs "Inter:500,700"  y se activan solas. -->
+<link rel="stylesheet" href="../runtime/fonts/fonts.css">
+<style>
+  /* TOKENS (design.md → aquí). Un acento, una tipografía de pantalla. */
+  :root{--bg:#0b0d12;--text:#f4f6fb;--muted:#8b93a7;--accent:#5df2a6;--font:'Inter',system-ui,-apple-system,'Segoe UI',sans-serif}
+  *{box-sizing:border-box;margin:0;padding:0}
+  #stage{background:var(--bg);color:var(--text);font-family:var(--font)}
+  .scene{position:absolute;inset:0;display:grid;place-content:center;justify-items:center;gap:28px;opacity:0}
+  .h1{font-size:150px;font-weight:700;letter-spacing:-.03em;line-height:1}
+  .sub{font-size:48px;color:var(--muted);font-weight:500}
+  .pill{font-size:30px;font-weight:600;color:var(--bg);background:var(--accent);padding:12px 34px;border-radius:999px}
+</style>
+</head>
+<body>
+<div id="stage">
+  <section class="scene" id="s1"><div class="pill" id="pill">NUEVO</div><h1 class="h1" id="h1">Hola, movimiento.</h1></section>
+  <section class="scene" id="s2"><div class="h1" id="num">0</div><p class="sub" id="cap">mensajes entregados hoy</p></section>
+</div>
+
+<script src="../runtime/mg-runtime.js"></script>
+<script>
+  const { seg, win, ease, lerp } = MG;
+  const $ = (id) => document.getElementById(id);
+
+  // render(t) debe dejar TODO posicionado para el instante t, sin depender de lo que pasó antes.
+  function render(t) {
+    // Escena 1: 0.0–3.2 s
+    $('s1').style.opacity = win(t, 0, 3.2, 0.3);
+    const pIn = ease.outBack(seg(t, 0.15, 0.55));
+    $('pill').style.transform = `scale(${lerp(0.6, 1, pIn)})`;
+    const hIn = ease.out4(seg(t, 0.35, 1.05));
+    $('h1').style.transform = `translateY(${lerp(60, 0, hIn)}px)`;
+    $('h1').style.opacity = hIn;
+    $('h1').style.filter = `blur(${lerp(16, 0, hIn)}px)`;
+
+    // Escena 2: entra en 3.0 s y se queda hasta el final (estado final estable, sin fundido de salida)
+    $('s2').style.opacity = seg(t, 3.0, 3.3);
+    const n = Math.floor(ease.out3(seg(t, 3.3, 5.3)) * 12480 + 1e-6);
+    $('num').textContent = n.toLocaleString('es-ES');
+    $('num').style.transform = `scale(${lerp(0.94, 1, ease.out3(seg(t, 3.0, 3.8)))})`;
+  }
+
+  MG.register({ duration: 7, fps: 60, width: 1920, height: 1080, render });
+</script>
+</body>
+</html>

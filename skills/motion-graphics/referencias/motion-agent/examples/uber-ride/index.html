@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Uber Ride — recreación del video (928×576)</title>
+<style>
+*{box-sizing:border-box}
+*{box-sizing:border-box}
+#stage{background:#fcfcfc;font-family:"Helvetica Neue",Helvetica,Arial,sans-serif;color:#111}
+.sc{position:absolute;inset:0;opacity:0;pointer-events:none}
+.abs{position:absolute}
+.row{position:absolute;left:0;right:0;top:268px;display:flex;justify-content:center;align-items:center;gap:12px;font-weight:600;font-size:46px;letter-spacing:-.5px}
+.dot{width:40px;height:40px;border-radius:50%;background:#000;filter:blur(7px);left:0;top:0}
+.pill{background:#e6e6e6;border-radius:30px;height:62px;position:relative;box-shadow:0 8px 24px rgba(0,0,0,.08)}
+.pill span{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:38px;font-weight:500}
+.dots{display:flex;gap:10px;justify-content:center;margin-top:16px}
+.dots i{width:9px;height:9px;border-radius:50%;background:#000}
+.card{background:#e8e8e8;border-radius:16px}
+.field{position:absolute;background:#fafafa;border-radius:8px;height:40px;width:224px;left:34px;padding:5px 10px 0 34px;font-size:12px;line-height:1.25}
+.field b{display:block;font-size:14px}
+.field s{position:absolute;left:10px;top:12px;width:14px;height:14px;border:3px solid #111}
+.field u{position:absolute;left:10px;top:12px;width:14px;height:14px;border:3px solid #111;border-radius:50%}
+.t{position:absolute;left:0;right:0;text-align:center;font-weight:700}
+</style>
+</head>
+<body>
+<div id="stage">
+
+<!-- 1. Fast / Active -->
+<div class="sc" id="s1">
+ <div class="row" id="r1">Fast <svg width="34" height="34" viewBox="0 0 24 24"><circle cx="12" cy="12" r="11" fill="#111"/><circle cx="12" cy="12" r="6" fill="none" stroke="#fff" stroke-width="1.6"/><circle cx="12" cy="12" r="1.8" fill="#fff"/><path d="M-4 9h6M-5 13h6" stroke="#111" stroke-width="1.5"/></svg></div>
+ <div class="row" id="r2">Active <svg width="34" height="34" viewBox="0 0 24 24"><circle cx="12" cy="12" r="11" fill="#111"/><path d="M13.5 7.5L9 12l4.5 4.5" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/></svg></div>
+ <div class="dot abs" id="d1"></div>
+</div>
+
+<!-- 2. Black intro -->
+<div class="sc" id="s2">
+ <div class="abs" id="ln" style="left:50%;top:300px;height:4px;background:#fff;border-radius:3px;transform:translate(-50%,0)"></div>
+ <div class="abs" id="ut" style="left:0;right:0;top:238px;text-align:center;color:#fff;font-size:56px;font-weight:600">Uber</div>
+ <div class="abs" id="l1" style="left:398px;top:226px;width:60px;height:2px;background:#fff"></div>
+ <div class="abs" id="l2" style="left:398px;top:322px;width:60px;height:2px;background:#fff"></div>
+</div>
+
+<!-- 3. Logo -->
+<div class="sc" id="s3">
+ <div class="abs" id="lg" style="left:384px;top:210px;width:160px;height:156px;border-radius:24px;background:linear-gradient(115deg,#000 40%,#2a2a2a 50%,#000 60%);color:#fff;font-size:56px;font-weight:600;display:flex;align-items:center;justify-content:center">Uber</div>
+</div>
+
+<!-- 4. Courier / Ride -->
+<div class="sc" id="s4">
+ <div class="abs" style="left:0;right:0;top:240px">
+  <div style="display:flex;justify-content:center;align-items:center;gap:14px">
+   <div class="pill" id="pl" style="width:150px"><span id="pc">Courier</span><span id="pr" style="opacity:0">Ride</span></div>
+   <div style="position:relative;width:46px;height:46px">
+    <svg id="ic1" class="abs" width="46" height="46" viewBox="0 0 24 24" style="left:0;top:0"><circle cx="9" cy="6" r="3.2" fill="#111"/><path d="M3 20v-6c0-2.5 2-4 6-4s6 1.5 6 4v6z" fill="#111"/><rect x="12" y="13" width="10" height="8" fill="#555" stroke="#fff" stroke-width="1"/></svg>
+    <svg id="ic2" class="abs" width="46" height="46" viewBox="0 0 24 24" style="left:0;top:0;opacity:0"><path d="M3 15v-3l2-5h14l2 5v3h-2a2 2 0 0 1-4 0H9a2 2 0 0 1-4 0zM7 9l-1 3h12l-1-3z" fill="#111"/></svg>
+   </div>
+  </div>
+  <div class="dots" id="dts"><i></i><i></i><i></i></div>
+ </div>
+ <svg class="abs" id="cur" width="22" height="26" viewBox="0 0 12 16" style="left:0;top:0;opacity:0"><path d="M1 1v12l3-3 2 5 2-1-2-5h4z" fill="#111" stroke="#fff" stroke-width=".8"/></svg>
+</div>
+
+<!-- 5. Location -->
+<div class="sc" id="s5">
+ <div class="abs" style="left:0;right:0;top:180px;text-align:center;font-weight:700;font-size:25px">Location
+  <svg id="arw" width="24" height="24" viewBox="0 0 24 24" style="vertical-align:-3px;margin-left:8px"><path d="M21 3L3 11l7 3 3 7z" fill="#111"/></svg></div>
+ <div class="card abs" id="lc" style="left:214px;top:230px;width:472px;height:112px;overflow:hidden">
+  <svg class="abs" style="left:20px;top:36px" width="30" height="40" viewBox="0 0 24 30"><path d="M12 1a8 8 0 0 0-8 8c0 6 8 15 8 15s8-9 8-15a8 8 0 0 0-8-8z" fill="#111"/><circle cx="12" cy="9" r="3" fill="#e8e8e8"/></svg>
+  <div class="abs" id="ta" style="left:72px;top:28px;width:330px"><div style="font-size:23px;font-weight:700;white-space:nowrap">6 New York City - Apple Plc</div><div style="font-size:17px;color:#9a7a80;margin-top:4px;white-space:nowrap">Exp, New York City 30040102, U.S.A</div></div>
+  <div class="abs" id="tb" style="left:72px;top:28px;width:330px;opacity:0"><div style="font-size:23px;font-weight:700">Silverlight Cinema</div><div style="font-size:17px;color:#9a7a80;margin-top:4px">50 Crescent Road, Dubai, UAE</div></div>
+  <div class="abs" style="right:24px;top:44px;width:22px;height:22px;border:2px solid #111;border-radius:50%"><div id="rd" style="position:absolute;inset:3px;background:#111;border-radius:50%;opacity:0"></div></div>
+ </div>
+</div>
+
+<!-- 6. Your Ride panel -->
+<div class="sc" id="s6" style="perspective:1400px">
+ <div class="card abs" id="pn" style="left:151px;top:88px;width:626px;height:400px;transform-origin:50% 50%">
+  <div class="abs" style="left:16px;top:12px;font-weight:700;color:#555;font-size:20px">Uber</div>
+  <div class="t" style="top:20px;font-size:30px">Your Ride</div>
+  <div class="t" style="top:62px;font-size:19px;font-weight:400;color:#444">Go anywhere with Uber</div>
+  <div class="field" style="top:140px"><s></s><span style="color:#777">Dropoff location</span><b>Silverlight Cinema</b></div>
+  <div class="field" style="top:192px"><u></u><span style="color:#777">Pickup location</span><b>Villa Suite Hotel</b></div>
+  <svg class="abs" style="left:430px;top:110px" width="150" height="80" viewBox="0 0 100 52"><ellipse cx="50" cy="44" rx="40" ry="5" fill="rgba(0,0,0,.12)"/><path d="M8 34c0-8 6-12 14-14l10-9c3-3 8-4 14-4h8c6 0 10 2 14 6l8 8c4 2 8 5 8 10v6c0 3-3 4-6 4H14c-4 0-6-2-6-6z" fill="#fafafa" stroke="#ddd"/><path d="M34 14h14v8H28zM52 14h8c3 0 5 2 7 5l3 3H52z" fill="#2b2b2b"/><circle cx="26" cy="38" r="6" fill="#222"/><circle cx="74" cy="38" r="6" fill="#222"/></svg>
+  <div class="abs" id="bt" style="left:76px;top:306px;width:474px;height:78px;border-radius:9px;background:#111;display:flex;align-items:center;justify-content:center;color:#fff;font-size:36px;font-weight:500"><span id="bl">Ride</span>
+   <svg id="sp" class="abs" width="34" height="34" viewBox="0 0 24 24" style="left:220px;top:36px;opacity:0"><path d="M4 12a8 8 0 0 0 16 0" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round"/></svg></div>
+ </div>
+ <svg class="abs" id="cu2" width="22" height="26" viewBox="0 0 12 16" style="left:0;top:0;opacity:0"><path d="M1 1v12l3-3 2 5 2-1-2-5h4z" fill="#111" stroke="#fff" stroke-width=".8"/></svg>
+</div>
+
+<!-- 7. Requesting Driver -->
+<div class="sc" id="s7" style="perspective:1400px">
+ <div class="card abs" id="rq" style="left:144px;top:160px;width:640px;height:244px;box-shadow:0 12px 30px rgba(0,0,0,.08)">
+  <div class="t" style="top:48px;font-size:46px;letter-spacing:-.5px">Requesting Driver</div>
+  <div class="t" id="rs" style="top:112px;font-size:28px;font-weight:500;color:#888">Finding driver nearby</div>
+  <div class="abs" style="left:34px;right:34px;top:176px;height:8px;border-radius:4px;background:#fafafa"><div id="pf" style="height:100%;width:0;border-radius:4px;background:#0a4f9c"></div></div>
+ </div>
+</div>
+
+<!-- 8. Approved -->
+<div class="sc" id="s8">
+ <div class="abs" id="ap" style="left:164px;top:266px;width:618px;height:188px;border-radius:16px;background:#f3f3f1;border:1px solid #ddd;box-shadow:0 10px 26px rgba(0,0,0,.08)">
+  <div class="t" style="top:30px;font-size:46px;letter-spacing:-.5px">Request Approved</div>
+  <div class="abs" style="left:54px;top:110px;height:8px;border-radius:4px;background:#8ea100;width:510px"></div>
+ </div>
+</div>
+
+<!-- 9. Driver -->
+<div class="sc" id="s9">
+ <div class="abs" id="dc" style="left:164px;top:200px;width:618px;height:184px;border-radius:26px;border:4px solid rgba(0,0,0,.07);background:#fff;overflow:hidden">
+  <div id="dcar" class="abs" style="left:-10px;top:50px;width:110px"><svg width="110" height="58" viewBox="0 0 100 52"><path d="M8 34c0-8 6-12 14-14l10-9c3-3 8-4 14-4h8c6 0 10 2 14 6l8 8c4 2 8 5 8 10v6c0 3-3 4-6 4H14c-4 0-6-2-6-6z" fill="#f3f3f3" stroke="#ddd"/><path d="M34 14h14v8H28zM52 14h8c3 0 5 2 7 5l3 3H52z" fill="#bbb"/><circle cx="26" cy="38" r="6" fill="#ccc"/><circle cx="74" cy="38" r="6" fill="#ccc"/></svg></div>
+  <div id="dtx" class="abs" style="left:100px;top:46px;font-size:40px;font-weight:600">Driver</div>
+ </div>
+</div>
+
+<!-- 10. Approaching -->
+<div class="sc" id="s10">
+ <div id="ac" class="abs" style="left:0;top:262px;width:120px"><svg width="120" height="64" viewBox="0 0 100 52"><ellipse cx="50" cy="46" rx="40" ry="4" fill="rgba(0,0,0,.1)"/><path d="M8 34c0-8 6-12 14-14l10-9c3-3 8-4 14-4h8c6 0 10 2 14 6l8 8c4 2 8 5 8 10v6c0 3-3 4-6 4H14c-4 0-6-2-6-6z" fill="#f6f6f6" stroke="#ddd"/><path d="M34 14h14v8H28zM52 14h8c3 0 5 2 7 5l3 3H52z" fill="#aaa"/><circle cx="26" cy="38" r="6" fill="#bbb"/><circle cx="74" cy="38" r="6" fill="#bbb"/></svg></div>
+ <div id="at" class="abs" style="left:272px;top:208px"><div style="font-size:46px;font-weight:600;color:#666;letter-spacing:-.5px">Driver Approaching</div><div style="font-size:28px;color:#aaa;margin:6px 0 0 50px">Meet at pickup point</div></div>
+</div>
+
+<!-- 11. Uber gray -->
+<div class="sc" id="s11"><div class="abs" style="left:0;right:0;top:238px;text-align:center;font-size:72px;font-weight:700;color:#938a8a;letter-spacing:-1px">Uber</div></div>
+
+<!-- 12. Peli -->
+<div class="sc" id="s12">
+ <svg class="abs" id="pe" style="left:400px;top:262px" width="130" height="52" viewBox="0 0 26 8.5" fill="#fff">
+  <rect x="0" y="0" width="1.6" height="8"/><rect x="0" y="0" width="5" height="1.6"/><rect x="0" y="3.2" width="5" height="1.5"/><rect x="3.4" y="0" width="1.6" height="4.7"/>
+  <rect x="7" y="0" width="1.6" height="8"/><rect x="7" y="0" width="5" height="1.6"/><rect x="7" y="3.2" width="4" height="1.5"/><rect x="7" y="6.4" width="5" height="1.6"/>
+  <rect x="14" y="0" width="1.6" height="8"/><rect x="14" y="6.4" width="5" height="1.6"/>
+  <rect x="21" y="1.4" width="1.6" height="6.6"/><rect x="20.4" y="0" width="4.2" height="0.8"/>
+ </svg>
+</div>
+
+</div>
+
+<script src="../../runtime/mg-runtime.js"></script>
+<script>
+const $ = (id) => document.getElementById(id);
+const { seg, win, lerp, interp } = MG;
+const e = MG.ease.inOut3, eo = MG.ease.out3;
+const st = (el, o, tf, bl) => { el.style.opacity = o; if (tf !== undefined) el.style.transform = tf; if (bl !== undefined) el.style.filter = bl ? 'blur(' + bl + 'px)' : 'none'; };
+
+const bgPts=[[0,252],[.95,252],[1.05,0],[1.95,0],[2.0,252],[9.45,252],[10,56],[10.45,0],[12.4,0]];
+
+function render(t){
+ const g=Math.round(interp(t,bgPts));$('stage').style.background='rgb('+g+','+g+','+g+')';
+
+ // S1
+ $('s1').style.opacity=Math.min(1,win(t,-1,1.0,.07)+ (t<.1?1:0));
+ let p=e(seg(t,.38,.52)), i0=.92+.08*eo(seg(t,0,.25));
+ st($('r1'),1-p,'translateY('+(-26*p)+'px) scale('+i0+')',6*p);
+ st($('r2'),p,'translateY('+(26*(1-p))+'px)',6*(1-p));
+ const dp=eo(seg(t,0,.6));
+ const d=$('d1');d.style.left=lerp(880,32,dp)+'px';d.style.top=lerp(260,530,dp)+'px';
+ d.style.opacity=win(t,0,.62,.1)*(t<.1?1:1);d.style.transform='scale('+lerp(1,.9,dp)+')';
+
+ // S2
+ $('s2').style.opacity=win(t,1.0,2.0,.04);
+ const lw=6+54*eo(seg(t,1.05,1.4));
+ $('ln').style.width=lw+'px';$('ln').style.opacity=1-seg(t,1.35,1.5);
+ $('ut').style.opacity=seg(t,1.4,1.65)*(1-seg(t,1.85,1.98));
+ $('ut').style.letterSpacing=(10*(1-eo(seg(t,1.4,1.8))))+'px';
+ const lo=eo(seg(t,1.45,1.6))*(1-seg(t,1.8,1.95));
+ $('l1').style.opacity=lo;$('l2').style.opacity=lo;
+ $('l1').style.transform='scaleX('+eo(seg(t,1.45,1.7))+')';$('l2').style.transform='scaleX('+eo(seg(t,1.45,1.7))+')';
+
+ // S3
+ $('s3').style.opacity=win(t,1.97,2.42,.05);
+ const bk=1.70158, x=seg(t,2.0,2.35), sc=1+(bk+1)*Math.pow(x-1,3)+bk*Math.pow(x-1,2);
+ $('lg').style.transform='scale('+(0.5+0.5*sc)+') ';
+ $('lg').style.backgroundPosition=lerp(-100,200,seg(t,2.0,2.4))+'% 0';
+
+ // S4
+ $('s4').style.opacity=win(t,2.35,3.95,.08);
+ p=e(seg(t,3.25,3.45));
+ $('pl').style.width=lerp(150,104,p)+'px';
+ $('pc').style.opacity=1-p;$('pr').style.opacity=p;
+ $('pc').style.transform='translateY('+(-16*p)+'px)';$('pr').style.transform='translateY('+(16*(1-p))+'px)';
+ $('ic1').style.opacity=1-p;$('ic2').style.opacity=p;
+ const ds=$('dts').children, act=t<3.3?1:2;
+ for(let k=0;k<3;k++)ds[k].style.opacity=k===act?1:.25;
+ const press=seg(t,3.72,3.8)-seg(t,3.8,3.88);
+ $('pl').style.transform='scale('+(1-.06*press)+')';
+ const cv=seg(t,3.35,3.5);
+ $('cur').style.opacity=cv;$('cur').style.left=lerp(560,478,eo(seg(t,3.35,3.7)))+'px';$('cur').style.top=lerp(330,300,eo(seg(t,3.35,3.7)))+'px';
+ $('s4').style.transform='translateY('+(-18*seg(t,3.85,3.98))+'px)';
+ $('s4').style.filter=t>3.85?'blur('+(6*seg(t,3.85,3.98))+'px)':'none';
+
+ // S5
+ $('s5').style.opacity=win(t,3.9,5.5,.07);
+ p=eo(seg(t,3.92,4.45));
+ st($('lc'),p,'translateY('+(70*(1-p))+'px)',10*(1-p));
+ $('arw').style.transform='translateX('+(28*eo(seg(t,4.7,5.1)))+'px) rotate('+(-15*seg(t,4.7,5.1))+'deg)';
+ $('arw').style.opacity=1-.6*seg(t,4.9,5.1);
+ p=eo(seg(t,4.72,4.98));
+ $('ta').style.opacity=1-p;$('ta').style.transform='translateX('+(-60*p)+'px)';
+ $('tb').style.opacity=p;$('tb').style.transform='translateX('+(60*(1-p))+'px)';
+ $('rd').style.opacity=seg(t,5.0,5.1);
+
+ // S6
+ $('s6').style.opacity=win(t,5.38,6.5,.06);
+ p=eo(seg(t,5.38,5.62));
+ const fl=e(seg(t,6.15,6.5));
+ $('pn').style.transform='scale('+(lerp(.92,1,p)*lerp(1,.85,fl))+') rotateY('+(-90*fl)+'deg)';
+ p=seg(t,5.85,6.05);
+ $('bt').style.background='rgb('+Math.round(lerp(17,91,p))+','+Math.round(lerp(17,83,p))+','+Math.round(lerp(17,83,p))+')';
+ $('bl').style.color='rgba(255,255,255,'+(1-.6*p)+')';
+ $('sp').style.opacity=p;$('sp').style.transform='rotate('+(t*540%360)+'deg)';
+ $('cu2').style.opacity=seg(t,5.7,5.85)*(1-seg(t,6.2,6.3));
+ $('cu2').style.left=lerp(660,560,eo(seg(t,5.7,6.0)))+'px';$('cu2').style.top=lerp(400,396,eo(seg(t,5.7,6.0)))+'px';
+
+ // S7
+ $('s7').style.opacity=win(t,6.45,8.0,.06);
+ p=eo(seg(t,6.45,7.05));
+ $('rq').style.transform='rotateY('+(60*(1-p))+'deg) rotateZ('+(2.5*(1-p))+'deg) scale('+lerp(.8,1,p)+')';
+ $('pf').style.width=(100*interp(t,[[6.6,0],[7.0,.55],[7.5,.82],[7.95,1]]))+'%';
+ $('rs').textContent=t<7.25?'Finding driver nearby':'Found a driver!!!';
+
+ // S8
+ $('s8').style.opacity=win(t,7.9,8.45,.07);
+ p=eo(seg(t,7.9,8.2));
+ st($('ap'),1,'scale('+lerp(.92,1,p)+')',4*(1-p));
+
+ // S9
+ $('s9').style.opacity=win(t,8.35,8.95,.08);
+ p=eo(seg(t,8.35,8.65));
+ $('dc').style.transform='scale('+lerp(.94,1,p)+')';
+ $('dcar').style.transform='translateX('+(-130*(1-p))+'px)';
+ $('dtx').style.opacity=seg(t,8.45,8.7);
+
+ // S10
+ $('s10').style.opacity=win(t,8.85,9.55,.1);
+ p=eo(seg(t,8.85,9.15));
+ $('ac').style.left=lerp(-130,130,p)+'px';
+ $('ac').style.transform='translateX('+(700*eo(seg(t,9.25,9.55)))+'px)';
+ st($('at'),seg(t,8.9,9.15),'translateY('+(14*(1-p))+'px)');
+
+ // S11
+ $('s11').style.opacity=win(t,9.9,10.9,.1);
+
+ // S12
+ $('s12').style.opacity=seg(t,10.85,11.1);
+ p=eo(seg(t,10.85,11.25));
+ $('pe').style.transform='scale('+lerp(.85,1,p)+')';
+ $('pe').style.opacity=.8+.2*Math.abs(Math.sin(t*2.2));
+
+}
+
+MG.register({ duration: 12.33, fps: 30, width: 928, height: 576, render });
+</script>
+</body>
+</html>
