@@ -688,6 +688,8 @@ export class Sessions {
     if (event.t === 'thinking') event.at ??= Date.now() // panel de etapas
     // El error nombra el plan de quien falló, aunque el hilo pase luego a otro agente.
     if (event.t === 'turn_end' && !event.ok) event.agente ??= proveedorDe(meta.model)
+    // Con qué modelo fue el turno, para la actividad de cada agente en Opciones (`server/actividad-agentes.ts`).
+    if (event.t === 'turn_end') event.model ??= meta.model
     const list = this.load(id)
     list.push(event)
     this.anotar(id, JSON.stringify(event) + '\n')

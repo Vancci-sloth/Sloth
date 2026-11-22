@@ -56,6 +56,7 @@ import { equipo } from './equipo.ts' // tu equipo
 import { celular } from './celular.ts' // tu celular
 import { licencia } from './licencia.ts' // suscripción
 import { Sessions, ultimoTexto } from './sessions.ts'
+import { actividadAgentes } from './actividad-agentes.ts' // actividad de los agentes
 import { mantenerVoz } from './voz-viva.ts'
 import { avisoDeVideos } from '../shared/limites.ts'
 import { eventosEnVivo } from './eventos-en-vivo.ts'
@@ -182,6 +183,8 @@ const sessions = new Sessions(
 
 /** Si el hilo es de un estilo de video: solo su estudio enseña lo que va escribiendo. */
 const conEtapas = (id: string) => !!cards().find((c) => c.id === sessions.meta(id)?.cardId)?.etapas?.length
+/** La actividad de cada agente, de los historiales de los hilos (Opciones). */
+const usoAgente = actividadAgentes(join(APP, 'data', 'sessions'), () => sessions.list())
 sessions.esVideo = (meta) => !!cards().find((c) => c.id === meta.cardId)?.etapas?.some((e) => e.fase)
 // Con otra cuenta de Claude, los hilos quietos sueltan su Claude Code: el siguiente mensaje ya va con ella.
 alEntrarClaude(() => sessions.soltarQuietos('claude'))
@@ -495,6 +498,11 @@ async function api(req: IncomingMessage, res: ServerResponse, url: URL): Promise
   if (await movil.api(req, res, path)) return true // tu celular
   if (await narrar.api(req, res, path)) return true // voz de AI Studio
   if (await generarFlow.api(req, res, path)) return true // Google Flow
+
+  if (path === '/api/actividad-agentes' && method === 'GET') {
+    const p = url.searchParams.get('agente') as Proveedor
+    return PROVEEDORES.includes(p) ? send(res, 200, await usoAgente(p)) : send(res, 400, { error: 'Ese agente no existe.' })
+  }
 
   if (path === '/api/opciones' && method === 'GET') {
     send(res, 200, opciones())

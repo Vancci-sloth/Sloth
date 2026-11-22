@@ -437,7 +437,7 @@ export type AgentEvent =
    * `relevo`: la sesión del agente ya no sirve; el hilo sigue en otra con un resumen, sola (`sigue`) o con el siguiente
    * mensaje. `agente`: de un turno que falló, quién lo llevaba (el hilo puede pasar luego a otro).
    */
-  | { t: 'turn_end'; at: number; ok: boolean; error?: string; costUsd?: number; tokens?: Tokens; caida?: boolean; relevo?: 'sigue' | 'espera'; agente?: Proveedor }
+  | { t: 'turn_end'; at: number; ok: boolean; error?: string; costUsd?: number; tokens?: Tokens; caida?: boolean; relevo?: 'sigue' | 'espera'; agente?: Proveedor; model?: string }
   | { t: 'info'; text: string }
   /** El agente tarda en arrancar: `dura`, lo que se espera en ms, desde `desde`. `listo`: ya arrancó. El fin del turno también lo acaba. */
   | { t: 'arranque'; nombre: string; desde: number; dura: number; listo?: boolean }

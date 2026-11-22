@@ -2,6 +2,7 @@ import { type ReactNode, type Ref, useEffect, useRef, useState } from 'react'
 import { type CuentaClaude as Cuenta, type Opciones as Datos, type EstadoAgente, type LimitesClaude, type Model, type NavegadorDeFuera, NAVEGADOR_REDES, type Requisito, type VersionClaude } from '../../shared/types'
 import { api } from './api'
 import { Arranque } from './Arranque'
+import { ActividadAgentes } from './ActividadAgente' // actividad de los agentes
 import { type Proveedor, proveedorDe } from '../../shared/providers'
 import { encender, encendido, notificar, sonar, usePermiso } from './avisos'
 import { abrirBienvenida } from './Bienvenida'
@@ -129,6 +130,9 @@ function Ajustes({ onDone, iniciando, onIniciando }: { onDone(): void; iniciando
         {OTROS_AGENTES.map((p) => (
           <CuentaAgente key={p} p={p} />
         ))}
+      </Grupo>
+      <Grupo titulo="Actividad de los agentes" nota="Cuánto trabajó cada agente en tus hilos: los turnos y los tokens que dijo, día por día.">
+        <ActividadAgentes />
       </Grupo>
       <Grupo titulo="Sobre ti" nota="A qué te dedicas, tu canal, tu público y cómo te gusta que te hablen. Todos los agentes lo leen al empezar cada chat, así no lo repites en cada video. Lo que pidas en un mensaje manda sobre esto.">
         <SobreTi />

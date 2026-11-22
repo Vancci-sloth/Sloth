@@ -225,6 +225,8 @@ Este es el mapa:
 - `server/equipo.ts` y `web/src/Equipo.tsx`: Opciones → Tu equipo. Qué eligió Sloth para esta computadora y cuánto
   tarda aquí la voz y el render, de lo que midió (`equipo.json`, junto a los modelos). Si puede ir más rápido (Parakeet
   sin NVIDIA), el hilo nuevo lo ofrece arriba.
+- `server/actividad-agentes.ts` y `web/src/ActividadAgente.tsx`: Opciones → Actividad de los agentes. Turnos y tokens de
+  cada agente y modelo por día, de los últimos 91 días, leídos de los cierres de turno de cada hilo (`turn_end.model`).
 - `server/espacio.ts` y `web/src/Espacio.tsx`: Opciones → Espacio en disco. Lo que dejan los videos y no hace falta
   (temporales de Remotion, pedazos de render, `node_modules` repetidos, cachés viejas); lo seguro lo borra solo cada
   6 horas si nada trabaja. Las skills evitan dejarlo con `espacio.py` y `remotion.cjs` de video-base. «Cambiar de disco…»
