@@ -10,6 +10,7 @@ import { esIconoValido } from '../../iconos'
 import type { RutasCelular } from '../../rutas'
 import { useLlave } from '../../local/llave'
 import { c, radio } from '../../tema'
+import { Actualizacion } from '../../actualizacion'
 import { Aviso, Boton, Gamma, Punto } from '../../ui'
 
 export function InicioLocal() {
@@ -29,6 +30,7 @@ export function InicioLocal() {
             <Text style={s.modoTexto}>Trabajando en este celular</Text>
           </View>
           <Gamma corto />
+          <Actualizacion />
           <Text style={s.titulo}>¿Qué hacemos hoy?</Text>
           <Text style={s.sub}>Elige un estilo y cuéntale qué video quieres. Aquí se hacen la idea, la investigación y el guion; el video final lo arma tu computadora cuando se lo pases.</Text>
           {llave === null && (

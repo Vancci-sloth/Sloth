@@ -3,6 +3,19 @@
     "name": "Sloth",
     "slug": "sloth",
     "version": "0.1.1",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://api.sloth.vancci.org/celular/actualizacion",
+      "checkAutomatically": "ON_LOAD",
+      "fallbackToCacheTimeout": 0,
+      "codeSigningCertificate": "./certificados/certificate.pem",
+      "codeSigningMetadata": {
+        "keyid": "main",
+        "alg": "rsa-v1_5-sha256"
+      }
+    },
     "scheme": "slothmovil",
     "orientation": "portrait",
     "icon": "./assets/icon.png",

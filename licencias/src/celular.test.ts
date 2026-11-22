@@ -32,6 +32,8 @@ function cobro(cobra: boolean) {
 test('apagado, abre para todos; encendido, solo apoya quien paga hoy', async () => {
   const apagado = cobro(false)
   assert.equal((await apagado.pregunta({ equipo: 'celular-uno' })).cobra, false)
+  const sinClave = await apagado.pregunta({ equipo: 'celular-uno', clave: 'SLOTH-ZZZZ-ZZZZ-ZZZZ-ZZZZ' })
+  assert.deepEqual([sinClave.status, sinClave.cobra], [200, false], 'apagado, una clave que ya no existe no cierra nada')
 
   const c = cobro(true)
   c.fila('SLOTH-AAAA-AAAA-AAAA-AAAA', 'apoya@x.com', 'mensual', 'authorized', manana)

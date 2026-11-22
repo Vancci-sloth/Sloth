@@ -11,6 +11,7 @@ import { useConexion } from '../conexion'
 import { Icono } from '../Icono'
 import { refrescar, useSloth } from '../sloth'
 import { c, radio } from '../tema'
+import { Actualizacion } from '../actualizacion'
 import { Aviso, Cargando, Gamma, Punto } from '../ui'
 import type { Rutas } from '../rutas'
 
@@ -46,6 +47,7 @@ export function Estilos() {
             </Text>
           </View>
           <Gamma corto />
+          <Actualizacion />
           <Text style={s.titulo}>¿Qué hacemos hoy?</Text>
           <Text style={s.sub}>Elige un estilo y cuéntale qué video quieres. Tu computadora hace el trabajo y aquí lo ves en vivo.</Text>
           {!!error && <Aviso texto={error} />}

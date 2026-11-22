@@ -43,3 +43,5 @@ yarn-error.*
 # Se generan con `npx expo prebuild` o en EAS (Continuous Native Generation): no se editan a mano.
 /ios
 /android
+# El certificado de las actualizaciones es público (la app lo trae dentro); su llave privada nunca entra al repo.
+!certificados/certificate.pem

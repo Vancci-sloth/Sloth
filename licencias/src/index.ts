@@ -70,6 +70,7 @@
  * con la misma clave (`/respaldo*`, en `respaldo.ts`).
  */
 import type { VersionLiberable } from '../../shared/types.ts'
+import { actualizarCelular } from './actualizar-celular.ts'
 import { celular } from './celular.ts'
 import { aLaVista, comunidad, creditos, olvidarSueltos } from './comunidad.ts'
 import { guardado } from './guardado.ts'
@@ -574,6 +575,7 @@ async function atender(req: Request, env: Env, ctx: ExecutionContext, url: URL):
     if (req.method === 'POST' && url.pathname === '/a-mano') return await aMano(req, env)
     if (req.method === 'POST' && url.pathname === '/bajar-apoyo') return await bajarApoyo(req, env)
     if (req.method === 'POST' && url.pathname === '/celular') return await celular(req, env, await cuerpo(req))
+    if (url.pathname.startsWith('/celular/')) return await actualizarCelular(req, env, url)
     if (url.pathname === '/comunidad' || url.pathname.startsWith('/comunidad/')) return await comunidad(req, env, url, ctx)
     if (url.pathname === '/voz' || url.pathname.startsWith('/voz/')) return await voz(req, env, ctx, url)
     if (url.pathname === '/respaldo' || url.pathname.startsWith('/respaldo/')) return await respaldo(req, env, url)
@@ -1936,7 +1938,7 @@ export function redDe(ip: string): string {
 }
 
 /** Si pide quien publica, con la llave `PUBLICAR`. */
-const conLlave = (req: Request, env: Env) => !!env.PUBLICAR && iguales(req.headers.get('authorization') ?? '', `Bearer ${env.PUBLICAR}`)
+export const conLlave = (req: Request, env: Env) => !!env.PUBLICAR && iguales(req.headers.get('authorization') ?? '', `Bearer ${env.PUBLICAR}`)
 
 /** Si pide el creador: con su llave `ADMIN`, o con la de publicar, que también lo es. */
 export const delCreador = (req: Request, env: Env) => conLlave(req, env) || (!!env.ADMIN && iguales(req.headers.get('authorization') ?? '', `Bearer ${env.ADMIN}`))

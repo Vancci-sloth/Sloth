@@ -3,7 +3,7 @@ import { useState } from 'react'
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native'
 import { useNavigation } from '@react-navigation/native'
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack'
-import Constants from 'expo-constants'
+import { versionDeLaApp } from '../../actualizacion'
 import { useConexion } from '../../conexion'
 import { Icono, type NombreIcono } from '../../Icono'
 import { useLlave } from '../../local/llave'
@@ -33,7 +33,7 @@ export function MasLocal() {
           onPress={() => elegirModo('computadora')}
         />
       </View>
-      <Text style={s.version}>{`Sloth para celular ${Constants.expoConfig?.version ?? ''} · versión GAMMA`}</Text>
+      <Text style={s.version}>{`Sloth para celular ${versionDeLaApp()} · versión GAMMA`}</Text>
     </ScrollView>
   )
 }

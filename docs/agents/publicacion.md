@@ -318,14 +318,29 @@ bienvenida, Inicio y Más) y la página de venta (`#celular`). Mientras sea gamm
 Se compila en Linux con `App del celular (Android)` (`.github/workflows/celular.yml`), sin EAS: en Windows no compila,
 porque las rutas de C++ de React Native pasan de 260 caracteres (ni desde `C:\s\m` ni con `CMAKE_OBJECT_PATH_MAX`), y
 activar las rutas largas pide administrador. En una PR que toca `movil/` deja el `.apk` como artefacto; corrido a mano
-desde `main` (`gh workflow run celular.yml`) lo sube encima del release `celular-gamma` (prerelease), siempre con el mismo
-nombre: la página enlaza `releases/download/celular-gamma/Sloth-gamma.apk`.
+desde `main` con `gh workflow run celular.yml -f publicar=apk` lo sube encima del release `celular-gamma` (prerelease),
+siempre con el mismo nombre: la página enlaza `releases/download/celular-gamma/Sloth-gamma.apk`.
 
 Se firma con la llave de Sloth, en los secretos `SLOTH_ANDROID_KEYSTORE` (base64) y `SLOTH_ANDROID_CLAVE`; el original
 está en `%APPDATA%\sloth\movil\` (`sloth-android.keystore` y su contraseña en `llave-android.json`). **Sin esa llave no
-se puede actualizar la app ya instalada** (Android rechaza una firma distinta): respáldala. Cada versión nueva sube
-`version` y `android.versionCode` en `app.json`. Antes de correrlo a mano, prueba el artefacto de la PR en el emulador
-(`adb install -r`).
+se puede actualizar la app ya instalada** (Android rechaza una firma distinta): respáldala. Antes de correrlo a mano,
+prueba el artefacto de la PR en el emulador (`adb install -r`).
+
+### Actualizar sin otro .apk
+
+Desde la 0.1.1, la app trae `expo-updates`: lo que no es nativo (pantallas, textos, el agente, los estilos) le llega
+sola, sin bajar nada, con `gh workflow run celular.yml -f publicar=actualizacion` desde `main`. La baja al abrir y se
+pone la siguiente vez que se abre; Inicio avisa «Hay una versión nueva de Sloth lista» con «Reiniciar», y Más dice de
+qué día es la que corre. Cada una va firmada (`movil/scripts/publicar-actualizacion.mjs`) con la llave del secreto
+`SLOTH_CELULAR_ACTUALIZACIONES`; el original está en `%APPDATA%\sloth\movil\actualizaciones\` (respáldala con la otra)
+y su certificado, que la app trae dentro, en `movil/certificados/certificate.pem` (vence en 2056). El cobro solo las
+guarda y las sirve (`licencias/src/actualizar-celular.ts`, en R2 bajo `celular/`).
+
+Una actualización solo llega a las apps con la misma `version` de `app.json` (`runtimeVersion` con la política
+`appVersion`). Lo nativo no viaja así: un paquete nuevo con código nativo (`npx expo install` de algo que no es solo
+JavaScript), un permiso, un plugin o un cambio de `app.json` fuera de lo que lee JavaScript. Para eso, sube `version` y
+`android.versionCode` y saca otro `.apk`; publicar una actualización con código nativo nuevo sobre la versión de antes
+truena en los celulares. Para deshacer una, revierte el commit y publica otra.
 
 ### El candado del celular: solo para quienes apoyan
 

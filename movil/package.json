@@ -24,6 +24,7 @@
     "expo-splash-screen": "~58.0.14",
     "expo-status-bar": "~58.0.5",
     "expo-system-ui": "~58.0.7",
+    "expo-updates": "~58.0.22",
     "expo-video": "~58.0.14",
     "marked": "^18.2.1",
     "react": "19.3.0",
