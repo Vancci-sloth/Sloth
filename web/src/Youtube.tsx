@@ -1,9 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
-import { createPortal } from 'react-dom'
 import type { ConexionYoutube } from '../../shared/youtube'
 import { api } from './api'
 import { Logo } from './Logos'
-import { RevisionYoutube } from './YoutubeProgramar'
+import { abrirRevisionYoutube } from './youtube-ruta'
 import './Youtube.css'
 
 /** YouTube: la conexión OAuth en Opciones y el acceso a la revisión desde Entrega y las galerías. */
@@ -137,10 +136,7 @@ function Legal() {
 
 type VideoYoutube = { cardId: string; ruta: string; titulo: string }
 
+/** Abre la revisión de YouTube (`#/youtube`) solo con este video. */
 export function YoutubeBoton({ video, disabled, chico, nombre }: { video: VideoYoutube; disabled?: boolean; chico?: boolean; nombre?: string }) {
-  const [abierto, setAbierto] = useState(false)
-  return <>
-    <button type="button" className={chico ? 'youtube-boton' : 'final-boton'} title={video.ruta} disabled={disabled} onClick={(e) => { e.stopPropagation(); setAbierto(true) }}>{nombre ? `Revisar ${nombre} para YouTube` : 'Revisar YouTube'}</button>
-    {abierto && createPortal(<RevisionYoutube cardId={video.cardId} ruta={video.ruta} cerrar={() => setAbierto(false)} />, document.body)}
-  </>
+  return <button type="button" className={chico ? 'youtube-boton' : 'final-boton'} title={video.ruta} disabled={disabled} onClick={(e) => { e.stopPropagation(); abrirRevisionYoutube(video.cardId, video.ruta) }}>{nombre ? `Revisar ${nombre} para YouTube` : 'Revisar YouTube'}</button>
 }

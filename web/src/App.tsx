@@ -1,6 +1,7 @@
 import { memo, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { CANAL_CARD, IDEAS_CARD } from '../../shared/ideas' // ideas
 import { MODELO3D_CARD } from '../../shared/modelos3d' // modelos 3D
+import { PUBLICACIONES_CARD } from '../../shared/publicaciones' // «Organizar en chat» de YouTube
 import { REVISION_CARD } from '../../shared/revision' // revisión de estilos
 import type { Afinado, AvanceCorto, AvisoComunidad, Card, Marcas, RifaGanada, Model, Previa, Serie, ServerPush, SessionMeta, VideoHecho } from '../../shared/types'
 import { NOMBRE_AGENTE, PROVEEDORES, proveedorDe } from '../../shared/providers'
@@ -43,7 +44,7 @@ import { SinApoyo } from './SinApoyo' // estilos de la comunidad, sin apoyo
 import { Bienvenida } from './Bienvenida'
 import { AvisoMacViejo } from './AvisoMacViejo'
 import { MarcaAgente } from './Logos'
-import { YoutubeLote } from './YoutubeProgramar'
+import { RevisionYoutube, YoutubeLote } from './YoutubeProgramar'
 import { CalendarioYoutube } from './YoutubeCalendario'
 import { avisarTanda, AvisoRedes, ConNavegadorRedes, usePublicar } from './Redes' // redes
 import { NombreDelHilo, Renombrar } from './Renombrar'
@@ -68,6 +69,8 @@ type View =
   | { kind: 'modelos3d' } // modelos 3D
   | { kind: 'comunidad' } // comunidad
   | { kind: 'admin'; pestana?: PestanaAdmin } // Administrador, solo en la computadora del creador
+  /** La revisión de YouTube (`youtube-ruta.ts`): `volver` es la vista de donde se abrió. */
+  | { kind: 'youtube'; cardId?: string; ruta?: string; volver: string }
 
 /** Lo que se escribió en un hilo nuevo sin mandarlo. Vive en localStorage hasta que se manda o se borra. */
 type Saved = Draft & { cardId: string; at: number }
@@ -79,6 +82,11 @@ const newId = () => Math.random().toString(36).slice(2, 10)
 
 /** La vista sale del hash (#/s/<id>, #/d/<id>, #/new/<card>), así sobrevive a las recargas de cuando la app se edita sola. */
 function readHash(): View {
+  if (/^#\/youtube(?:\?|$)/.test(location.hash)) {
+    const p = new URLSearchParams(location.hash.split('?')[1] ?? '')
+    const volver = p.get('volver') ?? ''
+    return { kind: 'youtube', cardId: p.get('cardId') || undefined, ruta: p.get('ruta') || undefined, volver: volver.startsWith('#/') && !volver.startsWith('#/youtube') ? volver : '#/mis-videos' }
+  }
   const [, kind, id] = location.hash.split('/')
   if (kind === 's' && id) return { kind: 'session', id }
   if (kind === 'd' && id) return { kind: 'draft', id }
@@ -95,6 +103,7 @@ function readHash(): View {
 const irAPestanaAdmin = (pestana: PestanaAdmin) => go({ kind: 'admin', pestana })
 
 function go(view: View) {
+  if (view.kind === 'youtube') return void (location.hash = view.volver)
   location.hash =
     view.kind === 'session'
       ? `/s/${view.id}`
@@ -347,7 +356,7 @@ export function App() {
   }
 
   // Los hilos de Ideas, los de «Nuevo modelo» y los que revisan un estilo son de una card que no sale en el inicio: les da su icono.
-  const cardOf = (id: string) => cards.find((c) => c.id === id) ?? [IDEAS_CARD, CANAL_CARD, MODELO3D_CARD, REVISION_CARD].find((c) => c.id === id)
+  const cardOf = (id: string) => cards.find((c) => c.id === id) ?? [IDEAS_CARD, CANAL_CARD, MODELO3D_CARD, REVISION_CARD, PUBLICACIONES_CARD].find((c) => c.id === id)
   // Antes de dibujar: las etiquetas de hilo del compositor y de las burbujas lo leen al pintarse.
   threadIcons.clear()
   for (const s of sessions) {
@@ -737,6 +746,7 @@ export function App() {
           />
         )}
         {view.kind === 'modelos3d' && <Modelos3D />} {/* modelos 3D */}
+        {view.kind === 'youtube' && <RevisionYoutube key={`${view.cardId ?? ''}:${view.ruta ?? ''}`} cardId={view.cardId} ruta={view.ruta} cerrar={() => (location.hash = view.volver)} />}
         {view.kind === 'comunidad' && <Comunidad />}
         {/* Se arma oculto en cuanto Sloth queda quieto (o al entrar): abrirlo después es solo enseñarlo. */}
         {esCreador && (view.kind === 'admin' || adminArmado) && (

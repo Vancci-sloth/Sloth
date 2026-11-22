@@ -43,6 +43,7 @@ import { afinar } from './afinar.ts'
 import { estilos } from './estilos.ts' // estilos compartidos
 import { CADA as CADA_REVISION, revisionDeEstilos } from './estilos-revision.ts' // revisión de estilos
 import { REVISION_CARD } from '../shared/revision.ts'
+import { PUBLICACIONES_CARD } from '../shared/publicaciones.ts' // «Organizar en chat» de YouTube
 import { carpetaTrabajo } from './trabajo.ts'
 import { redes } from './redes/index.ts' // redes
 import { elegirNavegador, navegadorDeFuera, navegadorEn } from './chromium.ts'
@@ -758,7 +759,8 @@ async function api(req: IncomingMessage, res: ServerResponse, url: URL): Promise
 
   if (path === '/api/sessions' && method === 'POST') {
     const input = await body<{ cardId: string; model: string; effort?: string; text: string; images?: string[]; masDeDos?: boolean }>(req)
-    const card = cards().find((c) => c.id === input.cardId)
+    // «Organizar en chat» (revisión de YouTube) abre un chat de una card que no sale en el inicio.
+    const card = input.cardId === PUBLICACIONES_CARD.id ? { ...PUBLICACIONES_CARD, cwd: join(carpetaTrabajo(APP), PUBLICACIONES_CARD.id) } : cards().find((c) => c.id === input.cardId)
     if (!card) return send(res, 404, { error: 'No existe esa card' }), true
     if (card.bloqueada) return send(res, 402, { error: SIN_APOYO }), true
     if (card.etapas?.some((e) => e.fase) && pideConfirmar(res, input.masDeDos)) return true
