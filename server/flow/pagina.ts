@@ -3,7 +3,7 @@ import { mkdirSync, readFileSync } from 'node:fs'
 import { extname, join } from 'node:path'
 import type { Browser, Locator, Page } from 'playwright-core'
 import { paginaNueva } from '../chromium.ts'
-import { creditosDe, FORMATOS_IMAGEN, FORMATOS_VIDEO, gastoDeRechazo, PALABRA_CREDITOS, type Saldo, saldoDe } from '../../shared/flow.ts'
+import { creditosDe, FORMATOS_IMAGEN, FORMATOS_VIDEO, gastoDeRechazo, PALABRA_CREDITOS, type Saldo, saldoDe, sinSesion } from '../../shared/flow.ts'
 
 /**
  * Lo que se hace en la página de Google Flow. Se usan los iconos (el nombre de cada `mat-icon`), no los textos: Flow sale
@@ -84,7 +84,7 @@ async function ir(page: Page, url: string) {
   for (let i = 0; i < 3; i++) {
     await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60_000 })
     await page.waitForLoadState('networkidle', { timeout: 20_000 }).catch(() => {})
-    if (page.url().startsWith('https://accounts.google.com/')) throw new SinEmpezar('Flow ya no tiene la sesión de esta cuenta de Google: vuelve a conectarla (la de la voz en Opciones → Voz; las demás, agregándola otra vez en Opciones → Google Flow).', '', true)
+    if (sinSesion(page.url())) throw new SinEmpezar('Flow ya no tiene la sesión de esta cuenta de Google: vuelve a conectarla (la de la voz en Opciones → Voz; las demás, agregándola otra vez en Opciones → Google Flow).', '', true)
     if (!(await page.locator('mat-dialog-container').first().waitFor({ timeout: NOVEDADES }).then(() => true, () => false))) return
   }
 }

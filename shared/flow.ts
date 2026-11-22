@@ -251,3 +251,11 @@ export function hechoDeFlow(salida: string): HechoFlow | null {
   if (!m) return null
   return { archivo: m[1], modelo: m[2], creditos: Number(m[3]), ...(m[4] ? { cuenta: m[4] } : {}), ...(m[5] ? { pedido: m[5] } : {}), ...(m[6] ? { quedan: Number(m[6]) } : {}) }
 }
+
+/**
+ * Si la página dice que la cuenta ya no tiene sesión en Flow: Google la manda a entrar o, si conserva la de Google pero
+ * no la de Flow, a la página pública (`/about`, «Crear con Google Flow»). Esa página tiene su propio ⋮, y sin verla así
+ * todo pedido fallaba con «locator.waitFor: Timeout 10000ms exceeded» en vez de pasar a otra cuenta (avisado desde una
+ * Mac, 21 de noviembre de 2026).
+ */
+export const sinSesion = (url: string) => url.startsWith('https://accounts.google.com/') || /^https:\/\/flow\.google\.com\/about\b/.test(url)

@@ -1,1 +1,1 @@
-Sloth en la nube ya no se detiene mientras la usas: deja abierta la pestaña de tu Codespace y Sloth le avisa a GitHub.
+Arreglo express: si una cuenta de Google Flow pierde su sesión, Sloth ya no falla con «locator.waitFor: Timeout»: pasa el pedido a otra cuenta sin gastar y te dice cuál reconectar.
