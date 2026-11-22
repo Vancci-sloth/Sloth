@@ -73,7 +73,7 @@ export function TuEquipo() {
   }
 
   const voz = !e?.motor
-    ? 'Falta el Python de Sloth: descárgalo en Herramientas de video.'
+    ? <>Falta el Python de Sloth. Descárgalo en <a href="#/opciones/equipo/herramientas">Herramientas de video</a>.</>
     : e.midiendo
       ? 'Midiendo cuánto tarda aquí… (unos 30 s)'
       : e.voz
@@ -128,7 +128,7 @@ export function TuEquipo() {
   )
 }
 
-function Fila({ icono, nombre, detalle, children }: { icono: NombreIcono; nombre: string; detalle: string; children?: ReactNode }) {
+function Fila({ icono, nombre, detalle, children }: { icono: NombreIcono; nombre: string; detalle: ReactNode; children?: ReactNode }) {
   return (
     <div className="item">
       <div className="fila">

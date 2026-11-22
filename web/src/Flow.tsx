@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { IMAGEN_CHATGPT, MODELOS_IMAGEN, OPCIONES_CLIPS } from '../../shared/flow'
 import type { CuentaClaude, CuentaEnFlow, EstadoFlow, GastoFlow } from '../../shared/types'
-import { api } from './api'
+import { api, leerCuenta } from './api'
 import { Picker } from './Composer'
 import { Confirm } from './Confirm'
 import { Logo } from './Logos'
@@ -47,7 +47,7 @@ export function useFlow() {
   const cada = estado?.agregando ? 2000 : estado?.leyendo ? 3000 : estado?.enFila ? 5000 : 0
   useEffect(() => {
     if (!cada) return
-    const t = setInterval(() => void recibir(api('/api/flow')), cada)
+    const t = setInterval(() => { if (!document.hidden) void recibir(api('/api/flow')) }, cada)
     return () => clearInterval(t)
   }, [cada])
   return { estado, error, recibir, poner: setEstado }
@@ -87,7 +87,7 @@ export function useChatGPT(): boolean {
     'chatgpt',
     false,
     () => {
-      if (!chatgpt || Date.now() - chatgpt.cuando > 60_000) chatgpt = { cuando: Date.now(), lectura: api<CuentaClaude>('/api/codex/cuenta').then((c) => c.conectada, () => false) }
+      if (!chatgpt || Date.now() - chatgpt.cuando > 60_000) chatgpt = { cuando: Date.now(), lectura: leerCuenta<CuentaClaude>('/api/codex/cuenta').then((c) => c.conectada, () => false) }
       return chatgpt.lectura
     },
     []
@@ -108,6 +108,7 @@ export function SelectorImagenes({ valor, hayChatGPT, voz, flow, onCambio }: { v
     <>
       <Picker
         label={label}
+        className="selector-imagenes"
         value={valor}
         menuWidth={300}
         disabled={!voz.estado || voz.estado.conectando}
@@ -162,7 +163,7 @@ export function SelectorClips({ valor, onCambio }: { valor: string; onCambio(mod
  * cada una con cómo está, lo que le queda y su menú; lo gastado en videos hoy y este mes, y los dos ajustes. Al abrirse
  * lee lo que les queda a las que nunca se leyeron; a todas, con «Actualizar créditos» (abre su Flow sin ventana).
  */
-export function FlowOpciones({ voz }: { voz: UsoVoz }) {
+export function FlowOpciones({ voz, privacidad }: { voz: UsoVoz; privacidad: boolean }) {
   const { estado: e, error, recibir, poner } = useFlow()
   const [pidiendo, setPidiendo] = useState(false)
   const [quitando, setQuitando] = useState<string>()
@@ -178,18 +179,19 @@ export function FlowOpciones({ voz }: { voz: UsoVoz }) {
   // Al abrirse, en cuanto se sabe cuáles faltan: las que se agreguen después se leen solas en el servidor.
   const cargado = !!e
   useEffect(() => {
-    if (e?.cuentas.some((c) => !c.saldo)) leer(true)
-  }, [cargado])
+    if (!privacidad && e?.cuentas.some((c) => !c.saldo)) leer(true)
+  }, [cargado, privacidad])
   return (
     <div className="item">
+      {!privacidad && <>
       <div className="fila">
-        <Logo de="gemini" />
+        <Logo de="flow" />
         <div className="fila-nombre">
-          <strong>Google Flow</strong>
+          <strong>Cuentas de Google</strong>
           <span>
             {n
               ? `Veo y Nano Banana con ${n === 1 ? 'una cuenta' : `${n} cuentas`} · quedan ${e?.quedan ?? 0} créditos${e?.enFila ? ` · generando ${e.enFila}` : ''}`
-              : 'Conecta arriba la cuenta de la voz o agrega aquí una cuenta de Google.'}
+              : 'Agrega una cuenta aquí o conéctala en Google AI Studio.'}
           </span>
         </div>
         {e?.agregando ? (
@@ -234,11 +236,12 @@ export function FlowOpciones({ voz }: { voz: UsoVoz }) {
                       label: 'Cuenta',
                       options: [
                         { value: 'abrir', label: 'Abrir Flow' },
-                        ...(c.deLaVoz ? [{ value: 'quitar', label: 'Quitar de Sloth (también de AI Studio)' }] : [{ value: 'conectar', label: 'Volver a conectar' }, { value: 'quitar', label: 'Quitar de Sloth' }])
+                        { value: 'conectar', label: 'Revisar sesión (conservar cuenta)' },
+                        { value: 'quitar', label: c.deLaVoz ? 'Quitar de Sloth (también de AI Studio)' : 'Quitar de Sloth' }
                       ]
                     }
                   ]}
-                  onChange={(q) => (q === 'quitar' ? setQuitando(c.correo) : q === 'conectar' ? agregar() : void recibir(api('/api/flow/abrir', { correo: c.correo })))}
+                  onChange={(q) => (q === 'quitar' ? setQuitando(c.correo) : void recibir(api('/api/flow/abrir', { correo: c.correo })))}
                 />
                 <span className="muted small una-linea" title={c.saldo ? `${texto}. Leído a las ${hora(c.saldo.leido)}.` : texto}>
                   {texto}
@@ -248,31 +251,27 @@ export function FlowOpciones({ voz }: { voz: UsoVoz }) {
           })}
         </div>
       )}
-      {e && (
-        <div className="fila-extra">
-          <label className="con-interruptor">
-            Ayudar a mejorar Flow
-            <button role="switch" aria-checked={e.aportar} className={`interruptor${e.aportar ? ' on' : ''}`} onClick={() => void recibir(api('/api/flow/ajustes', { aportar: !e.aportar }))}>
-              <span />
-            </button>
-          </label>
-          <p className="muted small">
-            Encendido, Google usa lo que generes para mejorar sus productos y su IA, y sus revisores pueden verlo. Se aplica en tu siguiente pedido. La primera vez, abre Flow y acepta su aviso.
-          </p>
-          <label className="con-interruptor">
-            Tengo los derechos de las imágenes que mando
-            <button
-              role="switch"
-              aria-checked={e.derechos}
-              className={`interruptor${e.derechos ? ' on' : ''}`}
-              onClick={() => (e.derechos ? void recibir(api('/api/flow/ajustes', { derechos: false })) : setPidiendo(true))}
-            >
-              <span />
-            </button>
-          </label>
-          <p className="muted small">Sin esto, Flow solo recibe texto: no puede repetir tu personaje ni seguir el estilo de tu video.</p>
+      </>}
+      {privacidad && (e ? <>
+        <div className="fila flow-preferencia">
+          <div className="fila-nombre">
+            <strong>Ayudar a mejorar Flow</strong>
+            <span>Google puede usar tus generaciones para mejorar su IA y sus revisores pueden verlas. Se aplica al siguiente pedido. La primera vez, abre Flow y acepta su aviso.</span>
+          </div>
+          <button type="button" role="switch" aria-label="Ayudar a mejorar Flow" aria-checked={e.aportar} className={`interruptor${e.aportar ? ' on' : ''}`} onClick={() => void recibir(api('/api/flow/ajustes', { aportar: !e.aportar }))}>
+            <span />
+          </button>
         </div>
-      )}
+        <div className="fila flow-preferencia">
+          <div className="fila-nombre">
+            <strong>Enviar imágenes de referencia</strong>
+            <span>Confirma que tienes los derechos para enviar referencias de personajes o estilo. Con el ajuste apagado, Flow recibe solo texto.</span>
+          </div>
+          <button type="button" role="switch" aria-label="Enviar imágenes de referencia" aria-checked={e.derechos} className={`interruptor${e.derechos ? ' on' : ''}`} onClick={() => (e.derechos ? void recibir(api('/api/flow/ajustes', { derechos: false })) : setPidiendo(true))}>
+            <span />
+          </button>
+        </div>
+      </> : !error && <p className="fila muted small" role="status">Cargando preferencias de Flow…</p>)}
       {pidiendo && <AvisoDerechos onHecho={poner} onCerrar={() => setPidiendo(false)} />}
       {quitando &&
         (quitandoVoz ? (

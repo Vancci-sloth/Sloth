@@ -8,6 +8,7 @@ import { abrirBorrador, abrirHilo, CompartirTuyo, type Instalado, TrasInstalar }
 import { LINK } from './etiquetas'
 import { Unirse } from './Licencia'
 import { Icono as IconoBase, type NombreIcono, trazosDe } from './Iconos'
+import { CampoAscii } from './CampoAscii'
 import { Liberar } from './Liberar'
 import { Fondo } from './Fondo'
 import { VerEvidencia } from './Evidencia'
@@ -428,7 +429,8 @@ export function Comunidad() {
   const escribe = escribiendo && seccionDe(escribiendo.seccion)
 
   return (
-    <div className="com" ref={raiz} {...soltar}>
+    <div className="com fondo-ramas" ref={raiz} {...soltar}>
+      <CampoAscii variante="ramas" />
       <div className="com-rejilla">
         <main className="com-centro">
           <header className="com-cabeza">

@@ -3,23 +3,32 @@
  * abajo, Opciones y Reiniciar backend. Los títulos de sección se ven como los grupos de Opciones.
  */
 
-.sidebar { display: flex; flex-direction: column; background: var(--panel); border-right: 1px solid var(--line); min-height: 0; }
-.brand { display: flex; align-items: center; gap: 10px; padding: 16px 16px 12px; font-weight: 700; font-size: 15px; letter-spacing: -0.01em; }
+.sidebar { display: flex; flex-direction: column; background: var(--bg); border-right: 1px solid var(--linea-tarjeta); min-height: 0; }
+.brand { display: flex; align-items: center; gap: 9px; padding: 6px 0; font-weight: 700; font-size: 15px; letter-spacing: -0.01em; }
 .brand img { width: 26px; height: 26px; }
 
 /* Las dos de arriba son filas como las de los hilos, con su icono en la misma columna. */
-.new-chat, .buscar { display: flex; align-items: center; gap: 9px; height: 34px; margin: 0 8px 2px; padding: 0 8px; border-radius: 8px; text-align: left; transition: background 0.15s, color 0.15s; }
-.new-chat { color: var(--text); font-weight: 600; }
-.new-chat:hover, .new-chat.active { background: var(--panel-2); }
-.new-chat-icon { width: 18px; height: 18px; flex: none; display: grid; place-items: center; border: 1px solid var(--line); border-radius: 5px; font-size: 14px; line-height: 1; color: var(--amber); }
-.new-chat-icon .ico { width: 12px; height: 12px; stroke-width: 2.2; }
+.new-chat, .buscar { display: flex; align-items: center; gap: 10px; flex: none; min-height: 34px; margin: 0 10px 2px; padding: 0 10px; border-radius: 8px; text-align: left; transition: background 0.15s, color 0.15s; }
+.new-chat { color: var(--suave); font-weight: 550; }
+.new-chat:hover { background: var(--panel-2); color: var(--text); }
+.barra-destinos { display: flex; flex: none; flex-direction: column; margin: 2px 0 8px; }
+.barra-destinos .new-chat.active, .pie button.on { background: var(--amber-tinte); color: var(--text); box-shadow: inset 2px 0 var(--amber); }
+.new-chat-icon { width: 18px; height: 18px; flex: none; display: grid; place-items: center; color: var(--muted); }
+.new-chat-icon .ico { width: 16px; height: 16px; }
+.new-chat.active .new-chat-icon, .new-chat:hover .new-chat-icon { color: var(--amber); }
+.barra-nuevo { min-height: 37px; margin-bottom: 8px; border: 1px solid var(--linea-tarjeta); background: var(--panel); color: var(--text); font-weight: 650; }
+.barra-nuevo .new-chat-icon { color: var(--amber); }
+.barra-nuevo:hover { background: color-mix(in srgb, var(--amber) 20%, var(--panel)); }
 /* comunidad: los avisos sin leer, a la derecha de «Comunidad»; plegada, un punto sobre su icono. */
 /* «Comunidad», cuando a un estilo tuyo le falta algo para estar en la tienda: en rojo, con su punto. */
 .new-chat.falta, .new-chat.falta .new-chat-icon { color: var(--bad); }
 .new-chat.falta .nav-cuenta { background: var(--bad); color: var(--bg); }
 .nav-cuenta { min-width: 18px; height: 18px; margin-left: auto; padding: 0 5px; display: grid; place-items: center; border-radius: 999px; background: var(--amber); color: var(--sobre-ambar); font-size: 10.5px; font-weight: 750; font-variant-numeric: tabular-nums; }
-.buscar { margin-bottom: 4px; color: var(--muted); cursor: text; }
+.buscar { margin-bottom: 10px; border: 1px solid var(--line); color: var(--muted); background: var(--bg); cursor: text; }
 .buscar:hover { background: var(--panel-2); }
+.buscar { position: relative; isolation: isolate; }
+.buscar > .campo-ascii { z-index: -1; width: 72px; opacity: .72; color: var(--gris-400); }
+.buscar kbd { background: var(--panel); }
 .buscar:focus-within { background: var(--panel-2); box-shadow: inset 0 0 0 1px var(--line); color: var(--text); }
 .buscar svg { width: 18px; height: 15px; flex: none; }
 .buscar input { flex: 1; min-width: 0; padding: 0; background: none; border: 0; outline: none; font-size: 13px; }
@@ -28,8 +37,30 @@
 .buscar:focus-within kbd { display: none; }
 .buscar-x { flex: none; width: 18px; height: 18px; display: grid; place-items: center; border-radius: 5px; font-size: 11px; color: var(--muted); }
 .buscar-x:hover { background: var(--line); color: var(--text); }
+.buscar-x .ico { width: 12px; height: 12px; }
 
-.sessions { flex: 1; overflow-y: auto; padding: 0 8px 10px; }
+.sessions { flex: 1; min-height: 0; overflow-y: auto; padding: 0 10px 10px; }
+.barra-historial-vacio { position: relative; min-height: 100%; }
+.barra-historial-vacio p { position: relative; z-index: 1; margin: 0; padding: 12px 8px; border-top: 1px solid var(--linea-tarjeta); color: var(--muted); font-size: 12px; }
+.barra-ascii {
+  position: absolute;
+  inset: auto -10px 0;
+  height: min(76%, 290px);
+}
+.barra-ascii > .campo-ascii {
+  inset: 0;
+  width: 100%;
+  color: var(--gris-400);
+  opacity: .76;
+  mask-image: linear-gradient(to bottom, transparent, #000 18% 82%, transparent);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .new-chat-icon, .pie button svg { transition: transform 160ms ease-out; }
+  .new-chat:hover .new-chat-icon, .pie button:hover:not(:disabled) svg { transform: translateX(2px); }
+}
+@media (max-height: 520px) {
+  .barra-ascii { display: none; }
+}
 /* Hoy, Ayer, Esta semana, Antes. Archivados es uno que se abre, con cuántos hay. */
 .barra-seccion { display: flex; align-items: center; gap: 6px; width: 100%; padding: 14px 8px 5px; color: var(--muted); font-size: 11px; font-weight: 650; letter-spacing: 0.07em; text-transform: uppercase; text-align: left; }
 button.barra-seccion { transition: color 0.15s; }
@@ -67,13 +98,14 @@ button.barra-seccion:hover { color: var(--text); }
 .lote-pausa .ghost { padding: 2px 4px; color: var(--amber); }
 
 /* Abajo: Opciones y Reiniciar backend, como filas con su icono. */
-.pie { display: flex; flex-direction: column; gap: 1px; padding: 8px; border-top: 1px solid var(--line); }
+.pie { display: flex; flex: none; flex-direction: column; gap: 2px; margin: 0 10px 10px; padding: 5px; border: 1px solid var(--linea-tarjeta); border-radius: 12px; background: var(--panel); }
 .pie button { display: flex; align-items: center; gap: 9px; height: 32px; padding: 0 8px; border-radius: 8px; color: var(--muted); font-size: 13px; text-align: left; transition: background 0.15s, color 0.15s; }
-.pie button:hover:not(:disabled), .pie button.on { background: var(--panel-2); color: var(--text); }
+.pie button:hover:not(:disabled) { background: var(--panel-2); color: var(--text); }
 .pie svg { width: 18px; height: 15px; flex: none; }
 .pie .reconectando { color: var(--amber); opacity: 1; }
 .pie .reconectando svg { animation: spin 1s steps(12) infinite; }
 .pie .bad, .pie .pie-nota { padding: 2px 8px; overflow-wrap: anywhere; }
+.pie .pie-nota { margin-top: 3px; padding-top: 6px; border-top: 1px solid var(--linea-tarjeta); }
 
 /* Renombrar en línea: el campo ocupa el sitio del título, en su fila o en la cabecera del hilo (`Renombrar.tsx`). */
 .renombrar { flex: 1; min-width: 0; padding: 1px 6px; margin: -2px 0; border-radius: 6px; background: var(--bg); border: 1px solid var(--amber); outline: none; font-size: 13px; }
@@ -97,9 +129,9 @@ button.barra-seccion:hover { color: var(--text); }
 .avance.hecho { color: var(--ok); }
 
 /* Arriba: el logo, que abre un chat nuevo, y el botón que pliega la barra (Ctrl+B). */
-.brand-fila { display: flex; align-items: center; }
+.brand-fila { display: flex; flex: none; align-items: center; gap: 3px; margin: 0 10px 8px; padding: 7px 3px; min-height: 52px; }
 .brand-fila .brand { flex: 1; min-width: 0; }
-.plegar { flex: none; width: 28px; height: 28px; margin-right: 10px; display: grid; place-items: center; border-radius: 7px; color: var(--muted); transition: background 0.15s, color 0.15s; }
+.plegar { flex: none; width: 28px; height: 28px; display: grid; place-items: center; border-radius: 7px; color: var(--muted); transition: background 0.15s, color 0.15s; }
 .plegar:hover { background: var(--panel-2); color: var(--text); }
 .plegar svg { width: 17px; height: 17px; }
 
@@ -119,9 +151,8 @@ button.barra-seccion:hover { color: var(--text); }
   .app:not(.plegada) > .sidebar + * { grid-column: 2; }
 }
 .plegada .select-bar { left: 70px; }
-.plegada .brand-fila { flex-direction: column; }
-.plegada .brand { justify-content: center; gap: 0; padding: 14px 0 6px; font-size: 0; }
-.plegada .plegar { margin: 0 0 6px; }
+.plegada .brand-fila { flex-direction: column; gap: 0; }
+.plegada .brand { justify-content: center; gap: 0; padding: 3px 0; font-size: 0; }
 .plegada .new-chat, .plegada .buscar { justify-content: center; gap: 0; padding: 0; font-size: 0; }
 .plegada .new-chat { position: relative; }
 .plegada .nav-cuenta { position: absolute; top: 4px; right: 10px; min-width: 8px; width: 8px; height: 8px; padding: 0; margin: 0; font-size: 0; }
@@ -135,6 +166,7 @@ button.barra-seccion:hover { color: var(--text); }
 .plegada .session-row .dot { position: absolute; top: 4px; right: 4px; }
 .plegada .lote-videos { margin-left: 3px; padding-left: 2px; }
 .plegada .pie button, .plegada .pie .aviso-redes { justify-content: center; gap: 0; padding: 0; font-size: 0; }
+.plegada .pie { margin-inline: 6px; padding-inline: 3px; }
 /* Un fallo del pie (el servidor no compila) queda en un punto rojo, que lo dice al pasar el ratón. */
 .plegada .pie .bad { align-self: center; width: 7px; height: 7px; margin: 6px 0; padding: 0; border-radius: 50%; background: var(--bad); font-size: 0; }
 .plegada .pie .pie-nota { display: none; }

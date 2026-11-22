@@ -5,10 +5,11 @@ import { type RefObject, useEffect } from 'react'
  * dentro (`.desplazando > *` en styles.css): lo que pasa bajo el cursor no se levanta ni arranca su video, que era casi
  * todo el trabajo de cada cuadro del scroll. Va directo a la clase, sin estado: cambiarla no redibuja nada.
  */
-export function useDesplazando(ref: RefObject<HTMLElement | null>) {
+export function useDesplazando(ref: RefObject<HTMLElement | null>, refDesplazamiento = ref) {
   useEffect(() => {
     const el = ref.current
-    if (!el) return
+    const desplazamiento = refDesplazamiento.current
+    if (!el || !desplazamiento) return
     let t = 0
     const alDesplazar = () => {
       if (!t) el.classList.add('desplazando')
@@ -18,10 +19,11 @@ export function useDesplazando(ref: RefObject<HTMLElement | null>) {
         t = 0
       }, 200)
     }
-    el.addEventListener('scroll', alDesplazar, { passive: true })
+    desplazamiento.addEventListener('scroll', alDesplazar, { passive: true })
     return () => {
-      el.removeEventListener('scroll', alDesplazar)
+      desplazamiento.removeEventListener('scroll', alDesplazar)
       clearTimeout(t)
+      el.classList.remove('desplazando')
     }
-  }, [ref])
+  }, [ref, refDesplazamiento])
 }

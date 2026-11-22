@@ -12,7 +12,7 @@ type Aviso = EstiloAnterior & { card: Card }
 type Hecho = { titulo: string; id: string; adaptar: string[] }
 
 /**
- * Al abrir Sloth, a todos, si esta versión cambió a fondo un estilo de Sloth (`Card.cambio`) y aún no leyeron el aviso
+ * Con los avisos activos, al abrir Sloth si esta versión cambió a fondo un estilo (`Card.cambio`) y el aviso está pendiente
  * (`server/anteriores.ts`): ocupa toda la pantalla, con lo de atrás borroso, y cabe en ella sin bajar. A la izquierda, el
  * mismo video con el de antes y con el nuevo (`cambio.comparacion`); a la derecha, qué cambió y «Leí toda la
  * especificación». Quien tenía el de antes (se guardó al actualizar) elige después: «Guardar también el de antes» lo pasa
@@ -21,7 +21,7 @@ type Hecho = { titulo: string; id: string; adaptar: string[] }
  * otra vez a ese estilo (`activa`, la card abierta) o al abrir Sloth. A quien abre Sloth por primera vez, después de la
  * bienvenida. Si cambiaron varios, uno tras otro.
  */
-export function EstiloCambio({ cards, activa }: { cards: Card[]; activa?: string }) {
+export function EstiloCambio({ cards, activa, onDesactivar }: { cards: Card[]; activa?: string; onDesactivar(): void }) {
   const [avisos, setAvisos] = useState<Aviso[]>([])
   /** Los que se cerraron sin acabar: vuelven al entrar a su estilo. */
   const [cerrados, setCerrados] = useState<string[]>([])
@@ -37,15 +37,18 @@ export function EstiloCambio({ cards, activa }: { cards: Card[]; activa?: string
   const clave = cambiados.map((c) => `${c.id}:${c.cambio?.fecha}`).join()
 
   useEffect(() => {
-    if (!clave) return
+    if (!clave || bienvenida) return
     let vivo = true
-    Promise.all(cambiados.map((card) => api<EstiloAnterior | null>(`/api/cards/${card.id}/anterior`).then((a) => (a ? { ...a, card } : null), () => null))).then(
-      (todos) => vivo && setAvisos(todos.filter((a): a is Aviso => a !== null))
-    )
+    const espera = setTimeout(() => {
+      void Promise.all(cambiados.map((card) => api<EstiloAnterior | null>(`/api/cards/${card.id}/anterior`).then((a) => (a ? { ...a, card } : null), () => null))).then(
+        (todos) => vivo && setAvisos(todos.filter((a): a is Aviso => a !== null))
+      )
+    }, 6000)
     return () => {
       vivo = false
+      clearTimeout(espera)
     }
-  }, [clave])
+  }, [clave, bienvenida])
 
   useEffect(() => {
     const alCerrar = () => setBienvenida(false)
@@ -145,6 +148,9 @@ export function EstiloCambio({ cards, activa }: { cards: Card[]; activa?: string
     <div className="ec-acciones">
       <button ref={principal} className="ec-boton ec-leido" disabled={ocupado} onClick={() => (aviso.guardado ? setLeido(true) : hacer('olvidar'))}>
         Leí toda la especificación
+      </button>
+      <button className="ec-boton ec-boton-suave" disabled={ocupado} onClick={onDesactivar}>
+        No mostrar estos avisos
       </button>
     </div>
   ) : olvidar ? (

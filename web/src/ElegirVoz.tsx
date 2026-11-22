@@ -673,7 +673,7 @@ function Panel(props: { voz: UsoVoz; valor: string; propia?: string; ancho?: num
         <div className="voz-filtros">
           <div className="voz-pestanas" role="group" aria-label="Motor">
             {(['todas', 'favoritas', ...motores] as Filtro[]).map((m) => (
-              <button key={m} className={filtro === m ? 'on' : ''} aria-pressed={filtro === m} onClick={() => (setFiltro(m), campo.current?.focus())} title={m === 'todas' ? 'Todas las voces' : m === 'favoritas' ? 'Las que marcaste con la estrella' : conOrigen(m)}>
+              <button key={m} data-motor={m} className={filtro === m ? 'on' : ''} aria-pressed={filtro === m} onClick={() => (setFiltro(m), campo.current?.focus())} title={m === 'todas' ? 'Todas las voces' : m === 'favoritas' ? 'Las que marcaste con la estrella' : conOrigen(m)}>
                 {m === 'todas' ? 'Todas' : m === 'favoritas' ? <><Icono de="estrella" />Favoritas</> : <><Logo de={LOGO[m]} nombre={NOMBRE_MOTOR[m]} chico />{NOMBRE_MOTOR[m]}</>}
                 <span className="voz-cuenta">{m === 'todas' ? todas.length : m === 'favoritas' ? favoritas.filter((v) => todas.some((i) => i.valor === v)).length : m === 'vc' && vcProveedores.length ? vcProveedores.reduce((n, p) => n + p.voces, 0) : todas.filter((i) => i.motor === m).length}</span>
               </button>
@@ -759,6 +759,7 @@ function Panel(props: { voz: UsoVoz; valor: string; propia?: string; ancho?: num
                   data-fila={k}
                   role="option"
                   aria-selected={props.valor === it.valor}
+                  data-motor={it.motor}
                   className={`voz-fila ${activo === k ? 'activa' : ''} ${props.valor === it.valor ? 'on' : ''} ${suena ? 'sonando' : ''}`}
                   onPointerEnter={() => setActivo(k)}
                   onClick={() => void elegir(it)}
@@ -861,12 +862,9 @@ function Panel(props: { voz: UsoVoz; valor: string; propia?: string; ancho?: num
 
       <div className="voz-pie">
         {props.musica && (
-          <button className={`voz-musica ${props.musica.encendida ? 'on' : ''}`} role="switch" aria-checked={props.musica.encendida} onClick={() => props.musica!.onCambio(!props.musica!.encendida)}>
+          <button className={`voz-musica ${props.musica.encendida ? 'on' : ''}`} title="Música sintetizada y libre de derechos; baja sola cuando hablan" role="switch" aria-checked={props.musica.encendida} onClick={() => props.musica!.onCambio(!props.musica!.encendida)}>
             <Icono de="musica" />
-            <span className="voz-texto">
-              <strong>Música de fondo</strong>
-              <small>Sintetizada y libre de derechos; baja sola cuando hablan</small>
-            </span>
+            <span className="voz-musica-nombre">Música de fondo</span>
             <span className="voz-casilla" aria-hidden="true">
               {props.musica.encendida && <Icono de="palomita" />}
             </span>
@@ -1006,7 +1004,7 @@ function Clonar({ voz, onListo, onVolver }: { voz: UsoVoz; onListo(v?: string): 
   }
 
   return (
-    <div className="voz-clonar-panel" onKeyDown={(ev) => ev.key === 'Escape' && !grabando && (ev.preventDefault(), ev.stopPropagation(), onVolver())}>
+    <div className="voz-clonar-panel" data-motor={destino} onKeyDown={(ev) => ev.key === 'Escape' && !grabando && (ev.preventDefault(), ev.stopPropagation(), onVolver())}>
       <div className="voz-clonar-cabeza">
         <button ref={volver} className="voz-volver" onClick={onVolver} aria-label="Volver a las voces">
           <Icono de="izquierda" />

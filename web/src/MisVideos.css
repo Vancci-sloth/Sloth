@@ -4,10 +4,10 @@
  * styles.css), que hacen scroll solas. Lo elegido sale en una barra abajo.
  */
 .mis-videos { --suave: color-mix(in srgb, var(--muted) 60%, var(--text)); position: relative; height: 100%; width: 100%; max-width: 1560px; margin: 0 auto; padding: 22px 40px 0; display: flex; flex-direction: column; gap: 12px; }
-.mis-videos-head { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
-.mis-videos-head h1 { display: flex; align-items: baseline; gap: 10px; margin: 0; font-size: 24px; font-weight: 700; letter-spacing: -0.02em; white-space: nowrap; }
-.mis-total { font-size: 15px; font-weight: 600; color: var(--suave); font-variant-numeric: tabular-nums; letter-spacing: 0; }
-.mis-buscar { flex: 1 1 280px; max-width: 460px; display: flex; align-items: center; gap: 8px; height: 38px; padding: 0 10px 0 12px; border-radius: 10px; background: var(--panel); border: 1px solid var(--line); color: var(--suave); transition: border-color 0.15s; }
+.mis-videos-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding-bottom: 16px; border-bottom: 1px solid var(--linea-tarjeta); }
+.mis-videos-head h1 { flex: 0 0 100%; display: flex; align-items: center; gap: 10px; margin: 0; font-size: 28px; font-weight: 700; letter-spacing: -0.02em; }
+.mis-total { padding: 2px 8px; border: 1px solid var(--linea-tarjeta); border-radius: 8px; background: var(--panel); font-size: 13px; font-weight: 600; color: var(--suave); font-variant-numeric: tabular-nums; letter-spacing: 0; }
+.mis-buscar { flex: 1 1 260px; min-width: 0; display: flex; align-items: center; gap: 8px; height: 40px; padding: 0 10px 0 12px; border-radius: 10px; background: var(--panel); border: 1px solid var(--line); color: var(--suave); transition: border-color 0.15s; }
 .mis-buscar:focus-within { border-color: var(--amber); }
 .mis-buscar .ico { width: 16px; height: 16px; flex: none; }
 .mis-buscar input { flex: 1; min-width: 0; background: none; border: none; outline: none; color: var(--text); font-size: 14.5px; }
@@ -15,12 +15,14 @@
 .mis-buscar input::-webkit-search-cancel-button { filter: grayscale(1); }
 .mis-buscar kbd { flex: none; min-width: 20px; padding: 1px 6px; border-radius: 5px; border: 1px solid var(--line); color: var(--suave); font: 600 14.5px var(--mono); text-align: center; }
 .mis-buscar:focus-within kbd { visibility: hidden; }
-.mis-videos-acciones { display: flex; align-items: center; gap: 4px; margin-left: auto; }
-/* Acciones de la cabecera: texto con su icono, sin borde; el fondo sale al pasar. */
-.mis-accion { display: inline-flex; align-items: center; gap: 7px; height: 36px; padding: 0 12px; border-radius: 10px; color: var(--suave); font-size: 14.5px; font-weight: 600; white-space: nowrap; transition: color 0.15s, background 0.15s; }
+.mis-videos-acciones { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin-left: auto; }
+.mis-accion { display: inline-flex; align-items: center; gap: 7px; min-height: 40px; padding: 6px 12px; border: 1px solid var(--linea-tarjeta); border-radius: 10px; background: var(--panel); color: var(--suave); font-size: 14px; font-weight: 600; text-align: left; transition: color 0.15s, background 0.15s; }
 .mis-accion .ico { width: 16px; height: 16px; }
 .mis-accion:hover, .mis-accion.on { color: var(--amber); background: var(--amber-tinte); }
-.mis-accion.peligro:hover { color: var(--bad); background: color-mix(in srgb, var(--bad) 10%, transparent); }
+.mis-accion.peligro:hover { color: var(--bad); background: rgba(224, 108, 85, 0.1); }
+.mis-vacio { display: grid; justify-items: center; gap: 8px; margin-top: 8px; padding: 42px 16px; border: 1px dashed var(--line); border-radius: 12px; text-align: center; }
+.mis-vacio .ico { box-sizing: content-box; width: 22px; height: 22px; padding: 10px; border: 1px solid var(--linea-tarjeta); border-radius: 12px; background: var(--panel); color: var(--suave); }
+.mis-vacio p { margin: 0; color: var(--suave); font-size: 14px; }
 
 /* Los filtros: estilos a la izquierda y forma a la derecha. El elegido, en ámbar y con su raya. */
 .mis-filtros { display: flex; align-items: flex-end; justify-content: space-between; gap: 8px 24px; flex-wrap: wrap; border-bottom: 1px solid var(--line); }
@@ -68,6 +70,8 @@
 .mis-videos .videos { --claro: color-mix(in srgb, var(--text) 60%, #fff); }
 .mis-videos .videos .video-titulo, .mis-videos .videos .video-meta, .mis-videos .videos .video-dura, .mis-videos .videos .insignia, .mis-videos .videos .youtube-boton { color: var(--claro); }
 .mis-videos .videos .video-meta { font-weight: 450; }
+.mis-videos .videos .video-tile { gap: 8px; }
+.mis-videos .videos .video-meta { margin-top: 4px; gap: 7px; line-height: 1.5; }
 .mis-videos .videos .insignia.hecho::before { background: var(--ok); }
 .mis-videos .videos .insignia.falta::before { background: var(--amber); }
 .mis-videos .videos .insignia.mal::before { background: var(--bad); }
@@ -95,7 +99,7 @@
 @media (max-width: 720px) {
   .mis-videos { padding: 16px 16px 0; }
   .mis-videos-acciones { margin-left: 0; flex-wrap: wrap; }
-  .mis-buscar { flex-basis: 100%; max-width: none; order: 1; }
+  .mis-buscar { flex-basis: 100%; }
   .mis-videos .videos { --alto: 200px; }
   /* Angosta, cada barra de publicar se parte en líneas: el botón baja y nada se sale de lado. */
   .mis-publicar .resumen-redes.lote, .mis-publicar .youtube-lote-barra, .mis-publicar .youtube-lote-barra > div { flex-wrap: wrap; white-space: normal; }
@@ -107,3 +111,46 @@
   /* Pegado abajo de lo que se ve de la página, no de la ventana: no tapa la barra lateral. */
   .mis-flotan { position: sticky; bottom: 12px; left: auto; right: auto; margin-top: auto; padding-bottom: 4px; }
 }
+
+/* En Redes, el contenido del apartado desplaza toda la galería y su cabecera. */
+.mis-videos-publicaciones {
+  container-type: inline-size;
+  height: auto;
+  min-width: 0;
+  padding: 0 2px;
+  overflow: visible;
+}
+.mis-videos-publicaciones .mis-buscar { flex: 1 1 230px; }
+.mis-videos-publicaciones .mis-videos-acciones { margin-left: 0; min-width: 0; }
+@container (min-width: 720px) {
+  .mis-videos-publicaciones .mis-videos-head h1 { flex-basis: auto; }
+}
+.mis-videos-publicaciones .mis-filtros { column-gap: 12px; }
+.mis-videos-publicaciones .mis-pestanas { min-width: 0; }
+.mis-videos-publicaciones .mis-pestanas button { max-width: 100%; padding-inline: 8px; text-align: left; white-space: normal; overflow-wrap: anywhere; }
+.mis-videos-publicaciones .mis-pestanas .mis-forma { flex: none; }
+.mis-videos-publicaciones .mis-publicar :is(.resumen-redes.lote, .youtube-lote-barra, .youtube-lote-barra > div) {
+  flex-wrap: wrap;
+  white-space: normal;
+}
+.mis-videos-publicaciones .mis-publicar .resumen-redes.lote { flex: 1 1 320px; min-width: 0; }
+.mis-videos-publicaciones .mis-publicar .resumen-redes > .muted:first-of-type { flex: 0 1 auto; }
+.mis-videos-publicaciones .mis-publicar .youtube-lote-acciones { flex: 0 1 auto; margin-left: auto; }
+.mis-videos-publicaciones .mis-publicar .muted { overflow: visible; overflow-wrap: anywhere; }
+.mis-videos-publicaciones .mis-publicar .primary { height: auto; min-height: 34px; max-width: 100%; white-space: normal; }
+
+.mis-videos-publicaciones .videos {
+  --alto: clamp(212px, 30cqi, 268px);
+  flex: none;
+  overflow: visible;
+  margin: 0;
+  padding: 4px 0 16px;
+  gap: 24px 16px;
+}
+.mis-videos-publicaciones .video-con-subida { flex: 0 0 min(100%, calc(var(--alto) * 9 / 16)); min-width: 0; }
+.mis-videos-publicaciones .video-con-subida[data-formato='horizontal'] { flex-basis: min(100%, calc(var(--alto) * 16 / 9)); }
+.mis-videos-publicaciones .video-tile { width: 100%; }
+.mis-videos-publicaciones .video-marco { width: 100%; height: auto; }
+.mis-videos-publicaciones .video-marco :is(img, video) { object-fit: contain; }
+.mis-videos-publicaciones .mis-flotan { position: sticky; bottom: 12px; left: auto; right: auto; }
+.mis-videos-publicaciones .mis-flotan > * { flex-wrap: wrap; white-space: normal; }

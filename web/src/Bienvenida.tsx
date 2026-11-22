@@ -59,7 +59,7 @@ export const BIENVENIDA_CERRADA = 'sloth-bienvenida-cerrada'
  */
 export function Bienvenida({ models }: { models: Model[] }) {
   const [abierta, setAbierta] = useState(bienvenidaPendiente)
-  const conAgente = useConAgente(models)
+  const conAgente = useConAgente(models, abierta)
   const [listo, setListo] = useState<boolean>()
   // En la app instalada en Windows: si Sloth está anclada a la barra de tareas. `null`, aquí no se ofrece.
   const [anclada, setAnclada] = useState<boolean | null>(null)
@@ -105,75 +105,74 @@ export function Bienvenida({ models }: { models: Model[] }) {
           <div>
             <h2>Te damos la bienvenida a Sloth</h2>
             <p>
-              Sloth hace videos con Claude, con ChatGPT, con OpenCode y otros agentes. Eliges un estilo, le das un tema o un enlace, y
-              lo ves trabajar paso a paso: investiga, escribe el guion, te pide tu voz y arma el video.
+              Elige un estilo y dale un tema o un enlace. Sloth investiga, escribe el guion y arma el video con tu agente.
             </p>
           </div>
         </header>
 
-        {/* Con uno basta. Sin ninguno, el aviso lleva a Opciones → Agentes, como el del compositor. */}
-        <Paso n={1} titulo="Elige con qué trabaja" hecho={conAgente}>
-          Con uno basta, y Sloth no te cobra aparte. Todos se conectan en Opciones → Agentes; Pi usa el plan o la llave que le
-          conectes.
-          {OPCIONES.map(({ titulo, nota, agentes }) => (
-            <div className="opcion" key={titulo}>
-              <b>{titulo}</b>
-              <div>
-                <ul>
-                  {agentes.map(([id, nombre]) => (
-                    <li key={id}>
-                      <Logo de={id} nombre={nombre} chico />
-                      {nombre}
-                    </li>
-                  ))}
-                </ul>
-                {nota && <p>{nota}</p>}
+        <div className="bienvenida-pasos">
+          {/* Con uno basta. Sin ninguno, el aviso lleva a Opciones → Agentes, como el del compositor. */}
+          <Paso n={1} titulo="Elige con qué trabaja" hecho={conAgente}>
+            Con uno basta, y Sloth no te cobra aparte. Todos se conectan en Opciones → Agentes; Pi usa el plan o la llave que le
+            conectes.
+            {OPCIONES.map(({ titulo, nota, agentes }) => (
+              <div className="opcion" key={titulo}>
+                <b>{titulo}</b>
+                <div>
+                  <ul>
+                    {agentes.map(([id, nombre]) => (
+                      <li key={id}>
+                        <Logo de={id} nombre={nombre} chico />
+                        {nombre}
+                      </li>
+                    ))}
+                  </ul>
+                  {nota && <p>{nota}</p>}
+                </div>
               </div>
-            </div>
-          ))}
-          {conAgente === false && <AvisoPrimerAgente onIr={cerrar} />}
-        </Paso>
-        <Paso n={2} titulo="Cuéntale de ti (opcional)">
-          A qué te dedicas, de qué es tu canal, para quién haces videos y cómo te gusta que te hablen. Lo escribes una vez
-          y todos los agentes lo tienen en cuenta en cada chat; lo cambias cuando quieras en Opciones → Sobre ti.
-          <SobreTi />
-        </Paso>
-        <Paso n={3} titulo="Prepara tu computadora" hecho={listo}>
-          Los estilos usan unas herramientas (FFmpeg, Python…). Si falta alguna, aquí sale el botón para descargarla; tarda unos
-          minutos y solo se hace una vez.
-          <Requisitos onListo={setListo} />
-        </Paso>
-        {anclada !== null && (
-          <Paso n={4} titulo="Ten Sloth a mano (opcional)" hecho={anclada}>
-            {anclada ? 'Sloth está anclada a la barra de tareas.' : 'Ánclala a la barra de tareas para abrirla con un clic.'}
-            {!anclada && (
-              <div className="anclar">
-                <button className="boton" disabled={anclando} onClick={() => void anclar()}>
-                  {anclando ? 'Windows te pregunta…' : 'Anclar a la barra de tareas'}
-                </button>
-                {sinPermiso && (
-                  <p className="small">
-                    Windows no dejó anclarla desde aquí. Haz clic derecho en el icono de Sloth en la barra de tareas y elige
-                    «Anclar a la barra de tareas».
-                  </p>
-                )}
-              </div>
-            )}
+            ))}
+            {conAgente === false && <AvisoPrimerAgente onIr={cerrar} />}
           </Paso>
-        )}
-        <Paso n={anclada === null ? 4 : 5} titulo="Haz tu primer video">
-          Elige un estilo, escribe el tema o pega un enlace y pulsa <b>↑</b>. Cuando el guion está listo, Sloth te pide tu voz:
-          grábalo con el celular y súbelo en la etapa «Tu voz». Luego arma el video y lo revisa. El Diff tarda de una a dos
-          horas; el Video explicativo, unos 40 minutos. Cuando acaba, lo descargas desde el video o en «Mis videos».
-        </Paso>
-        <Paso n={anclada === null ? 5 : 6} titulo="Lo que gasta">
-          Cada video usa una parte de los límites de tu plan, que ves en Opciones. Las cifras en dólares que salen en cada
-          video dicen cuánto costaría pagado aparte, no lo que se te cobra. Un video gasta bastante: con el plan Pro el límite
-          se acaba pronto, y con Max alcanza para varios. Con una llave de API no hay límites: esas cifras son lo que pagas.
-          Con los modelos gratis de OpenCode no pagas nada, pero tu uso gratis tiene un tope, y es de tu computadora: al
-          acabarse, vuelve solo en unas horas, y cambiar de cuenta no lo repone. Sus modelos de pago se cobran del saldo de tu
-          cuenta de OpenCode.
-        </Paso>
+          <Paso n={2} titulo="Cuéntale de ti (opcional)">
+            Describe tu canal, tu público y cómo prefieres que te hablen. Puedes editarlo en Opciones → Perfil y avisos.
+            <SobreTi />
+          </Paso>
+          <Paso n={3} titulo="Prepara tu computadora" hecho={listo}>
+            Descarga las herramientas que falten para crear videos, como FFmpeg y Python.
+            <Requisitos onListo={setListo} />
+          </Paso>
+          {anclada !== null && (
+            <Paso n={4} titulo="Ten Sloth a mano (opcional)" hecho={anclada}>
+              {anclada ? 'Sloth está anclada a la barra de tareas.' : 'Ánclala a la barra de tareas para abrirla con un clic.'}
+              {!anclada && (
+                <div className="anclar">
+                  <button className="boton" disabled={anclando} onClick={() => void anclar()}>
+                    {anclando ? 'Windows te pregunta…' : 'Anclar a la barra de tareas'}
+                  </button>
+                  {sinPermiso && (
+                    <p className="small">
+                      Windows no dejó anclarla desde aquí. Haz clic derecho en el icono de Sloth en la barra de tareas y elige
+                      «Anclar a la barra de tareas».
+                    </p>
+                  )}
+                </div>
+              )}
+            </Paso>
+          )}
+          <Paso n={anclada === null ? 4 : 5} titulo="Haz tu primer video">
+            Elige un estilo, escribe el tema o pega un enlace y pulsa <b>↑</b>. Cuando el guion está listo, Sloth te pide tu voz:
+            grábalo con el celular y súbelo en la etapa «Tu voz». Luego arma el video y lo revisa. El Diff tarda de una a dos
+            horas; el Video explicativo, unos 40 minutos. Cuando acaba, lo descargas desde el video o en «Mis videos».
+          </Paso>
+          <Paso n={anclada === null ? 5 : 6} titulo="Lo que gasta">
+            Cada video usa una parte de los límites de tu plan, que ves en Opciones. Las cifras en dólares que salen en cada
+            video dicen cuánto costaría pagado aparte, no lo que se te cobra. Un video gasta bastante: con el plan Pro el límite
+            se acaba pronto, y con Max alcanza para varios. Con una llave de API no hay límites: esas cifras son lo que pagas.
+            Con los modelos gratis de OpenCode no pagas nada, pero tu uso gratis tiene un tope, y es de tu computadora: al
+            acabarse, vuelve solo en unas horas, y cambiar de cuenta no lo repone. Sus modelos de pago se cobran del saldo de tu
+            cuenta de OpenCode.
+          </Paso>
+        </div>
 
         <div className="modal-actions">
           <span className="muted small">La vuelves a ver en Opciones.</span>
@@ -189,12 +188,12 @@ export function Bienvenida({ models }: { models: Model[] }) {
 /** Un paso, con su número o, si ya está hecho, una palomita. */
 function Paso({ n, titulo, hecho, children }: { n: number; titulo: string; hecho?: boolean; children: ReactNode }) {
   return (
-    <section className={`paso${hecho ? ' hecho' : ''}`}>
-      <span className="paso-n">{hecho ? <Icono de="palomita" /> : n}</span>
-      <div className="paso-cuerpo">
+    <details className={`paso${hecho ? ' hecho' : ''}`}>
+      <summary>
+        <span className="paso-n" aria-label={hecho ? 'Completado' : undefined}>{hecho ? <Icono de="palomita" /> : n}</span>
         <strong>{titulo}</strong>
-        <div className="paso-texto">{children}</div>
-      </div>
-    </section>
+      </summary>
+      <div className="paso-texto">{children}</div>
+    </details>
   )
 }

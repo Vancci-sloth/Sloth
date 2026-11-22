@@ -6,8 +6,8 @@ import { useDelTema } from './temas'
  * medio segundo y acaba sola; ninguna se repite sin fin. Con «reducir movimiento» del sistema, nada se mueve. En el tema
  * Sloth no hace nada.
  *
- * - `Movimiento`: un pulso corto al pulsar un botón, y en la barra lateral la marca de lo elegido viaja de lo de antes a lo
- *   nuevo. Una sola escucha para toda la app, también para los menús que se montan después.
+ * - `Movimiento`: un pulso corto al pulsar un botón, y en la barra lateral y los menús de cada vista la marca de lo elegido
+ *   viaja de lo de antes a lo nuevo. Una sola escucha para toda la app, también para los menús que se montan después.
  * - `useTransicionApartado`: lo de una vista entra suave al cambiar de vista.
  * - `useEntradaEstilo`: el nombre y la descripción del estilo elegido entran al cambiar de estilo.
  */
@@ -16,7 +16,7 @@ const REDUCIDO = '(prefers-reduced-motion: reduce)'
 const quieto = () => matchMedia(REDUCIDO).matches
 const CONTROLES = 'button:is(.new-chat,.primary,.boton,.ghost,.send,.picker-trigger,.plegar,.card,.mis-accion,.m3d-accion,.dictado-boton,.estilo-importar), .pie > button'
 /** Donde la marca de lo elegido viaja de un sitio a otro. */
-const NAVEGACION = '.sidebar'
+const NAVEGACION = '.sidebar, .youtube-apartados, .youtube-paginacion nav, .centro-redes-nav, .opciones-secciones, .opciones-apartados-nav, .opciones-agentes-lateral'
 
 export function Movimiento() {
   const { movimiento } = useDelTema()
@@ -28,8 +28,10 @@ export function Movimiento() {
       const control = e.target.closest('button, a, [role="button"]')
       if (!(control instanceof HTMLElement) || control.matches(':disabled,[aria-disabled="true"]')) return
       const nav = control.closest(NAVEGACION)
-      const previo = nav?.querySelector('.new-chat.active, .session-row.active, [aria-current="page"]')
-      if (previo instanceof HTMLElement && previo !== control && control.matches('.new-chat, .session-row')) {
+      const previo = nav?.querySelector('.new-chat.active, .session-row.active, [aria-current="page"], [aria-selected="true"]')
+      // En la barra lateral, solo sus destinos y sus hilos; en los menús de cada vista, cualquiera de sus botones.
+      const destino = nav?.matches('.sidebar') ? control.matches('.new-chat, .session-row') : true
+      if (previo instanceof HTMLElement && previo !== control && destino) {
         const desde = previo.getBoundingClientRect()
         const hasta = control.getBoundingClientRect()
         const capa = document.createElement('div')

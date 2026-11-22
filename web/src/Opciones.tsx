@@ -1,20 +1,21 @@
-import { type ReactNode, type Ref, useEffect, useRef, useState } from 'react'
+import { type ReactNode, useEffect, useRef, useState } from 'react'
 import { type CuentaClaude as Cuenta, type Opciones as Datos, type EstadoAgente, type LimitesClaude, type Model, type NavegadorDeFuera, NAVEGADOR_REDES, type Requisito, type VersionClaude } from '../../shared/types'
 import { api, leerCuenta } from './api'
 import { Arranque } from './Arranque'
-import { ActividadAgentes } from './ActividadAgente' // actividad de los agentes
-import { CampoAscii } from './CampoAscii' // fondos de los temas que los piden
 import { ponerTema, TEMAS, type Tema, useTema } from './temas'
-import { type Proveedor, proveedorDe } from '../../shared/providers'
+import { NOMBRE_AGENTE, PROVEEDORES, type Proveedor, proveedorDe } from '../../shared/providers'
+import { ActividadAgente } from './ActividadAgente'
+import { AvisoAgentes } from './Actualizar'
+import { CampoAscii } from './CampoAscii'
 import { encender, encendido, notificar, sonar, usePermiso } from './avisos'
 import { abrirBienvenida } from './Bienvenida'
 import { abrirNovedades } from './Novedades'
 import { Picker } from './Composer'
-import { ESPACIO_DISCO, EspacioDisco } from './Espacio' // espacio en disco
+import { EspacioDisco } from './Espacio' // espacio en disco
 import { discoLleno } from './items'
 import { TuEquipo } from './Equipo' // tu equipo
 import { TuCelular } from './Celular' // tu celular
-import { Icono } from './Iconos'
+import { Icono, type NombreIcono } from './Iconos'
 import { SuscripcionOpciones, VersionYApoyo } from './Licencia' // apoyo
 import { RespaldoOpciones } from './Respaldo' // tu Sloth en otra computadora
 import { SlothWebOpciones } from './SlothWeb' // Sloth en la web
@@ -36,13 +37,15 @@ import './Opciones.css'
  * puesta (a veces se abre para cambiarla); a la derecha su estado, verde si está bien, ámbar si te toca hacer algo, y
  * lo que se puede hacer con ella, en un botón o en un desplegable.
  */
-export function Opciones({ onDone }: { onDone(): void }) {
+type PreferenciaAvisosEstilos = { avisosEstilos: boolean; onAvisosEstilos(si: boolean): void }
+
+export function Opciones({ onDone, seccion, apartado, avisosEstilos, onAvisosEstilos }: PreferenciaAvisosEstilos & { onDone(): void; seccion?: string; apartado?: string }) {
   const [iniciando, setIniciando] = useState(false)
   // A la derecha, como en los hilos, el navegador de las redes mientras inicias sesión en él: se abre solo al conectar
   // TikTok, y el globo del título lo enseña o lo esconde.
   return (
-    <ConNavegadorRedes puede={iniciando}>
-      <Ajustes onDone={onDone} iniciando={iniciando} onIniciando={setIniciando} />
+    <ConNavegadorRedes puede={iniciando && (!seccion || seccion === 'redes')}>
+      <Ajustes seccion={seccion} apartado={apartado} onDone={onDone} iniciando={iniciando} onIniciando={setIniciando} avisosEstilos={avisosEstilos} onAvisosEstilos={onAvisosEstilos} />
     </ConNavegadorRedes>
   )
 }
@@ -50,22 +53,25 @@ export function Opciones({ onDone }: { onDone(): void }) {
 /** Opciones abierta en la sección de Agentes: a ella lleva el aviso de la cuenta que falta. */
 const AGENTES = '/opciones/agentes'
 
-function Ajustes({ onDone, iniciando, onIniciando }: { onDone(): void; iniciando: boolean; onIniciando(si: boolean): void }) {
-  const req = useRequisitos(true)
-  const agentes = useRef<HTMLElement>(null)
-  // Uno para Voz y Google Flow: la cuenta de la voz también genera en Flow, y quitarla en uno la quita en el otro.
-  const voz = useVoz()
-  // Lo de arriba (Redes) crece al cargar; el anclaje del scroll del navegador mantiene Agentes donde quedó.
+const SECCIONES = [
+  ['redes', 'Redes', 'compartir'], ['agentes', 'Agentes de IA', 'cubo'], ['creacion', 'Voz e imágenes', 'imagen'],
+  ['perfil', 'Perfil y avisos', 'campana'], ['equipo', 'Equipo', 'pulso'], ['dispositivos', 'Otros dispositivos', 'movil'],
+  VENTA ? ['apoyo', 'Apoyo', 'estrella'] : ['integraciones', 'Integraciones', 'globo']
+] as const satisfies readonly Apartado[]
+
+function Ajustes({ onDone, iniciando, onIniciando, seccion, apartado, avisosEstilos, onAvisosEstilos }: PreferenciaAvisosEstilos & { onDone(): void; iniciando: boolean; onIniciando(si: boolean): void; seccion?: string; apartado?: string }) {
+  const activa = SECCIONES.some(([id]) => id === seccion) ? seccion : 'redes'
+  const [redesVisitadas, setRedesVisitadas] = useState(activa === 'redes')
+  const contenido = useRef<HTMLDivElement>(null)
   useEffect(() => {
-    if (location.hash === `#${AGENTES}`) requestAnimationFrame(() => agentes.current?.scrollIntoView({ block: 'start' }))
-  }, [])
+    if (activa === 'redes') setRedesVisitadas(true)
+    contenido.current?.scrollTo(0, 0)
+  }, [activa, apartado])
   return (
-    <div className="opciones fondo-ramas">
+    <div className="opciones fondo-ramas" data-seccion={activa}>
       <CampoAscii variante="ramas" />
-      <button className="ghost" onClick={onDone}>
-        ← Volver
-      </button>
-      <div className="opciones-titulo">
+      <header className="opciones-titulo">
+        <button className="opciones-volver" type="button" title="Volver al chat" aria-label="Volver al chat" onClick={onDone}><Icono de="izquierda" /></button>
         <div className="opciones-nombre">
           <h1>Opciones</h1>
           <VersionYApoyo className="muted small" />
@@ -77,14 +83,18 @@ function Ajustes({ onDone, iniciando, onIniciando }: { onDone(): void; iniciando
           <button className="ghost small" onClick={abrirNovedades}>
             Ver novedades
           </button>
-          {iniciando && <BotonNavegador hilo={NAVEGADOR_REDES} trabajando={false} />}
+          {activa === 'redes' && iniciando && <BotonNavegador hilo={NAVEGADOR_REDES} trabajando={false} />}
         </div>
-      </div>
+      </header>
       {/* Desde la web, los inicios de sesión de la computadora se ven aquí (server/ventanas-remotas.ts). */}
       {enLaWeb && <VueltaWeb />}
-      {/* Las redes, lo primero: es por donde salen los videos. Cada quien las conecta con sus propias credenciales. */}
-      <section className="grupo redes-grupo">
-        <div className="redes-cabeza">
+      <nav className="opciones-secciones" aria-label="Secciones de Opciones">
+        {SECCIONES.map(([id, nombre, icono]) => <a key={id} href={`#/opciones/${id}`} aria-current={activa === id ? 'page' : undefined}><Icono de={icono} />{nombre}</a>)}
+      </nav>
+      <div ref={contenido} className="opciones-contenido">
+      {(activa === 'redes' || redesVisitadas) && <section className="grupo redes-grupo" hidden={activa !== 'redes'}>
+        <div className="redes-cabeza superficie-ascii redes-portada">
+          {activa === 'redes' && <CampoAscii variante="malla" />}
           <div>
             <h2>Redes</h2>
             <p>Por donde salen tus videos. Sloth los programa en cada red y te avisa si algo falla.</p>
@@ -98,12 +108,36 @@ function Ajustes({ onDone, iniciando, onIniciando }: { onDone(): void; iniciando
           <YoutubeOpciones />
         </div>
         <p className="grupo-nota">Los verticales salen en TikTok, Instagram y YouTube Shorts; los largos, en YouTube. Sloth tiene que estar abierto mientras sube a TikTok y a YouTube; Instagram publica aunque la computadora esté apagada.</p>
-      </section>
-      {VENTA && (
+      </section>}
+      {activa === 'apoyo' && VENTA && (
         <Grupo titulo="Apoyo" nota="Sloth es gratis. El apoyo es opcional y se cobra con PayPal; cancelado, lo ya pagado sigue valiendo hasta su fecha.">
           <SuscripcionOpciones />
         </Grupo>
       )}
+      {activa === 'agentes' && <OpcionesAgentes />}
+      {activa === 'perfil' && <>
+      <Grupo titulo="Sobre ti" nota="A qué te dedicas, tu canal, tu público y cómo te gusta que te hablen. Todos los agentes lo leen al empezar cada chat, así no lo repites en cada video. Lo que pidas en un mensaje manda sobre esto.">
+        <SobreTi />
+      </Grupo>
+      <Grupo titulo="Avisos">
+        <Avisos />
+        <div className="item">
+          <div className="fila">
+            <span className="logo" aria-hidden><Icono de="megafono" /></span>
+            <div className="fila-nombre">
+              <strong>Cambios de estilos</strong>
+              <span>Muestra automáticamente los anuncios de nuevas versiones de tus estilos.</span>
+            </div>
+            <Interruptor on={avisosEstilos} onCambiar={onAvisosEstilos} etiqueta="Avisos de cambios de estilos" />
+          </div>
+        </div>
+      </Grupo>
+      <Grupo titulo="Apariencia" nota="Cambia al instante y se recuerda en esta computadora. Los fondos y el movimiento de Cristal se quedan quietos si tu sistema pide reducir el movimiento.">
+        <Apariencia />
+      </Grupo>
+      </>}
+      {/* Lo que solo tiene Sloth: usarla desde otro dispositivo, traer tu Sloth a otra computadora y el celular. */}
+      {activa === 'dispositivos' && <>
       {enLaNube ? (
         <Grupo
           titulo="Sloth en la nube"
@@ -126,57 +160,99 @@ function Ajustes({ onDone, iniciando, onIniciando }: { onDone(): void; iniciando
       <Grupo titulo="Tu Sloth en otra computadora" nota="Con tu clave, Sloth guarda sola una copia de tus estilos, tus chats, «Sobre ti» y tus marcas. Escribe esa clave en otra computadora y te ofrece traerlo todo. Los videos y las cuentas conectadas no viajan.">
         <RespaldoOpciones />
       </Grupo>
-      <Grupo ref={agentes} titulo="Agentes" nota="Cada agente se descarga la primera vez que lo eliges. Claude y ChatGPT necesitan un plan de pago o una llave de API; OpenCode, solo tu cuenta, que es gratis. Los demás, la cuenta o la llave de cada uno.">
-        <Agentes />
-        <CuentaCodex />
-        <CuentaOpenCode />
-        {OTROS_AGENTES.map((p) => (
-          <CuentaAgente key={p} p={p} />
-        ))}
-      </Grupo>
-      <Grupo titulo="Actividad de los agentes" nota="Cuánto trabajó cada agente en tus hilos: los turnos y los tokens que dijo, día por día.">
-        <ActividadAgentes />
-      </Grupo>
-      <Grupo titulo="Sobre ti" nota="A qué te dedicas, tu canal, tu público y cómo te gusta que te hablen. Todos los agentes lo leen al empezar cada chat, así no lo repites en cada video. Lo que pidas en un mensaje manda sobre esto.">
-        <SobreTi />
-      </Grupo>
-      <Grupo titulo="Voz" nota="Al pedir un video eliges en «Voz» si la mandas tú o si el agente la genera con una de estas. La sesión de Google vive en un perfil aparte del navegador de Sloth, que ningún agente usa; las llaves, en tu usuario de esta computadora.">
-        <VozOpciones voz={voz} />
-      </Grupo>
-      <Grupo
-        titulo="Google Flow"
-        nota="Los agentes generan imágenes y videos con tus cuentas de Google: la de la Voz y las que agregues aquí, hasta 50. Las imágenes son gratis; los videos gastan créditos de Flow, y si una cuenta se queda sin ellos, Sloth sigue con otra. Agrega solo cuentas tuyas: Google puede limitar o bloquear las que usa de más."
-      >
-        <FlowOpciones voz={voz} />
-      </Grupo>
-      <NavegadorDeGoogle />
-      {/* Solo sirven a Ideas: sin la de YouTube, las recomendaciones van con el canal conectado. */}
-      {!VENTA && (
-        <Grupo titulo="Llaves de API">
-          <Llave id="youtube" />
-          <Llave id="meta" />
-        </Grupo>
-      )}
-      <Grupo titulo="Radar" nota="El Diff investiga aquí primero: el radar lee estas fuentes cada 5 minutos y guarda sus noticias, así cada noticiero sale con lo último.">
-        <RadarOpciones />
-      </Grupo>
-      <Grupo titulo="Avisos">
-        <Avisos />
-      </Grupo>
-      <Grupo titulo="Apariencia" nota="Cambia al instante y se recuerda en esta computadora. Los fondos y el movimiento de Cristal se quedan quietos si tu sistema pide reducir el movimiento.">
-        <Apariencia />
-      </Grupo>
       <TuCelular />
-      <TuEquipo />
-      <EspacioDisco />
-      <Herramientas req={req} />
+      </>}
+      {activa === 'creacion' && <OpcionesCreacion apartado={apartado} />}
+      {activa === 'integraciones' && !VENTA && <>
+        <Grupo titulo="Llaves de API"><Llave id="youtube" /><Llave id="meta" /></Grupo>
+        <Grupo titulo="Radar" nota="El Diff consulta estas fuentes para encontrar noticias recientes."><RadarOpciones /></Grupo>
+      </>}
+      {activa === 'equipo' && <OpcionesEquipo apartado={apartado} />}
+      </div>
     </div>
   )
 }
 
-function Grupo({ ref, titulo, extra, nota, children }: { ref?: Ref<HTMLElement>; titulo: string; extra?: ReactNode; nota?: string; children: ReactNode }) {
+function OpcionesAgentes() {
+  const [p, elegir] = useState<Proveedor>('claude')
+  const navegacion = (
+    <div className="opciones-agentes-lista" role="group" aria-labelledby="lista-proveedores">
+      <h2 id="lista-proveedores">Proveedores</h2>
+      {PROVEEDORES.map((agente) => <button key={agente} data-proveedor={agente} aria-pressed={agente === p} onClick={() => elegir(agente)}>
+        <Logo de={agente} nombre={NOMBRE_AGENTE[agente]} /><span>{NOMBRE_AGENTE[agente]}</span>
+      </button>)}
+    </div>
+  )
+  const conexion = (<>
+    <Grupo titulo="Actualizaciones de agentes">
+      <AvisoAgentes />
+    </Grupo>
+    <Grupo titulo="Conexión">
+      {p === 'claude' ? <Agentes /> : p === 'codex' ? <CuentaCodex /> : p === 'opencode' ? <CuentaOpenCode /> : <CuentaAgente key={p} p={p} />}
+    </Grupo>
+  </>)
+  return <ActividadAgente proveedor={p} navegacion={navegacion} conexion={conexion} />
+}
+
+type Apartado = readonly [id: string, titulo: string, icono: NombreIcono]
+
+const CREACION = [
+  ['google', 'Google AI Studio', 'microfono'], ['sloth', 'Voces de Sloth', 'sonido'], ['externos', 'Proveedores externos', 'globo'],
+  ['flow', 'Google Flow', 'imagen'], ['privacidad', 'Privacidad de Flow', 'escudo']
+] as const satisfies readonly Apartado[]
+
+const EQUIPO = [
+  ['rendimiento', 'Rendimiento', 'pulso'], ['disco', 'Espacio en disco', 'basura'], ['herramientas', 'Herramientas de video', 'descargar'],
+  ['navegador', 'Navegador', 'globo']
+] as const satisfies readonly Apartado[]
+
+function NavegacionOpciones({ seccion, titulo, apartados, activa, children }: { seccion: string; titulo: string; apartados: readonly Apartado[]; activa: string; children: ReactNode }) {
+  return <div className="opciones-apartados">
+    <nav className="opciones-apartados-nav" aria-label={titulo}>
+      {apartados.map(([id, nombre, icono]) => <a key={id} href={`#/opciones/${seccion}/${id}`} aria-current={id === activa ? 'page' : undefined}>
+        <Icono de={icono} /><span>{nombre}</span>
+      </a>)}
+    </nav>
+    <div className="opciones-apartados-principal">{children}</div>
+  </div>
+}
+
+function OpcionesCreacion({ apartado }: { apartado?: string }) {
+  const voz = useVoz()
+  const [activa, titulo] = CREACION.find(([id]) => id === apartado) ?? CREACION[0]
+  const esFlow = activa === 'flow' || activa === 'privacidad'
+  return <NavegacionOpciones seccion="creacion" titulo="Voz e imágenes" apartados={CREACION} activa={activa}>
+    <header className="opciones-apartados-cabecera"><h2>{titulo}</h2>
+      {activa === 'google' && <p>Conecta tu cuenta de Google para generar narraciones. También puedes usarla en Google Flow.</p>}
+      {activa === 'sloth' && <p>Gestiona tu clave, tus créditos y las voces que aparecen en el compositor.</p>}
+      {activa === 'externos' && <p>Conecta un proveedor con su llave de API para añadir sus voces al selector.</p>}
+      {activa === 'flow' && <p>Gestiona las cuentas y los créditos para generar imágenes con Nano Banana y clips con Veo.</p>}
+      {activa === 'privacidad' && <p>Decide si Flow puede usar tus generaciones para mejorar sus productos y si puedes enviar imágenes de referencia.</p>}
+    </header>
+    <div className={`panel${activa === 'externos' ? ' opciones-proveedores' : ''}`}>
+      {esFlow ? <FlowOpciones voz={voz} privacidad={activa === 'privacidad'} /> : <VozOpciones voz={voz} vista={activa} />}
+    </div>
+  </NavegacionOpciones>
+}
+
+function OpcionesEquipo({ apartado }: { apartado?: string }) {
+  const [activa] = EQUIPO.find(([id]) => id === apartado) ?? EQUIPO[0]
+  return <NavegacionOpciones seccion="equipo" titulo="Equipo" apartados={EQUIPO} activa={activa}>
+    {activa === 'rendimiento' && <TuEquipo />}
+    {activa === 'disco' && <EspacioDisco />}
+    {activa === 'navegador' && <NavegadorDeGoogle />}
+    {activa === 'herramientas' && <HerramientasEquipo />}
+  </NavegacionOpciones>
+}
+
+function HerramientasEquipo() {
+  const req = useRequisitos(true)
+  return <Herramientas req={req} />
+}
+
+function Grupo({ titulo, extra, nota, children }: { titulo: string; extra?: ReactNode; nota?: string; children: ReactNode }) {
   return (
-    <section className="grupo" ref={ref}>
+    <section className="grupo">
       <div className="grupo-titulo">
         <h2>{titulo}</h2>
         {extra}
@@ -197,16 +273,7 @@ function Fallo({ error, className = '' }: { error?: string; className?: string }
   return (
     <p className={`bad small fila-extra ${className}`} title={error}>
       Tu disco está lleno y no cupo lo que había que descargar. Libera espacio y vuelve a intentarlo.{' '}
-      {/* Sin cambiar el hash, que es la ruta de la app. */}
-      <a
-        href={`#${ESPACIO_DISCO}`}
-        onClick={(e) => {
-          e.preventDefault()
-          document.getElementById(ESPACIO_DISCO)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-        }}
-      >
-        Ir a Espacio en disco
-      </a>
+      <a href="#/opciones/equipo/disco">Ir a Espacio en disco</a>
     </p>
   )
 }
@@ -366,7 +433,7 @@ function useCuenta(fresco = false, proveedor = 'claude') {
   const [error, setError] = useState('')
 
   // El servidor recuerda la cuenta conectada; `fresco` (Opciones) le pide mirarla otra vez.
-  const leer = (de = '') => api<Cuenta>(`/api/${proveedor}/cuenta${de}`).then(setCuenta, (e) => setError(e.message))
+  const leer = (de = '') => leerCuenta<Cuenta>(`/api/${proveedor}/cuenta${de}`).then((cuenta) => { setCuenta(cuenta); setError('') }, (e) => setError(e.message))
   useEffect(() => void leer(fresco ? '?fresco' : ''), [])
 
   // Mientras autorizas en el navegador, se mira cada dos segundos si ya entraste.
@@ -562,8 +629,8 @@ export function useSinClaude(models: Model[] = []) {
 }
 
 /** Si hay alguna IA conectada, la que sea (`undefined` mientras no se sabe): la bienvenida pide la primera si no. */
-export function useConAgente(models: Model[] = []) {
-  const { cuentas, otro } = useCuentas(models)
+export function useConAgente(models: Model[] = [], habilitado = true) {
+  const { cuentas, otro } = useCuentas(models, habilitado)
   return cuentas && (cuentas !== 'ninguna' || !!otro)
 }
 
@@ -581,10 +648,11 @@ let cuentasSabidas: Cuentas | undefined = (() => {
 })()
 
 /** Qué cuenta hay de Claude, ChatGPT u OpenCode, por ese orden, y el primero de los demás agentes que tenga modelos. */
-function useCuentas(models: Model[]) {
+function useCuentas(models: Model[], habilitado = true) {
   const [cuentas, setCuentas] = useState<Cuentas | undefined>(cuentasSabidas)
   const otro = OTROS_AGENTES.find((p) => models.some((m) => proveedorDe(m.id) === p))
   useEffect(() => {
+    if (!habilitado) return
     let vivo = true
     const saber = (c: Cuentas) => {
       cuentasSabidas = c
@@ -604,7 +672,7 @@ function useCuentas(models: Model[]) {
       vivo = false
       removeEventListener(CUENTA_CONECTADA, leer)
     }
-  }, [])
+  }, [habilitado])
   return { cuentas, otro }
 }
 
@@ -612,15 +680,23 @@ function useCuentas(models: Model[]) {
  * Si el programa de cada agente ya se bajó (`server/agentes.ts`). Mientras se baja alguno, o con `vigilar` (se está
  * conectando una cuenta, que lo baja antes), se mira cada dos segundos. Al acabar, avisa como al conectar una cuenta.
  */
+let agentesSabidos: Record<Proveedor, EstadoAgente> | undefined
+let consultaAgentes: Promise<Record<Proveedor, EstadoAgente>> | undefined
+function consultarAgentes() {
+  return consultaAgentes ??= api<Record<Proveedor, EstadoAgente>>('/api/agentes')
+    .then((estado) => { agentesSabidos = estado; return estado })
+    .finally(() => { consultaAgentes = undefined })
+}
 function useAgentes(vigilar = false) {
-  const [agentes, setAgentes] = useState<Record<Proveedor, EstadoAgente>>()
+  const [agentes, setAgentes] = useState<Record<Proveedor, EstadoAgente> | undefined>(agentesSabidos)
   const [error, setError] = useState('')
-  const leer = () => api<Record<Proveedor, EstadoAgente>>('/api/agentes').then(setAgentes, (e) => setError(e.message))
-  useEffect(() => void leer(), [])
+  const leer = () => consultarAgentes().then((agentes) => { setAgentes(agentes); setError('') }, (e) => setError(e.message))
+  // Comprueba también al terminar de conectar: una descarga rápida puede acabar entre dos sondeos.
+  useEffect(() => void leer(), [vigilar])
   const bajando = !!agentes && Object.values(agentes).some((a) => a.instalando)
   useEffect(() => {
     if (!bajando && !vigilar) return
-    const id = setInterval(() => void leer(), 2000)
+    const id = setInterval(() => { if (!document.hidden) void leer() }, 2000)
     return () => clearInterval(id)
   }, [bajando, vigilar])
   const antes = useRef(bajando)
@@ -737,6 +813,7 @@ export function CuentaOpenCode({ aviso = false, onFalta }: { aviso?: boolean; on
         </p>
       )}
       {!aviso && cuenta?.conectada && <Limites proveedor="opencode" />}
+      {!aviso && cuenta?.conectada && !espera && <div className="fila-extra"><button type="button" className="boton" onClick={conectar} disabled={c.ocupado}>Agregar cuenta</button></div>}
       <div className="fila-extra small">
         <p>
           <b>Antes de usarlo:</b> los modelos gratis lo son por tiempo limitado, a veces se saturan y tu uso gratis tiene un
@@ -938,7 +1015,7 @@ export function CuentaAgente({ p, aviso = false, onFalta }: { p: OtroAgente; avi
                   label: o.como === 'llave' ? 'Llave' : 'Cuenta',
                   options: [
                     ...(cuenta.uso || o.uso ? [{ value: 'uso', label: o.como === 'llave' ? 'Ver tu saldo ↗' : 'Ver tu uso ↗' }] : []),
-                    { value: 'cambiar', label: o.como === 'llave' ? 'Cambiar de llave' : activa ? 'Conectar otra cuenta' : 'Cambiar de cuenta' },
+                    { value: 'cambiar', label: o.como === 'llave' ? 'Cambiar de llave' : activa ? 'Conectar otra cuenta' : 'Volver a autorizar' },
                     activa && otras.length
                       ? { value: `quitar:${activa.id}`, label: 'Quitar esta cuenta' }
                       : { value: 'quitar', label: o.como === 'llave' ? 'Quitar la llave' : 'Cerrar sesión' },
@@ -988,6 +1065,7 @@ export function CuentaAgente({ p, aviso = false, onFalta }: { p: OtroAgente; avi
             : 'Puedes conectar más cuentas de Google con «Conectar otra cuenta», en el menú de la tuya: cuando a una se le acaba la cuota, Sloth sigue con la siguiente.'}
         </p>
       )}
+      {p === 'antigravity' && cuenta?.conectada && !aviso && !espera && <div className="fila-extra"><button type="button" className="boton" onClick={conectar} disabled={c.ocupado}>Agregar cuenta</button></div>}
       {o.beta && <p className="fila-extra muted small">Está en beta: puedes probarlo, pero puede tener errores. Si te topas con uno, repórtalo en la Comunidad, en Ayuda.</p>}
       {pegando && (
         <form className="fila-extra" onSubmit={(e) => (e.preventDefault(), llave.trim() && void guardarLlave(llave.trim()))}>
@@ -1189,18 +1267,31 @@ const conMayuscula = (s?: string) => s && s[0].toUpperCase() + s.slice(1)
  * Lo que las skills necesitan fuera de Sloth (FFmpeg, Python…), y el botón que baja lo que falta. Con `skill`, solo lo
  * que pide esa skill; sin ella (Opciones), todo.
  */
-function useRequisitos(fresco = false, skill?: string) {
+function useRequisitos(fresco = false, skill?: string, esperar = false) {
   const [lista, setLista] = useState<Requisito[] | null>(null)
   const [error, setError] = useState('')
+  const consultaInicial = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
 
   // Con todo listo, el servidor no vuelve a mirar; `fresco` (Opciones) se lo pide.
   function leer(fresco = false) {
+    clearTimeout(consultaInicial.current)
     const q = new URLSearchParams()
     if (skill) q.set('skill', skill)
     if (fresco) q.set('fresco', '')
-    return api<Requisito[]>(`/api/requisitos?${q}`).then(setLista, (e) => setError(e.message))
+    return api<Requisito[]>(`/api/requisitos?${q}`).then((datos) => {
+      setLista(datos)
+      setError('')
+    }, (e) => setError(e.message))
   }
-  useEffect(() => void leer(fresco), [skill])
+  useEffect(() => {
+    if (!esperar) {
+      void leer(fresco)
+      return
+    }
+    // La campana se monta al abrir la ventana. Sus comprobaciones lanzan Python y FFmpeg.
+    consultaInicial.current = setTimeout(() => void leer(fresco), 5000)
+    return () => clearTimeout(consultaInicial.current)
+  }, [skill, fresco, esperar])
 
   // Mientras se instala, se mira cada tres segundos cómo va.
   const trabajando = !!lista?.some((r) => r.estado)
@@ -1215,29 +1306,86 @@ function useRequisitos(fresco = false, skill?: string) {
     api<Requisito[]>('/api/requisitos/instalar', { ids, skill }).then(setLista, (e) => setError(e.message))
   }
 
-  return { lista, error, trabajando, bajar }
+  return { lista, error, trabajando, bajar, leer }
 }
 
 type UsoRequisitos = ReturnType<typeof useRequisitos>
 
-/**
- * Lo que ve quien abre la app si falta algo que Sloth puede bajar: encima del compositor, solo lo que falta para la skill
- * de la card, con un botón que lo baja todo. En Opciones está la lista entera, cada uno con su botón.
- */
-export function Requisitos({ skill, onListo }: { skill?: string; onListo?(listo?: boolean): void }) {
-  const { lista, error, trabajando, bajar } = useRequisitos(false, skill)
-  const bajables = lista?.filter((r) => !r.listo && r.instalable && !r.estado) ?? []
-  // Si ya está todo (la bienvenida lo marca); `undefined` mientras no se sabe. Lo opcional (ChatGPT) no cuenta.
+/** La bienvenida marca este paso cuando todas las herramientas necesarias están listas. */
+export function Requisitos({ onListo }: { onListo?(listo?: boolean): void }) {
+  const req = useRequisitos()
+  const { lista } = req
   const listo = lista ? !lista.some((r) => !r.listo && !r.opcional) : undefined
   useEffect(() => onListo?.(listo), [listo])
-  if (!trabajando && !bajables.length && !lista?.some((r) => r.error)) return null
+  return <RequisitosPendientes req={req} />
+}
+
+export function Notificaciones({ skill }: { skill?: string }) {
+  const req = useRequisitos(false, skill, true)
+  const { lista, error, leer } = req
+  const pendientes = lista?.filter((r) => (!r.listo && !r.opcional && r.instalable) || r.estado || r.error) ?? []
+  const hayDescargas = pendientes.some((r) => !r.listo && r.instalable && !r.estado)
+  const bandeja = useRef<HTMLDivElement>(null)
+  const [aviso, setAviso] = useState(false)
+
+  useEffect(() => {
+    if (!hayDescargas || sessionStorage.getItem('aviso-requisitos')) return
+    sessionStorage.setItem('aviso-requisitos', '1')
+    setAviso(true)
+  }, [hayDescargas])
+
+  useEffect(() => {
+    if (!aviso) return
+    const id = setTimeout(() => setAviso(false), 7000)
+    return () => clearTimeout(id)
+  }, [aviso])
+
+  function abrir() {
+    setAviso(false)
+    if (!bandeja.current?.matches(':popover-open')) void leer()
+  }
+
+  return <>
+    <button className="notificaciones-boton" title="Notificaciones" aria-label={pendientes.length ? 'Notificaciones pendientes' : 'Notificaciones'}
+      popoverTarget="notificaciones" onClick={abrir}>
+      <Icono de="campana" />
+      {pendientes.length > 0 && <span aria-hidden="true" />}
+    </button>
+    <div className="notificaciones-bandeja" id="notificaciones" popover="auto" ref={bandeja} role="region" aria-label="Notificaciones">
+      <header>
+        <strong>Notificaciones</strong>
+        <button title="Cerrar notificaciones" aria-label="Cerrar notificaciones" popoverTarget="notificaciones" popoverTargetAction="hide"><Icono de="cerrar" /></button>
+      </header>
+      {pendientes.length > 0 || error ? <RequisitosPendientes req={req} /> : <div className="notificaciones-vacias superficie-ascii">
+        {lista && <CampoAscii variante="orbita" />}
+        <p>{lista ? 'Estás al día.' : 'Consultando notificaciones…'}</p>
+      </div>}
+    </div>
+    {aviso && hayDescargas && (
+      <div className="notificaciones-aviso">
+        <Icono de="campana" />
+        <span role="status">Faltan herramientas de video</span>
+        <button onClick={() => {
+          abrir()
+          bandeja.current?.showPopover()
+        }}>Ver</button>
+        <button title="Ocultar aviso" aria-label="Ocultar aviso" onClick={() => setAviso(false)}><Icono de="cerrar" /></button>
+      </div>
+    )}
+  </>
+}
+
+function RequisitosPendientes({ req }: { req: UsoRequisitos }) {
+  const { lista, error, trabajando, bajar } = req
+  const bajables = lista?.filter((r) => !r.listo && r.instalable && !r.estado) ?? []
+  if (!error && !trabajando && !bajables.length && !lista?.some((r) => r.error)) return null
   return (
-    <section className="panel requisitos-aviso">
+    <section className="panel">
       <div className="item">
         <div className="fila">
           <div className="fila-nombre">
-            <strong>Falta descargar algunas cosas</strong>
-            <span>Los estilos de video las usan para armar, transcribir y revisar. Puede tardar unos minutos.</span>
+            <strong>{trabajando ? 'Instalando herramientas de video' : bajables.length ? 'Faltan herramientas de video' : 'Revisar herramientas de video'}</strong>
+            <span>Se usan para armar, transcribir y revisar videos.</span>
           </div>
           {bajables.length > 0 && (
             <button className="primary" onClick={() => bajar()}>
@@ -1264,7 +1412,7 @@ function Herramientas({ req }: { req: UsoRequisitos }) {
   const [abierta, setAbierta] = useState(false)
   const lista = req.lista ?? []
   const bajables = lista.filter((r) => !r.listo && r.instalable && !r.estado)
-  const todoListo = !!req.lista && lista.every((r) => (r.listo || r.opcional) && !r.error)
+  const todoListo = !!req.lista && lista.every((r) => (r.listo || r.opcional) && !r.error && !r.estado)
   const plegada = todoListo && !abierta
   return (
     <Grupo
@@ -1311,32 +1459,32 @@ function Herramientas({ req }: { req: UsoRequisitos }) {
 
 /** Una herramienta: para qué sirve, su versión si está, y si no, cómo conseguirla. Sin `onBajar` no lleva botón. */
 function RequisitoFila({ r, onBajar }: { r: Requisito; onBajar?(): void }) {
+  const detalleLargo = !!onBajar && !r.listo && !r.estado && (r.detalle?.length ?? 0) > 30
   return (
     <div className="item">
-      <div className="fila">
+      <div className="fila requisito-fila">
         <Logo de={r.id} nombre={r.nombre} />
         <div className="fila-nombre" title={r.para}>
           <strong>{r.nombre}</strong>
-          <span className={r.listo ? 'una-linea' : undefined}>{r.para}</span>
+          <span>{r.para}</span>
+          {detalleLargo && <span className="falta">{r.detalle}</span>}
           {!r.listo && r.aMano && <span>{r.aMano}</span>}
         </div>
-        <EstadoRequisito r={r} />
-        {onBajar && r.instalable && !r.listo && !r.estado && (
-          <button className="primary" onClick={onBajar}>
-            Descargar
-          </button>
-        )}
+        {onBajar ? <div className="requisito-acciones">
+          <EstadoRequisito r={r} resumido={detalleLargo} />
+          {r.instalable && !r.listo && !r.estado && <button className="primary" onClick={onBajar}>Descargar</button>}
+        </div> : <EstadoRequisito r={r} />}
       </div>
       <Fallo error={r.error} className="requisito-error" />
     </div>
   )
 }
 
-function EstadoRequisito({ r }: { r: Requisito }) {
+function EstadoRequisito({ r, resumido }: { r: Requisito; resumido?: boolean }) {
+  if (r.estado) return <span className="estado moviendo" role="status">{r.estado === 'instalando' ? (r.detalle ? `${r.detalle}…` : 'Preparando la instalación…') : 'En espera'}</span>
   if (r.listo) return <span className="estado">{r.detalle ?? 'Listo'}</span>
   if (r.opcional) return <span className="estado apagado">Opcional</span>
-  if (r.estado) return <span className="estado moviendo" title={r.detalle}>{r.estado === 'instalando' ? (r.detalle ? `${r.detalle}…` : 'Descargando…') : 'En espera'}</span>
-  return <span className="estado falta">{r.detalle ?? 'Falta'}</span>
+  return <span className="estado falta">{resumido ? 'Falta' : r.detalle ?? 'Falta'}</span>
 }
 
 /**
@@ -1391,7 +1539,7 @@ function Agentes() {
                           label: 'Cuenta',
                           options: [
                             { value: 'uso', label: 'Ver tu uso ↗' },
-                            { value: 'cambiar', label: 'Cambiar de cuenta' },
+                            { value: 'cambiar', label: 'Volver a autorizar' },
                             { value: 'salir', label: 'Cerrar sesión' },
                           ],
                         },

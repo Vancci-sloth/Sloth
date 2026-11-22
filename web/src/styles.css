@@ -17,6 +17,48 @@
   --sobre-ambar: #1b1408;
   --ok: #8fc177;
   --bad: #e06c55;
+  /*
+   * Lo que usa el diseño común (el de Sloth) en los dos temas: la escala de grises, el borde y el radio de las tarjetas,
+   * el cristal y el color de cada agente, función y red. En el tema Sloth todo sale de su paleta (el acento es el ámbar
+   * y el cristal es plano); Cristal les pone los suyos (`temas/cristal.css`).
+   */
+  --gris-50: var(--text);
+  --gris-100: var(--text);
+  --gris-200: var(--suave);
+  --gris-300: var(--muted);
+  --gris-400: var(--muted);
+  --gris-500: var(--line-hover);
+  --gris-600: var(--line-hover);
+  --gris-700: var(--line);
+  --gris-800: var(--panel-2);
+  --gris-900: var(--panel);
+  --gris-950: var(--bg);
+  --linea-tarjeta: var(--line);
+  --radio-tarjeta: 14px;
+  --cristal-fondo: var(--panel);
+  --cristal-borde: var(--line);
+  --cristal-reflejo: none;
+  --acento-claude: var(--amber);
+  --acento-codex: var(--amber);
+  --acento-gemini: var(--amber);
+  --acento-deepseek: var(--amber);
+  --acento-opencode: var(--amber);
+  --acento-grok: var(--amber);
+  --acento-antigravity: var(--amber);
+  --acento-cursor: var(--amber);
+  --acento-muse: var(--amber);
+  --acento-pi: var(--amber);
+  --acento-openrouter: var(--amber);
+  --acento-freellmapi: var(--amber);
+  --acento-voz: var(--amber);
+  --acento-imagen: var(--amber);
+  --acento-youtube: var(--amber);
+  --acento-tiktok: var(--amber);
+  --acento-tiktok-rosa: var(--amber);
+  --acento-instagram: var(--amber);
+  --acento-instagram-final: var(--amber);
+  /* El color del agente elegido en el compositor; Cristal lo cambia por el de cada uno (`data-proveedor`). */
+  --acento-modelo: var(--amber);
   --radio: 10px;
   --mono: 'JetBrains Mono', 'Cascadia Code', Consolas, monospace;
   color-scheme: dark;
@@ -32,6 +74,29 @@ body {
 }
 button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; padding: 0; }
 button:disabled { cursor: default; opacity: 0.45; }
+.vista-cargando { padding: 16px 24px; color: var(--muted); }
+.campo-ascii { position: absolute; inset: 0 0 0 auto; width: min(45%, 330px); height: 100%; pointer-events: none; color: var(--gris-500); mask-image: linear-gradient(to right, transparent, #000 55%); }
+.superficie-ascii { position: relative; isolation: isolate; overflow: hidden; border: 1px solid var(--linea-tarjeta); border-radius: var(--radio-tarjeta); background: radial-gradient(ellipse at top right, var(--panel-2), transparent 72%), var(--panel); }
+.superficie-ascii > .campo-ascii { z-index: -1; }
+.fondo-ramas { position: relative; isolation: isolate; }
+.fondo-ramas > .campo-ascii {
+  z-index: -1;
+  inset: 0;
+  width: 100%;
+  color: var(--gris-400);
+  opacity: var(--opacidad-ramas, .38);
+  mask-image: radial-gradient(ellipse at 50% 58%, #000 35%, transparent 92%);
+  animation: none;
+}
+.new-session.fondo-ramas > .campo-ascii {
+  mask-image: linear-gradient(to bottom, transparent, #000 14%, #000 34%, transparent 83%);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .campo-ascii { animation: entrada-ascii 520ms steps(12) both; }
+  :is(.primary, .boton, .ghost, .send, .opciones-volver, .notificaciones-boton) { transition: color 150ms ease, background-color 150ms ease, border-color 150ms ease; }
+  @keyframes entrada-ascii { from { opacity: 0; } }
+}
+:where(button, a)[style*='--pulso-control'] { scale: var(--pulso-control, 1); }
 input, textarea, select { font: inherit; color: inherit; }
 .mono { font-family: var(--mono); }
 .muted { color: var(--muted); }
@@ -77,34 +142,75 @@ input, textarea, select { font: inherit; color: inherit; }
 @keyframes pulse { 50% { opacity: 0.4; } }
 
 .main { position: relative; min-width: 0; min-height: 0; display: flex; flex-direction: column; }
-/* Arriba a la derecha del hilo nuevo: «Acelerar Sloth en tu equipo». */
+/* Arriba a la derecha del hilo nuevo: avisos de la app. */
 .avisos-nuevo { position: absolute; top: 14px; right: 18px; z-index: 2; display: flex; gap: 8px; align-items: center; }
-/* Sin cápsula y legible como el resto del inicio: texto claro, borde ámbar, 14 px. */
+/* Los avisos del inicio llevan texto claro y un borde de acento. */
 .aviso-version { padding: 5px 12px; border-radius: 10px; background: var(--panel); border: 1px solid var(--amber); color: var(--text); font-size: 15px; font-weight: 600; }
 .aviso-version:hover { background: var(--amber-2); color: var(--sobre-ambar); }
 .aviso-version.quieto, .aviso-version.quieto:hover { background: var(--panel); color: var(--text); font-weight: 500; }
 
+.notificaciones-boton { position: relative; display: grid; place-items: center; flex: none; width: 28px; height: 28px; border-radius: 7px; color: var(--muted); }
+.notificaciones-boton:hover, .notificaciones-boton:has(> span) { color: var(--amber); }
+.notificaciones-boton:hover { background: var(--panel-2); }
+.notificaciones-boton .ico, .notificaciones-aviso .ico, .notificaciones-bandeja header .ico { width: 16px; height: 16px; }
+.notificaciones-boton > span { position: absolute; top: 4px; right: 4px; width: 7px; height: 7px; border: 1px solid var(--panel); border-radius: 50%; background: var(--amber); }
+.plegada .notificaciones-boton { margin-bottom: 4px; }
+.notificaciones-bandeja { position: fixed; inset: 52px auto auto clamp(8px, calc(100vw - 470px), 180px); width: min(450px, calc(100vw - 16px)); max-height: calc(100dvh - 64px); overflow: auto; margin: 0; padding: 0; border: 1px solid var(--line); border-radius: var(--radio); background: var(--panel); color: var(--text); box-shadow: 0 14px 36px #0008; }
+.plegada .notificaciones-bandeja { top: 80px; left: 8px; }
+.notificaciones-bandeja header { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 14px; border-bottom: 1px solid var(--line); }
+.notificaciones-vacias { min-height: 70px; margin: 9px; padding: 16px; display: flex; align-items: center; color: var(--suave); }
+.notificaciones-vacias p { margin: 0; }
+.notificaciones-bandeja > .panel { border: 0; border-radius: 0; }
+.notificaciones-bandeja .item:first-child .fila { flex-wrap: wrap; }
+.notificaciones-bandeja .item:first-child .fila-nombre { flex-basis: 100%; }
+.notificaciones-aviso { position: fixed; top: 56px; right: 18px; z-index: 12; display: flex; align-items: center; gap: 8px; max-width: calc(100vw - 36px); padding: 8px 10px; border: 1px solid var(--line-hover); border-radius: var(--radio); background: var(--panel); color: var(--text); box-shadow: 0 8px 24px #0008; font-size: 13px; }
+.notificaciones-aviso > .ico { flex: none; color: var(--amber); }
+.notificaciones-aviso button, .notificaciones-bandeja header button { display: grid; place-items: center; padding: 4px 6px; border-radius: 6px; color: var(--suave); }
+.notificaciones-aviso button:first-of-type { color: var(--amber); font-weight: 650; }
+.notificaciones-aviso button:hover, .notificaciones-bandeja header button:hover { background: var(--panel-2); }
+
 /* Inicio: arriba las skills, a lo ancho; abajo, centradas, la elegida y el compositor, que no se mueven de su sitio. Si
    sobran skills, hacen scroll ellas solas y el compositor sigue a la vista. */
-.new-session { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 22px; padding: 28px 48px 24px; font-size: 15px; }
+.new-session { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 18px; padding: 28px 48px clamp(18px, 3vh, 32px); font-size: 15px; }
 .new-top { flex: 1; min-height: 0; width: 100%; max-width: 1560px; margin: 0 auto; display: flex; flex-direction: column; justify-content: safe flex-end; }
-.new-bottom { flex: none; width: 100%; max-width: 760px; margin: 0 auto; display: flex; flex-direction: column; gap: 14px; }
-.new-head { text-align: center; }
-.new-head h1 { margin: 0 0 4px; display: flex; align-items: center; justify-content: center; gap: 10px; font-size: 24px; font-weight: 700; letter-spacing: -0.02em; }
+.new-bottom { flex: none; width: 100%; max-width: 760px; margin: 0 auto; display: flex; flex-direction: column; gap: 10px; }
+.new-bottom > .composer {
+  min-height: 158px;
+  display: flex;
+  flex-direction: column;
+}
+.new-bottom > .composer > .composer-bar { margin-top: auto; padding-top: 6px; }
+@media (max-width: 700px) {
+  .new-bottom > .composer { min-height: 194px; }
+}
+/* La descripción acompaña al carrusel; el espacio mayor separa la elección del mensaje. */
+.new-bottom > .new-head {
+  flex: none;
+  height: 142px;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+  margin-bottom: clamp(18px, 3vh, 32px);
+}
+.new-bottom > .new-head h1 { font-size: 22px; }
+.new-bottom > .new-head .guia { margin-top: 6px; }
+.new-head-fila { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 6px 12px; margin-bottom: 5px; }
+.new-head-fila h1 { min-width: 0; flex: 1 1 220px; }
+.new-bottom > .new-head .new-head-fila .compartir-boton { flex: none; margin: 0; min-height: 30px; padding: 4px 10px; font-size: 12px; }
+.new-head { padding: 9px 14px; text-align: left; }
+.new-head h1 { margin: 0 0 3px; display: flex; align-items: center; gap: 9px; font-size: 24px; font-weight: 550; letter-spacing: -0.025em; }
 .new-head h1 .card-icon.big { font-size: 26px; }
 .new-head h1 .card-icon.big .icon-trazo { width: 26px; height: 26px; }
 .new-head p { margin: 0; color: var(--suave); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-.new-head .estilo-version { align-self: center; font-size: 15px; font-weight: 500; letter-spacing: 0; color: var(--suave); font-variant-numeric: tabular-nums; }
+.new-head .estilo-version { align-self: center; padding: 1px 6px; border: 1px solid var(--linea-tarjeta); border-radius: 6px; font: 11px/1.5 var(--mono); letter-spacing: 0; color: var(--suave); }
 /* El compositor del inicio se lee como el resto: letra de 15 px y contraste de 9,5:1 o más. */
 .new-session .composer-bar .picker-trigger { font-size: 15px; color: var(--suave); }
 .new-session .composer-bar .picker-trigger:hover:not(:disabled), .new-session .composer-bar .picker.open > .picker-trigger { color: var(--text); }
 .new-session .segmento { font-size: 15px; border-radius: 10px; }
 .new-session .segmento button { border-radius: 8px; color: var(--suave); }
-/* El elegido: el texto claro y una línea ámbar debajo (ámbar sobre ámbar no llegaba a 9:1). */
+/* La opción elegida mantiene el texto claro y se marca con una línea de acento. */
 .new-session .segmento button.on { background: var(--panel); color: var(--text); box-shadow: inset 0 -2px 0 var(--amber); }
 .new-session .editor .placeholder { color: var(--suave); }
-/* Texto oscuro sobre el ámbar claro: 10:1 (sobre --amber, 8,5). */
-.new-session .send:not(.stop), .new-session .card .card-version { background: var(--amber-2); }
+.new-session .send:not(.stop) { background: var(--amber-2); }
 .new-session .send:not(.stop):hover:not(:disabled) { filter: brightness(1.08); }
 /* Ventana estrecha (un celular, media pantalla): menos margen, para que quepan los carteles. */
 @media (max-width: 760px) {
@@ -114,7 +220,7 @@ input, textarea, select { font: inherit; color: inherit; }
   .new-session .composer-bar .picker-trigger { height: auto; min-height: 28px; white-space: normal; text-align: left; }
   .new-head h1 { font-size: 20px; }
 }
-/* «Con tus cambios (N)» (TusCambios.tsx): ámbar, que avisa sin alarmar. */
+/* «Con tus cambios (N)» (TusCambios.tsx): aviso con el color de acento. */
 .tus-cambios { margin-top: 8px; padding: 3px 11px; border-radius: 999px; border: 1px solid var(--amber); color: var(--amber); font-size: 12.5px; font-weight: 600; transition: background 0.15s; }
 .tus-cambios:hover { background: var(--amber-tinte); }
 .new-head .tus-cambios-listo { margin-top: 8px; font-size: 12.5px; }
@@ -125,12 +231,12 @@ input, textarea, select { font: inherit; color: inherit; }
 .tus-cambios-lista code { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tus-cambios-lista button { flex: none; padding: 2px 9px; border-radius: 999px; color: var(--muted); font-size: 12px; transition: background 0.15s, color 0.15s; }
 .tus-cambios-lista button:hover { background: var(--panel-2); color: var(--text); }
-.new-bottom .cuenta-aviso, .new-bottom .requisitos-aviso { border-color: var(--amber); }
+.new-bottom .cuenta-aviso { border-color: var(--amber); }
 
 /* El estante: cada skill es un cartel. Con previa, su último video (quieto hasta pasar el ratón); sin ella, su icono y
    qué hace. Abajo, sobre una sombra, el nombre y cuánto se usa. */
 /* El estante ocupa todo el alto libre y sus carteles se acomodan para caber enteros (`encajar.ts`). */
-.estante { flex: 1; min-height: 0; display: flex; flex-direction: column; justify-content: flex-end; gap: 10px; }
+.estante { flex: 1; min-height: 0; display: flex; flex-direction: column; justify-content: safe center; gap: 10px; }
 .estante header { display: flex; align-items: center; gap: 2px; }
 .estante h2 { flex: 1; margin: 0; font-size: 15px; font-weight: 650; color: var(--suave); }
 /* «Importar» un estilo que te pasaron: texto con su icono, sin cápsula. */
@@ -142,25 +248,77 @@ a.estilo-importar { text-decoration: none; }
 /* Encajadas: cada cartel del tamaño que cabe, juntos y pegados al compositor. */
 .cards.encajadas { flex: none; overflow: hidden; grid-template-columns: repeat(var(--columnas), var(--cartel-ancho)); grid-auto-rows: var(--cartel-alto); justify-content: center; }
 .cards.encajadas .card { aspect-ratio: auto; }
+.estilos-carrusel { position: relative; width: 100%; min-width: 0; margin: 0 auto; }
+.carrusel-posicion { align-self: center; margin-right: 8px; color: var(--muted); font: 12px var(--mono); }
+.estilos-carrusel-controles { display: flex; justify-content: flex-end; gap: 6px; margin-bottom: 8px; }
+.estilos-carrusel-controles .boton { display: grid; place-items: center; width: 34px; height: 30px; padding: 0; }
+.estilos-carrusel-controles .ico { width: 16px; height: 16px; }
+.carrusel-siguiente { display: grid; transform: rotate(180deg); }
+.cards.cards-carrusel {
+  --paso-carrusel: clamp(96px, 14vw, 170px);
+  position: relative;
+  display: block;
+  flex: none;
+  height: clamp(190px, 35vh, 330px);
+  overflow: hidden;
+  perspective: 1000px;
+  margin: 0;
+  padding: 0;
+  touch-action: pan-y;
+  user-select: none;
+  cursor: grab;
+}
+.cards.cards-carrusel:active { cursor: grabbing; }
+.cards-carrusel .card {
+  position: absolute;
+  left: 50%;
+  top: 5px;
+  width: auto;
+  min-width: 0;
+  height: calc(100% - 46px);
+  aspect-ratio: 2 / 3;
+  border-radius: 9px;
+  border-width: 1px;
+  transform-origin: center;
+  backface-visibility: hidden;
+  box-shadow: 0 14px 26px color-mix(in srgb, var(--bg) 65%, transparent);
+  transition: border-color 150ms ease;
+}
+.cards-carrusel .card-version { top: 8px; font-size: 10px; padding: 1px 4px; }
+.cards-carrusel .card:has(.card-version) .card-fondo { padding-top: 34px; }
+.cards-carrusel .card-pie { padding: 12px 9px; }
+.cards-carrusel .card-title { font-size: 13px; }
+.cards-carrusel .card-desc { font-size: 12px; }
+.cards-carrusel .card-uso { font-size: 11px; }
+.cards-carrusel .card-previa { border-radius: 8px; }
+@media (max-height: 700px) {
+  .new-bottom > .new-head { height: 110px; }
+  .new-bottom > .new-head { margin-bottom: 12px; }
+  .estante { justify-content: safe flex-end; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .cards-carrusel .card { transition: transform 450ms cubic-bezier(.22,.8,.3,1), opacity 350ms ease, visibility 350ms, border-color 150ms ease; }
+}
 /* Una columna: arriba su icono y qué hace (lo que quepa), abajo el nombre y su uso, enteros aunque ocupen dos líneas. */
 .card { position: relative; display: flex; flex-direction: column; aspect-ratio: 3 / 4; overflow: hidden; isolation: isolate; container-type: size; border-radius: 12px; border: 1px solid var(--line); background: var(--panel-2); text-align: left; transition: border-color 0.15s; }
-.card:has(.card-fondo) { background: radial-gradient(circle at 20% 0%, var(--amber-tinte), transparent 65%), var(--panel-2); }
+.card:has(.card-fondo) { background: var(--panel); }
+.card.active:has(.card-fondo) { background: var(--panel-2); }
+.card > .campo-ascii { z-index: -1; inset: 0 0 auto auto; width: 58%; height: 56%; opacity: .26; mask-image: radial-gradient(ellipse at 90% 15%, #000 10%, transparent 76%); }
+.card.active > .campo-ascii, .card:hover > .campo-ascii { opacity: .54; }
 .card:hover { border-color: var(--line-hover); }
 .card:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
 .card.active { border-color: var(--amber); box-shadow: 0 0 0 1px var(--amber); }
 .card-previa { position: absolute; inset: 0; z-index: -2; width: 100%; height: 100%; object-fit: cover; }
-.card-fondo { flex: 1; min-height: 0; overflow: hidden; display: flex; flex-direction: column; gap: 12px; padding: 16px 16px 0; mask-image: linear-gradient(to bottom, #000 calc(100% - 10px), transparent); }
+.card-fondo { flex: 1; min-height: 0; overflow: hidden; display: flex; flex-direction: column; gap: 8px; padding: 14px 12px 0; }
 .card-icon { font-size: 34px; line-height: 1; }
 .card-icon.big { font-size: 40px; }
-.card-desc { font-size: 15px; line-height: 1.4; color: var(--suave); display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
+.card-desc { font-size: 13px; line-height: 1.35; color: var(--suave); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 /* En un cartel bajo, la descripción se acorta o se va (y en uno muy bajo, también el icono): nunca pisan el nombre ni su
    uso, que siempre se leen. Van después de `.card-desc`, que si no las pisa. */
-@container (max-height: 250px) { .card-desc { -webkit-line-clamp: 3; } }
-@container (max-height: 225px) { .card-desc { -webkit-line-clamp: 2; } }
 @container (max-height: 205px) { .card-desc { -webkit-line-clamp: 1; } }
 @container (max-height: 185px) { .card-desc { display: none; } }
 .card::after { content: ''; position: absolute; inset: 0; z-index: -1; background: linear-gradient(to top, color-mix(in srgb, var(--bg) 92%, transparent), color-mix(in srgb, var(--bg) 35%, transparent) 32%, transparent 55%); }
-.card-pie { flex: none; margin-top: auto; display: flex; flex-direction: column; gap: 1px; padding: 26px 14px 12px; }
+.card-pie { flex: none; margin-top: auto; display: flex; flex-direction: column; gap: 2px; padding: 12px; }
 /* Sobre una previa, el pie lleva su propia sombra, tan alta como él: con el nombre en dos líneas, la de la card no
    alcanzaba y se leía encima del video. El pie tiene el mismo alto con previa o sin ella: la previa llega después y,
    si no, lo movía. */
@@ -177,17 +335,17 @@ a.estilo-importar { text-decoration: none; }
 .sin-apoyo .primary { flex: none; white-space: nowrap; }
 @media (max-width: 760px) { .sin-apoyo { flex-wrap: wrap; } }
 .card.active .card-title { color: var(--amber-2); }
-.card-uso { font-size: 15px; line-height: 1.35; color: var(--suave); overflow-wrap: anywhere; }
+.card-uso { font-size: 12px; line-height: 1.35; color: var(--suave); overflow-wrap: anywhere; }
 .card-uso.vivo { color: var(--amber); }
 /* La versión del estilo (Card.version), arriba a la izquierda; con fondo, que encima de una previa se lea. */
-.card-version { position: absolute; top: 8px; left: 8px; z-index: 1; padding: 1px 7px; border-radius: 6px; background: var(--amber); color: var(--sobre-ambar); font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; }
-.card:has(.card-version) .card-fondo { padding-top: 38px; }
+.card-version { position: absolute; top: 8px; left: 8px; z-index: 1; padding: 2px 5px; border-radius: 5px; border: 1px solid var(--line); background: var(--panel); color: var(--suave); font: 11px/1.2 var(--mono); }
+.card:has(.card-version) .card-fondo { padding-top: 34px; }
 /* En uno muy bajo solo el nombre y su uso: sin la zona del icono, y la versión se va (sale junto al nombre del elegido)
    para no tapar el nombre. */
 @container (max-height: 160px) { .card-fondo, .card-version { display: none; } .card .card-pie { padding-top: 8px; } }
 .card-actions { position: absolute; top: 8px; right: 8px; display: flex; gap: 2px; opacity: 0; visibility: hidden; transition: opacity 0.15s, visibility 0.15s; }
 .card:hover .card-actions, .card:focus-visible .card-actions { opacity: 1; visibility: visible; }
-/* Cada botón de su color, y distintos de la versión (ámbar): duplicar, compartir y quitar no se confunden. */
+/* Duplicar, compartir y quitar se distinguen por color. */
 .card-actions span { width: 24px; height: 24px; display: grid; place-items: center; border-radius: 6px; background: var(--text); color: var(--sobre-ambar); font-size: 12px; font-weight: 700; }
 .card-actions span.compartir { background: var(--ok); }
 .card-actions span.danger { background: var(--bad); }
@@ -197,6 +355,17 @@ a.estilo-importar { text-decoration: none; }
 .estilo-volver { align-self: flex-start; color: var(--muted); font-size: 12.5px; padding: 3px 10px; border-radius: 999px; border: 1px solid var(--line); transition: color 0.15s, border-color 0.15s; }
 .estilo-volver:hover { color: var(--amber); border-color: var(--amber); }
 .estilo-vacio { color: var(--muted); text-align: center; margin: 24px 0; }
+.viendo-estilo .new-top { justify-content: flex-start; padding-top: 18px; }
+.viendo-estilo .estilo { flex: 1; min-height: 0; gap: 16px; }
+.estilo-galeria-cabecera { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; padding-bottom: 12px; border-bottom: 1px solid var(--linea-tarjeta); }
+.estilo-galeria-cabecera > span { color: var(--muted); font-size: 13px; }
+.estilo-galeria-cabecera .estilo-volver { display: flex; align-items: center; gap: 7px; padding: 7px 12px; background: var(--panel); }
+.estilo-galeria-cabecera .ico, .estilo-ver-videos .ico { width: 16px; height: 16px; }
+.estilo-ver-videos { display: inline-flex; align-items: center; gap: 7px; padding: 5px 0; color: var(--suave); font-size: 12px; }
+.estilo-ver-videos:hover { color: var(--text); }
+.estilo-galeria-vacia { display: grid; justify-items: center; align-content: center; gap: 10px; flex: 1; min-height: 120px; padding: 18px; text-align: center; }
+.estilo-galeria-vacia > .ico { width: 28px; height: 28px; color: var(--muted); }
+.estilo-galeria-vacia p { max-width: 420px; margin: 0; color: var(--muted); font-size: 13px; }
 /* Mientras se desplaza una rejilla (`useDesplazando`), lo de dentro no responde al ratón. */
 .desplazando > * { pointer-events: none; }
 .videos { --alto: 200px; display: flex; flex-wrap: wrap; align-content: flex-start; gap: 18px 14px; min-height: 0; overflow-y: auto; margin: 0 -6px; padding: 6px; }
@@ -319,7 +488,7 @@ a.estilo-importar { text-decoration: none; }
 .icon-trazo { width: 1em; height: 1em; vertical-align: -0.15em; }
 .card-icon .icon-trazo { color: var(--amber); stroke-width: 1.6; }
 .chip-name { max-width: 280px; overflow: hidden; text-overflow: ellipsis; }
-/* La de un enlace: eslabón ámbar, el sitio y la ruta en gris. En el globo es un enlace de verdad. */
+/* La de un enlace: eslabón claro, el sitio y la ruta en gris. En el globo es un enlace de verdad. */
 .link-chip { color: inherit; text-decoration: none; }
 .link-chip .chip-icon, .quote-chip .chip-icon { stroke: var(--amber); background: var(--amber-tinte); }
 .quote-chip .chip-name { font-weight: 400; font-style: italic; }
@@ -351,6 +520,12 @@ a.link-chip:hover { border-color: var(--amber); }
 .segmento button { padding: 2px 10px; border-radius: 999px; color: var(--muted); transition: background 0.15s, color 0.15s; white-space: nowrap; }
 .segmento button:hover:not(:disabled) { color: var(--text); }
 .segmento button.on { background: var(--amber-tinte); color: var(--amber); }
+/* El dibujo del aparato junto a Vertical / Horizontal: gira al cambiar de formato. */
+.segmento-dispositivo { align-items: center; }
+.formato-dispositivo { display: grid; place-items: center; flex: none; width: 28px; color: var(--text); }
+.formato-dispositivo svg { width: 20px; height: 20px; }
+.segmento-dispositivo[data-orientacion="horizontal"] .formato-dispositivo svg { transform: rotate(90deg); }
+@media (prefers-reduced-motion: no-preference) { .formato-dispositivo svg { transition: transform 0.3s ease; } }
 .picker { position: relative; }
 .picker-trigger { display: flex; align-items: center; gap: 5px; height: 28px; padding: 0 8px 0 10px; border-radius: 8px; font-size: 12.5px; color: var(--muted); transition: background 0.15s, color 0.15s; }
 .picker-trigger svg { opacity: 0.7; transition: transform 0.15s; }
@@ -373,6 +548,8 @@ a.link-chip:hover { border-color: var(--amber); }
 .picker-detalle { margin-left: auto; color: var(--suave); font-size: 12px; font-variant-numeric: tabular-nums; }
 .picker-option.on .picker-detalle { color: inherit; }
 .picker-detalle + svg { margin-left: -4px; }
+.picker-modelo-logo { display: inline-flex; align-items: center; gap: 8px; min-width: 0; }
+.picker-modelo-logo > .logo { flex: none; }
 .picker-menu.down { bottom: auto; top: calc(100% + 8px); animation-name: drop; }
 /*
  * El desplegable de toda la app (Desplegable.tsx): donde iría un <select>, que el sistema pinta a su manera. Toma la
@@ -387,6 +564,11 @@ a.link-chip:hover { border-color: var(--amber); }
 .desplegable.campo > .picker-trigger:hover:not(:disabled), .desplegable.campo.open > .picker-trigger { border-color: var(--muted); background: var(--bg); }
 /* La lista de modelos dentro de Avanzado conserva el menú de Sloth y sale por encima de su panel. */
 .picker-menu.picker-flotante { position: fixed; margin: 0; min-width: 0; color: var(--text); }
+.picker-buscable { scroll-padding-top: 48px; }
+.picker-buscar { position: sticky; z-index: 1; top: -6px; display: flex; align-items: center; gap: 8px; padding: 6px 8px; background: var(--panel); }
+.picker-buscar .ico { width: 15px; height: 15px; flex: none; color: var(--muted); }
+.picker-buscar input { min-width: 0; width: 100%; min-height: 32px; padding: 4px 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--text); }
+.picker-sin-resultados { margin: 0; padding: 10px; color: var(--muted); font-size: 12px; }
 .modelos-selector > .picker-trigger { gap: 10px; padding: 0 8px 0 10px; height: 28px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel-2); color: var(--text); white-space: nowrap; }
 .modelos-selector > .picker-trigger:hover, .modelos-selector.open > .picker-trigger { border-color: var(--muted); background: var(--panel-2); }
 .modelos-lista { padding: 6px; border-radius: 12px; }
@@ -414,19 +596,6 @@ a.link-chip:hover { border-color: var(--amber); }
 .send { width: 34px; height: 34px; border-radius: 50%; background: var(--amber); color: var(--sobre-ambar); font-weight: 800; font-size: 17px; }
 .send:hover:not(:disabled) { background: var(--amber-2); }
 .send.stop { background: var(--text); font-size: 12px; }
-/* El dictado (Dictado.tsx), junto a enviar: el micrófono y, mientras escucha, cinco barritas que siguen tu voz. */
-.dictado { display: flex; align-items: center; gap: 8px; min-width: 0; }
-.dictado > span { max-width: 230px; overflow-wrap: anywhere; }
-.dictado-boton { width: 34px; height: 34px; flex: none; display: grid; place-items: center; border-radius: 8px; border: 1px solid var(--line); color: var(--muted); }
-.dictado-boton:hover:not(:disabled) { color: var(--text); border-color: var(--muted); }
-.dictado-boton .ico { width: 17px; height: 17px; }
-.dictado-boton.grabando { color: var(--amber); border-color: var(--amber); background: var(--amber-tinte); }
-.dictado-boton:is(.preparando, .transcribiendo):disabled { opacity: 1; color: var(--amber); }
-.dictado-ondas { display: flex; align-items: center; gap: 2px; height: 18px; }
-.dictado-ondas i { width: 2px; height: 18px; border-radius: 2px; background: currentColor; transform: scaleY(0.14); }
-.dictado-giro { width: 16px; height: 16px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: dictado-girar 0.9s steps(12) infinite; }
-@keyframes dictado-girar { to { transform: rotate(360deg); } }
-@media (prefers-reduced-motion: reduce) { .dictado-giro { animation: none; } }
 /* Un video del lote que espera su turno, pegado encima del compositor. */
 .queue { display: flex; flex-direction: column; margin: 0 14px; border: 1px solid var(--line); border-bottom: 0; border-radius: 12px 12px 0 0; background: var(--panel); }
 .queued { display: flex; align-items: center; gap: 10px; padding: 4px 12px; }
@@ -472,6 +641,8 @@ a.link-chip:hover { border-color: var(--amber); }
 .md code { font-family: var(--mono); font-size: 12.5px; background: var(--panel-2); border-radius: 5px; padding: 1px 5px; }
 .md pre { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radio); padding: 12px; overflow-x: auto; }
 .md pre code { background: none; padding: 0; }
+.historial-imagen :is(.bubble, .md pre) { overflow-wrap: anywhere; }
+.historial-imagen .md pre { white-space: pre-wrap; }
 .md .code-block { position: relative; }
 .md .code-block pre { padding-right: 80px; }
 .md .copy { position: absolute; top: 8px; right: 8px; font-size: 12px; color: var(--muted); background: var(--panel-2); border: 1px solid var(--line); border-radius: 6px; padding: 3px 9px; }
@@ -502,7 +673,7 @@ a.link-chip:hover { border-color: var(--amber); }
 .tool.error .tool-verb { color: var(--bad); }
 .tool-body { margin: 2px 0 8px 34px; display: flex; flex-direction: column; gap: 6px; }
 .tool-body pre { margin: 0; font-family: var(--mono); font-size: 12px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 10px; max-height: 360px; overflow: auto; white-space: pre-wrap; word-break: break-word; }
-.tool-output { color: #cfc6b4; }
+.tool-output { color: var(--suave); }
 .nested { margin-left: 26px; padding-left: 10px; border-left: 2px solid var(--line); }
 
 /* Los subagentes, como en T3 Code: una fila por cada uno (o un grupo, los que salen juntos) que se abre en su vista.
@@ -593,3 +764,19 @@ span.sub-avatar > .logo.chico svg { width: 13px; height: 13px; }
 .modal-actions { display: flex; justify-content: flex-end; align-items: center; gap: 16px; margin-top: 20px; }
 .primary.danger { background: var(--bad); color: var(--sobre-ambar); }
 .primary.danger:hover:not(:disabled) { background: var(--bad); filter: brightness(1.1); }
+.movimiento-seleccion { position: fixed; z-index: 10000; pointer-events: none; transform-origin: top left; border: 1px solid color-mix(in srgb, var(--text) 25%, transparent); background: color-mix(in srgb, var(--text) 9%, transparent); box-shadow: inset 0 1px 0 color-mix(in srgb, var(--text) 15%, transparent); }
+.dictado { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.dictado > span { max-width: 230px; font-size: 12px; overflow-wrap: anywhere; }
+.dictado { flex-wrap: wrap; }
+.dictado-boton { display: grid; place-items: center; width: 34px; height: 34px; flex: none; border-radius: 50%; color: var(--text); background: var(--cristal-fondo); border: 1px solid color-mix(in srgb, var(--acento-modelo) 40%, var(--line)); box-shadow: var(--cristal-reflejo); transition: transform 150ms; }
+.dictado-boton .ico { width: 17px; height: 17px; }
+.dictado-boton.grabando { color: var(--acento-modelo, var(--text)); border-color: var(--acento-modelo, var(--line)); background: linear-gradient(145deg, color-mix(in srgb, var(--acento-modelo, var(--text)) 22%, transparent), transparent), var(--cristal-fondo); }
+.dictado-boton:active { transform: scale(.95); }
+.dictado-ondas { display: flex; align-items: center; gap: 2px; height: 18px; }
+.dictado-ondas i { width: 2px; height: 18px; border-radius: 2px; background: currentColor; transform: scaleY(.14); }
+.dictado-giro { width: 16px; height: 16px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: dictado-girar 900ms steps(12) infinite; }
+.dictado-boton:is(.preparando, .transcribiendo):disabled { opacity: 1; color: var(--acento-modelo); }
+@keyframes dictado-girar { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .dictado-ondas i, .dictado-giro { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .dictado-boton { transition: none; } }
+@media (prefers-reduced-motion: reduce) { .movimiento-seleccion { display: none; } }

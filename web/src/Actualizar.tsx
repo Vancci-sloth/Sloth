@@ -3,6 +3,7 @@ import type { ActualizacionSloth, AgentesAlDia } from '../../shared/types'
 import { api } from './api'
 import { Confirm } from './Confirm'
 import { enLaNube } from './web'
+import { Icono } from './Iconos'
 
 /**
  * Mientras baja, cada cuánto se pregunta cómo va; si no, cada cuánto se mira si la ventana ya sabe de una versión nueva
@@ -68,36 +69,60 @@ export function ActualizarSloth() {
 const juntar = (xs: string[]) => (xs.length > 1 ? `${xs.slice(0, -1).join(', ')} y ${xs.at(-1)}` : xs[0])
 
 /**
- * Arriba a la derecha del hilo nuevo: si Claude Code, Codex u OpenCode sacaron una versión más nueva que la que tienes
- * (`server/agentes.ts`), el botón que la baja, con sus modelos nuevos. Los hilos abiertos siguen con la de antes; los
+ * En Opciones: si Claude Code, Codex u OpenCode tienen una versión compatible más nueva
+ * (`server/agentes.ts`), aparece el botón para instalarla. Los hilos abiertos siguen con la de antes; los
  * nuevos van con la nueva. Mientras baja, en cuál va.
  */
 export function AvisoAgentes() {
   const [a, setA] = useState<AgentesAlDia>()
   const [preguntar, setPreguntar] = useState(false)
-  const leer = () => api<AgentesAlDia>('/api/agentes/al-dia').then(setA, () => {})
-  useEffect(() => void leer(), [])
+  const [falloConsulta, setFalloConsulta] = useState(false)
   const actualizando = !!a?.actualizando
   useEffect(() => {
-    if (!actualizando) return
-    const id = setInterval(leer, 2000)
-    return () => clearInterval(id)
+    let vigente = true
+    let espera: ReturnType<typeof setTimeout>
+    async function leer() {
+      try {
+        const estado = await api<AgentesAlDia>('/api/agentes/al-dia')
+        if (vigente) {
+          setA(estado)
+          setFalloConsulta(false)
+        }
+      } catch {
+        if (vigente) setFalloConsulta(true)
+      } finally {
+        if (vigente) espera = setTimeout(leer, actualizando ? 2000 : CADA)
+      }
+    }
+    void leer()
+    return () => {
+      vigente = false
+      clearTimeout(espera)
+    }
   }, [actualizando])
 
-  if (a?.actualizando) return <span className="aviso-version quieto">{a.actualizando}</span>
-  if (!a?.nuevos.length) return a?.error ? <span className="bad small">{a.error}</span> : null
-  const nombres = a.nuevos.map((n) => n.nombre)
+  const nuevos = a?.nuevos ?? []
+  const nombres = nuevos.map((n) => n.nombre)
   const titulo = nombres.length === 1 ? `Actualizar ${nombres[0]}` : 'Actualizar los agentes'
   return (
     <>
-      <button className="aviso-version" title={a.nuevos.map((n) => `${n.nombre}: ${n.de} → ${n.a}`).join('\n')} onClick={() => setPreguntar(true)}>
-        ↑ {titulo}
-      </button>
-      {preguntar && (
+      <div className="item">
+        <div className="fila">
+          <span className="logo" aria-hidden><Icono de="descargar" /></span>
+          <div className="fila-nombre">
+            <strong>Claude Code, Codex y OpenCode</strong>
+            <span role="status">{a?.actualizando ?? (falloConsulta ? 'No se pudo consultar el estado.' : !a ? 'Buscando actualizaciones…' : nuevos.length ? nuevos.map((n) => `${n.nombre} ${n.de} → ${n.a}`).join(' · ') : 'Sin actualizaciones disponibles.')}</span>
+          </div>
+          {!actualizando && !falloConsulta && nuevos.length > 0 && (
+            <button className="boton" onClick={() => setPreguntar(true)}>{titulo}</button>
+          )}
+        </div>
+        {a?.error && <p className="bad small fila-extra">{a.error}</p>}
+      </div>
+      {preguntar && nuevos.length > 0 && !actualizando && (
         <Confirm title={`¿${titulo}?`} action="Actualizar" onConfirm={() => api<AgentesAlDia>('/api/agentes/actualizar', {}).then(setA)} onClose={() => setPreguntar(false)}>
-          Se baja la versión nueva de {juntar(a.nuevos.map((n) => `${n.nombre} (${n.de} → ${n.a}, unos ${n.pesa})`))}, con sus modelos nuevos. Puedes seguir
+          Se baja la versión nueva de {juntar(nuevos.map((n) => `${n.nombre} (${n.de} → ${n.a}, unos ${n.pesa})`))}. Puedes seguir
           trabajando: los chats abiertos siguen con la de antes, y los nuevos ya van con la nueva.
-          {a.error && <span className="bad small fila-extra">La última vez falló: {a.error}</span>}
         </Confirm>
       )}
     </>

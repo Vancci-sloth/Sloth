@@ -61,8 +61,7 @@ export function GanasteRifa() {
 
   function usar() {
     cerrar()
-    location.hash = '#/opciones'
-    setTimeout(() => document.getElementById('voces-de-sloth')?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 300)
+    location.hash = '#/opciones/creacion/sloth'
   }
 
   if (!aviso) return null

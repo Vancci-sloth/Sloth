@@ -179,9 +179,10 @@ function plegarTrabajo(lista: Item[], acabado: boolean): (Item | Trabajo)[] {
  * la fila que cambió (`Row` va memorizada y `buildTimeline` deja igual lo que no cambió). `relevos`: un modelo de cada
  * otro agente conectado, con los que el hilo sigue si el suyo llega al límite.
  */
-export function Timeline({ running, background, sessionId, proveedor = 'claude', subagente, onSubagente, onResponder, relevos }: { running: boolean; background: string[]; sessionId: string; proveedor?: string; subagente?: string; onSubagente?(id: string | null): void; onResponder?(text: string, images?: string[]): Promise<unknown>; relevos?: Choice[] }) {
+export function Timeline({ running, background, sessionId, proveedor = 'claude', subagente, onSubagente, onResponder, relevos, desdeEvento = 0 }: { running: boolean; background: string[]; sessionId: string; proveedor?: string; subagente?: string; onSubagente?(id: string | null): void; onResponder?(text: string, images?: string[]): Promise<unknown>; relevos?: Choice[]; desdeEvento?: number }) {
   const events = useEventos(sessionId) ?? SIN_EVENTOS
-  const items = buildTimeline(events)
+  const visiblesEnHilo = useMemo(() => desdeEvento ? events.slice(desdeEvento) : events, [events, desdeEvento])
+  const items = buildTimeline(visiblesEnHilo)
   const lanzador = subagente ? items.find((i): i is Extract<Item, { kind: 'tool' }> => i.kind === 'tool' && i.id === subagente && !!i.subagente) : undefined
   const sub = lanzador?.subagente
   // Al volver de un subagente lanzado por otro, se vuelve a ese.
@@ -612,7 +613,7 @@ function Fallo({ item, datos, proveedor, sessionId, onResponder, relevos = [] }:
       {onResponder && (
         <div className="turn-ayuda">
           <span className={fallo ? 'bad' : ''}>{fallo || e.ayuda}</span>
-          {e.limite && agente === 'claude' && actual === 'claude' && (
+          {sessionId && e.limite && agente === 'claude' && actual === 'claude' && (
             <LimiteClaude
               hilo={sessionId}
               ocupado={enviando}

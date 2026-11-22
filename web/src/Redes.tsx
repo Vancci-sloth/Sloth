@@ -189,7 +189,7 @@ function RedFila(props: { red: Red; conectando: 'abriendo' | 'app' | 'edge' | nu
   }
 
   return (
-    <div className="item red">
+    <div className="item red" data-red={red.id}>
       <div className="fila">
         <Logo de={red.id} />
         <div className="fila-nombre">

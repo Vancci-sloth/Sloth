@@ -9,8 +9,10 @@
 /* El fondo opaco no se ve (es el de la página), pero con él Chromium desplaza la rejilla ya pintada aunque la pantalla
    esté al 100 o al 125 %; sin él, a esas escalas, la volvía a pintar en cada cuadro. */
 .m3d { --suave: color-mix(in srgb, var(--muted) 55%, var(--text)); height: 100%; width: 100%; overflow-y: auto; background: var(--bg); font-size: 14.5px; }
-.m3d > :not(.m3d-velo):not(.m3d-visor):not(.m3d-visor-borde) { width: 100%; max-width: 1400px; margin-left: auto; margin-right: auto; padding-left: 48px; padding-right: 48px; }
-.m3d-cabeza { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; padding-top: 36px; }
+.m3d > :not(.m3d-velo, .m3d-visor, .m3d-visor-borde, .campo-ascii) { width: 100%; max-width: 1400px; margin-left: auto; margin-right: auto; padding-left: 48px; padding-right: 48px; }
+.m3d-cabeza { display: grid; gap: 16px; padding-top: 22px; }
+.m3d-herramientas { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding-bottom: 16px; border-bottom: 1px solid var(--linea-tarjeta); }
+.m3d-herramientas .m3d-acciones { flex-wrap: wrap; margin-left: auto; }
 .m3d-cabeza h1 { margin: 0 0 6px; font-size: 28px; font-weight: 700; letter-spacing: -0.02em; }
 .m3d-cabeza p { margin: 0; max-width: 560px; color: var(--suave); font-size: 14.5px; line-height: 1.5; }
 .m3d-cuenta { margin-top: -4px; padding-bottom: 16px; font-size: 14.5px; color: var(--suave); }
@@ -33,7 +35,7 @@
 .m3d-teclas { color: var(--suave); }
 
 /* El buscador. */
-.m3d-busca { flex-shrink: 0; width: 300px; display: flex; align-items: center; gap: 9px; padding: 0 8px 0 12px; height: 40px; border-radius: 12px; border: 1px solid var(--line); background: var(--panel); color: var(--suave); transition: border-color 0.15s, background 0.15s; }
+.m3d-busca { flex: 1 1 280px; min-width: 0; display: flex; align-items: center; gap: 9px; padding: 0 8px 0 12px; height: 40px; border-radius: 12px; border: 1px solid var(--line); background: var(--panel); color: var(--suave); transition: border-color 0.15s, background 0.15s; }
 .m3d-busca:focus-within { border-color: var(--amber); background: var(--panel-2); }
 .m3d-busca > svg { width: 16px; height: 16px; flex: none; }
 .m3d-busca input { flex: 1; min-width: 0; border: 0; outline: none; background: none; color: var(--text); font-size: 14.5px; }
@@ -147,9 +149,9 @@
 .m3d-usar { position: sticky; bottom: 0; margin: auto -32px 0; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 32px 16px; background: var(--panel); border-top: 1px solid var(--line); font-size: 14.5px; color: var(--suave); }
 
 @media (max-width: 860px) {
-  .m3d > :not(.m3d-velo):not(.m3d-visor):not(.m3d-visor-borde) { padding-left: 20px; padding-right: 20px; }
-  .m3d-cabeza { flex-direction: column; align-items: stretch; }
-  .m3d-busca { width: 100%; }
+  .m3d > :not(.m3d-velo, .m3d-visor, .m3d-visor-borde, .campo-ascii) { padding-left: 20px; padding-right: 20px; }
+  .m3d-busca { flex-basis: 100%; }
+  .m3d-herramientas .m3d-acciones { margin-left: 0; }
   .m3d-barra { flex-direction: column; align-items: stretch; gap: 4px; }
   .m3d-tipos { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
   .m3d-tipos button { flex: none; }

@@ -252,10 +252,11 @@ export function GenerarVoz({ onGenerar }: { onGenerar(texto: string): Promise<vo
  * Opciones → Voz: la cuenta de Google con que Sloth genera las voces en AI Studio y las llaves de Fish Audio y
  * ElevenLabs. `voz` es el de Opciones, que comparte con Google Flow.
  */
-export function VozOpciones({ voz }: { voz: UsoVoz }) {
+export function VozOpciones({ voz, vista }: { voz: UsoVoz; vista: 'google' | 'sloth' | 'externos' }) {
   const e = voz.estado
+  if (vista === 'sloth') return <VoicesCloningOpciones voz={voz} />
+  if (vista === 'externos') return <>{PROVEEDORES.map(p => <ProveedorOpciones key={p} p={p} voz={voz} />)}</>
   return (
-    <>
       <div className="item">
         <div className="fila">
           <Logo de="gemini" />
@@ -264,7 +265,7 @@ export function VozOpciones({ voz }: { voz: UsoVoz }) {
             <span>
               {e?.cuenta
                 ? `Gemini 3.8 Flash TTS · ${e.voces.length} voces en el menú Voz${e.enFila ? ` · generando ${e.enFila}` : ''}`
-                : `Genera la voz de tus videos con Gemini 3.8 Flash TTS, gratis, con tu cuenta de Google. Entras una vez, en ${e?.navegador ?? 'Edge'}.`}
+                : 'Gemini 3.8 Flash TTS · Elige sus voces en el menú Voz de un video.'}
             </span>
           </div>
           {e?.conectando ? (
@@ -288,11 +289,6 @@ export function VozOpciones({ voz }: { voz: UsoVoz }) {
         {e?.conectando && <p className="muted small fila-extra">Google no deja entrar desde una app. Al entrar en {e.navegador} (la primera vez, AI Studio te pide aceptar sus términos), la ventana se cierra y la sesión pasa sola a Sloth.</p>}
         {voz.error && !e?.conectando && <p className="bad small fila-extra">{voz.error}</p>}
       </div>
-      <VoicesCloningOpciones voz={voz} />
-      {PROVEEDORES.map((p) => (
-        <ProveedorOpciones key={p} p={p} voz={voz} />
-      ))}
-    </>
   )
 }
 

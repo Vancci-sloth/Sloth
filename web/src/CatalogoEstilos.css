@@ -1,23 +1,52 @@
-/* El catálogo de estilos (CatalogoEstilos.tsx): una rejilla de fichas con buscador, con la paleta de Sloth. */
 .catalogo-estilos { flex: 1; min-height: 0; overflow: auto; padding: clamp(14px, 4vw, 44px); }
 .catalogo-estilos-contenido { max-width: 1080px; margin-inline: auto; display: grid; gap: 20px; }
-.catalogo-estilos-cabecera { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px; }
-.catalogo-estilos-cabecera h1 { margin: 0 0 4px; font-size: clamp(24px, 3vw, 30px); letter-spacing: -0.02em; }
-.catalogo-estilos-cabecera p { margin: 0; color: var(--suave); }
+.catalogo-estilos-cabecera {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px;
+  padding: clamp(16px, 3vw, 28px);
+}
+.catalogo-estilos-cabecera h1 { margin: 0 0 4px; font-size: clamp(25px, 3vw, 34px); }
+.catalogo-estilos-cabecera p { margin: 0; color: var(--muted); }
 .catalogo-estilos-acciones { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
 .catalogo-estilos :is(button, label) > svg { width: 16px; height: 16px; flex: none; }
-.catalogo-estilos .boton { display: inline-flex; align-items: center; justify-content: center; gap: 7px; }
-.catalogo-estilos-buscar { display: flex; align-items: center; gap: 8px; width: min(100%, 340px); padding: 8px 12px; border: 1px solid var(--line); border-radius: var(--radio); background: var(--panel); color: var(--muted); }
-.catalogo-estilos-buscar:focus-within { border-color: var(--amber); }
-.catalogo-estilos-buscar input { width: 100%; min-width: 0; border: 0; outline: 0; padding: 0; background: transparent; color: var(--text); font: inherit; }
-.catalogo-estilos-lista { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 230px), 1fr)); gap: 12px; list-style: none; padding: 0; margin: 0; }
+.catalogo-estilos .boton { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 36px; }
+body .catalogo-estilos .catalogo-estilos-crear {
+  background: linear-gradient(145deg, color-mix(in srgb, var(--acento-codex) 28%, transparent), transparent), var(--cristal-fondo);
+  border-color: color-mix(in srgb, var(--acento-codex) 50%, var(--line));
+}
+body .catalogo-estilos .catalogo-estilos-crear:hover:not(:disabled) {
+  background: linear-gradient(145deg, color-mix(in srgb, var(--acento-codex) 40%, transparent), transparent), var(--cristal-fondo);
+}
+.catalogo-estilos-buscar {
+  display: flex; align-items: center; gap: 8px; width: min(100%, 340px); padding: 8px 12px;
+  border: 1px solid var(--line); border-radius: var(--radio); background: var(--panel); color: var(--muted);
+}
+.catalogo-estilos-buscar:focus-within { border-color: var(--acento-codex); }
+.catalogo-estilos-buscar input {
+  width: 100%; min-width: 0; border: 0; outline: 0; padding: 0; background: transparent; color: var(--text); font: inherit;
+}
+.catalogo-estilos-lista {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 230px), 1fr));
+  gap: 12px; list-style: none; padding: 0; margin: 0;
+}
 .catalogo-estilos-lista:empty { display: none; }
-.catalogo-estilos-card { min-width: 0; display: grid; grid-template-rows: auto auto 1fr auto; align-items: start; gap: 9px; padding: 16px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); overflow-wrap: anywhere; transition: border-color 0.15s; }
-.catalogo-estilos-card:hover, .catalogo-estilos-card:focus-within { border-color: var(--muted); }
+.catalogo-estilos-card {
+  min-width: 0; display: grid; grid-template-rows: auto auto 1fr auto; align-items: start; gap: 9px;
+  padding: 16px; border: 1px solid var(--line); border-radius: var(--radio-tarjeta);
+  background: linear-gradient(150deg, var(--panel-2), var(--panel) 60%); overflow-wrap: anywhere;
+}
+.catalogo-estilos-card:focus-within, .catalogo-estilos-card:hover { border-color: var(--linea-tarjeta); }
 .catalogo-estilos-identidad { display: flex; align-items: start; justify-content: space-between; gap: 6px; }
-.catalogo-estilos-icono { width: 38px; height: 38px; display: grid; place-items: center; border: 1px solid var(--line); border-radius: 10px; background: var(--panel-2); color: var(--amber); font-size: 20px; }
+.catalogo-estilos-icono {
+  width: 38px; height: 38px; display: grid; place-items: center;
+  border: 1px solid var(--line); border-radius: 10px; background: var(--panel); color: var(--acento-codex);
+}
 .catalogo-estilos-icono :is(svg, img) { width: 20px; height: 20px; }
-.catalogo-estilos-card .estilo-version { padding: 1px 6px; border-radius: 6px; background: var(--panel-2); color: var(--suave); font-size: 12px; font-variant-numeric: tabular-nums; }
+.catalogo-estilos-card .estilo-version { padding: 2px 6px; border: 1px solid var(--line); border-radius: 6px; color: var(--muted); font: 11px/1.5 var(--mono); }
 .catalogo-estilos-card h2 { margin: 0; font-size: 16px; }
-.catalogo-estilos-card p { margin: 0; color: var(--suave); font-size: 13px; }
-.catalogo-estilos-card .boton { justify-self: start; margin-top: 3px; font-size: 12.5px; }
+.catalogo-estilos-card p { margin: 0; color: var(--muted); font-size: 13px; }
+.catalogo-estilos-card button { justify-self: start; margin-top: 3px; font-size: 12px; }
+@media (prefers-reduced-motion: no-preference) {
+  .catalogo-estilos-card { transition: border-color 160ms ease; }
+  .catalogo-estilos-card button svg { transition: transform 160ms ease; }
+  .catalogo-estilos-card button:hover svg { transform: translateX(3px); }
+}

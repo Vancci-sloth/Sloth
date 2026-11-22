@@ -4,8 +4,6 @@ import { api } from './api'
 import { Icono } from './Iconos'
 
 const gb = (b: number) => (b >= 1e9 ? `${(b / 1e9).toFixed(1)} GB` : b >= 1e6 ? `${Math.round(b / 1e6)} MB` : '0 MB')
-/** El id de la sección, para que el aviso de «disco lleno» de Opciones lleve a ella. */
-export const ESPACIO_DISCO = 'espacio-disco'
 /** Lo que no vale un botón: menos de esto no se enseña. */
 const MINIMO = 20e6
 
@@ -52,9 +50,10 @@ export function EspacioDisco() {
   const seguros = visibles.filter((g) => g.seguro)
   const totalSeguro = seguros.reduce((n, g) => n + g.bytes, 0)
   const ocupado = liberando !== null
+  const usado = e && Math.max(0, Math.min(e.total, e.total - e.libre))
 
   return (
-    <section className="grupo" id={ESPACIO_DISCO}>
+    <section className="grupo">
       <div className="grupo-titulo">
         <h2>Espacio en disco</h2>
         {totalSeguro > 0 && (
@@ -77,7 +76,7 @@ export function EspacioDisco() {
                   <strong>{gb(e.libre)} libres de {gb(e.total)}</strong>
                   <span>
                     {e.liberado ? `Se liberaron ${gb(e.liberado)}. ` : ''}
-                    {visibles.length ? 'Nada de esto es tuyo: tus videos terminados, tus grabaciones y tus guiones no se tocan.' : 'No hay nada que sobre.'}
+                    {visibles.length ? 'Archivos que puedes liberar. Sloth conserva tus videos terminados, grabaciones y guiones.' : 'Sin archivos para liberar.'}
                   </span>
                   {donde && <span className="mono">Tus videos y la IA local: {donde}</span>}
                 </div>
@@ -87,6 +86,10 @@ export function EspacioDisco() {
                   </button>
                 )}
               </div>
+              {e.total > 0 && usado !== undefined && <div className="fila-extra disco-uso">
+                <meter min={0} max={e.total} value={usado} aria-label="Espacio en disco usado" aria-valuetext={`${gb(usado)} de ${gb(e.total)}`} />
+                <span>{gb(usado)} usados</span>
+              </div>}
             </div>
             {visibles.map((g) => (
               <Fila key={g.id} g={g} liberando={ocupado && (liberando === 'seguros' ? g.seguro : liberando.includes(g.id))} disabled={ocupado} onLiberar={() => liberar([g.id])} />

@@ -5,6 +5,7 @@ import { Desplegable } from './Desplegable'
 import { buscar, indexar } from './buscar3d'
 import { useDesplazando } from './desplazando'
 import { Icono } from './Iconos'
+import { CampoAscii } from './CampoAscii'
 import { Acciones3D } from './Modelos3DAcciones'
 import { ANGOSTO, useVisor3D, type ListoVisor, type Visor3D } from './Visor3D'
 import './Modelos3D.css'
@@ -194,40 +195,44 @@ export const Modelos3D = memo(function Modelos3D() {
   }
 
   return (
-    <div className="m3d" ref={raiz}>
+    <div className="m3d fondo-ramas" ref={raiz}>
+      <CampoAscii variante="ramas" />
       <header className="m3d-cabeza">
         <div>
           <h1>Modelos 3D</h1>
           <p>
-            Lo que ya está hecho para tus videos. Antes de modelar algo, el agente busca aquí; lo nuevo que hace, lo guarda aquí.
+            Biblioteca de modelos que tus agentes pueden reutilizar en los videos.
             {modelos.length > 0 && <span className="m3d-teclas"> Con el teclado, / busca y del 1 al {tipos.length + 1} se elige el tipo.</span>}
           </p>
         </div>
-        <label className="m3d-busca" title="Tecla /">
-          <Icono de="buscar" />
-          <input
-            ref={campo}
-            placeholder="Buscar: caja, dinero, se abre…"
-            value={busca}
-            onChange={(e) => setBusca(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Escape') {
-                setBusca('')
-                e.currentTarget.blur()
-              } else if (e.key === 'Enter' && enOrden[0]) setAbierto(enOrden[0].id)
-              else if (e.key === 'ArrowDown') {
-                e.preventDefault()
-                rejilla.current?.querySelector<HTMLElement>('.m3d-cartel')?.focus()
-              }
-            }}
-          />
-          {busca && (
-            <button title="Borrar la búsqueda" aria-label="Borrar la búsqueda" onClick={() => (setBusca(''), campo.current?.focus())}>
-              <Icono de="cerrar" />
-            </button>
-          )}
-        </label>
-        <Acciones3D tipos={nombres} onImportado={(id) => void cargar().then(() => setAbierto(id))} />
+        <div className="m3d-herramientas">
+          <label className="m3d-busca" title="Tecla /">
+            <Icono de="buscar" />
+            <input
+              ref={campo}
+              aria-label="Buscar modelos 3D"
+              placeholder="Buscar: caja, dinero, se abre…"
+              value={busca}
+              onChange={(e) => setBusca(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Escape') {
+                  setBusca('')
+                  e.currentTarget.blur()
+                } else if (e.key === 'Enter' && enOrden[0]) setAbierto(enOrden[0].id)
+                else if (e.key === 'ArrowDown') {
+                  e.preventDefault()
+                  rejilla.current?.querySelector<HTMLElement>('.m3d-cartel')?.focus()
+                }
+              }}
+            />
+            {busca && (
+              <button title="Borrar la búsqueda" aria-label="Borrar la búsqueda" onClick={() => (setBusca(''), campo.current?.focus())}>
+                <Icono de="cerrar" />
+              </button>
+            )}
+          </label>
+          <Acciones3D tipos={nombres} onImportado={(id) => void cargar().then(() => setAbierto(id))} />
+        </div>
       </header>
 
       {biblioteca && modelos.length > 0 && (

@@ -5,6 +5,7 @@ import { Icon } from './Composer'
 import { compartirVideo } from './Comunidad'
 import { Confirm } from './Confirm'
 import { Icono } from './Iconos'
+import { CampoAscii } from './CampoAscii'
 import { Ritmos } from './Ritmos'
 import { abrirNavegador, BotonNavegador } from './Navegador'
 import { useDesplazando } from './desplazando'
@@ -18,8 +19,7 @@ import { abrirRuta, bajar as bajarAlDispositivo, enLaNube, enLaWeb } from './web
 /**
  * «Mis videos»: los videos terminados de todos los estilos, del más nuevo al más viejo. Se buscan por título, archivo o
  * estilo, y se filtran por estilo (el elegido va en el hash), por forma y por cómo van en redes. Llegan en una sola
- * petición (`GET /api/videos`), con sus marcas de redes, que se pide de antemano (`precargarVideos`, al arrancar y al
- * pasar por «Mis videos»): al entrar, la lista y las primeras portadas ya están. Las tarjetas son las de la galería de
+ * petición (`GET /api/videos`), con sus marcas de redes, al entrar en la galería. Las tarjetas son las de la galería de
  * cada estilo (`VideoDe`), por tandas al bajar.
  *
  * Con el teclado: `/` busca; ↓ entra a la rejilla; las flechas se mueven y el video elegido se mueve solo; Enter lo abre;
@@ -33,9 +33,6 @@ const TANDA = 30
 /** Lo último que llegó de `/api/videos`: al volver a «Mis videos» se dibuja ya, y se pide de nuevo detrás. */
 let ultima: VideosDeTodos | null = null
 let pidiendo: Promise<VideosDeTodos> | null = null
-let pedidaEn = 0
-/** Las portadas que ya se pidieron al navegador: no se piden dos veces. */
-const portadasPedidas = new Set<string>()
 
 /** Cómo parar al video que se mueve ahora: solo se mueve uno a la vez. */
 let moviendose: (() => void) | null = null
@@ -43,29 +40,11 @@ let moviendose: (() => void) | null = null
 /** La portada pequeña de un video (su primer cuadro, `server/miniaturas.ts`). */
 const portadaDe = (v: Pick<VideoHecho, 'src'>) => `${v.src}&cuadro`
 
-/**
- * Pide la lista y baja las portadas de la primera pantalla, ya decodificadas. La usa la barra lateral al arrancar y al
- * pasar por «Mis videos», y «Mis videos» al abrir.
- */
-export function precargarVideos(o: { nueva?: boolean; reciente?: number; previas?: boolean } = {}): Promise<VideosDeTodos> {
-  // Al pasar el ratón por «Mis videos», lo de hace menos de `reciente` ms sirve.
-  if (o.reciente && ultima && Date.now() - pedidaEn < o.reciente) return Promise.resolve(ultima)
+function pedirVideos(nueva: boolean): Promise<VideosDeTodos> {
   // Tras un cambio (un video borrado), la que ya iba en camino puede traer la lista de antes: se pide otra detrás.
-  if (o.nueva && pidiendo) return (pidiendo = pidiendo.catch(() => null).then(() => ((pidiendo = null), precargarVideos({ previas: o.previas }))))
-  pedidaEn = Date.now()
-  // Con `previas` (desde «Mis videos» abierta), el servidor hace también las vistas previas de la primera tanda.
-  pidiendo ??= api<VideosDeTodos>(o.previas ? '/api/videos?previas' : '/api/videos')
-    .then((r) => {
-      ultima = r
-      for (const v of r.videos.slice(0, TANDA)) {
-        if (portadasPedidas.has(v.src)) continue
-        portadasPedidas.add(v.src)
-        const img = new Image()
-        img.src = portadaDe(v)
-        img.decode().catch(() => portadasPedidas.delete(v.src))
-      }
-      return r
-    })
+  if (nueva && pidiendo) return (pidiendo = pidiendo.catch(() => null).then(() => ((pidiendo = null), pedirVideos(false))))
+  pidiendo ??= api<VideosDeTodos>('/api/videos')
+    .then((r) => (ultima = r))
     .finally(() => (pidiendo = null))
   return pidiendo
 }
@@ -93,7 +72,7 @@ export function cuando(t: number, ahora = Date.now()): string {
 
 type Forma = 'vertical' | 'horizontal'
 
-export function MisVideos({ cards, sessions, estilo, onEstilo }: { cards: Card[]; sessions: SessionMeta[]; estilo?: string; onEstilo(id?: string): void }) {
+export function MisVideos({ cards, sessions, estilo, onEstilo, refDesplazamiento }: { cards: Card[]; sessions: SessionMeta[]; estilo?: string; onEstilo(id?: string): void; refDesplazamiento?: RefObject<HTMLDivElement | null> }) {
   const [todos, setTodos] = useState<VideosDeTodos | null>(ultima)
   const [error, setError] = useState('')
   // Lo que falló al tocar una marca de redes (reintentar, descartar), al bajar o al borrar.
@@ -130,7 +109,8 @@ export function MisVideos({ cards, sessions, estilo, onEstilo }: { cards: Card[]
   useEffect(() => {
     let vivo = true
     // La primera vez, sin esperar; las siguientes (un turno que acaba, un cambio en redes), juntas en 300 ms.
-    const t = setTimeout(() => precargarVideos({ nueva: !primera.current, previas: true }).then((r) => vivo && (setTodos(r), setError('')), (e) => vivo && setError(e.message)), primera.current ? 0 : 300)
+    const renovar = !primera.current
+    const t = setTimeout(() => pedirVideos(renovar).then((r) => vivo && (setTodos(r), setError('')), (e) => vivo && setError(e.message)), renovar ? 300 : 0)
     primera.current = false
     return () => {
       vivo = false
@@ -138,21 +118,6 @@ export function MisVideos({ cards, sessions, estilo, onEstilo }: { cards: Card[]
     }
   }, [clave, vuelta])
 
-  // El primer video que se mueve en una página paga arrancar el decodificador (medido: 220–540 ms, contra ~100 los
-  // siguientes). Se paga aquí, con uno fuera de la página y mudo, un instante después de abrir.
-  const calentado = useRef(false)
-  useEffect(() => {
-    const src = todos?.videos[0]?.src
-    if (!src || calentado.current) return
-    const t = setTimeout(() => {
-      calentado.current = true
-      const v = document.createElement('video')
-      v.muted = true
-      v.src = `${src}&previa`
-      v.play().then(() => v.pause(), () => {}).finally(() => (v.removeAttribute('src'), v.load()))
-    }, 400)
-    return () => clearTimeout(t)
-  }, [todos])
 
   // `/` (o Ctrl+F) busca desde cualquier sitio de la página, si no escribes en otro campo.
   useEffect(() => {
@@ -299,10 +264,9 @@ export function MisVideos({ cards, sessions, estilo, onEstilo }: { cards: Card[]
     return false
   }
 
-  const vacio = !videos.length ? 'Aún no hay videos terminados. Cada uno sale aquí en cuanto su estilo lo termina.' : 'Ninguno coincide.'
-
   return (
-    <div className="mis-videos">
+    <div className={`mis-videos ${refDesplazamiento ? 'mis-videos-publicaciones' : 'fondo-ramas'}`}>
+      {!refDesplazamiento && <CampoAscii variante="ramas" />}
       <header className="mis-videos-head">
         <h1>
           Mis videos{todos && <span className="mis-total">{videos.length}</span>}
@@ -382,12 +346,12 @@ export function MisVideos({ cards, sessions, estilo, onEstilo }: { cards: Card[]
       {fallo && <p className="bad small">{fallo}</p>}
       {!todos ? null : enRejilla.length ? (
         // Por estilo, forma, búsqueda y estado, una rejilla nueva: empieza arriba y con la primera tanda.
-        <Rejilla key={claveVista} videos={enRejilla} refRejilla={rejilla} onArriba={() => buscador.current?.focus()} elegidos={lista.length > 0}>
+        <Rejilla key={claveVista} videos={enRejilla} refRejilla={rejilla} refDesplazamiento={refDesplazamiento} onArriba={() => buscador.current?.focus()} elegidos={lista.length > 0}>
           {(v, i) => (
             <VideoDe
               key={v.src}
               video={v}
-              primera={i < TANDA}
+              primera={i < 4}
               // En «Todos», cada uno dice de qué estilo es.
               estilo={filtro ? undefined : conVideos.find((c) => c.id === v.cardId)}
               onVer={() => setViendo(v.src)}
@@ -402,7 +366,11 @@ export function MisVideos({ cards, sessions, estilo, onEstilo }: { cards: Card[]
           )}
         </Rejilla>
       ) : (
-        <p className="estilo-vacio">{vacio}</p>
+        <div className="mis-vacio" role="status">
+          <Icono de="video" />
+          <strong>{videos.length ? 'No hay videos que coincidan' : 'Aún no hay videos terminados'}</strong>
+          {!videos.length && <p>Cuando un video esté listo, aparecerá en esta biblioteca.</p>}
+        </div>
       )}
       {(lista.length > 0 || aviso) && (
         <div className="mis-flotan">
@@ -505,7 +473,7 @@ function abrirVideo(video: VideoHecho, ver: (src: string) => void) {
  * Con el teclado es una sola parada de Tab (la tarjeta activa); las flechas van a la de al lado o a la de la fila de
  * arriba o de abajo según dónde están dibujadas, Inicio y Fin a la primera y la última. ↑ desde la primera fila, `onArriba`.
  */
-export function Rejilla({ videos, children, refRejilla, onArriba, elegidos }: { videos: VideoHecho[]; children(v: VideoHecho, i: number): ReactNode; refRejilla?: RefObject<HTMLDivElement | null>; onArriba?(): void; elegidos?: boolean }) {
+export function Rejilla({ videos, children, refRejilla, refDesplazamiento, onArriba, elegidos }: { videos: VideoHecho[]; children(v: VideoHecho, i: number): ReactNode; refRejilla?: RefObject<HTMLDivElement | null>; refDesplazamiento?: RefObject<HTMLDivElement | null>; onArriba?(): void; elegidos?: boolean }) {
   const [hasta, setHasta] = useState(TANDA)
   const propia = useRef<HTMLDivElement>(null)
   const rejilla = refRejilla ?? propia
@@ -524,16 +492,17 @@ export function Rejilla({ videos, children, refRejilla, onArriba, elegidos }: { 
     })
   }
   useEffect(marcar)
-  useDesplazando(rejilla)
+  useDesplazando(rejilla, refDesplazamiento)
   // Se vuelve a mirar tras cada tanda: si el final sigue cerca (una pantalla alta), entra otra.
   useEffect(() => {
     if (!quedan || !fin.current) return
-    // Angosta, la rejilla no hace scroll (lo hace la página): entonces se mira la ventana, o entrarían todas las tandas.
+    // Se mira el panel de Redes, la rejilla si se desplaza sola, o la ventana si el contenido fluye.
     const propio = rejilla.current && getComputedStyle(rejilla.current).overflowY !== 'visible'
-    const io = new IntersectionObserver(([e]) => e.isIntersecting && setHasta((n) => n + TANDA), { root: propio ? rejilla.current : null, rootMargin: '0px 0px 600px' })
+    const root = refDesplazamiento?.current ?? (propio ? rejilla.current : null)
+    const io = new IntersectionObserver(([e]) => e.isIntersecting && setHasta((n) => n + TANDA), { root, rootMargin: '0px 0px 600px' })
     io.observe(fin.current)
     return () => io.disconnect()
-  }, [quedan, hasta])
+  }, [quedan, hasta, rejilla, refDesplazamiento])
 
   function mover(e: KeyboardEvent<HTMLDivElement>) {
     const flechas = ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End']
@@ -621,6 +590,7 @@ export function VideoDe(props: {
     <div
       className={`video-con-subida${elegido ? ' elegido' : ''}`}
       data-video
+      data-formato={forma.trim() || undefined}
       // En toda la tarjeta, también sus botones de encima: ir de la portada a «Descargar» no la para.
       onPointerEnter={() => ver(true)}
       // Al salir el ratón sigue moviéndose si tiene el foco del teclado.

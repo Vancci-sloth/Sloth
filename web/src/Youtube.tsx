@@ -61,7 +61,7 @@ export function YoutubeOpciones() {
   }
   const conSloth = !!conexion?.sloth?.apoya
   return (
-    <div className="item">
+    <div className="item" data-red="youtube">
       <div className="fila">
         <Logo de="youtube" nombre="YouTube" />
         <div className="fila-nombre">
@@ -138,5 +138,7 @@ type VideoYoutube = { cardId: string; ruta: string; titulo: string }
 
 /** Abre la revisión de YouTube (`#/youtube`) solo con este video. */
 export function YoutubeBoton({ video, disabled, chico, nombre }: { video: VideoYoutube; disabled?: boolean; chico?: boolean; nombre?: string }) {
-  return <button type="button" className={chico ? 'youtube-boton' : 'final-boton'} title={video.ruta} disabled={disabled} onClick={(e) => { e.stopPropagation(); abrirRevisionYoutube(video.cardId, video.ruta) }}>{nombre ? `Revisar ${nombre} para YouTube` : 'Revisar YouTube'}</button>
+  return <>
+    <button type="button" data-red="youtube" className={chico ? 'youtube-boton' : 'final-boton'} title={video.ruta} disabled={disabled} onClick={(e) => { e.stopPropagation(); abrirRevisionYoutube(video.cardId, video.ruta) }}>{nombre ? `Revisar ${nombre} para YouTube` : 'Revisar YouTube'}</button>
+  </>
 }

@@ -46,7 +46,7 @@ export function Modelos(props: {
   const cambiarPrincipal = (c: Partial<Choice>) => props.onAvanzado({ ...avanzado!, principal: { ...choice!, ...c } })
 
   return (
-    <div ref={root} className={`picker modelos ${open ? 'open' : ''}`}>
+    <div ref={root} data-proveedor={proveedorDe(choice?.model ?? '')} className={`picker modelos ${open ? 'open' : ''}`}>
       <button className="picker-trigger" title="Qué modelo hace cada tarea" onClick={() => setOpen(!open)}>
         {avanzado ? `Avanzado · ${modelo?.label ?? choice?.model ?? ''} ${choice?.effort ?? ''}` : '✦ Optimizado'}
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">

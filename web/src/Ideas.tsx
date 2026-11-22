@@ -47,6 +47,7 @@ import { api } from './api'
 import { Desplegable } from './Desplegable'
 import { Icon, type Choice } from './Composer'
 import { Confirm } from './Confirm'
+import { Icono } from './Iconos'
 import { Logo } from './Logos'
 import { Segmento } from './Segmento'
 import './Ideas.css'
@@ -182,27 +183,26 @@ export function Ideas(props: {
   const actual = canales?.find((c) => c.id === props.canalId) ?? (props.canalId ? undefined : canales?.[0])
 
   return (
-    <div className="ideas">
+    <section className="ideas" aria-labelledby="ideas-titulo">
       <header className="ideas-head">
         <div>
-          <h1>💡 Ideas</h1>
+          <h2 id="ideas-titulo">Ideas</h2>
           {!nuevo && esVertical(actual) ? (
             <p className="muted">
-              Qué video vertical hacer, con evidencia. Sloth busca tu nicho en TikTok y en Instagram, mide cada video contra su cuenta y lee qué piden sus comentarios, y Claude
-              propone ideas con señales de demanda, empaque de nichos vecinos, gancho de 4 P en 3 segundos y el riesgo dicho claro.
+              Investiga TikTok e Instagram y encuentra ideas para videos verticales a partir de los resultados y comentarios de tu nicho.
             </p>
           ) : (
             <p className="muted">
-              Qué video largo hacer, con evidencia. Sloth lee tu nicho en YouTube, mide cada video contra su canal y Claude propone ideas con
-              señales de demanda, empaque de nichos vecinos, gancho de 4 P y el riesgo dicho claro.
+              Investiga tu nicho y encuentra ideas para videos largos de YouTube a partir del rendimiento de otros canales.
             </p>
           )}
         </div>
       </header>
-      {canales && (
-        <nav className="ideas-canales">
+      {!!canales?.length && (
+        <nav className="ideas-canales" aria-label="Canales de Ideas">
           {canales.map((c) => (
-            <button key={c.id} className={`ideas-canal ${!nuevo && actual?.id === c.id ? 'on' : ''}`} onClick={() => (setNuevo(false), props.onCanal(c.id))}>
+            <button key={c.id} className="boton ideas-canal" aria-pressed={!nuevo && actual?.id === c.id} onClick={() => (setNuevo(false), props.onCanal(c.id))}>
+              {!esVertical(c) && <Icono de="video" />}
               {c.nombre}
               {esVertical(c) && (
                 <span className="logos" title="TikTok e Instagram">
@@ -213,8 +213,8 @@ export function Ideas(props: {
               {trabajando.includes(c.id) && <span className="dot running" title="Investigando" />}
             </button>
           ))}
-          <button className={`ideas-canal mas ${nuevo || !canales.length ? 'on' : ''}`} onClick={() => setNuevo(true)}>
-            + Canal
+          <button className="boton ideas-canal" aria-pressed={nuevo} onClick={() => setNuevo(true)}>
+            <Icono de="mas" /> Nuevo canal
           </button>
         </nav>
       )}
@@ -223,6 +223,7 @@ export function Ideas(props: {
         <CanalForm
           primero={!canales.length}
           canales={canales}
+          ayudaIA={!!eleccion(props.models)}
           onCancel={canales.length ? () => setNuevo(false) : undefined}
           onGuardado={(c) => {
             setNuevo(false)
@@ -236,7 +237,7 @@ export function Ideas(props: {
       ) : (
         canales && <p className="muted">No existe ese canal.</p>
       )}
-    </div>
+    </section>
   )
 }
 
@@ -249,6 +250,7 @@ function CanalForm({
   canal,
   canales = [],
   primero,
+  ayudaIA,
   onCancel,
   onGuardado,
   onEntrevista
@@ -256,6 +258,7 @@ function CanalForm({
   canal?: Canal
   canales?: Canal[]
   primero?: boolean
+  ayudaIA: boolean
   onCancel?(): void
   onGuardado(c: Canal): void
   onEntrevista(canalId: string, campo?: string): Promise<void>
@@ -263,12 +266,16 @@ function CanalForm({
   const [c, setC] = useState<Partial<Canal>>(canal ?? { semillas: [], vecinos: [], referencias: [] })
   const [ocupado, setOcupado] = useState(false)
   const [error, setError] = useState('')
-  const campo = (k: keyof Canal) => (e: { target: { value: string } }) => setC({ ...c, [k]: e.target.value })
+  const campo = (k: keyof Canal) => (e: { target: { value: string } }) => {
+    const valor = e.target.value
+    setC((actual) => ({ ...actual, [k]: valor }))
+  }
   const vertical = esVertical(c)
   // Lo que se busca no se copia: en TikTok se escribe distinto que en YouTube.
   const copiables = canales.filter((x) => x.publico || x.meta || x.vecinos.length)
 
   function guardar() {
+    if (ocupado || !c.nombre?.trim()) return
     setOcupado(true)
     setError('')
     api<Canal>('/api/ideas/canales', c)
@@ -283,6 +290,7 @@ function CanalForm({
     setError('')
     try {
       const guardado = await api<Canal>('/api/ideas/canales', { ...c, nombre: c.nombre?.trim() || 'Canal nuevo' })
+      setC(guardado)
       await onEntrevista(guardado.id, k)
     } catch (e) {
       setError((e as Error).message)
@@ -290,33 +298,51 @@ function CanalForm({
       setOcupado(false)
     }
   }
-  const noSe = (k: string) => (
+  const noSe = (k: string) => ayudaIA && (
     <button type="button" className="no-se" disabled={ocupado} onClick={(e) => (e.preventDefault(), preguntar(k))} title="Claude te hace preguntas para llenar este campo contigo">
-      No sé, pregúntame
+      <Icono de="hilo" /> No sé, pregúntame
     </button>
   )
 
   return (
-    <section className="opcion canal-form">
-      <div className="skill-name">
-        <strong>{canal ? 'Editar el canal' : primero ? 'Empieza por tu canal' : 'Canal nuevo'}</strong>
-      </div>
-      {primero && (
-        <p className="muted small">
-          Un canal es a quién le hablas. Es lo primero porque decide todo lo demás: qué se busca, qué evidencia cuenta y qué idea sirve. Si aún no tienes el
-          canal, no importa: la investigación funciona igual.
-        </p>
-      )}
+    <form className="canal-form" aria-labelledby="canal-form-titulo" onSubmit={(e) => { e.preventDefault(); guardar() }}>
+      <header className="canal-form-head">
+        <div>
+          <h2 id="canal-form-titulo"><Icono de="lapiz" /> {canal ? 'Editar perfil del canal' : primero ? 'Configura tu primer canal' : 'Nuevo canal'}</h2>
+          {primero && <p>Puedes investigar aunque todavía no tengas una cuenta en la plataforma.</p>}
+        </div>
+        {ayudaIA && <button type="button" className="boton ideas-accion ideas-accion-ia" disabled={ocupado} onClick={() => preguntar()}><Icono de="hilo" /> Configurar con IA</button>}
+      </header>
+      <fieldset className="canal-grupo">
+        <legend><Icono de="video" /> Canal y plataforma</legend>
       {!canal && (
-        <div className="segmento formato" role="tablist">
-          <button role="tab" aria-selected={!vertical} className={vertical ? '' : 'on'} onClick={() => setC({ ...c, formato: undefined, instagram: undefined })}>
-            YouTube · videos largos
+        <div className="segmento formato" role="group" aria-label="Formato de video">
+          <button type="button" aria-pressed={!vertical} className={vertical ? '' : 'on'} onClick={() => setC({ ...c, formato: undefined, instagram: undefined })}>
+            <Logo de="youtube" chico /> YouTube · videos largos
           </button>
-          <button role="tab" aria-selected={vertical} className={vertical ? 'on' : ''} onClick={() => setC({ ...c, formato: 'vertical' })}>
-            TikTok e Instagram · verticales
+          <button type="button" aria-pressed={vertical} className={vertical ? 'on' : ''} onClick={() => setC({ ...c, formato: 'vertical' })}>
+            <Logo de="tiktok" chico /> TikTok e Instagram · verticales
           </button>
         </div>
       )}
+      <div className="canal-cuentas">
+      <label className="campo">
+        <span>Nombre</span>
+        <input value={c.nombre ?? ''} onChange={campo('nombre')} placeholder="Ej. Tutoriales de IA" />
+      </label>
+      <label className="campo">
+        <span>{vertical ? 'Tu TikTok' : 'Tu canal en YouTube'} <small className="muted">Opcional</small></span>
+        <input value={c.handle ?? ''} onChange={campo('handle')} placeholder={vertical ? '@tu.cuenta' : '@tu_canal'} />
+      </label>
+      {vertical && <label className="campo">
+        <span>Tu Instagram <small className="muted">Opcional</small></span>
+        <input value={c.instagram ?? ''} onChange={campo('instagram')} placeholder="@tu.instagram" />
+      </label>}
+      </div>
+      <small className="muted">Si añades tus cuentas, Sloth compara las ideas con el rendimiento de tus videos.</small>
+      </fieldset>
+      <fieldset className="canal-grupo">
+        <legend><Icono de="personas" /> Público y objetivo</legend>
       {!canal && vertical && copiables.length > 0 && (
         <div className="campo">
           <span>Copiar el perfil de otro canal</span>
@@ -330,73 +356,44 @@ function CanalForm({
           <small className="muted">Trae a quién le hablas, para qué y los nichos vecinos, y los ajustas aquí. Lo que se busca no: en TikTok se escribe distinto.</small>
         </div>
       )}
-      <div className="entrevista-invita">
-        <div>
-          <strong>¿No sabes qué poner?</strong>
-          <span className="muted small">
-            Sloth te hace preguntas, una a la vez y con ejemplos para elegir, y va llenando el canal contigo. Antes de poner cada frase de búsqueda, mira en
-            {vertical ? ' TikTok' : ' YouTube'} cuánta gente la busca.
-          </span>
-        </div>
-        <button className="primary" disabled={ocupado} onClick={() => preguntar()}>
-          Armar el canal con preguntas
-        </button>
-      </div>
-      <label className="campo">
-        <span>Nombre</span>
-        <input value={c.nombre ?? ''} onChange={campo('nombre')} placeholder="vancci · IA" autoFocus />
-      </label>
-      <label className="campo">
-        <span>{vertical ? 'Tu TikTok' : 'Tu canal en YouTube'}</span>
-        <input value={c.handle ?? ''} onChange={campo('handle')} placeholder={vertical ? '@tu.cuenta (opcional)' : '@tu_canal (opcional)'} />
-        {!vertical && <small className="muted">Para medir tu propio piso: cuánto saca hoy un video tuyo. Vacío si el canal aún no existe.</small>}
-      </label>
-      {vertical && (
-        <label className="campo">
-          <span>Tu Instagram</span>
-          <input value={c.instagram ?? ''} onChange={campo('instagram')} placeholder="@tu.instagram (opcional)" />
-          <small className="muted">Con tu TikTok, para medir tu propio piso en cada red: cuánto saca hoy un video tuyo. Vacíos si aún no tienes las cuentas.</small>
-        </label>
-      )}
-      <label className="campo">
-        <span className="campo-titulo">
-          ¿A quién le hablas? {noSe('publico')}
-        </span>
-        <textarea rows={2} value={c.publico ?? ''} onChange={campo('publico')} placeholder="Gente que quiere hacer videos con IA para su canal, aunque no sepa editar" />
-        <small className="muted">Quien quieres que vea y, si vendes algo, que compre. Un millón de vistas del público equivocado vale menos que diez mil del correcto.</small>
-      </label>
-      <label className="campo">
-        <span className="campo-titulo">
-          ¿Para qué es el canal? {noSe('meta')}
-        </span>
-        <input value={c.meta ?? ''} onChange={campo('meta')} placeholder="Vender Sloth, mi app para hacer videos con IA" />
-        <small className="muted">Si vendes algo, cada idea trae la llamada a la acción que regala en vez de pedir.</small>
-      </label>
       <div className="campo">
         <span className="campo-titulo">
-          Lo que tu público busca{vertical && ' en TikTok'} {noSe('semillas')}
+          <label htmlFor="ideas-publico">¿A quién le hablas?</label> {noSe('publico')}
         </span>
-        <Fichas lista={c.semillas ?? []} onCambio={(semillas) => setC({ ...c, semillas })} placeholder="crear videos con ia ↵" />
+        <textarea id="ideas-publico" rows={2} value={c.publico ?? ''} onChange={campo('publico')} placeholder="Gente que quiere hacer videos con IA para su canal, aunque no sepa editar" />
+      </div>
+      <div className="campo">
+        <span className="campo-titulo">
+          <label htmlFor="ideas-meta">¿Para qué es el canal?</label> {noSe('meta')}
+        </span>
+        <input id="ideas-meta" value={c.meta ?? ''} onChange={campo('meta')} placeholder="Ej. Enseñar a editar videos con IA" />
+      </div>
+      </fieldset>
+      <fieldset className="canal-grupo">
+        <legend><Icono de="buscar" /> Búsquedas y referencias</legend>
+      <div className="campo">
+        <span className="campo-titulo">
+          <label htmlFor="ideas-semillas">Lo que tu público busca{vertical && ' en TikTok'}</label> {noSe('semillas')}
+        </span>
+        <Fichas id="ideas-semillas" lista={c.semillas ?? []} onCambio={(semillas) => setC((actual) => ({ ...actual, semillas }))} placeholder="crear videos con ia ↵" />
         {vertical ? (
           <small className="muted">
-            Frases como las escribiría tu público en el buscador de TikTok («crear videos con ia», «editar con capcut»), no palabras sueltas: Sloth busca cada
-            una y abre las cuentas que salen. Pon de 5 a 12, en español y en inglés («faceless youtube channel»): lo que funciona en inglés suele llegar después
-            al español. TikTok mezcla los resultados por tu país; de una búsqueda en inglés se toman los videos y las cuentas en inglés.
+            Añade de 5 a 12 frases como las buscaría tu público en TikTok. Puedes incluir búsquedas en español e inglés.
           </small>
         ) : (
           <small className="muted">
-            Frases como las escribiría tu público en YouTube («crear videos con ia», «crecer en tiktok»), no palabras sueltas: «Tiktok» solo trae también mashups
-            de música. Sloth busca cada una y abre los canales que salen. Pon de 5 a 12.
+            Añade de 5 a 12 frases como las buscaría tu público en YouTube, por ejemplo «crecer en TikTok».
           </small>
         )}
       </div>
       <div className="campo">
         <span className="campo-titulo">
-          {vertical ? 'Cuentas' : 'Canales'} que ya conoces {noSe('referencias')}
+          <label htmlFor="ideas-referencias">{vertical ? 'Cuentas' : 'Canales'} que ya conoces</label> {noSe('referencias')}
         </span>
         <Fichas
+          id="ideas-referencias"
           lista={c.referencias ?? []}
-          onCambio={(referencias) => setC({ ...c, referencias })}
+          onCambio={(referencias) => setC((actual) => ({ ...actual, referencias }))}
           placeholder={vertical ? '@cuenta o instagram.com/cuenta ↵' : '@canal o enlace ↵'}
           red={vertical}
         />
@@ -407,29 +404,30 @@ function CanalForm({
       </div>
       <div className="campo">
         <span className="campo-titulo">
-          Nichos vecinos {noSe('vecinos')}
+          <label htmlFor="ideas-vecinos">Nichos vecinos</label> {noSe('vecinos')}
         </span>
-        <Fichas lista={c.vecinos ?? []} onCambio={(vecinos) => setC({ ...c, vecinos })} placeholder={vertical ? 'crecer en tiktok ↵' : 'crecer en youtube ↵'} />
+        <Fichas id="ideas-vecinos" lista={c.vecinos ?? []} onCambio={(vecinos) => setC((actual) => ({ ...actual, vecinos }))} placeholder={vertical ? 'crecer en tiktok ↵' : 'crecer en youtube ↵'} />
         <small className="muted">Públicos con la misma intención. De ahí salen las fórmulas de {vertical ? 'gancho' : 'título'} que tu nicho aún no usa.</small>
       </div>
+      </fieldset>
       {error && <p className="bad small">{error}</p>}
-      <div className="opcion-fila">
+      <div className="canal-acciones">
         {onCancel && (
-          <button className="ghost" onClick={onCancel}>
-            Cancelar
+          <button type="button" className="boton ideas-accion ideas-accion-neutra" disabled={ocupado} onClick={onCancel}>
+            <Icono de="cerrar" /> Cancelar
           </button>
         )}
         <span className="spacer" />
-        <button className="primary" disabled={ocupado || !c.nombre?.trim()} onClick={guardar}>
-          {ocupado ? 'Guardando…' : canal ? 'Guardar' : 'Crear el canal'}
+        <button type="submit" className="primary ideas-accion" disabled={ocupado || !c.nombre?.trim()}>
+          <Icono de="palomita" /> {ocupado ? 'Guardando…' : canal ? 'Guardar perfil' : 'Crear canal'}
         </button>
       </div>
-    </section>
+    </form>
   )
 }
 
 /** Fichas que se añaden con Enter o coma. A diferencia de los hashtags, llevan espacios. Con `red`, el logo de la suya. */
-function Fichas({ lista, onCambio, placeholder, red }: { lista: string[]; onCambio(l: string[]): void; placeholder: string; red?: boolean }) {
+function Fichas({ id, lista, onCambio, placeholder, red }: { id: string; lista: string[]; onCambio(l: string[]): void; placeholder: string; red?: boolean }) {
   const [nueva, setNueva] = useState('')
   const agregar = () => {
     const t = nueva.trim()
@@ -442,17 +440,19 @@ function Fichas({ lista, onCambio, placeholder, red }: { lista: string[]; onCamb
         <span className="tag" key={t}>
           {red && <Logo de={redDeReferencia(t)} chico />}
           {t}
-          <button type="button" title="Quitar" onClick={() => onCambio(lista.filter((x) => x !== t))}>
-            ✕
+          <button type="button" title="Quitar" aria-label={`Quitar ${t}`} onClick={() => onCambio(lista.filter((x) => x !== t))}>
+            <Icono de="cerrar" />
           </button>
         </span>
       ))}
       <input
+        id={id}
         value={nueva}
         placeholder={placeholder}
         onChange={(e) => setNueva(e.target.value)}
         onBlur={agregar}
         onKeyDown={(e) => {
+          if (e.nativeEvent.isComposing) return
           if (e.key === 'Enter' || e.key === ',') (e.preventDefault(), agregar())
           else if (e.key === 'Backspace' && !nueva && lista.length) onCambio(lista.slice(0, -1))
         }}
@@ -474,7 +474,7 @@ function CanalVista(props: {
 }) {
   const { id } = props
   const [d, setD] = useState<CanalCompleto | null>(null)
-  const [editando, setEditando] = useState(false)
+  const [editando, setEditando] = useState<boolean>()
   const [borrar, setBorrar] = useState(false)
   const [error, setError] = useState('')
   // La búsqueda que se está mirando: una ficha del perfil o una fila de Búsquedas filtra los outliers a lo que trajo.
@@ -521,13 +521,30 @@ function CanalVista(props: {
   const investigando = t?.estado === 'trabajando'
   const elegir = eleccion(props.models)
   const c = d.canal
-  const completo = !!c.publico && !!c.meta && c.semillas.length >= 5 && c.vecinos.length > 0
+  const completo = !!c.publico?.trim() && !!c.meta?.trim() && c.semillas.length >= 5 && c.vecinos.length > 0
+  const verFormulario = editando ?? !completo
 
   return (
     <>
+      {verFormulario ? (
+        <CanalForm
+          canal={c}
+          ayudaIA={!!elegir}
+          onCancel={() => setEditando(false)}
+          onGuardado={(canal) => {
+            setD((anterior) => anterior && { ...anterior, canal })
+            setEditando(false)
+            props.onCambio()
+          }}
+          onEntrevista={props.onEntrevista}
+        />
+      ) : (
+        <Perfil d={d} vista={vista} filtro={filtro} onFiltro={setFiltro} onEditar={() => setEditando(true)}
+          onBorrar={() => setBorrar(true)} onPreguntar={elegir ? () => props.onEntrevista(id) : undefined} />
+      )}
       {d.entrevista && (
         <div className={`entrevista-barra ${preguntando ? 'trabajando' : completo ? 'lista' : 'espera'}`}>
-          {preguntando ? <span className="spinner" /> : <span>💬</span>}
+          {preguntando ? <span className="spinner" /> : <Icono de="hilo" />}
           <span>
             <strong>Entrevista del canal</strong> ·{' '}
             {preguntando
@@ -537,20 +554,10 @@ function CanalVista(props: {
                 : 'Claude espera tu respuesta en su hilo.'}
           </span>
           <span className="spacer" />
-          <button className="ghost small" onClick={() => props.onHilo(d.entrevista!.id)}>
-            {completo && !preguntando ? 'Ver la entrevista →' : 'Contestar →'}
+          <button type="button" className="boton ideas-accion ideas-accion-ia" onClick={() => props.onHilo(d.entrevista!.id)}>
+            {completo && !preguntando ? 'Ver entrevista' : 'Responder entrevista'} <Icono de="flecha" />
           </button>
         </div>
-      )}
-      {editando ? (
-        <CanalForm
-          canal={d.canal}
-          onCancel={() => setEditando(false)}
-          onGuardado={() => (setEditando(false), leer(), props.onCambio())}
-          onEntrevista={(canalId, campo) => (setEditando(false), props.onEntrevista(canalId, campo))}
-        />
-      ) : (
-        <Perfil d={d} vista={vista} filtro={filtro} onFiltro={setFiltro} onEditar={() => setEditando(true)} onBorrar={() => setBorrar(true)} onPreguntar={(campo) => props.onEntrevista(id, campo)} />
       )}
       {d.rendimiento !== undefined && <TusVideos d={d} elegir={elegir} sessions={props.sessions} onHilo={props.onHilo} onCambio={leer} />}
       <Pasos d={d} corriendo={corriendo} />
@@ -597,14 +604,8 @@ function Perfil({
   onFiltro(t: string | null): void
   onEditar(): void
   onBorrar(): void
-  onPreguntar(campo?: string): void
+  onPreguntar?(): void
 }) {
-  // Un campo vacío ofrece la entrevista en vez de un hueco.
-  const pregunta = (campo: string) => (
-    <button className="no-se" onClick={() => onPreguntar(campo)}>
-      No sé, pregúntame
-    </button>
-  )
   const c = d.canal
   const vertical = esVertical(c)
   // Tu piso: lo que saca hoy un video tuyo. En vertical, uno por red.
@@ -631,9 +632,9 @@ function Perfil({
       </span>
     )
   return (
-    <section className="opcion perfil">
-      <div className="skill-name">
-        <strong>
+    <section className="ideas-bloque perfil">
+      <header className="ideas-bloque-head">
+        <h2><Icono de="personas" />
           {c.nombre}
           {c.handle && (
             <span className="muted small">
@@ -649,38 +650,32 @@ function Perfil({
               {c.instagram}
             </span>
           )}
-        </strong>
+        </h2>
         <span className="perfil-acciones">
-          <button className="ghost small" onClick={() => onPreguntar()} title="Claude te hace preguntas para afinar el canal">
-            Preguntarme
+          <button type="button" className="boton ideas-accion" onClick={onEditar}>
+            <Icono de="lapiz" /> Editar perfil
           </button>
-          <button className="ghost small" onClick={onEditar}>
-            Editar
-          </button>
-          <button className="ghost small peligro" onClick={onBorrar}>
-            Borrar
+          {onPreguntar && <button type="button" className="boton ideas-accion ideas-accion-ia" onClick={onPreguntar}>
+            <Icono de="hilo" /> Configurar con IA
+          </button>}
+          <button type="button" className="boton ideas-accion ideas-accion-borrar" onClick={onBorrar}>
+            <Icono de="basura" /> Borrar
           </button>
         </span>
-      </div>
+      </header>
       <dl>
         <dt>Le habla a</dt>
         <dd>
-          {c.publico || (
-            <>
-              <span className="muted">Sin decir, y es lo que más pesa.</span> {pregunta('publico')}
-            </>
-          )}
+          {c.publico || <span className="muted">Público sin definir</span>}
         </dd>
         <dt>Para</dt>
-        <dd>{c.meta || pregunta('meta')}</dd>
+        <dd>{c.meta || <span className="muted">Objetivo sin definir</span>}</dd>
         <dt>Busca</dt>
         <dd>
           {c.semillas.length ? (
             c.semillas.map(ficha)
           ) : (
-            <>
-              <span className="muted">Sin términos todavía.</span> {pregunta('semillas')}
-            </>
+            <span className="muted">Sin búsquedas</span>
           )}
         </dd>
         {c.referencias.length > 0 && (
@@ -697,7 +692,7 @@ function Perfil({
           </>
         )}
         <dt>Vecinos</dt>
-        <dd>{c.vecinos.length ? c.vecinos.map(ficha) : pregunta('vecinos')}</dd>
+        <dd>{c.vecinos.length ? c.vecinos.map(ficha) : <span className="muted">Sin nichos vecinos</span>}</dd>
         {pisos.map(
           ([nombre, x]) =>
             x && (
@@ -712,7 +707,6 @@ function Perfil({
             )
         )}
       </dl>
-      <p className="muted small mono carpeta">{d.carpeta}</p>
     </section>
   )
 }
@@ -1096,7 +1090,7 @@ function Investigacion({
   return (
     <section className="ideas-bloque">
       <div className="ideas-bloque-head">
-        <h2>Investigación</h2>
+        <h2><Icono de="buscar" /> Investigación</h2>
         <span className="muted small">
           {inv?.hecha
             ? `${inv.terminos.length} búsquedas · ${inv.canales.length} ${vertical ? 'cuentas' : 'canales'} · ${inv.videos.filter(esOutlier).length} outliers`
@@ -1106,12 +1100,12 @@ function Investigacion({
         </span>
         <span className="spacer" />
         {trabajando ? (
-          <button className="ghost" onClick={() => api(`/api/ideas/${d.canal.id}/detener`, {})}>
-            Detener
+          <button type="button" className="boton ideas-accion ideas-accion-borrar" onClick={() => api(`/api/ideas/${d.canal.id}/detener`, {})}>
+            <Icono de="cerrar" /> Detener
           </button>
         ) : (
           <button
-            className="primary"
+            className="primary ideas-accion"
             disabled={!d.ytdlp}
             onClick={empezar}
             title={
@@ -1120,7 +1114,7 @@ function Investigacion({
                 : 'Busca cada término, abre los canales que salen y mide cada video contra su canal. Lo hecho en los últimos 3 días no se repite'
             }
           >
-            {toda?.videos.length ? 'Investigar otra vez' : 'Investigar'}
+            <Icono de="buscar" /> {toda?.videos.length ? 'Investigar otra vez' : 'Investigar'}
           </button>
         )}
       </div>

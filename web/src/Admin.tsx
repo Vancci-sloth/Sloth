@@ -173,26 +173,10 @@ export function useEsCreador(): boolean {
       } catch {}
     }
     void api<{ creador: boolean }>('/api/admin').then(
-      (r) => (saber(!!r.creador), r.creador && void guardado()),
+      (r) => saber(!!r.creador),
       () => setSi(false)
     )
   }, [])
-  return si
-}
-
-/**
- * Si ya toca armar el Administrador oculto: en la del creador, cuando Sloth lleva un rato quieto tras abrir (con lo
- * último leído, sin preguntar al cobro). Así la primera vez que se abre ya está pintado.
- */
-export function useArmarAdmin(esCreador: boolean): boolean {
-  const [si, setSi] = useState(false)
-  useEffect(() => {
-    if (!esCreador || si) return
-    const ya = () => void guardado().then(() => setSi(true))
-    // Sloth corre en Chromium (Electron o el navegador de la copia del repo): siempre lo tiene.
-    const id = requestIdleCallback(ya, { timeout: 1500 })
-    return () => cancelIdleCallback(id)
-  }, [esCreador, si])
   return si
 }
 
