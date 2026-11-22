@@ -211,47 +211,20 @@ def lanzar_portada(m: dict, horizontal: bool) -> subprocess.Popen | None:
               f"sans-serif (like Figtree ExtraBold), white, with the last word in {p.get('luz', '#ffb347')}.")
     que = (f"The video ({titulo() or RAIZ.name}) opens with: \"{gancho()}\". Main subject: {prota or 'what that sentence is about'}, "
            f"big and doing what surprises. {adjuntas}")
-    salida = RAIZ / "portada" / "ia.png"
-    cmd = PY + [str(BASE / "portada_ia.py"), con, str(salida), "--titulo", texto, "--estilo", estilo, "--que", que,
-                *[x for r in refs for x in ("--ref", str(r))], *(["--horizontal"] if horizontal else [])]
-    salida.parent.mkdir(exist_ok=True)
-    log = open(salida.parent / "ia.log", "w", encoding="utf-8")
-    paso(f"portada con IA ({'ChatGPT' if con == 'chatgpt' else 'Flow, ' + con}), de fondo mientras se hacen la voz y el render")
-    return subprocess.Popen(cmd, cwd=RAIZ, stdin=subprocess.DEVNULL, stdout=log, stderr=subprocess.STDOUT)
+    return de_la_base().pedir_portada(RAIZ, con, texto, estilo, que, refs, horizontal, decir=paso)
+
+
+def de_la_base():
+    """Lo de la portada con IA que comparten todos los estilos (momentos.py de video-base)."""
+    if str(BASE) not in sys.path:
+        sys.path.insert(0, str(BASE))
+    import momentos
+    return momentos
 
 
 def esperar_portada(proceso: subprocess.Popen | None) -> Path | None:
-    """
-    La portada con IA, si llegó: se espera 90 s como mucho (casi siempre ya está: tarda de 30 a 90 s y la voz y el
-    render, más). Si no llegó o falló, None y lo dice: va la del titular. Dice también lo que gastó.
-    """
-    if not proceso:
-        return None
-    salida, estado = RAIZ / "portada" / "ia.png", RAIZ / "portada" / "ia.png.json"
-    hasta = time.time() + 90
-    leido = {}
-    while time.time() < hasta:
-        if proceso.poll() is not None:
-            try:
-                leido = json.loads(estado.read_text(encoding="utf-8"))
-            except (OSError, ValueError):
-                leido = {}
-            # Si otro hacer.py ya la estaba generando, este sale al momento: se espera a aquel por su estado.
-            if leido.get("estado") != "generando":
-                break
-        time.sleep(1)
-    else:
-        # No se mata: si llega, queda en portada/ia.png, y otro hacer.py la toma sin pedirla otra vez.
-        paso("la portada con IA no llegó en 90 s: va la del cuadro del titular (si llega, queda en portada/ia.png)")
-        return None
-    if leido.get("estado") == "lista" and salida.exists():
-        if leido.get("hecha", 0) < INICIO:
-            paso(f"portada con IA: la de antes, que no cambió (nada nuevo gastado; aquella: {leido.get('gasto', '?')})")
-        else:
-            paso(f"portada con IA lista en {leido.get('segundos', '?')} s, mientras renderizaba. Gastó: {leido.get('gasto', '?')}")
-        return salida
-    paso(f"la portada con IA no salió ({leido.get('por') or 'mira portada/ia.log'}): va la del cuadro del titular")
-    return None
+    """La portada con IA, si llegó (90 s como mucho); si no, None y lo dice: va la del titular."""
+    return de_la_base().esperar_portada(RAIZ, proceso, INICIO, "la del cuadro del titular", decir=paso)
 
 
 def esperar_proyecto() -> None:

@@ -48,6 +48,21 @@ export interface Card {
   /** Un estilo que instalaste de otro: de dónde vino. Al volver a instalarlo de ahí, se pone al día. */
   origen?: OrigenEstilo
   /**
+   * Un estilo instalado de la comunidad (`origen.publicacion`) en una computadora que ya no apoya a Sloth: lo pone el
+   * servidor. Lleva su candado y no hace videos hasta volver a apoyar (`web/src/SinApoyo.tsx`); los ya hechos se quedan.
+   */
+  bloqueada?: true
+  /**
+   * Un estilo tuyo que salió de uno de la comunidad (lo copió «Nuevo estilo» de uno instalado): la publicación de aquel.
+   * Al compartirlo, cuenta como su variante (`licencias/src/tienda.ts`).
+   */
+  deComunidad?: string
+  /**
+   * Cómo se usa, para quien lo instala: la plantilla que se llena al compartirlo (`shared/guia.ts`). La escribe «Nuevo
+   * estilo» al hacerlo y llega con uno instalado de la comunidad. Se ve bajo su nombre (`web/src/Guia.tsx`).
+   */
+  guia?: GuiaEstilo
+  /**
    * Lo que el agente de Claude de esta card no ve: herramientas (`NotebookEdit`, `mcp__21st__bookmark`) o servidores MCP
    * enteros (`mcp__openseo`), también los del usuario. Sale de lo que sus hilos nunca usaron (`medidor economizar`, en
    * sloth-medidor): menos herramientas ofrecidas, menos contexto en cada mensaje.
@@ -109,6 +124,61 @@ export interface EstiloAnterior {
   /** Si este usuario tenía el de antes y está guardado. Si no (instaló de cero), el aviso solo pide leerlo. */
   guardado: boolean
 }
+
+/** La guía de uso de un estilo compartido: los campos de su plantilla (`CAMPOS_GUIA` en `shared/guia.ts`). */
+export interface GuiaEstilo {
+  /** Lo que pone cada vez quien lo usa: un tema, un enlace, su grabación… */
+  das: string
+  /** Lo que sale: qué video, de cuánto y en qué formato. */
+  entrega: string
+  /** Un mensaje de ejemplo, listo para mandar. */
+  ejemplo: string
+  /** Lo que hace falta aparte de Sloth (cuentas, material propio), si algo. */
+  necesita?: string
+  /** Con qué de Sloth hace el video (`HERRAMIENTAS` en `shared/guia.ts`): solo código, Google Flow, voz generada… */
+  herramientas?: string[]
+  /** Los agentes con que se probó y da buen resultado. */
+  agentes?: Proveedor[]
+}
+
+/**
+ * La prueba de un estilo compartido: lo que costó hacer el video con que se enseña, medido en el hilo donde se hizo
+ * (`server/prueba-estilo.ts`). Los números se ven en la tienda; `hilo`, su evidencia, solo su autor y el creador.
+ */
+export interface PruebaEstilo {
+  /** El agente que hizo el video y su modelo, como lo llama su proveedor. */
+  agente: Proveedor
+  modelo: string
+  /** Lo que costó el hilo hasta ese video, en dólares a precio de la API (con una suscripción no se cobra aparte). */
+  costo: number
+  /** Los segundos que trabajó el agente hasta dejarlo terminado, sin lo que esperó a quien lo usa. */
+  segundos: number
+  /** Cuánto dura el video. */
+  video?: number
+  /** El hilo, resumido: lo que se le pidió, cada turno con lo que tardó y costó, y lo que usó de Sloth. Sin sus archivos. */
+  hilo?: { pedido: string; turnos: { segundos: number; costo: number; herramientas: number }[]; usa: string[] }
+  /** La llave del hilo completo (`EvidenciaEstilo`), un archivo de la comunidad que solo bajan su autor y el creador. */
+  evidencia?: string
+}
+
+/**
+ * El hilo completo donde se hizo el video de una prueba, como lo guardó Sloth: lo que se le pidió al agente, lo que
+ * contestó y lo que hizo en cada turno, hasta el video terminado. Es la evidencia de la prueba: «Ver la evidencia», en
+ * la publicación del estilo, la enseña a su autor y al creador (`web/src/Evidencia.tsx`).
+ */
+export interface EvidenciaEstilo {
+  version: 1
+  titulo: string
+  modelo: string
+  pasos: PasoEvidencia[]
+}
+
+export type PasoEvidencia =
+  | { t: 'usuario'; texto: string }
+  | { t: 'agente'; texto: string }
+  /** `entrada` y `salida`, recortadas: lo que se le pasó a la herramienta y lo que devolvió. */
+  | { t: 'herramienta'; nombre: string; entrada: string; salida?: string; error?: true }
+  | { t: 'turno'; segundos: number; costo: number; ok: boolean; error?: string }
 
 /** De dónde vino un estilo instalado: de un archivo (sin `publicacion`) o de la comunidad, y de qué versión de Sloth. */
 export interface OrigenEstilo {
@@ -444,6 +514,26 @@ export interface Lote {
 }
 
 
+/** Una dirección de esta computadora a la que puede llegar el celular: la red de la casa, Tailscale u otra. */
+export interface DireccionCelular {
+  ip: string
+  /** El nombre de su red en el sistema («Wi-Fi», «Ethernet», «Tailscale»). */
+  red: string
+  tipo: 'casa' | 'tailscale' | 'otra'
+  url: string
+}
+
+/** `GET /api/celular`: la puerta del celular (`server/celular.ts`, ADR 0025). `enlace` es lo que lleva el QR. */
+export interface Celular {
+  activo: boolean
+  escuchando: boolean
+  puerto: number
+  llave: string
+  direcciones: DireccionCelular[]
+  enlace: string
+  error?: string
+}
+
 /** Lo que enseña la pantalla de Opciones. De una llave solo viaja el final, para reconocerla. */
 export interface Opciones {
   /** La de la API de YouTube (Data API v3), opcional: la sección Ideas saca con ella fechas y comentarios. */
@@ -453,6 +543,17 @@ export interface Opciones {
    * (`server/ideas/instagram.ts`). `caduca`, si Meta lo dice. No es el token de la nube, que publica.
    */
   meta: { final: string; caduca?: number } | null
+}
+
+/**
+ * El navegador de tu computadora donde se entra con Google, que no deja hacerlo dentro de la app (`server/chromium.ts`).
+ * `elegido`: el programa del que elegiste en Opciones, o `null` si lo toma Sloth; `automatico`: el nombre del que toma
+ * entonces, o `null` si no hay ninguno; `lista`: los instalados que sirven.
+ */
+export interface NavegadorDeFuera {
+  elegido: string | null
+  automatico: string | null
+  lista: { exe: string; nombre: string }[]
 }
 
 /** La tarjeta de un enlace pegado en el inicio (`server/enlaces.ts`). Sin título, se enseña solo el sitio, o nada. */
@@ -1151,6 +1252,24 @@ export interface AyudaMejora {
   preguntas: string[]
 }
 
+/**
+ * Lo que propone «Afinar» en el hilo nuevo (`POST /api/afinar`, `server/afinar.ts`): el pedido reescrito para el estilo,
+ * con `{{1}}`, `{{2}}`… donde va lo que solo decide quien lo pide. Cada uno es el hueco de ese número (empieza en 1).
+ */
+export interface Afinado {
+  texto: string
+  huecos: Hueco[]
+}
+
+/** Un hueco del pedido afinado: se ve como `etiqueta` en el campo y, al pulsarlo, pregunta y ofrece sus opciones. */
+export interface Hueco {
+  /** Lo que se ve en el campo, corto y en forma de pregunta: «¿qué ciudad?». */
+  etiqueta: string
+  /** La pregunta entera, arriba de las opciones. */
+  pregunta: string
+  opciones: string[]
+}
+
 /** Las secciones de la comunidad (`licencias/src/comunidad.ts`). En Anuncios solo publica el creador. */
 export type CategoriaComunidad = 'general' | 'hice' | 'ayuda' | 'mejoras' | 'estilos' | 'anuncios'
 /** Cómo se ordena el feed: por actividad, lo último publicado o, solo el creador, lo que no ha contestado. */
@@ -1178,9 +1297,21 @@ export interface AdjuntoComunidad {
   url: string
   /** El nombre del estilo. */
   nombre?: string
+  /** El estilo de la comunidad del que salió este (su publicación): así cuenta como su variante (`licencias/src/tienda.ts`). */
+  de?: string
+  /** Cómo se usa el estilo: en Estilos no se publica sin ella (`shared/guia.ts`). */
+  guia?: GuiaEstilo
+  /** Lo que costó hacer el video con que se enseña: en Estilos no se publica sin ella (`shared/guia.ts`). */
+  prueba?: PruebaEstilo
   /** La portada de un video: su llave y su URL. */
   poster?: string
   posterUrl?: string
+  /**
+   * El adelanto del video de un estilo: mudo, chico y de unos segundos, con tramos de todo el video. Es lo que se mueve
+   * en el muro de la tienda (`web/src/Tienda.tsx`); sin él, se mueve el principio del video.
+   */
+  previa?: string
+  previaUrl?: string
   vertical?: boolean
 }
 
@@ -1208,8 +1339,23 @@ export interface PublicacionComunidad {
   comentaron: Autor[]
   /** Cuántos la reportaron. Solo lo ve el creador; con 3 o más, los demás ya no la ven hasta que la revise. */
   reportes?: number
-  /** Un estilo que el creador aún no aprueba: solo lo ven quien lo compartió y él. */
+  /** Un estilo que aún no se aprueba: solo lo ven quien lo compartió y el creador. */
   porAprobar?: true
+  /**
+   * Un estilo pre-aprobado por Sloth (ADR 0024): el creador le hizo la prueba, le completó lo que faltaba y le arregló sus
+   * errores. Ya lo ve toda la comunidad; su autor lo deja así («Así está bien») o manda otra versión.
+   */
+  preaprobada?: true
+  /**
+   * Solo a su autor y al creador, de un estilo en revisión: la comunidad sigue viendo la versión de antes, que ya estaba a
+   * la vista, hasta que se apruebe esta.
+   */
+  publicaAun?: true
+  /**
+   * Un estilo al que le falta algo de lo que lleva todo estilo de la comunidad (`faltaEnEstilo` en `shared/guia.ts`): no
+   * sale en la tienda hasta que su autor lo complete. Solo lo ven él, en rojo, y el creador.
+   */
+  incompleto?: string[]
 }
 
 export interface ComentarioComunidad {
@@ -1230,7 +1376,11 @@ export interface ComentarioComunidad {
 /** Lo que le pasó a lo tuyo en la comunidad: te comentaron, te respondieron, te dieron me gusta… */
 export interface AvisoComunidad {
   id: string
-  tipo: 'comento' | 'respondio' | 'gusta' | 'gustaComentario' | 'estado' | 'reporte' | 'anuncio' | 'estilo' | 'aprobado'
+  /**
+   * `incompleto`: a un estilo tuyo le falta algo de lo que lleva todo estilo, y no sale en la tienda hasta que lo completes.
+   * `preaprobado`: Sloth lo probó, lo completó y lo arregló, y ya lo ve toda la comunidad.
+   */
+  tipo: 'comento' | 'respondio' | 'gusta' | 'gustaComentario' | 'estado' | 'reporte' | 'anuncio' | 'estilo' | 'aprobado' | 'preaprobado' | 'incompleto'
   de: Autor
   publicacion: string
   /** El título de la publicación, o el principio de su texto. */
@@ -1251,7 +1401,7 @@ export interface RoadmapComunidad {
 
 export interface FeedComunidad {
   /** Con lo que llevas hecho, para «Comienza aquí». */
-  yo: Autor & { publicaciones: number; comentarios: number }
+  yo: Autor & { publicaciones: number; comentarios: number; /** Apoya a Sloth ahora: entra a los estilos de la comunidad. */ apoya?: boolean }
   /** Las licencias activas. */
   miembros: number
   /** Las que abrieron Sloth en las últimas 24 horas. */
@@ -1272,6 +1422,127 @@ export interface RifaGanada {
   creditos: number
   /** Ya están en tu cuenta. */
   entregados: boolean
+}
+
+/** El fondo de la comunidad (`licencias/src/fondo.ts`): `GET /api/comunidad/fondo`. */
+export interface FondoComunidad {
+  /** El periodo que se reparte junto: un mes ('2027-01'); el primero junta del 15 de noviembre al fin de diciembre de 2026. */
+  periodo: string
+  /** «enero de 2027»; el primero, «noviembre y diciembre de 2026». */
+  mes: string
+  /** El primer reparto, el 1 de enero de 2027: hay tiempo para prepararse. */
+  primero?: true
+  /** En el primero, desde cuándo cuenta lo que entra, en ISO: lo cobrado antes no es del fondo. */
+  desde?: string
+  /** Lo que se lleva la comunidad este mes, por moneda, en unidades y del mayor al menor. Vacío: aún nada. */
+  montos: { moneda: string; monto: number }[]
+  /**
+   * Las cuentas de cada moneda, ya hechas: lo cobrado con tarjeta, lo que se quedó Stripe, lo devuelto y el IVA; lo que
+   * queda (`neto`) y la mitad para la comunidad. En unidades, todo positivo.
+   */
+  cuentas: { moneda: string; cobrado: number; comision: number; devuelto: number; impuesto: number; neto: number; comunidad: number }[]
+  /** Cuándo cierra el periodo y se reparte (00:00 del día 1 siguiente en Ciudad de México), en ISO. */
+  cierra: string
+}
+
+/** Lo tuyo en el fondo de la comunidad (`licencias/src/reparto.ts`): `GET /api/comunidad/fondo/mio`. */
+export interface MiFondo {
+  /** Participas: pusiste tu Binance ID, adonde se te paga. */
+  participa: boolean
+  /** Tu Binance ID, tapado: «••••1234». */
+  binance?: string
+  /** Los puntos de tus estilos en este periodo. */
+  puntos: number
+  /** Lo que llevas si el periodo cerrara ahora; si no participas, lo que llevarías. */
+  estimado: FondoComunidad['montos']
+  /** Tus partes de los periodos ya cerrados, del último al primero. */
+  partes: { periodo: string; mes: string; montos: FondoComunidad['montos']; pagado?: string }[]
+}
+
+/** La parte de una persona en el reparto de un periodo. Solo la ve el creador. */
+export interface ParteReparto {
+  miembro: Autor
+  correo: string
+  /** Adónde se le paga: entero. */
+  binance: string
+  puntos: number
+  montos: FondoComunidad['montos']
+  /** De qué estilos salen sus puntos, y cuántas personas hicieron videos con cada uno. */
+  estilos: { id: string; titulo: string; puntos: number; personas: number }[]
+  /** Lo que conviene mirar antes de pagarle. */
+  avisos: string[]
+  /** Cuándo se marcó como pagada, y con qué referencia. */
+  pagado?: string
+  referencia?: string
+}
+
+/** El reparto del fondo de un periodo, para el creador: `GET /api/comunidad/fondo/reparto?periodo=`. */
+export interface RepartoFondo {
+  periodo: string
+  mes: string
+  /** Los periodos que hay, del primero al de hoy. */
+  periodos: { id: string; mes: string }[]
+  /** Ya terminó: se puede cerrar. */
+  termino: boolean
+  /** Cuándo se cerró. Sin él, lo demás va en vivo. */
+  cerrado?: string
+  /** Las cuentas del fondo; sin ellas, si Stripe no contestó. */
+  fondo: FondoComunidad | null
+  /** Los puntos entre los que se reparte. */
+  puntos: number
+  partes: ParteReparto[]
+  /** Quienes tienen puntos pero no participan (no dieron su Binance ID): no se llevan nada. */
+  fuera: { miembro: Autor; puntos: number }[]
+}
+
+/** Cómo se ordena la tienda de estilos: los favoritos (más me gusta), los más usados, descargados, lo que más gana este mes o lo nuevo. */
+export type OrdenTienda = 'favoritos' | 'usados' | 'descargas' | 'ganando' | 'nuevos'
+
+/** Un estilo de la tienda (`licencias/src/tienda.ts`), con sus números, que son públicos. */
+export interface EstiloTienda {
+  publicacion: PublicacionComunidad
+  /** De siempre: computadoras que lo instalaron, videos que otras personas terminaron con él, cuántas personas y variantes. */
+  descargas: number
+  videos: number
+  personas: number
+  variantes: number
+  /** Este mes, lo que cuenta para el fondo: los videos, con su tope por persona. */
+  mes: { personas: number; videos: number; variantes: number; puntos: number }
+  /** Si se lleva del fondo: su autor quiso participar (dio su Binance ID) y no es el creador de Sloth. */
+  participa: boolean
+  /** Lo que se llevaría del fondo si el periodo cerrara ahora; vacío si no participa. */
+  estimado: FondoComunidad['montos']
+  /** El estilo de la comunidad del que salió. */
+  basadoEn?: { id: string; titulo: string }
+}
+
+/** `GET /api/comunidad/estilos`. */
+export interface TiendaEstilos {
+  estilos: EstiloTienda[]
+  /** El fondo de este mes; sin él, si Stripe no contestó. */
+  fondo: FondoComunidad | null
+  /** Los puntos de los estilos que se llevan del fondo en este periodo. */
+  puntos: number
+  /** A quien no apoya: ve la tienda entera, pero no instala; y cuántos estilos hay, para la invitación a apoyar. */
+  sinApoyo?: { estilos: number }
+  /** Cuánto vale cada cosa, y los días que tiene que llevar una cuenta para que sus videos sumen. */
+  reglas: { persona: number; video: number; tope: number; variante: number; dias: number }
+}
+
+/** Solo el creador: las pruebas de los videos de un estilo en un mes (`GET /api/comunidad/estilos/pruebas`). */
+export interface PruebasEstilo {
+  periodo: string
+  videos: {
+    equipo: string
+    huella: string
+    /** El número de persona (las computadoras y conexiones que se tocan son una). */
+    persona: number
+    autor: Autor
+    /** La URL de su portada. */
+    prueba?: string
+    descartado: boolean
+    creado: string
+  }[]
 }
 
 /** La rifa de la comunidad (`licencias/src/rifa.ts`), como la ve cada quien: `GET /api/comunidad/rifa`. */
@@ -1505,8 +1776,6 @@ export type FuenteVoz = ProveedorVoz | 'vc'
 export interface EstadoVoicesCloning {
   disponible: boolean
   creador: boolean
-  /** Créditos que se suman cada mes natural por el apoyo o el lugar de Fundador. */
-  mensuales?: number
   creditos?: number
   usados?: number
   hoy?: number
@@ -1688,6 +1957,20 @@ export interface PuenteNavegador {
   oirPestana?(cb: (hilo: string, url: string) => void): () => void
   estados(): Promise<EstadoNavegador[]>
 }
+
+/**
+ * Lo que la web le hace a la página de un hilo (ADR 0025, `server/navegador-remoto.ts`): ahí no hay vista nativa, así
+ * que se ve en capturas y se usa con esto. `x` e `y`, en píxeles CSS de la página.
+ */
+export type EntradaNavegador =
+  | { tipo: 'clic'; x: number; y: number }
+  | { tipo: 'rueda'; x: number; y: number; dx: number; dy: number }
+  | { tipo: 'texto'; texto: string }
+  | { tipo: 'tecla'; tecla: TeclaNavegador }
+
+/** Las teclas que no son texto y que la web manda una a una. */
+export const TECLAS_NAVEGADOR = ['Enter', 'Backspace', 'Tab', 'Escape', 'Delete', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End', 'PageUp', 'PageDown'] as const
+export type TeclaNavegador = (typeof TECLAS_NAVEGADOR)[number]
 
 /** Lo que se puede borrar sin perder nada tuyo, en Opciones → Espacio en disco (`server/espacio.ts`). */
 export type IdEspacio = 'temporales' | 'renders' | 'modulos' | 'caches' | 'perfiles' | 'fuentes' | 'python' | 'adjuntos'

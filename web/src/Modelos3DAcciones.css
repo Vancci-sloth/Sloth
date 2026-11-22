@@ -11,8 +11,9 @@
 .m3d-modal-texto { margin: -6px 0 0; color: color-mix(in srgb, var(--muted) 55%, var(--text)); font-size: 14.5px; line-height: 1.5; }
 .m3d-campo { display: flex; flex-direction: column; gap: 5px; font-size: 14.5px; color: color-mix(in srgb, var(--muted) 55%, var(--text)); }
 .m3d-campo > span { font-weight: 600; }
-.m3d-campo input:not([type='file']), .m3d-campo textarea, .m3d-campo select { padding: 8px 11px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); color: var(--text); font-size: 14.5px; outline: none; resize: vertical; }
-.m3d-campo input:focus, .m3d-campo textarea:focus, .m3d-campo select:focus { border-color: var(--amber); }
+.m3d-campo .desplegable.campo > .picker-trigger { min-height: 39px; padding: 8px 11px; border-radius: 10px; }
+.m3d-campo input:not([type='file']), .m3d-campo textarea { padding: 8px 11px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); color: var(--text); font-size: 14.5px; outline: none; resize: vertical; }
+.m3d-campo input:focus, .m3d-campo textarea:focus { border-color: var(--amber); }
 .m3d-modal-pie { display: flex; justify-content: flex-end; gap: 8px; padding-top: 4px; }
 
 @media (max-width: 760px) {

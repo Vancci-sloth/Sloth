@@ -6,6 +6,7 @@ que el explicativo (`video-base/MOTOR.md`): aquí el guion ya está dicho, es la
     python -I -B -X utf8 <skill>/scripts/hacer.py --revisa     solo revisa momentos.json contra la grabación (un segundo)
     python -I -B -X utf8 <skill>/scripts/hacer.py              todo: material, edición, render, medida y portada
     python -I -B -X utf8 <skill>/scripts/hacer.py --material   solo baja y trata el material (revision/material.jpg)
+    --imagenes <con>   la portada con IA: `chatgpt` o el modelo de Flow de la línea `Imágenes:` (se recuerda en el proyecto)
 
 Desde la raíz del proyecto (la carpeta que dejó `nuevo.py`). En orden, y para en el primer ✗ diciendo todo lo que hay
 que arreglar de una vez:
@@ -17,12 +18,15 @@ que arreglar de una vez:
 3. La cama de música, si el proyecto trae una canción en public/assets/music/ (bed-mix.py: se corta bajo `remate`).
 4. El director (components/director.py) arma la edición: src/edicion.json y el sonido.
 5. Render, sonido a −14 LUFS, out/final.mp4 y su comprobación (terminar.py); que no se haya tapado ninguna palabra
-   (transcribir.py --comparar); la medida (medir.py) y la portada: el cuadro de la palabra roja.
+   (transcribir.py --comparar); la medida (medir.py) y la portada: la generada con IA si el usuario eligió con qué en
+   «Imágenes» (se pide de fondo desde el paso 2 y aquí se espera, 90 s como mucho) o, sin ella, el cuadro de la palabra
+   roja.
 """
 
 import hashlib
 import json
 import os
+import shutil
 import subprocess
 import sys
 import threading
@@ -37,7 +41,7 @@ os.environ.setdefault("SLOTH_SKILLS", str(SKILL.parent))
 sys.path.insert(0, str(BASE))
 sys.path.insert(0, str(SKILL / "scripts"))
 sys.path.insert(0, str(SKILL / "components"))
-from momentos import Reloj, hoja, leer, parar  # noqa: E402
+from momentos import Reloj, con_imagenes, esperar_portada, hoja, leer, opcion, parar, pedir_portada  # noqa: E402
 
 CAMARA = RAIZ / "public" / "assets" / "media" / "cam_raw.mp4"
 MUSICA = (".mp3", ".wav", ".m4a", ".flac", ".ogg", ".aac")
@@ -101,17 +105,54 @@ def cama(m: dict, p: dict, reloj: Reloj) -> None:
                  "--voice-end", f"{p['fin']:.3f}", *rampas, "--out", str(premezcla)], "la cama de música")
 
 
-def portada(t: float | None, video: Path, vertical: bool) -> Path | None:
+def pedir_la_portada(m: dict, p: dict, words: list[dict], con: str, vertical: bool) -> subprocess.Popen | None:
     """
-    La portada: el cuadro de la palabra roja ya entera (el primer `mega`; si no hay, la primera palabra `grande`), con
-    la cara cruda o su material: el segundo lo dice el director. En vertical va de primer fotograma; en horizontal
-    queda de miniatura (1280×720).
+    La portada con IA, de fondo (`pedir_portada` de la base), si el usuario eligió con qué en «Imágenes»: quien habla
+    (un cuadro de su cámara en la frase estrella, de referencia) con la palabra roja detrás de la cabeza, sobre el
+    material del video. El título es esa palabra (el primer `mega`; si no hay, la primera `grande`), o `titulo`.
     """
-    if t is None:
+    if not con:
         return None
+    texto = lambda v: str(v.get("texto") or "") if isinstance(v, dict) else str(v or "")
+    estrella = next((x for x in p["momentos"] if x.get("mega")), None) or next((x for x in p["momentos"] if x.get("grande")), None)
+    palabra = texto(estrella.get("mega") or estrella.get("grande")) if estrella else ""
+    titulo = palabra or str(m.get("titulo") or "")
+    refs = []
+    if CAMARA.exists():
+        cara = RAIZ / "portada" / "cara.jpg"
+        cara.parent.mkdir(exist_ok=True)
+        t = (estrella["t0"] + estrella["t1"]) / 2 if estrella else min(1.0, p["fin"] / 2)
+        r = subprocess.run(["ffmpeg", "-nostdin", "-v", "error", "-y", "-ss", f"{t:.3f}", "-i", str(CAMARA), "-frames:v", "1",
+                            "-vf", "scale='min(1024,iw)':-2", str(cara)], cwd=RAIZ, capture_output=True)
+        if not r.returncode and cara.exists():
+            refs.append(cara)
+    estilo = ("Style: the same look as the video, a fast found-footage documentary: real archive photos, web pages and film "
+              "stills in a rough collage, color-graded teal (#0E5560), hard black and white and amber (#D9822B), with film grain. "
+              "In front, the person who talks to camera, cut out, from the chest up, and behind their head the title as one "
+              "enormous red word (#F2030A) in a black-weight sans-serif (like Inter Black), partly hidden by the head but "
+              "fully readable."
+              + (" Attached image 1: the person who talks in the video; keep their face, hair and clothes exactly." if refs else ""))
+    dicho = " ".join(str(w.get("w", "")) for w in words[:45]).strip()
+    que = (f"The video{' (' + str(m['titulo']) + ')' if m.get('titulo') else ''} is this person saying: \"{dicho}…\". "
+           "Behind them, two or three archive images of what that is about.")
+    return pedir_portada(RAIZ, con, titulo, estilo, que, refs, horizontal=not vertical)
+
+
+def portada(t: float | None, video: Path, vertical: bool, hecha: Path | None = None) -> Path | None:
+    """
+    La portada: la generada con IA (`hecha`) o, sin ella, el cuadro de la palabra roja ya entera (el primer `mega`; si
+    no hay, la primera palabra `grande`), con la cara cruda o su material: el segundo lo dice el director. En vertical
+    va de primer fotograma; en horizontal queda de miniatura (1280×720).
+    """
     salida = RAIZ / "portada.png"
-    subprocess.run(["ffmpeg", "-nostdin", "-v", "error", "-y", "-ss", f"{t:.3f}", "-i", str(video), "-frames:v", "1",
-                    *([] if vertical else ["-vf", "scale=1280:720:flags=lanczos"]), str(salida)], cwd=RAIZ, check=True)
+    if hecha:
+        # Ya viene a su tamaño (1080×1920 o 1280×720).
+        shutil.copy(hecha, salida)
+    elif t is None:
+        return None
+    else:
+        subprocess.run(["ffmpeg", "-nostdin", "-v", "error", "-y", "-ss", f"{t:.3f}", "-i", str(video), "-frames:v", "1",
+                        *([] if vertical else ["-vf", "scale=1280:720:flags=lanczos"]), str(salida)], cwd=RAIZ, check=True)
     if vertical:
         correr(["node", str(BASE / "portada.mjs"), str(video), str(salida)], "la portada")
     return salida
@@ -120,11 +161,13 @@ def portada(t: float | None, video: Path, vertical: bool) -> Path | None:
 def main() -> None:
     sys.stdout.reconfigure(encoding="utf-8")
     args = sys.argv[1:]
+    imagenes = opcion(args, "--imagenes")
     revisa, solo_material = "--revisa" in args, "--material" in args
     if [a for a in args if a not in ("--revisa", "--material")]:
         sys.exit(__doc__)
     if not (RAIZ / "remotion.config.ts").exists():
         sys.exit("Córrelo desde la raíz del proyecto (la carpeta que dejó nuevo.py, donde está remotion.config.ts).")
+    con = con_imagenes(RAIZ, imagenes)
     palabras = RAIZ / "work" / "tx" / "words.json"
     if not palabras.exists():
         sys.exit("✗ Falta la transcripción (work/tx/words.json): nuevo.py la deja; si no, transcribir.py .")
@@ -144,6 +187,7 @@ def main() -> None:
         return
     reloj = Reloj(RAIZ)
     vertical = director.VERTICAL
+    con_ia = None if solo_material else pedir_la_portada(m, p, words, con, vertical)
     reloj.paso(f"momentos.json bien; bajando y tratando {len(cosas)} cosas"
                + (" y recortando la frase estrella" if any(x.get("recorte") for x in p["momentos"]) else ""))
     avisos: list[str] = []
@@ -199,7 +243,7 @@ def main() -> None:
         print("  ⚠ no se oye bien:" + l, flush=True)
     for l in salidas.get("medida", "").splitlines():
         print("  " + l, flush=True)
-    foto = portada(datos.get("portada"), video, vertical)
+    foto = portada(datos.get("portada"), video, vertical, esperar_portada(RAIZ, con_ia, reloj.inicio, "el cuadro de la palabra roja"))
     if marcados:
         print("  Derechos por revisar (FUENTES.md), díselo al usuario:\n    " + "\n    ".join(marcados), flush=True)
     # Una sola imagen que mirar: la hoja del video. El material y la portada quedan por si algo no se ve bien.

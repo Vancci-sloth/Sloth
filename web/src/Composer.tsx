@@ -1,13 +1,15 @@
 import { type ReactNode, useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
 import { consultaBarra, filtrarBarra, type OpcionBarra } from './menu-estilos'
-import type { GastoFlow, Model } from '../../shared/types'
+import type { Afinado, GastoFlow, Hueco, Model } from '../../shared/types'
 import { proveedorDe, type Proveedor } from '../../shared/providers'
+import { gruposModelos } from '../../shared/modelos'
 import { imageUrl, Thumbs, type Attached } from './Images'
 import { esIcono, Icono } from './Iconos'
 import { FlowEnUso, LimitesContexto } from './LimitesContexto'
 import type { Resumen } from './eventos'
 import { compact } from './items'
 import { invocacion, LINK, LINK_ICON, linkParts, QUOTE_EVENT, QUOTE_ICON, quoteRef, THREAD, THREAD_ICON, threadIconOf } from './etiquetas'
+import { subir } from './web'
 
 /**
  * El aviso con el que el inicio le pasa al compositor lo que se soltó fuera de él (`Soltar.tsx`): los archivos y el texto
@@ -42,34 +44,12 @@ export interface Draft {
   images: (Attached & { chip: boolean })[]
 }
 
-export interface Choice {
-  model: string
-  effort?: string
-}
+export type { Choice } from '../../shared/modelos'
+import type { Choice } from '../../shared/modelos'
+export { gruposModelos }
 
-/** Los desplegables separan las dos familias para encontrar cada modelo de un vistazo. */
-export function gruposModelos(models: Model[]) {
-  return [
-    { id: 'claude', label: 'Anthropic' },
-    { id: 'codex', label: 'OpenAI' },
-    { id: 'opencode', label: 'OpenCode · gratis' },
-    // Los de pago de OpenCode, debajo de los gratis: se cobran del saldo de la cuenta.
-    { id: 'opencode', label: 'OpenCode · de pago (de tu saldo, por millón de tokens)', pago: true },
-    { id: 'deepseek', label: 'DeepSeek · beta' },
-    { id: 'grok', label: 'Grok · beta' },
-    { id: 'antigravity', label: 'Antigravity · beta' },
-    { id: 'gemini', label: 'Gemini · beta' },
-    { id: 'cursor', label: 'Cursor' },
-    { id: 'muse', label: 'Muse Code (Meta)' },
-    { id: 'pi', label: 'Pi · beta · gratis' },
-    { id: 'pi', label: 'Pi · beta · de pago (por millón de tokens)', pago: true },
-  ].map((p) => ({
-    label: p.label,
-    options: models
-      .filter((m) => proveedorDe(m.id) === p.id && !!m.precio === !!p.pago)
-      .map((m) => ({ value: m.id, label: m.precio ? `${m.label} · ${m.precio}` : m.label })),
-  })).filter((g) => g.options.length > 0)
-}
+/** Desde cuántas opciones un desplegable con `buscar` enseña su buscador (`Picker`). */
+const BUSCAR_DESDE = 20
 
 /** Las que Claude sabe leer. */
 const IMAGE = /^image\/(png|jpeg|gif|webp)$/
@@ -254,6 +234,91 @@ function withLinks(text: string): Node[] {
 }
 
 /**
+ * Un hueco del pedido afinado: lo que solo decide quien pide el video. Se ve como su pregunta corta, subrayada; al
+ * agente, si nadie lo llena, le llega como «decídelo tú». Guarda su pregunta y sus opciones, que siguen en el borrador.
+ */
+function huecoChip(h: Hueco): HTMLElement {
+  const el = document.createElement('span')
+  el.className = 'chip hueco-chip'
+  el.contentEditable = 'false'
+  el.dataset.ref = `[${h.pregunta} Decídelo tú.]`
+  el.dataset.pregunta = h.pregunta
+  el.dataset.opciones = JSON.stringify(h.opciones)
+  el.title = h.pregunta
+  el.innerHTML = '<span class="chip-name"></span><svg class="hueco-flecha" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>'
+  el.querySelector('.chip-name')!.textContent = h.etiqueta
+  return el
+}
+
+/** El pedido afinado para el campo: su texto (con enlaces y hilos vueltos etiqueta) y sus huecos en su sitio. */
+function conHuecos(a: Afinado): Node[] {
+  return a.texto.split(/\{\{(\d+)\}\}/).flatMap((parte, i) => {
+    if (i % 2) {
+      const h = a.huecos[Number(parte) - 1]
+      return h ? [huecoChip(h)] : []
+    }
+    if (!parte) return []
+    const nodos = withChips(parte)
+    return nodos.length ? nodos : [document.createTextNode(parte)]
+  })
+}
+
+/** Las opciones de un hueco, encima de él, y una respuesta propia. Lo elegido entra al campo como texto. */
+function MenuHueco({ hueco, onElegir, onCerrar }: { hueco: HTMLElement; onElegir(texto: string): void; onCerrar(): void }) {
+  const menu = useRef<HTMLDivElement>(null)
+  const [otra, setOtra] = useState('')
+  const [lugar, setLugar] = useState({ left: 12, bottom: 0 })
+  const opciones = JSON.parse(hueco.dataset.opciones ?? '[]') as string[]
+  const ancho = Math.min(300, innerWidth - 24)
+  useLayoutEffect(() => {
+    const r = hueco.getBoundingClientRect()
+    setLugar({ left: Math.max(12, Math.min(r.left - 8, innerWidth - ancho - 12)), bottom: innerHeight - r.top + 8 })
+    hueco.classList.add('abierto')
+    menu.current?.showPopover()
+    menu.current?.querySelector<HTMLElement>('.picker-option')?.focus({ preventScroll: true })
+    return () => hueco.classList.remove('abierto')
+  }, [hueco])
+  useEffect(() => {
+    const fuera = (e: PointerEvent) => !menu.current?.contains(e.target as Node) && !hueco.contains(e.target as Node) && onCerrar()
+    addEventListener('pointerdown', fuera, true)
+    return () => removeEventListener('pointerdown', fuera, true)
+  }, [hueco, onCerrar])
+  return (
+    <div
+      ref={menu}
+      popover="manual"
+      className="picker-menu picker-flotante hueco-menu"
+      style={{ left: lugar.left, bottom: lugar.bottom, top: 'auto', width: ancho }}
+      role="listbox"
+      aria-label={hueco.dataset.pregunta}
+      onKeyDown={(e) => {
+        if (e.key === 'Escape') return e.preventDefault(), e.stopPropagation(), onCerrar()
+        if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return
+        e.preventDefault()
+        const lista = Array.from(menu.current!.querySelectorAll<HTMLElement>('.picker-option, .hueco-otra'))
+        const i = lista.indexOf(document.activeElement as HTMLElement)
+        lista[(i + (e.key === 'ArrowDown' ? 1 : lista.length - 1)) % lista.length]?.focus()
+      }}
+    >
+      <span className="picker-label">{hueco.dataset.pregunta}</span>
+      {opciones.map((o) => (
+        <button key={o} type="button" role="option" aria-selected={false} className="picker-option" onClick={() => onElegir(o)}>
+          {o}
+        </button>
+      ))}
+      <input
+        className="hueco-otra"
+        placeholder="Otra respuesta…"
+        aria-label="Otra respuesta"
+        value={otra}
+        onChange={(e) => setOtra(e.target.value)}
+        onKeyDown={(e) => e.key === 'Enter' && otra.trim() && (e.preventDefault(), onElegir(otra.trim()))}
+      />
+    </div>
+  )
+}
+
+/**
  * «Uso»: cuánto le queda al agente para recordar este chat y cuánto queda de tu plan, a un clic. Antes era un círculo con
  * un % junto a Enviar, y se leía como el avance del video. Todo se mide en lo que queda. Con el chat casi lleno sale un
  * punto ámbar y se puede resumir ya (lo mismo que escribir /compact); si no, el agente lo resume solo al llenarse. El plan
@@ -368,7 +433,9 @@ function TokensDelChat({ g }: { g: Resumen }) {
 /**
  * Un desplegable con la cara de la app, en vez del nativo: el del sistema no se deja pintar. Se abre hacia arriba
  * (el compositor suele vivir abajo), salvo que arriba no quepa: en «Nuevo chat» el compositor está cerca del borde.
- * Se cierra al elegir, al hacer clic fuera o con Escape. También lo usa Opciones → Redes.
+ * Se cierra al elegir, al hacer clic fuera o con Escape. También lo usa Opciones → Redes. Donde antes iba un
+ * `<select>`, se usa a través de `Desplegable.tsx`, que le pone el valor elegido de etiqueta. Con `buscar` y una lista
+ * larga (los modelos, con el catálogo de OpenRouter) lleva arriba un buscador: lo escrito filtra por nombre y por grupo.
  */
 export function Picker(props: {
   label: ReactNode
@@ -379,6 +446,13 @@ export function Picker(props: {
   flotante?: boolean
   value: string
   disabled?: boolean
+  /** En una página, no en el compositor: se abre hacia abajo si cabe, y su lista es al menos tan ancha como el botón. */
+  abajo?: boolean
+  /** Qué se elige, para quien no ve; y la ayuda al pasar el ratón. */
+  nombre?: string
+  titulo?: string
+  /** Con más de `BUSCAR_DESDE` opciones, un buscador arriba de la lista. */
+  buscar?: boolean
   /** `detalle` va a la derecha de la opción, apagado (lo que cuesta y tarda cada modelo). */
   groups: { label: string; options: { value: string; label: string; detalle?: string }[] }[]
   onChange(value: string): void
@@ -388,14 +462,21 @@ export function Picker(props: {
   const [place, setPlace] = useState({ down: false, max: 360, left: 0, edge: 0, width: 280 })
   const root = useRef<HTMLDivElement>(null)
   const menu = useRef<HTMLDivElement>(null)
+  const [busca, setBusca] = useState('')
+  const largo = !!props.buscar && props.groups.reduce((n, g) => n + g.options.length, 0) > BUSCAR_DESDE
+  const palabras = largo ? busca.toLowerCase().split(/\s+/).filter(Boolean) : []
+  const groups = palabras.length
+    ? props.groups.map((g) => ({ ...g, options: g.options.filter((o) => palabras.every((p) => `${g.label} ${o.label}`.toLowerCase().includes(p))) })).filter((g) => g.options.length)
+    : props.groups
 
   const toggle = () => {
+    if (!open) setBusca('')
     if (!open && root.current) {
       const r = root.current.getBoundingClientRect()
       const above = r.top - 16
       const below = innerHeight - r.bottom - 16
-      const down = above < 360 && below > above
-      const width = Math.min(props.menuWidth ?? 280, innerWidth - 24)
+      const down = props.abajo ? below >= 220 || below > above : above < 360 && below > above
+      const width = Math.min(props.menuWidth ?? (props.abajo ? Math.max(220, r.width) : 280), innerWidth - 24)
       setPlace({ down, max: Math.max(0, Math.min(360, down ? below : above)), left: Math.max(12, Math.min(r.left, innerWidth - width - 12)), edge: down ? r.bottom + 8 : innerHeight - r.top + 8, width })
     }
     setOpen(!open)
@@ -418,7 +499,9 @@ export function Picker(props: {
     // Que se vea la opción elegida aunque la lista sea larga.
     const elegido = menu.current?.querySelector<HTMLButtonElement>('.picker-option.on')
     elegido?.scrollIntoView({ block: 'nearest' })
-    if (props.flotante) (elegido ?? menu.current?.querySelector<HTMLButtonElement>('.picker-option'))?.focus({ preventScroll: true })
+    // Con buscador, el foco va a él para escribir: aquí y no con `autoFocus`, que en la capa superior llega antes de que se vea.
+    if (largo) menu.current?.querySelector<HTMLInputElement>('.picker-buscar')?.focus({ preventScroll: true })
+    else if (props.flotante) (elegido ?? menu.current?.querySelector<HTMLButtonElement>('.picker-option'))?.focus({ preventScroll: true })
     const mover = (e: Event) => {
       if (props.flotante && !menu.current?.contains(e.target as Node)) setOpen(false)
     }
@@ -434,7 +517,7 @@ export function Picker(props: {
 
   return (
     <div ref={root} className={`picker ${props.className ?? ''} ${open ? 'open' : ''}`}>
-      <button className="picker-trigger" disabled={props.disabled} aria-haspopup="listbox" aria-expanded={open} onClick={toggle} onKeyDown={(e) => {
+      <button type="button" className="picker-trigger" disabled={props.disabled} aria-label={props.nombre} title={props.titulo} aria-haspopup="listbox" aria-expanded={open} onClick={toggle} onKeyDown={(e) => {
         if (!open && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) { e.preventDefault(); toggle() }
       }}>
         {props.label}
@@ -452,17 +535,31 @@ export function Picker(props: {
             return
           }
           if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(e.key)) return
+          // En el buscador, Inicio y Fin mueven el cursor por lo escrito.
+          if (e.target instanceof HTMLInputElement && (e.key === 'Home' || e.key === 'End')) return
           e.preventDefault()
           const opciones = Array.from(menu.current?.querySelectorAll<HTMLButtonElement>('.picker-option') ?? [])
           const actual = opciones.indexOf(document.activeElement as HTMLButtonElement)
           const siguiente = e.key === 'Home' ? 0 : e.key === 'End' ? opciones.length - 1 : (actual + (e.key === 'ArrowDown' ? 1 : -1) + opciones.length) % opciones.length
           opciones[siguiente]?.focus()
         }}>
-          {props.groups.map((g) => (
+          {largo && (
+            <input
+              className="picker-buscar"
+              placeholder="Buscar"
+              aria-label="Buscar en la lista"
+              value={busca}
+              onChange={(e) => setBusca(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && menu.current?.querySelector<HTMLButtonElement>('.picker-option')?.click()}
+            />
+          )}
+          {largo && !groups.length && <span className="picker-label">Nada con ese nombre</span>}
+          {groups.map((g) => (
             <div key={g.label} className="picker-group">
               <span className="picker-label">{g.label}</span>
               {g.options.map((o) => (
                 <button
+                  type="button"
                   key={o.value}
                   role="option"
                   aria-selected={o.value === props.value}
@@ -529,6 +626,11 @@ export function Composer(props: {
   /** En el inicio: `/` y unas letras al principio del campo abren el menú para cambiar de estilo (`menu-estilos.ts`). */
   estilos?: OpcionBarra[]
   onEstilo?(id: string): void
+  /**
+   * En el hilo nuevo de un estilo, «Afinar»: el agente reescribe el pedido para `para` (`server/afinar.ts`) y lo que solo
+   * tú decides queda como hueco en el campo, con sus opciones. «Deshacer» vuelve a lo que escribiste.
+   */
+  afinar?: { para: string; pedir(texto: string, choice: Choice): Promise<Afinado> }
   /** Con el agente trabajando, le llega ya, en mitad del turno. */
   onSend(text: string, choice: Choice, images: string[]): Promise<unknown>
   /** Si falla, el modelo vuelve al de antes y el error sale en la barra, como los de mandar. Lo mismo al detener. */
@@ -545,6 +647,14 @@ export function Composer(props: {
   const [dragging, setDragging] = useState(false)
   const box = useRef<HTMLDivElement>(null)
   const picker = useRef<HTMLInputElement>(null)
+  // «Afinar»: lo que había antes (para deshacer y verlo), los huecos que quedan y el que tiene su menú abierto.
+  const [afinando, setAfinando] = useState(false)
+  const [afinado, setAfinado] = useState<{ antes: string; escrito: string } | null>(null)
+  const [verEscrito, setVerEscrito] = useState(false)
+  const [huecos, setHuecos] = useState(0)
+  const [abierto, setAbierto] = useState<HTMLElement | null>(null)
+  // Otro estilo: lo afinado era para el de antes.
+  useEffect(() => setAfinado(null), [props.afinar?.para])
 
   useEffect(() => {
     if (!own && props.initial) setChoice(props.initial)
@@ -581,9 +691,64 @@ export function Composer(props: {
   function sync() {
     const el = box.current!
     etiquetarInvocacion(el)
-    setText(read(el))
+    const leido = read(el)
+    setText(leido)
     const shown = new Set(Array.from(el.querySelectorAll<HTMLElement>('[data-src]'), (c) => c.dataset.src))
     setImages((list) => list.filter((i) => !i.chip || shown.has(i.src)))
+    setHuecos(el.querySelectorAll('.hueco-chip').length)
+    if (!leido.trim()) setAfinado(null)
+  }
+
+  /** El agente reescribe lo escrito; las imágenes del texto se quedan, al final. Se abre el primer hueco. */
+  async function afinarPedido() {
+    const el = box.current!
+    if (!props.afinar || !choice || afinando || !text.trim()) return
+    setAfinando(true)
+    setError('')
+    setAbierto(null)
+    try {
+      const a = await props.afinar.pedir(text.trim(), choice)
+      const antes = el.innerHTML
+      const imagenes = Array.from(el.querySelectorAll<HTMLElement>('[data-src]'))
+      el.replaceChildren(...conHuecos(a), ...imagenes.flatMap((n) => [document.createTextNode(' '), n]))
+      // Afinar otra vez lo ya afinado: deshacer vuelve a lo que escribiste tú.
+      setAfinado((ya) => ya ?? { antes, escrito: text.trim() })
+      sync()
+      el.focus()
+      getSelection()?.selectAllChildren(el)
+      getSelection()?.collapseToEnd()
+      setAbierto(el.querySelector<HTMLElement>('.hueco-chip'))
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setAfinando(false)
+    }
+  }
+
+  function deshacer() {
+    const el = box.current!
+    el.innerHTML = afinado!.antes
+    setAfinado(null)
+    setAbierto(null)
+    sync()
+    el.focus()
+    getSelection()?.selectAllChildren(el)
+    getSelection()?.collapseToEnd()
+  }
+
+  /** Lo elegido en un hueco entra como texto, y el cursor queda detrás. */
+  function llenarHueco(hueco: HTMLElement, respuesta: string) {
+    const nodo = document.createTextNode(respuesta)
+    hueco.replaceWith(nodo)
+    setAbierto(null)
+    // El cursor antes de `sync`: al juntar el texto, `nodo` deja de existir, y el cursor se conserva por su posición.
+    box.current!.focus()
+    const r = document.createRange()
+    r.setStartAfter(nodo)
+    r.collapse(true)
+    getSelection()?.removeAllRanges()
+    getSelection()?.addRange(r)
+    sync()
   }
 
   /** Pone algo donde está el cursor, o al final si el cursor no está en el campo. */
@@ -670,6 +835,9 @@ export function Composer(props: {
       box.current!.replaceChildren()
       setText('')
       setImages([])
+      setAfinado(null)
+      setAbierto(null)
+      setHuecos(0)
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
     } finally {
@@ -711,7 +879,7 @@ export function Composer(props: {
     for (const [i, file] of files.entries()) {
       const src = srcs[i]
       try {
-        const res = await fetch(`/api/upload?name=${encodeURIComponent(file.name || 'imagen.png')}`, { method: 'POST', body: file })
+        const res = await subir(`/api/upload?name=${encodeURIComponent(file.name || 'imagen.png')}`, file)
         // Si el servidor no la guardó, no hay ruta: adjuntarla le mandaría al agente "undefined".
         const { path, error } = await res.json().catch(() => ({}))
         if (!res.ok || typeof path !== 'string') throw new Error(`No se pudo subir «${file.name || 'imagen.png'}»: ${error ?? `el servidor respondió ${res.status}`}`)
@@ -735,6 +903,35 @@ export function Composer(props: {
   }
 
   return (
+    <>
+      {afinado && props.afinar && (
+        <div className="afinado">
+          <span className="afinado-quien">
+            <Icono de="lapiz" className="icon-trazo" />
+            Afinado para {props.afinar.para}
+          </span>
+          {huecos > 0 && <span className="afinado-falta">{huecos === 1 ? 'Falta 1 hueco: si lo dejas, lo decide el agente' : `Faltan ${huecos} huecos: si los dejas, los decide el agente`}</span>}
+          <span className="spacer" />
+          <button type="button" aria-expanded={verEscrito} onClick={() => setVerEscrito((v) => !v)}>
+            {verEscrito ? 'Ocultar lo que escribiste' : 'Ver lo que escribiste'}
+          </button>
+          <button type="button" onClick={deshacer}>
+            <Icono de="reabrir" className="icon-trazo" />
+            Deshacer
+          </button>
+        </div>
+      )}
+      {afinado && verEscrito && <p className="afinado-escrito">{afinado.escrito}</p>}
+      {abierto && box.current?.contains(abierto) && (
+        <MenuHueco
+          hueco={abierto}
+          onElegir={(t) => llenarHueco(abierto, t)}
+          onCerrar={() => {
+            setAbierto(null)
+            box.current?.focus()
+          }}
+        />
+      )}
     <div
       className={`composer ${dragging ? 'dragging' : ''}`}
       onDragOver={(e) => (e.preventDefault(), setDragging(true))}
@@ -793,13 +990,19 @@ export function Composer(props: {
         <div
           ref={box}
           className="field"
-          contentEditable="plaintext-only"
+          // Mientras afina, lo escrito no cambia: la respuesta lo reemplaza.
+          contentEditable={afinando ? 'false' : 'plaintext-only'}
+          aria-busy={afinando}
           role="textbox"
           aria-multiline
           aria-label={props.placeholder.replace(/…$/, '').replace(/… /g, ', ')}
           aria-controls={opcionActiva ? idMenu : undefined}
           aria-activedescendant={opcionActiva ? `${idMenu}-${opcionActiva.id}` : undefined}
           onInput={sync}
+          onClick={(e) => {
+            const hueco = (e.target as HTMLElement).closest<HTMLElement>('.hueco-chip')
+            if (hueco) setAbierto(hueco === abierto ? null : hueco)
+          }}
           onPaste={(e) => {
             const files = Array.from(e.clipboardData.files)
             if (files.length) {
@@ -822,6 +1025,9 @@ export function Composer(props: {
               if ((e.key === 'Enter' && !e.shiftKey) || e.key === 'Tab') return e.preventDefault(), elegirEstilo(opcionActiva)
               if (e.key === 'Escape') return e.preventDefault(), e.stopPropagation(), setMenuCerrado(true)
             }
+            // Tab abre el primer hueco que queda.
+            const hueco = e.key === 'Tab' && !e.shiftKey ? box.current!.querySelector<HTMLElement>('.hueco-chip') : null
+            if (hueco) return e.preventDefault(), setAbierto(hueco)
             if (e.key === 'Enter' && !e.shiftKey) {
               e.preventDefault()
               submit()
@@ -850,6 +1056,7 @@ export function Composer(props: {
         <Picker
           label={model?.label ?? choice?.model ?? 'Modelo'}
           disabled={props.running || props.lockModel}
+          buscar
           groups={gruposModelos(props.models)}
           value={model?.id ?? choice?.model ?? ''}
           onChange={(id) => {
@@ -873,6 +1080,18 @@ export function Composer(props: {
         {props.context && <Uso {...props.context} proveedor={proveedorDe(choice?.model ?? '')} flow={props.flow} gasto={props.gasto} onCompactar={props.onCompactar} />}
         {uploading > 0 && <span className="muted small">Subiendo…</span>}
         {error && <span className="bad small">{error}</span>}
+        {props.afinar && !props.running && (!!text.trim() || afinando) && (
+          <button
+            type="button"
+            className="afinar"
+            title={`Reescribe tu pedido como lo necesita ${props.afinar.para}; lo que solo tú decides queda como hueco`}
+            disabled={afinando || busy || uploading > 0}
+            onClick={() => void afinarPedido()}
+          >
+            <Icono de="lapiz" className="icon-trazo" />
+            {afinando ? 'Afinando…' : 'Afinar'}
+          </button>
+        )}
         {(!trabajando || !empty) && (
           <button
             className="send"
@@ -890,5 +1109,6 @@ export function Composer(props: {
         )}
       </div>
     </div>
+    </>
   )
 }

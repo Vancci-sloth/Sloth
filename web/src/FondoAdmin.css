@@ -1,0 +1,23 @@
+/* El reparto del fondo de la comunidad, en Administrador (FondoAdmin.tsx). */
+.admin-fondo-cabeza { display: flex; flex-wrap: wrap; align-items: center; gap: 16px 28px; }
+.admin-fondo-cabeza > div { flex: 1; min-width: 240px; }
+.admin-fondo-cabeza label { display: flex; flex-direction: column; gap: 4px; }
+.admin-fondo-cabeza .desplegable { font-size: 14px; }
+.admin-fondo-cabeza h3 { margin: 4px 0; font-size: 22px; font-weight: 750; letter-spacing: -0.01em; font-variant-numeric: tabular-nums; }
+.admin-fondo-cabeza h3 .muted { font-size: 14px; font-weight: 500; letter-spacing: 0; }
+.admin-fondo-cabeza p { margin: 0; }
+
+/* Cada parte: lo de una persona en varios renglones dentro de su celda. */
+.admin-fondo-tabla td { white-space: normal; vertical-align: top; }
+.admin-fondo-tabla td > span, .admin-fondo-tabla td > strong { display: block; }
+.admin-fondo-copiar { display: inline-flex; align-items: center; gap: 6px; padding: 3px 8px; border: 1px solid var(--line); border-radius: 8px; color: var(--text); font-family: var(--mono); font-size: 13px; }
+.admin-fondo-copiar:hover { border-color: var(--amber); color: var(--amber-2); }
+.admin-fondo-copiar .ico { width: 13px; height: 13px; }
+.admin-fondo-pagar { display: flex !important; flex-wrap: wrap; gap: 6px; }
+.admin-fondo-pagar input { width: 170px; padding: 6px 9px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--text); font-size: 13px; }
+.admin-fondo-pagar input:focus { outline: none; border-color: var(--amber); }
+.admin-fondo-pagado { color: var(--ok); }
+.admin-fondo-pagado .ico { width: 14px; height: 14px; vertical-align: -0.15em; }
+.admin-fondo-deshacer { margin-left: 8px; color: var(--muted); text-decoration: underline; text-underline-offset: 3px; }
+.admin-fondo-deshacer:hover { color: var(--text); }
+.admin-fondo-fuera p { margin: 4px 0 0; color: var(--suave); }

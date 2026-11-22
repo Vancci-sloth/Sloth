@@ -14,6 +14,7 @@ Lo que comparten los estilos de vídeo: el lote, los errores ya vistos y los scr
 
 | Archivo | Qué es |
 |---|---|
+| [ESTILO.md](ESTILO.md) | Lo que necesita todo estilo: los 30 requisitos con que se hace, se comparte y se aprueba uno, y cuáles comprueba Sloth solo |
 | [MOTOR.md](MOTOR.md) | El motor: un video desde `momentos.json` (qué se ve en cada palabra) y un `hacer.py` que hace lo demás. El contrato que siguen el explicativo, el documental y El Diff, y con el que nace un estilo nuevo |
 | [FORMATO.md](FORMATO.md) | Vertical u horizontal: todo estilo hace los dos, y qué cambia de uno a otro (`Formato:` del mensaje) |
 | [LOTE.md](LOTE.md) | Lo que cambia cuando el vídeo es uno de un lote; solo se lee si el mensaje trae `Lote:` |
@@ -87,6 +88,7 @@ en el script.
 
 ## Un estilo nuevo
 
+Cumple [lo que necesita todo estilo](ESTILO.md); lo de abajo es por qué.
 Su skill dice lo suyo y usa de aquí lo que ya existe: si te ves copiando un párrafo o un script de otro estilo, va
 aquí. Nace con su card en `cards.json` de Sloth, con sus `etapas`, cada una con su `fase` (`idea`, `guion`, `sonido`,
 `video` o `entrega`: Idea · Guion · Sonido y voz · Video · Entrega, ver `FASES` en `shared/types.ts` de Sloth). `listo`
@@ -102,7 +104,7 @@ Todos dicen cómo se usan si los corres sin argumentos. Node sin dependencias y 
 
 | Script | Qué hace |
 |---|---|
-| `masterizar.mjs crudo.wav audio.wav` | −14 LUFS y true peak ≤ −1 dBTP, 48 kHz 24 bits; falla si no lo clava |
+| `masterizar.mjs crudo.wav audio.wav` | −14 LUFS y true peak ≤ −1 dBTP, 48 kHz 24 bits; falla si no lo clava. Usa soxr si FFmpeg lo trae, o su remuestreador de serie si no |
 | `musica.py --poner video.mp4 [--pista a.mp3]` | La línea `Música: de fondo`: música sintetizada (libre de derechos) o la `--pista` del usuario bajo la voz del video terminado, que baja sola al hablar; masterizada y sin tocar la imagen. Una segunda vez no hace nada |
 | `comprobar.mjs video.mp4 --duracion 10 --fps 30 --tamano 1080x1920` | Códec, tamaño, fps, fotogramas, audio, sonoridad, pico, faststart, negros, arranque vacío |
 | `hoja.mjs video.mp4 hoja.png [--n 16 \| --cada 0.25 \| --t …] [--zonas] [--recomprimir 3M]` | Hoja de contacto con tiempos; zonas seguras; prueba de recompresión |
@@ -110,13 +112,13 @@ Todos dicen cómo se usan si los corres sin argumentos. Node sin dependencias y 
 | `portada.mjs video.mp4 portada.png` | Pone la portada como primer fotograma, en un segundo y sin recodificar el vídeo (si no puede, recodifica); otra vez, la cambia |
 | `portada_ia.py <chatgpt\|modelo de Flow> salida.png --titulo "…" --estilo "…" --que "…" [--ref img]… [--horizontal]` | La portada con IA de fondo, desde el principio y sin cuadros del vídeo, con lo elegido en `Imágenes:`; deja `salida.png.json` con cómo va y lo que gastó, y si no hay cuenta o falla, lo dice para que el estilo use su respaldo |
 | `portada_sin_ia.mjs video.mp4 portada.png --titulo "…" [--horizontal]` | La portada sin cuenta de ChatGPT: un cuadro del vídeo y el título encima, en la zona que se ve; con `--horizontal`, la miniatura de YouTube (1280x720) |
-| `chrome.mjs` (librería) | Busca Chrome o Edge (o el de `CHROME`) y lo abre sin ventana: `abrirChrome({ ancho, alto })` |
+| `chrome.mjs` (librería) | Busca Chrome o Edge (o el de `CHROME`) y lo abre sin ventana: `abrirChrome({ ancho, alto })`. En macOS captura sin el modo determinista del headless shell, que allí puede impedir el arranque; Windows y Linux conservan ese modo |
 | `sloth.py`, `fuente.py` | El Python de Sloth (el transcriptor, yt-dlp) y bajar y transcribir un vídeo. `proceso()` dice antes cuánto tardará la voz en este equipo y luego cuánto falta, cada 10 %. WhisperX va de uno en uno en toda la máquina (`turno_gpu`) y, con una NVIDIA, ya cargado (`voz_viva.py`, que se va tras 10 min sin uso): 6 min de voz salen en ~40 s en vez de cargar Whisper cada vez (de 36 s a 10 min con la máquina ocupada), y las descargas de YouTube también (`turno_youtube`): los vídeos de un lote esperan ahí su turno. `vectorizar` usa el modelo de vectores ya cargado (`vectores_vivo.py`, que se va tras 10 min sin uso): un texto nuevo tarda menos de un segundo en vez de ~18. Un video de YouTube que otro vídeo ya bajó se enlaza de su carpeta en vez de bajarlo |
 | `huellas.py buscar\|revisar\|cerrar <skill>` | Que ningún vídeo de un estilo salga igual a otro ya hecho: la huella de cada uno (lo que cuenta y cómo se ve, y su hoja de ocho cuadros) en `<skill>/huellas/`, comparada contra todas por el script, que solo dice lo que choca. Python del sistema con numpy y Pillow; los textos, con los vectores de Sloth |
 | `banco.py ver\|tomar\|guardar <skill> <serie>` | El banco de historias de una serie, en `<skill>/series/banco/`: las candidatas ya leídas y comprobadas que no se usaron ([SERIES.md](SERIES.md)) |
 | `espacio.py` (librería) | El disco: `enlazar_modulos` (un solo `node_modules` por plantilla, en %LOCALAPPDATA%/sloth-modulos, enlazado desde cada video: antes cada uno copiaba ~1 GB), `limpiar_temporales` (las `remotion-*` de %TEMP% que dejan los renders cortados) y `comprobar_disco` (para antes de renderizar sin espacio). Sloth hace lo mismo en Opciones → Espacio en disco |
 | `equipo.cjs` (librería) | El render según este equipo: `tarjeta3D()` (avisa si Chrome dibuja el 3D por software), `estimado(cuadros)` y `falta(parte, desde)` para decir cuánto tardará, y `anotarRender()` del final, que Sloth enseña en Opciones → Tu equipo |
-| `momentos.py` (librería) | Lo común de los `hacer.py` del motor ([MOTOR.md](MOTOR.md)): anclar cada momento a su palabra, decir todos los ✗ de una vez, los pasos con su segundo (`revision/tiempos.json`, `✓ listo`) y lo que mira quien juzga (`hoja`, `tiras`, `pares`) |
+| `momentos.py` (librería) | Lo común de los `hacer.py` del motor ([MOTOR.md](MOTOR.md)): anclar cada momento a su palabra, decir todos los ✗ de una vez, los pasos con su segundo (`revision/tiempos.json`, `✓ listo`), lo que mira quien juzga (`hoja`, `tiras`, `pares`) y la portada con IA de todo estilo (`con_imagenes`, `pedir_portada`, `esperar_portada`) |
 | `render.cjs <salida.mp4> --id=<composición>` | El render de un proyecto de Remotion con un solo Chrome, diciendo cuánto falta, y puesto en su sitio aunque el estudio tenga abierto el de antes. `--antes=<módulo>` prepara algo en el paquete antes de dibujar (el documental saca ahí los cuadros de sus clips: 6 veces más rápido) |
 | `remotion.cjs` (librería) | `empaquetar(raiz)`: el `bundle()` de Remotion en una carpeta de %TEMP% que se borra al terminar (la de Remotion se quedaba, con una copia de `public/`). Todo script que empaquete usa este |
 | `recorte.py foto.jpg salida.png [--borde]` | Quita el fondo con rembg (o respeta el alfa que traiga) y corta al contenido; con `--borde`, un borde blanco de tijera. También una carpeta entera |

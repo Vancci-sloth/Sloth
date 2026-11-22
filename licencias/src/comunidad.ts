@@ -18,28 +18,49 @@
  *
  * En Estilos, cada publicación lleva un estilo empaquetado (`server/estilos.ts`), que se instala desde ahí. Es código que
  * corre en la computadora de quien lo instala: uno nuevo, o uno al que le cambian el paquete, queda `aprobada = 0` y solo
- * lo ven quien lo compartió y el creador (le llega un aviso) hasta que lo aprueba (migración 0019).
+ * lo ven quien lo compartió y el creador (le llega un aviso) hasta que lo aprueba (migración 0019). El creador también lo
+ * pre-aprueba (`aprobada = 2`, ADR 0024): le hizo la prueba, lo completó y lo arregló él, y ya lo ve toda la comunidad;
+ * su autor lo deja así (`/conforme`) o manda otro. Al que ya estaba a la vista y su autor le manda otro paquete, la
+ * comunidad le sigue viendo el de antes (`publica`, migración 0035) hasta que se apruebe el nuevo (`armar`).
+ * Va con lo que hace y su guía de uso (`shared/guia.ts`): sin la plantilla completa no se publica (`estiloEnSuSitio`).
+ * Los estilos los ve cualquiera, con su video y sus números: se ven en la tienda, en el feed y en el buscador, y se
+ * comentan. Instalarlos es de quien apoya (`apoya`): a los demás no se les entrega el paquete (402, `SOLO_APOYO`), y la
+ * app les enseña entonces la invitación a apoyar. El suyo sí lo baja cada quien, que compartir un estilo es de cualquiera.
+ * Los que ya instaló quien deja de apoyar los cierra su app, con lo que dice su licencia firmada (`apoyaHoy`, `index.ts`).
  *
  * - `GET /comunidad?categoria=&orden=&antes=`: quién eres, los números de la comunidad y una página del feed: las fijadas
  *   y luego lo que tuvo actividad más reciente, lo último publicado o, para el creador, lo que no ha contestado
  *   (`consultaFeed`).
  * - `POST /comunidad/publicar` `{categoria, titulo, texto, adjuntos}`.
  * - `GET /comunidad/p/<id>`: una, con sus comentarios. `POST /comunidad/p/<id>` `{categoria?, titulo?, texto?,
- *   adjuntos?, fijada?, estado?, aprobada?}` la cambia (`aprobada`, solo el creador); `/borrar`, `/megusta`, `/comentar` `{texto, responde?, adjuntos?}` (sus
+ *   adjuntos?, fijada?, estado?, aprobada?, llave?}` la cambia (`aprobada`, solo el creador: `true`, `false` o `2`,
+ *   pre-aprobado; con `llave`, solo si su paquete sigue siendo ese); `/conforme`, su autor deja un pre-aprobado como
+ *   está; `/borrar`, `/megusta`, `/comentar` `{texto, responde?, adjuntos?}` (sus
  *   imágenes, migración 0009), `/reportar`
  *   `{motivo}` y `/revisada` (el creador quita sus reportes).
  * - `POST /comunidad/c/<id>/borrar`, `/megusta`, `/reportar` y `/revisada`: lo mismo para un comentario.
  * - `GET /comunidad/avisos` (`?cuenta`: solo cuántos sin leer, y lo que ganaste en la rifa) y `POST /comunidad/avisos/leidos`.
  * - `/comunidad/rifa*`: la rifa del creador (`rifa.ts`).
+ * - `GET /comunidad/fondo`: lo que este mes se lleva la comunidad, la mitad de los apoyos que cobra Stripe (`fondo.ts`).
+ * - `GET /comunidad/estilos` y `POST /comunidad/estilos/uso`: la tienda de estilos y lo que se mide de cada uno (`tienda.ts`).
+ * - `/comunidad/fondo/*`: participar en el fondo con tu Binance ID, y su reparto, que cierra y paga el creador (`reparto.ts`).
  * - `POST /comunidad/roadmap` `{meta}`: tu voto de qué sigue (uno por miembro; el de un Fundador vale dos). Da la votación.
  * - `POST /comunidad/perfil` `{nombre?, foto?, creditos?}`: `creditos`, solo un Fundador (sale en `GET /creditos`).
  * - `PUT /comunidad/archivo`, con el archivo de cuerpo y su `content-type`: una imagen o un video (sus primeros
- *   segundos, que recorta `server/comunidad.ts`; el entero se enlaza en el texto). Da su llave.
+ *   segundos, que recorta `server/comunidad.ts`; el entero se enlaza en el texto. El de un estilo llega entero,
+ *   comprimido para caber). Da su llave.
  * - `GET /comunidad/liberar`, solo el creador: la última versión de cada sistema y si aún es solo de quien apoya.
  *   `POST` la da a todos ya (`liberar` en `index.ts`), cuando el chat de un live cumple su meta.
  */
-import type { AdjuntoComunidad, Autor, AvisoComunidad, CategoriaComunidad, ComentarioComunidad, FeedComunidad, OrdenComunidad, PublicacionComunidad, RifaGanada, RoadmapComunidad } from '../../shared/types.ts'
+import type { AdjuntoComunidad, Autor, AvisoComunidad, CategoriaComunidad, ComentarioComunidad, FeedComunidad, GuiaEstilo, OrdenComunidad, PublicacionComunidad, RifaGanada, RoadmapComunidad } from '../../shared/types.ts'
+import { acentosBien } from '../../shared/acentos.ts'
+import { AVISO_BINANCE, COMO_PONER_BINANCE } from '../../shared/fondo.ts'
+import { faltaEnEstilo, guiaConSuPrueba, guiaDe, pruebaDe, TIPO_HILO } from '../../shared/guia.ts'
+import { fondo } from './fondo.ts'
+import { cerrar, mio, pagado, participar, reparto, salir } from './reparto.ts'
+import { descartar, olvidarNumeros, pruebas, tienda, usos } from './tienda.ts'
 import { ganada, rifa } from './rifa.ts'
+import { guardado } from './guardado.ts'
 import { BLOQUEADA, CLAVE, EQUIPO, cupo, delCreador, esFundador, type Env, type Fila, Rechazo, cuerpo, json, letras, liberar, servir, vigencia, vigilar } from './index.ts'
 
 export const CATEGORIAS: CategoriaComunidad[] = ['general', 'hice', 'ayuda', 'mejoras', 'estilos', 'anuncios']
@@ -59,10 +80,15 @@ const PAGINA = 20
 const MAX_COMENTARIOS = 500
 /** Las imágenes de un comentario, como las de un chat: unas pocas. */
 const FOTOS_COMENTARIO = 4
-/** Lo más que pesa un archivo. Un video son sus primeros segundos: unos pocos MB. Un estilo, lo que topa `server/estilos.ts`. */
-const PESO = { imagen: 10 * 1024 * 1024, video: 50 * 1024 * 1024, estilo: 15 * 1024 * 1024 }
-const TIPOS: Record<string, { tipo: AdjuntoComunidad['tipo']; ext: string }> = {
+/**
+ * Lo más que pesa un archivo. Un video son sus primeros segundos, unos pocos MB, o el de un estilo, entero: hasta 45 MB
+ * (`PESO_ENTERO` en `server/comunidad.ts`). Un estilo, lo que topa `server/estilos.ts`.
+ */
+const PESO = { imagen: 10 * 1024 * 1024, video: 50 * 1024 * 1024, estilo: 15 * 1024 * 1024, hilo: 4 * 1024 * 1024 }
+const TIPOS: Record<string, { tipo: AdjuntoComunidad['tipo'] | 'hilo'; ext: string }> = {
   'application/x-sloth-estilo': { tipo: 'estilo', ext: 'estilo' },
+  // La evidencia de la prueba de un estilo: el hilo donde se hizo su video (`server/prueba-estilo.ts`).
+  [TIPO_HILO]: { tipo: 'hilo', ext: 'hilo' },
   'image/png': { tipo: 'imagen', ext: 'png' },
   'image/jpeg': { tipo: 'imagen', ext: 'jpg' },
   'image/webp': { tipo: 'imagen', ext: 'webp' },
@@ -71,22 +97,23 @@ const TIPOS: Record<string, { tipo: AdjuntoComunidad['tipo']; ext: string }> = {
   'video/webm': { tipo: 'video', ext: 'webm' },
   'video/quicktime': { tipo: 'video', ext: 'mov' }
 }
-const LLAVE = /^[a-z0-9]{20}\.(png|jpg|webp|gif|mp4|webm|mov|estilo)$/
+const LLAVE = /^[a-z0-9]{20}\.(png|jpg|webp|gif|mp4|webm|mov|estilo|hilo)$/
 const IMAGEN = /\.(png|jpg|webp|gif)$/
 const ESTILO = /\.estilo$/
+const HILO = /\.hilo$/
 const ID = /^[a-z0-9]+$/
 /**
  * Lo más que publica, comenta, reporta o sube cada miembro en un día (`cupo`): que un error o un abuso no llene la
  * comunidad ni la cuenta de R2. Un video pesa hasta 50 MB: van aparte, menos.
  */
-const AL_DIA = { publicaciones: 10, comentarios: 100, reportes: 20, archivos: 60, videos: 10 }
+const AL_DIA = { publicaciones: 10, comentarios: 100, reportes: 20, archivos: 60, videos: 10, usos: 30, binance: 3 }
 /** Lo subido con dueño que nada usa (una publicación que no se hizo, o un abuso) se borra pasado esto. */
 const SUELTO = 2 * 24 * 3600_000
 /** El identificador que manda la app (`server/licencia.ts`): el de la computadora resumido, o un UUID. Otro lo inventó alguien. */
 export const DE_LA_APP = /^(?:[0-9a-f]{32}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/
 
 /** El cupo del día de `yo`. Quien llega al tope queda vigilado: se le avisa por correo. */
-async function conCupo(env: Env, yo: Miembro, tipo: keyof typeof AL_DIA): Promise<boolean> {
+export async function conCupo(env: Env, yo: Miembro, tipo: keyof typeof AL_DIA): Promise<boolean> {
   if (await cupo(env, yo.id, tipo, AL_DIA[tipo])) return true
   const email = (await env.DB.prepare('SELECT email FROM licencias WHERE clave = ?').bind(yo.clave).first<{ email: string }>())?.email
   if (email) await vigilar(env, email, `llegó al tope del día de ${tipo} (${AL_DIA[tipo]})`)
@@ -100,17 +127,8 @@ const DIA = 24 * 3600_000
 /** Cuánto se guardan los avisos. */
 const AVISOS = 60 * DIA
 
-/**
- * Lo que es igual para todos y cuesta leer (D1 cobra por fila leída y el plan gratis corta a los 5 millones al día):
- * cada copia del Worker lo guarda `GUARDADO` en vez de recorrer las tablas en cada visita. Los miembros y activos de
- * hoy recorren `licencias` y `equipos` enteras; el roadmap y los créditos calculan la insignia de cada uno.
- */
-const GUARDADO = 10 * 60_000
-let numeros: { miembros: number; activos: number; hasta: number } | undefined
-let votosGuardados: { votos: Map<string, number>; hasta: number } | undefined
-let creditosGuardados: { nombres: string[]; hasta: number } | undefined
 
-interface Miembro {
+export interface Miembro {
   id: string
   clave: string
   nombre: string
@@ -123,7 +141,7 @@ interface Miembro {
   insignia?: Autor['insignia'] | null
 }
 
-interface Guardada {
+export interface Guardada {
   id: string
   autor: string
   categoria: CategoriaComunidad
@@ -139,9 +157,24 @@ interface Guardada {
   likes: number
   reportes: number
   ultimo_comentario: string | null
-  /** 0: un estilo que el creador aún no aprueba. */
+  /** 0: un estilo que el creador aún no aprueba; 1: aprobado; 2: pre-aprobado por Sloth (`PREAPROBADA`). */
   aprobada: number
+  /** De un estilo con otro paquete en revisión, lo que sigue viendo la comunidad (`Publica`, en JSON). */
+  publica?: string | null
 }
+
+/** Un estilo que el creador probó, completó y arregló él: ya lo ve la comunidad, y su autor aún no dice si así está bien. */
+export const PREAPROBADA = 2
+
+/** Lo que la comunidad sigue viendo de un estilo mientras se revisa el paquete nuevo que mandó su autor. */
+type Publica = Pick<Guardada, 'titulo' | 'texto' | 'adjuntos' | 'aprobada'>
+const publicaDe = (g: Pick<Guardada, 'publica'>): Publica | undefined => (g.publica ? (JSON.parse(g.publica) as Publica) : undefined)
+
+/**
+ * La condición en SQL de lo que ven todos de un estilo (`p`: el prefijo de la tabla): aprobado, pre-aprobado o con una
+ * versión a la vista mientras se revisa otra. Lo demás de la comunidad siempre lleva `aprobada = 1`.
+ */
+export const aLaVista = (p = '') => `(${p}aprobada > 0 OR ${p}publica IS NOT NULL)`
 
 interface ComentarioGuardado {
   id: string
@@ -156,11 +189,11 @@ interface ComentarioGuardado {
 }
 
 /** Un adjunto como se guarda: sin URLs, que dependen de `ORIGEN`. */
-type Adjunto = Pick<AdjuntoComunidad, 'tipo' | 'llave' | 'poster' | 'vertical' | 'nombre'>
+type Adjunto = Pick<AdjuntoComunidad, 'tipo' | 'llave' | 'poster' | 'previa' | 'vertical' | 'nombre' | 'de' | 'guia' | 'prueba'>
 
 export async function comunidad(req: Request, env: Env, url: URL, ctx: ExecutionContext): Promise<Response> {
   const ruta = url.pathname
-  // Lo único libre: los archivos, que se piden por un nombre que no se adivina.
+  // Lo único libre: las imágenes y los videos, que se piden por un nombre que no se adivina. El paquete de un estilo, no.
   const archivo = /^\/comunidad\/archivo\/([^/]+)$/.exec(ruta)
   if (archivo && (req.method === 'GET' || req.method === 'HEAD')) return servirArchivo(req, env, archivo[1])
 
@@ -192,13 +225,24 @@ export async function comunidad(req: Request, env: Env, url: URL, ctx: Execution
     return json({ ok: true })
   }
   if (ruta === '/comunidad/archivo' && req.method === 'PUT') return json(await subir(req, env, yo))
+  if (ruta === '/comunidad/fondo' && req.method === 'GET') return json(await fondo(env))
+  if (ruta === '/comunidad/fondo/mio' && req.method === 'GET') return json(await mio(env, yo))
+  if (ruta === '/comunidad/fondo/participar' && req.method === 'POST') return json(await participar(req, env, yo, await cuerpo(req)))
+  if (ruta === '/comunidad/fondo/salir' && req.method === 'POST') return json(await salir(req, env, yo))
+  if (ruta === '/comunidad/fondo/reparto' && req.method === 'GET') return json(await reparto(env, yo, url))
+  if (ruta === '/comunidad/fondo/cerrar' && req.method === 'POST') return json(await cerrar(env, yo, await cuerpo(req)))
+  if (ruta === '/comunidad/fondo/pagado' && req.method === 'POST') return json(await pagado(env, yo, await cuerpo(req)))
+  if (ruta === '/comunidad/estilos' && req.method === 'GET') return json(await tienda(env, yo, url))
+  if (ruta === '/comunidad/estilos/uso' && req.method === 'POST') return json(await usos(req, env, yo))
+  if (ruta === '/comunidad/estilos/pruebas' && req.method === 'GET') return json(await pruebas(env, yo, url))
+  if (ruta === '/comunidad/estilos/descartar' && req.method === 'POST') return json(await descartar(req, env, yo))
   if (ruta === '/comunidad/rifa' || ruta.startsWith('/comunidad/rifa/')) return json(await rifa(req, env, ctx, { id: yo.id, clave: yo.clave, nombre: yo.nombre, creador: esCreador(yo) }, ruta))
   if (ruta === '/comunidad/liberar' && (req.method === 'GET' || req.method === 'POST')) {
     if (!esCreador(yo)) throw new Rechazo(403, 'Eso solo lo hace el creador de Sloth.')
     return json(await liberar(env, req.method === 'POST'))
   }
 
-  const p = /^\/comunidad\/p\/([a-z0-9]+)(?:\/(borrar|megusta|comentar|reportar|revisada))?$/.exec(ruta)
+  const p = /^\/comunidad\/p\/([a-z0-9]+)(?:\/(borrar|megusta|comentar|reportar|revisada|conforme))?$/.exec(ruta)
   if (p && req.method === 'GET' && !p[2]) return json(await abrir(env, yo, p[1]))
   if (p && req.method === 'POST') {
     const pub = await env.DB.prepare('SELECT * FROM publicaciones WHERE id = ?').bind(p[1]).first<Guardada>()
@@ -208,6 +252,7 @@ export async function comunidad(req: Request, env: Env, url: URL, ctx: Execution
     if (p[2] === 'borrar') return json(await borrar(env, yo, pub))
     if (p[2] === 'reportar') return json(await reportar(env, yo, 'publicaciones', pub, await cuerpo(req)))
     if (p[2] === 'revisada') return json(await revisada(env, yo, 'publicaciones', pub.id))
+    if (p[2] === 'conforme') return json(await conforme(env, yo, pub))
     return json(await cambiar(env, yo, pub, await cuerpo(req)))
   }
   const c = /^\/comunidad\/c\/([a-z0-9]+)\/(borrar|megusta|reportar|revisada)$/.exec(ruta)
@@ -279,19 +324,37 @@ const insignia = (env: Env) => `(SELECT CASE WHEN MAX(${esFundador('li')}) THEN 
   AND li.email = (SELECT lc.email FROM licencias lc WHERE lc.clave = m.clave)) AS insignia`
 
 const nuevoId = () => letras(12).toLowerCase()
-const urlDe = (env: Env, llave: string) => `${env.ORIGEN}/comunidad/archivo/${llave}`
+export const urlDe = (env: Env, llave: string) => `${env.ORIGEN}/comunidad/archivo/${llave}`
 /** Los adjuntos guardados (JSON), con sus URLs. */
 const conUrls = (env: Env, adjuntos: string): AdjuntoComunidad[] =>
-  (JSON.parse(adjuntos) as Adjunto[]).map((a) => ({ ...a, url: urlDe(env, a.llave), ...(a.poster ? { posterUrl: urlDe(env, a.poster) } : {}) }))
+  (JSON.parse(adjuntos) as Adjunto[]).map((a) => ({
+    ...a,
+    url: urlDe(env, a.llave),
+    ...(a.poster ? { posterUrl: urlDe(env, a.poster) } : {}),
+    ...(a.previa ? { previaUrl: urlDe(env, a.previa) } : {})
+  }))
 const autor = (env: Env, m: Pick<Miembro, 'id' | 'nombre' | 'foto' | 'clave' | 'insignia'>): Autor => ({
   id: m.id,
   nombre: m.nombre,
   ...(m.foto ? { foto: urlDe(env, m.foto) } : {}),
   ...(m.clave === CREADOR ? { creador: true } : m.insignia ? { insignia: m.insignia } : {})
 })
-const esCreador = (m: Miembro) => m.clave === CREADOR
-/** Lo reportado por `OCULTAR` personas, y un estilo sin aprobar, solo lo ven quien lo escribió y el creador. */
-const laVe = (x: { autor: string; reportes: number; aprobada?: number }, yo: Miembro) => (x.reportes < OCULTAR && x.aprobada !== 0) || x.autor === yo.id || esCreador(yo)
+export const esCreador = (m: Miembro) => m.clave === CREADOR
+/** Quien apoya a Sloth ahora (su insignia: un apoyo pagado y sin vencer, o su lugar de por vida), y el creador. */
+export const apoya = (m: Miembro) => esCreador(m) || !!m.insignia
+/** Lo que oye quien quiere instalar un estilo sin apoyar: la app lo cambia por la invitación a apoyar. */
+export const SOLO_APOYO = 'Instalar los estilos de la comunidad es para quienes apoyan a Sloth. Apoya y instala los que quieras.'
+/** Quién pide una consulta. */
+export interface Quien {
+  id: string
+  creador: boolean
+}
+/**
+ * Lo reportado por `OCULTAR` personas, y un estilo sin aprobar (sin una versión a la vista), solo lo ven quien lo
+ * escribió y el creador.
+ */
+const laVe = (x: { autor: string; reportes: number; aprobada?: number; publica?: string | null }, yo: Miembro) =>
+  (x.reportes < OCULTAR && (x.aprobada !== 0 || !!x.publica)) || x.autor === yo.id || esCreador(yo)
 
 /**
  * Un aviso para `para` de lo que hizo `de`. Nadie se avisa a sí mismo. Con `unaVez`, no se repite (quitar y volver a
@@ -314,7 +377,7 @@ function aviso(env: Env, para: string, de: Miembro, tipo: AvisoComunidad['tipo']
  * comentario o, sin comentarios, la publicación) no es suya, por actividad. `antes` es la `actividad` (o la `creada`,
  * en `recientes`) de la última que ya tienes.
  */
-export function consultaFeed(yo: { id: string; creador: boolean }, p: { categoria: string; antes: string; orden: string }): { sql: string; valores: (string | number)[] } {
+export function consultaFeed(yo: Quien, p: { categoria: string; antes: string; orden: string }): { sql: string; valores: (string | number)[] } {
   const orden = (ORDENES as readonly string[]).includes(p.orden) ? (p.orden as OrdenComunidad) : p.orden ? null : 'actividad'
   if (!orden) throw new Rechazo(400, 'Ese orden no existe.')
   if (orden === 'sin-contestar' && !yo.creador) throw new Rechazo(403, 'Eso solo lo ve el creador de Sloth.')
@@ -325,7 +388,7 @@ export function consultaFeed(yo: { id: string; creador: boolean }, p: { categori
     donde.push('categoria = ?')
     valores.push(p.categoria)
   }
-  if (!yo.creador) donde.push('((reportes < ? AND aprobada = 1) OR autor = ?)'), valores.push(OCULTAR, yo.id)
+  if (!yo.creador) donde.push(`((reportes < ? AND ${aLaVista()}) OR autor = ?)`), valores.push(OCULTAR, yo.id)
   if (orden === 'sin-contestar')
     donde.push('COALESCE((SELECT c.autor FROM comentarios c WHERE c.publicacion = publicaciones.id ORDER BY c.creada DESC LIMIT 1), autor) != ?'), valores.push(yo.id)
   const columna = orden === 'recientes' ? 'creada' : 'actividad'
@@ -337,7 +400,7 @@ export function consultaFeed(yo: { id: string; creador: boolean }, p: { categori
 }
 
 /** `col` en minúsculas y sin acentos, en SQL: así «robotica» encuentra «Robótica». */
-const sinAcentos = (col: string) =>
+export const sinAcentos = (col: string) =>
   [
     ...[...'áàâäãÁÀÂÄÃ'].map((c) => [c, 'a']),
     ...[...'éèêëÉÈÊË'].map((c) => [c, 'e']),
@@ -369,25 +432,29 @@ const RESULTADOS = 20
  * La consulta del buscador: las publicaciones donde está cada palabra (en el título, el texto o algún comentario), lo
  * que `yo` puede ver; primero las que la tienen en el título y luego por actividad. Sin palabras, ninguna (`sql` vacío).
  */
-export function consultaBuscar(yo: { id: string; creador: boolean }, q: string): { sql: string; valores: (string | number)[] } {
+export function consultaBuscar(yo: Quien, q: string): { sql: string; valores: (string | number)[] } {
   const palabras = palabrasDe(q)
   if (!palabras.length) return { sql: '', valores: [] }
-  const donde: string[] = []
   const valores: (string | number)[] = []
   // Las palabras solo llevan letras y números (`palabrasDe`): ni `%` ni `_` llegan al LIKE.
   const comoTexto = (p: string) => `%${p}%`
   // Un comentario oculto (reportado por `OCULTAR`) no cuenta, salvo el tuyo o para el creador: así no se adivina su texto.
-  const comentarioVisible = yo.creador ? '' : ' AND (comentarios.reportes < ? OR comentarios.autor = ?)'
-  for (const p of palabras) {
-    donde.push(
-      `(${sinAcentos('titulo')} LIKE ? OR ${sinAcentos('texto')} LIKE ? OR id IN (SELECT publicacion FROM comentarios WHERE ${sinAcentos('comentarios.texto')} LIKE ?${comentarioVisible}))`
-    )
-    valores.push(comoTexto(p), comoTexto(p), comoTexto(p), ...(yo.creador ? [] : [OCULTAR, yo.id]))
+  const comentarioVisible = yo.creador ? '' : ' AND (reportes < ? OR autor = ?)'
+  // Cada palabra, en su tabla unida (`e0`, `e1`…): las publicaciones que la tienen en el título (`t` = 1), en el texto
+  // o en un comentario. No va como `id IN (SELECT …)` dentro de la condición: D1 no acepta más de 100 niveles entre una
+  // expresión y las de sus subconsultas, `sinAcentos` ya lleva la mitad y así el buscador fallaba siempre. Unida, cada
+  // una cuenta por separado, y lo de afuera (qué ve `yo`, el orden) se queda sin `sinAcentos`.
+  const encontradas = palabras.map((p, i) => {
+    valores.push(comoTexto(p), comoTexto(p), comoTexto(p), comoTexto(p), ...(yo.creador ? [] : [OCULTAR, yo.id]))
+    return `JOIN (SELECT id, MAX(t) AS t FROM (SELECT id, ${sinAcentos('titulo')} LIKE ? AS t FROM publicaciones WHERE ${sinAcentos('titulo')} LIKE ? OR ${sinAcentos('texto')} LIKE ? UNION ALL SELECT publicacion, 0 FROM comentarios WHERE ${sinAcentos('texto')} LIKE ?${comentarioVisible}) GROUP BY id) e${i} ON e${i}.id = p.id`
+  })
+  const donde: string[] = []
+  if (!yo.creador) donde.push(`((p.reportes < ? AND ${aLaVista('p.')}) OR p.autor = ?)`), valores.push(OCULTAR, yo.id)
+  const enTitulo = palabras.map((_, i) => `e${i}.t`).join(' AND ')
+  return {
+    sql: `SELECT p.* FROM publicaciones p ${encontradas.join(' ')}${donde.length ? ` WHERE ${donde.join(' AND ')}` : ''} ORDER BY (${enTitulo}) DESC, p.actividad DESC LIMIT ${RESULTADOS}`,
+    valores
   }
-  if (!yo.creador) donde.push('((reportes < ? AND aprobada = 1) OR autor = ?)'), valores.push(OCULTAR, yo.id)
-  const enTitulo = palabras.map(() => `${sinAcentos('titulo')} LIKE ?`).join(' AND ')
-  valores.push(...palabras.map(comoTexto))
-  return { sql: `SELECT * FROM publicaciones WHERE ${donde.join(' AND ')} ORDER BY (${enTitulo}) DESC, actividad DESC LIMIT ${RESULTADOS}`, valores }
 }
 
 /** Lo que más trae el índice del buscador. */
@@ -398,10 +465,10 @@ const EN_INDICE = 2000
  * principio del texto, la sección, el nombre de quien la escribió y sus fechas. Con él, la app encuentra al instante lo
  * que está en un título; lo demás (el texto entero, los comentarios) lo busca `consultaBuscar`.
  */
-export function consultaIndice(yo: { id: string; creador: boolean }): { sql: string; valores: (string | number)[] } {
-  const visible = yo.creador ? '' : ' WHERE ((p.reportes < ? AND p.aprobada = 1) OR p.autor = ?)'
+export function consultaIndice(yo: Quien): { sql: string; valores: (string | number)[] } {
+  const donde = yo.creador ? [] : [`((p.reportes < ? AND ${aLaVista('p.')}) OR p.autor = ?)`]
   return {
-    sql: `SELECT p.id, p.titulo, substr(p.texto, 1, 300) AS texto, p.categoria, p.creada, p.actividad, COALESCE(m.nombre, '') AS autor FROM publicaciones p LEFT JOIN miembros m ON m.id = p.autor${visible} ORDER BY p.actividad DESC LIMIT ${EN_INDICE}`,
+    sql: `SELECT p.id, p.titulo, substr(p.texto, 1, 300) AS texto, p.categoria, p.creada, p.actividad, COALESCE(m.nombre, '') AS autor FROM publicaciones p LEFT JOIN miembros m ON m.id = p.autor${donde.length ? ` WHERE ${donde.join(' AND ')}` : ''} ORDER BY p.actividad DESC LIMIT ${EN_INDICE}`,
     valores: yo.creador ? [] : [OCULTAR, yo.id]
   }
 }
@@ -413,32 +480,33 @@ async function feed(env: Env, yo: Miembro, url: URL): Promise<FeedComunidad> {
     { categoria: url.searchParams.get('categoria') ?? '', antes: url.searchParams.get('antes') ?? '', orden: url.searchParams.get('orden') ?? '' }
   )
   const ahora = Date.now()
-  const contar = !numeros || numeros.hasta < ahora
-  const [pubs, cuentas, totales] = await env.DB.batch([
-    env.DB.prepare(sql).bind(...valores),
-    env.DB.prepare(
-      `SELECT
-        (SELECT COUNT(*) FROM publicaciones WHERE autor = ?) AS publicaciones,
-        (SELECT COUNT(*) FROM comentarios WHERE autor = ?) AS comentarios,
-        (SELECT COUNT(*) FROM avisos WHERE para = ? AND leido = 0) AS avisos`
-    ).bind(yo.id, yo.id, yo.id),
-    ...(contar
-      ? [
-          env.DB.prepare(
-            `SELECT
-              (SELECT COUNT(*) FROM licencias WHERE estado IN ('authorized', 'gratis') OR pagado_hasta > ?) AS miembros,
-              (SELECT COUNT(DISTINCT clave) FROM equipos WHERE visto > ?) AS activos`
-          ).bind(new Date(ahora).toISOString(), new Date(ahora - DIA).toISOString())
-        ]
-      : [])
+  const [[pubs, cuentas], numeros] = await Promise.all([
+    env.DB.batch([
+      env.DB.prepare(sql).bind(...valores),
+      env.DB.prepare(
+        `SELECT
+          (SELECT COUNT(*) FROM publicaciones WHERE autor = ?) AS publicaciones,
+          (SELECT COUNT(*) FROM comentarios WHERE autor = ?) AS comentarios,
+          (SELECT COUNT(*) FROM avisos WHERE para = ? AND leido = 0) AS avisos`
+      ).bind(yo.id, yo.id, yo.id)
+    ]),
+    // Los miembros y activos de hoy recorren `licencias` y `equipos` enteras.
+    guardado(env, 'comunidad', async () =>
+      (await env.DB.prepare(
+        `SELECT
+          (SELECT COUNT(*) FROM licencias WHERE estado IN ('authorized', 'gratis') OR pagado_hasta > ?) AS miembros,
+          (SELECT COUNT(DISTINCT clave) FROM equipos WHERE visto > ?) AS activos`
+      )
+        .bind(new Date(ahora).toISOString(), new Date(ahora - DIA).toISOString())
+        .first<{ miembros: number; activos: number }>())!
+    )
   ])
-  if (totales) numeros = { ...(totales.results[0] as { miembros: number; activos: number }), hasta: ahora + GUARDADO }
   const filas = pubs.results as unknown as Guardada[]
   const n = cuentas.results[0] as { publicaciones: number; comentarios: number; avisos: number }
   return {
-    yo: { ...autor(env, yo), creditos: !!yo.creditos, publicaciones: n.publicaciones, comentarios: n.comentarios },
-    miembros: numeros!.miembros,
-    activos: numeros!.activos,
+    yo: { ...autor(env, yo), creditos: !!yo.creditos, apoya: apoya(yo), publicaciones: n.publicaciones, comentarios: n.comentarios },
+    miembros: numeros.miembros,
+    activos: numeros.activos,
     avisos: n.avisos,
     roadmap: await roadmap(env, yo),
     publicaciones: await armar(env, yo, filas.slice(0, PAGINA)),
@@ -447,7 +515,19 @@ async function feed(env: Env, yo: Miembro, url: URL): Promise<FeedComunidad> {
 }
 
 /** Las publicaciones como las ve `yo`: con su autor, si le gustan y las caras de los últimos que comentaron. */
-async function armar(env: Env, yo: Miembro, filas: Guardada[]): Promise<PublicacionComunidad[]> {
+/** La guía de un estilo ya guardado, como se guardaría hoy (`adjuntosDe`). Sin guía, nada. */
+function alDia(guia: unknown, prueba: unknown): { guia?: GuiaEstilo } {
+  const g = guiaConSuPrueba(guiaDe(guia), pruebaDe(prueba))
+  return g ? { guia: g } : {}
+}
+
+/**
+ * Las publicaciones como las ve `yo`. De un estilo, a su autor y al creador les dice lo que le falta (`incompleto`). La
+ * evidencia de su prueba (el resumen del hilo donde se hizo su video) solo va al abrirla (`entera`), y solo a ellos dos.
+ * De uno con otro paquete en revisión, los demás ven lo que ya estaba a la vista (`publica`); su autor y el creador, lo
+ * nuevo, y que la comunidad aún ve lo de antes (`publicaAun`).
+ */
+export async function armar(env: Env, yo: Miembro, filas: Guardada[], entera = false): Promise<PublicacionComunidad[]> {
   if (!filas.length) return []
   const ids = filas.map((f) => f.id)
   const marcas = ids.map(() => '?').join(', ')
@@ -463,13 +543,20 @@ async function armar(env: Env, yo: Miembro, filas: Guardada[]): Promise<Publicac
   const caras = comentaron.results as { publicacion: string; autor: string }[]
   const autores = await miembros(env, [...filas.map((f) => f.autor), ...caras.map((c) => c.autor)])
   const leGustan = new Set((gustan.results as { publicacion: string }[]).map((g) => g.publicacion))
-  return filas.map((f) => ({
+  return filas.map((g) => {
+    const suya = g.autor === yo.id || esCreador(yo)
+    const publica = !g.aprobada ? publicaDe(g) : undefined
+    const f = publica && !suya ? { ...g, ...publica } : g
+    // Lo guardado antes de que Sloth arreglara esto sola sale ya arreglado: los acentos, y la guía con lo de su prueba.
+    const adjuntos = conUrls(env, f.adjuntos).map((a) => (a.tipo === 'estilo' ? { ...a, ...(a.nombre ? { nombre: acentosBien(a.nombre) } : {}), ...alDia(a.guia, a.prueba) } : a))
+    const falta = f.categoria === 'estilos' && suya ? faltaEnEstilo(adjuntos, f.texto) : []
+    return {
     id: f.id,
     autor: autores.get(f.autor) ?? { id: f.autor, nombre: '' },
     categoria: f.categoria,
-    titulo: f.titulo,
-    texto: f.texto,
-    adjuntos: conUrls(env, f.adjuntos),
+    titulo: acentosBien(f.titulo),
+    texto: acentosBien(f.texto),
+    adjuntos: entera && suya ? adjuntos : adjuntos.map((a) => (a.prueba ? { ...a, prueba: { ...a.prueba, hilo: undefined, evidencia: undefined } } : a)),
     fijada: !!f.fijada,
     ...(f.estado ? { estado: f.estado } : {}),
     creada: f.creada,
@@ -481,11 +568,15 @@ async function armar(env: Env, yo: Miembro, filas: Guardada[]): Promise<Publicac
     ...(f.ultimo_comentario ? { ultimoComentario: f.ultimo_comentario } : {}),
     comentaron: caras.filter((c) => c.publicacion === f.id).flatMap((c) => autores.get(c.autor) ?? []),
     ...(esCreador(yo) && f.reportes ? { reportes: f.reportes } : {}),
-    ...(!f.aprobada ? { porAprobar: true as const } : {})
-  }))
+    ...(!f.aprobada ? { porAprobar: true as const } : {}),
+    ...(f.aprobada === PREAPROBADA ? { preaprobada: true as const } : {}),
+    ...(publica && suya ? { publicaAun: true as const } : {}),
+    ...(falta.length ? { incompleto: falta } : {})
+    }
+  })
 }
 
-async function miembros(env: Env, ids: string[]): Promise<Map<string, Autor>> {
+export async function miembros(env: Env, ids: string[]): Promise<Map<string, Autor>> {
   const unicos = [...new Set(ids)]
   const mapa = new Map<string, Autor>()
   // D1 acepta hasta 100 valores por consulta.
@@ -508,7 +599,7 @@ async function abrir(env: Env, yo: Miembro, id: string): Promise<{ publicacion: 
   const comentarios = (todos.results as unknown as ComentarioGuardado[]).filter((c) => laVe(c, yo))
   const leGustan = new Set((gustan.results as { comentario: string }[]).map((g) => g.comentario))
   const autores = await miembros(env, comentarios.map((c) => c.autor))
-  const [publicacion] = await armar(env, yo, [f])
+  const [publicacion] = await armar(env, yo, [f], true)
   return {
     publicacion,
     comentarios: comentarios
@@ -532,9 +623,9 @@ function comentarioComo(env: Env, yo: Miembro, c: ComentarioGuardado, a: Autor |
   }
 }
 
-/** Lo que se escribe, ya limpio y recortado. */
+/** Lo que se escribe, ya limpio y recortado, y con sus acentos bien si llegaron rotos (`shared/acentos.ts`). */
 function texto(valor: unknown, max: number): string {
-  return String(valor ?? '').replace(/\r\n/g, '\n').trim().slice(0, max)
+  return acentosBien(String(valor ?? '')).replace(/\r\n/g, '\n').trim().slice(0, max)
 }
 
 function categoriaDe(valor: unknown, yo: Miembro): CategoriaComunidad {
@@ -549,15 +640,23 @@ export function adjuntosDe(valor: unknown): Adjunto[] {
   if (!Array.isArray(valor)) return []
   const lista = valor.flatMap((a): Adjunto[] => {
     if (!a || typeof a !== 'object') return []
-    const { tipo, llave, poster, vertical, nombre } = a as Record<string, unknown>
+    const { tipo, llave, poster, previa, vertical, nombre, de, guia, prueba } = a as Record<string, unknown>
     if ((tipo !== 'imagen' && tipo !== 'video' && tipo !== 'estilo') || typeof llave !== 'string' || !LLAVE.test(llave)) return []
-    if ((tipo === 'imagen') !== IMAGEN.test(llave) || (tipo === 'estilo') !== ESTILO.test(llave)) return []
-    if (tipo === 'estilo') return [{ tipo, llave, nombre: texto(nombre, 80) || 'Estilo' }]
+    // El hilo de una prueba no es un adjunto: va dentro de la prueba de su estilo.
+    if ((tipo === 'imagen') !== IMAGEN.test(llave) || (tipo === 'estilo') !== ESTILO.test(llave) || HILO.test(llave)) return []
+    if (tipo === 'estilo') {
+      const p = pruebaDe(prueba)
+      // Lo que su prueba demuestra va en su guía: no se le devuelve a su autor para que lo marque.
+      const g = guiaConSuPrueba(guiaDe(guia), p)
+      return [{ tipo, llave, nombre: texto(nombre, 80) || 'Estilo', ...(typeof de === 'string' && ID.test(de) ? { de } : {}), ...(g ? { guia: g } : {}), ...(p ? { prueba: p } : {}) }]
+    }
     return [
       {
         tipo,
         llave,
         ...(tipo === 'video' && typeof poster === 'string' && LLAVE.test(poster) && IMAGEN.test(poster) ? { poster } : {}),
+        // El adelanto del video de un estilo, para el muro de la tienda: otro MP4.
+        ...(tipo === 'video' && typeof previa === 'string' && LLAVE.test(previa) && /\.mp4$/.test(previa) ? { previa } : {}),
         ...(tipo === 'video' && typeof vertical === 'boolean' ? { vertical } : {})
       }
     ]
@@ -567,12 +666,30 @@ export function adjuntosDe(valor: unknown): Adjunto[] {
   return lista.filter((a, i) => a.tipo === 'imagen' || i === video || i === estilo).slice(0, 10)
 }
 
-/** Un estilo va en Estilos, y en Estilos va siempre uno. */
-export function estiloEnSuSitio(categoria: CategoriaComunidad, adjuntos: Adjunto[]) {
-  const lleva = adjuntos.some((a) => a.tipo === 'estilo')
-  if (categoria === 'estilos' && !lleva) throw new Rechazo(400, 'En Estilos se comparte un estilo: elígelo con «Estilo», o usa «Compartir» en su card.')
-  if (categoria !== 'estilos' && lleva) throw new Rechazo(400, 'Un estilo se comparte en la sección Estilos.')
+/**
+ * Un estilo va en Estilos, y en Estilos va siempre uno, con lo que lleva todo estilo de la comunidad (`shared/guia.ts`,
+ * igual para todos): lo que hace (`texto`), su guía de uso completa, un video entero hecho con él y la prueba de con qué
+ * agente se hizo, cuánto costó y cuánto tardó. Los que ya estaban sin eso dejaron de verse (migración 0033) hasta que su
+ * autor los complete.
+ */
+export function estiloEnSuSitio(categoria: CategoriaComunidad, adjuntos: Adjunto[], cuerpoTexto: string) {
+  const estilo = adjuntos.find((a) => a.tipo === 'estilo')
+  if (categoria !== 'estilos') {
+    if (estilo) throw new Rechazo(400, 'Un estilo se comparte en la sección Estilos.')
+    return
+  }
+  if (!estilo) throw new Rechazo(400, 'En Estilos se comparte un estilo: elígelo con «Estilo», o usa «Compartir» en su card.')
+  const falta = faltaEnEstilo(adjuntos, cuerpoTexto)
+  if (falta.length) throw new Rechazo(400, `Para compartir un estilo falta: ${falta.join('; ')}. Se llena con «Compartir» en su card; si tu Sloth no te lo pide, actualízala.`)
 }
+
+/**
+ * Si a ese autor hay que decirle cómo poner su Binance ID (`shared/fondo.ts`): no lo ha puesto, no es el creador y no se
+ * le ha dicho ya en ninguna publicación suya. Da una fila si sí. Lleva el autor y cómo empieza el aviso (`AVISO_BINANCE`).
+ * Sin `LIKE`: D1 no acepta un patrón de más de 50 bytes («LIKE or GLOB pattern too complex»), y SQLite en las pruebas sí.
+ */
+export const FALTA_BINANCE = `SELECT 1 FROM miembros m WHERE m.id = ?1 AND m.binance IS NULL AND m.clave != 'admin'
+  AND NOT EXISTS (SELECT 1 FROM comentarios c JOIN publicaciones p ON p.id = c.publicacion WHERE p.autor = ?1 AND substr(c.texto, 1, length(?2)) = ?2)`
 
 const llaveDelEstilo = (adjuntos: string) => (JSON.parse(adjuntos) as Adjunto[]).find((a) => a.tipo === 'estilo')?.llave
 
@@ -602,7 +719,7 @@ async function publicar(env: Env, yo: Miembro, c: Record<string, unknown>): Prom
   const cuerpoTexto = texto(c.texto, 20_000)
   const adjuntos = adjuntosDe(c.adjuntos)
   if (!titulo && !cuerpoTexto && !adjuntos.length) throw new Rechazo(400, 'Escribe algo o agrega una imagen.')
-  estiloEnSuSitio(categoria, adjuntos)
+  estiloEnSuSitio(categoria, adjuntos, cuerpoTexto)
   await soloSuyos(env, yo, llavesDe(JSON.stringify(adjuntos)))
   if (!esCreador(yo) && !(await conCupo(env, yo, 'publicaciones')))
     throw new Rechazo(429, `Ya publicaste ${AL_DIA.publicaciones} veces hoy. Mañana sigues.`)
@@ -640,7 +757,9 @@ async function publicar(env: Env, yo: Miembro, c: Record<string, unknown>): Prom
 
 /**
  * Quien la escribió cambia lo suyo; el creador, además, la fija, dice cómo va una mejora (y se le avisa a quien la pidió) y
- * aprueba un estilo. Un estilo al que le cambian el paquete vuelve a esperar su aprobación.
+ * aprueba o pre-aprueba un estilo (`aprobada: 2`: lo arregló él, y su autor dice si así está bien). Un estilo al que su
+ * autor le cambia el paquete vuelve a esperar su aprobación; si ya estaba a la vista, la comunidad sigue viendo lo de antes
+ * (`publica`) hasta que se apruebe el nuevo.
  */
 async function cambiar(env: Env, yo: Miembro, f: Guardada, c: Record<string, unknown>): Promise<PublicacionComunidad> {
   const suya = f.autor === yo.id
@@ -662,14 +781,35 @@ async function cambiar(env: Env, yo: Miembro, f: Guardada, c: Record<string, unk
   if (c.fijada !== undefined) nueva.fijada = c.fijada ? 1 : 0
   if (c.estado !== undefined) nueva.estado = c.estado === 'haciendo' || c.estado === 'hecha' ? c.estado : null
   if (nueva.categoria !== 'mejoras') nueva.estado = null
-  if (contenido) estiloEnSuSitio(nueva.categoria, JSON.parse(nueva.adjuntos) as Adjunto[])
+  // Un estilo guardado con los acentos rotos, o sin lo de su prueba en su guía, queda bien en cuanto se toca: al aprobarlo, sobre todo.
+  if (nueva.categoria === 'estilos') {
+    nueva.titulo = acentosBien(nueva.titulo)
+    nueva.texto = acentosBien(nueva.texto)
+    nueva.adjuntos = JSON.stringify((JSON.parse(nueva.adjuntos) as Adjunto[]).map((a) => (a.tipo === 'estilo' ? { ...a, ...alDia(a.guia, a.prueba) } : a)))
+  }
+  if (contenido) estiloEnSuSitio(nueva.categoria, JSON.parse(nueva.adjuntos) as Adjunto[], nueva.texto)
   // Lo que se aprobó es ese paquete: otro (o el mismo, al pasar a Estilos) vuelve a esperar.
   const otroPaquete = nueva.categoria === 'estilos' && (f.categoria !== 'estilos' || llaveDelEstilo(nueva.adjuntos) !== llaveDelEstilo(f.adjuntos))
-  if (otroPaquete && !creador) nueva.aprobada = 0
-  if (c.aprobada !== undefined) nueva.aprobada = c.aprobada ? 1 : 0
-  if (nueva.categoria !== 'estilos') nueva.aprobada = 1
+  if (otroPaquete && !creador) {
+    // La primera vez, lo que ya veía la comunidad se guarda tal cual; si ya había uno esperando, lo de antes se queda.
+    if (f.aprobada && !f.publica) nueva.publica = JSON.stringify({ titulo: f.titulo, texto: f.texto, adjuntos: f.adjuntos, aprobada: f.aprobada } satisfies Publica)
+    nueva.aprobada = 0
+  }
+  // Se aprueba el paquete que se revisó (`llave`, la que manda la revisión automática): si su autor ya puso otro, no.
+  if (c.aprobada && typeof c.llave === 'string' && llaveDelEstilo(nueva.adjuntos) !== c.llave) throw new Rechazo(409, 'El estilo cambió mientras se revisaba: se revisa de nuevo.')
+  // Ni el creador aprueba uno de otro al que le falta lo que lleva todo estilo: no sale en la tienda hasta que lo complete.
+  if (c.aprobada && nueva.categoria === 'estilos' && !suya) {
+    const falta = faltaEnEstilo(JSON.parse(nueva.adjuntos) as Adjunto[], nueva.texto)
+    if (falta.length) throw new Rechazo(409, `A este estilo le falta: ${falta.join('; ')}. Su autor lo completa con «Compartir», o tú, al pre-aprobarlo.`)
+  }
+  // Aprobado, pre-aprobado o quitado, ya no hay otra versión a la vista: queda esta, o ninguna.
+  if (c.aprobada !== undefined) (nueva.aprobada = c.aprobada === PREAPROBADA ? PREAPROBADA : c.aprobada ? 1 : 0), (nueva.publica = null)
+  if (nueva.categoria !== 'estilos') (nueva.aprobada = 1), (nueva.publica = null)
+  // Al aprobarse un estilo de alguien que no ha puesto su Binance ID, se le dice cómo: una vez por autor.
+  const ahora = new Date().toISOString()
+  const comoCobrar = nueva.aprobada && !f.aprobada && nueva.categoria === 'estilos' && !suya && !!(await env.DB.prepare(FALTA_BINANCE).bind(f.autor, AVISO_BINANCE).first()) ? nuevoId() : ''
   await env.DB.batch([
-    env.DB.prepare('UPDATE publicaciones SET categoria = ?, titulo = ?, texto = ?, adjuntos = ?, fijada = ?, estado = ?, editada = ?, aprobada = ? WHERE id = ?').bind(
+    env.DB.prepare('UPDATE publicaciones SET categoria = ?, titulo = ?, texto = ?, adjuntos = ?, fijada = ?, estado = ?, editada = ?, aprobada = ?, publica = ? WHERE id = ?').bind(
       nueva.categoria,
       nueva.titulo,
       nueva.texto,
@@ -678,15 +818,38 @@ async function cambiar(env: Env, yo: Miembro, f: Guardada, c: Record<string, unk
       nueva.estado,
       nueva.editada,
       nueva.aprobada,
+      nueva.publica ?? null,
       f.id
     ),
     ...(nueva.estado && nueva.estado !== f.estado ? aviso(env, f.autor, yo, 'estado', f.id, { texto: nueva.estado }) : []),
-    ...(nueva.aprobada && !f.aprobada ? aviso(env, f.autor, yo, 'aprobado', f.id) : []),
-    ...(!nueva.aprobada && f.aprobada ? [porAprobar(env, yo, f.id)] : [])
+    ...(nueva.aprobada === 1 && !f.aprobada ? aviso(env, f.autor, yo, 'aprobado', f.id) : []),
+    ...(nueva.aprobada === PREAPROBADA && f.aprobada !== PREAPROBADA ? aviso(env, f.autor, yo, 'preaprobado', f.id) : []),
+    ...(!nueva.aprobada && f.aprobada ? [porAprobar(env, yo, f.id)] : []),
+    ...(comoCobrar
+      ? [
+          env.DB.prepare("INSERT INTO comentarios (id, publicacion, autor, texto, creada, responde, adjuntos) VALUES (?, ?, ?, ?, ?, NULL, '[]')").bind(comoCobrar, f.id, yo.id, COMO_PONER_BINANCE, ahora),
+          env.DB.prepare('UPDATE publicaciones SET comentarios = comentarios + 1, actividad = ?, ultimo_comentario = ? WHERE id = ?').bind(ahora, ahora, f.id),
+          ...aviso(env, f.autor, yo, 'comento', f.id, { comentario: comoCobrar })
+        ]
+      : [])
   ])
-  // Lo que se quitó al editar ya no se usa.
-  await quitarArchivos(env, llavesDe(f.adjuntos).filter((l) => !llavesDe(nueva.adjuntos).includes(l)))
+  // Un estilo que entra o sale de la tienda: sus números se vuelven a contar.
+  if (nueva.aprobada !== f.aprobada || nueva.categoria !== f.categoria) olvidarNumeros()
+  // Lo que se quitó al editar ya no se usa: ni en lo nuevo ni en lo que sigue a la vista.
+  const siguen = usadas(nueva)
+  await quitarArchivos(env, usadas(f).filter((l) => !siguen.includes(l)))
   return (await armar(env, yo, [nueva]))[0]
+}
+
+/** Los archivos de una publicación: los suyos y los de la versión que sigue a la vista. */
+const usadas = (g: Pick<Guardada, 'adjuntos' | 'publica'>) => [...llavesDe(g.adjuntos), ...llavesDe(publicaDe(g)?.adjuntos ?? '[]')]
+
+/** Su autor deja como está el estilo que pre-aprobó Sloth: pasa a aprobado. */
+async function conforme(env: Env, yo: Miembro, f: Guardada): Promise<PublicacionComunidad> {
+  if (f.autor !== yo.id) throw new Rechazo(403, 'Solo su autor dice si así está bien.')
+  if (f.aprobada !== PREAPROBADA) throw new Rechazo(409, 'Este estilo ya no está pre-aprobado: recarga la publicación.')
+  await env.DB.prepare('UPDATE publicaciones SET aprobada = 1 WHERE id = ? AND aprobada = ?').bind(f.id, PREAPROBADA).run()
+  return (await armar(env, yo, [{ ...f, aprobada: 1 }]))[0]
 }
 
 async function borrar(env: Env, yo: Miembro, f: Guardada): Promise<{ ok: true }> {
@@ -695,13 +858,15 @@ async function borrar(env: Env, yo: Miembro, f: Guardada): Promise<{ ok: true }>
   const fotos = await llavesDeComentarios(env, 'SELECT adjuntos FROM comentarios WHERE publicacion = ?', f.id)
   await env.DB.batch([
     env.DB.prepare('DELETE FROM likes WHERE publicacion = ?').bind(f.id),
+    env.DB.prepare('DELETE FROM estilo_usos WHERE publicacion = ?').bind(f.id),
     env.DB.prepare(`DELETE FROM likes_comentarios WHERE comentario IN (${suyos})`).bind(f.id),
     env.DB.prepare(`DELETE FROM reportes WHERE objeto = ? OR objeto IN (${suyos})`).bind(f.id, f.id),
     env.DB.prepare('DELETE FROM avisos WHERE publicacion = ?').bind(f.id),
     env.DB.prepare('DELETE FROM comentarios WHERE publicacion = ?').bind(f.id),
     env.DB.prepare('DELETE FROM publicaciones WHERE id = ?').bind(f.id)
   ])
-  await quitarArchivos(env, [...llavesDe(f.adjuntos), ...fotos])
+  if (f.categoria === 'estilos') olvidarNumeros()
+  await quitarArchivos(env, [...usadas(f), ...fotos])
   return { ok: true }
 }
 
@@ -826,7 +991,7 @@ async function avisos(env: Env, yo: Miembro, soloCuenta: boolean): Promise<{ avi
       tipo: a.tipo,
       de: autores.get(a.de) ?? { id: a.de, nombre: '' },
       publicacion: a.publicacion,
-      sobre: a.titulo || (a.ptexto ?? '').slice(0, 80) || 'una publicación',
+      sobre: acentosBien(a.titulo || (a.ptexto ?? '').slice(0, 80)) || 'una publicación',
       ...(a.comentario ? { comentario: a.comentario } : {}),
       ...(a.texto ? { texto: a.texto } : {}),
       creado: a.creado,
@@ -852,39 +1017,46 @@ async function perfil(env: Env, yo: Miembro, c: Record<string, unknown>): Promis
   return { ...autor(env, { ...yo, nombre, foto }), creditos: !!creditos }
 }
 
-/** La votación del roadmap, como la ve `yo`: los votos de cada meta (el de un Fundador vale dos) y el suyo. */
+/**
+ * La votación del roadmap, como la ve `yo`: los votos de cada meta (el de un Fundador vale dos) y el suyo. Contarlos
+ * calcula la insignia de cada quien que votó: va guardado, y se recuenta cuando alguien vota (`recontar`).
+ */
 async function roadmap(env: Env, yo: Miembro, recontar = false): Promise<RoadmapComunidad> {
-  const ahora = Date.now()
-  const [mio] = await Promise.all([
+  const [mio, votos] = await Promise.all([
     env.DB.prepare('SELECT meta FROM votos WHERE miembro = ?').bind(yo.id).first<string>('meta'),
-    (async () => {
-      if (!recontar && votosGuardados && votosGuardados.hasta > ahora) return
-      const { results } = await env.DB.prepare(`SELECT v.meta, ${insignia(env)} FROM votos v JOIN miembros m ON m.id = v.miembro`).all<{ meta: string; insignia: string | null }>()
-      const votos = new Map<string, number>()
-      for (const v of results) votos.set(v.meta, (votos.get(v.meta) ?? 0) + (v.insignia === 'fundador' ? 2 : 1))
-      votosGuardados = { votos, hasta: ahora + GUARDADO }
-    })()
+    guardado(
+      env,
+      'votos',
+      async () => {
+        const { results } = await env.DB.prepare(`SELECT v.meta, ${insignia(env)} FROM votos v JOIN miembros m ON m.id = v.miembro`).all<{ meta: string; insignia: string | null }>()
+        const votos: Record<string, number> = {}
+        for (const v of results) votos[v.meta] = (votos[v.meta] ?? 0) + (v.insignia === 'fundador' ? 2 : 1)
+        return votos
+      },
+      recontar
+    )
   ])
-  const votos = votosGuardados!.votos
-  return { metas: METAS.map((m) => ({ ...m, votos: votos.get(m.id) ?? 0 })), ...(mio ? { mio } : {}) }
+  return { metas: METAS.map((m) => ({ ...m, votos: votos[m.id] ?? 0 })), ...(mio ? { mio } : {}) }
 }
 
-/** Los nombres de los Fundadores que pidieron salir en los créditos de sloth.vancci.org, del primero al último. */
-export async function creditos(env: Env): Promise<string[]> {
-  if (creditosGuardados && creditosGuardados.hasta > Date.now()) return creditosGuardados.nombres
-  const { results } = await env.DB.prepare(`SELECT m.nombre, ${insignia(env)} FROM miembros m WHERE m.creditos = 1 AND m.nombre != '' ORDER BY m.creado`).all<Pick<Miembro, 'nombre' | 'insignia'>>()
-  const nombres = results.filter((m) => m.insignia === 'fundador').map((m) => m.nombre)
-  creditosGuardados = { nombres, hasta: Date.now() + GUARDADO }
-  return nombres
+/**
+ * Los nombres de los Fundadores que pidieron salir en los créditos de sloth.vancci.org, del primero al último. Calcula
+ * la insignia de cada uno: va guardado.
+ */
+export function creditos(env: Env): Promise<string[]> {
+  return guardado(env, 'creditos', async () => {
+    const { results } = await env.DB.prepare(`SELECT m.nombre, ${insignia(env)} FROM miembros m WHERE m.creditos = 1 AND m.nombre != '' ORDER BY m.creado`).all<Pick<Miembro, 'nombre' | 'insignia'>>()
+    return results.filter((m) => m.insignia === 'fundador').map((m) => m.nombre)
+  })
 }
 
 /** El tipo de un archivo y su llave nueva, si se acepta y no pesa de más. */
-function aceptar(contentType: string, bytes: number): { tipo: AdjuntoComunidad['tipo']; llave: string; contentType: string } {
+function aceptar(contentType: string, bytes: number): { tipo: AdjuntoComunidad['tipo'] | 'hilo'; llave: string; contentType: string } {
   const ct = contentType.split(';')[0].trim().toLowerCase()
   const t = TIPOS[ct]
   if (!t) throw new Rechazo(415, 'Solo se suben imágenes (PNG, JPG, WebP, GIF), videos (MP4, WebM, MOV) y estilos de Sloth.')
   if (!bytes) throw new Rechazo(411, 'Falta el tamaño del archivo.')
-  if (bytes > PESO[t.tipo]) throw new Rechazo(413, `${t.tipo === 'video' ? 'El video' : t.tipo === 'estilo' ? 'El estilo' : 'La imagen'} pesa más de ${pesoLegible(PESO[t.tipo])}.`)
+  if (bytes > PESO[t.tipo]) throw new Rechazo(413, `${t.tipo === 'video' ? 'El video' : t.tipo === 'estilo' ? 'El estilo' : t.tipo === 'hilo' ? 'El hilo de la prueba' : 'La imagen'} pesa más de ${pesoLegible(PESO[t.tipo])}.`)
   return { tipo: t.tipo, llave: `${letras(20).toLowerCase()}.${t.ext}`, contentType: ct }
 }
 const pesoLegible = (b: number) => `${b / 1024 ** 2} MB`
@@ -919,7 +1091,7 @@ export const esDe = (metadatos: Record<string, string> | undefined, miembro: str
 
 /**
  * Cada mañana: lo subido con dueño (desde que se anota, ver `subir`) que pasado `SUELTO` nada usa (ni una publicación,
- * ni un comentario, ni una foto de perfil) se borra.
+ * ni un comentario, ni una foto de perfil, ni la prueba de un video de un estilo) se borra.
  */
 export async function olvidarSueltos(env: Env, ahora = Date.now()) {
   const viejos: string[] = []
@@ -932,9 +1104,12 @@ export async function olvidarSueltos(env: Env, ahora = Date.now()) {
   if (!viejos.length) return
   const usadas = new Set<string>()
   for (const sql of [
-    "SELECT coalesce(adjuntos, '') || ' ' || coalesce(texto, '') AS t FROM publicaciones",
+    // Con la versión que sigue a la vista mientras se revisa otra.
+    "SELECT coalesce(adjuntos, '') || ' ' || coalesce(texto, '') || ' ' || coalesce(publica, '') AS t FROM publicaciones",
     "SELECT coalesce(adjuntos, '') || ' ' || coalesce(texto, '') AS t FROM comentarios",
-    'SELECT foto AS t FROM miembros WHERE foto IS NOT NULL'
+    'SELECT foto AS t FROM miembros WHERE foto IS NOT NULL',
+    // Las portadas que prueban los videos de los estilos (`tienda.ts`).
+    'SELECT prueba AS t FROM estilo_usos WHERE prueba IS NOT NULL'
   ]) {
     const { results } = await env.DB.prepare(sql).all<{ t: string }>()
     for (const r of results) for (const l of llavesEn(r.t)) usadas.add(l)
@@ -951,14 +1126,32 @@ export const sueltos = (viejas: string[], usadas: Set<string>) => viejas.filter(
 async function servirArchivo(req: Request, env: Env, llave: string): Promise<Response> {
   const cabeza = LLAVE.test(llave) ? await env.DESCARGAS.head(`comunidad/${llave}`) : null
   if (!cabeza) throw new Rechazo(404, 'No existe')
+  // El paquete de un estilo no es libre como las imágenes ni como su publicación, que ve cualquiera: se pide con la
+  // cuenta, y lo baja quien apoya o quien lo subió.
+  // Su autor también baja el que Sloth le arregló al pre-aprobarlo, que subió el creador: está en su publicación.
+  const estilo = ESTILO.test(llave)
+  if (estilo) {
+    const yo = await quien(req, env)
+    if (!apoya(yo) && !esDe(cabeza.customMetadata, yo.id) && !(await enLoSuyo(env, yo, llave))) throw new Rechazo(402, SOLO_APOYO)
+  }
+  // El hilo donde se hizo el video de una prueba es de quien lo subió: lo leen él y el creador, nadie más.
+  const hilo = HILO.test(llave)
+  if (hilo) {
+    const yo = await quien(req, env)
+    if (!esCreador(yo) && !esDe(cabeza.customMetadata, yo.id)) throw new Rechazo(404, 'No existe')
+  }
   return servir(req, env, `comunidad/${llave}`, cabeza.size, {
-    'content-type': cabeza.httpMetadata?.contentType ?? 'application/octet-stream',
-    'cache-control': 'public, max-age=31536000, immutable'
+    'content-type': hilo ? 'application/json' : (cabeza.httpMetadata?.contentType ?? 'application/octet-stream'),
+    'cache-control': estilo || hilo ? 'private, no-store' : 'public, max-age=31536000, immutable'
   })
 }
 
+/** Si ese archivo va en una publicación de `yo` (o en la versión suya que sigue a la vista). */
+const enLoSuyo = async (env: Env, yo: Miembro, llave: string) =>
+  !!(await env.DB.prepare("SELECT 1 FROM publicaciones WHERE autor = ? AND (instr(adjuntos, ?) > 0 OR instr(coalesce(publica, ''), ?) > 0) LIMIT 1").bind(yo.id, llave, llave).first())
+
 function llavesDe(adjuntos: string): string[] {
-  return (JSON.parse(adjuntos) as Adjunto[]).flatMap((a) => [a.llave, ...(a.poster ? [a.poster] : [])])
+  return (JSON.parse(adjuntos) as Adjunto[]).flatMap((a) => [a.llave, ...(a.poster ? [a.poster] : []), ...(a.previa ? [a.previa] : []), ...(a.prueba?.evidencia ? [a.prueba.evidencia] : [])])
 }
 
 async function quitarArchivos(env: Env, llaves: string[]) {

@@ -81,6 +81,35 @@ test('la cuenta gratis de una computadora solo se recupera con su mismo correo',
   }
 })
 
+test('quien ya apoya y pide una cuenta no gasta cupos: siempre lee que use su clave, y su conexión sigue libre', async () => {
+  const { db, DB } = d1()
+  db.prepare(
+    "INSERT INTO licencias (id, clave, email, plan, monto, fundador, estado, creada, modo) VALUES ('a', 'SLOTH-AAAA-BBBB-CCCC-DDDD', 'apoya@x.com', 'mensual', 10, 0, 'authorized', '2026-11-18', 'prueba')"
+  ).run()
+  const antes = globalThis.fetch
+  globalThis.fetch = (async () => new Response('{"id":"1"}')) as typeof fetch
+  try {
+    const unirse = (email: string) =>
+      pedir({ ...base, DB }, '/suscribir', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'cf-connecting-ip': '203.0.113.7' },
+        body: JSON.stringify({ email, plan: 'gratis', equipo: '3f9a0c1e7b2d4a6f8e0c1b3d5f7a9c2e', acepto: true, terminos: '2026-01-01', porCorreo: true })
+      })
+    // Más veces que las cuentas al día de una conexión y que los correos al día de una dirección.
+    for (let i = 0; i < 8; i++) {
+      const r = await unirse('apoya@x.com')
+      assert.equal(r.status, 409)
+      const texto = await r.text()
+      assert.match(texto, /apoyo activo/)
+      assert.doesNotMatch(texto, /SLOTH-AAAA/)
+    }
+    assert.equal((db.prepare('SELECT COUNT(*) AS n FROM cupos').get() as { n: number }).n, 0)
+    assert.deepEqual(await (await unirse('nueva@x.com')).json(), { enviada: true })
+  } finally {
+    globalThis.fetch = antes
+  }
+})
+
 test('la versión que aún es de quien apoya no se baja a mano: su instalador y su mapa no están para los demás', async () => {
   const { DB } = d1()
   const todos = new Date(Date.now() + 5 * 864e5).toISOString()

@@ -1,0 +1,36 @@
+/* La guía de uso de un estilo (Guia.tsx): la plantilla que se llena y cómo se lee. */
+
+/* La plantilla: un campo por renglón, como los de «Compartir». */
+.guia-campos { display: flex; flex-direction: column; gap: 12px; }
+.guia-campos label { display: flex; flex-direction: column; gap: 5px; }
+.guia-campos label > span { color: var(--text); font-size: 12.5px; font-weight: 600; }
+.guia-campos label > span em { color: var(--muted); font-style: normal; font-weight: 500; }
+.guia-campos input, .guia-campos textarea, .esc .guia-campos textarea { width: 100%; min-height: 0; padding: 8px 10px; background: var(--bg); border: 1px solid var(--line); border-radius: var(--radio); color: var(--text); font-size: 13.5px; line-height: 1.45; resize: vertical; }
+.guia-campos input:focus, .guia-campos textarea:focus { outline: none; border-color: var(--amber); }
+.guia-campos input::placeholder, .guia-campos textarea::placeholder { color: var(--muted); }
+/* Lo que se marca, igual para todos: con qué lo hace y con qué agentes funciona. Una casilla por renglón, dos columnas. */
+.guia-marcar { margin: 0; padding: 0; border: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 6px 14px; min-width: 0; }
+.guia-marcar legend { padding: 0 0 6px; color: var(--text); font-size: 12.5px; font-weight: 600; }
+.guia-marcar legend em { color: var(--muted); font-style: normal; font-weight: 500; }
+.guia-campos .guia-marcar label { flex-direction: row; align-items: flex-start; gap: 7px; color: var(--muted); font-size: 12.5px; line-height: 1.4; cursor: pointer; }
+.guia-campos .guia-marcar label > span { color: var(--muted); font-weight: 400; }
+.guia-marcar label strong { color: var(--text); font-weight: 600; }
+.guia-campos .guia-marcar input { width: auto; flex: none; margin: 2px 0 0; padding: 0; accent-color: var(--amber); }
+.guia-marcar.agentes { grid-template-columns: repeat(4, 1fr); }
+/* Al editar la publicación de un estilo, bajo su texto. */
+.esc .guia-campos { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); }
+
+/* Como se lee: el título abre y cierra; cada campo, su nombre y lo que dice. */
+.guia { margin: 12px 0 4px; text-align: left; }
+.guia-titulo { display: inline-flex; align-items: center; gap: 6px; padding: 0; color: var(--suave); font-size: 13px; font-weight: 600; }
+.guia-titulo:hover { color: var(--text); }
+.guia-ico { width: 15px; height: 15px; flex: none; }
+.guia dl { margin: 8px 0 0; padding: 10px 14px; display: flex; flex-direction: column; gap: 8px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); }
+.guia dt { color: var(--muted); font-size: 12px; font-weight: 600; }
+.guia dd { margin: 1px 0 0; color: var(--text); font-size: 14px; line-height: 1.45; overflow-wrap: anywhere; }
+.guia-usar { margin-left: 8px; color: var(--amber); font-size: 12.5px; font-weight: 600; }
+.guia-usar:hover { text-decoration: underline; }
+
+/* Bajo el nombre de la card, donde todo va centrado: la guía en su columna. */
+.new-head .guia { max-width: 560px; margin: 8px auto 0; text-align: center; }
+.new-head .guia dl { text-align: left; }

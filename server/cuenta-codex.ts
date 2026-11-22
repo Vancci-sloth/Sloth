@@ -6,7 +6,7 @@ import { ventanasCodex, type LimitesCodexRpc } from './limites-codex.ts'
 
 /** La cuenta se autoriza y renueva en Codex; Sloth solo ve su correo, plan y enlace de inicio de sesión. */
 let rpc: CodexRpc | undefined
-let login: { id: string; url: string } | undefined
+let login: { id: string; url: string; codigo?: string } | undefined
 let fallo: string | undefined
 let reloj: ReturnType<typeof setTimeout> | undefined
 let lectura: Promise<CuentaClaude> | undefined
@@ -52,7 +52,7 @@ export function cuentaCodex(): Promise<CuentaClaude> {
     try {
       await c.ready
       const r = await c.request<{ account: { type: string; email?: string; planType?: string } | null }>('account/read', { refreshToken: false })
-      return { conectada: r.account?.type === 'chatgpt', quien: r.account?.email, plan: r.account?.planType, conectando: login && { url: login.url }, error: fallo, llave: llaveDe('codex') }
+      return { conectada: r.account?.type === 'chatgpt', quien: r.account?.email, plan: r.account?.planType, conectando: login && { url: login.url, codigo: login.codigo }, error: fallo, llave: llaveDe('codex') }
     } catch (error) {
       return { conectada: false, error: error instanceof Error ? error.message : String(error) }
     } finally { lectura = undefined; descansar() }
@@ -60,15 +60,19 @@ export function cuentaCodex(): Promise<CuentaClaude> {
   return lectura
 }
 
-export async function conectarCodex(): Promise<CuentaClaude> {
+/**
+ * Conecta la cuenta de ChatGPT. Desde la web (`remoto`), con un código de dispositivo: el inicio normal vuelve a un
+ * puerto de esta computadora, que desde el celular no carga; con el código se autoriza en cualquier navegador.
+ */
+export async function conectarCodex(remoto = false): Promise<CuentaClaude> {
   await asegurarAgente('codex')
   const c = cliente()
   await c.ready
   if (login) return cuentaCodex()
   fallo = undefined
   limites = undefined
-  const r = await c.request<{ loginId: string; authUrl: string }>('account/login/start', { type: 'chatgpt' })
-  login = { id: r.loginId, url: r.authUrl }
+  const r = await c.request<{ loginId: string; authUrl?: string; verificationUrl?: string; userCode?: string }>('account/login/start', { type: remoto ? 'chatgptDeviceCode' : 'chatgpt' })
+  login = { id: r.loginId, url: r.verificationUrl ?? r.authUrl ?? '', codigo: r.userCode }
   return cuentaCodex()
 }
 

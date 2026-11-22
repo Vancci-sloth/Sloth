@@ -20,10 +20,14 @@
  * El relevo escucha en 127.0.0.1, con un secreto en la ruta, y anota dónde en `data/navegador-integrado.json` (con el
  * pid de este proceso, para que el servidor sepa si sigue vivo). La próxima vez repite puerto y secreto: el agente de un
  * hilo que siguió abierto vuelve a encontrarlo.
+ *
+ * Desde la web (ADR 0025) no hay vista nativa: el mismo servidor del relevo da por HTTP (`remoto`) cómo van las páginas,
+ * una captura de la de un hilo y lo que se le hace (ir, atrás, un clic, la rueda, el teclado), y el servidor de Sloth lo
+ * pasa a la web (`server/navegador-remoto.ts`).
  */
 import { randomBytes } from 'node:crypto'
 import { mkdirSync, readFileSync } from 'node:fs'
-import { createServer } from 'node:http'
+import { createServer, type IncomingMessage, type ServerResponse } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { join } from 'node:path'
 import { app, ipcMain, Menu, session, shell, WebContentsView, type BrowserWindow, type Session, type WebContents } from 'electron'
@@ -32,7 +36,8 @@ import { guardar } from '../server/disco.ts'
 import { crearRelevo, type Relevo } from './relevo.ts'
 import { actividadNavegador } from './actividad-navegador.ts'
 import { type EnGoogle, vigilarGoogle } from './google.ts'
-import { type AccionNavegador, type EstadoNavegador, NAVEGADOR_REDES, NAVEGADOR_VOZ, type PantallaNavegador } from '../shared/types.ts'
+import { type AccionNavegador, type EntradaNavegador, type EstadoNavegador, NAVEGADOR_REDES, NAVEGADOR_VOZ, type PantallaNavegador } from '../shared/types.ts'
+import { entradaCdp } from '../shared/entrada-cdp.ts'
 
 const PARTICION = 'persist:navegador'
 const PARTICION_REDES = 'persist:redes'
@@ -126,9 +131,20 @@ const enGoogle: EnGoogle = {
   }
 }
 
+/**
+ * Lo de la ventana que la web también pide por el relevo (`/<secreto>/ventana/…`, `server/navegador-remoto.ts`): la
+ * versión nueva de Sloth y ponerla. En la nube (ADR 0026) nadie ve la ventana, y es lo único que la sabe.
+ */
+export interface DeLaVentana {
+  actualizacion: () => Promise<unknown>
+  actualizar: () => unknown
+}
+let deLaVentana: DeLaVentana | undefined
+
 /** Pone el navegador: lo que pide la interfaz, el perfil de las páginas y el relevo para el agente. */
-export function iniciarNavegador(appDir: string) {
+export function iniciarNavegador(appDir: string, ventana?: DeLaVentana) {
   carpeta = appDir
+  deLaVentana = ventana
   for (const p of [PARTICION, PARTICION_REDES, PARTICION_VOZ]) prepararPerfil(session.fromPartition(p))
 
   ipcMain.on('navegador:ver', (_e, hilo: string | null, caja?: Caja, pantalla?: PantallaNavegador | null) => ver(hilo, caja, pantalla))
@@ -450,7 +466,12 @@ function relevar(archivo: string) {
     // La primera vez.
   }
   const secreto = typeof antes.secreto === 'string' && antes.secreto ? antes.secreto : randomBytes(18).toString('hex')
-  const http = createServer((_req, res) => res.writeHead(404).end())
+  const http = createServer((req, res) =>
+    void remoto(req, res, secreto).catch((e) => {
+      if (!res.headersSent) res.writeHead(500, { 'content-type': 'application/json' })
+      res.end(JSON.stringify({ error: e instanceof Error ? e.message : String(e) }))
+    })
+  )
   // El WebSocketServer repite los errores de `http`; sin este oyente tumbaban la app (los atiende `http.on('error')`).
   new WebSocketServer({ server: http, maxPayload: 64 * 1024 * 1024 }).on('error', () => {}).on('connection', (ws, req) => {
     const [, s, hilo] = new URL(req.url ?? '/', 'http://x').pathname.split('/')
@@ -524,4 +545,105 @@ async function conectar(ws: WebSocket, hilo: string) {
     avisar(h)
   })
   avisar(h)
+}
+
+/** Lo más que se espera una captura para la web. */
+const CAPTURA_TOPE = 8000
+/** El depurador de la página, el mismo que comparte con el agente (`conectar`). */
+function depurador(wc: WebContents) {
+  if (!wc.debugger.isAttached()) wc.debugger.attach('1.3')
+  return wc.debugger
+}
+
+function leerCuerpo(req: IncomingMessage): Promise<Record<string, unknown>> {
+  return new Promise((ok) => {
+    let t = ''
+    req.on('data', (d) => (t += d))
+    req.on('end', () => {
+      try {
+        ok(JSON.parse(t || '{}'))
+      } catch {
+        ok({})
+      }
+    })
+  })
+}
+
+/**
+ * La página de cada hilo, desde la web (por `server/navegador-remoto.ts`), en `/<secreto>/remoto/…`:
+ * - `GET estados`: cómo van todas, como `navegador:estados`.
+ * - `GET <hilo>/captura`: una captura en JPEG, con su medida en píxeles CSS (`x-ancho`, `x-alto`). 204 si no hay
+ *   página.
+ * - `POST <hilo>/ir {url}`, `POST <hilo>/hacer {accion}` y `POST <hilo>/entrada` (`EntradaNavegador`).
+ * Solo el servidor de esta computadora: con el secreto y sin `Origin`. También `GET ventana/actualizacion` y
+ * `POST ventana/actualizar` (`DeLaVentana`).
+ */
+async function remoto(req: IncomingMessage, res: ServerResponse, secreto: string) {
+  const u = new URL(req.url ?? '/', 'http://x')
+  const [, s, que, uno, accion] = u.pathname.split('/')
+  const responder = (status: number, datos?: unknown) => {
+    res.writeHead(status, { 'content-type': 'application/json', 'cache-control': 'no-store' })
+    res.end(datos === undefined ? '' : JSON.stringify(datos))
+  }
+  if (s !== secreto || req.headers.origin || !uno) return responder(404)
+  if (que === 'ventana') {
+    if (!deLaVentana) return responder(404)
+    if (uno === 'actualizacion' && req.method === 'GET') return responder(200, await deLaVentana.actualizacion())
+    if (uno === 'actualizar' && req.method === 'POST') return responder(200, await deLaVentana.actualizar())
+    return responder(404)
+  }
+  if (que !== 'remoto') return responder(404)
+  if (uno === 'estados' && req.method === 'GET') return responder(200, [...hojas.values()].map(estado))
+  const hilo = decodeURIComponent(uno)
+  if (!/^[\w~-]+$/.test(hilo)) return responder(400)
+
+  if (accion === 'captura' && req.method === 'GET') {
+    const h = hojas.get(hilo) ?? (ultimas.has(hilo) ? reabrir(hilo) : undefined)
+    if (!h) return responder(204)
+    await h.lista
+    const wc = h.vista.webContents
+    if (wc.isDestroyed() || !estado(h).url) return responder(204)
+    // Mide lo mismo que para el agente: la web la encoge a su caja, como el tamaño fijo del panel.
+    h.usada = Date.now()
+    // `capturePage` la pinta aunque esté escondida; `Page.captureScreenshot` de CDP se quedaba esperando un cuadro que
+    // una página escondida no dibuja.
+    const foto = await h.actividad.usar(() =>
+      Promise.race([
+        (async () => {
+          const m = (await depurador(wc).sendCommand('Page.getLayoutMetrics')) as { cssVisualViewport: { clientWidth: number; clientHeight: number } }
+          const imagen = await wc.capturePage()
+          return { datos: imagen.isEmpty() ? null : imagen.toJPEG(60), ancho: Math.round(m.cssVisualViewport.clientWidth), alto: Math.round(m.cssVisualViewport.clientHeight) }
+        })(),
+        new Promise<null>((r) => setTimeout(() => r(null), CAPTURA_TOPE))
+      ])
+    )
+    if (!foto?.datos) return responder(503, { error: 'La página no se dejó ver. Se vuelve a intentar.' })
+    res.writeHead(200, { 'content-type': 'image/jpeg', 'cache-control': 'no-store', 'x-ancho': String(foto.ancho), 'x-alto': String(foto.alto) })
+    return void res.end(foto.datos)
+  }
+
+  if (req.method !== 'POST') return responder(404)
+  const c = await leerCuerpo(req)
+  if (accion === 'ir') {
+    if (typeof c.url !== 'string' || !/^https?:\/\//i.test(c.url)) return responder(400)
+    llevar(hojas.get(hilo) ?? abrir(hilo), c.url)
+    return responder(200, { ok: true })
+  }
+  if (accion === 'hacer') {
+    // El menú y «abrir fuera» son de la ventana: en la web los hace su propia página.
+    const permitidas: AccionNavegador[] = ['atras', 'adelante', 'recargar', 'parar', 'acercar', 'alejar', 'zoomNormal', 'cerrar']
+    if (permitidas.includes(c.accion as AccionNavegador)) hacer(hilo, c.accion as AccionNavegador)
+    return responder(200, { ok: true })
+  }
+  if (accion === 'entrada') {
+    const h = hojas.get(hilo)
+    if (!h || h.vista.webContents.isDestroyed()) return responder(404)
+    const e = c as unknown as EntradaNavegador
+    const wc = h.vista.webContents
+    h.usada = Date.now()
+    // Con la página encogida, Chromium toma los clics en píxeles de la caja, como los del agente (`conectar`).
+    await h.actividad.usar(() => entradaCdp((metodo, params) => depurador(wc).sendCommand(metodo, params), e, h.escala))
+    return responder(200, { ok: true })
+  }
+  responder(404)
 }

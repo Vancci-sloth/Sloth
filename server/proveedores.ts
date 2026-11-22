@@ -5,9 +5,11 @@ import { cancelarAntigravity, conectandoAntigravity, conectarAntigravity, cuenta
 import { startClaude } from './claude.ts'
 import { cancelarCursor, conectandoCursor, conectarCursor, cuentaCursor, modelosCursor, salirCursor, startCursor } from './cursor.ts'
 import { cuentaDeepSeek, deepseekModels } from './deepseek.ts'
+import { cuentaFreeLLMAPI, modelosFreeLLMAPI } from './freellmapi.ts'
 import { cuentaGemini, modelosGemini, startGemini } from './gemini.ts'
 import { cuentaGrok, modelosGrok, startGrok } from './grok.ts'
 import { cuentaMuse, modelosMuse, startMuse } from './muse.ts'
+import { cuentaOpenRouter, modelosOpenRouter } from './openrouter.ts'
 import { cuentaPi, llavesPi, modelosPi, salirPi, startPi } from './pi.ts'
 
 /**
@@ -17,13 +19,15 @@ import { cuentaPi, llavesPi, modelosPi, salirPi, startPi } from './pi.ts'
  * `/api/<agente>/…` de server/index.ts y Opciones (`CuentaAgente`, web/src/Opciones.tsx).
  *
  * `como` dice cómo se conecta, para que Opciones lo explique: en una ventana del agente (`ventana`), en el navegador con
- * un enlace (`navegador`) o pegando una llave de API (`llave`, DeepSeek y Gemini; se guarda con `/api/<agente>/acceso`).
+ * un enlace (`navegador`) o pegando una llave de API (`llave`: DeepSeek, OpenRouter, FreeLLMAPI y Gemini; se guarda con
+ * `/api/<agente>/acceso`).
  */
 export interface Otro {
   como: 'ventana' | 'navegador' | 'llave'
   start(opts: AgentOptions): AgentRun
   cuenta(fresco?: boolean): Promise<CuentaClaude> | CuentaClaude
-  conectar?(): Promise<CuentaClaude>
+  /** `remoto`: se pidió desde la web (ADR 0025). */
+  conectar?(remoto?: boolean): Promise<CuentaClaude>
   cancelar?(): Promise<CuentaClaude> | CuentaClaude
   salir?(): Promise<CuentaClaude> | CuentaClaude
   conectando?(): string | null
@@ -37,6 +41,8 @@ export interface Otro {
 
 export const OTROS: Partial<Record<Proveedor, Otro>> = {
   deepseek: { como: 'llave', start: startClaude, cuenta: cuentaDeepSeek, modelos: deepseekModels },
+  openrouter: { como: 'llave', start: startClaude, cuenta: cuentaOpenRouter, modelos: modelosOpenRouter },
+  freellmapi: { como: 'llave', start: startClaude, cuenta: cuentaFreeLLMAPI, modelos: modelosFreeLLMAPI },
   grok: { como: 'ventana', start: startGrok, ...cuentaGrok, modelos: modelosGrok },
   antigravity: { como: 'navegador', start: startAntigravity, cuenta: cuentaAntigravity, conectar: conectarAntigravity, cancelar: cancelarAntigravity, salir: salirAntigravity, usar: usarAntigravity, quitar: quitarAntigravity, conectando: conectandoAntigravity, modelos: modelosAntigravity },
   gemini: { como: 'llave', start: startGemini, cuenta: cuentaGemini, modelos: modelosGemini },

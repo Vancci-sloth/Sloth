@@ -8,6 +8,8 @@ import type { BorradorYoutube, CalendarioYoutube, CatalogoYoutube, ConexionYoutu
 import { aLaPapelera, guardar, huella } from './disco.ts'
 import { folderOf, servir, videosDe } from './etapas.ts'
 import { leer, escribir } from './opciones.ts'
+import type { Credencial } from './comunidad.ts'
+import { COBRO } from './licencia.ts'
 import type { Sessions } from './sessions.ts'
 import { errorYoutube, subirYoutube, type SubidaYoutube } from './youtube-subida.ts'
 import { carpetaYoutube, formaYoutube, miniaturasYoutube, propuestaYoutube, validarMiniatura } from './youtube-catalogo.ts'
@@ -21,21 +23,57 @@ import { modeloYoutube } from './youtube-modelo.ts'
  * YouTube para videos largos, separado del calendario de verticales: autorización OAuth de escritorio con PKCE,
  * elección explícita de privacidad y subida reanudable. Las credenciales viven en el entorno del usuario, como las
  * llaves de Opciones; el avance y las sesiones de subida, en data/youtube.json. Solo acepta videos terminados de Sloth.
+ *
+ * El canal se conecta con una de dos apps de Google: la de Sloth, para quien apoya (`AppSloth`: el cobro guarda su
+ * secreto y canjea cada permiso, `licencias/src/youtube.ts`), o la propia de cada quien, con el JSON que importa.
  */
 const CLIENTE = 'YOUTUBE_CLIENT_ID'
 const SECRETO = 'YOUTUBE_CLIENT_SECRET'
 const REFRESH = 'YOUTUBE_REFRESH_TOKEN'
 const PERMISOS = 'YOUTUBE_SCOPES'
+/** `1` si el canal se conectó con la app de Sloth: su permiso se renueva en el cobro, no directo con Google. */
+const CON_SLOTH = 'YOUTUBE_CON_SLOTH'
 const SCOPES = 'https://www.googleapis.com/auth/youtube.upload https://www.googleapis.com/auth/youtube.readonly https://www.googleapis.com/auth/youtube.force-ssl'
 const TOKEN = 'https://oauth2.googleapis.com/token'
 type Credenciales = { leer(nombre: string): string; escribir(nombre: string, valor: string | null): void }
 type Datos = { cuenta: CuentaYoutube | null; subidas: Record<string, SubidaYoutube>; borradores: Partial<Record<string, BorradorYoutube>>; ritmo?: Ritmo }
 /** Lo más pronto que «Pasar al ritmo nuevo» pone o mueve una fecha: YouTube pide que falten al menos dos minutos. */
 const MARGEN = 10 * 60_000
+/** Cada cuánto se vuelve a preguntar al cobro si la app de Sloth está lista y si esta computadora apoya. */
+const MIRAR_SLOTH = 5 * 60_000
+
+/** La app de Google de Sloth, en el cobro (`licencias/src/youtube.ts`), con la clave de esta computadora. */
+export interface AppSloth {
+  /** Su id y si quien pregunta apoya; `{}` si aún no está lista. */
+  info(): Promise<{ cliente?: string; apoya?: boolean }>
+  /** Canjea el código de la autorización (`code`, `verifier`, `retorno`) o renueva el permiso (`refresh`). */
+  token(cuerpo: Record<string, string>): Promise<Response>
+}
+
+/** `AppSloth` sobre el cobro, con quién eres: la clave de tu apoyo o, en la computadora del creador, su llave. */
+export function appSloth(credencial: () => Credencial | undefined | Promise<Credencial | undefined>, cobro = process.env.SLOTH_COBRO || COBRO): AppSloth {
+  async function pedir(ruta: string, cuerpo?: Record<string, string>) {
+    const c = await credencial()
+    const quien: Record<string, string> = !c ? {} : 'llave' in c ? { authorization: `Bearer ${c.llave}` } : { 'x-sloth-clave': c.clave, 'x-sloth-equipo': c.equipo }
+    return fetch(`${cobro}${ruta}`, {
+      method: cuerpo ? 'POST' : 'GET',
+      headers: { ...quien, ...(cuerpo ? { 'content-type': 'application/json' } : {}) },
+      body: cuerpo ? JSON.stringify(cuerpo) : undefined,
+      signal: AbortSignal.timeout(20_000)
+    })
+  }
+  return {
+    info: async () => {
+      const r = await pedir('/youtube')
+      return r.ok ? ((await r.json()) as { cliente?: string; apoya?: boolean }) : {}
+    },
+    token: (cuerpo) => pedir('/youtube/token', cuerpo)
+  }
+}
 
 export function youtube(app: string, sessions: Sessions, cards: () => Card[], retorno: string, credenciales: Credenciales = {
   leer: (nombre) => process.env[nombre] || leer(nombre), escribir
-}, modelos: () => Model[] = () => [], papelera: typeof aLaPapelera = aLaPapelera) {
+}, modelos: () => Model[] = () => [], papelera: typeof aLaPapelera = aLaPapelera, sloth?: AppSloth) {
   const archivo = join(app, 'data', 'youtube.json')
   let datos: Datos = { cuenta: null, subidas: {}, borradores: {} }
   let roto = false
@@ -76,7 +114,7 @@ export function youtube(app: string, sessions: Sessions, cards: () => Card[], re
     mkdirSync(join(app, 'data'), { recursive: true })
     guardar(archivo, JSON.stringify(datos, null, 2))
   }
-  let permiso: { state: string; verifier: string; hasta: number } | null = null
+  let permiso: { state: string; verifier: string; hasta: number; sloth?: boolean } | null = null
   let error: string | undefined
   let acceso: { token: string; hasta: number } | null = null
   let renovando: Promise<string> | null = null
@@ -85,17 +123,32 @@ export function youtube(app: string, sessions: Sessions, cards: () => Card[], re
   let procesando = false
   let eliminando = false
   const conectado = () => !!credenciales.leer(REFRESH)
+  const conSloth = () => credenciales.leer(CON_SLOTH) === '1'
   const puedeProgramar = () => conectado() && credenciales.leer(PERMISOS).split(' ').includes('https://www.googleapis.com/auth/youtube.force-ssl')
+  /** Lo último que dijo el cobro de la app de Sloth (`AppSloth.info`). Sin conexión, lo de antes. */
+  let infoSloth: { cliente?: string; apoya?: boolean; leida: number } = { leida: 0 }
+  async function mirarSloth(ya = false) {
+    if (!sloth || (!ya && Date.now() - infoSloth.leida < MIRAR_SLOTH)) return infoSloth
+    try { infoSloth = { ...(await sloth.info()), leida: Date.now() } } catch { infoSloth.leida = Date.now() - MIRAR_SLOTH + 30_000 }
+    return infoSloth
+  }
   function estado(): ConexionYoutube {
     if (permiso && permiso.hasta < Date.now()) { permiso = null; error = 'La conexión con Google venció. Pulsa «Conectar canal» para intentarlo otra vez.' }
-    return { cliente: !!credenciales.leer(CLIENTE), cuenta: conectado() ? datos.cuenta : null, conectando: !!permiso || autorizando, error, programar: puedeProgramar() }
+    return { cliente: !!credenciales.leer(CLIENTE), cuenta: conectado() ? datos.cuenta : null, conectando: !!permiso || autorizando, error, programar: puedeProgramar(),
+      ...(infoSloth.cliente ? { sloth: { apoya: !!infoSloth.apoya } } : {}), ...(conectado() && conSloth() ? { conSloth: true } : {}) }
   }
-  async function canjear(body: URLSearchParams) {
-    const res = await fetch(TOKEN, { method: 'POST', body, signal: AbortSignal.timeout(30_000) })
-    const j = await res.json() as { access_token?: string; refresh_token?: string; expires_in?: number; error?: string; scope?: string }
+  /** Pide el permiso a Google: con la app propia, directo; con la de Sloth, por el cobro, que guarda su secreto. */
+  async function canjear(body: Record<string, string>, viaSloth: boolean) {
+    const res = viaSloth
+      ? await sloth!.token(body)
+      : await fetch(TOKEN, { method: 'POST', body: new URLSearchParams({ client_id: credenciales.leer(CLIENTE), client_secret: credenciales.leer(SECRETO), ...body }), signal: AbortSignal.timeout(30_000) })
+    const j = await res.json().catch(() => ({})) as { access_token?: string; refresh_token?: string; expires_in?: number; error?: string; scope?: string }
     if (!res.ok || !j.access_token) {
+      // El cobro dice que ya no apoya: el permiso queda, y vuelve a servir al apoyar otra vez.
+      if (viaSloth && res.status === 402) { infoSloth = { ...infoSloth, apoya: false }; throw new Error(j.error ?? 'Conectar YouTube con la app de Sloth es para quienes apoyan a Sloth.') }
+      if (viaSloth && res.status !== 400) throw new Error(j.error && res.status < 500 ? j.error : 'No hay conexión con el cobro de Sloth, que renueva el permiso de YouTube. Reintenta en un momento.')
       if (j.error === 'invalid_grant') error = 'Google retiró el permiso o caducó. Vuelve a conectar el canal.'
-      throw new Error(error ?? 'Google no pudo autorizar el canal. Revisa las credenciales OAuth de escritorio y vuelve a conectarlo.')
+      throw new Error(error ?? (viaSloth ? 'Google no pudo autorizar el canal. Vuelve a conectarlo.' : 'Google no pudo autorizar el canal. Revisa las credenciales OAuth de escritorio y vuelve a conectarlo.'))
     }
     acceso = { token: j.access_token, hasta: Date.now() + (j.expires_in ?? 3600) * 1000 }
     return j
@@ -105,9 +158,21 @@ export function youtube(app: string, sessions: Sessions, cards: () => Card[], re
     if (renovando) return renovando
     const refresh = credenciales.leer(REFRESH)
     if (!refresh) throw new Error('Conecta tu canal de YouTube en Opciones antes de subir un video.')
-    renovando = canjear(new URLSearchParams({ client_id: credenciales.leer(CLIENTE), client_secret: credenciales.leer(SECRETO), refresh_token: refresh, grant_type: 'refresh_token' }))
+    renovando = (conSloth() ? canjear({ refresh }, true) : canjear({ refresh_token: refresh, grant_type: 'refresh_token' }, false))
       .then((j) => j.access_token!)
     try { return await renovando } finally { renovando = null }
+  }
+  /**
+   * Olvida el permiso del canal aquí y le pide a Google que lo retire (lo piden las políticas de la API de YouTube al
+   * desconectar). Retirarlo no necesita el secreto de la app. Sin conexión, aquí se olvida igual.
+   */
+  async function revocar() {
+    const refresh = credenciales.leer(REFRESH)
+    credenciales.escribir(REFRESH, null)
+    credenciales.escribir(PERMISOS, null)
+    credenciales.escribir(CON_SLOTH, null)
+    acceso = null
+    if (refresh) await fetch('https://oauth2.googleapis.com/revoke', { method: 'POST', body: new URLSearchParams({ token: refresh }), signal: AbortSignal.timeout(10_000) }).catch(() => undefined)
   }
   async function cuenta(): Promise<CuentaYoutube> {
     const res = await fetch('https://www.googleapis.com/youtube/v3/channels?part=snippet&mine=true', { headers: { authorization: `Bearer ${await token()}` }, signal: AbortSignal.timeout(30_000) })
@@ -272,7 +337,10 @@ export function youtube(app: string, sessions: Sessions, cards: () => Card[], re
       return json(res, 403, { error: 'La petición tiene que venir de Sloth.' })
     if (post && eliminando) return json(res, 409, { error: 'Espera a que termine de enviar los videos a la Papelera.' })
     try {
-      if (url.pathname === '/api/youtube' && req.method === 'GET') return json(res, 200, estado())
+      if (url.pathname === '/api/youtube' && req.method === 'GET') {
+        await mirarSloth()
+        return json(res, 200, estado())
+      }
       // El calendario sale del registro de YouTube, incluso cuando el MP4 local ya fue enviado a la Papelera.
       if (url.pathname === '/api/youtube/calendario' && req.method === 'GET') {
         const delCanal = datos.cuenta ? Object.entries(datos.subidas).filter(([k]) => k.startsWith(`${datos.cuenta!.id}:`)).map(([, s]) => s) : []
@@ -404,8 +472,9 @@ export function youtube(app: string, sessions: Sessions, cards: () => Card[], re
         const cliente = clienteYoutube((await body(req)).cliente)
         credenciales.escribir(CLIENTE, cliente.id)
         credenciales.escribir(SECRETO, cliente.secreto)
-        credenciales.escribir(REFRESH, null)
-        credenciales.escribir(PERMISOS, null)
+        // Conectado con la app de Sloth, se queda así: tu app queda lista para cuando la elijas.
+        if (conSloth() && conectado()) return json(res, 200, estado())
+        await revocar()
         datos.cuenta = null
         acceso = null
         permiso = null
@@ -413,11 +482,16 @@ export function youtube(app: string, sessions: Sessions, cards: () => Card[], re
         guardarDatos()
         return json(res, 200, estado())
       }
+      // `sloth`: con la app de Google de Sloth, si apoyas; si no, con la tuya.
       if (url.pathname === '/api/youtube/conectar' && post) {
         if (activa || autorizando || recomendar.ocupado()) return json(res, 409, { error: 'Espera a que termine la subida, el análisis o la conexión.' })
-        const id = credenciales.leer(CLIENTE)
+        const conLaDeSloth = (await body(req)).sloth === true
+        const info = conLaDeSloth ? await mirarSloth(true) : undefined
+        if (info && !info.cliente) return json(res, 400, { error: 'La app de YouTube de Sloth todavía no está lista. Conecta tu propia app de Google.' })
+        if (info && !info.apoya) return json(res, 402, { error: 'Conectar YouTube con la app de Sloth es para quienes apoyan a Sloth. Apoya, o conecta tu propia app de Google.' })
+        const id = info ? info.cliente! : credenciales.leer(CLIENTE)
         if (!id) return json(res, 400, { error: 'Importa primero el JSON de las credenciales OAuth de escritorio de Google Cloud.' })
-        permiso = { state: randomBytes(32).toString('base64url'), verifier: randomBytes(32).toString('base64url'), hasta: Date.now() + 10 * 60_000 }
+        permiso = { state: randomBytes(32).toString('base64url'), verifier: randomBytes(32).toString('base64url'), hasta: Date.now() + 10 * 60_000, ...(info ? { sloth: true } : {}) }
         error = undefined
         const q = new URLSearchParams({ client_id: id, redirect_uri: retorno, response_type: 'code',
           scope: SCOPES,
@@ -435,11 +509,15 @@ export function youtube(app: string, sessions: Sessions, cards: () => Card[], re
           if (url.searchParams.has('error')) throw new Error('No se concedió el permiso a Sloth. Puedes conectar el canal de nuevo.')
           const code = url.searchParams.get('code')
           if (!code) throw new Error('Google no devolvió la autorización del canal.')
-          const j = await canjear(new URLSearchParams({ client_id: credenciales.leer(CLIENTE), client_secret: credenciales.leer(SECRETO), code,
-            code_verifier: p.verifier, redirect_uri: retorno, grant_type: 'authorization_code' }))
+          const j = p.sloth
+            ? await canjear({ code, verifier: p.verifier, retorno }, true)
+            : await canjear({ code, code_verifier: p.verifier, redirect_uri: retorno, grant_type: 'authorization_code' }, false)
           if (!j.refresh_token) throw new Error('Google no devolvió el permiso para futuras subidas. Vuelve a conectar el canal.')
           const canal = await cuenta()
+          // El permiso de antes no se retira: las variables las comparten la Sloth instalada y la de desarrollo, y la otra
+          // seguiría usándolo. Se retira al pulsar «Desconectar canal».
           credenciales.escribir(REFRESH, j.refresh_token)
+          credenciales.escribir(CON_SLOTH, p.sloth ? '1' : null)
           credenciales.escribir(PERMISOS, j.scope ?? SCOPES)
           datos.cuenta = canal
           guardarDatos()
@@ -456,8 +534,7 @@ export function youtube(app: string, sessions: Sessions, cards: () => Card[], re
       }
       if (url.pathname === '/api/youtube/desconectar' && post) {
         if (activa || autorizando || recomendar.ocupado()) return json(res, 409, { error: 'Espera a que termine la subida, el análisis o la conexión.' })
-        credenciales.escribir(REFRESH, null)
-        credenciales.escribir(PERMISOS, null)
+        await revocar()
         datos.cuenta = null
         acceso = null
         permiso = null

@@ -1,6 +1,7 @@
 import { memo, useCallback, type KeyboardEvent as TeclaReact, type PointerEvent as PunteroReact, type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
 import type { Biblioteca3D, Modelo3D } from '../../shared/types'
 import { api } from './api'
+import { Desplegable } from './Desplegable'
 import { buscar, indexar } from './buscar3d'
 import { useDesplazando } from './desplazando'
 import { Icono } from './Iconos'
@@ -246,16 +247,7 @@ export const Modelos3D = memo(function Modelos3D() {
               </button>
             ))}
           </div>
-          <label className="m3d-orden" title="Ordenar">
-            <Icono de="ordenar" />
-            <select value={orden} onChange={(e) => setOrden(e.target.value as Orden)} aria-label="Ordenar">
-              {ORDENES.map(([o, texto]) => (
-                <option key={o} value={o}>
-                  {texto}
-                </option>
-              ))}
-            </select>
-          </label>
+          <Desplegable className="m3d-orden" nombre="Ordenar" icono={<Icono de="ordenar" />} valor={orden} opciones={ORDENES.map(([o, texto]) => ({ value: o, label: texto }))} onCambio={(o) => setOrden(o as Orden)} />
         </div>
       )}
       {biblioteca && (hayBusqueda || elegido) && enOrden.length > 0 && (

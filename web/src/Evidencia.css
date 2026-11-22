@@ -1,0 +1,26 @@
+/* La evidencia de la prueba de un estilo (Evidencia.tsx): el hilo completo donde se hizo su video. */
+
+/* En la publicación, junto a su guía: texto con icono, como los demás. */
+.hiloprueba-boton { display: inline-flex; align-items: center; gap: 6px; margin: 8px 0 0; padding: 0; color: var(--amber); font-size: 13px; font-weight: 600; }
+.hiloprueba-boton:hover { text-decoration: underline; }
+.hiloprueba-boton svg { width: 15px; height: 15px; }
+
+.hiloprueba-prueba { margin: 0 0 4px; color: var(--text); font-size: 14px; font-weight: 600; }
+.hiloprueba-usa { margin: 0 0 4px; color: var(--muted); font-size: 13px; }
+
+/* El hilo, como pasó: quién habla, a la izquierda de lo que dijo. */
+.hiloprueba-hilo { list-style: none; margin: 12px 0 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.hiloprueba-hilo li { min-width: 0; }
+.hiloprueba-usuario, .hiloprueba-agente { padding: 9px 12px; border: 1px solid var(--line); border-radius: 12px; }
+.hiloprueba-usuario { background: var(--panel-2); }
+.hiloprueba-hilo li > span { display: block; margin-bottom: 3px; color: var(--muted); font-size: 11.5px; font-weight: 600; }
+.hiloprueba-hilo p { margin: 0; color: var(--text); font-size: 13.5px; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; }
+/* Cada herramienta, en un renglón que se abre. */
+.hiloprueba-herramienta summary { color: var(--muted); font-size: 12.5px; cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hiloprueba-herramienta summary strong { color: var(--text); font-weight: 600; }
+.hiloprueba-herramienta.mal summary strong { color: var(--bad); }
+.hiloprueba-herramienta pre { margin: 6px 0 0; padding: 8px 10px; border: 1px solid var(--line); border-radius: var(--radio); background: var(--bg); color: var(--text); font-size: 12px; line-height: 1.45; white-space: pre-wrap; overflow-wrap: anywhere; max-height: 260px; overflow-y: auto; }
+.hiloprueba-herramienta pre.salida { color: var(--muted); }
+/* Cómo acabó cada turno: lo que tardó y lo que costó. */
+.hiloprueba-turno { padding: 2px 0 6px; border-bottom: 1px solid var(--line); color: var(--muted); font-size: 12px; text-align: center; }
+.hiloprueba-turno.mal { color: var(--bad); }

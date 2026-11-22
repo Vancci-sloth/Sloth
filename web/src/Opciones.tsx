@@ -1,18 +1,21 @@
 import { type ReactNode, type Ref, useEffect, useRef, useState } from 'react'
-import { type CuentaClaude as Cuenta, type Opciones as Datos, type EstadoAgente, type LimitesClaude, type Model, NAVEGADOR_REDES, type Requisito, type VersionClaude } from '../../shared/types'
+import { type CuentaClaude as Cuenta, type Opciones as Datos, type EstadoAgente, type LimitesClaude, type Model, type NavegadorDeFuera, NAVEGADOR_REDES, type Requisito, type VersionClaude } from '../../shared/types'
 import { api } from './api'
 import { Arranque } from './Arranque'
 import { type Proveedor, proveedorDe } from '../../shared/providers'
 import { encender, encendido, notificar, sonar, usePermiso } from './avisos'
 import { abrirBienvenida } from './Bienvenida'
 import { abrirNovedades } from './Novedades'
-import { abrirCreditosVoz } from './CreditosVoz'
 import { Picker } from './Composer'
 import { ESPACIO_DISCO, EspacioDisco } from './Espacio' // espacio en disco
 import { discoLleno } from './items'
 import { TuEquipo } from './Equipo' // tu equipo
+import { TuCelular } from './Celular' // tu celular
 import { Icono } from './Iconos'
-import { SuscripcionOpciones } from './Licencia' // apoyo
+import { SuscripcionOpciones, VersionYApoyo } from './Licencia' // apoyo
+import { RespaldoOpciones } from './Respaldo' // tu Sloth en otra computadora
+import { SlothWebOpciones } from './SlothWeb' // Sloth en la web
+import { ALLA, enLaNube, enLaWeb } from './web'
 import { Logo } from './Logos'
 import { BotonNavegador } from './Navegador'
 import { RadarOpciones } from './RadarOpciones' // radar
@@ -59,7 +62,10 @@ function Ajustes({ onDone, iniciando, onIniciando }: { onDone(): void; iniciando
         ← Volver
       </button>
       <div className="opciones-titulo">
-        <h1>Opciones</h1>
+        <div className="opciones-nombre">
+          <h1>Opciones</h1>
+          <VersionYApoyo className="muted small" />
+        </div>
         <div className="opciones-titulo-acciones">
           <button className="ghost small" onClick={abrirBienvenida}>
             Ver la bienvenida
@@ -67,15 +73,11 @@ function Ajustes({ onDone, iniciando, onIniciando }: { onDone(): void; iniciando
           <button className="ghost small" onClick={abrirNovedades}>
             Ver novedades
           </button>
-          {/* Solo en el repo: el aviso de los créditos sale solo a quien apoya, y así se revisa. */}
-          {!VENTA && (
-            <button className="ghost small" onClick={abrirCreditosVoz}>
-              Ver aviso de créditos
-            </button>
-          )}
           {iniciando && <BotonNavegador hilo={NAVEGADOR_REDES} trabajando={false} />}
         </div>
       </div>
+      {/* Desde la web, los inicios de sesión de la computadora se ven aquí (server/ventanas-remotas.ts). */}
+      {enLaWeb && <VueltaWeb />}
       {/* Las redes, lo primero: es por donde salen los videos. Cada quien las conecta con sus propias credenciales. */}
       <section className="grupo redes-grupo">
         <div className="redes-cabeza">
@@ -98,6 +100,28 @@ function Ajustes({ onDone, iniciando, onIniciando }: { onDone(): void; iniciando
           <SuscripcionOpciones />
         </Grupo>
       )}
+      {enLaNube ? (
+        <Grupo
+          titulo="Sloth en la nube"
+          nota="Esta Sloth corre en tu Codespace de GitHub, sin tu computadora. Entra desde cualquier navegador con tu cuenta de GitHub en esta misma dirección. Deja abierta la pestaña de tu Codespace: mientras usas Sloth o algo trabaja, ahí le avisa a GitHub. Sin ella, GitHub la detiene tras un rato sin uso (en sus opciones lo subes hasta 4 horas) y la enciendes otra vez en github.com/codespaces: tus chats y tus videos se quedan."
+        >
+          <p className="small">
+            <a href="https://github.com/settings/codespaces" target="_blank" rel="noreferrer">
+              Cambiar cuánto espera GitHub antes de detenerla
+            </a>
+          </p>
+        </Grupo>
+      ) : (
+        <Grupo
+          titulo="Sloth en la web"
+          nota="Usa tu Sloth desde el navegador del celular o de otra computadora, con tus mismos chats, agentes y videos. Todo sigue trabajando en esta computadora: tiene que estar encendida, con internet y con Sloth abierto. La conexión va cifrada por un túnel de Cloudflare, y solo entran los dispositivos que conectes aquí. ¿Sin computadora? Sloth también corre en la nube, en web.sloth.vancci.org."
+        >
+          <SlothWebOpciones />
+        </Grupo>
+      )}
+      <Grupo titulo="Tu Sloth en otra computadora" nota="Con tu clave, Sloth guarda sola una copia de tus estilos, tus chats, «Sobre ti» y tus marcas. Escribe esa clave en otra computadora y te ofrece traerlo todo. Los videos y las cuentas conectadas no viajan.">
+        <RespaldoOpciones />
+      </Grupo>
       <Grupo ref={agentes} titulo="Agentes" nota="Cada agente se descarga la primera vez que lo eliges. Claude y ChatGPT necesitan un plan de pago o una llave de API; OpenCode, solo tu cuenta, que es gratis. Los demás, la cuenta o la llave de cada uno.">
         <Agentes />
         <CuentaCodex />
@@ -118,6 +142,7 @@ function Ajustes({ onDone, iniciando, onIniciando }: { onDone(): void; iniciando
       >
         <FlowOpciones voz={voz} />
       </Grupo>
+      <NavegadorDeGoogle />
       {/* Solo sirven a Ideas: sin la de YouTube, las recomendaciones van con el canal conectado. */}
       {!VENTA && (
         <Grupo titulo="Llaves de API">
@@ -131,6 +156,7 @@ function Ajustes({ onDone, iniciando, onIniciando }: { onDone(): void; iniciando
       <Grupo titulo="Avisos">
         <Avisos />
       </Grupo>
+      <TuCelular />
       <TuEquipo />
       <EspacioDisco />
       <Herramientas req={req} />
@@ -368,6 +394,13 @@ type UsoCuenta = ReturnType<typeof useCuenta>
  */
 function Autorizando({ c }: { c: UsoCuenta }) {
   if (!c.cuenta?.conectando) return null
+  // Desde la web, el inicio de sesión sale en el panel de abajo a la derecha (`VentanasRemotas.tsx`).
+  if (enLaWeb)
+    return (
+      <div className="fila-extra">
+        <p className="small">Sigue los pasos en el panel «En {ALLA}», abajo a la derecha: abre el enlace, entra con tu cuenta y pega ahí el código que te da. Al terminar, esto se actualiza solo.</p>
+      </div>
+    )
   return (
     <div className="fila-extra">
       <p className="small">Autoriza a Claude Code en la pestaña que se abrió. Al terminar, esto se actualiza solo.</p>
@@ -714,14 +747,15 @@ export function CuentaOpenCode({ aviso = false, onFalta }: { aviso?: boolean; on
 }
 
 /** Los agentes que llegaron después de Claude, Codex y OpenCode (`server/proveedores.ts`), en el orden de Opciones. */
-export const OTROS_AGENTES = ['deepseek', 'grok', 'antigravity', 'gemini', 'cursor', 'muse', 'pi'] as const satisfies readonly Proveedor[]
+export const OTROS_AGENTES = ['deepseek', 'openrouter', 'freellmapi', 'grok', 'antigravity', 'gemini', 'cursor', 'muse', 'pi'] as const satisfies readonly Proveedor[]
 type OtroAgente = (typeof OTROS_AGENTES)[number]
 
 /**
  * Cómo se conecta cada uno y qué hay que saber antes, a la vista. `ventana`: el agente abre su propia ventana para
  * iniciar sesión; `navegador`: da un enlace que se autoriza en el navegador; `llave`: se pega una llave de API.
+ * `direccion`: con la llave se puede escribir dónde está (FreeLLMAPI en otra computadora); sin ella, se busca en esta.
  */
-const OTROS: Record<OtroAgente, { titulo: string; logo: string; como: 'ventana' | 'navegador' | 'llave'; texto: ReactNode; ayuda?: ReactNode; uso?: string; abreSolo?: string; beta?: boolean }> = {
+const OTROS: Record<OtroAgente, { titulo: string; logo: string; como: 'ventana' | 'navegador' | 'llave'; texto: ReactNode; ayuda?: ReactNode; uso?: string; abreSolo?: string; beta?: boolean; direccion?: string }> = {
   deepseek: {
     titulo: 'DeepSeek · con tu llave de API',
     logo: 'deepseek',
@@ -735,6 +769,40 @@ const OTROS: Record<OtroAgente, { titulo: string; logo: string; como: 'ventana' 
           platform.deepseek.com
         </a>{' '}
         y ponle saldo. Se guarda solo en Sloth, en esta computadora.
+      </>
+    )
+  },
+  openrouter: {
+    titulo: 'OpenRouter · con tu llave de API',
+    logo: 'openrouter',
+    como: 'llave',
+    beta: true,
+    texto: 'Trabaja en el mismo Claude Code de Sloth, con el modelo que elijas del catálogo de OpenRouter, de la marca que sea: las skills, los subagentes y el navegador van igual que con Claude. Se cobra por uso, de tus créditos de OpenRouter; sus modelos gratis no gastan.',
+    ayuda: (
+      <>
+        Créala en{' '}
+        <a href="https://openrouter.ai/settings/keys" target="_blank" rel="noreferrer">
+          openrouter.ai
+        </a>
+        . Para los modelos de pago, ponle créditos; los gratis tienen un tope de mensajes al día. Se guarda solo en Sloth, en esta computadora.
+      </>
+    )
+  },
+  freellmapi: {
+    titulo: 'FreeLLMAPI · gratis, en tu computadora',
+    logo: 'freellmapi',
+    como: 'llave',
+    beta: true,
+    direccion: 'Dirección, solo si está en otra computadora',
+    texto: 'Trabaja en el mismo Claude Code de Sloth, con los modelos gratis que juntes en FreeLLMAPI: un programa que instalas tú y que reparte lo que le pides entre los rangos gratis de Google, Groq, NVIDIA y otros. Tiene que estar abierto mientras Sloth trabaja.',
+    ayuda: (
+      <>
+        Instala{' '}
+        <a href="https://github.com/tashfeenahmed/freellmapi#readme" target="_blank" rel="noreferrer">
+          FreeLLMAPI
+        </a>
+        , ponle las llaves gratis de sus proveedores y pega aquí su llave única (en su icono de la bandeja, «Copy Key»). Sloth lo busca en esta computadora. Se guarda
+        solo en Sloth, en esta computadora.
       </>
     )
   },
@@ -752,14 +820,14 @@ const OTROS: Record<OtroAgente, { titulo: string; logo: string; como: 'ventana' 
     como: 'navegador',
     beta: true,
     abreSolo: 'Abriendo Antigravity: al terminar se abre sola la página de Google',
-    texto: 'Sloth trabaja con tu cuenta de Google en Antigravity, con sus modelos de Gemini. La cuenta se autoriza en el navegador.'
+    texto: 'Sloth trabaja con tu cuenta de Google en Antigravity, con sus modelos de Gemini. Si esa cuenta paga Google AI Pro o Ultra, usa la cuota de tu plan; si no, la gratis. La cuenta se autoriza en el navegador.'
   },
   gemini: {
     titulo: 'Gemini · con tu llave de API',
     logo: 'gemini',
     como: 'llave',
     beta: true,
-    texto: 'Trabaja con Gemini CLI y tu llave de AI Studio: no con tu cuenta ni tu plan de Google, que Gemini CLI ya no acepta. La llave gratis alcanza para probar; para trabajar, actívale la facturación.',
+    texto: 'Trabaja con Gemini CLI y tu llave de AI Studio: no con tu cuenta ni tu plan de Google, que Gemini CLI ya no acepta. Si pagas Google AI Pro o Ultra, tu plan se usa en Antigravity. La llave gratis alcanza para probar; para trabajar, actívale la facturación.',
     ayuda: (
       <>
         Créala en{' '}
@@ -809,13 +877,14 @@ export function CuentaAgente({ p, aviso = false, onFalta }: { p: OtroAgente; avi
   const version = useVersion(p, !aviso, a?.instalado)
   const [pegando, setPegando] = useState(false)
   const [llave, setLlave] = useState('')
+  const [direccion, setDireccion] = useState('')
   const cuenta = c.cuenta
   const falta = cuenta ? !cuenta.conectada : undefined
   useEffect(() => onFalta?.(falta), [falta])
   if (aviso && !falta) return null
   const espera = cuenta?.conectando
   const guardarLlave = (nueva: string | null) =>
-    c.pedir(`/api/${p}/acceso`, { api: !!nueva, llave: nueva }).then((x) => x && (setPegando(false), setLlave('')))
+    c.pedir(`/api/${p}/acceso`, { api: !!nueva, llave: nueva, ...(o.direccion ? { direccion } : {}) }).then((x) => x && (setPegando(false), setLlave(''), setDireccion('')))
   const conectar = () => {
     if (o.como === 'llave') return setPegando(true)
     if (o.como === 'ventana') return void c.conectar()
@@ -893,6 +962,15 @@ export function CuentaAgente({ p, aviso = false, onFalta }: { p: OtroAgente; avi
           )
         )}
       </div>
+      {p === 'antigravity' && activa && !aviso && (
+        <p className="fila-extra muted small">
+          {cuenta?.plan === 'gratis'
+            ? 'Esta cuenta va con la cuota gratis de Antigravity, que se renueva cada semana. Si le pones Google AI Pro o Ultra, Sloth usa la cuota de tu plan sin conectar nada más.'
+            : cuenta?.plan
+              ? `Esta cuenta tiene ${cuenta.plan}: Sloth usa la cuota de tu plan.`
+              : 'Si esta cuenta paga Google AI Pro o Ultra, Sloth usa la cuota de tu plan. Cuál tiene se sabe con su primer hilo.'}
+        </p>
+      )}
       {activa && !aviso && (
         <p className="fila-extra muted small">
           {otras.length
@@ -908,10 +986,15 @@ export function CuentaAgente({ p, aviso = false, onFalta }: { p: OtroAgente; avi
             <button className="primary" disabled={c.ocupado || !llave.trim()}>
               {c.ocupado ? 'Probando…' : 'Guardar'}
             </button>
-            <button type="button" className="ghost" onClick={() => (setPegando(false), setLlave(''))}>
+            <button type="button" className="ghost" onClick={() => (setPegando(false), setLlave(''), setDireccion(''))}>
               Cancelar
             </button>
           </div>
+          {o.direccion && (
+            <div className="opcion-fila">
+              <input type="text" placeholder={o.direccion} value={direccion} onChange={(e) => setDireccion(e.target.value)} autoComplete="off" spellCheck={false} />
+            </div>
+          )}
           {o.ayuda && <p className="muted small">{o.ayuda}</p>}
         </form>
       )}
@@ -1080,7 +1163,7 @@ function CuentaCodex({ aviso = false, onFalta }: { aviso?: boolean; onFalta?(fal
       </div>
       {!aviso && cuenta && llave.selector}
       {llave.formulario}
-      {url && <p className="fila-extra small"><a href={url} target="_blank" rel="noreferrer">Abrir inicio de sesión de ChatGPT ↗</a>. Vuelve aquí después de autorizar.</p>}
+      {url && <p className="fila-extra small"><a href={url} target="_blank" rel="noreferrer">Abrir inicio de sesión de ChatGPT ↗</a>{cuenta?.conectando?.codigo ? <> y escribe este código: <strong className="mono">{cuenta.conectando.codigo}</strong></> : null}. Vuelve aquí después de autorizar.</p>}
       {!aviso && cuenta?.conectada && <Limites proveedor="codex" />}
       <Fallo error={c.error} />
       {version.aviso}
@@ -1435,6 +1518,50 @@ function Avisos() {
   )
 }
 
+/**
+ * En qué navegador de tu computadora se entra con Google (`server/chromium.ts`): el que toma Sloth o el que elijas. Solo
+ * sale si hay más de uno entre los que elegir.
+ */
+function NavegadorDeGoogle() {
+  const [datos, setDatos] = useState<NavegadorDeFuera>()
+  const [error, setError] = useState('')
+  useEffect(() => {
+    api<NavegadorDeFuera>('/api/navegador-de-fuera').then(setDatos, () => {})
+  }, [])
+  if (!datos || datos.lista.length < 2) return null
+  const elegido = datos.lista.find((n) => n.exe === datos.elegido)
+  const elegir = (exe: string) => {
+    setError('')
+    api<NavegadorDeFuera>('/api/navegador-de-fuera', { exe: exe || null }).then(setDatos, (e) => setError(e.message))
+  }
+  return (
+    <Grupo
+      titulo="Navegador"
+      nota="Google no deja iniciar sesión dentro de una app: ese paso se da en un navegador de tu computadora, con un perfil aparte del tuyo, y la sesión pasa a Sloth. Si lo cambias, puede que Google te pida entrar otra vez en Voz y en Flow."
+    >
+      <div className="item">
+        <div className="fila">
+          <span className="logo" aria-hidden>
+            <Icono de="globo" />
+          </span>
+          <div className="fila-nombre">
+            <strong>Para entrar con Google</strong>
+            <span>{elegido ? `Siempre en ${elegido.nombre}.` : `Lo elige Sloth: ahora, ${datos.automatico}.`}</span>
+          </div>
+          <Picker
+            className="acciones"
+            label={<span className="estado">{elegido?.nombre ?? 'Automático'}</span>}
+            value={elegido?.exe ?? ''}
+            groups={[{ label: 'Navegador', options: [{ value: '', label: 'Automático', detalle: datos.automatico ?? undefined }, ...datos.lista.map((n) => ({ value: n.exe, label: n.nombre }))] }]}
+            onChange={elegir}
+          />
+        </div>
+        <Fallo error={error} />
+      </div>
+    </Grupo>
+  )
+}
+
 /** Un interruptor de encendido y apagado, con la bolita que se desliza y su nombre a la izquierda, que también lo cambia. */
 function Interruptor({ on, onCambiar, etiqueta, disabled }: { on: boolean; onCambiar(si: boolean): void; etiqueta: string; disabled?: boolean }) {
   return (
@@ -1444,5 +1571,37 @@ function Interruptor({ on, onCambiar, etiqueta, disabled }: { on: boolean; onCam
         <span />
       </button>
     </label>
+  )
+}
+
+/**
+ * Desde la web: un inicio de sesión que vuelve a `localhost` (YouTube, Antigravity) no carga en este dispositivo. Pegando
+ * esa dirección, la computadora la abre y termina (`/api/web/vuelta`, `server/ventanas-remotas.ts`).
+ */
+function VueltaWeb() {
+  const [url, setUrl] = useState('')
+  const [aviso, setAviso] = useState('')
+  async function mandar(ev: React.FormEvent) {
+    ev.preventDefault()
+    setAviso('')
+    try {
+      const r = await api<{ ok: boolean }>('/api/web/vuelta', { url: url.trim() })
+      setAviso(r.ok ? `Listo: ${ALLA} terminó el inicio de sesión.` : 'Sloth la abrió, pero no terminó: vuelve a conectar.')
+      setUrl('')
+    } catch (e) {
+      setAviso(e instanceof Error ? e.message : String(e))
+    }
+  }
+  return (
+    <div className="grupo-nota vuelta-web">
+      <p>Estás usando Sloth desde la web. Lo que conectar una cuenta abre en {ALLA} (su terminal o su navegador para Google) sale aquí, en el panel «En {ALLA}», abajo a la derecha.</p>
+      <form onSubmit={(ev) => void mandar(ev)}>
+        <input value={url} placeholder="¿Terminó en una página que no carga (localhost o 127.0.0.1)? Pega aquí su dirección" aria-label="Dirección de vuelta" onChange={(ev) => setUrl(ev.target.value)} />
+        <button className="ghost small" type="submit" disabled={!url.trim()}>
+          Terminar
+        </button>
+      </form>
+      {aviso && <p className="small">{aviso}</p>}
+    </div>
   )
 }

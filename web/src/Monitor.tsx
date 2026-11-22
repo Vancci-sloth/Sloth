@@ -2,7 +2,9 @@ import { type ReactNode, useCallback, useEffect, useRef, useState, useSyncExtern
 import type { Avance, Card } from '../../shared/types'
 import type { Pasos } from './Etapas'
 import { Icono } from './Iconos'
+import { Desplegable } from './Desplegable'
 import { Segmento } from './Segmento'
+import { enLaWeb } from './web'
 
 /**
  * El monitor del estudio, uno solo para todos los estilos en la fase Video (`useMonitor` y `Monitor`). Enseña el video
@@ -69,7 +71,8 @@ type Marco = { url: string; n: number }
  * segundos, y en el mismo proceso congelaba la interfaz entera cada vez que el agente cambiaba algo. Se habla con ella por
  * `postMessage`, que no necesita el mismo sitio (`server/origen.ts` la deja abrir así).
  */
-const aparte = (ruta: string) => `${location.protocol}//${location.hostname === '127.0.0.1' ? 'localhost' : '127.0.0.1'}:${location.port}${ruta}`
+// Desde la web no hay otra dirección: `127.0.0.1` sería la del dispositivo. Va en la misma, en un marco del túnel.
+const aparte = (ruta: string) => (enLaWeb ? ruta : `${location.protocol}//${location.hostname === '127.0.0.1' ? 'localhost' : '127.0.0.1'}:${location.port}${ruta}`)
 
 /**
  * Todo lo que suena en el monitor, sea el motor en vivo, la vista en vivo de la skill o el render: qué se ve, el segundo,
@@ -400,14 +403,14 @@ export function Monitor({ m, escena, antes, despues, vertical, label, children }
           />
         )}
         {modo === 'render' && m.renders.length > 1 && (
-          <select className="monitor-cual" aria-label="Qué video se ve" value={render?.ruta} onChange={(e) => m.elegirRender(e.target.value)}>
-            {m.renders.map((v) => (
-              <option key={v.ruta} value={v.ruta}>
-                {v.ruta.split('/').pop()!.replace(/\.\w+$/, '')}
-                {v.vertical === undefined ? '' : v.vertical ? ' · vertical' : ' · horizontal'}
-              </option>
-            ))}
-          </select>
+          <Desplegable
+            campo
+            className="monitor-cual"
+            nombre="Qué video se ve"
+            valor={render?.ruta ?? ''}
+            opciones={m.renders.map((v) => ({ value: v.ruta, label: v.ruta.split('/').pop()!.replace(/\.\w+$/, ''), ...(v.vertical === undefined ? {} : { detalle: v.vertical ? 'vertical' : 'horizontal' }) }))}
+            onCambio={m.elegirRender}
+          />
         )}
         {modo === 'render' && render?.viejo && <span className="small render-viejo">Desactualizado: cambió {render.viejo.ruta}</span>}
         <button className={`transporte-boton ${m.silencio ? 'on' : ''}`} title={m.silencio ? 'Con sonido' : 'Sin sonido'} onClick={() => m.setSilencio(!m.silencio)}>

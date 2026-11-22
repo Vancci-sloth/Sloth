@@ -4,7 +4,7 @@ import { chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync
 import { delimiter, dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { brotliDecompressSync } from 'node:zlib'
-import { programaDe, type Programa, type Proveedor } from '../shared/providers.ts'
+import { PROVEEDORES, programaDe, type Programa, type Proveedor } from '../shared/providers.ts'
 import type { AgentesAlDia, EstadoAgente } from '../shared/types.ts'
 import type { AgentOptions, AgentRun } from './agent.ts'
 import { correr } from './version.ts'
@@ -16,7 +16,7 @@ import { correr } from './version.ts'
  * suya. Lo mismo para los proveedores que vengan: una entrada más en `AGENTES`.
  *
  * Casi todos salen de npm, con el npm que trae Sloth. Muse Code, con el instalador de Meta, y Antigravity, del zip que
- * publica Google (como los baja T3 Code). DeepSeek no tiene programa: usa el de Claude Code (`programaDe`).
+ * publica Google (como los baja T3 Code). DeepSeek, OpenRouter y FreeLLMAPI no tienen programa: usan el de Claude Code (`programaDe`).
  *
  * En el repo (y en las versiones de Sloth que aún lo traían dentro) el programa de Claude, Codex y OpenCode ya está en
  * node_modules de la app, y se usa ese.
@@ -316,7 +316,7 @@ export function estadoAgente(p: Proveedor): EstadoAgente {
 }
 
 export const estadoAgentes = () =>
-  Object.fromEntries((['claude', 'codex', 'opencode', 'deepseek', ...(Object.keys(AGENTES) as Programa[]).filter((p) => !['claude', 'codex', 'opencode'].includes(p))] as Proveedor[]).map((p) => [p, estadoAgente(p)])) as Record<Proveedor, EstadoAgente>
+  Object.fromEntries(PROVEEDORES.map((p) => [p, estadoAgente(p)])) as Record<Proveedor, EstadoAgente>
 
 /** Qué agente se está bajando o actualizando: reiniciar el servidor cortaría la descarga. */
 export const bajandoAgente = () => {

@@ -34,6 +34,12 @@ export interface AgentOptions {
   conLlave?: boolean
   /** Claude: las herramientas y los MCP que no se le ofrecen (`Card.sinHerramientas`). */
   sinHerramientas?: string[]
+  /**
+   * Lee algo ajeno (un estilo de la comunidad por aprobar, `server/estilos-revision.ts`): solo lee archivos, sin
+   * escribir, ejecutar ni conectarse a nada. Solo lo cumple Claude Code (`SOLO_LEER` en `server/claude.ts`); con otro
+   * agente, el hilo no arranca.
+   */
+  soloLeer?: boolean
   onEvent(event: AgentEvent): void
   onProviderSession(id: string): void
   /** Lo que lleva escrito un `Write` antes de terminar. Opcional: no todo proveedor lo da. */

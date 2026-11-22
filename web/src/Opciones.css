@@ -6,6 +6,7 @@
 .opciones { padding: 56px 48px 72px; max-width: 720px; width: 100%; margin: 0 auto; overflow-y: auto; display: flex; flex-direction: column; gap: 26px; }
 .opciones h1 { margin: 0; font-size: 30px; font-weight: 700; letter-spacing: -0.02em; }
 .opciones-titulo { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.opciones-nombre { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
 .opciones-titulo-acciones { display: flex; align-items: center; gap: 10px; }
 .opciones > .ghost { align-self: flex-start; margin-bottom: -20px; }
 
@@ -51,12 +52,12 @@
 .logo-codex { background: #000; box-shadow: none; }
 .logo-opencode { background: #f1ecec; box-shadow: none; }
 .logo-deepseek { background: #4d6bfe; box-shadow: none; }
-.logo-cursor, .logo-grok, .logo-elevenlabs { background: #000; box-shadow: none; }
+.logo-cursor, .logo-grok, .logo-elevenlabs, .logo-openrouter, .logo-freellmapi { background: #000; box-shadow: none; }
 .logo-muse { background: #0467df; box-shadow: none; }
 .logo-ffmpeg { background: #007808; box-shadow: none; }
 .logo-paquetes { background: #3775a9; box-shadow: none; }
 .logo-instagram { background: radial-gradient(circle at 30% 107%, #fdf497 0%, #fdf497 5%, #fd5949 45%, #d6249f 60%, #285aeb 90%); box-shadow: none; }
-.logo.chico:is(.logo-claude, .logo-codex, .logo-opencode, .logo-deepseek, .logo-cursor, .logo-grok, .logo-elevenlabs, .logo-muse, .logo-ffmpeg, .logo-paquetes, .logo-instagram) { box-shadow: 0 0 0 2px var(--panel-2); }
+.logo.chico:is(.logo-claude, .logo-codex, .logo-opencode, .logo-deepseek, .logo-openrouter, .logo-freellmapi, .logo-cursor, .logo-grok, .logo-elevenlabs, .logo-muse, .logo-ffmpeg, .logo-paquetes, .logo-instagram) { box-shadow: 0 0 0 2px var(--panel-2); }
 
 /* La línea de debajo del nombre cuando se abre (las herramientas) o despliega (la cuenta de Claude). */
 .resumen, .sub .picker-trigger { align-self: flex-start; display: inline-flex; align-items: center; gap: 6px; height: auto; margin-left: -6px; padding: 1px 6px; border-radius: 6px; color: var(--muted); font-size: 12px; transition: color 0.15s, background 0.15s; }
@@ -115,3 +116,21 @@
 .creditos-sloth { font-size: 12px; }
 .creditos-sloth > .limite-nombre:first-child { align-items: baseline; color: var(--text); }
 .creditos-sloth > .limite-nombre > strong { font-size: 24px; line-height: 1.2; font-weight: 600; }
+/* Desde la web: pegar la dirección de vuelta de un inicio de sesión (VueltaWeb). */
+.vuelta-web { display: flex; flex-direction: column; gap: 6px; }
+.vuelta-web p { margin: 0; }
+.vuelta-web form { display: flex; gap: 8px; }
+.vuelta-web input { flex: 1; min-width: 0; height: 30px; padding: 0 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--panel-2); color: var(--text); font-size: 12px; }
+
+/* Tu celular (`Celular.tsx`): el QR a la izquierda y, a su lado, cómo escanearlo, las direcciones y la llave. */
+.item.celular { display: flex; gap: 20px; align-items: flex-start; padding: 16px; }
+.celular-qr { flex: none; width: 176px; height: 176px; border-radius: 8px; }
+.celular-texto { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 8px; font-size: 12.5px; }
+.celular-texto strong { font-size: 13.5px; }
+.celular-texto ol { margin: 0; padding-left: 18px; color: var(--suave); }
+.celular-texto p { margin: 0; }
+.celular-direcciones { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 4px; }
+.celular-direcciones li { display: flex; flex-direction: column; }
+.celular-botones { display: flex; gap: 16px; }
+.celular-botones button { display: inline-flex; align-items: center; gap: 6px; }
+.celular-botones svg { width: 14px; height: 14px; }

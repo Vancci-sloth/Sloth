@@ -1,47 +1,101 @@
 import { execFileSync, spawn } from 'node:child_process'
-import { existsSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync } from 'node:fs'
 import { homedir } from 'node:os'
-import { join, win32 } from 'node:path'
+import { dirname, join, win32 } from 'node:path'
 import type { Browser, Page } from 'playwright-core'
+import type { NavegadorDeFuera } from '../shared/types.ts'
+import { guardar } from './disco.ts'
 
 /**
  * Chrome, Edge u otro Chromium del sistema, con un perfil de Sloth y CDP, donde se entra con Google (la voz y Flow, `server/voz/`; las
  * redes, `server/redes/navegador.ts`): Google no deja entrar dentro de una app, y Safari no se deja manejar por CDP, así
  * que sin uno de los dos la sesión no tiene cómo pasar a Sloth. Sin ventana, se abre con `SIN_VENTANA` y sus páginas con
- * `paginaNueva`, para que Google no lo vea como un robot.
+ * `paginaNueva`, para que Google no lo vea como un robot. Cuál se usa lo eliges en Opciones → Navegador (`elegirNavegador`).
  */
 
-/** En Mac, Chrome y Edge también se instalan solo para tu usuario, en `~/Applications`. */
-const enMac = (app: string, exe: string) => ['/Applications', join(homedir(), 'Applications')].map((d) => join(d, `${app}.app`, 'Contents', 'MacOS', exe))
+/** En Mac, los navegadores también se instalan solo para tu usuario, en `~/Applications`. */
+const enMac = (app: string, exe = app) => ['/Applications', join(homedir(), 'Applications')].map((d) => join(d, `${app}.app`, 'Contents', 'MacOS', exe))
 /** En Windows, en Archivos de programa o, instalado solo para tu usuario, en `%LOCALAPPDATA%`. */
 const programas = [process.env.PROGRAMFILES, process.env['PROGRAMFILES(X86)'], process.env.LOCALAPPDATA].filter((p): p is string => !!p)
 const enWindows = (...ruta: string[]) => programas.map((p) => join(p, ...ruta, 'Application'))
-/** Los demás Chromium donde también se entra con Google: Chrome antes que Brave y Vivaldi. */
-const CHROME =
-  process.platform === 'win32'
-    ? [
-        ...enWindows('Google', 'Chrome').map((d) => join(d, 'chrome.exe')),
-        ...enWindows('BraveSoftware', 'Brave-Browser').map((d) => join(d, 'brave.exe')),
-        ...enWindows('Vivaldi').map((d) => join(d, 'vivaldi.exe'))
-      ]
-    : process.platform === 'darwin'
-      ? enMac('Google Chrome', 'Google Chrome')
-      : ['/opt/google/chrome/chrome', '/usr/bin/google-chrome', '/usr/bin/chromium']
-const EDGE =
-  process.platform === 'win32'
-    ? ['C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe', ...enWindows('Microsoft', 'Edge').map((d) => join(d, 'msedge.exe'))]
-    : process.platform === 'darwin'
-      ? enMac('Microsoft Edge', 'Microsoft Edge')
-      : ['/opt/microsoft/msedge/msedge']
+const WINDOWS = process.platform === 'win32'
+const MAC = process.platform === 'darwin'
+const CHROME = WINDOWS
+  ? enWindows('Google', 'Chrome').map((d) => join(d, 'chrome.exe'))
+  : MAC
+    ? enMac('Google Chrome')
+    : ['/opt/google/chrome/chrome', '/usr/bin/google-chrome', '/usr/bin/chromium', '/usr/bin/chromium-browser']
+const EDGE = WINDOWS
+  ? ['C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe', ...enWindows('Microsoft', 'Edge').map((d) => join(d, 'msedge.exe'))]
+  : MAC
+    ? enMac('Microsoft Edge')
+    : ['/opt/microsoft/msedge/msedge']
+/** Los demás Chromium donde también se entra con Google, cuando no hay Chrome ni Edge. */
+const OTROS = WINDOWS
+  ? [...enWindows('BraveSoftware', 'Brave-Browser').map((d) => join(d, 'brave.exe')), ...enWindows('Vivaldi').map((d) => join(d, 'vivaldi.exe'))]
+  : MAC
+    ? [...enMac('Brave Browser'), ...enMac('Vivaldi')]
+    : ['/usr/bin/brave-browser', '/usr/bin/vivaldi']
+/** Opera y Opera GX solo si los eliges: nunca se toman solos. En Windows se instalan para tu usuario, en `Programs`. */
+const OPERA = WINDOWS
+  ? [process.env.LOCALAPPDATA && join(process.env.LOCALAPPDATA, 'Programs'), process.env.PROGRAMFILES].flatMap((p) => (p ? ['Opera', 'Opera GX'].map((o) => join(p, o, 'opera.exe')) : []))
+  : MAC
+    ? [...enMac('Opera'), ...enMac('Opera GX', 'Opera')]
+    : ['/usr/bin/opera']
 
 /**
- * El primero que haya, Chrome antes que Edge si `chromePrimero`. En Windows, Edge sigue primero (ahí está la sesión de
- * quien ya entró) y, sin él, tu navegador predeterminado si es un Chromium: hay quien quitó Edge (avisado en la comunidad
- * el 8 de noviembre de 2026). Firefox no sirve: ya no habla CDP, y sin eso la sesión no pasa a Sloth.
+ * El que elegiste en Opciones → Navegador o, sin elegir (o si ya no está instalado), el primero que haya, Chrome antes
+ * que Edge si `chromePrimero`. En Windows, Edge sigue primero (ahí está la sesión de quien ya entró) y, sin él, tu
+ * navegador predeterminado si es un Chromium: hay quien quitó Edge (avisado en la comunidad el 8 de noviembre de 2026).
+ * Firefox no sirve: ya no habla CDP, y sin eso la sesión no pasa a Sloth.
  */
 export function chromiumDelSistema(chromePrimero: boolean): string | undefined {
-  const otros = [...(process.platform === 'win32' ? [predeterminado()].filter((e): e is string => !!e) : []), ...CHROME]
-  return (chromePrimero ? [...otros, ...EDGE] : [...EDGE, ...otros]).find((e) => existsSync(e))
+  return elegido() ?? automatico(chromePrimero)
+}
+
+function automatico(chromePrimero: boolean): string | undefined {
+  const chrome = [...(WINDOWS ? [predeterminado()].filter((e): e is string => !!e) : []), ...CHROME]
+  return [...(chromePrimero ? [...chrome, ...EDGE] : [...EDGE, ...chrome]), ...OTROS].find((e) => existsSync(e))
+}
+
+/**
+ * Dónde se guarda el elegido (`data/navegador-elegido.json`). Lo dicen al arrancar el servidor y la ventana, que son dos
+ * procesos y lo leen del mismo archivo, cada vez: el cambio vale desde la siguiente ventana que se abra.
+ */
+let archivo: string | undefined
+export const navegadorEn = (app: string) => void (archivo = join(app, 'data', 'navegador-elegido.json'))
+
+function elegido(): string | undefined {
+  if (!archivo) return undefined
+  try {
+    const { exe } = JSON.parse(readFileSync(archivo, 'utf8')) as { exe?: unknown }
+    return typeof exe === 'string' && existsSync(exe) ? exe : undefined
+  } catch {
+    return undefined
+  }
+}
+
+/** Los instalados donde se puede entrar con Google, uno por nombre. */
+function instalados() {
+  const vistos = new Set<string>()
+  return [...EDGE, ...(WINDOWS ? [predeterminado()].filter((e): e is string => !!e) : []), ...CHROME, ...OTROS, ...OPERA]
+    .filter((exe) => existsSync(exe))
+    .map((exe) => ({ exe, nombre: nombreDe(exe) }))
+    .filter((n) => !vistos.has(n.nombre) && vistos.add(n.nombre))
+}
+
+/** Lo que enseña Opciones → Navegador: el elegido, el que se toma sin elegir y entre cuáles se puede. */
+export function navegadorDeFuera(): NavegadorDeFuera {
+  const auto = automatico(MAC)
+  return { elegido: elegido() ?? null, automatico: auto ? nombreDe(auto) : null, lista: instalados() }
+}
+
+/** Guarda el que eliges, o `null` para que Sloth vuelva a tomar el de siempre. Solo uno de los instalados. */
+export function elegirNavegador(exe: string | null) {
+  if (!archivo) throw new Error('Sloth aún no sabe dónde guardar el navegador.')
+  if (exe && !instalados().some((n) => n.exe === exe)) throw new Error('Ese navegador ya no está instalado.')
+  mkdirSync(dirname(archivo), { recursive: true })
+  guardar(archivo, `${JSON.stringify({ exe }, null, 1)}\n`)
 }
 
 /** El navegador predeterminado de Windows si es un Chromium, leído una vez del registro. */
@@ -72,7 +126,9 @@ export function chromiumDeComando(comando: string): string | null {
 /** Su nombre, para decirte dónde entrar. */
 export function nombreDe(exe: string | undefined) {
   const n = win32.basename(exe ?? '').toLowerCase()
-  return n.includes('edge') ? 'Edge' : n.includes('brave') ? 'Brave' : n.includes('vivaldi') ? 'Vivaldi' : 'Chrome'
+  // El programa de Opera GX también se llama `opera`: se distingue por su carpeta.
+  if (n.includes('opera')) return /opera gx/i.test(exe ?? '') ? 'Opera GX' : 'Opera'
+  return n.includes('edge') ? 'Edge' : n.includes('brave') ? 'Brave' : n.includes('vivaldi') ? 'Vivaldi' : n.includes('chromium') ? 'Chromium' : 'Chrome'
 }
 
 /** Lo que se dice si no hay ninguno: en Mac casi siempre es que solo hay Safari, y en Windows, Firefox. */

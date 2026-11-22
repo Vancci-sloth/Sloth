@@ -43,7 +43,9 @@
  * con su primer pago, la página ofrece el precio de Fundador aunque los lugares estén ocupados. Cada suscripción conserva el monto y la moneda con que se creó: las de antes
  * del 30 de octubre de 2026 siguen en pesos; las nuevas, en `MONEDA`. Desde el 13 de noviembre de 2026 el apoyo es uno
  * solo, de $10 (199 MXN), que es también el de Fundador: las de más bajaron a $10 y lo pagado de más se les dio como
- * tiempo (`bajar-apoyo.ts`).
+ * tiempo (`bajar-apoyo.ts`). Desde el 18 de noviembre de 2026 ese precio es una escalera (`escalera.ts`): sube
+ * `PRECIO_SUBE` por cada `PRECIO_CADA` personas que apoyan, y a quien entra con el precio del día le baja lo mismo cada
+ * mes hasta `PRECIO_MENSUAL`, que sigue siendo el de Fundador y el que cuenta en `apoyan`.
  * Cuando Sloth se vendía, las primeras personas se unieron gratis de por vida (plan `gratis`, `GRATIS` como mucho): son
  * fundadoras como las primeras que apoyan (`esFundador`), con lo nuevo `ANTICIPO` antes y sin el recordatorio. Ya no se
  * dan.
@@ -64,15 +66,23 @@
  * automático: se aceptan sus términos y el pago único.
  *
  * Y la comunidad (`/comunidad/*`, en `comunidad.ts`), de quien tiene una licencia activa, y la voz de Voices Cloning
- * (`/voz/*`, en `voz.ts`), que guarda aquí la llave del socio.
+ * (`/voz/*`, en `voz.ts`), que guarda aquí la llave del socio. Y la copia de cada Sloth, para traerla a otra computadora
+ * con la misma clave (`/respaldo*`, en `respaldo.ts`).
  */
 import type { VersionLiberable } from '../../shared/types.ts'
-import { comunidad, creditos, olvidarSueltos } from './comunidad.ts'
+import { actualizarCelular } from './actualizar-celular.ts'
+import { celular } from './celular.ts'
+import { aLaVista, comunidad, creditos, olvidarSueltos } from './comunidad.ts'
+import { guardado } from './guardado.ts'
 import { cancelarStripe, firmaDeStripe, leerStripe, modoStripe, pagoDeSesion, sesion, sesionStripe, suscripcionStripe, type PagoStripe, type SesionStripe } from './stripe.ts'
-import { olvidarRegistroVoz, renovarVoces, voz } from './voz.ts'
+import { olvidarRegistroVoz, voz } from './voz.ts'
 import { entregarRifas } from './rifa.ts'
 import { APERTURA_VOZ } from './voz-mensual.ts'
 import { bajarApoyo, reanudarPausadas } from './bajar-apoyo.ts'
+import { bajarCadaMes, comoBaja, comoSigue, pasoEn, precioDe, siVuelves, tuPrecioSeQueda } from './escalera.ts'
+import { olvidarRespaldos, respaldo } from './respaldo.ts'
+import { HOST_ENTRADA, olvidarWeb, web } from './web.ts'
+import { youtube } from './youtube.ts'
 
 export interface Env {
   DB: D1Database
@@ -106,10 +116,18 @@ export interface Env {
   NOWPAYMENTS_IPN_SECRET?: string
   /** La llave privada Ed25519 en PKCS8 y base64. */
   FIRMA: string
+  /** La app de Google de Sloth para YouTube (`src/youtube.ts`), solo para quien apoya. Sin las dos, no se ofrece. */
+  YOUTUBE_CLIENT_ID?: string
+  YOUTUBE_CLIENT_SECRET?: string
   /** La dirección de este Worker, para la página a la que vuelve el cliente tras pagar. */
   ORIGEN: string
+  /** El apoyo de cada mes con menos de `PRECIO_CADA` personas, y hasta donde le baja a cada quien (`escalera.ts`). */
   PRECIO_MENSUAL: number
   PRECIO_ANUAL: number
+  /** La escalera: cuánto sube el apoyo por cada `PRECIO_CADA` personas que apoyan, y cuánto le baja a cada quien cada mes. Sin ellos, no hay. */
+  PRECIO_SUBE?: number
+  PRECIO_SUBE_MXN?: number
+  PRECIO_CADA?: number
   /** Lo menos que se apoya con el monto que elija cada quien, al mes o de una vez. */
   APOYO_MINIMO: number
   /** Desde cuánto al mes es un apoyo grande: su insignia en la comunidad. */
@@ -145,6 +163,8 @@ export interface Env {
   VOZ_CREDITOS?: number
   /** Con `"1"`, las voces de Voices Cloning son solo del creador, aunque alguien más tenga créditos. */
   VOZ_SOLO_CREADOR?: string
+  /** Con `"1"`, la app del celular solo abre a quien apoya hoy (`celular.ts`). */
+  CELULAR_SOLO_APOYO?: string
 }
 
 /**
@@ -203,6 +223,10 @@ export interface Fila {
   /** La suscripción de PayPal o Mercado Pago que se pausó para no cobrar antes de `extra_hasta`: el cron la reanuda ese día. */
   reanudar?: string | null
   extra_avisado?: string | null
+  /** Hasta dónde baja su cobro de cada mes, en su moneda (`escalera.ts`); vacío, no baja. */
+  piso?: number | null
+  /** El `pagado_hasta` del mes con que ya bajó: una vez por cada mes pagado. */
+  bajado?: string | null
 }
 
 /** Lo que el cobro guarda de una suscripción o de los pagos del año. `hasta`: su próximo cobro o su fin, si se sabe. */
@@ -231,6 +255,9 @@ type Tarifas = Pick<
   | 'FUNDADORES_HASTA'
   | 'PRECIO_MENSUAL'
   | 'PRECIO_ANUAL'
+  | 'PRECIO_SUBE'
+  | 'PRECIO_SUBE_MXN'
+  | 'PRECIO_CADA'
   | 'APOYO_MINIMO'
   | 'APOYO_GRANDE'
   | 'MONEDA'
@@ -241,7 +268,12 @@ type Tarifas = Pick<
 >
 /** Lo que cuesta el apoyo en una moneda: el sugerido al mes y al año, y de cuánto a cuánto se elige. */
 export interface Precios {
+  /** El apoyo de hoy, con las personas que apoyan: lo que paga el primer mes quien entra. */
   mensual: number
+  /** Hasta dónde le baja, y lo que cuesta con menos de `cada` personas. */
+  base: number
+  /** Cuánto sube por cada `cada` personas y cuánto baja cada mes; 0 sin escalera. */
+  paso: number
   anual: number
   minimo: number
   grande: number
@@ -424,6 +456,19 @@ export function esFundador(t: string) {
   return `((${t}.fundador = 1 AND ${t}.autorizada IS NOT NULL AND julianday(${t}.pagado_hasta) > julianday('now')) OR (${t}.plan = 'gratis' AND ${t}.estado = 'gratis'))`
 }
 
+/**
+ * Si un correo apoya hoy, como lo ve la comunidad (la insignia de `comunidad.ts`, que abre la tienda de estilos): un
+ * apoyo suyo pagado y sin vencer, o su lugar gratis de por vida. Va firmado en su licencia (`firmada`).
+ */
+export async function apoyaHoy(env: Env, email: string): Promise<boolean> {
+  return !!(await env.DB.prepare(
+    `SELECT 1 FROM licencias l WHERE l.email = ? AND l.plan IN ('mensual', 'anual', 'unico', 'gratis') AND l.modo = 'produccion'
+     AND (${esFundador('l')} OR julianday(l.pagado_hasta) > julianday('now')) LIMIT 1`
+  )
+    .bind(email)
+    .first())
+}
+
 /** Un enlace de invitación de Fundador que sigue en pie (`enlaces_fundador`): sin revocar y sin que nadie haya pagado con él. */
 async function enlaceFundador(env: Env, codigo: unknown): Promise<boolean> {
   if (typeof codigo !== 'string' || !/^[A-Za-z0-9]{8,32}$/.test(codigo)) return false
@@ -464,6 +509,11 @@ export class Rechazo extends Error {
 export default {
   async fetch(req: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(req.url)
+    // La entrada de Sloth en la web tiene su propio dominio, donde no vive nada más (src/web.ts).
+    if (url.hostname === HOST_ENTRADA) {
+      url.pathname = `/web${url.pathname === '/' ? '' : url.pathname}`
+      return web(req, env, url).catch((e) => (e instanceof Rechazo ? json({ error: e.message }, e.status) : json({ error: 'Algo falló. Intenta otra vez en un momento.' }, 500)))
+    }
     if (!PUBLICAS.has(url.pathname)) return atender(req, env, ctx, url)
     // La página de Sloth (sloth.vancci.org) enseña el precio y la versión, y suscribe: también sus errores se leen.
     const r =
@@ -474,11 +524,10 @@ export default {
     return r
   },
 
-  /** Cada 10 minutos, las claves que no salieron, los créditos de voz y los premios de la rifa; cada mañana, el aviso de los cobros que vienen. */
+  /** Cada 10 minutos, las claves que no salieron y los premios de la rifa; cada mañana, el aviso de los cobros que vienen. */
   async scheduled(evento: ScheduledController, env: Env, ctx: ExecutionContext) {
     if (evento.cron === '*/10 * * * *') {
       ctx.waitUntil(reenviarClaves(env).catch((e) => console.error('Claves sin mandar', e instanceof Error ? e.message : e)))
-      ctx.waitUntil(renovarVoces(env, ctx).catch((e) => console.error('Créditos mensuales de voz', e instanceof Error ? e.message : e)))
       ctx.waitUntil(entregarRifas(env, ctx).catch((e) => console.error('Premios de la rifa', e instanceof Error ? e.message : e)))
       ctx.waitUntil(reanudarPausadas(env).catch((e) => console.error('Reanudar pausadas', e instanceof Error ? e.message : e)))
       return
@@ -487,6 +536,8 @@ export default {
     ctx.waitUntil(env.DB.prepare('DELETE FROM cupos WHERE creado < ?').bind(new Date(Date.now() - 2 * DIA).toISOString()).run())
     ctx.waitUntil(olvidarRegistroVoz(env).catch((e) => console.error('Registro de la voz', e instanceof Error ? e.message : e)))
     ctx.waitUntil(olvidarSueltos(env).catch((e) => console.error('Archivos sueltos de la comunidad', e instanceof Error ? e.message : e)))
+    ctx.waitUntil(olvidarRespaldos(env).catch((e) => console.error('Copias que nadie renueva', e instanceof Error ? e.message : e)))
+    ctx.waitUntil(olvidarWeb(env).catch((e) => console.error('Sloth en la web', e instanceof Error ? e.message : e)))
   }
 } satisfies ExportedHandler<Env>
 
@@ -523,8 +574,13 @@ async function atender(req: Request, env: Env, ctx: ExecutionContext, url: URL):
     if (req.method === 'POST' && url.pathname === '/pago') return await pago(env, await cuerpo(req))
     if (req.method === 'POST' && url.pathname === '/a-mano') return await aMano(req, env)
     if (req.method === 'POST' && url.pathname === '/bajar-apoyo') return await bajarApoyo(req, env)
+    if (req.method === 'POST' && url.pathname === '/celular') return await celular(req, env, await cuerpo(req))
+    if (url.pathname.startsWith('/celular/')) return await actualizarCelular(req, env, url)
     if (url.pathname === '/comunidad' || url.pathname.startsWith('/comunidad/')) return await comunidad(req, env, url, ctx)
     if (url.pathname === '/voz' || url.pathname.startsWith('/voz/')) return await voz(req, env, ctx, url)
+    if (url.pathname === '/respaldo' || url.pathname.startsWith('/respaldo/')) return await respaldo(req, env, url)
+    if (url.pathname === '/youtube' || url.pathname.startsWith('/youtube/')) return await youtube(req, env, url)
+    if (url.pathname === '/web' || url.pathname.startsWith('/web/')) return await web(req, env, url)
     return json({ error: 'No existe' }, 404)
   } catch (error) {
     if (error instanceof Rechazo) return json({ error: error.message }, error.status)
@@ -583,30 +639,39 @@ const ULTIMA_EN_CACHE = 30
 /**
  * El vistazo de la app instalada (electron/main.ts): la última versión de `so` y desde cuándo es de todos. Si cambia
  * (salió una, o se liberó en un live), la app pregunta por ella de inmediato. Es igual para todos: va en caché.
+ * `yml` es la marca de su `latest.yml`, que se sube al final, después del instalador (y en Mac, de su .zip): cambia otra
+ * vez cuando llega, y la app que miró entre los dos, cuando aún no había nada que ofrecerle, vuelve a preguntar.
  */
 async function ultimaLigera(req: Request, env: Env, ctx: ExecutionContext, so: Sistema): Promise<Response> {
   const cache = typeof caches === 'undefined' ? undefined : caches.default
   const llave = new Request(new URL(`/ultima?so=${so}`, req.url))
   const guardada = await cache?.match(llave)
   if (guardada) return guardada
-  const u = await (await env.DESCARGAS.get(ULTIMAS[so]))?.json<Ultima>()
-  const r = json(u ? { version: u.version, ...(u.todos ? { todos: u.todos } : {}) } : {}, 200, { 'cache-control': `public, max-age=${ULTIMA_EN_CACHE}` })
+  const [u, yml] = await Promise.all([env.DESCARGAS.get(ULTIMAS[so]).then((o) => o?.json<Ultima>()), env.DESCARGAS.head(YML[so])])
+  const r = json(u ? { version: u.version, ...(u.todos ? { todos: u.todos } : {}), ...(yml ? { yml: yml.etag } : {}) } : {}, 200, { 'cache-control': `public, max-age=${ULTIMA_EN_CACHE}` })
   if (cache) ctx.waitUntil(cache.put(llave, r.clone()))
   return r
 }
 
 /**
- * Si quien pregunta apoya hoy: la app manda su clave y su computadora (`x-sloth-clave`, `x-sloth-equipo`), y la clave
- * es de un apoyo vigente (mensual, anual o de una vez), o de un lugar gratis de por vida, en esa computadora.
+ * Si quien pregunta apoya hoy: la app manda su clave y su computadora (`x-sloth-clave`, `x-sloth-equipo`); la clave vale
+ * en esa computadora y su correo tiene un apoyo vigente (mensual, anual o de una vez) o un lugar gratis de por vida. Va
+ * por el correo, como la insignia de la comunidad: quien apoyó desde la tienda de estilos sigue con la clave de su cuenta
+ * gratis, y con solo mirar el plan de esa clave no recibía lo nuevo antes.
  */
-async function apoya(req: Request, env: Env): Promise<boolean> {
+export async function apoya(req: Request, env: Env): Promise<boolean> {
   const clave = (req.headers.get('x-sloth-clave') ?? '').replace(/\s+/g, '').toUpperCase()
   const equipo = req.headers.get('x-sloth-equipo') ?? ''
   if (!CLAVE.test(clave) || !EQUIPO.test(equipo)) return false
-  const f = await env.DB.prepare("SELECT l.estado, l.pagado_hasta FROM licencias l JOIN equipos e ON e.clave = l.clave WHERE l.clave = ? AND e.equipo = ? AND l.plan IN ('mensual', 'anual', 'unico', 'gratis')")
+  const ahora = Date.now()
+  const suya = await env.DB.prepare('SELECT l.email, l.estado, l.pagado_hasta FROM licencias l JOIN equipos e ON e.clave = l.clave WHERE l.clave = ? AND e.equipo = ?')
     .bind(clave, equipo)
-    .first<Pick<Fila, 'estado' | 'pagado_hasta'>>()
-  return !!f && vigencia(f, Date.now()).activa
+    .first<Pick<Fila, 'email' | 'estado' | 'pagado_hasta'>>()
+  if (!suya || !vigencia(suya, ahora).activa) return false
+  const { results } = await env.DB.prepare("SELECT estado, pagado_hasta FROM licencias WHERE email = ? AND plan IN ('mensual', 'anual', 'unico', 'gratis')")
+    .bind(suya.email)
+    .all<Pick<Fila, 'estado' | 'pagado_hasta'>>()
+  return results.some((f) => vigencia(f, ahora).activa)
 }
 
 /**
@@ -744,28 +809,37 @@ async function publicar(req: Request, env: Env, url: URL): Promise<Response> {
  * El precio de hoy. Las suscripciones de prueba y las cuentas gratis no cuentan: solo las pagadas de verdad y los lugares
  * gratis de por vida. `quedan`: los lugares públicos de Fundador libres. Con un enlace de Fundador en pie (`codigo`),
  * `fundador`: la página ofrece ese apoyo. `apoyan`: quienes tienen pagado y sin vencer el precio de Fundador o más, cada
- * mes o una vez.
+ * mes o una vez. Contarlos recorre `licencias` entera: la página los lee guardados (`guardado.ts`); al apoyar (`alDia`),
+ * que es cuando se decide quién es Fundador, se cuentan en el momento.
  */
-async function precios(env: Env, codigo?: unknown) {
-  const c = await env.DB.prepare(
-    `SELECT COUNT(CASE WHEN ${esFundador('licencias')} THEN 1 END) AS fundadores,
-            COUNT(CASE WHEN julianday(pagado_hasta) > julianday('now') AND ((moneda = ? AND monto >= ?) OR (moneda = 'MXN' AND monto >= ?)) THEN 1 END) AS apoyan
-     FROM licencias WHERE plan IN ('mensual', 'anual', 'unico') AND modo = 'produccion'`
-  )
-    .bind(env.MONEDA, Number(env.PRECIO_MENSUAL), Number(env.PRECIO_MENSUAL_MXN))
-    .first<Cuenta>()
+async function precios(env: Env, codigo?: unknown, alDia = false) {
+  const contar = () =>
+    env.DB.prepare(
+      `SELECT COUNT(CASE WHEN ${esFundador('licencias')} THEN 1 END) AS fundadores,
+              COUNT(CASE WHEN julianday(pagado_hasta) > julianday('now') AND ((moneda = ? AND monto >= ?) OR (moneda = 'MXN' AND monto >= ?)) THEN 1 END) AS apoyan
+       FROM licencias WHERE plan IN ('mensual', 'anual', 'unico') AND modo = 'produccion'`
+    )
+      .bind(env.MONEDA, Number(env.PRECIO_MENSUAL), Number(env.PRECIO_MENSUAL_MXN))
+      .first<Cuenta>()
+  const c = alDia ? await contar() : await guardado(env, 'precio', contar)
   // Mercado Pago solo se ofrece con su token del modo de hoy.
   const conMp = !!(env.MP_MODO === 'produccion' ? env.MP_ACCESS_TOKEN_PRODUCCION : env.MP_ACCESS_TOKEN)
   // Cripto, con la llave y la clave de los avisos de NOWPayments; cobra los mismos precios, en `MONEDA`, pero el monto
   // elegido va desde `APOYO_MINIMO_CRIPTO`.
   const conCripto = !!(env.NOWPAYMENTS_API_KEY && env.NOWPAYMENTS_IPN_SECRET)
   const t = tarifa(c ?? { fundadores: 0, apoyan: 0 }, env, conMp)
-  const cripto: Precios = { mensual: t.mensual, anual: t.anual, minimo: Number(env.APOYO_MINIMO_CRIPTO), grande: t.grande, maximo: t.maximo, moneda: t.moneda }
+  const cripto: Precios = { mensual: t.mensual, base: t.base, paso: t.paso, anual: t.anual, minimo: Number(env.APOYO_MINIMO_CRIPTO), grande: t.grande, maximo: t.maximo, moneda: t.moneda }
   const fundador = codigo !== undefined && (await enlaceFundador(env, codigo))
   // La tarjeta, con Stripe y la clave de sus avisos, a los mismos precios en `MONEDA`.
   const conTarjeta = !!(env.STRIPE_SECRET_KEY && env.STRIPE_WEBHOOK_SECRET)
+  // Cuántos estilos tiene la tienda de la comunidad (los que ven todos, como `sinApoyo` en `tienda.ts`), para que la página
+  // diga «Más de N estilos». Si la consulta falla, no va: el precio no depende de ella.
+  const estilos = await env.DB.prepare(`SELECT COUNT(*) AS n FROM publicaciones WHERE categoria = 'estilos' AND ${aLaVista()}`)
+    .first<{ n: number }>()
+    .then((f) => f?.n ?? 0, () => 0)
   return {
     ...t,
+    ...(estilos ? { estilos } : {}),
     ...(conCripto ? { cripto } : {}),
     ...(conTarjeta ? { tarjeta: true } : {}),
     ...(env.SIN_PAYPAL === '1' ? { sinPaypal: true } : {}),
@@ -773,15 +847,27 @@ async function precios(env: Env, codigo?: unknown) {
   }
 }
 
+/** Lo que paga hoy el primer mes quien entra, en la moneda que se pida: `undefined` sin escalera o si no se pudo contar. */
+async function apoyoDeHoy(env: Env): Promise<(moneda: string) => number | undefined> {
+  const t = await precios(env).catch(() => undefined)
+  return (moneda) => (!t?.paso ? undefined : moneda === 'MXN' ? t.mxn?.mensual : moneda === t.moneda ? t.mensual : undefined)
+}
+
 /**
  * El precio sugerido, el mismo para todos, y desde cuánto se apoya con el monto que elija cada quien (`minimo`) o es un
  * apoyo grande (`grande`), en `MONEDA` (con PayPal) y, con `conMp`, en pesos (`mxn`, con Mercado Pago). `quedan`: los
- * lugares de fundador que quedan; `apoyan`, para las metas del roadmap.
+ * lugares de fundador que quedan; `apoyan`, para las metas del roadmap y para la escalera (`escalera.ts`): `mensual` es
+ * `base` más `paso` por cada `cada` personas que apoyan.
  */
 export function tarifa(c: Cuenta, env: Tarifas, conMp = false, ahora = Date.now()) {
   const abierto = !env.FUNDADORES_HASTA || ahora < Date.parse(env.FUNDADORES_HASTA)
+  const cada = Number(env.PRECIO_CADA) || 0
+  const escalera = (base: number, sube: unknown) => {
+    const paso = (cada && Number(sube)) || 0
+    return { mensual: precioDe(base, paso, cada, c.apoyan), base, paso }
+  }
   const mxn: Precios = {
-    mensual: Number(env.PRECIO_MENSUAL_MXN),
+    ...escalera(Number(env.PRECIO_MENSUAL_MXN), env.PRECIO_SUBE_MXN),
     anual: Number(env.PRECIO_ANUAL_MXN),
     minimo: Number(env.APOYO_MINIMO_MXN),
     grande: Number(env.APOYO_GRANDE_MXN),
@@ -790,20 +876,23 @@ export function tarifa(c: Cuenta, env: Tarifas, conMp = false, ahora = Date.now(
   }
   return {
     quedan: abierto ? Math.max(0, Number(env.FUNDADORES) - c.fundadores) : 0,
-    mensual: Number(env.PRECIO_MENSUAL),
+    ...escalera(Number(env.PRECIO_MENSUAL), env.PRECIO_SUBE),
     anual: Number(env.PRECIO_ANUAL),
     minimo: Number(env.APOYO_MINIMO),
     grande: Number(env.APOYO_GRANDE),
     maximo: APOYO_MAXIMO[env.MONEDA] ?? APOYO_MAXIMO.USD,
     moneda: env.MONEDA,
     ...(conMp && mxn.mensual ? { mxn } : {}),
+    cada,
     apoyan: c.apoyan
   }
 }
 
 /**
- * Cuánto se cobra: el anual, su precio; el mensual, el sugerido si no se elige otro; el de una vez, el que se elija.
- * El elegido va en enteros de su moneda, de `minimo` a `maximo`: cada monto mensual de PayPal es un plan.
+ * Cuánto se cobra: el anual, su precio; el mensual, el de hoy si no se elige otro; el de una vez, el que se elija.
+ * El elegido va en enteros de su moneda, de `minimo` a `maximo`: cada monto mensual de PayPal es un plan. Sin monto lo
+ * pide la app de antes de la escalera (su tienda dice «$10 USD al mes»): también paga el de hoy, por decisión del
+ * creador, y el monto y cómo baja los ve en la página de pago de Stripe antes de pagar.
  */
 export function montoDe(plan: 'mensual' | 'anual' | 'unico', elegido: unknown, p: Pick<Precios, 'mensual' | 'anual' | 'minimo' | 'maximo' | 'moneda'>): number {
   if (plan === 'anual') return p.anual
@@ -840,7 +929,7 @@ async function suscribir(env: Env, c: Record<string, unknown>, desde: string): P
     )
   const acepto = new Date().toISOString()
   if (plan === 'gratis') return unirse(env, email, equipo!, acepto, terminos, desde, c.porCorreo === true)
-  const t = await precios(env, c.fundador)
+  const t = await precios(env, c.fundador, true)
   if (pasa === 'paypal' && t.sinPaypal) throw new Rechazo(400, 'Por ahora no se puede pagar con PayPal: elige tarjeta, Mercado Pago o cripto.')
   if ((pasa === 'mercadopago' && !t.mxn) || (pasa === 'tarjeta' && !t.tarjeta) || (pasa === 'cripto' && !t.cripto)) throw new Rechazo(400, 'Por ahora no se puede pagar así: elige otra forma de pago.')
   // La página de la tarjeta de Mercado Pago (`/pagar`, hasta el 6 de noviembre de 2026) mandaba el monto en pesos y su
@@ -866,10 +955,16 @@ async function suscribir(env: Env, c: Record<string, unknown>, desde: string): P
   // Cada intento abre un pago en la pasarela y una fila: pocos al día por conexión, que nadie llene D1 ni alarme a la pasarela.
   if (!(await cupo(env, desde, 'pago', PAGOS_AL_DIA))) throw new Rechazo(429, 'Desde esta conexión ya se abrieron muchos pagos hoy. Prueba mañana, o escríbenos.')
 
-  // Fundador, cada mes o una vez, con el precio de Fundador de su moneda o más: con un enlace de Fundador que nadie ha
-  // usado (aunque no queden lugares; el enlace queda usado con su pago), o en uno de los lugares públicos libres.
-  const conEnlace = !!t.fundador && plan !== 'anual' && monto >= p.mensual
-  const deFundador = conEnlace || (t.quedan > 0 && plan !== 'anual' && monto >= p.mensual)
+  // Fundador, cada mes o una vez, con el precio de Fundador de su moneda (`base`) o más: con un enlace de Fundador que
+  // nadie ha usado (aunque no queden lugares; el enlace queda usado con su pago), o en uno de los lugares públicos libres.
+  const conEnlace = !!t.fundador && plan !== 'anual' && monto >= p.base
+  const deFundador = conEnlace || (t.quedan > 0 && plan !== 'anual' && monto >= p.base)
+  // El mensual al precio del día baja cada mes hasta su piso (`escalera.ts`); con cripto, no menos de lo que acepta
+  // NOWPayments. Quien elige otro monto se queda con él. La página y la app dicen cuál es (`sugerido`) con el monto que
+  // enseñaron: si el precio cambió mientras tanto, paga ese y le baja igual, que es lo que aceptó. La página y la app
+  // de antes de la escalera no lo dicen: baja si es el precio de hoy (el que va sin monto).
+  const piso = Math.max(p.base, p.minimo)
+  const baja = plan === 'mensual' && monto > piso && (c.sugerido === true || monto === p.mensual)
   const fila: Fila = {
     id: crypto.randomUUID(),
     clave: nuevaClave(),
@@ -896,10 +991,11 @@ async function suscribir(env: Env, c: Record<string, unknown>, desde: string): P
     paypal: null,
     orden: null,
     cripto: null,
-    stripe: null
+    stripe: null,
+    piso: baja ? piso : null
   }
-  await env.DB.prepare('INSERT INTO licencias (id, clave, email, plan, monto, moneda, fundador, enlace_fundador, estado, creada, acepto, terminos, modo) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
-    .bind(fila.id, fila.clave, email, plan, fila.monto, fila.moneda, fila.fundador, fila.enlace_fundador, fila.estado, fila.creada, acepto, terminos, fila.modo)
+  await env.DB.prepare('INSERT INTO licencias (id, clave, email, plan, monto, moneda, fundador, enlace_fundador, estado, creada, acepto, terminos, modo, piso) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+    .bind(fila.id, fila.clave, email, plan, fila.monto, fila.moneda, fila.fundador, fila.enlace_fundador, fila.estado, fila.creada, acepto, terminos, fila.modo, fila.piso ?? null)
     .run()
   // Dónde se paga y en qué columna queda: la suscripción mensual, o el pago del año o del apoyo de una vez.
   let abierto: { columna: 'orden' | 'paypal' | 'preapproval' | 'preferencia' | 'cripto' | 'stripe'; id: string; enlace: string }
@@ -987,7 +1083,7 @@ export function mensualRechazado(mensaje: string): string {
  * en `stripe_pagos`, por cobrar, para contarse cuando se paguen.
  */
 async function pagoStripe(env: Env, f: Fila): Promise<{ id: string; enlace: string }> {
-  const s = await sesionStripe(env, f)
+  const s = await sesionStripe(env, f, comoBaja(env, f))
   if (!s.url) throw new Rechazo(502, 'Stripe no dio el enlace de pago')
   if (f.plan !== 'mensual') await guardarPagoStripe(env, f, pagoDeSesion(s))
   return { id: s.id, enlace: s.url }
@@ -1116,12 +1212,14 @@ async function unirse(env: Env, email: string, equipo: string, acepto: string, t
     await vigilar(env, email, 'pidió otra cuenta con su correo bloqueado', true)
     throw new Rechazo(403, BLOQUEADA)
   }
+  let clave = (await env.DB.prepare("SELECT clave FROM licencias WHERE email = ? AND plan = 'cuenta' AND estado = 'gratis' LIMIT 1").bind(email).first<{ clave: string }>())?.clave
+  // Antes de los cupos: a quien ya apoya no se le hace cuenta ni se le manda correo, así que insistir no gasta nada y
+  // siempre lee que use su clave (la app le abre dónde escribirla), no que pidió muchas cuentas.
+  if (!clave) await sinOtra(env, email, false)
   if (!(await cupo(env, desde, 'cuenta', CUENTAS_AL_DIA))) throw new Rechazo(429, 'Desde esta conexión ya se pidieron muchas cuentas hoy. Prueba mañana.')
   if (!(await cupo(env, await resumen(`correo:${email}`), 'correo', CORREOS_AL_DIA)))
     throw new Rechazo(429, `Ya te mandamos tu clave a ${email} varias veces hoy. Búscala en ese correo (también en spam o promociones).`)
-  let clave = (await env.DB.prepare("SELECT clave FROM licencias WHERE email = ? AND plan = 'cuenta' AND estado = 'gratis' LIMIT 1").bind(email).first<{ clave: string }>())?.clave
   if (!clave) {
-    await sinOtra(env, email, false)
     clave = nuevaClave()
     await env.DB.prepare(
       `INSERT INTO licencias (id, clave, email, plan, monto, fundador, estado, autorizada, creada, acepto, terminos, modo)
@@ -1154,7 +1252,7 @@ async function sinOtra(env: Env, email: string, apoyar: boolean) {
   if (results.some((f) => f.plan === 'gratis'))
     throw new Rechazo(409, 'Ese correo ya tiene Sloth gratis de por vida. Usa su clave: está en Opciones de Sloth, en la computadora donde te uniste.')
   if (results.some((f) => f.estado === 'authorized' || f.estado === 'pagado'))
-    throw new Rechazo(409, 'Ya hay un apoyo activo con ese correo. Usa su clave: te la mandamos por correo y está en Opciones de Sloth.')
+    throw new Rechazo(409, 'Ya hay un apoyo activo con ese correo. Usa su clave: te llegó a ese correo al apoyar, en «Tu clave de Sloth» (si no lo ves, revisa spam o promociones).')
   if (!apoyar && results.length) throw new Rechazo(409, 'Ese correo ya tiene una cuenta de Sloth. Su clave te llegó por correo, en «Tu cuenta de Sloth».')
 }
 
@@ -1199,9 +1297,12 @@ async function cancelar(env: Env, c: Record<string, unknown>): Promise<Response>
     fila = { ...fila, folio: `C-${letras(8)}`, cancelada: new Date().toISOString() }
     await env.DB.prepare('UPDATE licencias SET folio = ?, cancelada = ? WHERE id = ?').bind(fila.folio, fila.cancelada, fila.id).run()
     const hasta = fila.pagado_hasta && Date.parse(fila.pagado_hasta) > Date.now() ? ` Sloth sigue abierta hasta el ${fecha(fila.pagado_hasta)}, lo que ya pagaste.` : ''
+    // Con la escalera (`escalera.ts`), quien vuelve entra con el precio del día.
+    const vuelve = pasoEn(env, fila.moneda) ? [siVuelves(fila, (await apoyoDeHoy(env))(fila.moneda))] : []
     await correo(env, fila.email, `Cancelaste tu suscripción a Sloth · folio ${fila.folio}`, [
       'Hola:',
       `Cancelamos tu suscripción a Sloth. Tu folio de cancelación es ${fila.folio}. ${pasarela(fila)} ya no te hará más cobros.${hasta}`,
+      ...vuelve,
       'Si no fuiste tú, responde a este correo.'
     ]).catch((e) => console.error('Correo de cancelación', e instanceof Error ? e.message : e))
   }
@@ -1556,7 +1657,8 @@ async function guardarEstado(env: Env, fila: Fila, l: Lectura): Promise<Fila> {
   await env.DB.prepare('UPDATE licencias SET estado = ?, pagado_hasta = ?, autorizada = COALESCE(autorizada, ?), revisada = ? WHERE id = ?')
     .bind(estado, nueva.pagado_hasta, nueva.autorizada, ahora, fila.id)
     .run()
-  return nueva
+  // Con un mes recién pagado, el apoyo que baja cada mes queda cobrando el monto siguiente (`escalera.ts`).
+  return bajarCadaMes(env, nueva)
 }
 
 /**
@@ -1624,12 +1726,18 @@ export async function reenviarClaves(env: Env, ahora = Date.now()) {
 
 /** La clave y cómo empezar, al confirmarse el primer pago. */
 function bienvenida(env: Env, f: Fila) {
+  // El apoyo que baja cada mes (`escalera.ts`): lo que se le cobra el siguiente. Y a todo el que apoya cada mes con
+  // cobro automático, que su precio se queda con él mientras siga.
+  const sigue = comoSigue(env, f)
+  const seQueda = f.plan === 'mensual' && !deUnaVez(f) && !deAMano(f) && pasoEn(env, f.moneda) ? tuPrecioSeQueda(env, f) : undefined
   return correo(env, f.email, `Tu clave de Sloth: ${f.clave}`, [
     'Hola:',
     deAMano(f)
       ? `Recibimos tu apoyo: gracias por apoyar a Sloth. Eres Fundador hasta el ${fecha(f.pagado_hasta!)}. Guarda este correo, es donde queda tu clave.`
       : `${pasarela(f)} confirmó tu pago: gracias por apoyar a Sloth. Guarda este correo, es donde queda tu clave.`,
     `Tu clave: ${f.clave}`,
+    ...(sigue ? [sigue] : []),
+    ...(seQueda ? [seQueda] : []),
     `Pégala en Sloth, en Opciones, y deja de salirte el recordatorio. Si aún no la tienes, descárgala en ${env.ORIGEN}/descargar (Mac: ${env.ORIGEN}/descargar?so=mac; Linux: ${env.ORIGEN}/descargar?so=linux). La clave sirve en dos computadoras a la vez.`,
     'Sloth trabaja con la IA que ya tengas: Claude, ChatGPT, OpenCode (que tiene modelos gratis) y otros agentes. Con uno basta, y Sloth no te cobra aparte: lo conectas en Opciones, en Agentes. Si tienes dudas, responde a este correo.'
   ])
@@ -1698,6 +1806,8 @@ async function firmada(env: Env, f: Fila, equipo: string, ahora: number): Promis
   // Fundador: un apoyo de su correo que entró entre los primeros y se llegó a pagar (`esFundador`), o su lugar gratis de por vida.
   const fundador = !!(await env.DB.prepare(`SELECT 1 FROM licencias l WHERE l.email = ? AND ${esFundador('l')} LIMIT 1`).bind(f.email).first())
   const datos = JSON.stringify({
+    // Si su correo apoya hoy. Siempre va, también `false`: con eso la app cierra los estilos que instaló de la comunidad.
+    apoya: await apoyaHoy(env, f.email),
     clave: f.clave,
     equipo,
     email: f.email,
@@ -1729,7 +1839,7 @@ async function recordarEquipo(env: Env, clave: string, equipo: string, ahora: nu
   return true
 }
 
-async function porClave(env: Env, valor: unknown): Promise<Fila> {
+export async function porClave(env: Env, valor: unknown): Promise<Fila> {
   const clave = String(valor ?? '').replace(/\s+/g, '').toUpperCase()
   const fila = CLAVE.test(clave) ? await env.DB.prepare('SELECT * FROM licencias WHERE clave = ?').bind(clave).first<Fila>() : null
   if (!fila) throw new Rechazo(404, 'No encontramos esa clave. Revisa que esté bien escrita.')
@@ -1802,7 +1912,7 @@ export async function vigilar(env: Env, email: string, motivo: string, bloqueada
 }
 
 /** La conexión de quien pide, resumida: para su cupo, sin guardar su IP. */
-async function conexion(req: Request): Promise<string> {
+export async function conexion(req: Request): Promise<string> {
   return `ip:${await resumen(`sloth:${redDe(req.headers.get('cf-connecting-ip') ?? '')}`)}`
 }
 
@@ -1828,7 +1938,7 @@ export function redDe(ip: string): string {
 }
 
 /** Si pide quien publica, con la llave `PUBLICAR`. */
-const conLlave = (req: Request, env: Env) => !!env.PUBLICAR && iguales(req.headers.get('authorization') ?? '', `Bearer ${env.PUBLICAR}`)
+export const conLlave = (req: Request, env: Env) => !!env.PUBLICAR && iguales(req.headers.get('authorization') ?? '', `Bearer ${env.PUBLICAR}`)
 
 /** Si pide el creador: con su llave `ADMIN`, o con la de publicar, que también lo es. */
 export const delCreador = (req: Request, env: Env) => conLlave(req, env) || (!!env.ADMIN && iguales(req.headers.get('authorization') ?? '', `Bearer ${env.ADMIN}`))
@@ -1936,6 +2046,8 @@ export async function avisarCobros(env: Env, ahora = Date.now()) {
   const { results } = await env.DB.prepare(
     "SELECT * FROM licencias WHERE estado IN ('authorized', 'pagado') AND plan != 'unico' AND pagado_hasta IS NOT NULL AND (avisado_para IS NULL OR avisado_para != pagado_hasta)"
   ).all<Fila>()
+  // Lo que paga hoy quien entra (`escalera.ts`), para decirle a quien ya apoya que su precio se queda con él.
+  let hoy: ((moneda: string) => number | undefined) | undefined
   for (const vieja of results) {
     if (!faltaAvisar(vieja, ahora)) continue
     const f = await refrescar(env, vieja).catch(() => null)
@@ -1944,6 +2056,7 @@ export async function avisarCobros(env: Env, ahora = Date.now()) {
     // Pagado de una vez: el año, o el mes con cripto.
     const lapso = f.plan === 'anual' ? 'año' : 'mes'
     const con = f.stripe ? 'tarjeta, en Stripe' : f.cripto ? 'cripto, con NOWPayments' : f.preferencia && !f.orden ? 'Mercado Pago' : 'PayPal'
+    const seQueda = f.estado === 'authorized' && f.plan === 'mensual' && pasoEn(env, f.moneda) ? [tuPrecioSeQueda(env, f, (hoy ??= await apoyoDeHoy(env))(f.moneda))] : []
     const enviado = await (f.estado === 'pagado'
       ? correo(env, f.email, `Tu ${lapso} de Sloth se acaba el ${fecha(f.pagado_hasta!)}`, [
           'Hola:',
@@ -1954,6 +2067,7 @@ export async function avisarCobros(env: Env, ahora = Date.now()) {
       : correo(env, f.email, `Tu próximo cobro de Sloth: ${fecha(f.pagado_hasta!)}`, [
           'Hola:',
           `El ${fecha(f.pagado_hasta!)} ${pasarela(f)} te cobrará ${f.monto.toLocaleString('es-MX')} ${f.moneda} (IVA incluido) por tu suscripción ${cada} a Sloth.`,
+          ...seQueda,
           'Si no quieres que se renueve, cancélala antes de esa fecha en Sloth: Opciones, Suscripción, «Cancelar suscripción». También puedes responder a este correo o escribirnos por WhatsApp. Lo ya pagado sigue valiendo hasta su fecha.'
         ])
     ).catch((e) => (console.error('Aviso de cobro', e instanceof Error ? e.message : e), false))

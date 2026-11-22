@@ -13,6 +13,7 @@ import { YoutubeLote } from './YoutubeProgramar'
 import { CalendarioYoutube } from './YoutubeCalendario'
 import { CalendarioRedes, type EstadoRedes, estadoEnRedes, Marcas, ResumenRedes } from './Redes' // redes
 import './MisVideos.css'
+import { abrirRuta, bajar as bajarAlDispositivo, enLaNube, enLaWeb } from './web'
 
 /**
  * «Mis videos»: los videos terminados de todos los estilos, del más nuevo al más viejo. Se buscan por título, archivo o
@@ -230,8 +231,14 @@ export function MisVideos({ cards, sessions, estilo, onEstilo }: { cards: Card[]
   }
   /** Copia los videos a Descargas y lo dice, con un enlace que los señala en su carpeta. */
   const bajando = useRef(false)
+  const v0 = (vs: VideoHecho[]) => vs[0].ruta.split(/[\\/]/).pop()
   async function bajar(vs: VideoHecho[]) {
     if (bajando.current) return
+    // En la nube no hay Descargas de una computadora: van directo a este dispositivo, uno tras otro.
+    if (enLaNube) {
+      vs.forEach((v, i) => setTimeout(() => bajarAlDispositivo(`/api/web/archivo?ruta=${encodeURIComponent(v.ruta)}`), i * 700))
+      return setAviso({ texto: vs.length === 1 ? `Bajando «${v0(vs)}» a este dispositivo.` : `Bajando ${vs.length} videos a este dispositivo.` })
+    }
     bajando.current = true
     setFallo('')
     setAviso({ texto: vs.length === 1 ? 'Copiando a Descargas…' : `Copiando ${vs.length} videos a Descargas…` })
@@ -239,6 +246,11 @@ export function MisVideos({ cards, sessions, estilo, onEstilo }: { cards: Card[]
       const r = await api<{ carpeta: string; copias: string[] }>('/api/videos/descargar', { rutas: vs.map((v) => v.ruta) })
       const nombre = r.copias[0].split(/[\\/]/).pop()
       setAviso({ texto: r.copias.length === 1 ? `«${nombre}» está en Descargas.` : `${r.copias.length} videos están en Descargas.`, ruta: r.copias[0] })
+      // Desde la web, además, a este dispositivo: uno tras otro, que el navegador no corta varias descargas juntas.
+      if (enLaWeb) {
+        r.copias.forEach((c, i) => setTimeout(() => bajarAlDispositivo(`/api/web/archivo?ruta=${encodeURIComponent(c)}`), i * 700))
+        setAviso({ texto: `${r.copias.length === 1 ? `«${nombre}» está` : `${r.copias.length} videos están`} en Descargas de tu computadora, y se bajan también a este dispositivo.`, ruta: r.copias[0] })
+      }
     } catch (e) {
       setAviso(null)
       setFallo(e instanceof Error ? e.message : String(e))
@@ -398,7 +410,7 @@ export function MisVideos({ cards, sessions, estilo, onEstilo }: { cards: Card[]
             <div className="mis-aviso" role="status">
               <Icono de="descargar" /> {aviso.texto}
               {aviso.ruta && (
-                <button className="link" onClick={() => api('/api/open', { path: aviso.ruta })}>
+                <button className="link" onClick={() => void abrirRuta(aviso.ruta!, undefined, { bajar: false }).catch(() => {})}>
                   Mostrar
                 </button>
               )}
@@ -467,7 +479,7 @@ export function MisVideos({ cards, sessions, estilo, onEstilo }: { cards: Card[]
           onConfirm={async () => {
             setFallo('')
             const r = await api<{ borrados: number; quedan: number }>('/api/redes/eliminar', { rutas: programados.map((v) => v.ruta) })
-            if (r.quedan) setFallo(`${r.quedan === 1 ? 'Uno no se borró' : `${r.quedan} no se borraron`}: un agente trabaja en su carpeta, o Windows no lo dejó mover.`)
+            if (r.quedan) setFallo(`${r.quedan === 1 ? 'Uno no se borró' : `${r.quedan} no se borraron`}: un agente trabaja en su carpeta, o no se pudo mover a la Papelera.`)
             otraVuelta()
           }}
         >

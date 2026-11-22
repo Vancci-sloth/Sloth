@@ -2,6 +2,12 @@
    derecha del chat; en el estudio, en el centro. */
 .navegador { position: relative; display: flex; flex-direction: column; min-width: 0; min-height: 0; background: var(--panel); }
 .session-cuerpo > .navegador { flex: 0 0 var(--navegador-ancho, clamp(380px, 48%, 980px)); max-width: min(70%, calc(100% - 360px)); border-left: 1px solid var(--line); }
+/* Angosto (el celular, desde la web): el panel no cabe junto al chat y lo tapa entero; el globo lo vuelve a esconder. */
+@media (max-width: 760px) {
+  .session-cuerpo { position: relative; }
+  .session-cuerpo > .navegador { position: absolute; inset: 0; z-index: 5; max-width: none; border-left: 0; }
+  .session-cuerpo > .navegador > .navegador-borde { display: none; }
+}
 .estudio > .navegador { grid-area: centro; }
 /* El borde que ensancha el panel. */
 .navegador-borde { position: absolute; z-index: 1; left: -4px; top: 0; bottom: 0; width: 8px; cursor: col-resize; touch-action: none; }
@@ -70,3 +76,11 @@
 .boton-navegador.on { color: var(--amber); border-color: color-mix(in srgb, var(--amber) 45%, var(--line)); background: var(--amber-tinte); }
 .boton-navegador .ico { width: 15px; height: 15px; }
 .boton-navegador.agente:not(.on)::after { content: ''; position: absolute; top: 1px; right: 1px; width: 7px; height: 7px; border-radius: 50%; background: var(--amber); box-shadow: 0 0 0 2px var(--bg); }
+/* Desde la web (NavegadorWeb.tsx): la página de la computadora en capturas, encima de la caja. */
+.navegador-remota { position: absolute; inset: 0; z-index: 1; display: flex; flex-direction: column; background: var(--bg); }
+.navegador-remota-pagina { position: relative; flex: 1; min-height: 0; outline: none; }
+.navegador-remota-pagina:focus-visible { box-shadow: inset 0 0 0 1px var(--amber); }
+.navegador-remota-pagina img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; object-position: top; user-select: none; }
+.navegador-escribir { display: flex; gap: 6px; padding: 6px 8px; border-top: 1px solid var(--line); background: var(--panel); }
+.navegador-escribir input { flex: 1; min-width: 0; height: 30px; padding: 0 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--panel-2); color: var(--text); font-size: 13px; }
+.navegador-escribir .navegador-chip { height: 30px; border-color: var(--line); }

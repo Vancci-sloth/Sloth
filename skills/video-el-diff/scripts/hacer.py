@@ -10,6 +10,7 @@ El Diff (director.py).
     python -B -X utf8 <skill>/scripts/hacer.py --solo-voz --studio <Voz>     solo la voz, en cuanto el guion está cerrado
     python -B -X utf8 <skill>/scripts/hacer.py                               otra vez, con la voz que ya hay
     … --otra-vez                                                           un segundo render, solo si el usuario pidió un cambio
+    … --imagenes <con>                                                     la portada con IA: `chatgpt` o el modelo de Flow de la línea `Imágenes:`
 
 `--dura`: los minutos que pidieron. Si el guion se pasa o se queda corto más del 10 %, lo dice antes de pagar la voz.
 
@@ -19,7 +20,9 @@ Desde la raíz del episodio. En orden, y para diciendo todo lo que hay que arreg
    está en la carpeta del noticiero no se baja otra vez), y la voz, que solo se pide si el guion cambió.
 3. El director escribe guion.json; la línea de tiempo (adaptar.py), la música y la vista en vivo del estudio.
 4. Lo que se mide sin renderizar (reglas.mjs): lo dice, y lo que es de acomodo lo arregla el director.
-5. La portada (la del gancho sobre un cuadro del episodio) y el render (final.py), una sola vez.
+5. La portada y el render (final.py), una sola vez. La portada es la generada con IA si el usuario eligió con qué en
+   «Imágenes» (se pide de fondo en cuanto está el material y aquí se espera, 90 s como mucho); si no, o si falla, la
+   del gancho sobre un cuadro del episodio.
 """
 
 import hashlib
@@ -41,7 +44,7 @@ sys.path.insert(0, str(BASE))
 sys.path.insert(0, str(SKILL / "scripts"))
 import director  # noqa: E402
 import memes  # noqa: E402
-from momentos import Reloj, guardar, hoja, palabras_de, parar  # noqa: E402
+from momentos import Reloj, con_imagenes, esperar_portada, guardar, hoja, palabras_de, parar, pedir_portada  # noqa: E402
 
 RAIZ = Path.cwd()
 PY = [sys.executable, "-B", "-X", "utf8"]
@@ -433,13 +436,51 @@ def medible(guion: dict) -> tuple[list[str], dict[int, set[str]]]:
     return hallazgos, mover
 
 
-def portada(m: dict, guion: dict, vertical: bool) -> str | None:
+def gancho_de(m: dict, guion: dict) -> str:
+    """El gancho del episodio en un renglón: el título de su portada."""
+    return " ".join(x.strip() for x in str(m.get("gancho") or guion.get("gancho") or RAIZ.name).replace("\n", "/").split("/") if x.strip())
+
+
+def pedir_la_portada(m: dict, guion: dict, con: str) -> subprocess.Popen | None:
     """
-    La del vertical (PORTADA.md de video-base): el gancho en un renglón sobre un cuadro del episodio, de un beat que no
-    sea texto citado si lo hay. final.py la pega de primer cuadro.
+    La portada con IA del vertical, de fondo (`pedir_portada` de la base), si el usuario eligió con qué en «Imágenes»:
+    el gancho con la letra del noticiero y, de referencia, el recorte de la primera persona y el primer logo que ya
+    bajaron. No mira el episodio, que aún no se renderiza.
+    """
+    if not con:
+        return None
+    refs, partes = [], []
+    for clave, carpeta, que in (("personas", "recortes", "a cut-out photo of {n}, who the story is about (keep the face exactly as it is)"),
+                                ("logos", "logos", "the logo of {n} (keep it exactly as it is)")):
+        for nombre in (m.get(clave) or {}):
+            archivo = RAIZ / "public" / carpeta / f"{nombre}.png"
+            if archivo.exists():
+                refs.append(archivo)
+                partes.append(que.format(n=nombre))
+                break
+    lineas = [l.strip() for l in (RAIZ / "guion.md").read_text(encoding="utf-8").splitlines() if l.strip()]
+    titulo = next((l[2:].strip() for l in lineas if l.startswith("# ")), RAIZ.name)
+    abre = " ".join(l for l in lineas if not l.startswith("#"))[:300]
+    estilo = ("Style: the same look as the video, a dry, mocking tech newscast for social media: a near-black background "
+              "(#0d0d10), the people and logos of the story as big cut-out photos, like a tabloid collage, with one bright "
+              "accent (orange #ff7a1a or red #ff3b30). Title font: very heavy condensed capitals (like Anton), filled with a "
+              "yellow-to-orange-to-red gradient (#ffe066, #ff9a1f, #ff3d17) with a dark outline."
+              + "".join(f" Attached image {k + 1}: {p}." for k, p in enumerate(partes)))
+    que = f"The episode ({titulo}) opens with: \"{abre}\". Main subject: who or what that story is about, big, reacting."
+    return pedir_portada(RAIZ, con, gancho_de(m, guion), estilo, que, refs)
+
+
+def portada(m: dict, guion: dict, vertical: bool, hecha: Path | None = None) -> str | None:
+    """
+    La del vertical (PORTADA.md de video-base): la generada con IA (`hecha`) o, sin ella, el gancho en un renglón sobre
+    un cuadro del episodio, de un beat que no sea texto citado si lo hay. final.py la pega de primer cuadro.
     """
     destino = RAIZ / "portada.png"
     if not vertical or destino.exists():
+        return None
+    if hecha:
+        # Ya viene a 1080×1920.
+        shutil.copy(hecha, destino)
         return None
     beats = [b for p in guion["parrafos"] for b in p["beats"]]
     sin_texto = [b for b in beats if b["v"].get("clip") or b["v"].get("encuadre") == "cubre" or any(e.get("tipo") == "pegado" for e in b["v"].get("encima") or [])]
@@ -448,8 +489,7 @@ def portada(m: dict, guion: dict, vertical: bool) -> str | None:
     cuadro = RAIZ / "revision" / f"{elegido}_95.jpg"
     if r.returncode or not cuadro.exists():
         return "la portada: no salió el cuadro de fondo: " + cola(r, 400)
-    titulo = " ".join(x.strip() for x in str(m.get("gancho") or guion.get("gancho") or RAIZ.name).replace("\n", "/").split("/") if x.strip())
-    r = correr(["node", str(BASE / "portada_sin_ia.mjs"), str(cuadro), str(destino), "--titulo", titulo])
+    r = correr(["node", str(BASE / "portada_sin_ia.mjs"), str(cuadro), str(destino), "--titulo", gancho_de(m, guion)])
     return None if destino.exists() else "la portada: " + cola(r, 400)
 
 
@@ -461,12 +501,13 @@ def main() -> None:
     args: dict = {}
     while a:
         x = a.pop(0)
-        if x in ("--studio", "--audio", "--dura") and a:
+        if x in ("--studio", "--audio", "--dura", "--imagenes") and a:
             args[x[2:]] = a.pop(0)
         elif x in ("--revisa", "--sin-voz", "--solo-voz", "--otra-vez", "--de-fondo"):
             args[x[2:]] = True
         else:
             sys.exit(__doc__)
+    con = con_imagenes(RAIZ, args.get("imagenes"))
     # Lo largo, antes que nada y aunque aún no haya momentos: cambiar el guion después de escribirlos los desancla todos
     # (en la primera corrida del eval el guion salió de 237 palabras para 180 y hubo que rehacer las dos cosas).
     g = director.Guion()
@@ -563,6 +604,9 @@ def main() -> None:
         print(f"✓ material y escenas listos ({sum(len(p['beats']) for p in guion['parrafos'])} beats). Con la voz: hacer.py --audio <archivo>")
         return
 
+    # La portada con IA, de fondo desde que hay recortes y logos que enseñarle: llega mientras se mide lo demás.
+    vertical = guion["formato"] == "vertical"
+    con_ia = pedir_la_portada(m, guion, con) if vertical and not (RAIZ / "portada.png").exists() else None
     reloj.paso("la línea de tiempo, la música y la vista en vivo…")
     r = correr(PY + ["voz/adaptar.py"])
     parte = re.search(r"\((\d+)%\)", r.stdout)
@@ -601,8 +645,7 @@ def main() -> None:
         print("  Lo que se midió (de acomodo; cámbialo solo si es de tu momentos.json: otra cita, otro rótulo):", flush=True)
         for h in hallazgos[:25]:
             print("  ✘ " + h, flush=True)
-    vertical = guion["formato"] == "vertical"
-    if error := portada(m, guion, vertical):
+    if error := portada(m, guion, vertical, esperar_portada(RAIZ, con_ia, reloj.inicio, "la del gancho sobre un cuadro del episodio")):
         sys.exit("✗ " + error)
     reloj.paso("render…")
     r = correr(PY + [str(SKILL / "scripts" / "final.py"), *(["--otra-vez"] if args.get("otra-vez") else [])])

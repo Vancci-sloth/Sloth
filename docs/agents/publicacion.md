@@ -79,9 +79,16 @@ Pendiente al 8-nov-2026 ([#23](https://github.com/Vancci-sloth/Sloth/issues/23))
 antes de la primera publicación con esto hay que desplegar el cobro, o ignora `sinTicket`. Ahí está también el estado de
 los envíos a Apple.
 
+Toda versión avisa lo que trae, sin excepción: su `novedad.txt` (paso 1) y su anuncio en la comunidad (paso 5). Las que
+salen para todos (`[para todos]`) son de dos clases, y el aviso dice cuál es (pedido del creador, 18 de noviembre de 2026):
+
+- **Normal:** trae cosas nuevas. Lleva su guía animada, la del creador bailando (paso 1), y el anuncio de siempre.
+- **Express:** un arreglo urgente. Sin guía, y `Novedades.tsx` no se toca: solo avisa, claro y corto, qué fallaba y que
+  ya quedó, en `novedad.txt` y en un anuncio titulado `ACTUALIZACION EXPRESS (…)` ([anuncios.md](anuncios.md)).
+
 1. Actualiza `novedad.txt`: un renglón corto con lo que trae la versión, que se ve al pasar el cursor sobre «Actualizar».
-   Una versión puede llevar además su guía animada (`web/src/Novedades.tsx`, la 0.4.2 en
-   `web/public/novedades/0.4.2.html`, que reemplaza a la de antes), que sale una vez al abrirla a quien actualizó. Su
+   Una versión puede llevar además su guía animada (`web/src/Novedades.tsx`, la 0.4.3 en
+   `web/public/novedades/0.4.3.html`, que reemplaza a la de antes), que sale una vez al abrirla a quien actualizó. Su
    número en `Novedades.tsx` debe ser el que saldrá: `version-venta.mjs` sube solo la última cifra de la publicada, y un
    salto (0.5.0) se pone a mano en `package.json`.
 2. Comprueba el diff completo entre `origin/venta` y `main`: se publicará todo lo que haya entrado a `main`. Guarda la
@@ -111,6 +118,21 @@ los envíos a Apple.
    se usa, que lo pruebe y le diga qué tal; sin `[para todos]`, que sin apoyo le llega en 7 días) con
    `node scripts/mejoras.mjs <id> <archivo>`, que también la marca hecha.
 
+### Si quien apoya dice que no le llega la versión nueva
+
+La app busca la nueva en `/actualizaciones/latest*.yml` con su clave y su computadora (`x-sloth-clave`,
+`x-sloth-equipo`, que le da `/api/licencia/credencial`). El cobro (`apoya`) da la nueva si esa clave vale en esa
+computadora y **su correo** tiene un apoyo vigente, como la insignia de la comunidad: quien apoyó desde la tienda de
+estilos sigue con la clave de su cuenta gratis. `licencias/src/anticipo.test.ts` lo prueba de punta a punta.
+
+- El navegador no lleva la clave: durante los 7 días, `/descargar` y la página dan la anterior a todos, también a
+  quien apoya. La nueva le llega por «Actualizar» en su Sloth (en una Mac sin firma de Apple o una Windows 0.4.0–0.4.1,
+  que bajan a mano, primero la anterior y desde ella la nueva).
+- La app pregunta al abrir, cada 6 horas, al minuto de escribir otra clave y cuando cambia `/ultima` (cada 5 min; cambia
+  al subirse el instalador y otra vez al llegar su `latest.yml`). Quien apoya desde la tienda la ve en la siguiente.
+- El cobro no guarda qué versión tiene cada quien. Sí se ve quién usa qué clave: `equipos.visto` se renueva cada vez
+  que su Sloth pregunta por la licencia (`npm run licencias -- d1 execute sloth-licencias --remote --command "…"`).
+
 La llave `PUBLICAR` del workflow autoriza la subida, y solo vive en los secretos de GitHub: con ella se reparte una
 versión a todos. En la computadora del creador va otra, `ADMIN` (`%APPDATA%\sloth\licencias\admin.txt`), que administra
 la comunidad, las voces y los apoyos a mano, pero no publica, porque ahí la leen sus agentes. Los secretos de Apple y el comportamiento sin firma están en
@@ -134,16 +156,33 @@ borra. Si pasa, `npm run licencias -- deployments list` y `npm run licencias -- 
 Aplica las migraciones cuando el cambio incluya alguna, antes de desplegar código que necesite esas columnas.
 Comprueba la ruta afectada en `https://api.sloth.vancci.org`. Este despliegue es independiente de
 `main` y `venta`; subir la app no actualiza el Worker. Los nombres de sus secretos están en la cabecera de su configuración.
-Los créditos mensuales de voz necesitan la migración `0024_voz_mensual.sql` y el Worker actualizado **antes** de publicar
-la app. El script de publicación manda `vozMensual` y, al terminar de subir el `latest*.yml`, el Worker guarda la marca
-`voz-mensual.json` en R2: ahí abre las voces aunque siga `VOZ_SOLO_CREADOR=1`. Hasta entonces siguen solo para el creador.
-Cada diez minutos refresca a 100.000 los créditos de cada correo, una vez por mes natural de Ciudad de México, **SOLO a
-quien paga activamente el apoyo o más** (`PRECIO_MENSUAL`: $10 USD desde el 13 de noviembre de 2026, antes $15; 199 MXN
-en los apoyos en pesos, o el anual) y a nadie más: ni cuentas gratis, ni apoyos de menos (el monto que cada quien elige),
-ni lugares gratis de Fundador de por vida. Lo decidió el creador el 7 de noviembre de 2026 y la regla es una sola, `daCreditos` en `licencias/src/voz-mensual.ts`, que usa
-también la rifa. También lo hace al consultar `/voz`. Refrescar es sumar lo que falta para llegar a 100.000: lo
-no usado no se acumula, nunca se quita lo que el creador dio de más, y no se recuperan meses anteriores. El correo lleva
-la **clave de Sloth existente**, que se pega en Opciones → Voz → Voces de Sloth, y se reintenta sin repetir la entrega. Todo sale de las mismas llaves de socio y aparece en Administrador.
+
+Si falla todo lo que toca la base (`/precio` da 500, la comunidad 503, no se puede apoyar ni crear cuenta) y lo de R2
+sigue bien (`/version`, `/ultima`), lee el error en `npm run licencias -- tail --format json`. El 16 de noviembre de 2026
+fue `D1_ERROR: … exceeded D1's free tier daily row read limit`: el plan gratis de Cloudflare da 5 millones de filas
+leídas al día y se levanta a medianoche UTC (18:00 de México), o al pasar la cuenta a Workers Paid. Qué consultas las
+gastan: `npm run licencias -- d1 insights sloth-licencias --timePeriod 2d --sort-type sum --sort-by reads --json`. Ese
+día, la mayor parte de las filas eran de las que recorren `licencias` entera: los miembros y activos de la comunidad, los
+conteos de `/precio`, y la insignia en los votos del roadmap y en `/creditos` (tres de cada cuatro filas). Desde
+entonces se calculan a lo más cada 10 minutos y se leen de la tabla `guardado` (`licencias/src/guardado.ts`): lo que
+sea igual para todos y recorra una tabla entera va ahí, no en una variable, porque cada copia del Worker vive poco.
+Las consultas a mano (`d1 execute --remote`) siguen contestando aunque el Worker esté en el tope.
+Las voces de Sloth se abren a todos con la marca `voz-mensual.json` en R2, que el Worker guarda cuando el script de
+publicación (que manda `vozMensual`) termina de subir el `latest*.yml`; sin ella, con `VOZ_SOLO_CREADOR=1`, son solo del
+creador.
+**Los créditos de voz de cada mes ya no se dan** (decisión del creador, 15 de noviembre de 2026). En noviembre de 2026
+se entregaron 100.000 a quien pagaba activamente el apoyo; desde esa fecha quien los recibió conserva su saldo, nadie
+más los recibe y no se rellenan: el Worker ya no los entrega ni manda su correo, y la app ya no los anuncia (ni el
+aviso a pantalla completa, ni Opciones → Voz, ni la tienda de estilos). No los prometas en anuncios, guías ni correos.
+Los créditos ahora llegan solo por la rifa o porque el creador los da (Administrador o `/voz/admin/regalo`). Lo
+entregado sigue en `voz_mensual` (migración 0024) y en Administrador → Créditos mensuales. La regla de quién paga el
+apoyo sugerido o más (`daCreditos` en `licencias/src/voz-mensual.ts`) la sigue usando la rifa para dejarlos fuera.
+La copia de cada Sloth (ADR 0020) necesita la migración `0031_respaldos.sql` y el Worker desplegado antes de publicar
+la versión de la app que la sube; hasta entonces la app solo anota que no pudo y lo vuelve a intentar.
+Sloth en la web (ADR 0025) necesita la migración `0036_web.sql` y el Worker desplegado antes de publicar la versión de
+la app que la trae: sin ellos, el túnel abre pero la entrada `api.sloth.vancci.org/web` no sabe adónde mandar.
+La entrada vive en su propio dominio, `web.sloth.vancci.org` (una ruta `custom_domain` más del mismo Worker en
+`wrangler.jsonc`, que `deploy` crea). Comprueba con `curl https://web.sloth.vancci.org` (la página de entrada, 200).
 La rifa necesita la migración `0025_rifas.sql` y el Worker desplegado; con créditos, además, las voces ya abiertas.
 Su sección y su ruleta llegan a la Administrador instalada con la siguiente versión de la app.
 Un reparto en `enviando` o `revisar` requiere comprobar el movimiento en el proveedor antes de volver a sumarlo: su API
@@ -161,11 +200,45 @@ bajaron a $10 con el cobro aplazado; las de Mercado Pago, a 199 MXN y en pausa, 
 PayPal no deja cambiarlas ni pausarlas (`USER_ACCOUNT_RESTRICTED`), y si quieren seguir apoyan otra vez. Si el apoyo
 vuelve a bajar, se cambia el precio, se despliega y se corre igual con la fecha del cambio (`--probar` primero).
 
+Desde el 18 de noviembre de 2026 ese precio es una escalera (`licencias/src/escalera.ts`, migración 0032): por cada 50
+personas que apoyan hoy (`apoyan` en `/precio`) el apoyo sube $5 USD ($100 MXN), y a quien entra con el precio del día
+le baja $5 cada mes que paga, hasta $10 (199 MXN): con 50 personas, $15 el primer mes y $10 después; con 100, $20, $15
+y $10. Los números son `PRECIO_CADA`, `PRECIO_SUBE` y `PRECIO_SUBE_MXN` en `wrangler.jsonc`; `PRECIO_MENSUAL` es el
+piso, el de Fundador y lo que cuenta en `apoyan`. `/precio` da `mensual` (el de hoy), `base`, `paso` y `cada`. Quien
+elige su monto en «Lo que gustes» no baja. La app de antes de esto (su tienda dice «$10 USD al mes» y no manda monto)
+también cobra el precio del día, por decisión del creador: el monto y cómo baja se ven en la página de pago de Stripe.
+Lo que más se le dice a la gente, porque es lo que vende: su precio se queda con cada quien mientras siga apoyando, y
+quien cancela y vuelve entra con el precio de ese día. Va en la página, en el correo de la clave, en el aviso de cada
+cobro, al cancelar (el correo y el aviso de la app) y en la tienda; al escribir anuncios o textos del apoyo, dilo también.
+Cómo va cada una: `monto` es lo que cobra su siguiente mes, `piso` hasta dónde baja y `bajado` con qué mes bajó
+(`d1 execute … "SELECT email, monto, piso, bajado, pagado_hasta FROM licencias WHERE piso IS NOT NULL"`). Si la pasarela
+no deja cambiar el monto (PayPal en revisión), queda en el registro como «Bajar el apoyo del mes» y se reintenta en cada
+lectura; el aviso de cobro dice siempre lo que de verdad se va a cobrar.
+
 Cuando el usuario pida un link de Fundador, dale uno nuevo con `npm run fundador -- nuevo <para quién>`. Es de una sola
 persona: quien apoya con $10 o más con él es Fundador aunque los 25 lugares públicos estén ocupados; sin link, lo es
 mientras quede alguno de los 25. Con `lista` ves los que se han dado y quién usó cada uno, y con `revocar <código>` uno deja de servir.
 Si alguien apoyó por transferencia, `npm run fundador -- dar <correo> [meses]` lo hace Fundador esos meses (1 si no se
 dice) y le manda su clave por correo; si ya tenía uno así, se le suman. Con 0 meses, solo se le vuelve a mandar.
+
+### YouTube con la app de Sloth
+
+Quien apoya conecta su canal con la app de Google de Sloth ([ADR 0021](../adr/0021-youtube-con-la-app-de-sloth.md)):
+el proyecto de Google Cloud de Sloth (`sloth-515321`, número 918300411652, creado el 20-nov-2026), con su cliente OAuth
+de tipo «App de escritorio» (`Sloth`, en producción). Su id y su secreto van en el cobro
+(`npm run licencias -- secret put YOUTUBE_CLIENT_ID` y `YOUTUBE_CLIENT_SECRET`, desde Git Bash como arriba). Sin los
+dos, `/youtube` responde `{}` y la app solo ofrece la propia de cada quien. Comprueba con
+`curl https://api.sloth.vancci.org/youtube`: debe traer `cliente`.
+
+Lo que pide Google, en el proyecto de Sloth:
+
+- Google Auth Platform → Público: «En producción». En «Prueba», el permiso caduca cada 7 días.
+- Verificar la app (Centro de verificación): página de inicio y aviso de privacidad en `sloth.vancci.org` (dominio
+  verificado en Search Console), la justificación de cada permiso (`SCOPES` en `server/youtube.ts`) y un video «No
+  listado» del flujo de «Conectar canal» y de una subida. Sin verificar, son 100 usuarios en toda la vida del proyecto.
+- Más de 100 subidas al día entre todos: auditoría y cuota en el
+  [formulario de YouTube](https://support.google.com/youtube/contact/yt_api_form) (aparte `videos.insert`, con su cuenta).
+  Una sola app de Sloth: varios proyectos para sumar cuota violan las políticas (III.D.1).
 
 ## Publicaciones de Instagram: nube/
 
@@ -185,8 +258,99 @@ solo afecta al servidor local. `scripts/nube.mjs` usa una sesión de Cloudflare 
 `sloth.vancci.org` vive en **`Vancci-sloth/vancci-web`**, en `web/public/sloth/index.html`. Un checkout puede estar
 atrasado o tener cambios sin guardar: consulta
 `git status`, actualiza las referencias con `git fetch origin` y parte de `origin/main` en un worktree aparte si hace
-falta. El proyecto de Astro está dentro de `web/`: ahí se corre `npm ci` y `npm run build` antes de subir los cambios
-al `main` de ese repo. Vercel despliega ese push.
+falta. El proyecto de Astro está dentro de `web/`: ahí se corre `npm ci` y, con los cambios ya en el `main` de ese repo,
+`npm run publicar`, que arma el sitio y lo sube a Cloudflare con la sesión de Sloth (la de `npm run licencias`). Subir a
+`main` no publica nada: desde el 16 de noviembre de 2026 la página ya no está en Vercel, que la apagó
+(`402 DEPLOYMENT_DISABLED`) y tiró `sloth.vancci.org` y `vancci.org`.
 
-Comprueba el despliegue de Vercel y la página publicada en `https://sloth.vancci.org`, incluidos los enlaces de descarga
-y pago que hayas cambiado. Cambiar este repo o desplegar `licencias/` no modifica esa página.
+Son tres piezas, todas en la cuenta de Cloudflare de Sloth: el Worker `sloth-web` (`sloth.vancci.org`), el Worker
+`vancci-web` (`vancci.org` y `www`) y el bucket de R2 `vancci-web-videos` (`videos.vancci.org`), a donde redirigen los
+`.mp4`, porque los archivos de un Worker no se sirven por partes y sin eso Safari no reproduce un video. Los dos Workers
+son solo archivos, sin código: así no gastan las 100.000 peticiones diarias del plan gratis, de las que el cobro ya usa
+entre 60.000 y 80.000. No les pongas código (`main`) ni uses `wrangler pages` con esos nombres: `pages project create
+sloth-web` reemplazó al Worker y dejó la página en 530 hasta volver a publicar. Si un dominio ya tiene registros DNS de
+otro sitio, `wrangler deploy` no lo conecta (error 100117) y la sesión de wrangler no puede borrarlos: hace falta un
+token con «DNS Write» o quitarlos en el panel. Los que había de Vercel quedaron en
+`%APPDATA%\sloth\respaldos\dns-vancci-org-2026-11-16.json`.
+
+Comprueba la página publicada en `https://sloth.vancci.org`, incluidos los enlaces de descarga y pago que hayas cambiado
+y que un video conteste 206 a `curl -L -H "Range: bytes=0-1"`. Cambiar este repo o desplegar `licencias/` no modifica
+esa página.
+
+Con qué se paga lo dice el cobro (`/precio`): hasta que contesta, y si no contesta, la página ofrece solo tarjeta.
+PayPal sale solo si el cobro lo da (sin `sinPaypal`). Si la página enseña algo raro en el pago, mira primero `/precio`.
+
+## App del celular: movil/
+
+La app de iOS y Android (ADR 0025) es un proyecto de Expo aparte, con su propio `package.json`: `cd movil && npm install`.
+No entra en `npm run compilar` ni en el instalador de escritorio. Comprobarla:
+
+- `cd movil && npx tsc --noEmit`, y `npm test` en la raíz, que corre `movil/src/*.test.ts` y `movil/src/local/*.test.ts`
+  (el enlace del QR, el agente del celular y si `src/local/estilos.json` va al día: si no, `node scripts/estilos.mjs` en
+  `movil/`; hazlo al cambiar una card de video o su SKILL.md).
+- El agente del celular sin gastar: una API de Anthropic de mentira que conteste `/v1/models` y `/v1/messages` en
+  streaming, y Metro con `EXPO_PUBLIC_ANTHROPIC_BASE_URL=http://<ip>:<puerto> npx expo start -c` (con `-c`: la variable
+  se fija al armar). Sin ella, la app habla con la API real.
+- `npx expo export --platform android --platform ios --output-dir <temporal>`: arma los dos paquetes de JavaScript con
+  Metro, que es lo que falla si algo de `shared/` o `web/src/` importa un paquete que el celular no tiene.
+- Para verla: Sloth abierta con Opciones → Tu celular encendido y `npx expo start --web` en `movil/` (la llave se escribe
+  a mano; la cámara, el micrófono, la galería y compartir solo van en el celular). En Android, con Expo Go: un celular o
+  el emulador `Sloth_Pixel` (el SDK está en `%LOCALAPPDATA%\Android\Sdk`; ábrelo con las herramientas de dispositivo de
+  T3) y `npx expo start --android`. Así se probó todo el 21 de noviembre: conectar por la IP del Wi-Fi, el hilo, cómo va
+  el video, ver, guardar en la galería y compartir, la comunidad, adjuntar de la galería y grabar la voz. Expo Go no
+  abre el enlace `slothmovil://` del QR con la cámara: para eso, una compilación (`eas build --profile desarrollo`).
+
+Compilar, con la cuenta de Expo de Vancci-sloth (`npx eas-cli@latest login`; la primera vez `eas init` escribe el
+`projectId` en `app.json`):
+
+- Android para probar o pasarla a quien sea: `eas build -p android --profile prueba` da un `.apk` que se instala directo.
+- Tiendas: `eas build --profile tiendas` y `eas submit --profile tiendas`. iOS firma con la cuenta de Apple de Sloth
+  (equipo MP48S4LXVU) y pide su sesión la primera vez; Google Play pide la cuenta de desarrollador y el primer `.aab`
+  se sube a mano.
+- Sube `version` en `movil/app.json` con cada cambio que se note; `tiendas` sube solo el número de compilación.
+
+### La versión GAMMA de Android (desde el 21-nov-2026)
+
+Por pedido del creador, la app del celular sale ya, como **SOLO VERSIÓN GAMMA**: una prueba súper temprana con fallos
+continuos, y quien no quiera presenciarlos, que no la descargue. Lo dicen la app (`Gamma` en `movil/src/ui.tsx`: la
+bienvenida, Inicio y Más) y la página de venta (`#celular`). Mientras sea gamma, todo texto sobre ella lo dice igual.
+
+Se compila en Linux con `App del celular (Android)` (`.github/workflows/celular.yml`), sin EAS: en Windows no compila,
+porque las rutas de C++ de React Native pasan de 260 caracteres (ni desde `C:\s\m` ni con `CMAKE_OBJECT_PATH_MAX`), y
+activar las rutas largas pide administrador. En una PR que toca `movil/` deja el `.apk` como artefacto; corrido a mano
+desde `main` con `gh workflow run celular.yml -f publicar=apk` lo sube encima del release `celular-gamma` (prerelease),
+siempre con el mismo nombre: la página enlaza `releases/download/celular-gamma/Sloth-gamma.apk`.
+
+Se firma con la llave de Sloth, en los secretos `SLOTH_ANDROID_KEYSTORE` (base64) y `SLOTH_ANDROID_CLAVE`; el original
+está en `%APPDATA%\sloth\movil\` (`sloth-android.keystore` y su contraseña en `llave-android.json`). **Sin esa llave no
+se puede actualizar la app ya instalada** (Android rechaza una firma distinta): respáldala. Antes de correrlo a mano,
+prueba el artefacto de la PR en el emulador (`adb install -r`).
+
+### Actualizar sin otro .apk
+
+Desde la 0.1.1, la app trae `expo-updates`: lo que no es nativo (pantallas, textos, el agente, los estilos) le llega
+sola, sin bajar nada, con `gh workflow run celular.yml -f publicar=actualizacion` desde `main`. La baja al abrir y se
+pone la siguiente vez que se abre; Inicio avisa «Hay una versión nueva de Sloth lista» con «Reiniciar», y Más dice de
+qué día es la que corre. Cada una va firmada (`movil/scripts/publicar-actualizacion.mjs`) con la llave del secreto
+`SLOTH_CELULAR_ACTUALIZACIONES`; el original está en `%APPDATA%\sloth\movil\actualizaciones\` (respáldala con la otra)
+y su certificado, que la app trae dentro, en `movil/certificados/certificate.pem` (vence en 2056). El cobro solo las
+guarda y las sirve (`licencias/src/actualizar-celular.ts`, en R2 bajo `celular/`).
+
+Una actualización solo llega a las apps con la misma `version` de `app.json` (`runtimeVersion` con la política
+`appVersion`). Lo nativo no viaja así: un paquete nuevo con código nativo (`npx expo install` de algo que no es solo
+JavaScript), un permiso, un plugin o un cambio de `app.json` fuera de lo que lee JavaScript. Para eso, sube `version` y
+`android.versionCode` y saca otro `.apk`; publicar una actualización con código nativo nuevo sobre la versión de antes
+truena en los celulares. Para deshacer una, revierte el commit y publica otra.
+
+### El candado del celular: solo para quienes apoyan
+
+Desde la 0.1.1, la app pregunta al cobro (`POST /celular`, `licencias/src/celular.ts`) al abrir y cada 6 horas. Con
+`CELULAR_SOLO_APOYO` en `"1"` (`licencias/wrangler.jsonc`), solo abre con una clave de Sloth cuyo correo apoya hoy:
+la que se escribe en el candado (`movil/src/pantallas/Candado.tsx`) o la de la computadora que el celular guardó al
+conectarse; el creador entra con su llave. Para encenderlo o apagarlo, cambia ese valor y despliega el cobro: no hace
+falta otra versión de la app. Solo cierra las copias que ya traen el candado; las 0.1.0 siguen abiertas. Sin internet,
+lo último que dijo el cobro vale una semana. Cada clave abre hasta 2 celulares (`celulares`, migración 0037), aparte
+de sus computadoras; para liberar uno, borra su fila.
+
+El candado no ofrece pagar ni enlaza a la página: Google Play no deja mandar a pagar fuera de su cobro. Al subirla a
+Google Play, deja a sus revisores una clave que apoye (en «Acceso a la app» de Play Console).

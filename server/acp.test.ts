@@ -5,7 +5,7 @@ import { dirname, join } from 'node:path'
 import test from 'node:test'
 import type { AgentEvent } from '../shared/types.ts'
 import { startAcp, type SaborAcp } from './acp.ts'
-import { elegirCuenta, errorAntigravity, grupoDe, renuevaEn } from './antigravity.ts'
+import { elegirCuenta, errorAntigravity, grupoDe, planDe, renuevaEn } from './antigravity.ts'
 import { errorGemini } from './gemini.ts'
 
 /**
@@ -259,14 +259,15 @@ process.stdin.on('data', (d) => {
         u({ sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: pedidos.join(',') } })
         decir({ id: m.id, result: { stopReason: 'end_turn', usage: { inputTokens: 1000, cachedReadTokens: 600, outputTokens: 20, thoughtTokens: 30 } } })
       }
-    } else if (m.id !== undefined) decir({ id: m.id, result: {} })
+    } else if (m.method === 'authenticate') decir({ id: m.id, result: process.env.PLAN ? { _meta: { antigravity: { tier: JSON.parse(process.env.PLAN) } } } : {} })
+    else if (m.id !== undefined) decir({ id: m.id, result: {} })
   }
 })
 `
 const SCRIPT_GEMINI = join(dirname(SCRIPT), 'gemini.mjs')
 writeFileSync(SCRIPT_GEMINI, COMO_GEMINI)
 
-function correrGemini(env: Record<string, string> = {}) {
+function correrGemini(env: Record<string, string> = {}, otro: Partial<SaborAcp> = {}) {
   const events: AgentEvent[] = []
   const sabor: SaborAcp = {
     nombre: 'Gemini',
@@ -276,7 +277,8 @@ function correrGemini(env: Record<string, string> = {}) {
     modo: 'yolo',
     sinCompactar: true,
     sinCuenta: 'Pega tu llave.',
-    traducir: errorGemini
+    traducir: errorGemini,
+    ...otro
   }
   let fin!: () => void
   const listo = new Promise<void>((ok) => (fin = ok))
@@ -424,6 +426,20 @@ test('Antigravity: conoce sus errores y deja pasar lo demás', () => {
   assert.equal(errorAntigravity('The input token count exceeds the maximum number of tokens allowed (131072).')?.relevo, true)
   assert.equal(errorAntigravity('Listo: el video pesa 12 MB y el modelo usó 3000 tokens.'), undefined)
   assert.equal(errorAntigravity(`The input tokens exceed… ${'x'.repeat(3000)}`), undefined)
+})
+
+test('Antigravity: el plan de Google de la cuenta sale de lo que contesta el inicio de sesión', async () => {
+  // Lo que contesta la 1.4.1 con una cuenta gratis.
+  const gratis = { name: 'Antigravity Starter Quota', id: 'free-tier', upgradeUri: 'https://antigravity.google/g1-upgrade' }
+  const vistos: unknown[] = []
+  const { run, listo } = correrGemini({ PLAN: JSON.stringify(gratis) }, { cuenta: () => 'A', alAutenticar: (resultado, cuenta) => vistos.push([planDe(resultado), cuenta]) })
+  run.send('hola')
+  await listo
+  run.close()
+  assert.deepEqual(vistos, [[{ id: 'free-tier', nombre: 'Antigravity Starter Quota' }, 'A']])
+  assert.deepEqual(planDe({ _meta: { antigravity: { tier: { id: 'g1-pro-tier' } } } }), { id: 'g1-pro-tier', nombre: 'g1-pro-tier' })
+  assert.equal(planDe({}), undefined)
+  assert.equal(planDe(undefined), undefined)
 })
 
 test('Antigravity: la cuota es por grupo, y al acabarse en una cuenta sigue la siguiente que tenga', () => {

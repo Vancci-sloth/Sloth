@@ -32,6 +32,11 @@ import type { ActualizacionSloth } from '../shared/types.ts'
 
 /** En el repo: la dirección del servidor que ya levantó `npm start`. */
 const SOLO_VENTANA = process.env.SLOTH_VENTANA
+/**
+ * En la nube (ADR 0026, `.devcontainer/sloth-nube.sh`): la ventana está en una pantalla que nadie ve. Ningún aviso que
+ * espere un clic: lo que diría queda en el registro, y si el servidor se cae, Sloth sale y la nube la vuelve a abrir.
+ */
+const NUBE = !!process.env.SLOTH_NUBE
 const URL_SLOTH = SOLO_VENTANA ?? `http://localhost:${process.env.PORT ?? '4848'}`
 const WINDOWS = process.platform === 'win32'
 const MAC = process.platform === 'darwin'
@@ -66,6 +71,8 @@ const CADA = 6 * 3600_000
  * una o se liberó para todos en un live, y se pregunta ya.
  */
 const VISTAZO = 5 * 60_000
+/** Cada cuánto se mira si cambió la clave de Sloth (se escribió la de un apoyo): el servidor la da sin salir a internet. */
+const CLAVE_NUEVA = 60_000
 /**
  * Si la descarga pasa este tiempo sin avanzar, está muerta: al irse el internet, la de Electron no siempre falla, se
  * queda esperando para siempre. Se corta y empieza otra.
@@ -117,15 +124,7 @@ else {
     await primera
     return actualizacion
   })
-  ipcMain.handle('actualizar', () => {
-    if (A_MANO) fuera(`${COBRO}/descargar?so=${SO}&visto`)
-    else if (actualizacion.nueva && actualizacion.avance === undefined) {
-      actualizacion = { ...actualizacion, avance: 0, error: undefined }
-      fallos = 0
-      bajar()
-    }
-    return actualizacion
-  })
+  ipcMain.handle('actualizar', () => actualizar())
   ipcMain.handle('anclada', () => anclada())
   ipcMain.handle('anclar', () => anclar())
   ipcMain.handle('disco:donde', () => (SOLO_VENTANA ? null : donde(APP)))
@@ -133,10 +132,24 @@ else {
   void app.whenReady().then(iniciar)
 }
 
+/** «Actualizar»: baja la versión nueva (o, en un Mac sin firma, abre su descarga). Lo pide la interfaz de la ventana o la web. */
+function actualizar() {
+  if (A_MANO) fuera(`${COBRO}/descargar?so=${SO}&visto`)
+  else if (actualizacion.nueva && actualizacion.avance === undefined) {
+    actualizacion = { ...actualizacion, avance: 0, error: undefined }
+    fallos = 0
+    bajar()
+  }
+  return actualizacion
+}
+
 async function iniciar() {
   permisos()
   Menu.setApplicationMenu(menu())
-  iniciarNavegador(APP)
+  iniciarNavegador(APP, {
+    actualizacion: async () => (await primera, actualizacion),
+    actualizar
+  })
   abrir()
   if (SOLO_VENTANA) return
   mkdirSync(join(APP, 'data'), { recursive: true })
@@ -190,7 +203,7 @@ function abrir() {
     if (d.reason === 'clean-exit') return
     caidas = [...caidas.filter((t) => Date.now() - t < 60_000), Date.now()]
     if (caidas.length <= 3) v.reload()
-    else if (caidas.length === 4) dialog.showErrorBox('Sloth', 'La ventana se cerró varias veces seguidas. Recárgala con Ctrl+R: los agentes y tus archivos siguen trabajando.')
+    else if (caidas.length === 4 && !NUBE) dialog.showErrorBox('Sloth', 'La ventana se cerró varias veces seguidas. Recárgala con Ctrl+R: los agentes y tus archivos siguen trabajando.')
   })
   v.on('close', (e) => {
     if (mudando) {
@@ -432,7 +445,8 @@ function arrancar() {
   s.stdout!.on('data', escribir)
   s.stderr!.on('data', escribir)
   s.on('error', (e) => {
-    dialog.showErrorBox('Sloth', `No se pudo abrir Sloth: ${e.message}`)
+    if (NUBE) anotar(`No se pudo abrir Sloth: ${e.message}`)
+    else dialog.showErrorBox('Sloth', `No se pudo abrir Sloth: ${e.message}`)
     salir()
   })
   // Solo el que sigue siendo el de Sloth: el que se paró para mudarse ya no cuenta.
@@ -463,6 +477,7 @@ function termino(codigo: number | null) {
     if (!ventana) app.quit()
     return
   }
+  if (NUBE) return (anotar('El servidor se cayó: Sloth sale y la nube la vuelve a abrir'), app.exit(1))
   dialog.showMessageBoxSync({ type: 'warning', title: 'Sloth', message: 'Sloth se cerró.', detail: `Lo que pasó está en el registro:\n${REGISTRO}` })
   salir()
 }
@@ -672,17 +687,31 @@ function actualizaciones() {
     anotar('La descarga no avanza: se empieza otra')
     bajada.cancel()
   }, REINTENTO)
+  const credencial = () =>
+    fetch(`${URL_SLOTH}/api/licencia/credencial`)
+      .then((r) => r.json() as Promise<{ clave?: string; equipo?: string }>)
+      .catch(() => ({}) as { clave?: string; equipo?: string })
+  /** La clave con que se preguntó la última vez. */
+  let conClave: string | undefined
   const revisar = async () => {
     // Quien apoya recibe lo nuevo antes: el cobro lo reconoce por su clave y esta computadora, que da el servidor. Al
     // abrir Sloth, se espera a que arranque: sin la clave, la versión de quien apoya le llegaba 6 horas después. Si no
     // arranca en 2 minutos, se pregunta igual: una versión nueva puede ser el arreglo.
     await Promise.race([servidorListo, new Promise((ok) => setTimeout(ok, 120_000))])
-    const c = (await fetch(`${URL_SLOTH}/api/licencia/credencial`).then((r) => r.json()).catch(() => ({}))) as { clave?: string; equipo?: string }
+    const c = await credencial()
+    conClave = c.clave
     autoUpdater.requestHeaders = c.clave && c.equipo ? { 'x-sloth-clave': c.clave, 'x-sloth-equipo': c.equipo } : null
     await autoUpdater.checkForUpdates().catch(() => {})
   }
   primera = revisar()
   setInterval(revisar, CADA)
+  // Quien escribe la clave de su apoyo con Sloth abierta ve la versión nueva en un minuto: sin esto se preguntaba con la
+  // clave de antes (o sin ninguna) hasta la siguiente vuelta, y parecía que apoyar no la daba.
+  setInterval(async () => {
+    await primera
+    const c = await credencial()
+    if (c.clave && c.clave !== conClave && !bajada) void revisar()
+  }, CLAVE_NUEVA)
   // La primera vez solo se anota cómo está: la pregunta de al abrir ya la ve.
   let vista: string | undefined
   const vistazo = async () => {

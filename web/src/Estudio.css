@@ -14,6 +14,17 @@
 .estudio-chat { grid-area: chat; min-height: 0; display: flex; flex-direction: column; background: var(--panel); border-left: 1px solid var(--line); --fondo-chat: var(--panel); }
 .estudio-chat .timeline-inner { padding: 20px 18px 24px; }
 .estudio-chat .session-composer { padding: 0 16px 16px; max-width: none; }
+/* Angosto (el celular, desde la web): una sola columna que se desplaza: el encabezado, las fases, lo elegido (el video
+   con su línea de tiempo, o la fase) y, debajo, el chat. Al lado no cabían: el chat se comía el video. */
+@media (max-width: 760px) {
+  .session.estudio { display: flex; flex-direction: column; overflow-y: auto; }
+  .session.estudio > * { flex: none; }
+  .session.estudio > .estudio-centro, .session.estudio > .navegador { height: 62vh; min-height: 0; }
+  .session.estudio > .estudio-video { height: auto; min-height: 62vh; }
+  .estudio-chat { height: 82vh; border-left: 0; border-top: 1px solid var(--line); }
+  /* Arrastrar de lado mueve la reproducción; deslizar arriba o abajo baja al chat. */
+  .estudio .linea-scroll { touch-action: pan-y; }
+}
 
 /* Las cinco fases, con su punto de estado. Una sin etapas en este estilo se ve apagada, pero está. */
 .estudio-fases { display: flex; align-items: center; gap: 2px; min-width: 0; padding: 8px 12px; border-bottom: 1px solid var(--line); overflow-x: auto; }
@@ -73,7 +84,8 @@
 .transporte-velocidad button { padding: 2px 7px; border-radius: 6px; font-size: 11.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
 .transporte-velocidad button:hover { color: var(--text); }
 .transporte-velocidad button.on { background: var(--line); color: var(--text); }
-.monitor-cual { padding: 3px 6px; border-radius: 7px; background: var(--panel-2); border: 1px solid var(--line); font-size: 12.5px; }
+.monitor-cual { font-size: 12.5px; }
+.monitor-cual.campo > .picker-trigger { min-height: 26px; padding: 3px 6px 3px 8px; border-radius: 7px; background: var(--panel-2); }
 /* El render quedó viejo: cambió una de sus entradas después de él. */
 .render-viejo { color: var(--amber-2); }
 

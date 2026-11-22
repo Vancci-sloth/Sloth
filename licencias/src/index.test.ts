@@ -112,7 +112,7 @@ test('acepta el aviso firmado por NOWPayments, con las llaves en orden, también
   assert.equal(await firmaDeNowpayments(aviso, firma, undefined), false)
 })
 
-test('el mensual va con el sugerido o con el monto que se elija; el anual, siempre con su precio', () => {
+test('el mensual va con el de hoy o con el monto que se elija; el anual, siempre con su precio', () => {
   const p = { mensual: 15, anual: 150, minimo: 1, maximo: 1000, moneda: 'USD' }
   assert.equal(montoDe('mensual', undefined, p), 15)
   assert.equal(montoDe('mensual', 30, p), 30)
@@ -161,14 +161,15 @@ test('el precio es el mismo para todos; las 25 primeras personas que apoyan son 
     APOYO_MINIMO_MXN: 20,
     APOYO_GRANDE_MXN: 599
   }
-  const precio = { mensual: 15, anual: 150, minimo: 1, grande: 30, maximo: 1000, moneda: 'USD' }
+  // Sin escalera (`PRECIO_CADA`, en escalera.test.ts), el precio no cambia con las personas que apoyan.
+  const precio = { mensual: 15, base: 15, paso: 0, anual: 150, minimo: 1, grande: 30, maximo: 1000, moneda: 'USD', cada: 0 }
   assert.deepEqual(tarifa({ fundadores: 0, apoyan: 0 }, env), { quedan: 25, ...precio, apoyan: 0 })
   assert.deepEqual(tarifa({ fundadores: 3, apoyan: 2 }, env), { quedan: 22, ...precio, apoyan: 2 })
   assert.deepEqual(tarifa({ fundadores: 25, apoyan: 80 }, env), { quedan: 0, ...precio, apoyan: 80 })
   // Con la fecha de fundadores ya pasada, no queda ninguno.
   assert.equal(tarifa({ fundadores: 0, apoyan: 0 }, { ...env, FUNDADORES_HASTA: '2026-01-01T00:00:00Z' }).quedan, 0)
   // Con Mercado Pago, los mismos en pesos.
-  assert.deepEqual(tarifa({ fundadores: 0, apoyan: 0 }, env, true).mxn, { mensual: 299, anual: 2990, minimo: 20, grande: 599, maximo: 20000, moneda: 'MXN' })
+  assert.deepEqual(tarifa({ fundadores: 0, apoyan: 0 }, env, true).mxn, { mensual: 299, base: 299, paso: 0, anual: 2990, minimo: 20, grande: 599, maximo: 20000, moneda: 'MXN' })
 })
 
 test('un lugar gratis abre siempre; quitado (cancelled, sin nada pagado), ya no', () => {

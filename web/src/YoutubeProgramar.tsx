@@ -6,9 +6,11 @@ import type { BorradorYoutube, CatalogoYoutube, MiniaturaYoutube, VideoParaYoutu
 import { resumenRitmo } from '../../shared/ritmo'
 import { fechaLocalYoutube, fechasYoutube, type RitmoYoutube } from '../../shared/youtube-fechas'
 import { api } from './api'
+import { Desplegable } from './Desplegable'
 import './Youtube.css'
 import { YoutubeRecomendaciones } from './YoutubeRecomendaciones'
 import { YoutubeEliminar } from './YoutubeEliminar'
+import { subir } from './web'
 
 /** La revisión por lote de YouTube: guarda borradores, exige revisar título y miniatura y confirma las fechas juntas. */
 const enCurso = (v: VideoParaYoutube) => !!v.subida && ['cola', 'subiendo', 'preparando'].includes(v.subida.estado)
@@ -42,7 +44,7 @@ export function YoutubeLote({ videos, cardId }: { videos: VideoHecho[]; cardId?:
   return <>
     <section className="youtube-lote-barra">
       <div><strong>YouTube</strong><span className="muted small">{datos ? `Horizontales · ${pendientes.length} por revisar · ${programados.length} programados${trabajando ? ' · Subiendo el lote…' : ''}` : error || 'Buscando videos largos…'}</span></div>
-      <div className="youtube-lote-acciones"><YoutubeEliminar videos={datos?.videos ?? []} onEliminar={async (r) => { await leer(); setAviso(r.quedan ? `${r.quedan} no se pudieron eliminar: siguen pendientes, en uso o Windows no los dejó mover.` : '') }} /><button className="primary" onClick={() => setAbierto(true)}>Revisar y programar{pendientes.length ? ` (${pendientes.length})` : ''}</button></div>
+      <div className="youtube-lote-acciones"><YoutubeEliminar videos={datos?.videos ?? []} onEliminar={async (r) => { await leer(); setAviso(r.quedan ? `${r.quedan} no se pudieron eliminar: siguen pendientes, en uso o no se pudieron mover a la Papelera.` : '') }} /><button className="primary" onClick={() => setAbierto(true)}>Revisar y programar{pendientes.length ? ` (${pendientes.length})` : ''}</button></div>
     </section>
     {aviso && <p className="bad small" role="status">{aviso}</p>}
     {abierto && createPortal(<RevisionYoutube cardId={cardId} cerrar={() => { setAbierto(false); void leer() }} onCambio={leer} />, document.body)}
@@ -179,7 +181,7 @@ export function RevisionYoutube({ cardId, ruta, cerrar, onCambio }: { cardId?: s
     setError('')
     try {
       if (file.size > 50 * 1024 * 1024 || !/\.(png|jpe?g)$/i.test(file.name)) throw new Error('Elige una miniatura PNG o JPEG de hasta 50 MB.')
-      const res = await fetch(`/api/upload?name=${encodeURIComponent(file.name)}`, { method: 'POST', body: file })
+      const res = await subir(`/api/upload?name=${encodeURIComponent(file.name)}`, file)
       const j = await res.json()
       if (!res.ok) throw new Error(j.error ?? 'No se pudo importar la miniatura.')
       const m = await api<MiniaturaYoutube>('/api/youtube/elegir-miniatura', { cardId: v.cardId, ruta: v.ruta, imagen: j.path })
@@ -200,20 +202,27 @@ export function RevisionYoutube({ cardId, ruta, cerrar, onCambio }: { cardId?: s
       </header>
       <div className="youtube-revision-controles">
         <div className="youtube-herramientas">
-          <label>Agente y modelo para las recomendaciones<select aria-label="Agente y modelo para YouTube" value={agente.model} disabled={!modelos.length} onChange={(e) => elegirAgente(e.target.value, modelos.find((m) => m.id === e.target.value)?.defaultEffort)}>
-            <option value="">Elegir agente y modelo…</option>
-            {(['claude', 'codex'] as const).map((p) => <optgroup label={p === 'claude' ? 'Claude' : 'Codex'} key={p}>{modelos.filter((m) => proveedorDe(m.id) === p).map((m) => <option value={m.id} key={m.id}>{p === 'claude' ? 'Claude' : 'Codex'} · {m.label.replace(/^(?:Codex|Claude)(?:\s*·\s*|\s+)/, '')}</option>)}</optgroup>)}
-          </select></label>
-          {!!modelo?.efforts.length && <label>Esfuerzo<select aria-label="Esfuerzo para YouTube" value={agente.effort ?? ''} onChange={(e) => elegirAgente(agente.model, e.target.value)}>{modelo.efforts.map((e) => <option key={e} value={e}>{ESFUERZOS[e] ?? e}</option>)}</select></label>}
+          <label>Agente y modelo para las recomendaciones<Desplegable
+            campo
+            nombre="Agente y modelo para YouTube"
+            valor={agente.model}
+            vacio="Elegir agente y modelo…"
+            disabled={!modelos.length}
+            opciones={(['claude', 'codex'] as const)
+              .map((p) => ({ label: p === 'claude' ? 'Claude' : 'Codex', options: modelos.filter((m) => proveedorDe(m.id) === p).map((m) => ({ value: m.id, label: `${p === 'claude' ? 'Claude' : 'Codex'} · ${m.label.replace(/^(?:Codex|Claude)(?:\s*·\s*|\s+)/, '')}` })) }))
+              .filter((g) => g.options.length)}
+            onCambio={(id) => elegirAgente(id, modelos.find((m) => m.id === id)?.defaultEffort)}
+          /></label>
+          {!!modelo?.efforts.length && <label>Esfuerzo<Desplegable campo nombre="Esfuerzo para YouTube" valor={agente.effort ?? ''} opciones={modelo.efforts.map((e) => ({ value: e, label: ESFUERZOS[e] ?? e }))} onCambio={(e) => elegirAgente(agente.model, e)} /></label>}
           <span className="muted small">Tu elección se usa para título, miniatura y descripción, y se recuerda para la próxima vez.</span>
           {errorModelos && <p className="bad small">{errorModelos}</p>}
         </div>
         {!catalogo?.conexion.programar && catalogo && <p className="youtube-nota">Puedes guardar la revisión. Para programar, <a href="#/opciones" onClick={(e) => { e.preventDefault(); void cerrarGuardando(true) }}>vuelve a conectar YouTube en Opciones → Redes</a> y concede el permiso de editar las publicaciones.</p>}
-        <div className="youtube-herramientas"><label>Buscar<input aria-label="Buscar videos para YouTube" value={busqueda} onChange={(e) => setBusqueda(e.target.value)} placeholder="Título o estilo…" /></label><label>Ver<select aria-label="Filtrar publicaciones" value={filtro} onChange={(e) => setFiltro(e.target.value)}><option value="todos">Todos</option><option value="pendientes">Pendientes</option><option value="revisados">Revisados</option><option value="programados">Programados</option><option value="errores">Fallaron</option></select></label>
+        <div className="youtube-herramientas"><label>Buscar<input aria-label="Buscar videos para YouTube" value={busqueda} onChange={(e) => setBusqueda(e.target.value)} placeholder="Título o estilo…" /></label><label>Ver<Desplegable campo nombre="Filtrar publicaciones" valor={filtro} opciones={[{ value: 'todos', label: 'Todos' }, { value: 'pendientes', label: 'Pendientes' }, { value: 'revisados', label: 'Revisados' }, { value: 'programados', label: 'Programados' }, { value: 'errores', label: 'Fallaron' }]} onCambio={setFiltro} /></label>
           <button className="boton" disabled={ocupado} onClick={() => setElegidos(new Set(pendientes.map((v) => v.huella)))}>Seleccionar pendientes ({pendientes.length})</button>
           <button className="ghost" onClick={() => setElegidos(new Set())}>Quitar selección</button>
         </div>
-        <div className="youtube-herramientas">{ritmo === 'semana' && <label>Primera publicación<input aria-label="Primera publicación" type="datetime-local" value={inicio} onChange={(e) => setInicio(e.target.value)} /></label>}<label>Ritmo<select aria-label="Ritmo de publicación" value={ritmo} onChange={(e) => setRitmo(e.target.value as RitmoYoutube)}><option value="tuyo">Tu ritmo{catalogo ? `: ${resumenRitmo(catalogo.ritmo)}` : ''}</option><option value="semana">Lunes, miércoles y viernes</option><option value="manual">Fechas a mano</option></select></label>
+        <div className="youtube-herramientas">{ritmo === 'semana' && <label>Primera publicación<input aria-label="Primera publicación" type="datetime-local" value={inicio} onChange={(e) => setInicio(e.target.value)} /></label>}<label>Ritmo<Desplegable campo nombre="Ritmo de publicación" valor={ritmo} opciones={[{ value: 'tuyo', label: `Tu ritmo${catalogo ? `: ${resumenRitmo(catalogo.ritmo)}` : ''}` }, { value: 'semana', label: 'Lunes, miércoles y viernes' }, { value: 'manual', label: 'Fechas a mano' }]} onCambio={(r) => setRitmo(r as RitmoYoutube)} /></label>
           <button className="boton" disabled={ritmo === 'manual' || !seleccionados.length || ocupado || (ritmo === 'semana' && !inicio)} onClick={distribuir}>Asignar fechas a la selección</button><span className="muted small">Hora local · {Intl.DateTimeFormat().resolvedOptions().timeZone}</span>
         </div>
       </div>
@@ -232,7 +241,16 @@ export function RevisionYoutube({ cardId, ruta, cerrar, onCambio }: { cardId?: s
               <strong className="youtube-titulo-previa">{b.titulo || 'Título pendiente'}</strong>
               <span className="muted small">{v.estilo} · {Math.floor(v.duracion / 60)}:{String(Math.floor(v.duracion % 60)).padStart(2, '0')}</span>
               <div className="youtube-portada-acciones"><label className={`youtube-importar${cerrado ? ' desactivado' : ''}`}>{importando === v.huella ? 'Importando…' : 'Importar miniatura'}<input type="file" accept="image/png,image/jpeg" hidden disabled={cerrado || !!importando} onChange={(e) => { void importar(v, e.target.files?.[0]); e.target.value = '' }} /></label><button className="ghost" onClick={() => setPrevia({ src: v.src, video: true })}>Ver video</button></div>
-              {v.miniaturas.length > 0 && <select aria-label={`Miniatura para ${b.titulo}`} value={m?.ruta ?? ''} disabled={cerrado} onChange={(e) => { const m = v.miniaturas.find((m) => m.ruta === e.target.value); cambiar(v, { miniatura: m?.ruta, huellaMiniatura: m?.huella }) }}><option value="">Elegir miniatura…</option>{v.miniaturas.map((m) => <option key={m.ruta} value={m.ruta}>{m.nombre}</option>)}</select>}
+              {v.miniaturas.length > 0 && <Desplegable
+                campo
+                nombre={`Miniatura para ${b.titulo}`}
+                valor={m?.ruta ?? ''}
+                vacio="Elegir miniatura…"
+                disabled={cerrado}
+                // Como antes, la primera opción deja el video sin miniatura elegida.
+                opciones={[{ value: '', label: 'Sin miniatura' }, ...v.miniaturas.map((m) => ({ value: m.ruta, label: m.nombre }))]}
+                onCambio={(ruta) => { const m = v.miniaturas.find((m) => m.ruta === ruta); cambiar(v, { miniatura: m?.ruta, huellaMiniatura: m?.huella }) }}
+              />}
             </div>
             <fieldset className="youtube-publicacion-campos" disabled={cerrado}>
               <label>Título<input aria-label={`Título de ${v.titulo}`} value={b.titulo} maxLength={100} onChange={(e) => cambiar(v, { titulo: e.target.value })} /><span className="muted small">{[...b.titulo].length}/100</span></label>
@@ -250,7 +268,7 @@ export function RevisionYoutube({ cardId, ruta, cerrar, onCambio }: { cardId?: s
               {!cerrado && elegidos.has(v.huella) && problema(v) && <p className="muted small">{problema(v)}</p>}
               {s?.id && <a className="small" href={`https://studio.youtube.com/video/${encodeURIComponent(s.id)}/edit`} target="_blank" rel="noreferrer">Abrir en YouTube Studio</a>}
               {s?.estado === 'cola' && !s.id && <button className="ghost small" onClick={() => void quitar(v)}>Quitar de la cola</button>}
-              <YoutubeEliminar videos={[v]} individual disabled={ocupado || !!importando} onEliminar={async (r) => { await leer(); onCambio?.(); if (r.quedan) setError('El archivo sigue en uso o Windows no lo dejó mover. Puedes reintentarlo.') }} />
+              <YoutubeEliminar videos={[v]} individual disabled={ocupado || !!importando} onEliminar={async (r) => { await leer(); onCambio?.(); if (r.quedan) setError('El archivo sigue en uso o no se pudo mover a la Papelera. Puedes reintentarlo.') }} />
             </div>
             <YoutubeRecomendaciones video={v} cerrado={cerrado} agente={modelo ? agente : undefined} tituloActual={b.titulo} descripcionActual={b.descripcion} usarDescripcion={(descripcion) => cambiar(v, { descripcion })} usarTitulo={(titulo) => cambiar(v, { titulo })} verImagen={(src) => setPrevia({ src })} />
           </article>

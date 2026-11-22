@@ -106,7 +106,7 @@
 .enlace:hover { color: var(--amber-2); }
 .tabla-wrap { display: flex; flex-direction: column; gap: 8px; }
 .filtros { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
-.filtros select { padding: 3px 6px; border-radius: 7px; background: var(--panel-2); border: 1px solid var(--line); }
+.filtros .desplegable.campo > .picker-trigger { min-height: 28px; padding: 3px 8px; border-radius: 7px; background: var(--panel-2); }
 .filtros label { display: inline-flex; align-items: center; gap: 5px; color: var(--muted); cursor: pointer; }
 .tabla { width: 100%; border-collapse: collapse; font-size: 13px; }
 .tabla th { text-align: left; font-size: 11px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); padding: 4px 8px; border-bottom: 1px solid var(--line); }

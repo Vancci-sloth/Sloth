@@ -28,7 +28,7 @@ _sesion = None
 
 
 def silueta(foto: Image.Image) -> Image.Image:
-    """La máscara del perro, del tamaño de la foto (rembg, como alfa() de video-base/recorte.py)."""
+    """La máscara del perro, del tamaño de la foto (rembg, como alfa() de video-base/scripts/recorte.py)."""
     global _sesion
     from rembg import new_session, remove
 

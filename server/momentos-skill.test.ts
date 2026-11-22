@@ -60,6 +60,50 @@ sys.exit("✗ falló")
   }
 })
 
+test('la portada con IA de todo estilo: recuerda con qué, y si no llega o falla va la de respaldo', { skip: !python }, () => {
+  const dir = mkdtempSync(join(tmpdir(), 'sloth-portada-'))
+  try {
+    // Flow sin contestar (nadie escucha en ese puerto): el pedido es de verdad y falla al momento, sin gastar nada.
+    const r = spawnSync(
+      python!,
+      [
+        '-I',
+        '-B',
+        '-X',
+        'utf8',
+        '-c',
+        `
+import json, sys, time
+from pathlib import Path
+sys.path.insert(0, r"${BASE}")
+from momentos import con_imagenes, esperar_portada, opcion, pedir_portada
+raiz, dichos = Path(r"${dir}"), []
+args = ["--studio", "Kore", "--imagenes", "Nano Banana 2.1"]
+con = con_imagenes(raiz, opcion(args, "--imagenes"))
+sin = pedir_portada(raiz, "", "El ciclo del agua", "Style.", "What.", decir=dichos.append)
+p = pedir_portada(raiz, con, "El ciclo del agua.", "Style.", "What.", decir=dichos.append)
+hecha = esperar_portada(raiz, p, time.time(), "la del cuadro del video", tope=60, decir=dichos.append)
+print(json.dumps({"con": con, "args": args, "recordada": con_imagenes(raiz, None), "chatgpt": con_imagenes(raiz, "Codex"), "sin": sin is None,
+                  "hecha": hecha is None, "dichos": dichos, "estado": json.loads((raiz / "portada" / "ia.png.json").read_text(encoding="utf-8"))}))
+`,
+      ],
+      { encoding: 'utf8', env: { ...process.env, SLOTH_URL: 'http://127.0.0.1:9' } }
+    )
+    assert.equal(r.status, 0, r.stderr)
+    const d = JSON.parse(r.stdout)
+    assert.equal(d.con, 'Nano Banana 2.1')
+    assert.deepEqual(d.args, ['--studio', 'Kore'])
+    assert.equal(d.recordada, 'Nano Banana 2.1')
+    assert.equal(d.chatgpt, 'chatgpt')
+    assert.ok(d.sin && d.hecha)
+    assert.equal(d.estado.estado, 'fallo')
+    assert.match(d.dichos[0], /^portada con IA \(Flow, Nano Banana 2\.1\), de fondo/)
+    assert.match(d.dichos[1], /^la portada con IA no salió \(no contesta Sloth en .*\): va la del cuadro del video$/)
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+})
+
 test('el --revisa del documental dice todo lo que falla de una vez, y ✓ cuando está bien', { skip: !conNumpy }, () => {
   const dir = mkdtempSync(join(tmpdir(), 'sloth-doc-'))
   try {

@@ -19,6 +19,7 @@ import {
   OPCIONES_CLIPS,
   RESOLUCIONES_OMNI,
   saldoDe,
+  sinSesion,
   tipoDeArchivo,
   type UsoCuenta
 } from './flow.ts'
@@ -146,4 +147,13 @@ test('lo que le queda a una cuenta se lee de su menú, con la hora en que se ren
   // Sin gastar aún, Flow dice la hora de ahora: no es cuándo se renuevan.
   assert.deepEqual(saldoDe('50 puntos de Google Flow\nLos puntos se actualizan a diario a las 15:00', ahora), { creditos: 50 })
   assert.equal(saldoDe('Créditos de Google Flow', ahora), null)
+})
+
+test('sin la sesión de Flow, Google manda a entrar o a la página pública; el inicio y los proyectos sí la tienen', () => {
+  assert.ok(sinSesion('https://accounts.google.com/ServiceLogin?continue=https://flow.google.com/'))
+  assert.ok(sinSesion('https://flow.google.com/about'))
+  assert.ok(sinSesion('https://flow.google.com/about#pricing'))
+  assert.ok(!sinSesion('https://flow.google.com/'))
+  assert.ok(!sinSesion('https://flow.google.com/project/bdbc9543-a6ed-46e5-b7f4-595116cd8590'))
+  assert.ok(!sinSesion('https://flow.google.com/aboutness'))
 })

@@ -1,0 +1,83 @@
+/* El fondo de la comunidad (Fondo.tsx): un panel con borde ámbar, para no competir con el bloque de la rifa. */
+/* Casi siempre, un renglón: su nombre, la raya del reparto con el monto sobre el día de hoy, y cuánto falta. */
+.fondo-renglon { display: flex; align-items: center; gap: 14px; width: 100%; padding: 10px 16px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); color: var(--muted); font-size: 12.5px; font-weight: 650; text-align: left; white-space: nowrap; }
+.fondo-renglon:hover { border-color: color-mix(in srgb, var(--amber) 55%, var(--line)); color: var(--suave); }
+.fondo-renglon > .ico, .fondo-renglon-nombre .ico { flex: none; width: 15px; height: 15px; }
+.fondo-renglon-nombre { display: inline-flex; align-items: center; gap: 7px; color: var(--amber); font-weight: 750; letter-spacing: 0.08em; text-transform: uppercase; }
+.fondo-renglon-monto { color: var(--amber-2); font-size: 17px; font-weight: 850; letter-spacing: -0.02em; }
+.fondo-subio { color: var(--ok); font-weight: 750; }
+.fondo-via { display: flex; flex: 1; align-items: center; gap: 8px; min-width: 0; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.fondo-via i { flex-basis: 0; min-width: 0; height: 3px; border-radius: 2px; }
+.fondo-via-hecho { background: var(--amber); }
+.fondo-via-falta { background: var(--line); }
+.fondo-via i.fondo-via-hoy { flex: none; width: 9px; height: 9px; border-radius: 50%; background: var(--amber); }
+.fondo .fondo-via { flex: none; max-width: 620px; color: var(--muted); font-size: 12.5px; font-weight: 650; }
+.fondo-noticia { margin: 0; color: var(--ok); font-size: 14px; font-weight: 750; font-variant-numeric: tabular-nums; }
+.fondo-cerrar { display: grid; place-items: center; width: 28px; height: 28px; margin: -6px -8px -6px 0; border-radius: 8px; background: none; color: var(--muted); }
+.fondo-cerrar:hover { background: var(--panel-2); color: var(--text); }
+@media (max-width: 760px) {
+  .fondo-renglon-nombre span, .fondo-renglon-faltan { display: none; }
+}
+.fondo { display: flex; flex-direction: column; gap: 10px; padding: 24px 28px; border: 1px solid var(--amber); border-radius: 16px; background: linear-gradient(135deg, var(--amber-tinte), transparent 70%), var(--panel); }
+.fondo-antetitulo { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin: 0; color: var(--amber); font-size: 12.5px; font-weight: 750; letter-spacing: 0.08em; text-transform: uppercase; }
+.fondo-antetitulo .ico { width: 16px; height: 16px; }
+.fondo-vivo { margin-left: auto; color: var(--ok); font-size: 11.5px; letter-spacing: 0.06em; }
+.fondo h2 { margin: 2px 0 0; color: var(--suave); font-size: 16px; font-weight: 650; }
+.fondo-monto { margin: 0; color: var(--amber-2); font-size: 44px; font-weight: 850; line-height: 1; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.fondo-texto { margin: 0; max-width: 620px; color: var(--text); font-size: 14.5px; line-height: 1.5; }
+.fondo-acciones { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 20px; margin-top: 4px; }
+/* Cómo se cuentan los puntos: una pregunta que abre las reglas del reparto. */
+.fondo-reglas-boton { display: inline-flex; align-items: center; gap: 6px; padding: 0; background: none; color: var(--suave); font-size: 13.5px; font-weight: 600; }
+.fondo-reglas-boton:hover { color: var(--text); }
+.fondo-reglas-boton .ico { width: 15px; height: 15px; }
+.fondo-reglas { max-width: 720px; margin: 0; padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel-2); color: var(--suave); font-size: 13.5px; line-height: 1.55; }
+.fondo-reglas p { margin: 0; }
+.fondo-reglas p + p { margin-top: 8px; }
+.fondo-reglas b { color: var(--amber-2); }
+.fondo-boton { display: inline-flex; align-items: center; gap: 10px; padding: 12px 22px; border-radius: 12px; background: var(--amber); color: var(--sobre-ambar); font-size: 15px; font-weight: 800; transition: transform 0.12s ease; }
+.fondo-boton:hover { transform: translateY(-2px); }
+.fondo-boton .ico { width: 18px; height: 18px; }
+
+.fondo-pasos { counter-reset: paso; display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 10px; margin: 6px 0 0; padding: 0; list-style: none; }
+.fondo-pasos li { counter-increment: paso; display: flex; flex-direction: column; align-items: flex-start; gap: 6px; padding: 14px 16px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel-2); }
+.fondo-pasos li::before { content: counter(paso); display: grid; place-items: center; width: 28px; height: 28px; border-radius: 8px; background: var(--amber); color: var(--sobre-ambar); font-size: 14px; font-weight: 850; }
+.fondo-pasos strong { font-size: 15px; font-weight: 750; }
+.fondo-pasos p { margin: 0; color: var(--suave); font-size: 13.5px; line-height: 1.5; }
+.fondo-pasos button { margin-top: auto; }
+
+.fondo-apoyo { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin: 4px 0 0; color: var(--muted); font-size: 13.5px; }
+.fondo-apoyo .ico { width: 15px; height: 15px; color: var(--amber); }
+.fondo-enlace { padding: 0; background: none; color: var(--amber-2); font-weight: 700; text-decoration: underline; text-underline-offset: 3px; }
+
+@media (max-width: 760px) {
+  .fondo { padding: 20px; }
+  .fondo-monto { font-size: 34px; }
+}
+
+/* Las cuentas, ya hechas: cada renglón a la izquierda su concepto y a la derecha su cantidad. */
+.fondo-cuentas { display: grid; gap: 4px; max-width: 420px; margin: 2px 0 0; padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel-2); font-size: 13.5px; }
+.fondo-cuentas div { display: flex; justify-content: space-between; gap: 12px; }
+.fondo-cuentas dt { color: var(--suave); }
+.fondo-cuentas dd { margin: 0; color: var(--text); font-variant-numeric: tabular-nums; }
+.fondo-queda { margin-top: 2px; padding-top: 6px; border-top: 1px solid var(--line); }
+.fondo-queda dt, .fondo-queda dd { color: var(--text); font-weight: 650; }
+.fondo-mitad dt, .fondo-mitad dd { color: var(--amber-2); font-weight: 800; }
+
+/* Lo tuyo en el fondo: si participas, tus puntos y tus partes de antes. */
+.fondo-mio { display: flex; flex-direction: column; gap: 4px; max-width: 620px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel-2); font-size: 13.5px; color: var(--suave); }
+.fondo-mio strong { color: var(--text); font-size: 14px; }
+.fondo-mio strong span { color: var(--suave); font-weight: 500; }
+.fondo-parte { color: var(--text); font-variant-numeric: tabular-nums; }
+.fondo-mio-acciones { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 4px; }
+.fondo-mio .fondo-enlace { font-size: 13px; font-weight: 600; }
+.fondo-error { margin: 0; color: var(--bad); font-size: 13px; }
+
+/* El Binance ID: su campo, el botón y de dónde sale. */
+.fondo-binance { display: flex; align-items: flex-end; flex-wrap: wrap; gap: 8px 10px; margin-top: 6px; }
+.fondo-binance label { display: flex; flex-direction: column; gap: 4px; }
+.fondo-binance label span { color: var(--text); font-size: 12.5px; font-weight: 600; }
+.fondo-binance input { width: 240px; max-width: 100%; padding: 8px 10px; border: 1px solid var(--line); border-radius: var(--radio); background: var(--bg); color: var(--text); font-size: 14px; font-variant-numeric: tabular-nums; }
+.fondo-binance input:focus { outline: none; border-color: var(--amber); }
+.fondo-binance p { flex-basis: 100%; margin: 0; color: var(--muted); font-size: 12.5px; line-height: 1.4; }
+.fondo-pasos .fondo-binance button { margin-top: 0; }
+.fondo-pasos .fondo-binance input { width: 100%; }

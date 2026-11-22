@@ -163,6 +163,16 @@ input, textarea, select { font: inherit; color: inherit; }
    si no, lo movía. */
 .card:has(.card-previa) .card-pie { background: linear-gradient(to top, rgba(15, 14, 12, 0.94) 55%, rgba(15, 14, 12, 0.7) 80%, transparent); }
 .card-title { font-size: 15px; font-weight: 650; line-height: 1.3; overflow-wrap: anywhere; }
+/* Un estilo de la comunidad sin apoyo vigente (`Card.bloqueada`): apagado, con su candado junto al nombre. */
+.card.bloqueada .card-previa, .card.bloqueada .card-fondo { opacity: 0.4; }
+.card-candado { margin-right: 5px; color: var(--amber); }
+/* Y en el sitio de su compositor, por qué no hace videos y cómo volver (SinApoyo.tsx). */
+.sin-apoyo { display: flex; align-items: center; gap: 14px; padding: 14px 16px; border: 1px solid var(--amber); border-radius: 12px; background: var(--amber-tinte); text-align: left; }
+.sin-apoyo > .icon-trazo { flex: none; width: 22px; height: 22px; color: var(--amber); }
+.sin-apoyo > div { flex: 1; min-width: 0; }
+.sin-apoyo p { margin: 3px 0 0; color: var(--suave); font-size: 13px; }
+.sin-apoyo .primary { flex: none; white-space: nowrap; }
+@media (max-width: 760px) { .sin-apoyo { flex-wrap: wrap; } }
 .card.active .card-title { color: var(--amber-2); }
 .card-uso { font-size: 15px; line-height: 1.35; color: var(--suave); overflow-wrap: anywhere; }
 .card-uso.vivo { color: var(--amber); }
@@ -312,6 +322,25 @@ input, textarea, select { font: inherit; color: inherit; }
 .quote-chip .chip-name { font-weight: 400; font-style: italic; }
 .link-chip small { margin-left: 1px; }
 a.link-chip:hover { border-color: var(--amber); }
+/* «Afinar» (Composer.tsx): el botón, la línea de encima del campo y los huecos del pedido afinado, subrayados en ámbar. */
+.afinar { display: flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px; border-radius: 8px; font-size: 15px; color: var(--amber-2); background: var(--amber-tinte); white-space: nowrap; transition: background 0.15s; }
+.afinar:hover:not(:disabled) { background: color-mix(in srgb, var(--amber) 22%, transparent); }
+.afinar:disabled { opacity: 0.65; cursor: default; }
+.afinar .icon-trazo { width: 16px; height: 16px; vertical-align: 0; }
+.afinado { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 14px; margin-bottom: -6px; padding: 0 6px; font-size: 14px; color: var(--suave); }
+.afinado-quien { display: flex; align-items: center; gap: 7px; font-weight: 600; color: var(--text); }
+.afinado-quien .icon-trazo { width: 16px; height: 16px; color: var(--amber); }
+.afinado-falta { color: var(--amber-2); }
+.afinado button { display: flex; align-items: center; gap: 5px; font-size: 14px; color: var(--suave); }
+.afinado button:hover { color: var(--text); }
+.afinado button .icon-trazo { width: 15px; height: 15px; }
+.afinado-escrito { margin: 0 6px -6px; padding-left: 10px; border-left: 2px solid var(--line); color: var(--suave); white-space: pre-wrap; overflow-wrap: anywhere; }
+.chip.hueco-chip { gap: 1px; margin: 0 1px; padding: 0 1px; border: 0; border-bottom: 1.5px dashed color-mix(in srgb, var(--amber) 70%, transparent); border-radius: 0; background: none; color: var(--amber-2); font-size: inherit; font-weight: inherit; line-height: inherit; vertical-align: baseline; user-select: none; cursor: pointer; }
+.chip.hueco-chip:hover, .chip.hueco-chip.abierto { border-bottom-style: solid; border-bottom-color: var(--amber); }
+.hueco-flecha { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; opacity: 0.7; }
+.hueco-menu .picker-option { white-space: normal; }
+.hueco-otra { display: block; width: calc(100% + 8px); margin: 4px -4px -4px; padding: 9px 14px; border: 0; border-top: 1px solid var(--line); border-radius: 0 0 12px 12px; background: none; color: var(--text); font: inherit; font-size: 13px; outline: 0; }
+.hueco-otra::placeholder { color: var(--muted); }
 .composer-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 6px; }
 .composer-bar .picker-trigger { white-space: nowrap; }
 /* Un grupo de botones donde solo uno está elegido (`Segmento`): el formato, la duración, el modo del modelo… */
@@ -326,6 +355,9 @@ a.link-chip:hover { border-color: var(--amber); }
 .picker.open > .picker-trigger svg { transform: rotate(180deg); }
 .picker-menu { position: absolute; bottom: calc(100% + 8px); left: 0; z-index: 30; min-width: 190px; max-height: 360px; overflow-y: auto; padding: 4px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45); animation: rise 0.12s ease-out; }
 .picker-group + .picker-group { margin-top: 4px; padding-top: 4px; border-top: 1px solid var(--line); }
+/* El buscador de una lista larga se queda arriba mientras la lista corre debajo. */
+.picker-buscar { position: sticky; top: -4px; z-index: 1; display: block; width: calc(100% + 8px); margin: -4px -4px 4px; padding: 9px 14px; border: 0; border-bottom: 1px solid var(--line); border-radius: 12px 12px 0 0; background: var(--panel); font-size: 13px; outline: none; }
+.picker-buscar::placeholder { color: var(--muted); }
 .picker-label { display: block; padding: 6px 10px 4px; font-size: 11px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); }
 .picker-option { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; padding: 6px 10px; border-radius: 7px; font-size: 13px; text-align: left; white-space: nowrap; color: var(--text); }
 .picker-option:hover { background: var(--panel-2); }
@@ -334,6 +366,17 @@ a.link-chip:hover { border-color: var(--amber); }
 .picker-option.on .picker-detalle { color: inherit; }
 .picker-detalle + svg { margin-left: -4px; }
 .picker-menu.down { bottom: auto; top: calc(100% + 8px); animation-name: drop; }
+/*
+ * El desplegable de toda la app (Desplegable.tsx): donde iría un <select>, que el sistema pinta a su manera. Toma la
+ * letra y el color de donde está; con `campo`, la cara de un campo de formulario.
+ */
+.desplegable { display: inline-flex; min-width: 0; }
+.desplegable > .picker-trigger { gap: 6px; max-width: 100%; height: auto; min-height: 28px; padding: 3px 6px 3px 8px; color: inherit; font: inherit; }
+.desplegable > .picker-trigger:disabled { opacity: 0.6; cursor: default; }
+.desplegable > .picker-trigger:focus-visible { outline: 1px solid var(--amber); outline-offset: 2px; }
+.desplegable-valor { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.desplegable.campo > .picker-trigger { width: 100%; min-height: 34px; justify-content: space-between; padding: 6px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--text); }
+.desplegable.campo > .picker-trigger:hover:not(:disabled), .desplegable.campo.open > .picker-trigger { border-color: var(--muted); background: var(--bg); }
 /* La lista de modelos dentro de Avanzado conserva el menú de Sloth y sale por encima de su panel. */
 .picker-menu.picker-flotante { position: fixed; margin: 0; min-width: 0; color: var(--text); }
 .modelos-selector > .picker-trigger { gap: 10px; padding: 0 8px 0 10px; height: 28px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel-2); color: var(--text); white-space: nowrap; }

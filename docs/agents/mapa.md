@@ -23,14 +23,31 @@ Este es el mapa:
   más nueva de npm de Claude Code, Codex y OpenCode a `<agente>/versiones/<versión>` (`AL_DIA`); se usa siempre la más
   nueva, la de la app o la bajada.
 - Los demás agentes, como en T3 Code (ADR 0012), cada uno con su cuenta y su catálogo en `server/proveedores.ts` y su fila
-  en Opciones (`CuentaAgente`): DeepSeek es Claude Code con la API de DeepSeek (`server/deepseek.ts`); Grok,
-  Antigravity y Gemini CLI hablan ACP (`server/acp.ts`, `grok.ts`, `antigravity.ts`, `gemini.ts`; Antigravity, con las cuentas de Google que conectes y un proceso por cuenta para todos sus hilos: al acabarse la cuota de una, el hilo sigue con la siguiente; Gemini, con llave de API, ADR 0013); Cursor corre su SDK en un puente aparte
+  en Opciones (`CuentaAgente`): DeepSeek es Claude Code con la API de DeepSeek (`server/deepseek.ts`), y lo mismo
+  OpenRouter (`openrouter.ts`, su catálogo filtrado y con buscador) y FreeLLMAPI (`freellmapi.ts`, el programa gratis que
+  cada quien instala; Sloth lo busca en esta computadora): los tres, en `server/otra-api.ts` (ADR 0021); Grok,
+  Antigravity y Gemini CLI hablan ACP (`server/acp.ts`, `grok.ts`, `antigravity.ts`, `gemini.ts`; Antigravity, con las cuentas de Google que conectes y un proceso por cuenta para todos sus hilos: al acabarse la cuota de una, el hilo sigue con la siguiente; la cuota es la del plan de Google de cada cuenta, gratis o Google AI Pro/Ultra, que Antigravity dice al iniciar sesión y sale en Opciones; Gemini, con llave de API, ADR 0013); Cursor corre su SDK en un puente aparte
   (`cursor.ts`, `cursor-puente.mjs`); Muse Code, su MSP (`muse.ts`); Pi, su RPC con una extensión que le pasa los MCP de
   Sloth (`pi.ts`). Lo que comparten (las instrucciones, la skill por su ruta, los MCP del hilo) está en
   `server/instrucciones.ts`; el JSON-RPC por líneas, en `server/rpc-lineas.ts`.
 - «Sobre ti» (`server/sobre-ti.ts`, `web/src/SobreTi.tsx`): lo que cada quien cuenta de sí en la bienvenida o en
   Opciones, en `data/sobre-ti.json`. Va con las instrucciones de Sloth a todos los agentes (`conSobreTi`: el `append`
   de Claude, las `developerInstructions` de Codex e `instrucciones()` de los demás), leído al empezar cada hilo.
+- Sloth en la web (`server/web.ts`, `web/src/web.ts`, `web/src/SlothWeb.tsx`, ADR 0025): la misma interfaz desde el
+  navegador de otro dispositivo, por un túnel rápido de Cloudflare (cloudflared se baja al encenderla). El cobro
+  (`licencias/src/web.ts`) solo dice dónde está el túnel de cada computadora; la entrada es `web.sloth.vancci.org`, que
+  crea en cada navegador una llave que no se puede sacar y firma un reto del túnel. Entra solo un dispositivo conectado
+  desde Opciones; `confianza` decide qué se atiende por el túnel. Lo que en la web no
+  aplica (abrir en el Explorador, `127.0.0.1`) usa `abrirRuta` y `enLaWeb`; lo grande sube por trozos (`subir`). El
+  navegador del hilo se ve en capturas y se usa a distancia (`server/navegador-remoto.ts`, `web/src/NavegadorWeb.tsx`,
+  `remoto` en `electron/navegador.ts`). Las cuentas se conectan desde la web con `server/ventanas-remotas.ts`
+  (terminales sin ventana, los Edge de Google a distancia, la vuelta a `localhost`) y `web/src/VentanasRemotas.tsx`. Para
+  probarla con el cobro local: `SLOTH_COBRO_WEB`.
+- Sloth en la nube (`.devcontainer/`, `server/nube.ts`, ADR 0026): sin computadora, la Sloth de Linux corre en un
+  Codespace de GitHub de cada quien, con su ventana en una pantalla virtual. `sloth-nube.sh` la baja, guarda lo tuyo en
+  `/workspaces/.sloth-nube` y la vigila; se entra por la dirección privada del puerto 4848 (`SLOTH_NUBE`), que el
+  servidor atiende como a su ventana. La interfaz va como desde la web (`enLaNube`): todo se baja al dispositivo y
+  «Actualizar» va por `/api/ventana/…`. La entrada (`licencias/src/web.ts`) ofrece «Abrir Sloth en la nube».
 - `server/sessions.ts`: cada hilo es `data/sessions/<id>.json` (qué es) y `<id>.jsonl` (lo que pasó). Retoma la sesión
   del proveedor tras reiniciar, reparte los lotes según la máquina y cierra el proceso de un video del lote al acabar.
   Un chat de Claude, DeepSeek, Codex u OpenCode con su sesión guardada suelta el proceso a la media hora; los demás
@@ -55,8 +72,32 @@ Este es el mapa:
   (`server/estilos-perdidos.ts`). Son las únicas que la
   venta deja borrar (`tuya`); la skill sale a `data/skills-tuyas` (`guardarSkillTuya`). «Compartir» (en su card, junto a
   su nombre o en Comunidad → Estilos) abre `CompartirEstilo` (`web/src/Estilos.tsx`): una pantalla ya llena que lo
-  empaqueta en un `.sloth-estilo` (`server/estilos.ts`, ADR 0017) y lo publica en Estilos, donde sale cuando el creador
-  lo aprueba, o lo guarda como archivo; «Importar» o «Instalar» lo pone entre los tuyos, con su `origen`.
+  empaqueta en un `.sloth-estilo` (`server/estilos.ts`, ADR 0017) y lo publica en Estilos, donde sale al aprobarse, o lo
+  guarda como archivo; «Importar» o «Instalar» lo pone entre los tuyos, con su `origen`. Todo estilo de la comunidad
+  lleva lo mismo (`shared/guia.ts`): su guía (con qué de Sloth lo hace y con qué agentes funciona, de listas fijas), un
+  video entero y su prueba (agente, costo y tiempo, sacados del hilo donde se hizo: `server/prueba-estilo.ts`); sin eso
+  el cobro no lo publica, y al que ya estaba su autor lo ve en rojo, con lo que le falta (`incompleto`,
+  `marcarIncompletos`), hasta completarlo. La vara de todo estilo es
+  `skills/video-base/ESTILO.md`, 30 requisitos; los que Sloth comprueba solo están en `server/estilos-requisitos.ts`
+  (un test los empareja y pasa por ella los estilos de Sloth). Antes de mandarlo le dice a su autor los que no cumple, y
+  el que ya compartió pone al día su misma publicación (`data/estilos-compartidos.json`). En la computadora del creador,
+  su Claude lee cada estilo que llega, sin instalarlo y sin poder más que leer (`soloLeer`), y la revisión se cierra
+  sola (`server/estilos-revision.ts`, ADR 0022): se aprueba el que no falla en lo que frena (ADR 0023: lo demás son
+  sugerencias, y los acentos rotos y lo que su prueba demuestra los arregla Sloth, `shared/acentos.ts`) y no añade nada
+  de riesgo, a su autor se le contesta en su publicación lo que le falta, y el hilo queda como «Aprobado», «Le falta», «Decide tú» (añade algo
+  que tiene que ver una persona) o «No lo aprobaría»; «Revisar», en la publicación, abre ese hilo. El creador también lo
+  pre-aprueba (ADR 0024): «Pre-aprobar» lo instala como card suya con un borrador para su agente (la prueba y los
+  arreglos), y su «Compartir» lo sube a la publicación del autor como «Pre-aprobado por Sloth» (`aprobada = 2`), que ya
+  ve toda la comunidad; su autor lo deja así o manda otro. Mientras se revisa el paquete nuevo de uno que ya estaba a la
+  vista, la comunidad sigue viendo el de antes (`publica`, `aLaVista`). Todo estilo
+  compartido lleva su guía de uso, una plantilla igual para todos (`shared/guia.ts`, `web/src/Guia.tsx`): qué le das, qué
+  te entrega, un ejemplo y qué necesita. El Worker no lo publica sin ella y queda en la card de quien lo instala (`guia`).
+- Tu Sloth en otra computadora (`server/respaldo.ts`, `web/src/Respaldo.tsx`, ADR 0020): con su clave, cada Sloth guarda
+  sola en el cobro (`licencias/src/respaldo.ts`, R2 y D1) una copia de sus estilos enteros, sus chats, «Sobre ti» y sus
+  marcas; los videos y las cuentas conectadas no. Al escribir esa clave en otra computadora, o al abrir una que ya la
+  tenía y a la que le faltan estilos, `TraerSloth` ofrece traerla, sin pisar lo que ya hay; un chat traído sigue con un
+  resumen (`Sessions.traer`). En Opciones se apaga la copia y se trae la de las otras. Los topes que la mantienen gratis
+  están en la cabecera del módulo del cobro.
 - Lo que el estudio ve en vivo: `server/claude.ts` saca los borradores de lo que escribe el agente (Write y los heredocs
   de Bash), el WebSocket los lleva a `web/src/App.tsx` y `Etapas.tsx` los dibuja.
 - El estudio de video (`web/src/Estudio.tsx`): toda card cuyas etapas tengan `fase` se ve igual, con las cinco fases
@@ -124,7 +165,7 @@ Este es el mapa:
   Sus capturas y los logs de consola quedan en `data/navegador-capturas/`. Copia lo mejor del de T3 Code (`C:\dev\t3code`):
   pestañas (el agente solo usa la primera), tamaños fijos (`navegador-medidas.ts`) y bordes que se arrastran. T3 usa
   `<webview>` y Sloth una vista nativa: el tamaño fijo es `enableDeviceEmulation`, y por eso el relevo reescala los clics.
-  Google no deja iniciar sesión dentro de la app: ese paso se da en Edge (Chrome en Mac; en Windows sin Edge, tu predeterminado si es Chrome, Brave o Vivaldi, o el que haya: `server/chromium.ts`) y la sesión pasa a sus páginas (`electron/google.ts`).
+  Google no deja iniciar sesión dentro de la app: ese paso se da en Edge (Chrome en Mac; en Windows sin Edge, tu predeterminado si es Chrome, Brave o Vivaldi, o el que haya; o el que elijas en Opciones → Navegador, también Opera: `server/chromium.ts`) y la sesión pasa a sus páginas (`electron/google.ts`).
 - `server/ideas/` y `web/src/Ideas.tsx`: Ideas, qué video hacer: largo en YouTube o vertical en TikTok e Instagram
   (`formato: 'vertical'`), en `trabajo/ideas/<id>/`. Investigar mide cada video contra su canal (outlier: 3× o más),
   transcribe lo dicho (`transcribir.ts`) y agrupa temas con vectores locales (`vectores.ts`); en vertical busca con
@@ -140,7 +181,20 @@ Este es el mapa:
   Publicar una mejora (la ven todos): `POST /api/mejoras {texto}`. Un anuncio a nombre del creador, en su tono:
   `docs/agents/anuncios.md`. La rifa (`licencias/src/rifa.ts`): arriba de la comunidad «Participa en la rifa» (`Rifa.tsx`,
   solo quien usa Sloth gratis), en Administrador se arma y se sortea con la ruleta (`RifaAdmin.tsx`); el ganador recibe
-  sus créditos de voz, un correo y el aviso a pantalla completa (`GanasteRifa.tsx`).
+  sus créditos de voz, un correo y el aviso a pantalla completa (`GanasteRifa.tsx`). Debajo, el fondo de la comunidad
+  (`licencias/src/fondo.ts`, `Fondo.tsx`, ADR 0019): la mitad de los apoyos que cobra Stripe en el mes, sin IVA, en vivo (casi siempre un
+  renglón con la raya del reparto; en grande solo cuando trae noticia, `web/src/fondoNoticia.ts`), y el
+  paso a paso para llevarse una parte con un estilo compartido. La sección Estilos es la tienda (`licencias/src/tienda.ts`,
+  `Tienda.tsx`): llega entera y se filtra en la app, al instante (`web/src/tiendaFiltros.ts`: buscador, temas que salen
+  del título y el texto de cada estilo, su forma, los nuevos para ti y el orden), un muro de portadas con la forma de cada video y, a la derecha (en el
+  sitio de la tarjeta de la comunidad), un visor fijo con el video entero del estilo elegido, Instalar y sus números
+  públicos con sus puntos del mes, que mide la app (`server/estilos-usos.ts`). El video de un estilo sube entero
+  (`calidadEntero` en `server/comunidad.ts`); los demás de la comunidad, sus primeros 5 segundos. La tienda la ve cualquiera; instalar es de quien apoya: a los demás,
+  «Instalar» les abre la invitación a apoyar (`ApoyarParaInstalar`) y el cobro no les entrega el paquete. Los ya instalados se cierran al acabarse el apoyo: la licencia firmada
+  dice si su correo apoya hoy (`apoyaHoy`), `server/licencia.ts` lo mira (`sinApoyo`) y el servidor marca esas cards
+  (`Card.bloqueada`: candado, sin videos nuevos, `SinApoyo.tsx`) hasta que vuelve a apoyar. El reparto (`licencias/src/reparto.ts`): participa quien pone su
+  Binance ID (en el recuadro del fondo), el primero es el 1 de enero de 2027 y el creador cierra cada periodo y marca
+  lo pagado en Administrador → Fondo (`FondoAdmin.tsx`); el envío es a mano, desde Binance.
 - `server/modelos3d.ts` y `web/src/Modelos3D.tsx`: «Modelos 3D» enseña la biblioteca `skills/modelos-3d` que usan los
   agentes (la de `SKILLS`), que llenan los videos. Empieza vacía; la moneda de la plantilla
   va en `modelos-3d/plantilla`, sin enseñarse. Sus botones (`server/modelos3d-acciones.ts`, `web/src/Modelos3DAcciones.tsx`):
@@ -183,8 +237,20 @@ Este es el mapa:
   (la que trae Sloth: se ponen al día al subirlas en package.json y publicar) y las credenciales de YouTube e Instagram (en las variables de entorno del usuario).
   `server/acceso.ts`: si Claude y Codex pagan con la suscripción o con una llave de API (Opciones → Agentes), guardada en
   `data/agentes.json`.
+- Sloth en el celular (`movil/`, ADR 0025): una app de Expo para iOS y Android con dos modos (`modo.ts`). «En este
+  celular» corre el agente en el teléfono (`src/local/`: Claude por la API con la llave de quien la usa, los estilos con
+  su skill en `estilos.json`, hilos y archivos en el teléfono, y «Seguir en la computadora» para el video final).
+  «Con mi computadora» le pide el trabajo a ella: entra por la puerta de `server/celular.ts` (el puerto de Sloth más uno, en la red y con la llave del QR de Opciones →
+  Tu celular, `web/src/Celular.tsx`), que reenvía `/api` y `/ws`. Usa los tipos de `shared/`, `buildTimeline` de
+  `web/src/items.ts`, la elección de modelo de `shared/modelos.ts` y los trazos de `web/src/trazos.ts`: nada de eso
+  puede importar paquetes. Pestañas: Inicio (estilos y hilo nuevo con las líneas del compositor), Hilos (el chat en vivo
+  y «Cómo va el video»), Mis videos (ver, guardar en la galería, compartir), Comunidad y Más. Compilar: `publicacion.md`.
 - `web/src`: React. `api.ts` habla con el servidor; `eventos.ts` guarda los eventos fuera de `App`, `items.ts` los junta
-  en bloques y `Timeline.tsx` los dibuja; `Composer.tsx` es el campo de texto.
+  en bloques y `Timeline.tsx` los dibuja; `Composer.tsx` es el campo de texto. Un desplegable es siempre `Desplegable`
+  (`Desplegable.tsx`, sobre el `Picker` del compositor), nunca un `<select>`: un test lo para.
 - «Nuevo chat» (`NewSession` en `App.tsx`): los carteles de los estilos caben enteros en cualquier ventana
   (`encajar.ts`), `/` en el campo cambia de estilo (`menu-estilos.ts`), Alt+N (Cmd+N en Mac) o Ctrl+Mayús+O abren uno
   desde cualquier parte, y lo que llega del servidor arranca con lo último sabido (`recordado.ts`) para que nada salte.
+  «Afinar», junto a enviar (`server/afinar.ts`, `POST /api/afinar`): el agente elegido reescribe el pedido con la card, su
+  SKILL.md, la marca y «Sobre ti»; lo que solo decide el usuario queda como hueco en el campo (`huecoChip` en
+  `Composer.tsx`), con sus opciones. Un hueco sin llenar le llega al agente como «Decídelo tú».

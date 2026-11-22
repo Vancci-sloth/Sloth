@@ -85,6 +85,23 @@ En Linux (Docker, xvfb, 42 hilos reales, hasta la interfaz montada):
 Lo que el agente abre en una página: Codex solo usaba el navegador de Sloth 1 de 6 veces (curl o `cua_repl`, igual antes de
 estos cambios); con `USA_EL_NAVEGADOR`, 6 de 6. La prueba es una página cuyo código pone JavaScript, con cada dirección distinta.
 
+El muro de la tienda que se mueve (19 de noviembre, copia de desarrollo, Edge con la GPU real, 61 estilos y diez videos de
+1080p a la vista; se bajó y subió por el muro durante 8 s):
+
+| Al bajar por el muro                     | Con React | Por fuera (`muroVivo.ts`) |
+| ---------------------------------------- | --------- | ------------------------- |
+| Cuadros de más de 25 ms                  | 30        | menos de 1                |
+| El peor cuadro                           | 69 ms     | 26 ms                     |
+| CPU de todos los procesos                | 161 %     | 107 %                     |
+| Cuadros de más de 25 ms, CPU 4× más lenta | 104       | 13                        |
+
+- Lo que daba tirones era que cada portada que entraba o salía de la pantalla volvía a dibujar el muro y montaba o
+  desmontaba un `<video>`. Ahora cada portada trae su video vacío y `muroVivo.ts` le pone y le quita la fuente; arranca
+  solo la que lleva 160 ms a la vista, y de una en una.
+- Quieto, diez videos andando gastan lo mismo que antes: un 45 % de un núcleo entre todos los procesos, y el hilo
+  principal un 1 %. Es de reproducirlos (se decodifican en la GPU, `D3D11VideoDecoder`), no de la app. Con adelantos de
+  320 px baja a un 33 %: el adelanto ahorra descarga, casi nada de procesador.
+
 ## Lo que se midió y no vale la pena
 
 - Partir el JS de la interfaz con `lazy()`: se monta en 25 ms, y en 90 ms con la CPU 6× más lenta, ya en caché. En frío, unos

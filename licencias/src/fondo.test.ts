@@ -1,0 +1,96 @@
+import assert from 'node:assert/strict'
+import { test } from 'node:test'
+import { cuentasDelFondo, deSloth, esPeriodo, inicioDelMes, montosDe, nombreDe, pagosDeSloth, periodoFondo, periodosHasta, PRIMER_PERIODO, proporcionDeImpuesto, tramoDe, type Factura, type Sesion } from './fondo.ts'
+
+const cobro = (amount: number, fee: number, currency = 'usd') => ({ amount, fee, net: amount - fee, currency, reporting_category: 'charge' })
+
+test('las cuentas: lo cobrado, menos la comisión y lo devuelto, y la mitad para la comunidad; los retiros no cuentan', () => {
+  const cuentas = cuentasDelFondo([
+    cobro(1500, 50),
+    cobro(3000, 99),
+    { amount: -1500, fee: 0, net: -1500, currency: 'usd', reporting_category: 'refund' },
+    { amount: -30, fee: 0, net: -30, currency: 'usd', reporting_category: 'fee' },
+    { amount: -5000, fee: 0, net: -5000, currency: 'usd', reporting_category: 'payout' },
+    cobro(30000, 2000, 'mxn')
+  ])
+  assert.deepEqual(cuentas, [
+    { moneda: 'MXN', cobrado: 300, comision: 20, devuelto: 0, impuesto: 0, neto: 280, comunidad: 140 },
+    { moneda: 'USD', cobrado: 45, comision: 1.79, devuelto: 15, impuesto: 0, neto: 28.21, comunidad: 14.1 }
+  ])
+  assert.deepEqual(montosDe(cuentas), [
+    { moneda: 'MXN', monto: 140 },
+    { moneda: 'USD', monto: 14.1 }
+  ])
+})
+
+test('sin el IVA: lo que fue impuesto de lo que no se devolvió se quita antes de partir a la mitad', () => {
+  // $11.60 con IVA dentro y sin comisión: $1.60 son del SAT, la mitad de $10 es $5.
+  const [c] = cuentasDelFondo([cobro(1160, 0)], 0.16 / 1.16)
+  assert.deepEqual(c, { moneda: 'USD', cobrado: 11.6, comision: 0, devuelto: 0, impuesto: 1.6, neto: 10, comunidad: 5 })
+  // Devuelto entero: ni IVA ni fondo.
+  assert.deepEqual(montosDe(cuentasDelFondo([cobro(1160, 0), { amount: -1160, fee: 0, net: -1160, currency: 'usd', reporting_category: 'refund' }], 0.16 / 1.16)), [])
+})
+
+test('la parte de impuesto se pesa por lo que vale cada pago, aunque se haya pagado en otra moneda', () => {
+  assert.equal(proporcionDeImpuesto([]), 0)
+  // Uno de México con IVA ($15) y uno de fuera sin impuesto ($15, pagado en pesos argentinos).
+  const p = proporcionDeImpuesto([
+    { total: 1500, impuesto: Math.round((1500 * 16) / 116), peso: 1500 },
+    { total: 2_190_000, impuesto: 0, peso: 1500 }
+  ])
+  assert.ok(Math.abs(p - 0.16 / 1.16 / 2) < 0.001)
+  // Un total en cero no rompe la cuenta.
+  assert.equal(proporcionDeImpuesto([{ total: 0, impuesto: 0, peso: 0 }]), 0)
+})
+
+test('solo cuentan los apoyos de Sloth: sus pagos sueltos y sus mensuales, no un link de pago ni otra suscripción', () => {
+  const tramo = { desde: 1000, hasta: 2000 }
+  const sesion = (id: string, created: number, extra: Partial<Sesion> = {}): Sesion => ({ id, created, mode: 'payment', payment_status: 'paid', client_reference_id: 'lic', payment_intent: `pi_${id}`, amount_total: 1160, total_details: { amount_tax: 160 }, ...extra })
+  const factura = (id: string, created: number, licencia?: string): Factura => ({ id, created, total: 1000, tax: 0, payment_intent: `pi_${id}`, subscription_details: { metadata: licencia ? { licencia } : {} } })
+  const { pagos, cobrados } = pagosDeSloth(
+    [sesion('unico', 1500), sesion('viejo', 500), sesion('link', 1500, { client_reference_id: null, payment_link: 'plink_1' }), sesion('mensual', 1500, { mode: 'subscription', payment_intent: null })],
+    [factura('mes', 1500, 'lic'), factura('ajena', 1500)],
+    tramo
+  )
+  // El suelto de antes del tramo sirve para reconocer su devolución, pero su impuesto no es del mes.
+  assert.deepEqual([...pagos].sort(), ['pi_mes', 'pi_unico', 'pi_viejo'])
+  assert.deepEqual(cobrados, [
+    { total: 1160, impuesto: 160, peso: 1160 },
+    { total: 1000, impuesto: 0, peso: 1000 }
+  ])
+  const de = (pago: string | null, reporting_category = 'charge') => ({ reporting_category, source: { payment_intent: pago } })
+  assert.equal(deSloth(de('pi_unico'), pagos), true)
+  assert.equal(deSloth(de('pi_viejo', 'refund'), pagos), true)
+  assert.equal(deSloth(de('pi_link'), pagos), false)
+  assert.equal(deSloth(de(null), pagos), false)
+  assert.equal(deSloth({ reporting_category: 'charge', source: 'ch_1' }, pagos), false)
+  // Las comisiones sueltas de Stripe Tax y Billing se quitan igual.
+  assert.equal(deSloth({ reporting_category: 'fee', source: null }, pagos), true)
+})
+
+test('sin cobros no sale nada', () => {
+  assert.deepEqual(cuentasDelFondo([]), [])
+  assert.deepEqual(cuentasDelFondo([{ amount: -500, fee: 0, net: -500, currency: 'usd', reporting_category: 'refund' }]), [])
+})
+
+test('el mes empieza a medianoche de Ciudad de México, también en enero', () => {
+  assert.equal(new Date(inicioDelMes('2026-11') * 1000).toISOString(), '2026-11-01T06:00:00.000Z')
+  assert.equal(new Date(inicioDelMes('2027-01') * 1000).toISOString(), '2027-01-01T06:00:00.000Z')
+})
+
+test('el primer reparto es el 1 de enero de 2027 y junta desde el 15 de noviembre, no lo cobrado antes; después, cada mes', () => {
+  const iso = (s: number) => new Date(s * 1000).toISOString()
+  // Todo lo de antes de enero cuenta para el primer periodo, también el 31 de diciembre por la noche en México.
+  for (const cuando of ['2026-11-15T12:00:00Z', '2026-12-01T12:00:00Z', '2027-01-01T05:59:00Z']) assert.equal(periodoFondo(new Date(cuando)), PRIMER_PERIODO)
+  assert.equal(periodoFondo(new Date('2027-01-01T06:00:00Z')), '2027-01')
+  assert.equal(periodoFondo(new Date('2027-03-10T12:00:00Z')), '2027-03')
+  // Lo que Stripe cobró del 1 al 15 de noviembre es del creador: el primer tramo empieza el 15 a las 14:45 de México.
+  assert.deepEqual([iso(tramoDe(PRIMER_PERIODO).desde), iso(tramoDe(PRIMER_PERIODO).hasta)], ['2026-11-15T20:45:00.000Z', '2027-01-01T06:00:00.000Z'])
+  assert.deepEqual([iso(tramoDe('2027-01').desde), iso(tramoDe('2027-01').hasta)], ['2027-01-01T06:00:00.000Z', '2027-02-01T06:00:00.000Z'])
+  assert.equal(nombreDe(PRIMER_PERIODO), 'noviembre y diciembre de 2026')
+  assert.equal(nombreDe('2027-01'), 'enero de 2027')
+  assert.deepEqual(periodosHasta(new Date('2026-11-20T12:00:00Z')), ['2026-12'])
+  assert.deepEqual(periodosHasta(new Date('2027-02-03T12:00:00Z')), ['2026-12', '2027-01', '2027-02'])
+  // Noviembre de 2026 no es un periodo aparte, ni lo que no es un mes.
+  assert.deepEqual(['2026-12', '2027-01', '2026-11', '2027-13', 'x'].map(esPeriodo), [true, true, false, false, false])
+})

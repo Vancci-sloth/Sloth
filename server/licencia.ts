@@ -1,10 +1,12 @@
 /**
  * La clave de la app que se vende (`VENTA`): la de una cuenta gratis, con la que se entra a la comunidad, o la de un
  * apoyo, que quita el recordatorio (`web/src/Licencia.tsx`). Sloth abre sin ella. El apoyo se paga en la página de Sloth,
- * que da la clave; la cuenta se crea aquí (`/api/licencia/unirse`). El cobro es `licencias/`, un Worker de Cloudflare con
+ * que da la clave, o con tarjeta desde la tienda de estilos (`/api/licencia/apoyar`); la cuenta se crea aquí
+ * (`/api/licencia/unirse`). El cobro es `licencias/`, un Worker de Cloudflare con
  * PayPal: aquí solo se le pregunta. Su respuesta llega firmada y se guarda en `data/licencia.json`. Sin
  * internet, vale hasta su `hasta` (una semana como mucho), y editar el archivo no la alarga. Se vuelve a preguntar al
- * abrir y cada 6 horas.
+ * abrir y cada 6 horas. Lo firmado dice también si su correo apoya hoy: cuando deja de hacerlo, los estilos que instaló
+ * de la comunidad se cierran (`sinApoyo`).
  */
 import { execFile } from 'node:child_process'
 import { createHash, createPublicKey, randomUUID, verify } from 'node:crypto'
@@ -18,8 +20,9 @@ import { cuerpo, json as enviar } from './http.ts'
 import { guardar } from './disco.ts'
 import { preguntarAlRegistro } from './registro.ts'
 
-/** El Worker de `licencias/`. */
-export const COBRO = 'https://api.sloth.vancci.org'
+import { COBRO } from '../shared/cobro.ts'
+/** El Worker de `licencias/` (`shared/cobro.ts`). */
+export { COBRO }
 /** La llave con la que se comprueba lo que firma el cobro (la privada es su secreto `FIRMA`). */
 const PUBLICA = createPublicKey({ key: Buffer.from('MCowBQYDK2VwAyEAlo09wigax6NbF1/ar4az15Aa70NhzL77nRXoqYH6p5M=', 'base64'), format: 'der', type: 'spki' })
 const CADA = 6 * 3600_000
@@ -40,6 +43,8 @@ interface Firmado extends Omit<Licencia, 'error'> {
   clave: string
   equipo: string
   hasta: string
+  /** Si su correo apoya hoy. Un cobro de antes no lo dice. */
+  apoya?: boolean
 }
 
 const correr = promisify(execFile)
@@ -52,7 +57,16 @@ class Rechazo extends Error {
   }
 }
 
-export function licencia(app: string) {
+/**
+ * Con lo firmado `d`, si ya no hay con qué usar los estilos instalados de la comunidad, que son de quien apoya
+ * (`Card.bloqueada`): sin nada firmado que valga (sin clave, o de otra computadora), con lo firmado vencido, o cuando el
+ * cobro dice que su correo no apoya hoy (por el correo: quien apoyó desde la tienda sigue con la clave de su cuenta
+ * gratis). Un cobro de antes, que no lo dice, no cierra nada.
+ */
+export const sinApoyoCon = (d: { hasta: string; apoya?: boolean } | undefined, ahora = Date.now()) => !d || ahora >= Date.parse(d.hasta) || d.apoya === false
+
+/** `alCambiar`: cuando esta computadora deja de apoyar a Sloth o vuelve a hacerlo (`sinApoyo`). */
+export function licencia(app: string, alCambiar?: (sinApoyo: boolean) => void) {
   const archivo = join(app, 'data', 'licencia.json')
   let a: Archivo = leer()
   // De Windows cada vez: copiada a otra computadora, la licencia no vale ahí hasta volver a preguntar, y cuenta como otra.
@@ -62,8 +76,20 @@ export function licencia(app: string) {
     equipo = id ?? a.equipo ?? nuevoEquipo()
   })
   let error = ''
+  /**
+   * Si esta computadora ya no tiene con qué usar los estilos que instaló de la comunidad (`sinApoyoCon`). Se mira cuando
+   * acaba la primera pregunta al cobro (antes no se sabe: nada se cierra) y cada vez que se guarda lo que dijo.
+   */
+  let sinApoyo = false
+  function mirarApoyo() {
+    const ahora = sinApoyoCon(firmado())
+    if (ahora !== sinApoyo) alCambiar?.((sinApoyo = ahora))
+  }
 
-  void revisar()
+  /** La primera pregunta al cobro, la de al abrir: `credencial` la espera si lo guardado ya venció. */
+  const primera = revisar()
+    .catch(() => undefined)
+    .finally(mirarApoyo)
   setInterval(() => void revisar(), CADA).unref()
 
   function leer(): Archivo {
@@ -77,6 +103,7 @@ export function licencia(app: string) {
   function escribir() {
     mkdirSync(dirname(archivo), { recursive: true })
     guardar(archivo, `${JSON.stringify(a, null, 2)}\n`)
+    if (equipo) mirarApoyo()
   }
 
   function nuevoEquipo(): string {
@@ -156,10 +183,15 @@ export function licencia(app: string) {
         return enviar(res, 200, estado())
       }
       // La cuenta gratis, con su correo: el cobro le manda su clave, que se escribe luego en `/api/licencia/clave`
-      // (`enviada`). Solo la da aquí si esta computadora ya tenía una.
+      // (`enviada`). Solo la da aquí si esta computadora ya tenía una. Si ese correo ya apoya (409), no se le hace
+      // otra: entra con la clave de su apoyo, y `yaTiene` dice dónde está, junto al campo para escribirla.
       if (ruta === '/api/licencia/unirse' && metodo === 'POST') {
         const { email, terminos } = await cuerpo<{ email?: string; terminos?: string }>(req)
-        const { clave } = await cobro<{ clave?: string }>('/suscribir', { email, plan: 'gratis', equipo, acepto: true, terminos, porCorreo: true })
+        const { clave, yaTiene } = await cobro<{ clave?: string; yaTiene?: string }>('/suscribir', { email, plan: 'gratis', equipo, acepto: true, terminos, porCorreo: true }).catch((e) => {
+          if (e instanceof Rechazo && e.status === 409) return { clave: undefined, yaTiene: e.message }
+          throw e
+        })
+        if (yaTiene) return enviar(res, 200, { ...estado(), yaTiene })
         if (!clave) return enviar(res, 200, { ...estado(), enviada: true })
         const { datos, firma } = await cobro<{ datos: string; firma: string }>('/licencia', { clave, equipo })
         a = { clave, datos, firma, equipo: a.equipo }
@@ -175,6 +207,26 @@ export function licencia(app: string) {
         escribir()
         return enviar(res, 200, estado())
       }
+      // «Desbloquea N estilos» (`web/src/Tienda.tsx`): quien ya tiene su cuenta apoya con tarjeta sin pasar por la página.
+      // El cobro abre el pago de Stripe con el correo de la cuenta y, al pagarse, la comunidad lo reconoce por ese
+      // correo (su insignia), sin escribir otra clave. Los términos y el cobro de cada mes se aceptan junto al botón.
+      // `monto`: el apoyo de hoy que enseñó la tienda (`/api/licencia/precio`), que baja cada mes (`sugerido`). Sin él
+      // (no pudo leer el precio), el cobro cobra el de hoy, que se ve en la página de pago.
+      if (ruta === '/api/licencia/apoyar' && metodo === 'POST') {
+        const email = estado().email
+        if (!email) throw new Rechazo(400, 'Primero crea tu cuenta de Sloth, con tu correo.')
+        const { terminos, monto } = await cuerpo<{ terminos?: string; monto?: number }>(req)
+        const elegido = Number.isInteger(monto) ? { monto, sugerido: true } : {}
+        return enviar(res, 200, await cobro<{ enlace: string }>('/suscribir', { email, plan: 'mensual', pasarela: 'tarjeta', acepto: true, terminos, ...elegido }))
+      }
+      // Lo que cuesta hoy apoyar con tarjeta: el cobro lo sube por cada 50 personas que apoyan y se lo baja a cada quien
+      // cada mes, hasta `base` (`licencias/src/escalera.ts`).
+      if (ruta === '/api/licencia/precio' && metodo === 'GET') {
+        const r = await fetch(`${COBRO}/precio`, { signal: AbortSignal.timeout(10_000) })
+        const p = (await r.json()) as { mensual?: number; base?: number; paso?: number }
+        if (!r.ok || !p.mensual) throw new Rechazo(502, SIN_CONEXION)
+        return enviar(res, 200, { mensual: p.mensual, base: p.base ?? p.mensual, paso: p.paso ?? 0 })
+      }
       // Para la ventana de Electron, al buscar la versión nueva: quien apoya la recibe antes (licencias/, `ANTICIPO`).
       if (ruta === '/api/licencia/credencial' && metodo === 'GET') return enviar(res, 200, (await credencial()) ?? {})
       // Con un año pagado de una vez: el pago del siguiente.
@@ -188,13 +240,18 @@ export function licencia(app: string) {
     return false
   }
 
-  /** Con qué entra a la comunidad (`server/comunidad.ts`): la clave y esta computadora, mientras esté activa. */
+  /**
+   * Con qué entra a la comunidad (`server/comunidad.ts`): la clave y esta computadora, mientras esté activa. Lo guardado
+   * vale una semana: al abrir Sloth después de más días ya venció, y se espera a lo que diga el cobro. Sin esperar, la
+   * ventana preguntaba por la versión nueva sin la clave y quien apoya no la veía hasta 6 horas después.
+   */
   const credencial = async () => {
     await listo
+    if (a.clave && !activa()) await primera
     return activa() && a.clave ? { clave: a.clave, equipo } : undefined
   }
 
-  return { api, credencial }
+  return { api, credencial, sinApoyo: () => sinApoyo }
 }
 
 /**

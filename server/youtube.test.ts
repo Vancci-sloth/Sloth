@@ -249,3 +249,78 @@ test('OAuth comprueba el estado y el canal; solo sube finales y evita repetir un
   assert.equal((await pedir('/subida', { ...datos, ruta: subidos[0].ruta })).status, 200)
   assert.equal(insertados, 3)
 })
+
+test('con la app de Sloth, quien apoya conecta su canal sin JSON propio; el permiso se renueva en el cobro y se retira al desconectar', async (t) => {
+  const base = resolve('data')
+  mkdirSync(base, { recursive: true })
+  const dir = mkdtempSync(join(base, 'prueba-youtube-sloth-'))
+  const sessions = new Sessions(join(dir, 'sesiones'), () => {}, () => {}, () => {}, () => {})
+  const credenciales = new Map<string, string>()
+  const originales = globalThis.fetch
+  const revocados: string[] = []
+  t.mock.method(globalThis, 'fetch', async (input: string | URL | Request, init?: RequestInit) => {
+    const url = String(input)
+    if (url.startsWith('http://127.0.0.1:')) return originales(input, init)
+    if (url.includes('/channels?')) return Response.json({ items: [{ id: 'canal-sloth', snippet: { title: 'Mi canal' } }] })
+    if (url === 'https://oauth2.googleapis.com/revoke') { revocados.push((init!.body as URLSearchParams).get('token')!); return new Response(null) }
+    throw new Error(`Petición inesperada: ${url}`)
+  })
+  let apoya = true
+  const alCobro: Record<string, string>[] = []
+  const sloth = {
+    info: async () => ({ cliente: 'sloth.apps.googleusercontent.com', apoya }),
+    token: async (cuerpo: Record<string, string>) => {
+      alCobro.push(cuerpo)
+      return apoya ? Response.json({ access_token: `acceso-${alCobro.length}`, refresh_token: 'refresh-sloth', expires_in: 3600, scope: 'https://www.googleapis.com/auth/youtube.force-ssl' })
+        : Response.json({ error: 'Conectar YouTube con la app de Sloth es para quienes apoyan a Sloth.' }, { status: 402 })
+    }
+  }
+  let servicio!: ReturnType<typeof youtube>
+  const server = createServer((req, res) => { void servicio.api(req, res, new URL(req.url!, 'http://localhost')).catch(() => { res.writeHead(500); res.end() }) })
+  await new Promise<void>((ok) => server.listen(0, '127.0.0.1', ok))
+  const address = server.address()
+  assert.ok(address && typeof address !== 'string')
+  const origen = `http://127.0.0.1:${address.port}`
+  const retorno = `${origen}/api/youtube/oauth`
+  const crear = () => youtube(dir, sessions, () => [], retorno, { leer: (n) => credenciales.get(n) ?? '', escribir: (n, v) => { if (v) credenciales.set(n, v); else credenciales.delete(n) } }, undefined, undefined, sloth)
+  servicio = crear()
+  t.after(async () => {
+    await new Promise<void>((ok) => server.close(() => ok()))
+    sessions.closeAll()
+    assert.ok(dir.startsWith(base + sep))
+    rmSync(dir, { recursive: true, force: true })
+  })
+  const pedir = async (path: string, body?: unknown) => {
+    const r = await originales(`${origen}/api/youtube${path}`, body === undefined ? undefined : { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
+    return { status: r.status, j: await r.json().catch(() => null) }
+  }
+
+  assert.deepEqual((await pedir('')).j.sloth, { apoya: true })
+  const auth = new URL((await pedir('/conectar', { sloth: true })).j.url)
+  assert.equal(auth.searchParams.get('client_id'), 'sloth.apps.googleusercontent.com')
+  assert.equal((await pedir(`/oauth?${new URLSearchParams({ state: auth.searchParams.get('state')!, code: 'codigo' })}`)).status, 200)
+  // Al cobro va el código con su verificador PKCE; ningún secreto vive en esta computadora.
+  assert.deepEqual(Object.keys(alCobro[0]).sort(), ['code', 'retorno', 'verifier'])
+  assert.equal(createHash('sha256').update(alCobro[0].verifier).digest('base64url'), auth.searchParams.get('code_challenge'))
+  assert.equal(credenciales.get('YOUTUBE_CON_SLOTH'), '1')
+  assert.equal(credenciales.get('YOUTUBE_CLIENT_SECRET'), undefined)
+  const conexion = (await pedir('')).j
+  assert.equal(conexion.conSloth, true)
+  assert.equal(conexion.cuenta.nombre, 'Mi canal')
+
+  // Al abrir Sloth otra vez, el permiso se renueva en el cobro.
+  servicio = crear()
+  assert.equal(await servicio.lectura.token(), 'acceso-2')
+  assert.deepEqual(alCobro[1], { refresh: 'refresh-sloth' })
+
+  // Quien deja de apoyar ya no lo renueva, y Opciones lo dice.
+  apoya = false
+  servicio = crear()
+  await assert.rejects(servicio.lectura.token(), /quienes apoyan/)
+  assert.equal((await pedir('/conectar', { sloth: true })).status, 402)
+  assert.deepEqual((await pedir('')).j.sloth, { apoya: false })
+
+  assert.equal((await pedir('/desconectar', {})).status, 200)
+  assert.deepEqual(revocados, ['refresh-sloth'])
+  assert.equal(credenciales.size, 0)
+})

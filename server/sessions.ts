@@ -6,7 +6,7 @@ import { leerHistorial, primerUsuario } from './historial.ts'
 import type { AgentEvent, FileDraft, SessionMeta } from '../shared/types.ts'
 import { NOMBRE_AGENTE, programaDe, proveedorDe } from '../shared/providers.ts'
 import { llaveEnUso } from './acceso.ts'
-import { conRutas, type AgentRun, type SkillRef } from './agent.ts'
+import { conRutas, sinArrancar, type AgentRun, type SkillRef } from './agent.ts'
 import { conAgente } from './agentes.ts'
 import { startClaude } from './claude.ts'
 import { startCodex } from './codex.ts'
@@ -80,8 +80,15 @@ function alDia(meta: SessionMeta & { provider?: string; queue?: unknown; pendien
 
 type Mensaje = Extract<AgentEvent, { t: 'user' }>
 
+/**
+ * Si el mensaje acaba preguntándole algo al usuario: con «?» o con el bloque `<opciones>` de sus botones, que las
+ * instrucciones de Sloth (`OPCIONES`, claude.ts) ponen al final de toda pregunta cerrada, en todos los agentes.
+ */
+function preguntaAlFinal(texto: string): boolean {
+  return /<opciones>[\s\S]*<\/opciones>\s*$/.test(texto) || /\?[\s*_`)"»]*$/.test(texto)
+}
 /** El último mensaje del agente en estos eventos (no el de un subagente), entero. */
-function ultimoTexto(events: AgentEvent[]): string {
+export function ultimoTexto(events: AgentEvent[]): string {
   const ultimo = events.findLast((e) => e.t === 'text' && !e.parent)
   if (ultimo?.t !== 'text') return ''
   return events.map((e) => (e.t === 'text' && e.id === ultimo.id ? e.delta : '')).join('')
@@ -112,6 +119,8 @@ export class Sessions {
   esVideo: (meta: SessionMeta) => boolean = () => false
   /** Lo que su card no le ofrece al agente (`Card.sinHerramientas`). */
   sinHerramientas: (meta: SessionMeta) => string[] | undefined = () => undefined
+  /** Si el hilo lee algo ajeno y su agente solo puede leer (`AgentOptions.soloLeer`). */
+  soloLeer: (meta: SessionMeta) => boolean = () => false
 
   constructor(
     private dir: string,
@@ -122,6 +131,8 @@ export class Sessions {
     private crearAgente: (opts: Parameters<typeof startCodex>[0]) => AgentRun = (opts) => {
       const p = proveedorDe(opts.model)
       const start = OTROS[p]?.start ?? (p === 'codex' ? startCodex : p === 'opencode' ? startOpenCode : startClaude)
+      // Solo Claude Code trabaja sin poder escribir ni ejecutar: a otro agente no se le da a leer algo ajeno.
+      if (opts.soloLeer && start !== startClaude) return sinArrancar(opts, 'Esto solo lo lee Claude: aquí es el único que trabaja sin poder escribir ni ejecutar nada. Elige un modelo de Claude.')
       return conAgente(p, opts, (o) => start(o))
     },
     /** Lo que le falta al video del hilo, leído de su carpeta (`queFalta`, etapas.ts); nada si no es de un estilo. */
@@ -207,6 +218,18 @@ export class Sessions {
   /** Si hay un agente trabajando, en su turno o en segundo plano. Reiniciar el servidor lo cortaría. */
   anyRunning(): boolean {
     return [...this.metas.values()].some((m) => m.running || m.background?.length)
+  }
+
+  /**
+   * Un hilo que llega de otra computadora (`server/respaldo.ts`), con su historial: entra quieto, sin agente ni sesión
+   * que retomar. `false` si aquí ya hay uno con ese id, que no se toca.
+   */
+  traer(meta: SessionMeta, registro: string): boolean {
+    if (this.metas.has(meta.id)) return false
+    guardar(join(this.dir, `${meta.id}.jsonl`), registro)
+    this.metas.set(meta.id, meta)
+    this.save(meta)
+    return true
   }
 
   /** Con `carpeta`, el hilo nace sabiendo dónde trabaja: la de su video, nuevo o que ya existe. */
@@ -550,7 +573,7 @@ export class Sessions {
     const list = this.load(id)
     const turno = list.slice(list.findLastIndex((e) => e.t === 'turn_start') + 1)
     const suyas = turno.filter((e) => e.t === 'tool' && !e.parent)
-    if (!suyas.length || suyas.some((e) => e.t === 'tool' && PREGUNTAS.test(e.name)) || /\?[\s*_`)"»]*$/.test(ultimoTexto(turno))) return
+    if (!suyas.length || suyas.some((e) => e.t === 'tool' && PREGUNTAS.test(e.name)) || preguntaAlFinal(ultimoTexto(turno))) return
     clearTimeout(this.aMedias.get(id))
     const reloj = setTimeout(() => {
       this.aMedias.delete(id)
@@ -626,6 +649,7 @@ export class Sessions {
       hilo: meta.id,
       conLlave,
       sinHerramientas: this.sinHerramientas(meta),
+      soloLeer: this.soloLeer(meta),
       onEvent: (event) => this.emit(meta.id, event),
       onDraft: (draft) => this.pushDraft(meta.id, draft),
       // Un proceso muerto no recibe nada: se olvida, y el siguiente mensaje abre otro que retoma la sesión. Si se cayó,

@@ -2,6 +2,7 @@ import { type KeyboardEvent as TeclaReact, memo, type ReactNode, type Ref, useCa
 import { api } from './api'
 import { Icono, type NombreIcono } from './Iconos'
 import { coincide, type Cuenta, explicar, fechaCorta, hace, num, planCorto, planLargo, segundos, sinAcentos, STATUS } from './admin-formato'
+import { FondoAdmin } from './FondoAdmin'
 import { RifaAdmin } from './RifaAdmin'
 
 export { fecha, num } from './admin-formato'
@@ -14,7 +15,8 @@ import './Admin.css'
  * Se abre al instante con lo último que se leyó (lo guarda el servidor en `data/voz/admin.json`, y aquí en memoria) y se
  * vuelve a leer de fondo: el cobro tarda unos segundos en preguntar a cada llave. Arriba, el buscador (ya enfocado; «/»
  * vuelve a él) y las cifras que importan en una fila; debajo, pestañas en vez de una página larga: Usuarios, Llamadas,
- * Rifa (`RifaAdmin.tsx`), Créditos mensuales, Llaves y lo que responde Voices Cloning tal cual (`#/admin/<pestaña>`).
+ * Rifa (`RifaAdmin.tsx`), Fondo (`FondoAdmin.tsx`: el reparto del fondo de la comunidad), Créditos mensuales, Llaves y lo que
+ * responde Voices Cloning tal cual (`#/admin/<pestaña>`).
  *
  * Con el teclado: escribir filtra, ↑↓ eligen la fila, Enter abre su ficha con el cursor en «créditos»; ahí Enter suma
  * (un número negativo quita) y Esc vuelve al buscador. Cada cambio de créditos o de estado se deshace: en el aviso que
@@ -51,11 +53,9 @@ interface Panel {
   /** `VOZ_SOLO_CREADOR` en el cobro: nadie más la usa. */
   soloCreador: boolean
   creditosIniciales: number
-  mensuales?: number
   /** Cuánto saldo queda libre para repartir (`cuentaDeReparto` del cobro); `error` si una llave no respondió. */
   reparto?: Reparto | { error: string } | null
-  /** Desde cuánto se reciben: «$10 USD (199 MXN en los apoyos en pesos)». */
-  mensualesDesde?: string
+  /** Lo que se entregó cuando había créditos de cada mes (noviembre de 2026): ya no se dan. */
   repartos?: { externo: string; periodo: string; creditos: number; estado: string; entregado: string | null; correo: string | null; error: string | null }[]
   pagina: number
   consumo: number
@@ -76,9 +76,6 @@ interface Panel {
 interface Reparto {
   saldo: number
   enUsuarios: number
-  beneficiarios: number
-  porEntregar: number
-  cadaMes: number
   libres: number
 }
 
@@ -134,6 +131,7 @@ const PESTANAS = [
   { id: 'usuarios', nombre: 'Usuarios', icono: 'personas' },
   { id: 'llamadas', nombre: 'Llamadas', icono: 'sonido' },
   { id: 'rifa', nombre: 'Rifa', icono: 'boleto' },
+  { id: 'fondo', nombre: 'Fondo', icono: 'corona' },
   { id: 'mensuales', nombre: 'Créditos mensuales', icono: 'calendario' },
   { id: 'llaves', nombre: 'Llaves', icono: 'escudo' },
   { id: 'tal-cual', nombre: 'Tal cual', icono: 'hilo' }
@@ -379,7 +377,7 @@ export const Admin = memo(function Admin({ activa, pestana = 'usuarios', onPesta
         )}
         {panel?.soloCreador && (
           <p className="admin-aviso">
-            Por ahora las voces de Sloth son <strong>solo para ti</strong>. Los créditos mensuales se abren automáticamente cuando se termine de publicar la actualización que los incluye.
+            Por ahora las voces de Sloth son <strong>solo para ti</strong>. Se abren a todos cuando se termine de publicar la actualización que las trae.
           </p>
         )}
 
@@ -412,6 +410,7 @@ export const Admin = memo(function Admin({ activa, pestana = 'usuarios', onPesta
               <Llamadas panel={panel} buscar={buscar} quien={quien} soloFallas={soloFallas} onSoloFallas={setSoloFallas} onAbrir={setAbierto} />
             )}
             {pestanaActual.id === 'rifa' && <RifaAdmin />}
+            {pestanaActual.id === 'fondo' && <FondoAdmin />}
             {pestanaActual.id === 'mensuales' && <Mensuales panel={panel} quien={quien} onAbrir={setAbierto} />}
             {pestanaActual.id === 'llaves' && <Llaves panel={panel} quien={quien} cargando={cargando} onConsumo={setConsumo} />}
             {pestanaActual.id === 'tal-cual' && <TalCual panel={panel} />}
@@ -487,7 +486,7 @@ function Cifras({ panel, errores, onErrores }: { panel: Panel; errores: number; 
   return (
     <div className="admin-cifras">
       {r && (
-        <div className={`admin-cifra admin-libres${corto ? ' corto' : ''}`} title="Tu saldo general menos lo que ya tienen los usuarios sin gastar y lo que falta entregar este mes. Es lo que puedes rifar o regalar sin quedarte corto.">
+        <div className={`admin-cifra admin-libres${corto ? ' corto' : ''}`} title="Tu saldo general menos lo que ya tienen los usuarios sin gastar. Es lo que puedes rifar o regalar sin quedarte corto.">
           <span className="admin-cifra-titulo">{corto ? 'Te faltan' : 'Para repartir'}</span>
           <strong>{num(Math.abs(r.libres))}</strong>
         </div>
@@ -500,12 +499,6 @@ function Cifras({ panel, errores, onErrores }: { panel: Panel; errores: number; 
         <div className="admin-cifra" title="Lo que ya tienen los usuarios y no han gastado">
           <span className="admin-cifra-titulo">Asignados</span>
           <strong>{num(r.enUsuarios)}</strong>
-        </div>
-      )}
-      {r && (
-        <div className="admin-cifra" title={`Lo que falta entregar este mes. ${num(r.beneficiarios)} ${r.beneficiarios === 1 ? 'persona recibe' : 'personas reciben'} ${num(panel.mensuales)} al mes: ${num(r.cadaMes)}`}>
-          <span className="admin-cifra-titulo">Por entregar</span>
-          <strong>{num(r.porEntregar)}</strong>
         </div>
       )}
       <div className="admin-cifra" title="Gastado hoy por todos, hora de Lima">
@@ -1046,7 +1039,7 @@ function Mensuales({ panel, quien, onAbrir }: { panel: Panel; quien(externo: str
   return (
     <>
       <p className="admin-nota">
-        {num(panel.mensuales)} créditos al mes solo para cada correo que paga activamente {panel.mensualesDesde ?? '$10 USD'} o más (o el anual). Nadie más: ni cuentas gratis, ni apoyos de menos, ni lugares gratis de Fundador. Cada mes se llenan hasta {num(panel.mensuales)}: no se acumulan. Salen de tus llaves de socio.
+        Los créditos de cada mes ya no se dan (desde el 15 de noviembre de 2026): quien los recibió conserva su saldo y nadie más los recibe. Aquí queda lo que se entregó; lo que diga «Revisar» se comprueba en el proveedor.
       </p>
       {panel.repartos?.length ? (
         <Tabla
@@ -1064,7 +1057,7 @@ function Mensuales({ panel, quien, onAbrir }: { panel: Panel; quien(externo: str
           ])}
         />
       ) : (
-        <p className="admin-vacio">El primer reparto empieza al publicar la actualización.</p>
+        <p className="admin-vacio">No se entregó ninguno.</p>
       )}
     </>
   )

@@ -97,9 +97,10 @@ export function pagoDeSesion(s: SesionStripe): PagoStripe {
 
 /**
  * La sesión de pago de una fila: el mensual, una suscripción; el año o el apoyo de una vez, un pago suelto. Su `url` es
- * adonde va el cliente; al pagar, vuelve a `/gracias`, y si sale, a la página de Sloth.
+ * adonde va el cliente; al pagar, vuelve a `/gracias`, y si sale, a la página de Sloth. `nota` sale bajo el nombre de lo
+ * que se paga: cómo baja el apoyo que baja cada mes (`escalera.ts`), porque Stripe solo enseña el monto del primero.
  */
-export function sesionStripe(env: Env, f: Pick<Fila, 'id' | 'email' | 'plan' | 'monto' | 'moneda'>): Promise<SesionStripe> {
+export function sesionStripe(env: Env, f: Pick<Fila, 'id' | 'email' | 'plan' | 'monto' | 'moneda'>, nota?: string): Promise<SesionStripe> {
   const mensual = f.plan === 'mensual'
   const nombre = { mensual: 'Sloth - apoyo mensual', anual: 'Sloth - plan anual', unico: 'Sloth - apoyo de una vez' }[f.plan as 'mensual' | 'anual' | 'unico']
   return stripe(env, 'POST', '/v1/checkout/sessions', {
@@ -112,6 +113,7 @@ export function sesionStripe(env: Env, f: Pick<Fila, 'id' | 'email' | 'plan' | '
     'line_items[0][price_data][unit_amount]': String(Math.round(f.monto * 100)),
     ...(mensual ? { 'line_items[0][price_data][recurring][interval]': 'month' } : {}),
     'line_items[0][price_data][product_data][name]': nombre,
+    ...(nota ? { 'line_items[0][price_data][product_data][description]': nota } : {}),
     // El precio ya trae el IVA, como dice la página: con Stripe Tax (encendido en la cuenta) se desglosa, no se suma.
     'line_items[0][price_data][tax_behavior]': 'inclusive',
     // Quien paga desde otro país lo ve y lo paga en su moneda.
@@ -143,11 +145,12 @@ export function cancelarStripe(env: Env, id: string): Promise<SuscripcionStripe>
 /** El modo de la llave: con `sk_live_` (o `rk_live_`) cobra de verdad. */
 export const modoStripe = (env: Pick<Env, 'STRIPE_SECRET_KEY'>) => (/^[sr]k_live_/.test(env.STRIPE_SECRET_KEY ?? '') ? 'produccion' : 'prueba')
 
-export async function stripe<T>(env: Env, metodo: string, ruta: string, formulario?: Record<string, string>): Promise<T> {
+/** Con `version`, la respuesta llega con la forma de esa versión de su API; sin ella, con la de la cuenta. */
+export async function stripe<T>(env: Env, metodo: string, ruta: string, formulario?: Record<string, string>, version?: string): Promise<T> {
   if (!env.STRIPE_SECRET_KEY) throw new Error('Falta STRIPE_SECRET_KEY.')
   const r = await fetch(`${API}${ruta}`, {
     method: metodo,
-    headers: { authorization: `Bearer ${env.STRIPE_SECRET_KEY}`, 'content-type': 'application/x-www-form-urlencoded' },
+    headers: { authorization: `Bearer ${env.STRIPE_SECRET_KEY}`, 'content-type': 'application/x-www-form-urlencoded', ...(version ? { 'stripe-version': version } : {}) },
     body: formulario && new URLSearchParams(formulario)
   })
   const datos = (await r.json().catch(() => ({}))) as { error?: { message?: string } }

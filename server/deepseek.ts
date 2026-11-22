@@ -1,5 +1,5 @@
 import type { CuentaClaude, Model } from '../shared/types.ts'
-import { llaveDe, llaveGuardada } from './acceso.ts'
+import { entornoClaudeCon, llaveDe, llaveGuardada } from './acceso.ts'
 
 /**
  * DeepSeek con el mismo Claude Code de Sloth: DeepSeek tiene una API compatible con la de Anthropic
@@ -20,25 +20,12 @@ export const modeloDeepSeek = (model: string) => model.replace(/^deepseek:/, '')
 /**
  * Lo que necesita Claude Code para hablar con DeepSeek. Los alias que piden las skills y sus subagentes (`opus`, `sonnet`)
  * van al modelo del hilo, y `haiku` (los títulos, lo rápido) a Flash. `[1m]` le dice a Claude Code que la ventana es de un
- * millón, como la de los dos modelos de DeepSeek: si no, compactaría a los 200 000. Sin la llave de Anthropic ni el token
- * de la cuenta de Claude, que irían a DeepSeek.
+ * millón, como la de los dos modelos de DeepSeek: si no, compactaría a los 200 000.
  */
 export function entornoDeepSeek(model: string, effort?: string): Record<string, string> {
   const llave = llaveGuardada('deepseek')
   if (!llave) throw new Error(SIN_LLAVE)
-  const { ANTHROPIC_API_KEY: _, CLAUDE_CODE_OAUTH_TOKEN: __, ...env } = process.env as Record<string, string>
-  const elegido = `${modeloDeepSeek(model)}[1m]`
-  return {
-    ...env,
-    ANTHROPIC_BASE_URL: `${API}/anthropic`,
-    ANTHROPIC_AUTH_TOKEN: llave,
-    ANTHROPIC_MODEL: elegido,
-    ANTHROPIC_DEFAULT_OPUS_MODEL: elegido,
-    ANTHROPIC_DEFAULT_SONNET_MODEL: elegido,
-    ANTHROPIC_DEFAULT_HAIKU_MODEL: 'deepseek-flash',
-    CLAUDE_CODE_AUTO_COMPACT_WINDOW: '786432',
-    ...(effort ? { CLAUDE_CODE_EFFORT_LEVEL: effort } : {})
-  }
+  return entornoClaudeCon({ direccion: `${API}/anthropic`, llave, modelo: `${modeloDeepSeek(model)}[1m]`, rapido: 'deepseek-flash', ventana: 786_432, effort })
 }
 
 export const SIN_LLAVE = 'Pega tu llave de API de DeepSeek en Opciones.'

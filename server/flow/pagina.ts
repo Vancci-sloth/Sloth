@@ -3,7 +3,7 @@ import { mkdirSync, readFileSync } from 'node:fs'
 import { extname, join } from 'node:path'
 import type { Browser, Locator, Page, Request } from 'playwright-core'
 import { paginaNueva } from '../chromium.ts'
-import { creditosDe, FORMATOS_IMAGEN, FORMATOS_VIDEO, gastoDeRechazo, PALABRA_CREDITOS, type Saldo, saldoDe } from '../../shared/flow.ts'
+import { creditosDe, FORMATOS_IMAGEN, FORMATOS_VIDEO, gastoDeRechazo, PALABRA_CREDITOS, type Saldo, saldoDe, sinSesion } from '../../shared/flow.ts'
 
 /**
  * Lo que se hace en la página de Google Flow. Se usan los iconos (el nombre de cada `mat-icon`), no los textos: Flow sale
@@ -95,10 +95,21 @@ export interface PedidoFlow {
 
 export const paginaFlow = (b: Browser): Promise<Page> => paginaNueva(b, { ancho: ANCHO, alto: ALTO })
 
+/** Lo que espera, tras cargar, a que Flow enseñe sus novedades. */
+const NOVEDADES = 2500
+
+/**
+ * Abre `url` sin el aviso de novedades de Flow encima. Ese aviso («A faster, easier-to-reach Flow Agent», 20 de noviembre
+ * de 2026) tapa toda la página, no se cierra con Escape y su botón de cerrar se apaga hasta pasar sus hojas; todo clic
+ * fallaba con «locator.click: Timeout». Sale una vez por cuenta: al recargar ya no está (puede haber otro en cola).
+ */
 async function ir(page: Page, url: string) {
-  await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60_000 })
-  await page.waitForLoadState('networkidle', { timeout: 20_000 }).catch(() => {})
-  if (page.url().startsWith('https://accounts.google.com/')) throw new SinEmpezar('Flow ya no tiene la sesión de esta cuenta de Google: vuelve a conectarla (la de la voz en Opciones → Voz; las demás, agregándola otra vez en Opciones → Google Flow).', '', true)
+  for (let i = 0; i < 3; i++) {
+    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60_000 })
+    await page.waitForLoadState('networkidle', { timeout: 20_000 }).catch(() => {})
+    if (sinSesion(page.url())) throw new SinEmpezar('Flow ya no tiene la sesión de esta cuenta de Google: vuelve a conectarla (la de la voz en Opciones → Voz; las demás, agregándola otra vez en Opciones → Google Flow).', '', true)
+    if (!(await page.locator('mat-dialog-container').first().waitFor({ timeout: NOVEDADES }).then(() => true, () => false))) return
+  }
 }
 
 const icono = (page: Page | Locator, nombre: string) => page.locator(`button:has(mat-icon:text-is("${nombre}"))`)
@@ -282,23 +293,25 @@ async function subir(page: Page, hueco: Locator, ruta: string): Promise<boolean>
   const nombre = `sloth-${randomBytes(4).toString('hex')}${ext}`
   await selector.setFiles({ name: nombre, mimeType: ext === '.png' ? 'image/png' : ext === '.webp' ? 'image/webp' : 'image/jpeg', buffer: readFileSync(ruta) })
   await page.locator('mat-dialog-container button').last().click({ timeout: 3000 }).catch(() => {})
-  // Elegirla cuando su miniatura venga ya de Flow. Con mala conexión una imagen tarda más de un minuto en subir: mientras
-  // la página siga mandando datos se espera (hasta `SUBIDA_MAXIMA`); si deja de mandar `SUBIDA_QUIETA`, la red no dio.
-  const item = panel.locator('button[role=option]').filter({ hasText: nombre }).first()
-  const miniatura = item.locator('img[src^="https://"]')
+  // Elegirla mientras sube la deja marcada sin entrar al compositor. Subiendo, su renglón lleva una rueda (antes, una
+  // miniatura suya); al acabar, un icono: la miniatura de Flow ya no llega hasta recargar la lista (18 de noviembre de
+  // 2026), y esperarla dejó a todos sin referencias ni fotogramas. Si la rueda no se va, se elige igual: quien llama
+  // mira si entró al compositor. Con mala conexión una imagen tarda más de un minuto en subir: se espera mientras la
+  // página siga mandando datos (hasta `SUBIDA_MAXIMA`); si deja de mandar `SUBIDA_QUIETA`, la red no dio (`SinConexion`).
+  const item = panel.locator('button[role=option]').filter({ hasText: nombre })
+  const yaSubio = item.filter({ hasNot: page.locator('[role=progressbar], img:not([src^="https://"])') }).first()
   const envios = mirarEnvios(page)
   try {
     const desde = Date.now()
-    while (!(await miniatura.count())) {
+    while (!(await yaSubio.count())) {
       if (envios.quieta() > SUBIDA_QUIETA) throw new SinConexion(`Flow no recibió la imagen ${ruta} en ${Math.round((Date.now() - desde) / 1000)} s (la conexión no dio)${await avisos(page)}. No se gastó nada.`)
-      if (Date.now() - desde > SUBIDA_MAXIMA) return false
+      if (Date.now() - desde > SUBIDA_MAXIMA) break
       await page.waitForTimeout(1000)
     }
   } finally {
     envios.soltar()
   }
-  await item.click({ timeout: 10_000 })
-  return true
+  return item.first().click({ timeout: 10_000 }).then(() => true, () => false)
 }
 
 /** Pone las referencias en el compositor («Ingredientes»), tras quitar las que hubiera. */
@@ -487,8 +500,8 @@ export async function generarEnFlow(b: Browser, page: Page, proyecto: string | u
   const creditos = await prepararEnFlow(page, proyecto, p, alEntrar).catch((e: unknown) => {
     throw esDeRed(e) ? new SinConexion(`La conexión con Flow falló antes de pedirlo (${(e as Error).message.split('\n')[0]}). No se gastó nada.`) : e
   })
-  // Después de preparar: cada imagen subida también es una tarjeta del proyecto, y se queda en su «100 %» un momento más.
-  // Se espera a que acabe: si cambiara después, parecería la tarjeta del pedido.
+  // Después de preparar: cada imagen subida también es una tarjeta del proyecto, y se queda en su «100 %» un momento
+  // más. Se espera a que acabe: si cambia después, parecería la tarjeta del pedido.
   await page.waitForFunction(() => !/\d+\s*%/.test(document.querySelector<HTMLElement>('flow-tile-container')?.innerText ?? ''), null, { timeout: 15_000 }).catch(() => {})
   const tarjeta = page.locator('flow-tile-container').first()
   const hay = (await tarjeta.count()) > 0

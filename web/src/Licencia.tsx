@@ -1,12 +1,52 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
+import { version } from '../../package.json'
 import type { Licencia } from '../../shared/types'
 import { api } from './api'
 import { Confirm } from './Confirm'
+import { claveEscrita } from './Respaldo'
 import './Licencia.css'
 
 const dinero = (n: number) => `$${n.toLocaleString('es-MX')}`
-const fecha = (iso?: string) => (iso ? new Date(iso).toLocaleDateString('es-MX', { day: 'numeric', month: 'long', year: 'numeric' }) : '')
+const fecha = (iso?: string, month: 'long' | 'short' = 'long') => (iso ? new Date(iso).toLocaleDateString('es-MX', { day: 'numeric', month, year: 'numeric' }) : '')
+
+/** Lo último que dijo el servidor de la clave: el pie y Opciones enseñan lo mismo, y cambian juntos al escribir una clave o cancelar. */
+let sabida: Licencia | undefined
+const oyentes = new Set<(l: Licencia) => void>()
+function saber(l: Licencia): Licencia {
+  sabida = l
+  for (const o of oyentes) o(l)
+  return l
+}
+function useLicencia(fresco = false) {
+  const [l, setL] = useState(sabida)
+  const [error, setError] = useState('')
+  useEffect(() => {
+    oyentes.add(setL)
+    if (fresco || !sabida) api<Licencia>(`/api/licencia${fresco ? '?fresco' : ''}`).then(saber, (e) => setError(e.message))
+    return () => void oyentes.delete(setL)
+  }, [fresco])
+  return { l, error }
+}
+
+/** Cuándo termina el apoyo. Nada si no hay fecha que decir: sin apoyo, con la cuenta gratis o gratis de por vida. */
+function finApoyo(l: Licencia | undefined, corta: boolean): string {
+  if (!l?.pagadaHasta || (l.plan !== 'mensual' && l.plan !== 'anual' && l.plan !== 'unico')) return ''
+  const dia = fecha(l.pagadaHasta, corta ? 'short' : 'long')
+  // Con el cobro en marcha no termina: ese día se cobra otra vez.
+  return !l.activa ? `tu apoyo terminó el ${dia}` : l.estado === 'authorized' ? `tu apoyo se renueva el ${dia}` : `tu apoyo termina el ${dia}`
+}
+
+/** La versión de Sloth que tienes y hasta cuándo vale tu apoyo: bajo el título de Opciones y abajo de la barra lateral (`corta`). */
+export function VersionYApoyo({ corta = false, className }: { corta?: boolean; className: string }) {
+  const fin = finApoyo(useLicencia().l, corta)
+  return (
+    <span className={className}>
+      Sloth {version}
+      {fin && ` · ${fin}`}
+    </span>
+  )
+}
 /** La página de Sloth: ahí se apoya, y tiene los términos y el aviso de privacidad. */
 const PAGINA = 'https://sloth.vancci.org'
 /** La versión de los términos que acepta quien crea su cuenta: la de `TERMINOS` en la página. */
@@ -17,7 +57,8 @@ const INICIOS = 'sloth:inicios'
 
 /** Si la clave quita el recordatorio: un apoyo vigente o un lugar gratis de por vida (de cuando Sloth se vendía). */
 const apoya = (l?: Licencia) => !!l?.activa && l.plan !== 'cuenta'
-const apoyar = () => window.open(`${PAGINA}/#apoyar`, '_blank')
+/** Abre la página ya en el formulario del pago (`#pago`), no en la tabla de lo que trae el apoyo. */
+const apoyar = () => window.open(`${PAGINA}/#pago`, '_blank')
 
 /**
  * Sloth es gratis (`server/licencia.ts`). Cada `CADA` inicios, a quien no apoya le recuerda que puede hacerlo, sin
@@ -86,7 +127,9 @@ function Clave({ licencia, aviso, onCambio, onVolver }: { licencia: Licencia; av
     setOcupado(true)
     setError('')
     try {
-      const l = await api<Licencia>('/api/licencia/clave', { clave })
+      const l = saber(await api<Licencia>('/api/licencia/clave', { clave }))
+      // Si esa clave ya se usa en otra computadora, Sloth ofrece traer lo de allá.
+      if (l.activa) claveEscrita()
       if (!l.activa) setError(l.estado === 'pending' ? 'Todavía no se confirma el pago de esa clave.' : 'Ese apoyo ya terminó. Puedes renovarlo en sloth.vancci.org.')
       onCambio(l)
     } catch (e) {
@@ -133,8 +176,8 @@ export function Unirse({ onListo }: { onListo(): void }) {
   const [acepto, setAcepto] = useState(false)
   const [ocupado, setOcupado] = useState(false)
   const [error, setError] = useState('')
-  // La clave va al correo: se escribe aquí para entrar.
-  const [enviada, setEnviada] = useState<Licencia>()
+  // La clave va al correo: se escribe aquí para entrar. Quien ya apoya entra con la de su apoyo (`yaTiene`: dónde está).
+  const [enviada, setEnviada] = useState<Licencia & { yaTiene?: string }>()
 
   async function unirse(e: FormEvent) {
     e.preventDefault()
@@ -142,8 +185,8 @@ export function Unirse({ onListo }: { onListo(): void }) {
     setOcupado(true)
     setError('')
     try {
-      const l = await api<Licencia & { enviada?: boolean }>('/api/licencia/unirse', { email, terminos: TERMINOS })
-      if (!l.enviada) return onListo()
+      const l = await api<Licencia & { enviada?: boolean; yaTiene?: string }>('/api/licencia/unirse', { email, terminos: TERMINOS })
+      if (!l.enviada && !l.yaTiene) return onListo()
       setEnviada(l)
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
@@ -157,9 +200,11 @@ export function Unirse({ onListo }: { onListo(): void }) {
         <Clave
           licencia={enviada}
           aviso={
-            <>
-              <b>Te la mandamos a {email.trim()}</b>, en «Tu cuenta de Sloth» (si no lo ves, revisa spam o promociones).
-            </>
+            enviada.yaTiene ?? (
+              <>
+                <b>Te la mandamos a {email.trim()}</b>, en «Tu cuenta de Sloth» (si no lo ves, revisa spam o promociones).
+              </>
+            )
           }
           onCambio={(l) => l.activa && onListo()}
           onVolver={() => setEnviada(undefined)}
@@ -227,15 +272,18 @@ function Cabeza({ titulo, children }: { titulo: string; children: ReactNode }) {
 
 /** En Opciones: el apoyo (o la cuenta gratis, o el lugar gratis), el próximo cobro, la clave, renovar (un año pagado de una vez) y cancelar. */
 export function SuscripcionOpciones() {
-  const [l, setL] = useState<Licencia>()
-  const [error, setError] = useState('')
+  // Recién leída del cobro; mientras llega, lo que ya se sabía.
+  const { l, error: sinLeer } = useLicencia(true)
+  const [fallo, setError] = useState('')
+  const error = fallo || sinLeer
   const [cancelando, setCancelando] = useState(false)
   const [copiada, setCopiada] = useState(false)
   const [clave, setClave] = useState(false)
-
+  // Lo que paga hoy quien entra (el apoyo sube con la gente): al cancelar se dice, porque quien vuelve entra con ese.
+  const [hoy, setHoy] = useState<{ mensual: number; paso: number }>()
   useEffect(() => {
-    api<Licencia>('/api/licencia?fresco').then(setL, (e) => setError(e.message))
-  }, [])
+    if (cancelando) api<{ mensual: number; paso: number }>('/api/licencia/precio').then(setHoy, () => {})
+  }, [cancelando])
 
   if (!l) return <div className="fila"><span className="muted small">{error || 'Mirando…'}</span></div>
   // Un año pagado de una vez: el pago del siguiente.
@@ -318,7 +366,7 @@ export function SuscripcionOpciones() {
         createPortal(
           <div className="modal-backdrop" onClick={() => setClave(false)}>
             <div className="modal licencia-caja" role="dialog" aria-modal aria-label="Tu clave" onClick={(e) => e.stopPropagation()}>
-              <Clave licencia={l} onCambio={(n) => (setL(n), apoya(n) && setClave(false))} onVolver={() => setClave(false)} />
+              <Clave licencia={l} onCambio={(n) => apoya(n) && setClave(false)} onVolver={() => setClave(false)} />
             </div>
           </div>,
           document.body
@@ -328,11 +376,12 @@ export function SuscripcionOpciones() {
           title="¿Cancelar tu apoyo?"
           action="Cancelar apoyo"
           danger
-          onConfirm={() => api<Licencia>('/api/licencia/cancelar', {}).then(setL)}
+          onConfirm={() => api<Licencia>('/api/licencia/cancelar', {}).then(saber)}
           onClose={() => setCancelando(false)}
         >
           Dejamos de cobrarte desde ahora, sin penalización. Sloth sigue siendo gratis; lo que ya pagaste vale hasta el{' '}
           {fecha(l.pagadaHasta)}. Te damos un folio de la cancelación.
+          {!!hoy?.paso && ` Tu precio se queda contigo solo mientras sigas: si después vuelves, entras con el precio de ese día (hoy, ${dinero(hoy.mensual)} USD el primer mes).`}
         </Confirm>
       )}
     </div>
