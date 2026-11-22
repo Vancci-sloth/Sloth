@@ -14,7 +14,9 @@ const sinSubir = args.includes('--sin-subir')
 const [dist, rutaConfig, plataforma = 'android'] = args.filter((a) => !a.startsWith('--'))
 if (!dist || !rutaConfig) throw new Error('Uso: node scripts/publicar-actualizacion.mjs <dist> <config.json> [android] [--sin-subir]')
 const ORIGEN = process.env.ORIGEN ?? 'https://api.sloth.vancci.org'
-const { PUBLICAR, LLAVE_ACTUALIZACIONES } = process.env
+// Con trim: el secreto PUBLICAR trae un BOM al inicio, que no cabe en una cabecera.
+const PUBLICAR = process.env.PUBLICAR?.trim()
+const LLAVE_ACTUALIZACIONES = process.env.LLAVE_ACTUALIZACIONES?.trim()
 if (!LLAVE_ACTUALIZACIONES) throw new Error('Falta LLAVE_ACTUALIZACIONES (la llave privada que firma las actualizaciones).')
 if (!sinSubir && !PUBLICAR) throw new Error('Falta PUBLICAR (la llave para subir al cobro).')
 
