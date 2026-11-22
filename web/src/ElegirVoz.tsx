@@ -45,15 +45,15 @@ const NOMBRE_MOTOR: Record<Motor, string> = { 'ai-studio': 'AI Studio', ...MOTOR
  * De dónde sale cada motor, para no confundirlos: Fish Audio y ElevenLabs van con la llave que pusiste; AI Studio, con
  * tu cuenta de Google; Voices Cloning es el de Sloth, con sus créditos.
  */
-const ORIGEN: Record<Motor, string> = { 'ai-studio': 'tu cuenta de Google', fish: 'tu llave', elevenlabs: 'tu llave', vc: 'tus créditos' }
+const ORIGEN: Record<Motor, string> = { 'ai-studio': 'tu cuenta de Google', fish: 'tu llave', elevenlabs: 'tu llave', vibi: 'tu llave', groq: 'tu llave', vc: 'tus créditos' }
 const conOrigen = (m: Motor) => `${NOMBRE_MOTOR[m]} · ${ORIGEN[m]}`
 /** La sección de las de ElevenLabs que tu plan gratis no deja usar (las de su biblioteca). */
 const PIDEN_PAGO = (n: number) => `ElevenLabs · ${n} ${n === 1 ? 'pide' : 'piden'} plan de pago · se oye su muestra`
 /** Los proveedores que Voices Cloning tiene dentro, como los nombra. */
-const DE_VC: Record<string, string> = { elevenlabs: 'ElevenLabs', edge: 'Edge', minimax: 'Minimax', vbee: 'Vbee', fishaudio: 'Fish', clone: 'Clonada' }
+const DE_VC: Record<string, string> = { elevenlabs: 'ElevenLabs', edge: 'Edge', minimax: 'MiniMax', capcut: 'CapCut', vbee: 'Vbee', fishaudio: 'Fish', clone: 'Clonada' }
 /** De dónde sale una fila: su uso en AI Studio; en Voices Cloning, también de cuál de los suyos. */
-const origenDe = (it: { motor: Motor; uso?: string; de?: string }) => it.uso ?? (it.motor === 'vc' && it.de ? `Sloth · ${DE_VC[it.de] ?? it.de}` : conOrigen(it.motor))
-const LOGO: Record<Motor, string> = { 'ai-studio': 'gemini', fish: 'fish', elevenlabs: 'elevenlabs', vc: 'sloth' }
+const origenDe = (it: { motor: Motor; uso?: string; de?: string }) => it.uso ?? ((it.motor === 'vc' || it.motor === 'vibi') && it.de ? `${NOMBRE_MOTOR[it.motor]} · ${DE_VC[it.de] ?? it.de}` : conOrigen(it.motor))
+const LOGO: Record<Motor, string> = { 'ai-studio': 'gemini', fish: 'fish', elevenlabs: 'elevenlabs', vibi: 'vibi', groq: 'groq', vc: 'sloth' }
 /** Las voces tuyas guardadas en esta computadora (`server/voz/apis.ts`, `TUYA`): se pueden quitar desde el menú. */
 const TUYA = 'tuya-'
 /** Con qué frase se prueba una voz que no trae muestra, si no escribiste la tuya. */
@@ -105,7 +105,7 @@ function itemDeApi(motor: FuenteVoz, v: VozApi, remota = false): Item {
     motor,
     ...(v.muestra ? { muestra: v.muestra } : {}),
     ...(v.propia ? { propia: true } : {}),
-    textos: [v.nombre, v.descripcion, texto, NOMBRE_MOTOR[motor], v.propia ? 'tuya mia clonada' : ''],
+    textos: [v.nombre, v.descripcion, texto, NOMBRE_MOTOR[motor], v.de ?? '', v.propia ? 'tuya mia clonada' : ''],
     ...(remota ? { remota: v } : {}),
     ...(v.de ? { de: v.de } : {})
   }
@@ -115,7 +115,7 @@ function itemDeApi(motor: FuenteVoz, v: VozApi, remota = false): Item {
 export function itemsDeVoz(e: EstadoVoz | undefined): Item[] {
   if (!e) return []
   const items: Item[] = []
-  for (const m of ['fish', 'elevenlabs'] as ProveedorVoz[]) if (e.motores?.[m]?.llave) items.push(...e.motores[m].voces.map((v) => itemDeApi(m, v)))
+  for (const m of ['fish', 'elevenlabs', 'vibi', 'groq'] as ProveedorVoz[]) if (e.motores?.[m]?.llave) items.push(...e.motores[m].voces.map((v) => itemDeApi(m, v)))
   if (e.vc?.disponible) items.push(...e.vc.voces.map((v) => itemDeApi('vc', v)))
   if (e.cuenta)
     for (const v of e.voces) {
@@ -521,7 +521,7 @@ function Panel(props: { voz: UsoVoz; valor: string; propia?: string; ancho?: num
     const usos = new Map<string, Item[]>()
     for (const i of todas.filter((x) => x.motor === 'ai-studio')) usos.set(i.uso ?? '', [...(usos.get(i.uso ?? '') ?? []), i])
     for (const [uso, items] of usos) s.push({ titulo: `AI Studio · ${uso}`, items })
-    for (const m of ['fish', 'elevenlabs'] as const) {
+    for (const m of ['fish', 'elevenlabs', 'vibi', 'groq'] as const) {
       const items = todas.filter((i) => i.motor === m && !i.propia)
       const usables = items.filter((i) => !i.bloqueo)
       const dePago = items.filter((i) => i.bloqueo)

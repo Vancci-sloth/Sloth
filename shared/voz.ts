@@ -10,14 +10,14 @@ import type { Card, FuenteVoz, VozStudio } from './types.ts'
 const GUIA = 'video-base/VOZ.md'
 
 /** El nombre de cada motor que no es AI Studio, como se ve en Sloth. */
-export const MOTORES: Record<FuenteVoz, string> = { fish: 'Fish Audio', elevenlabs: 'ElevenLabs', vc: 'Sloth' }
+export const MOTORES: Record<FuenteVoz, string> = { fish: 'Fish Audio', elevenlabs: 'ElevenLabs', vibi: 'Vibi', groq: 'Groq Orpheus', vc: 'Sloth' }
 
 /**
  * De qué motor es una voz: las de Fish Audio, ElevenLabs y Voices Cloning van con su prefijo (`fish:<id>`,
  * `elevenlabs:<id>`, `vc:<id>`); lo demás es el nombre de una voz de AI Studio (`Fola`).
  */
 export function motorDe(voz: string): { motor: FuenteVoz | 'ai-studio'; id: string } {
-  const m = /^(fish|elevenlabs|vc):(.+)$/.exec(voz.trim())
+  const m = /^(fish|elevenlabs|vibi|groq|vc):(.+)$/.exec(voz.trim())
   return m ? { motor: m[1] as FuenteVoz, id: m[2] } : { motor: 'ai-studio', id: voz.trim() }
 }
 

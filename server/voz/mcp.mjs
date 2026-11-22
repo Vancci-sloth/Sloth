@@ -16,7 +16,7 @@ const HERRAMIENTAS = [
   {
     name: 'voces',
     description:
-      'Las voces con que Sloth puede generar la narración: las de Google AI Studio (Gemini 3.8 Flash TTS, por grupos; cualquier nombre de su buscador sirve, tiene más de 2.000) y, si el usuario puso su llave, las de Fish Audio y ElevenLabs con el id que va en generar_voz (fish:… o elevenlabs:…), y las de Voices Cloning, el proveedor de Sloth, que el usuario eligió en su ventana (vc:…); «tuya» es una que el usuario clonó de su voz. Cada una con cómo suena. Dice también qué está conectado.',
+      'Lista las voces y cuentas conectadas de Google AI Studio, Fish Audio, ElevenLabs, Vibi, Groq y Voices Cloning. Usa en generar_voz el identificador que aparece en la lista, con su prefijo. «Tuya» indica una voz que el usuario clonó.',
     inputSchema: {
       type: 'object',
       properties: { buscar: { type: 'string', description: 'Solo las que tengan esto en su nombre, cómo suenan o su grupo («deep», «Podcast»)' } }
@@ -29,7 +29,7 @@ const HERRAMIENTAS = [
     inputSchema: {
       type: 'object',
       properties: {
-        voz: { type: 'string', description: 'El nombre de la voz en AI Studio, como Fola o Kore, o el id de una de Fish Audio, ElevenLabs o Voices Cloning tal cual (fish:…, elevenlabs:… o vc:…)' },
+        voz: { type: 'string', description: 'El nombre de la voz de AI Studio o el identificador completo que devuelve voces (fish:…, elevenlabs:…, vibi:…, groq:… o vc:…).' },
         texto: { type: 'string', description: 'Lo que se narra' },
         archivo: { type: 'string', description: 'O la ruta absoluta de un .md o .txt con lo que se narra' },
         salida: { type: 'string', description: 'La ruta absoluta del .wav que deja, como <carpeta del video>/fuentes/voz/ai-studio.wav' }
@@ -68,7 +68,7 @@ const LLAMADAS = {
       const grupos = Map.groupBy(voces, (v) => v.grupo)
       renglones.push(`AI Studio, cuenta ${e.cuenta}. ${voces.length} voces${b ? ` con «${buscar}»` : ''}:`, ...[...grupos].map(([g, vs]) => `${g}: ${vs.map((v) => `${v.nombre} (${v.descripcion})`).join('; ')}`))
     } else renglones.push('AI Studio: sin cuenta de Google conectada.')
-    for (const [motor, nombre] of [['fish', 'Fish Audio'], ['elevenlabs', 'ElevenLabs']]) {
+    for (const [motor, nombre] of [['fish', 'Fish Audio'], ['elevenlabs', 'ElevenLabs'], ['vibi', 'Vibi'], ['groq', 'Groq Orpheus']]) {
       const m = e.motores?.[motor]
       if (!m?.llave) {
         renglones.push(`${nombre}: sin llave.`)
@@ -87,7 +87,7 @@ const LLAMADAS = {
           : `Voices Cloning${creditos}: sin voces elegidas. El usuario las elige en el menú Voz («Abrir voces y funciones…»).`
       )
     }
-    if (!e.cuenta && !e.motores?.fish?.llave && !e.motores?.elevenlabs?.llave && !e.vc?.disponible) renglones.push('Nada conectado: que el usuario conecte una en Opciones → Voz. Mientras, pídele la voz.')
+    if (!e.cuenta && !Object.values(e.motores ?? {}).some((motor) => motor.llave) && !e.vc?.disponible) renglones.push('Nada conectado: que el usuario conecte una en Opciones → Voz. Mientras, pídele la voz.')
     return renglones.join('\n')
   },
   async generar_voz({ voz, texto, archivo, salida }) {

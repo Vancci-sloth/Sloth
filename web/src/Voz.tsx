@@ -158,7 +158,7 @@ export function useVoz() {
 
 export type UsoVoz = ReturnType<typeof useVoz>
 
-const PROVEEDORES: ProveedorVoz[] = ['fish', 'elevenlabs']
+const PROVEEDORES: ProveedorVoz[] = ['fish', 'elevenlabs', 'vibi', 'groq']
 
 /**
  * ¿Se puede generar con esta voz? La de AI Studio, con la cuenta; la de Fish Audio o ElevenLabs, con su llave; la de
@@ -395,10 +395,20 @@ const DE: Record<ProveedorVoz, { para: string; llaves: string; ayuda: string }> 
     para: 'Voces muy expresivas y la tuya clonada (clonar pide su plan de pago). Gasta los créditos de tu plan: el gratis da 10.000 letras al mes.',
     llaves: 'https://elevenlabs.io/app/settings/api-keys',
     ayuda: 'En elevenlabs.io, crea una llave en «API Keys» con permiso para Text to Speech y Voices.'
+  },
+  vibi: {
+    para: 'Voces de ElevenLabs, MiniMax y CapCut con los créditos de tu cuenta de Vibi. No clona voces desde Sloth.',
+    llaves: 'https://vibi.pro/docs/api-keys/get-api-key',
+    ayuda: 'Entra a tu cuenta de Vibi y copia la llave de API que sale en su documentación.'
+  },
+  groq: {
+    para: 'Voces Orpheus en inglés, con la cuota gratis de la API de Groq. No clona voces.',
+    llaves: 'https://console.groq.com/keys',
+    ayuda: 'Crea una llave en Groq Console. Orpheus, el modelo de esta voz, está hecho para inglés.'
   }
 }
 
-/** Fish Audio o ElevenLabs en Opciones → Voz: poner la llave (se prueba antes de guardarla), clonar tu voz y releer sus voces. */
+/** Fish Audio, ElevenLabs, Vibi o Groq en Opciones → Voz: poner la llave (se prueba antes de guardarla), clonar tu voz y releer sus voces. */
 function ProveedorOpciones({ p, voz }: { p: ProveedorVoz; voz: UsoVoz }) {
   const m = voz.estado?.motores?.[p]
   const de = DE[p]
@@ -449,7 +459,7 @@ function ProveedorOpciones({ p, voz }: { p: ProveedorVoz; voz: UsoVoz }) {
               {
                 label: MOTORES[p],
                 options: [
-                  { value: 'clonar', label: 'Clonar tu voz…' },
+                  ...(p === 'fish' || p === 'elevenlabs' ? [{ value: 'clonar', label: 'Clonar tu voz…' }] : []),
                   { value: 'releer', label: 'Volver a leer sus voces' },
                   { value: 'cambiar', label: 'Cambiar de llave' },
                   { value: 'ver', label: 'Ver tus llaves ↗' },

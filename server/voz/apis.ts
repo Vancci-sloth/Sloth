@@ -2,6 +2,7 @@ import { existsSync, mkdirSync, readFileSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import type { EstadoProveedorVoz, PlanVoz, ProveedorVoz, VozApi } from '../../shared/types.ts'
 import { MOTORES, motorDe, pcmDeWav, trozosParaVoz, wavDePcm } from '../../shared/voz.ts'
+import { VIBI, vocesVibi, hablarVibi } from './vibi.ts'
 import { guardar } from '../disco.ts'
 import { escribir, leer } from '../opciones.ts'
 
@@ -29,6 +30,7 @@ const RESPIRO = 0.3
 
 /** Lo de cada motor: dónde va su llave, cuánto cabe en un pedido y cómo se le habla. */
 interface Motor {
+  base: string
   variable: string
   /** Lo más que se pide de una vez, en letras (Eleven v3 acepta 5.000). */
   maximo: number
@@ -40,7 +42,7 @@ interface Motor {
   buscar?(pedir: Pedir, q: string): Promise<VozApi[]>
   /** El audio de un trozo, PCM de 16 bits. `referencia`: la grabación de una voz tuya guardada aquí (Fish Audio). */
   hablar(pedir: Pedir, id: string, texto: string, referencia?: Uint8Array): Promise<{ pcm: Uint8Array; frecuencia: number; canales: number }>
-  clonar(pedir: Pedir, nombre: string, audio: Blob, archivo: string): Promise<string>
+  clonar?(pedir: Pedir, nombre: string, audio: Blob, archivo: string): Promise<string>
 }
 
 type Pedir = (ruta: string, datos?: { json?: unknown; form?: FormData; crudo?: { cuerpo: Uint8Array; tipo: string }; cabeceras?: Record<string, string> }) => Promise<Response>
@@ -93,7 +95,35 @@ const vozFish = (m: ModeloFish, propia: boolean): VozApi => ({
 })
 
 const MOTOR: Record<ProveedorVoz, Motor> = {
+  groq: {
+    base: 'https://api.groq.com',
+    variable: 'GROQ_TTS_API_KEY',
+    maximo: 200,
+    cabeceras: (llave) => ({ Authorization: `Bearer ${llave}` }),
+    async voces(pedir) {
+      const catalogo = await (await pedir('/openai/v1/models')).json() as { data?: { id: string }[] }
+      if (!catalogo.data?.some((modelo) => modelo.id === 'canopylabs/orpheus-v1-english'))
+        throw new Error('Esta cuenta de Groq no tiene acceso al modelo Orpheus en inglés.')
+      return ['Autumn', 'Diana', 'Hannah', 'Austin', 'Daniel', 'Troy'].map((nombre, i) => ({
+        id: nombre.toLowerCase(), nombre, descripcion: `${i < 3 ? 'female' : 'male'} · Inglés`, propia: false
+      }))
+    },
+    hablar(pedir, id, texto) {
+      return pedirWav('Groq', pedir('/openai/v1/audio/speech', {
+        json: { model: 'canopylabs/orpheus-v1-english', input: texto, voice: id, response_format: 'wav' }
+      }))
+    }
+  },
+  vibi: {
+    base: VIBI,
+    variable: 'VIBI_API_KEY',
+    maximo: 2500,
+    cabeceras: (llave) => ({ 'xi-api-key': llave }),
+    voces: vocesVibi,
+    hablar: hablarVibi
+  },
   fish: {
+    base: FISH,
     variable: 'FISH_API_KEY',
     maximo: 3000,
     cabeceras: (llave) => ({ authorization: `Bearer ${llave}` }),
@@ -122,6 +152,7 @@ const MOTOR: Record<ProveedorVoz, Motor> = {
     }
   },
   elevenlabs: {
+    base: ELEVEN,
     variable: 'ELEVENLABS_API_KEY',
     maximo: 3000,
     cabeceras: (llave) => ({ 'xi-api-key': llave }),
@@ -166,6 +197,12 @@ const MOTOR: Record<ProveedorVoz, Motor> = {
   }
 }
 
+async function pedirWav(nombre: string, respuesta: Promise<Response>) {
+  const wav = pcmDeWav(new Uint8Array(await (await respuesta).arrayBuffer()))
+  if (!wav || wav.bits !== 16) throw new Error(`${nombre} no devolvió un WAV de 16 bits.`)
+  return { pcm: wav.datos, frecuencia: wav.frecuencia, canales: wav.canales }
+}
+
 /** Lo que el servidor de la voz (`index.ts`) usa de aquí. `carpeta`: `data/voz`. */
 export function vozPorApi(carpeta: string) {
   const archivo = join(carpeta, 'apis.json')
@@ -199,16 +236,16 @@ export function vozPorApi(carpeta: string) {
   const pedidor =
     (m: ProveedorVoz, con = llave(m)): Pedir =>
     async (ruta, datos = {}) => {
-      const base = m === 'fish' ? FISH : ELEVEN
+      const base = MOTOR[m].base
       for (let intento = 0; ; intento++) {
         const r = await fetch(`${base}${ruta}`, {
           method: datos.json || datos.form || datos.crudo ? 'POST' : 'GET',
           headers: { ...MOTOR[m].cabeceras(con), ...datos.cabeceras, ...(datos.json ? { 'content-type': 'application/json' } : datos.crudo ? { 'content-type': datos.crudo.tipo } : {}) },
           body: datos.form ?? (datos.json ? JSON.stringify(datos.json) : datos.crudo ? (datos.crudo.cuerpo as Uint8Array<ArrayBuffer>) : undefined),
-          signal: AbortSignal.timeout(5 * 60_000)
+          signal: AbortSignal.timeout(['vibi', 'groq'].includes(m) ? 25_000 : 5 * 60_000)
         })
         if (r.ok) return r
-        if ((r.status === 429 || r.status >= 500) && intento < 3) {
+        if ((r.status === 429 || r.status >= 500) && intento < 3 && !(m === 'vibi' && datos.json)) {
           await new Promise((ok) => setTimeout(ok, [2000, 5000, 12_000][intento]))
           continue
         }
@@ -241,10 +278,22 @@ export function vozPorApi(carpeta: string) {
     }
   }
 
-  // Las voces se vuelven a pedir al arrancar, por si cambiaron fuera de Sloth.
-  for (const m of Object.keys(MOTOR) as ProveedorVoz[]) if (llave(m)) void actualizar(m).catch(() => {})
+  // Las listas guardadas se usan al abrir. Solo una llave sin catálogo necesita red al consultar la voz.
+  const catalogosEnCurso = new Map<ProveedorVoz, Promise<void>>()
+  async function cargarFaltantes() {
+    await Promise.all((Object.keys(MOTOR) as ProveedorVoz[]).map((m) => {
+      if (guardadas[m] || errores[m] || !llave(m)) return
+      let consulta = catalogosEnCurso.get(m)
+      if (!consulta) {
+        consulta = actualizar(m).catch(() => {}).finally(() => catalogosEnCurso.delete(m))
+        catalogosEnCurso.set(m, consulta)
+      }
+      return consulta
+    }))
+  }
 
   return {
+    cargarFaltantes,
     estado: (): Record<ProveedorVoz, EstadoProveedorVoz> =>
       Object.fromEntries(
         (Object.keys(MOTOR) as ProveedorVoz[]).map((m) => {
@@ -301,9 +350,11 @@ export function vozPorApi(carpeta: string) {
       // El plan gratis de ElevenLabs no deja clonar: se dice antes de mandar la grabación.
       if (m === 'elevenlabs' && guardadas.planes?.[m] && !guardadas.planes[m].clonar)
         throw new Error('Tu plan gratis de ElevenLabs no deja clonar voces. Clónala en Fish Audio o en Sloth, o sube de plan en ElevenLabs.')
+      const clonar = MOTOR[m].clonar
+      if (!clonar) throw new Error(`${MOTORES[m]} no admite clonar voces desde Sloth.`)
       let id: string
       try {
-        id = await MOTOR[m].clonar(pedidor(m), nombre, new Blob([audio as Uint8Array<ArrayBuffer>], { type: tipo || 'audio/wav' }), archivoAudio)
+        id = await clonar(pedidor(m), nombre, new Blob([audio as Uint8Array<ArrayBuffer>], { type: tipo || 'audio/wav' }), archivoAudio)
       } catch (e) {
         if (m !== 'fish' || !/model creation limit|top up/i.test(mensaje(e))) throw e
         id = `${TUYA}${Date.now().toString(36)}`
@@ -338,7 +389,7 @@ export function vozPorApi(carpeta: string) {
     /** La voz de un guion entero (`voz` con su prefijo), como WAV, y cuánto dura. */
     async generar(voz: string, texto: string): Promise<{ wav: Uint8Array; segundos: number }> {
       const { motor, id } = motorDe(voz)
-      if (motor === 'ai-studio' || motor === 'vc') throw new Error(`${voz} no es una voz de Fish Audio ni de ElevenLabs.`)
+      if (motor === 'ai-studio' || motor === 'vc') throw new Error(`${voz} no pertenece a un proveedor externo con llave de API.`)
       if (!llave(motor)) throw new Error(`No hay llave de ${MOTORES[motor]}: que el usuario la ponga en Opciones → Voz. Mientras, pídele la voz.`)
       const pedir = pedidor(motor)
       const partes: Awaited<ReturnType<Motor['hablar']>>[] = []
@@ -364,6 +415,12 @@ async function motivo(m: ProveedorVoz, r: Response): Promise<string> {
   const clave = d && typeof d === 'object' && !Array.isArray(d) ? (d.status ?? '') : ''
   const nombre = MOTORES[m]
   const extra = dicho ? `: ${dicho}` : '.'
+  if (m !== 'fish' && m !== 'elevenlabs') {
+    if (r.status === 401 || r.status === 403) return `${nombre} no aceptó la solicitud. Revisa tu llave y sus permisos.`
+    if (r.status === 402) return `${nombre} indica que falta saldo para generar esta voz.`
+    if (r.status === 429) return `${nombre} alcanzó su límite de uso. Vuelve a intentar cuando se renueve tu cuota.`
+    return `${nombre} respondió HTTP ${r.status}${extra}`
+  }
   if (/paid_plan_required/.test(JSON.stringify(cuerpo ?? '')))
     return 'Tu plan gratis de ElevenLabs no deja usar por API las voces de su biblioteca: usa una de las de ElevenLabs, una tuya, o sube de plan. Mientras, pide la voz al usuario.'
   const sinSaldo = r.status === 402 ||/quota|credit|balance|payment/i.test(`${clave} ${dicho}`)

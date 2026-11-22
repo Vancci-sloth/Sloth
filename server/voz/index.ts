@@ -568,7 +568,10 @@ export function voz(app: string, socio: Parameters<typeof voicesCloning>[1]) {
       res.writeHead(status, { 'content-type': 'application/json' })
       res.end(JSON.stringify(datos))
     }
-    if (path === '/api/voz' && metodo === 'GET') return enviar(200, estado()), true
+    if (path === '/api/voz' && metodo === 'GET') {
+      await apis.cargarFaltantes()
+      return enviar(200, estado()), true
+    }
     if (path === '/api/voz/conectar' && metodo === 'POST') {
       void conectar()
       return enviar(200, { ...estado(), conectando: true }), true
@@ -660,7 +663,7 @@ export function voz(app: string, socio: Parameters<typeof voicesCloning>[1]) {
     }
     if (await vc.api(req, res, path, estado)) return true
     // Fish Audio y ElevenLabs: poner o quitar la llave, volver a leer sus voces y clonar la tuya.
-    const m = /^\/api\/voz\/(fish|elevenlabs)\/(llave|voces|clonar)$/.exec(path)
+    const m = /^\/api\/voz\/(fish|elevenlabs|vibi|groq)\/(llave|voces|clonar)$/.exec(path)
     if (m && metodo === 'POST') {
       const motor = m[1] as ProveedorVoz
       try {

@@ -12,7 +12,7 @@ llega en el primer mensaje:
 - Sin la línea: lo que diga tu skill.
 
 Donde tu skill diga «una voz de AI Studio» o «la de AI Studio», vale igual para Fish Audio, ElevenLabs y Voices
-Cloning: el mismo `generar_voz`, el mismo archivo y los mismos pasos.
+Cloning, y para Vibi: el mismo `generar_voz`, el mismo archivo y los mismos pasos. Para Vibi pasa el identificador completo `vibi:<motor>:<id>` que eligió el usuario.
 
 ## Generarla
 

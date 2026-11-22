@@ -78,7 +78,7 @@ export function NuevoHilo({ route, navigation }: NativeStackScreenProps<Rutas, '
     const lista: Opcion[] = [{ id: '', texto: card?.voz && card.voz.propia ? 'La que hace el estilo' : 'La mando yo', detalle: card?.voz && card.voz.propia ? card.voz.propia : 'Grábala con el micrófono y adjúntala, aquí o cuando el agente la pida.' }]
     if (e?.vc?.disponible) lista.push(...e.vc.voces.map((v) => ({ id: `vc:${v.id}`, texto: v.nombre, detalle: v.descripcion, grupo: 'Voces de Sloth' })))
     if (e?.cuenta) lista.push(...e.voces.map((v) => ({ id: v.nombre, texto: v.nombre, detalle: v.descripcion, grupo: 'AI Studio' })))
-    for (const m of ['fish', 'elevenlabs'] as const) if (e?.motores?.[m]?.llave) lista.push(...e.motores[m].voces.map((v) => ({ id: `${m}:${v.id}`, texto: v.nombre, detalle: v.descripcion, grupo: MOTORES[m] })))
+    for (const m of ['fish', 'elevenlabs', 'vibi', 'groq'] as const) if (e?.motores?.[m]?.llave) lista.push(...e.motores[m].voces.map((v) => ({ id: `${m}:${v.id}`, texto: v.nombre, detalle: v.descripcion, grupo: MOTORES[m] })))
     return lista
   }, [estadoVoz, card?.voz])
   const vozValida = opcionesVoz.some((o) => o.id === voz) ? voz : ''

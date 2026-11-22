@@ -1763,7 +1763,7 @@ export interface EstadoVoz {
 }
 
 /** Los proveedores de voz con llave de API, además de AI Studio. */
-export type ProveedorVoz = 'fish' | 'elevenlabs'
+export type ProveedorVoz = 'fish' | 'elevenlabs' | 'vibi' | 'groq'
 
 /** Los motores de voz que no son AI Studio: los de llave y Voices Cloning (`vc:<id>`). */
 export type FuenteVoz = ProveedorVoz | 'vc'
