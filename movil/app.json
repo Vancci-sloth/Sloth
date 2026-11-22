@@ -2,7 +2,7 @@
   "expo": {
     "name": "Sloth",
     "slug": "sloth",
-    "version": "0.1.0",
+    "version": "0.1.1",
     "scheme": "slothmovil",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -21,7 +21,7 @@
     },
     "android": {
       "package": "org.vancci.sloth",
-      "versionCode": 1,
+      "versionCode": 2,
       "adaptiveIcon": {
         "backgroundColor": "#0f0e0c",
         "foregroundImage": "./assets/android-icon-foreground.png",

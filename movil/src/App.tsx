@@ -4,7 +4,8 @@
  *   que viajan en la app. Hace la idea, la investigación y el guion; el video final lo pasa a la computadora.
  * - Con la computadora: le pide el trabajo a la Sloth de su computadora por la puerta del celular (`server/celular.ts`).
  * La primera vez pregunta cuál (`Bienvenida`). El enlace del QR (`slothmovil://conectar?…`) conecta con la computadora
- * aunque llegue con la app abierta.
+ * aunque llegue con la app abierta. Antes de todo, el candado (`candado.ts`): si el creador la dejó solo para quienes
+ * apoyan Sloth, pide la clave.
  */
 import { useEffect, useState } from 'react'
 import { StatusBar } from 'expo-status-bar'
@@ -13,6 +14,7 @@ import { createNavigationContainerRef, DarkTheme, NavigationContainer, type Them
 import { createNativeStackNavigator, type NativeStackNavigationOptions } from '@react-navigation/native-stack'
 import { createBottomTabNavigator, type BottomTabNavigationOptions } from '@react-navigation/bottom-tabs'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
+import { cargarCandado, cerrada, revisarCandado, useCandado } from './candado'
 import { cargarCredencial, recordarCredencial } from './comunidadApi'
 import { cargarConexion, conectar, conexion as conexionGuardada, motivoDeSalida, useConexion } from './conexion'
 import { leerEnlace } from './enlace'
@@ -27,6 +29,7 @@ import { c } from './tema'
 import { Cargando } from './ui'
 import { Avance } from './pantallas/Avance'
 import { Bienvenida } from './pantallas/Bienvenida'
+import { Candado } from './pantallas/Candado'
 import { Comunidad } from './pantallas/Comunidad'
 import { Escribir } from './pantallas/Escribir'
 import { Conectar } from './pantallas/Conectar'
@@ -170,15 +173,17 @@ function Computadora({ errorEnlace }: { errorEnlace: string }) {
 
 export default function App() {
   const modo = useModo()
+  const candado = useCandado()
   const [listo, setListo] = useState(false)
   const [errorEnlace, setErrorEnlace] = useState('')
   const enlace = Linking.useLinkingURL()
 
   useEffect(() => {
-    void Promise.all([cargarConexion(), cargarRecordado().then(cargarModo), cargarLlave(), cargarHilos(), cargarCredencial()]).then(() => {
+    void Promise.all([cargarConexion(), cargarRecordado().then(cargarModo), cargarLlave(), cargarHilos(), cargarCredencial(), cargarCandado()]).then(() => {
       // Quien ya se había conectado a su computadora antes de que hubiera modos sigue con ella.
       if (!modoActual() && conexionGuardada()) elegirModo('computadora')
       setListo(true)
+      void revisarCandado()
     })
   }, [])
 
@@ -194,7 +199,7 @@ export default function App() {
   return (
     <SafeAreaProvider>
       <StatusBar style="light" />
-      {!listo ? <Cargando texto="Abriendo Sloth…" /> : modo === 'celular' ? <Celular /> : modo === 'computadora' ? <Computadora errorEnlace={errorEnlace} /> : <Bienvenida />}
+      {!listo ? <Cargando texto="Abriendo Sloth…" /> : cerrada(candado, Date.now()) ? <Candado /> : modo === 'celular' ? <Celular /> : modo === 'computadora' ? <Computadora errorEnlace={errorEnlace} /> : <Bienvenida />}
     </SafeAreaProvider>
   )
 }

@@ -70,6 +70,7 @@
  * con la misma clave (`/respaldo*`, en `respaldo.ts`).
  */
 import type { VersionLiberable } from '../../shared/types.ts'
+import { celular } from './celular.ts'
 import { aLaVista, comunidad, creditos, olvidarSueltos } from './comunidad.ts'
 import { guardado } from './guardado.ts'
 import { cancelarStripe, firmaDeStripe, leerStripe, modoStripe, pagoDeSesion, sesion, sesionStripe, suscripcionStripe, type PagoStripe, type SesionStripe } from './stripe.ts'
@@ -161,6 +162,8 @@ export interface Env {
   VOZ_CREDITOS?: number
   /** Con `"1"`, las voces de Voices Cloning son solo del creador, aunque alguien más tenga créditos. */
   VOZ_SOLO_CREADOR?: string
+  /** Con `"1"`, la app del celular solo abre a quien apoya hoy (`celular.ts`). */
+  CELULAR_SOLO_APOYO?: string
 }
 
 /**
@@ -570,6 +573,7 @@ async function atender(req: Request, env: Env, ctx: ExecutionContext, url: URL):
     if (req.method === 'POST' && url.pathname === '/pago') return await pago(env, await cuerpo(req))
     if (req.method === 'POST' && url.pathname === '/a-mano') return await aMano(req, env)
     if (req.method === 'POST' && url.pathname === '/bajar-apoyo') return await bajarApoyo(req, env)
+    if (req.method === 'POST' && url.pathname === '/celular') return await celular(req, env, await cuerpo(req))
     if (url.pathname === '/comunidad' || url.pathname.startsWith('/comunidad/')) return await comunidad(req, env, url, ctx)
     if (url.pathname === '/voz' || url.pathname.startsWith('/voz/')) return await voz(req, env, ctx, url)
     if (url.pathname === '/respaldo' || url.pathname.startsWith('/respaldo/')) return await respaldo(req, env, url)
@@ -1833,7 +1837,7 @@ async function recordarEquipo(env: Env, clave: string, equipo: string, ahora: nu
   return true
 }
 
-async function porClave(env: Env, valor: unknown): Promise<Fila> {
+export async function porClave(env: Env, valor: unknown): Promise<Fila> {
   const clave = String(valor ?? '').replace(/\s+/g, '').toUpperCase()
   const fila = CLAVE.test(clave) ? await env.DB.prepare('SELECT * FROM licencias WHERE clave = ?').bind(clave).first<Fila>() : null
   if (!fila) throw new Rechazo(404, 'No encontramos esa clave. Revisa que esté bien escrita.')

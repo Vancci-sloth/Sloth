@@ -28,6 +28,9 @@ export async function cargarCredencial() {
   }
 }
 
+/** La credencial guardada: también abre el candado del celular (`candado.ts`). */
+export const credencialGuardada = () => credencial
+
 /** Con la computadora conectada: guarda su credencial de la comunidad para cuando el celular vaya solo. */
 export async function recordarCredencial() {
   try {
