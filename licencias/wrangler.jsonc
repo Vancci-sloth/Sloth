@@ -83,6 +83,9 @@
     // "1": Voices Cloning es solo del creador, aunque alguien más tenga créditos (desde el 6 de noviembre de 2026, mientras
     // se prueba). La actualización que trae las voces lo abre al terminar de publicarse (`voz-mensual.json` en R2).
     "VOZ_SOLO_CREADOR": "1",
+    // "1": la app del celular solo abre a quien apoya hoy, con su clave de Sloth (src/celular.ts); "0", para todos.
+    // Cambia sin sacar otra versión de la app: basta con desplegar. Desde el 21 de noviembre de 2026, "0" (versión GAMMA).
+    "CELULAR_SOLO_APOYO": "0",
     "CORREO_DE": "Sloth <avisos@vancci.org>",
     "CORREO_RESPUESTA": "soporte@vancci.org"
   }

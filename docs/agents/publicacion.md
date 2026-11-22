@@ -326,3 +326,16 @@ está en `%APPDATA%\sloth\movil\` (`sloth-android.keystore` y su contraseña en 
 se puede actualizar la app ya instalada** (Android rechaza una firma distinta): respáldala. Cada versión nueva sube
 `version` y `android.versionCode` en `app.json`. Antes de correrlo a mano, prueba el artefacto de la PR en el emulador
 (`adb install -r`).
+
+### El candado del celular: solo para quienes apoyan
+
+Desde la 0.1.1, la app pregunta al cobro (`POST /celular`, `licencias/src/celular.ts`) al abrir y cada 6 horas. Con
+`CELULAR_SOLO_APOYO` en `"1"` (`licencias/wrangler.jsonc`), solo abre con una clave de Sloth cuyo correo apoya hoy:
+la que se escribe en el candado (`movil/src/pantallas/Candado.tsx`) o la de la computadora que el celular guardó al
+conectarse; el creador entra con su llave. Para encenderlo o apagarlo, cambia ese valor y despliega el cobro: no hace
+falta otra versión de la app. Solo cierra las copias que ya traen el candado; las 0.1.0 siguen abiertas. Sin internet,
+lo último que dijo el cobro vale una semana. Cada clave abre hasta 2 celulares (`celulares`, migración 0037), aparte
+de sus computadoras; para liberar uno, borra su fila.
+
+El candado no ofrece pagar ni enlaza a la página: Google Play no deja mandar a pagar fuera de su cobro. Al subirla a
+Google Play, deja a sus revisores una clave que apoye (en «Acceso a la app» de Play Console).
