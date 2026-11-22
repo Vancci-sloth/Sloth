@@ -1,0 +1,97 @@
+{
+  "expo": {
+    "name": "Sloth",
+    "slug": "sloth",
+    "version": "0.1.0",
+    "scheme": "slothmovil",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "backgroundColor": "#0f0e0c",
+    "ios": {
+      "bundleIdentifier": "org.vancci.sloth",
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSAppTransportSecurity": {
+          "NSAllowsLocalNetworking": true
+        },
+        "NSLocalNetworkUsageDescription": "Sloth se conecta a tu computadora por el Wi-Fi para pedirle videos y seguir a los agentes.",
+        "ITSAppUsesNonExemptEncryption": false
+      }
+    },
+    "android": {
+      "package": "org.vancci.sloth",
+      "versionCode": 1,
+      "adaptiveIcon": {
+        "backgroundColor": "#0f0e0c",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false,
+      "softwareKeyboardLayoutMode": "resize"
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 160,
+          "resizeMode": "contain",
+          "backgroundColor": "#0f0e0c"
+        }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Sloth usa la cámara para leer el código QR que conecta con tu computadora.",
+          "microphonePermission": false,
+          "recordAudioAndroid": false,
+          "barcodeScannerEnabled": true
+        }
+      ],
+      "expo-video",
+      [
+        "expo-audio",
+        {
+          "microphonePermission": "Sloth graba tu voz para los videos y la manda a tu computadora.",
+          "recordAudioAndroid": true
+        }
+      ],
+      [
+        "expo-media-library",
+        {
+          "photosPermission": "Sloth guarda tus videos terminados en tu galería.",
+          "savePhotosPermission": "Sloth guarda tus videos terminados en tu galería.",
+          "isAccessMediaLocationEnabled": false,
+          "granularPermissions": [
+            "photo",
+            "video"
+          ]
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Sloth adjunta fotos y videos de tu galería a lo que le pides.",
+          "cameraPermission": "Sloth usa la cámara para adjuntar una foto o un video.",
+          "microphonePermission": false
+        }
+      ],
+      "expo-sharing",
+      "expo-secure-store",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "usesCleartextTraffic": true
+          }
+        }
+      ],
+      "expo-asset"
+    ]
+  }
+}

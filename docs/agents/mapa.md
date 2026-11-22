@@ -237,6 +237,14 @@ Este es el mapa:
   (la que trae Sloth: se ponen al día al subirlas en package.json y publicar) y las credenciales de YouTube e Instagram (en las variables de entorno del usuario).
   `server/acceso.ts`: si Claude y Codex pagan con la suscripción o con una llave de API (Opciones → Agentes), guardada en
   `data/agentes.json`.
+- Sloth en el celular (`movil/`, ADR 0025): una app de Expo para iOS y Android con dos modos (`modo.ts`). «En este
+  celular» corre el agente en el teléfono (`src/local/`: Claude por la API con la llave de quien la usa, los estilos con
+  su skill en `estilos.json`, hilos y archivos en el teléfono, y «Seguir en la computadora» para el video final).
+  «Con mi computadora» le pide el trabajo a ella: entra por la puerta de `server/celular.ts` (el puerto de Sloth más uno, en la red y con la llave del QR de Opciones →
+  Tu celular, `web/src/Celular.tsx`), que reenvía `/api` y `/ws`. Usa los tipos de `shared/`, `buildTimeline` de
+  `web/src/items.ts`, la elección de modelo de `shared/modelos.ts` y los trazos de `web/src/trazos.ts`: nada de eso
+  puede importar paquetes. Pestañas: Inicio (estilos y hilo nuevo con las líneas del compositor), Hilos (el chat en vivo
+  y «Cómo va el video»), Mis videos (ver, guardar en la galería, compartir), Comunidad y Más. Compilar: `publicacion.md`.
 - `web/src`: React. `api.ts` habla con el servidor; `eventos.ts` guarda los eventos fuera de `App`, `items.ts` los junta
   en bloques y `Timeline.tsx` los dibuja; `Composer.tsx` es el campo de texto. Un desplegable es siempre `Desplegable`
   (`Desplegable.tsx`, sobre el `Picker` del compositor), nunca un `<select>`: un test lo para.

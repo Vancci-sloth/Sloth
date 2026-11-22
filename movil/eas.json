@@ -1,0 +1,30 @@
+{
+  "cli": {
+    "version": ">= 16.0.0",
+    "appVersionSource": "local"
+  },
+  "build": {
+    "desarrollo": {
+      "developmentClient": true,
+      "distribution": "internal"
+    },
+    "simulador": {
+      "ios": {
+        "simulator": true
+      },
+      "distribution": "internal"
+    },
+    "prueba": {
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk"
+      }
+    },
+    "tiendas": {
+      "autoIncrement": true
+    }
+  },
+  "submit": {
+    "tiendas": {}
+  }
+}

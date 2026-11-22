@@ -121,3 +121,16 @@
 .vuelta-web p { margin: 0; }
 .vuelta-web form { display: flex; gap: 8px; }
 .vuelta-web input { flex: 1; min-width: 0; height: 30px; padding: 0 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--panel-2); color: var(--text); font-size: 12px; }
+
+/* Tu celular (`Celular.tsx`): el QR a la izquierda y, a su lado, cómo escanearlo, las direcciones y la llave. */
+.item.celular { display: flex; gap: 20px; align-items: flex-start; padding: 16px; }
+.celular-qr { flex: none; width: 176px; height: 176px; border-radius: 8px; }
+.celular-texto { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 8px; font-size: 12.5px; }
+.celular-texto strong { font-size: 13.5px; }
+.celular-texto ol { margin: 0; padding-left: 18px; color: var(--suave); }
+.celular-texto p { margin: 0; }
+.celular-direcciones { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 4px; }
+.celular-direcciones li { display: flex; flex-direction: column; }
+.celular-botones { display: flex; gap: 16px; }
+.celular-botones button { display: inline-flex; align-items: center; gap: 6px; }
+.celular-botones svg { width: 14px; height: 14px; }

@@ -1,0 +1,72 @@
+# La app del celular para Android (movil/, ADR 0025), en Linux: en Windows, las rutas de C++ de React Native pasan de
+# 260 caracteres y no compila. En una PR que toca movil/ solo comprueba que compile y deja el .apk como artefacto; a mano
+# (workflow_dispatch, desde main) además lo sube encima del release `celular-gamma`, que es lo que enlaza la página.
+# Se firma con la llave de Sloth (secretos SLOTH_ANDROID_KEYSTORE, en base64, y SLOTH_ANDROID_CLAVE): con otra firma,
+# Android no deja actualizar la app ya instalada.
+name: App del celular (Android)
+
+on:
+  pull_request:
+    branches: [main]
+    paths: ['movil/**', 'shared/**', 'web/src/trazos.ts', '.github/workflows/celular.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: celular-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24.18.0
+          cache: npm
+          cache-dependency-path: movil/package-lock.json
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 17
+      - run: npm ci --no-audit --no-fund
+        working-directory: movil
+      - run: npx tsc --noEmit
+        working-directory: movil
+      - name: Proyecto nativo
+        run: npx expo prebuild -p android --no-install
+        working-directory: movil
+      - name: Compilar
+        run: ./gradlew assembleRelease -PreactNativeArchitectures=arm64-v8a,armeabi-v7a,x86_64 --no-daemon
+        working-directory: movil/android
+      - name: Firmar con la llave de Sloth
+        env:
+          KEYSTORE: ${{ secrets.SLOTH_ANDROID_KEYSTORE }}
+          CLAVE: ${{ secrets.SLOTH_ANDROID_CLAVE }}
+        run: |
+          test -n "$KEYSTORE" && test -n "$CLAVE" || { echo "Faltan los secretos de la firma de Android"; exit 1; }
+          echo "$KEYSTORE" | base64 -d > "$RUNNER_TEMP/sloth.keystore"
+          HERRAMIENTAS=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
+          "$HERRAMIENTAS/apksigner" sign --ks "$RUNNER_TEMP/sloth.keystore" --ks-key-alias sloth \
+            --ks-pass env:CLAVE --key-pass env:CLAVE \
+            --out Sloth-gamma.apk movil/android/app/build/outputs/apk/release/app-release.apk
+          "$HERRAMIENTAS/apksigner" verify --print-certs Sloth-gamma.apk | head -3
+          rm "$RUNNER_TEMP/sloth.keystore"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Sloth-gamma-apk
+          path: Sloth-gamma.apk
+          retention-days: 14
+      - name: Subir al release celular-gamma
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view celular-gamma >/dev/null 2>&1 || gh release create celular-gamma --prerelease --target "$GITHUB_SHA" \
+            --title "Sloth en el celular · SOLO VERSIÓN GAMMA" \
+            --notes "SOLO VERSIÓN GAMMA: es una prueba súper temprana y hay que esperar fallos continuos. Si no quieres presenciarlos, no la descargues. Para Android: baja Sloth-gamma.apk e instálala (Android te pedirá permitir que tu navegador instale apps)."
+          gh release upload celular-gamma Sloth-gamma.apk --clobber

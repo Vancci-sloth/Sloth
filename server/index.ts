@@ -1,5 +1,5 @@
 import { spawn } from 'node:child_process'
-import { createReadStream, createWriteStream, existsSync, mkdirSync, readdirSync, renameSync, rmSync, statSync, watch } from 'node:fs'
+import { createReadStream, createWriteStream, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, watch } from 'node:fs'
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http'
 import { pipeline } from 'node:stream'
 import { pipeline as pipelineP } from 'node:stream/promises'
@@ -51,6 +51,7 @@ import { peticionDeConfianza } from './origen.ts'
 import { actualizarYtDlp, BANDERAS, instalandoAlgo, instalar, pythonSlothEntero, requisitos, rutaPythonSloth } from './requisitos.ts'
 import { espacio } from './espacio.ts' // espacio en disco
 import { equipo } from './equipo.ts' // tu equipo
+import { celular } from './celular.ts' // tu celular
 import { licencia } from './licencia.ts' // suscripción
 import { Sessions, ultimoTexto } from './sessions.ts'
 import { mantenerVoz } from './voz-viva.ts'
@@ -328,6 +329,7 @@ avance = avances(sessions, cards, broadcast)
 const disco = espacio({ app: APP, sessions, cards, ocupado, python: () => pythonSlothEntero(APP) }) // espacio en disco
 // Opciones → Tu equipo: con qué transcribe la voz y cuánto tarda cada cosa en esta computadora.
 const maquina = equipo({ app: APP, ocupado }) // tu equipo
+const movil = celular({ app: APP, puerto: PORT, version: JSON.parse(readFileSync(join(APP, 'package.json'), 'utf8')).version }) // tu celular
 // Opciones → Navegador: en cuál se entra con Google (la voz, Flow, las redes).
 navegadorEn(APP)
 // La voz de los videos, que los agentes piden a Sloth y Sloth genera en AI Studio con la cuenta de Google del usuario.
@@ -487,6 +489,7 @@ async function api(req: IncomingMessage, res: ServerResponse, url: URL): Promise
 
   if (await disco.api(req, res, path)) return true // espacio en disco
   if (await maquina.api(req, res, path)) return true // tu equipo
+  if (await movil.api(req, res, path)) return true // tu celular
   if (await narrar.api(req, res, path)) return true // voz de AI Studio
   if (await generarFlow.api(req, res, path)) return true // Google Flow
 

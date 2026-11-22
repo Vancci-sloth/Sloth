@@ -279,3 +279,50 @@ esa página.
 
 Con qué se paga lo dice el cobro (`/precio`): hasta que contesta, y si no contesta, la página ofrece solo tarjeta.
 PayPal sale solo si el cobro lo da (sin `sinPaypal`). Si la página enseña algo raro en el pago, mira primero `/precio`.
+
+## App del celular: movil/
+
+La app de iOS y Android (ADR 0025) es un proyecto de Expo aparte, con su propio `package.json`: `cd movil && npm install`.
+No entra en `npm run compilar` ni en el instalador de escritorio. Comprobarla:
+
+- `cd movil && npx tsc --noEmit`, y `npm test` en la raíz, que corre `movil/src/*.test.ts` y `movil/src/local/*.test.ts`
+  (el enlace del QR, el agente del celular y si `src/local/estilos.json` va al día: si no, `node scripts/estilos.mjs` en
+  `movil/`; hazlo al cambiar una card de video o su SKILL.md).
+- El agente del celular sin gastar: una API de Anthropic de mentira que conteste `/v1/models` y `/v1/messages` en
+  streaming, y Metro con `EXPO_PUBLIC_ANTHROPIC_BASE_URL=http://<ip>:<puerto> npx expo start -c` (con `-c`: la variable
+  se fija al armar). Sin ella, la app habla con la API real.
+- `npx expo export --platform android --platform ios --output-dir <temporal>`: arma los dos paquetes de JavaScript con
+  Metro, que es lo que falla si algo de `shared/` o `web/src/` importa un paquete que el celular no tiene.
+- Para verla: Sloth abierta con Opciones → Tu celular encendido y `npx expo start --web` en `movil/` (la llave se escribe
+  a mano; la cámara, el micrófono, la galería y compartir solo van en el celular). En Android, con Expo Go: un celular o
+  el emulador `Sloth_Pixel` (el SDK está en `%LOCALAPPDATA%\Android\Sdk`; ábrelo con las herramientas de dispositivo de
+  T3) y `npx expo start --android`. Así se probó todo el 21 de noviembre: conectar por la IP del Wi-Fi, el hilo, cómo va
+  el video, ver, guardar en la galería y compartir, la comunidad, adjuntar de la galería y grabar la voz. Expo Go no
+  abre el enlace `slothmovil://` del QR con la cámara: para eso, una compilación (`eas build --profile desarrollo`).
+
+Compilar, con la cuenta de Expo de Vancci-sloth (`npx eas-cli@latest login`; la primera vez `eas init` escribe el
+`projectId` en `app.json`):
+
+- Android para probar o pasarla a quien sea: `eas build -p android --profile prueba` da un `.apk` que se instala directo.
+- Tiendas: `eas build --profile tiendas` y `eas submit --profile tiendas`. iOS firma con la cuenta de Apple de Sloth
+  (equipo MP48S4LXVU) y pide su sesión la primera vez; Google Play pide la cuenta de desarrollador y el primer `.aab`
+  se sube a mano.
+- Sube `version` en `movil/app.json` con cada cambio que se note; `tiendas` sube solo el número de compilación.
+
+### La versión GAMMA de Android (desde el 21-nov-2026)
+
+Por pedido del creador, la app del celular sale ya, como **SOLO VERSIÓN GAMMA**: una prueba súper temprana con fallos
+continuos, y quien no quiera presenciarlos, que no la descargue. Lo dicen la app (`Gamma` en `movil/src/ui.tsx`: la
+bienvenida, Inicio y Más) y la página de venta (`#celular`). Mientras sea gamma, todo texto sobre ella lo dice igual.
+
+Se compila en Linux con `App del celular (Android)` (`.github/workflows/celular.yml`), sin EAS: en Windows no compila,
+porque las rutas de C++ de React Native pasan de 260 caracteres (ni desde `C:\s\m` ni con `CMAKE_OBJECT_PATH_MAX`), y
+activar las rutas largas pide administrador. En una PR que toca `movil/` deja el `.apk` como artefacto; corrido a mano
+desde `main` (`gh workflow run celular.yml`) lo sube encima del release `celular-gamma` (prerelease), siempre con el mismo
+nombre: la página enlaza `releases/download/celular-gamma/Sloth-gamma.apk`.
+
+Se firma con la llave de Sloth, en los secretos `SLOTH_ANDROID_KEYSTORE` (base64) y `SLOTH_ANDROID_CLAVE`; el original
+está en `%APPDATA%\sloth\movil\` (`sloth-android.keystore` y su contraseña en `llave-android.json`). **Sin esa llave no
+se puede actualizar la app ya instalada** (Android rechaza una firma distinta): respáldala. Cada versión nueva sube
+`version` y `android.versionCode` en `app.json`. Antes de correrlo a mano, prueba el artefacto de la PR en el emulador
+(`adb install -r`).

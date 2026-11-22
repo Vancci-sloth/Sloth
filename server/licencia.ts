@@ -20,8 +20,9 @@ import { cuerpo, json as enviar } from './http.ts'
 import { guardar } from './disco.ts'
 import { preguntarAlRegistro } from './registro.ts'
 
-/** El Worker de `licencias/`. */
-export const COBRO = 'https://api.sloth.vancci.org'
+import { COBRO } from '../shared/cobro.ts'
+/** El Worker de `licencias/` (`shared/cobro.ts`). */
+export { COBRO }
 /** La llave con la que se comprueba lo que firma el cobro (la privada es su secreto `FIRMA`). */
 const PUBLICA = createPublicKey({ key: Buffer.from('MCowBQYDK2VwAyEAlo09wigax6NbF1/ar4az15Aa70NhzL77nRXoqYH6p5M=', 'base64'), format: 'der', type: 'spki' })
 const CADA = 6 * 3600_000

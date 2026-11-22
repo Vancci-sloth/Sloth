@@ -1,8 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
-import type { Model, ModelosConf, ModeloTarea } from '../../shared/types'
+import type { Model, ModelosConf } from '../../shared/types'
 import { NOMBRE_AGENTE, proveedorDe, type Proveedor } from '../../shared/providers'
+import { textoPorMinuto, type Avanzado, type Tarea } from '../../shared/modelos'
 import { gruposModelos, Picker, type Choice } from './Composer'
 import { Segmento } from './Segmento'
+
+export { CON_CHATGPT, conOpenCode, conPrimero, elegirModelos, lineaSubagentes, subagentes, textoPorMinuto, type Avanzado } from '../../shared/modelos'
 
 /**
  * El modelo de un hilo nuevo. «Optimizado» (lo normal) usa lo que medimos como mejor para el hilo (`modelos` de la
@@ -10,75 +13,6 @@ import { Segmento } from './Segmento'
  * subagentes van siempre en ese mismo modelo y esfuerzo: Sloth se lo pasa al agente en la línea `Subagentes:`, que la
  * skill respeta (antes iban en lo medido por tarea, y en un hilo de Haiku los de las escenas salían en Opus).
  */
-
-/** Sin medir y sin nada elegido a mano, el hilo va en Opus con esfuerzo alto: lo mejor en las dos skills que se midieron. */
-const POR_DEFECTO: ModeloTarea = { model: 'claude-opus-5-5', effort: 'high' }
-/** Con ChatGPT y sin Claude, la card va en «Avanzado» con GPT-6.1 Terra en medio, mientras no elijas otro. */
-export const CON_CHATGPT: Avanzado = { principal: { model: 'codex:gpt-6.1-terra', effort: 'medium' }, tareas: {} }
-/**
- * Sin Claude ni ChatGPT, el modelo gratis de OpenCode con que va un hilo nuevo: el que mejor siguió las skills en las
- * pruebas, si sigue en el catálogo (cambia solo); si no, el primero.
- */
-const OPENCODE_PRIMERO = 'opencode:opencode/big-pickle'
-export function conOpenCode(models: Model[]): Avanzado | undefined {
-  const gratis = models.filter((m) => proveedorDe(m.id) === 'opencode' && !m.precio)
-  const m = gratis.find((x) => x.id === OPENCODE_PRIMERO) ?? gratis[0]
-  return m && { principal: { model: m.id }, tareas: {} }
-}
-/** Con otro agente (Grok, Cursor…) y sin Claude, ChatGPT ni OpenCode: su primer modelo, con su esfuerzo de siempre. */
-export function conPrimero(models: Model[], p: Proveedor): Avanzado | undefined {
-  const m = models.find((x) => proveedorDe(x.id) === p)
-  return m && { principal: { model: m.id, effort: m.defaultEffort }, tareas: {} }
-}
-
-/** Lo que el usuario cambió en «Avanzado». Sin esto, la card va en «Optimizado». */
-export type Avanzado = { principal?: Choice; tareas: Record<string, { model: string; effort: string }> }
-type Tarea = { nombre: string; para: string; model: string; effort: string; medido?: string }
-
-/**
- * El modelo del hilo y el de cada subagente, según el modo. En «Optimizado», el hilo va en lo medido para la card; sin
- * medir (o si el catálogo no lo trae), en `ultimo`, lo último que elegiste a mano; y si nunca elegiste, en `POR_DEFECTO`.
- */
-export function elegirModelos(conf: ModelosConf | undefined, models: Model[], avanzado: Avanzado | undefined, ultimo?: Choice) {
-  const optimo =
-    (conf?.principal && valido(models, conf.principal)) ||
-    (ultimo && valido(models, ultimo)) ||
-    valido(models, POR_DEFECTO) ||
-    (models[0] && valido(models, { model: models[0].id }))
-  const choice = (avanzado?.principal && valido(models, avanzado.principal)) || optimo
-  return { choice, tareas: subagentes(choice) }
-}
-
-/**
- * Los subagentes, en el modelo y el esfuerzo del hilo, con el alias que pide la herramienta Agent de Claude (`opus`,
- * `sonnet`, `haiku`, `fable`). Codex y OpenCode no lo leen: sus subagentes ya van en su modelo.
- */
-export function subagentes(choice: Choice | undefined): Tarea[] {
-  const alias = proveedorDe(choice?.model ?? '') === 'claude' && choice?.model.match(/claude-(opus|sonnet|haiku|fable)/)?.[1]
-  return alias ? [{ nombre: 'todos', para: 'Captura, escenas, revisión y los demás', model: alias, effort: choice?.effort ?? '' }] : []
-}
-
-/** La línea que la skill lee para elegir el modelo de cada subagente: `Subagentes: todos = haiku high.` */
-export const lineaSubagentes = (tareas: Tarea[]) => (tareas.length ? `Subagentes: ${tareas.map((t) => `${t.nombre} = ${t.model}${t.effort ? ` ${t.effort}` : ''}`).join('; ')}.` : '')
-
-/**
- * Lo que cuesta y tarda un minuto de video con un modelo, de lo medido en la card (`porMinuto`): «$0.45 · 4 min». Con
- * `effort`, solo lo medido con ese esfuerzo; sin él, con su esfuerzo de siempre o, si no se midió así, con el que se
- * midió, que entonces se nombra. Sin medir, nada.
- */
-export function textoPorMinuto(conf: ModelosConf | undefined, model: string, effort?: string, deSiempre?: string): string | undefined {
-  const medidas = (conf?.porMinuto ?? []).filter((p) => p.model === model.replace('[1m]', ''))
-  const exacta = medidas.find((p) => p.effort === (effort ?? deSiempre))
-  const p = exacta ?? (effort ? undefined : medidas.sort((a, b) => a.usd - b.usd)[0])
-  return p && `${exacta ? '' : `${p.effort} · `}$${p.usd.toFixed(2)} · ${Math.max(1, Math.round(p.minutos))} min`
-}
-
-/** Un modelo del catálogo con un esfuerzo que admite. Una elección vieja guardada puede decir `claude-opus-5-5[1m]`: es el mismo. */
-function valido(models: Model[], c: { model: string; effort?: string }): Choice | undefined {
-  const m = models.find((x) => x.id === c.model.replace('[1m]', ''))
-  if (!m) return undefined
-  return { model: m.id, effort: m.efforts.includes(c.effort ?? '') ? c.effort : m.defaultEffort }
-}
 
 export function Modelos(props: {
   conf?: ModelosConf
