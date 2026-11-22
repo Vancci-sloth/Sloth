@@ -1,7 +1,7 @@
 import { randomBytes } from 'node:crypto'
 import { mkdirSync, readFileSync } from 'node:fs'
 import { extname, join } from 'node:path'
-import type { Browser, Locator, Page } from 'playwright-core'
+import type { Browser, Locator, Page, Request } from 'playwright-core'
 import { paginaNueva } from '../chromium.ts'
 import { creditosDe, FORMATOS_IMAGEN, FORMATOS_VIDEO, gastoDeRechazo, PALABRA_CREDITOS, type Saldo, saldoDe } from '../../shared/flow.ts'
 
@@ -32,6 +32,13 @@ export class SinEmpezar extends Error {
 }
 
 /**
+ * La conexión con Flow no dio (una subida que no acabó, una página que no cargó, una espera que venció sin que la red
+ * callara) y aún no se había pedido nada: no gastó. El pedido puede reintentarse en la misma cuenta, que no tiene la
+ * culpa; `index.ts` lo espera y lo reintenta, cada vez más espaciado.
+ */
+export class SinConexion extends Error {}
+
+/**
  * Flow empezó el pedido y lo rechazó en su tarjeta (por ejemplo, «Notamos actividad inusual»). `aviso` es lo que dice la
  * tarjeta; `gasto`, lo que bajó el saldo de la cuenta (0 si nada), o `null` si no se supo; `saldo`, el de después.
  */
@@ -49,8 +56,24 @@ export class Rechazado extends Error {
 export const URL_FLOW = 'https://flow.google.com/'
 const ANCHO = 800
 const ALTO = 1000
-/** Lo que espera a que salga la tarjeta del pedido: si no sale, Flow lo rechazó (sin créditos, o el pedido no pasó). */
+/**
+ * Lo que espera una subida: mientras la página siga mandando algo a Google, hasta `SUBIDA_MAXIMA`; sin mandar nada,
+ * `SUBIDA_QUIETA`. Con mala conexión una imagen tarda más de un minuto en entrar, y cortarla a los 60 s la perdía.
+ */
+const SUBIDA_QUIETA = 90_000
+const SUBIDA_MAXIMA = 6 * 60_000
+/** Lo que se espera a que avance una descarga: lo generado ya se pagó, y con mala conexión baja despacio. */
+const BAJADA_QUIETA = 90_000
+const BAJADA_MAXIMA = 15 * 60_000
+/**
+ * Lo que espera a que salga la tarjeta del pedido; mientras la página siga mandando el pedido, hasta `APARECE_MAXIMO`.
+ * Si no sale, antes de darlo por no empezado se comprueba recargando (`comprobarSiEmpezo`): con mala conexión la tarjeta
+ * tarda, y darlo por no empezado mandaba el mismo video a otra cuenta, que lo cobraba otra vez.
+ */
 const APARECE = 45_000
+const APARECE_MAXIMO = 3 * 60_000
+/** Sin ver el % de la tarjeta este rato, se recarga para ver si sigue; si tras recargar tampoco avanza, la rechazó. */
+const SIN_AVANCE = 60_000
 const TERMINA = 10 * 60_000
 /** Lo que tarda el interruptor en enseñar lo guardado: al abrir el menú dibuja `false` aunque esté encendido. */
 const ASIENTA = 3500
@@ -223,6 +246,34 @@ const fotos = (page: Page) => page.locator('.base-prompt-box .prompt-top-row img
  * nombre propio, para reconocerla en la lista, y al subir Flow puede pedir aceptar «Derechos para usar esta imagen»: eso
  * lo declaró el usuario en Sloth (`server/flow/index.ts`), y por eso aquí se acepta. `false` si no subió.
  */
+/**
+ * Las peticiones que la página tiene en vuelo y que mandan algo (no `GET`): mientras haya alguna, una subida avanza.
+ * `quieta` dice cuánto lleva sin ninguna; así se distingue una conexión lenta (sigue mandando) de una caída (ya no manda).
+ */
+function mirarEnvios(page: Page) {
+  const enVuelo = new Set<unknown>()
+  let ultima = Date.now()
+  const empieza = (r: Request) => {
+    if (r.method() === 'GET' || !['fetch', 'xhr'].includes(r.resourceType())) return
+    enVuelo.add(r)
+    ultima = Date.now()
+  }
+  const acaba = (r: Request) => {
+    if (enVuelo.delete(r)) ultima = Date.now()
+  }
+  page.on('request', empieza)
+  page.on('requestfinished', acaba)
+  page.on('requestfailed', acaba)
+  return {
+    quieta: () => (enVuelo.size ? 0 : Date.now() - ultima),
+    soltar: () => {
+      page.off('request', empieza)
+      page.off('requestfinished', acaba)
+      page.off('requestfailed', acaba)
+    }
+  }
+}
+
 async function subir(page: Page, hueco: Locator, ruta: string): Promise<boolean> {
   await hueco.click({ timeout: 10_000 })
   const panel = page.locator('.cdk-overlay-pane').filter({ has: page.locator('mat-icon:text-is("upload")') }).last()
@@ -231,11 +282,23 @@ async function subir(page: Page, hueco: Locator, ruta: string): Promise<boolean>
   const nombre = `sloth-${randomBytes(4).toString('hex')}${ext}`
   await selector.setFiles({ name: nombre, mimeType: ext === '.png' ? 'image/png' : ext === '.webp' ? 'image/webp' : 'image/jpeg', buffer: readFileSync(ruta) })
   await page.locator('mat-dialog-container button').last().click({ timeout: 3000 }).catch(() => {})
-  // Elegirla mientras sube la deja marcada sin entrar al compositor: se espera a que su miniatura venga ya de Flow.
+  // Elegirla cuando su miniatura venga ya de Flow. Con mala conexión una imagen tarda más de un minuto en subir: mientras
+  // la página siga mandando datos se espera (hasta `SUBIDA_MAXIMA`); si deja de mandar `SUBIDA_QUIETA`, la red no dio.
   const item = panel.locator('button[role=option]').filter({ hasText: nombre }).first()
-  const subida = await item.locator('img[src^="https://"]').waitFor({ timeout: 60_000 }).then(() => true, () => false)
-  if (subida) await item.click({ timeout: 10_000 })
-  return subida
+  const miniatura = item.locator('img[src^="https://"]')
+  const envios = mirarEnvios(page)
+  try {
+    const desde = Date.now()
+    while (!(await miniatura.count())) {
+      if (envios.quieta() > SUBIDA_QUIETA) throw new SinConexion(`Flow no recibió la imagen ${ruta} en ${Math.round((Date.now() - desde) / 1000)} s (la conexión no dio)${await avisos(page)}. No se gastó nada.`)
+      if (Date.now() - desde > SUBIDA_MAXIMA) return false
+      await page.waitForTimeout(1000)
+    }
+  } finally {
+    envios.soltar()
+  }
+  await item.click({ timeout: 10_000 })
+  return true
 }
 
 /** Pone las referencias en el compositor («Ingredientes»), tras quitar las que hubiera. */
@@ -246,7 +309,7 @@ async function adjuntar(page: Page, rutas: string[]) {
   }
   for (const [i, ruta] of rutas.entries()) {
     const subida = await subir(page, page.locator('.base-prompt-box button:has(mat-icon:text-is("add"))').first(), ruta)
-    if (!subida || !(await fotos(page).nth(i).waitFor({ timeout: 15_000 }).then(() => true, () => false))) throw new Error(`Flow no tomó la referencia ${ruta}${await avisos(page)}.`)
+    if (!subida || !(await fotos(page).nth(i).waitFor({ timeout: 30_000 }).then(() => true, () => false))) throw new SinConexion(`Flow no tomó la referencia ${ruta}${await avisos(page)}. No se gastó nada.`)
   }
 }
 
@@ -259,34 +322,90 @@ async function ponerCuadros(page: Page, rutas: string[]) {
   if ((await vacios.count()) !== 2) throw new Error('Flow no enseñó los huecos de los fotogramas. No se generó nada.')
   for (const [i, ruta] of rutas.entries()) {
     const subida = await subir(page, vacios.first(), ruta)
-    const puesta = subida && (await page.waitForFunction((n) => document.querySelectorAll('.base-prompt-box button.empty-chip').length === n, 1 - i, { timeout: 15_000 }).then(() => true, () => false))
-    if (!puesta) throw new Error(`Flow no tomó el ${i ? 'último' : 'primer'} fotograma, ${ruta}${await avisos(page)}.`)
+    const puesta = subida && (await page.waitForFunction((n) => document.querySelectorAll('.base-prompt-box button.empty-chip').length === n, 1 - i, { timeout: 30_000 }).then(() => true, () => false))
+    if (!puesta) throw new SinConexion(`Flow no tomó el ${i ? 'último' : 'primer'} fotograma, ${ruta}${await avisos(page)}. No se gastó nada.`)
   }
 }
 
-/** Espera a que acabe la tarjeta del pedido: al salir enseña su % y, al acabar, su imagen o su botón de reproducir. */
-async function esperar(page: Page, tarjeta: Locator, tipo: PedidoFlow['tipo'], antes: string) {
-  const firma = () => tarjeta.evaluate((d) => `${(d as HTMLElement).innerText} ${d.querySelector('img')?.src ?? ''}`).catch(() => '')
-  const salio = Date.now() + APARECE
-  while ((await firma()) === antes) {
-    if (Date.now() > salio) {
-      const aviso = await avisos(page)
-      throw new SinEmpezar(`Flow no empezó a generar${aviso || ' (¿sin créditos?)'}.`, aviso)
+const firmaDe = (tarjeta: Locator) => tarjeta.evaluate((d) => `${(d as HTMLElement).innerText} ${d.querySelector('img')?.src ?? ''}`).catch(() => '')
+/** Solo el texto: tras recargar, la miniatura de la misma tarjeta vuelve con otra dirección. */
+const textoDe = (tarjeta: Locator) => tarjeta.evaluate((d) => (d as HTMLElement).innerText).catch(() => '')
+
+/**
+ * Espera a que salga la tarjeta del pedido (cambia la primera del proyecto). Mientras la página siga mandando algo, el
+ * pedido aún va de camino, así que no se da por perdido hasta `APARECE_MAXIMO`. `false` si no salió.
+ */
+async function aparece(page: Page, tarjeta: Locator, antes: string): Promise<boolean> {
+  const envios = mirarEnvios(page)
+  try {
+    const desde = Date.now()
+    while ((await firmaDe(tarjeta)) === antes) {
+      const pasado = Date.now() - desde
+      if (pasado > APARECE_MAXIMO || (pasado > APARECE && envios.quieta() > APARECE)) return false
+      await page.waitForTimeout(1000)
     }
-    await page.waitForTimeout(1000)
+    return true
+  } finally {
+    envios.soltar()
   }
+}
+
+/**
+ * La tarjeta no salió: se recarga el proyecto y se mira si el pedido está y, en un video, si bajó el saldo. Vuelve si
+ * empezó (y entonces se espera como siempre). Si no, dice por qué sin culpar a la cuenta de lo que fue la red:
+ * - Flow dijo algo (un aviso): `SinEmpezar` con él, como antes.
+ * - Un video que cobró sin tarjeta: `Rechazado` con lo gastado (no se pide otra vez).
+ * - Sin aviso, sin cobrar y con créditos: la red (`SinConexion`), que se reintenta en la misma cuenta sin castigarla.
+ * - Sin créditos para lo que cuesta: `SinEmpezar`, y la cuenta descansa hasta que se renueven.
+ * - Un video del que no se pudo leer el saldo: no se sabe si gastó, así que falla sin pasarlo a otra cuenta.
+ */
+async function comprobarSiEmpezo(page: Page, tarjeta: Locator, p: PedidoFlow, antesTexto: string, saldoAntes: Saldo | null, creditos: number): Promise<void> {
+  const aviso = await avisos(page)
+  if (aviso) throw new SinEmpezar(`Flow no empezó a generar${aviso}.`, aviso)
+  await ir(page, page.url())
+  await tarjeta.waitFor({ timeout: 20_000 }).catch(() => {})
+  const ahora = await textoDe(tarjeta)
+  if (ahora && ahora !== antesTexto) return
+  if (p.tipo === 'imagen') throw new SinConexion('La tarjeta de la imagen no salió en Flow (la conexión no dio). No se gastó nada.')
+  const despues = await leerSaldo(page).catch(() => null)
+  const gasto = gastoDeRechazo(saldoAntes, despues)
+  if (gasto) throw new Rechazado(`Flow cobró ${gasto} créditos pero no enseña el video.`, '', gasto, despues)
+  if (gasto === 0 && despues && despues.creditos < creditos) throw new SinEmpezar(`Flow no empezó a generar: le quedan ${despues.creditos} créditos y cuesta ${creditos}.`, 'sin créditos')
+  if (gasto === 0) throw new SinConexion('Flow no recibió el pedido del video (la conexión no dio) y el saldo no bajó. No se gastó nada.')
+  throw new Error('Flow no enseñó el video y no pude leer el saldo para saber si lo cobró. No lo pidas otra vez sin decírselo al usuario.')
+}
+
+/**
+ * Espera a que acabe la tarjeta del pedido: mientras va enseña su % y, al acabar, su imagen o su botón de reproducir.
+ * Sin % un rato (`SIN_AVANCE`), puede ser que la página dejó de refrescarse con mala conexión: se recarga y se mira otra
+ * vez. Solo si tras recargar tampoco avanza, Flow lo rechazó y deja la tarjeta con su motivo.
+ */
+async function esperar(page: Page, tarjeta: Locator, tipo: PedidoFlow['tipo']) {
   const fin = Date.now() + TERMINA
   let sinAvance = Date.now()
+  let recargada = false
   while (Date.now() < fin) {
-    const e = await tarjeta.evaluate((d, video) => {
-      const texto = (d as HTMLElement).innerText
-      const img = d.querySelector('img')
-      return { avanza: /\d+\s*%/.test(texto), lista: !/\d+\s*%/.test(texto) && (video ? /play_arrow/.test(texto) : !!img?.complete && img.naturalWidth > 0), texto }
-    }, tipo === 'video')
+    const e = await tarjeta
+      .evaluate((d, video) => {
+        const texto = (d as HTMLElement).innerText
+        const img = d.querySelector('img')
+        return { avanza: /\d+\s*%/.test(texto), lista: !/\d+\s*%/.test(texto) && (video ? /play_arrow/.test(texto) : !!img?.complete && img.naturalWidth > 0), texto }
+      }, tipo === 'video')
+      .catch(() => ({ avanza: false, lista: false, texto: '' }))
     if (e.lista) return
-    if (e.avanza) sinAvance = Date.now()
-    // Sin % y sin resultado: Flow lo rechazó y deja la tarjeta con su motivo.
-    else if (Date.now() - sinAvance > 60_000) {
+    if (e.avanza) {
+      sinAvance = Date.now()
+      recargada = false
+    } else if (Date.now() - sinAvance > SIN_AVANCE) {
+      // Sin % un rato: puede ser la conexión (la página dejó de refrescarse). Se recarga una vez y se vuelve a mirar;
+      // solo si tras recargar sigue sin avanzar, Flow lo rechazó.
+      if (!recargada) {
+        await ir(page, page.url()).catch(() => {})
+        await tarjeta.waitFor({ timeout: 20_000 }).catch(() => {})
+        recargada = true
+        sinAvance = Date.now()
+        continue
+      }
       const aviso = e.texto.replace(/\s+/g, ' ').trim().slice(0, 200)
       throw new Rechazado(`Flow no lo generó: ${aviso}`, aviso)
     }
@@ -295,24 +414,49 @@ async function esperar(page: Page, tarjeta: Locator, tipo: PedidoFlow['tipo'], a
   throw new Error(`Flow no acabó en ${TERMINA / 60_000} minutos.`)
 }
 
-/** Baja lo de la tarjeta, con la opción de su menú, a `carpeta`. Devuelve la ruta. */
+/**
+ * Baja lo de la tarjeta, con la opción de su menú, a `carpeta`. Devuelve la ruta. Un tope fijo (2 min) cortaba descargas
+ * largas de algo ya pagado: en su lugar se vigila el avance: mientras sigan llegando bytes se espera, hasta `BAJADA_MAXIMA`;
+ * solo falla si pasan `BAJADA_QUIETA` sin recibir nada.
+ */
 async function bajar(page: Page, b: Browser, tarjeta: Locator, carpeta: string): Promise<string> {
   mkdirSync(carpeta, { recursive: true })
   const cdp = await b.newBrowserCDPSession()
   await cdp.send('Browser.setDownloadBehavior', { behavior: 'allowAndName', downloadPath: carpeta, eventsEnabled: true })
-  const bajada = new Promise<string>((ok, mal) => {
-    let guid = ''
-    cdp.on('Browser.downloadWillBegin', (e) => void (guid ||= e.guid))
-    cdp.on('Browser.downloadProgress', (e) => {
-      if (e.guid !== guid) return
-      if (e.state === 'completed') ok(join(carpeta, guid))
-      if (e.state === 'canceled') mal(new Error('Edge canceló la descarga.'))
+  let reloj: NodeJS.Timeout | undefined
+  try {
+    const bajada = new Promise<string>((ok, mal) => {
+      const tope = Date.now() + BAJADA_MAXIMA
+      const vigilar = () => {
+        clearTimeout(reloj)
+        const falta = tope - Date.now()
+        reloj = setTimeout(() => mal(new Error(falta <= BAJADA_QUIETA ? `Lo generado no bajó en ${BAJADA_MAXIMA / 60_000} minutos.` : `Lo generado dejó de bajar (${BAJADA_QUIETA / 1000} s sin llegar nada).`)), Math.max(0, Math.min(BAJADA_QUIETA, falta))).unref()
+      }
+      let guid = ''
+      let recibido = -1
+      vigilar()
+      cdp.on('Browser.downloadWillBegin', (e) => void (guid ||= e.guid))
+      cdp.on('Browser.downloadProgress', (e) => {
+        if (e.guid !== guid) return
+        if (e.state === 'completed') ok(join(carpeta, guid))
+        else if (e.state === 'canceled') mal(new Error('Edge canceló la descarga.'))
+        else if (e.receivedBytes !== recibido) {
+          recibido = e.receivedBytes
+          vigilar()
+        }
+      })
     })
-  })
-  await tarjeta.click({ button: 'right', timeout: 15_000 })
-  await page.getByRole('menuitem').filter({ has: page.locator('mat-icon:text-is("download")') }).first().click({ timeout: 10_000 })
-  return Promise.race([bajada, new Promise<string>((_, mal) => setTimeout(() => mal(new Error('Lo generado no bajó en 2 minutos.')), 120_000).unref())])
+    await tarjeta.click({ button: 'right', timeout: 15_000 })
+    await page.getByRole('menuitem').filter({ has: page.locator('mat-icon:text-is("download")') }).first().click({ timeout: 10_000 })
+    return await bajada
+  } finally {
+    clearTimeout(reloj)
+    await cdp.detach().catch(() => {})
+  }
 }
+
+/** Un fallo de la red o una página que tardó, no algo que Flow dijo: antes de pedir nada, se puede reintentar. */
+const esDeRed = (e: unknown) => e instanceof Error && (e.name === 'TimeoutError' || /net::ERR_|Timeout \d+ms exceeded/i.test(e.message))
 
 /**
  * Deja el compositor listo para generar, sin generar: entra al proyecto, elige lo pedido, comprueba el costo y pone las
@@ -339,16 +483,26 @@ export async function generarEnFlow(b: Browser, page: Page, proyecto: string | u
   // El saldo, antes de entrar al proyecto: el menú de la cuenta no siempre se cierra con Escape, y abierto tapa el
   // compositor (el clic en la caja del prompt fallaba). Entrar al proyecto recarga la página y lo cierra.
   const saldoAntes = p.tipo === 'video' ? await saldoEnFlow(page).catch(() => null) : null
-  const creditos = await prepararEnFlow(page, proyecto, p, alEntrar)
-  // Después de preparar: cada imagen subida también es una tarjeta del proyecto.
+  // Hasta pulsar la flecha no se gasta nada: un corte de la red hasta ahí se puede reintentar (`SinConexion`).
+  const creditos = await prepararEnFlow(page, proyecto, p, alEntrar).catch((e: unknown) => {
+    throw esDeRed(e) ? new SinConexion(`La conexión con Flow falló antes de pedirlo (${(e as Error).message.split('\n')[0]}). No se gastó nada.`) : e
+  })
+  // Después de preparar: cada imagen subida también es una tarjeta del proyecto, y se queda en su «100 %» un momento más.
+  // Se espera a que acabe: si cambiara después, parecería la tarjeta del pedido.
+  await page.waitForFunction(() => !/\d+\s*%/.test(document.querySelector<HTMLElement>('flow-tile-container')?.innerText ?? ''), null, { timeout: 15_000 }).catch(() => {})
   const tarjeta = page.locator('flow-tile-container').first()
-  const antes = (await tarjeta.count()) ? await tarjeta.evaluate((d) => `${(d as HTMLElement).innerText} ${d.querySelector('img')?.src ?? ''}`) : ''
+  const hay = (await tarjeta.count()) > 0
+  const antes = hay ? await firmaDe(tarjeta) : ''
+  const antesTexto = hay ? await textoDe(tarjeta) : ''
   await page.locator('.base-prompt-box [role=textbox]').first().click({ timeout: 10_000 })
   await page.keyboard.insertText(p.prompt.split(/\s+/).join(' '))
   await page.waitForTimeout(500)
   await icono(page, 'arrow_forward').last().click({ timeout: 10_000 })
   try {
-    await esperar(page, tarjeta, p.tipo, antes)
+    // Si la tarjeta no sale, antes de darlo por no empezado se comprueba recargando: con mala conexión tarda, y darlo por
+    // no empezado mandaba el mismo video a otra cuenta, que lo cobraba de nuevo.
+    if (!(await aparece(page, tarjeta, antes))) await comprobarSiEmpezo(page, tarjeta, p, antesTexto, saldoAntes, creditos)
+    await esperar(page, tarjeta, p.tipo)
   } catch (e) {
     if (!(e instanceof Rechazado)) throw e
     if (p.tipo === 'imagen') throw new Rechazado(e.message, e.aviso, 0)
@@ -359,5 +513,14 @@ export async function generarEnFlow(b: Browser, page: Page, proyecto: string | u
       .catch(() => null)
     throw new Rechazado(e.message, e.aviso, gastoDeRechazo(saldoAntes, despues), despues)
   }
-  return { creditos, archivo: await bajar(page, b, tarjeta, carpeta) }
+  // Ya está pagado: si la descarga no arranca, se intenta otra vez antes de rendirse (pedirlo de nuevo lo pagaría dos veces).
+  for (let intento = 1; ; intento++) {
+    try {
+      return { creditos, archivo: await bajar(page, b, tarjeta, carpeta) }
+    } catch (e) {
+      if (intento >= 3) throw new Error(`${e instanceof Error ? e.message : e} Ya se hizo (y se pagó) en el proyecto de Flow de Sloth: no lo pidas otra vez; el usuario lo baja en Opciones → Google Flow → Abrir Flow.`)
+      await page.keyboard.press('Escape').catch(() => {})
+      await page.waitForTimeout(5000 * intento)
+    }
+  }
 }

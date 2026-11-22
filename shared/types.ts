@@ -1642,6 +1642,8 @@ export interface TrabajoFlow {
   /** En un video ya hecho: lo que les queda a las cuentas con su saldo al día (`EstadoFlow.quedan`). */
   quedan?: number
   error?: string
+  /** En fila tras un fallo de la conexión: cuándo lo reintenta Sloth solo, sin gastar. */
+  aviso?: string
 }
 
 /**
