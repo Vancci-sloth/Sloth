@@ -254,3 +254,6 @@ Este es el mapa:
   «Afinar», junto a enviar (`server/afinar.ts`, `POST /api/afinar`): el agente elegido reescribe el pedido con la card, su
   SKILL.md, la marca y «Sobre ti»; lo que solo decide el usuario queda como hueco en el campo (`huecoChip` en
   `Composer.tsx`), con sus opciones. Un hueco sin llenar le llega al agente como «Decídelo tú».
+- El dictado (`web/src/Dictado.tsx`, `server/dictado.ts`, `server/dictado-vivo.ts`): el micrófono del compositor manda tu
+  voz a Deepgram, con la llave de cada quien (`DEEPGRAM_API_KEY` o `data/deepgram.key`), y lo dicho entra al campo sin
+  mandarse. Sin llave no sale. `docs/DEEPGRAM-SERVICIO.md`.

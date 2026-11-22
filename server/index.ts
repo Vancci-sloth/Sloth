@@ -10,6 +10,8 @@ import { WebSocketServer, type WebSocket } from 'ws'
 import type { Card, Model, ServerPush } from '../shared/types.ts'
 import { VENTA } from '../shared/venta.ts'
 import { cambiarAcceso } from './acceso.ts'
+import { dictado } from './dictado.ts' // dictado con Deepgram
+import { dictadoVivo } from './dictado-vivo.ts'
 import { cuerpo as body, json as send } from './http.ts'
 import { ideas } from './ideas/index.ts' // ideas
 import { IMAGE_TYPES, nombreAdjunto } from './agent.ts'
@@ -480,6 +482,7 @@ function pideConfirmar(res: ServerResponse, confirmado: boolean | undefined, nue
 async function api(req: IncomingMessage, res: ServerResponse, url: URL): Promise<boolean> {
   const path = url.pathname
   const method = req.method ?? 'GET'
+  if (path === '/api/dictado') return dictado(APP, req, res) // dictado con Deepgram
 
   if (path === '/api/state' && method === 'GET') {
     if (!cargandoModelos && (['claude', 'codex', 'opencode'] as const).some((p) => rutaAgente(p) && !modelos.some((m) => proveedorDe(m.id) === p))) pedirModelos()
@@ -1080,7 +1083,13 @@ server.on('request', async (req, res) => {
 })
 
 const wss = new WebSocketServer({ noServer: true })
+// El dictado: trozos de audio de 250 ms, que Deepgram pasa a texto (`server/dictado-vivo.ts`).
+const dictados = new WebSocketServer({ noServer: true, maxPayload: 1024 * 1024 })
 server.on('upgrade', (req, socket, head) => {
+  if (req.url === '/api/dictado/vivo') {
+    if (!deConfianza(req) && web.confianza(req) !== 'sesion') return void socket.destroy()
+    return void dictados.handleUpgrade(req, socket, head, (cliente) => dictadoVivo(APP, cliente))
+  }
   // Otro WebSocket (el de Vite, en el repo) solo desde esta computadora o con sesión de la web: si no, se cierra y no se
   // queda colgado.
   if (req.url !== '/ws') return void (deConfianza(req) || web.confianza(req) === 'sesion' || socket.destroy())

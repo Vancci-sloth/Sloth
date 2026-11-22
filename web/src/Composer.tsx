@@ -6,6 +6,7 @@ import { gruposModelos } from '../../shared/modelos'
 import { imageUrl, Thumbs, type Attached } from './Images'
 import { esIcono, Icono } from './Iconos'
 import { FlowEnUso, LimitesContexto } from './LimitesContexto'
+import { Dictado } from './Dictado'
 import type { Resumen } from './eventos'
 import { compact } from './items'
 import { invocacion, LINK, LINK_ICON, linkParts, QUOTE_EVENT, QUOTE_ICON, quoteRef, THREAD, THREAD_ICON, threadIconOf } from './etiquetas'
@@ -640,6 +641,8 @@ export function Composer(props: {
   const [text, setText] = useState(props.draft?.text ?? '')
   const [images, setImages] = useState(props.draft?.images ?? [])
   const [uploading, setUploading] = useState(0)
+  // Con el micrófono abierto no se afina: lo dictado aún está llegando.
+  const [microfono, setMicrofono] = useState(false)
   const [own, setChoice] = useState<Choice | undefined>(props.initial)
   const choice = props.choice ?? own
   const [busy, setBusy] = useState(false)
@@ -748,6 +751,27 @@ export function Composer(props: {
     r.collapse(true)
     getSelection()?.removeAllRanges()
     getSelection()?.addRange(r)
+    sync()
+  }
+
+  /**
+   * Lo dictado (`Dictado.tsx`) entra al final del campo, en un solo trozo provisional que Deepgram corrige mientras
+   * hablas; al confirmarlo, el siguiente empieza otro. No sigue al cursor: reemplazar el texto provisional lo movería.
+   */
+  const dictando = useRef<HTMLSpanElement | null>(null)
+  function textoDictado(texto: string, final: boolean) {
+    const campo = box.current
+    if (!campo) return
+    let trozo = dictando.current
+    if (trozo && !campo.contains(trozo)) trozo = dictando.current = null
+    if (!trozo && texto) {
+      trozo = document.createElement('span')
+      campo.append(document.createTextNode(read(campo).trim() ? ' ' : ''), trozo)
+      dictando.current = trozo
+    }
+    if (!trozo) return
+    trozo.textContent = texto
+    if (final) dictando.current = null
     sync()
   }
 
@@ -1085,13 +1109,14 @@ export function Composer(props: {
             type="button"
             className="afinar"
             title={`Reescribe tu pedido como lo necesita ${props.afinar.para}; lo que solo tú decides queda como hueco`}
-            disabled={afinando || busy || uploading > 0}
+            disabled={afinando || busy || uploading > 0 || microfono}
             onClick={() => void afinarPedido()}
           >
             <Icono de="lapiz" className="icon-trazo" />
             {afinando ? 'Afinando…' : 'Afinar'}
           </button>
         )}
+        {!afinando && <Dictado onTexto={textoDictado} onFin={() => (dictando.current = null)} onActivo={setMicrofono} />}
         {(!trabajando || !empty) && (
           <button
             className="send"

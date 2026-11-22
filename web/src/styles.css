@@ -406,6 +406,19 @@ a.link-chip:hover { border-color: var(--amber); }
 .send { width: 34px; height: 34px; border-radius: 50%; background: var(--amber); color: var(--sobre-ambar); font-weight: 800; font-size: 17px; }
 .send:hover:not(:disabled) { background: var(--amber-2); }
 .send.stop { background: var(--text); font-size: 12px; }
+/* El dictado (Dictado.tsx), junto a enviar: el micrófono y, mientras escucha, cinco barritas que siguen tu voz. */
+.dictado { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.dictado > span { max-width: 230px; overflow-wrap: anywhere; }
+.dictado-boton { width: 34px; height: 34px; flex: none; display: grid; place-items: center; border-radius: 8px; border: 1px solid var(--line); color: var(--muted); }
+.dictado-boton:hover:not(:disabled) { color: var(--text); border-color: var(--muted); }
+.dictado-boton .ico { width: 17px; height: 17px; }
+.dictado-boton.grabando { color: var(--amber); border-color: var(--amber); background: var(--amber-tinte); }
+.dictado-boton:is(.preparando, .transcribiendo):disabled { opacity: 1; color: var(--amber); }
+.dictado-ondas { display: flex; align-items: center; gap: 2px; height: 18px; }
+.dictado-ondas i { width: 2px; height: 18px; border-radius: 2px; background: currentColor; transform: scaleY(0.14); }
+.dictado-giro { width: 16px; height: 16px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: dictado-girar 0.9s steps(12) infinite; }
+@keyframes dictado-girar { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .dictado-giro { animation: none; } }
 /* Un video del lote que espera su turno, pegado encima del compositor. */
 .queue { display: flex; flex-direction: column; margin: 0 14px; border: 1px solid var(--line); border-bottom: 0; border-radius: 12px 12px 0 0; background: var(--panel); }
 .queued { display: flex; align-items: center; gap: 10px; padding: 4px 12px; }
