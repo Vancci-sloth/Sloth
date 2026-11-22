@@ -1,8 +1,8 @@
 /*
- * El tema Cristal (`web/src/temas.ts`): una escala neutra de grises (Cod Gray) en vez del
- * oscuro cálido, el acento en gris claro, controles de cristal con el color de cada agente, la barra lateral en tarjetas y
- * los fondos de signos de `CampoAscii.tsx`. Todo va bajo `:root[data-tema="cristal"]`: sin el atributo (tema Sloth) nada
- * de aquí aplica. Éxito y error se quedan con sus colores.
+ * El tema Cristal (`web/src/temas.ts`): la escala de grises Cod Gray, el acento en gris claro, el color de cada agente,
+ * función y red en sus controles, y los controles de cristal (el desenfoque, solo en el compositor). Todo va anidado bajo
+ * `:root[data-tema='cristal']`: sin el atributo (tema Sloth) nada de aquí aplica, y el diseño común sale con la paleta de
+ * Sloth. Los fondos de signos y el movimiento los enciende `temas.ts`.
  */
 :root[data-tema='cristal'] {
   --gris-50: #fafafa;
@@ -42,123 +42,350 @@
   --acento-cursor: var(--gris-100);
   --acento-muse: #88b7fa;
   --acento-pi: #b5d5a0;
-  --acento-openrouter: #a9b7f7;
-  --acento-freellmapi: #9fd3c7;
+  --acento-openrouter: #86b9f5;
+  --acento-freellmapi: #b5d5a0;
   --acento-voz: #90d6cb;
   --acento-imagen: #b9aff2;
+  /* El de cada red, en sus acciones de publicar. */
   --acento-youtube: #ff5252;
+  --acento-tiktok: #25f4ee;
+  --acento-tiktok-rosa: #fe2c55;
+  --acento-instagram: #e87ab9;
+  --acento-instagram-final: #f5ab65;
+  --acento-modelo: var(--gris-300);
   --cristal-fondo: linear-gradient(155deg, color-mix(in srgb, var(--text) 12%, transparent), transparent 62%), color-mix(in srgb, var(--panel) 88%, transparent);
   --cristal-borde: color-mix(in srgb, var(--text) 22%, transparent);
   --cristal-reflejo: inset 0 1px 0 color-mix(in srgb, var(--text) 18%, transparent), inset 0 -1px 0 color-mix(in srgb, var(--bg) 45%, transparent), 0 3px 10px color-mix(in srgb, var(--bg) 35%, transparent);
+
+  body :is(.boton, .m3d-accion, .mis-accion, .opciones-volver, .barra-nuevo, .opciones-titulo-acciones .ghost) {
+    background: var(--cristal-fondo);
+    border: 1px solid var(--cristal-borde);
+    border-radius: 18px;
+    color: var(--text);
+    box-shadow: var(--cristal-reflejo);
+  }
+
+  body :is(.boton, .m3d-accion, .mis-accion, .opciones-volver, .barra-nuevo, .opciones-titulo-acciones .ghost):hover:not(:disabled) {
+    background: linear-gradient(145deg, var(--amber-tinte), transparent 85%), var(--panel-2);
+    border-color: var(--muted);
+    color: var(--text);
+  }
+
+  body :is(.primary:not(.danger), .m3d-accion.principal, .send:not(.stop)) {
+    background: linear-gradient(155deg, var(--gris-50), var(--gris-300) 68%, var(--gris-400));
+    border: 1px solid var(--gris-200);
+    border-radius: 18px;
+    color: var(--sobre-ambar);
+    box-shadow: inset 0 1px 0 var(--gris-50), inset 0 -2px 3px color-mix(in srgb, var(--gris-600) 35%, transparent), 0 3px 12px color-mix(in srgb, var(--bg) 35%, transparent);
+  }
+
+  body .send:not(.stop) { border-radius: 50%; }
+
+  body :is(.primary:not(.danger), .m3d-accion.principal, .send:not(.stop)):hover:not(:disabled) {
+    background: linear-gradient(155deg, var(--gris-50), var(--gris-200));
+    color: var(--sobre-ambar);
+  }
+
+  body .composer {
+    background: var(--cristal-fondo);
+    border-color: var(--cristal-borde);
+    border-radius: 25px;
+    box-shadow: var(--cristal-reflejo);
+    backdrop-filter: blur(12px);
+  }
+
+  body .composer:focus-within { border-color: var(--muted); }
+  body .composer.dragging { border-color: var(--amber); border-style: dashed; }
+
+  body .composer :is(.attach, .picker-trigger) {
+    border: 1px solid var(--linea-tarjeta);
+    background: linear-gradient(150deg, var(--amber-tinte), transparent 85%);
+    color: var(--suave);
+    box-shadow: inset 0 1px 0 color-mix(in srgb, var(--text) 8%, transparent);
+  }
+  body .composer .picker-trigger { border-radius: 12px; }
+
+  .composer { --acento-modelo: var(--gris-300); }
+  [data-proveedor="claude"] { --acento-modelo: var(--acento-claude); }
+  [data-proveedor="codex"] { --acento-modelo: var(--acento-codex); }
+  [data-proveedor="gemini"] { --acento-modelo: var(--acento-gemini); }
+  [data-proveedor="deepseek"] { --acento-modelo: var(--acento-deepseek); }
+  [data-proveedor="opencode"] { --acento-modelo: var(--acento-opencode); }
+  [data-proveedor="grok"] { --acento-modelo: var(--acento-grok); }
+  [data-proveedor="antigravity"] { --acento-modelo: var(--acento-antigravity); }
+  [data-proveedor="cursor"] { --acento-modelo: var(--acento-cursor); }
+  [data-proveedor="muse"] { --acento-modelo: var(--acento-muse); }
+  [data-proveedor="pi"] { --acento-modelo: var(--acento-pi); }
+
+  /* Identidad de cada familia, también en las listas flotantes del modo avanzado. */
+  .picker-group[data-proveedor] .picker-label { display: flex; align-items: center; gap: 9px; white-space: normal; line-height: 1.4; }
+  .picker-group[data-proveedor] .picker-label .logo { width: 22px; height: 22px; flex: 0 0 22px; padding: 3px; box-sizing: border-box; }
+  .picker-group[data-proveedor] .picker-option { white-space: normal; overflow-wrap: anywhere; text-align: left; }
+  body .picker-group[data-proveedor] .picker-option:is(.on, :hover, :focus-visible) {
+    background: linear-gradient(135deg, color-mix(in srgb, var(--acento-modelo) 22%, transparent), transparent), var(--cristal-fondo);
+    box-shadow: inset 2px 0 var(--acento-modelo), inset 0 1px 0 color-mix(in srgb, var(--acento-modelo) 20%, transparent);
+    color: var(--text);
+  }
+  body .modelos[data-proveedor] .modelos-selector > .picker-trigger {
+    --tinte-control: var(--acento-modelo);
+    background: linear-gradient(145deg, color-mix(in srgb, var(--acento-modelo) 20%, transparent), transparent), var(--cristal-fondo);
+    border: 1px solid color-mix(in srgb, var(--acento-modelo) 40%, var(--line));
+    box-shadow: var(--cristal-reflejo);
+  }
+  body .modelos[data-proveedor] .segmento button[aria-checked="true"] {
+    background: linear-gradient(145deg, color-mix(in srgb, var(--acento-modelo) 20%, transparent), transparent), var(--cristal-fondo);
+  }
+
+  body .composer .modelos > .picker-trigger,
+  body .composer .composer-bar > .picker:first-of-type > .picker-trigger {
+    --tinte-control: var(--acento-modelo);
+  }
+  body .composer .segmento-dispositivo { --tinte-control: var(--acento-codex); }
+  body .composer .elegir-voz > .picker-trigger { --tinte-control: var(--acento-voz); }
+  body .composer .selector-imagenes > .picker-trigger { --tinte-control: var(--acento-imagen); }
+  body .composer :is(.picker-trigger, .segmento-dispositivo) {
+    background: linear-gradient(150deg, color-mix(in srgb, var(--tinte-control, var(--gris-300)) 20%, transparent), color-mix(in srgb, var(--panel) 85%, transparent));
+    border-color: color-mix(in srgb, var(--tinte-control, var(--gris-300)) 35%, transparent);
+    box-shadow: inset 0 1px 0 color-mix(in srgb, var(--tinte-control, var(--gris-300)) 25%, transparent), 0 2px 6px color-mix(in srgb, var(--bg) 30%, transparent);
+    color: var(--text);
+  }
+  body .composer .picker-trigger:hover:not(:disabled) {
+    background: linear-gradient(150deg, color-mix(in srgb, var(--tinte-control, var(--gris-300)) 30%, transparent), var(--panel-2));
+  }
+  body .composer .send:not(.stop) {
+    background: linear-gradient(145deg, var(--acento-modelo), color-mix(in srgb, var(--acento-modelo) 72%, var(--gris-500)));
+    border-color: var(--acento-modelo);
+    color: var(--gris-950);
+    box-shadow: inset 0 1px 0 color-mix(in srgb, var(--acento-modelo) 50%, var(--gris-50)), 0 3px 12px color-mix(in srgb, var(--acento-modelo) 12%, transparent);
+  }
+  body .composer .send:not(.stop):hover:not(:disabled) { background: var(--acento-modelo); }
+
+  body :is(.boton, .primary, .m3d-accion, .mis-accion, .barra-nuevo):focus-visible {
+    outline: 2px solid var(--text);
+    outline-offset: 3px;
+  }
+
+  @media (prefers-reduced-transparency: reduce) {
+    body .composer { background: var(--panel); backdrop-filter: none; }
+    body :is(.boton, .m3d-accion, .mis-accion, .opciones-volver, .barra-nuevo, .opciones-titulo-acciones .ghost) { background: var(--panel-2); }
+  }
+
+  body .segmento-dispositivo {
+    align-items: center;
+    gap: 3px;
+    padding: 4px;
+    border: 1px solid var(--cristal-borde);
+    border-radius: 18px;
+    background: var(--cristal-fondo);
+    box-shadow: var(--cristal-reflejo);
+  }
+  .formato-dispositivo {
+    display: grid;
+    place-items: center;
+    flex: none;
+    width: 31px;
+    height: 30px;
+    color: var(--text);
+  }
+  .formato-dispositivo svg { width: 23px; height: 23px; transform: rotate(0deg); }
+  .segmento-dispositivo[data-orientacion="horizontal"] .formato-dispositivo svg { transform: rotate(90deg); }
+  body .segmento-dispositivo button { min-height: 30px; padding: 3px 10px; border-radius: 13px; font-size: 13px; }
+  body .segmento-dispositivo button.on {
+    color: var(--text);
+    background: linear-gradient(150deg, color-mix(in srgb, var(--text) 18%, transparent), var(--panel));
+    box-shadow: inset 0 1px 0 var(--cristal-borde), 0 2px 5px color-mix(in srgb, var(--bg) 45%, transparent);
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .formato-dispositivo svg { transition: transform 420ms cubic-bezier(.22, 1.35, .36, 1); }
+    body .segmento-dispositivo button { transition: background-color 180ms ease, color 180ms ease, box-shadow 180ms ease; }
+  }
+
+  /* Cada proveedor conserva el mismo acento en su selector, conexión y controles de actividad. */
+  body .opciones-agentes-lista > button {
+    border: 1px solid color-mix(in srgb, var(--acento-modelo) 18%, transparent);
+    border-radius: 12px;
+    background: linear-gradient(150deg, color-mix(in srgb, var(--acento-modelo) 8%, transparent), transparent 80%);
+    box-shadow: inset 0 1px 0 color-mix(in srgb, var(--acento-modelo) 10%, transparent);
+  }
+  body .opciones-agentes-lista > button:hover,
+  body .opciones-agentes-lista > button[aria-pressed="true"] {
+    background: linear-gradient(145deg, color-mix(in srgb, var(--acento-modelo) 24%, transparent), var(--panel));
+    border-color: color-mix(in srgb, var(--acento-modelo) 55%, transparent);
+    box-shadow: inset 0 1px 0 color-mix(in srgb, var(--acento-modelo) 30%, transparent);
+    color: var(--text);
+  }
+  body .opciones-agentes-principal .primary:not(.danger) {
+    background: linear-gradient(145deg, color-mix(in srgb, var(--acento-modelo) 78%, var(--gris-50)), var(--acento-modelo));
+    border-color: var(--acento-modelo);
+    color: var(--gris-950);
+    box-shadow: inset 0 1px 0 color-mix(in srgb, var(--acento-modelo) 40%, var(--gris-50)), 0 3px 12px color-mix(in srgb, var(--acento-modelo) 10%, transparent);
+  }
+  body .opciones-agentes-principal .boton,
+  body .opciones-agentes .segmento button.on,
+  body .opciones-agentes .actividad-vistas button[aria-pressed="true"] {
+    background: linear-gradient(145deg, color-mix(in srgb, var(--acento-modelo) 20%, transparent), var(--panel));
+    border: 1px solid color-mix(in srgb, var(--acento-modelo) 42%, transparent);
+    box-shadow: inset 0 1px 0 color-mix(in srgb, var(--acento-modelo) 22%, transparent);
+    color: var(--text);
+  }
+  body .opciones-agentes-principal :is(.primary, .boton):hover:not(:disabled) {
+    filter: brightness(1.08);
+  }
+  body .opciones-agentes-lista > button:focus-visible {
+    outline: 2px solid var(--acento-modelo);
+    outline-offset: 2px;
+  }
+
+  /* Acentos por función para orientar la navegación sobre la base neutra. */
+  .opciones { --acento-seccion: var(--gris-300); }
+  .opciones[data-seccion="redes"], .opciones-secciones a[href="#/opciones/redes"] { --acento-seccion: var(--acento-voz); }
+  .opciones[data-seccion="agentes"], .opciones-secciones a[href="#/opciones/agentes"] { --acento-seccion: var(--acento-codex); }
+  .opciones[data-seccion="creacion"], .opciones-secciones a[href="#/opciones/creacion"] { --acento-seccion: var(--acento-imagen); }
+  .opciones[data-seccion="perfil"], .opciones-secciones a[href="#/opciones/perfil"] { --acento-seccion: var(--acento-claude); }
+  .opciones[data-seccion="equipo"], .opciones-secciones a[href="#/opciones/equipo"] { --acento-seccion: var(--acento-pi); }
+  .opciones[data-seccion="integraciones"], .opciones-secciones a[href="#/opciones/integraciones"] { --acento-seccion: var(--acento-deepseek); }
+  .opciones[data-seccion="apoyo"], .opciones-secciones a[href="#/opciones/apoyo"] { --acento-seccion: var(--acento-claude); }
+
+  body .opciones-secciones a {
+    border: 1px solid transparent;
+    border-radius: 12px;
+  }
+  body .opciones-secciones a .ico { color: var(--acento-seccion); }
+  body .opciones-secciones a:hover,
+  body .opciones-secciones a[aria-current="page"],
+  body .opciones-apartados-nav a[aria-current="page"] {
+    background: linear-gradient(145deg, color-mix(in srgb, var(--acento-seccion) 22%, transparent), var(--panel));
+    border-color: color-mix(in srgb, var(--acento-seccion) 40%, transparent);
+    color: var(--text);
+    box-shadow: inset 0 1px 0 color-mix(in srgb, var(--acento-seccion) 25%, transparent);
+  }
+  body .opciones-apartados-nav a[aria-current="page"] .ico { color: var(--acento-seccion); }
+  body .opciones:not(:has(.opciones-agentes)) .opciones-contenido .primary:not(.danger) {
+    background: linear-gradient(145deg, color-mix(in srgb, var(--acento-seccion) 75%, var(--gris-50)), var(--acento-seccion));
+    border-color: var(--acento-seccion);
+    color: var(--gris-950);
+  }
+  body .opciones .interruptor.on {
+    background: var(--acento-modelo, var(--acento-seccion));
+    box-shadow: inset 0 1px 2px color-mix(in srgb, var(--gris-50) 25%, transparent);
+  }
+  body .barra-nuevo {
+    background: linear-gradient(145deg, color-mix(in srgb, var(--acento-codex) 15%, transparent), var(--panel));
+    border-color: color-mix(in srgb, var(--acento-codex) 30%, transparent);
+  }
+  body .barra-nuevo .new-chat-icon { color: var(--acento-codex); }
+  body .mis-accion.on {
+    background: linear-gradient(145deg, color-mix(in srgb, var(--acento-voz) 20%, transparent), var(--panel));
+    border-color: color-mix(in srgb, var(--acento-voz) 45%, transparent);
+  }
+
+  .barra-destinos { --acento-destino: var(--acento-codex); }
+  [data-destino="redes"] { --acento-destino: var(--acento-voz); }
+  [data-destino="videos"] { --acento-destino: var(--acento-voz); }
+  [data-destino="estilos"] { --acento-destino: var(--acento-codex); }
+  [data-destino="imagenes"] { --acento-destino: var(--acento-imagen); }
+  [data-destino="modelos3d"] { --acento-destino: var(--acento-imagen); }
+  [data-destino="comunidad"] { --acento-destino: var(--acento-pi); }
+  body .barra-destinos .new-chat {
+    border: 1px solid transparent;
+    border-radius: 12px;
+    background: transparent;
+    box-shadow: none;
+  }
+  body .barra-destinos .new-chat .new-chat-icon { color: var(--acento-destino); }
+  body .barra-destinos .new-chat:hover:not(.active) {
+    background: var(--panel);
+    border-color: var(--linea-tarjeta);
+  }
+  body .barra-destinos .new-chat.active {
+    background: linear-gradient(145deg, color-mix(in srgb, var(--acento-destino) 23%, transparent), var(--panel));
+    border-color: color-mix(in srgb, var(--acento-destino) 45%, transparent);
+    box-shadow: inset 0 1px 0 color-mix(in srgb, var(--acento-destino) 25%, transparent);
+    color: var(--text);
+  }
+  body .barra-destinos .nav-cuenta { background: var(--acento-destino); }
+  body .sidebar .buscar {
+    background: linear-gradient(145deg, color-mix(in srgb, var(--acento-codex) 7%, transparent), var(--bg));
+    border-color: color-mix(in srgb, var(--acento-codex) 25%, var(--linea-tarjeta));
+  }
+  body .sidebar .buscar:focus-within { border-color: var(--acento-codex); box-shadow: inset 0 1px 0 var(--amber-tinte); }
+  body .sidebar .notificaciones-boton { color: var(--acento-voz); }
+  body .pie button.on {
+    background: linear-gradient(145deg, color-mix(in srgb, var(--acento-codex) 20%, transparent), var(--panel));
+    box-shadow: inset 0 1px 0 color-mix(in srgb, var(--acento-codex) 25%, transparent);
+  }
+  body .pie button > svg { color: var(--acento-codex); }
+
+  .ideas { --acento-apartado: var(--acento-claude); }
+  .centro-redes .boton { background: linear-gradient(145deg, color-mix(in srgb, var(--acento-voz) 18%, transparent), var(--panel)); border-color: color-mix(in srgb, var(--acento-voz) 38%, transparent); }
+  .mis-videos { --acento-apartado: var(--acento-voz); }
+  .m3d { --acento-apartado: var(--acento-imagen); }
+  .com { --acento-apartado: var(--acento-pi); }
+
+  body :is(.ideas, .mis-videos, .m3d, .com) :is(.boton, .mis-accion, .m3d-accion, .com-escribe) {
+    background: linear-gradient(145deg, color-mix(in srgb, var(--acento-apartado) 15%, transparent), var(--panel));
+    border-color: color-mix(in srgb, var(--acento-apartado) 36%, transparent);
+    color: var(--text);
+    box-shadow: inset 0 1px 0 color-mix(in srgb, var(--acento-apartado) 22%, transparent), 0 3px 9px color-mix(in srgb, var(--bg) 30%, transparent);
+  }
+  body :is(.ideas, .mis-videos, .m3d, .com) :is(.primary:not(.danger), .m3d-accion.principal) {
+    background: linear-gradient(145deg, color-mix(in srgb, var(--acento-apartado) 75%, var(--gris-50)), var(--acento-apartado));
+    border-color: var(--acento-apartado);
+    color: var(--gris-950);
+  }
+  body :is(.ideas, .mis-videos, .m3d, .com) :is(.boton, .primary, .mis-accion, .m3d-accion, .com-escribe):hover:not(:disabled) {
+    filter: brightness(1.08);
+  }
+  body .ideas .segmento {
+    background: var(--cristal-fondo);
+    border-color: color-mix(in srgb, var(--acento-apartado) 30%, transparent);
+    box-shadow: var(--cristal-reflejo);
+  }
+  body .ideas :is(.segmento button.on, .ficha.on),
+  body .ideas .segmento button[aria-pressed="true"] {
+    background: linear-gradient(145deg, color-mix(in srgb, var(--acento-apartado) 28%, transparent), var(--panel));
+    color: var(--text);
+    box-shadow: inset 0 1px 0 color-mix(in srgb, var(--acento-apartado) 30%, transparent);
+  }
+  body .ideas .no-se {
+    display: inline-flex;
+    padding: 2px 8px;
+    border: 1px solid color-mix(in srgb, var(--acento-apartado) 30%, transparent);
+    border-radius: 10px;
+    background: linear-gradient(145deg, color-mix(in srgb, var(--acento-apartado) 12%, transparent), transparent);
+    color: var(--acento-apartado);
+  }
+  body .ideas .no-se:hover:not(:disabled) { background: var(--panel-2); color: var(--text); }
+  body .ideas :is(input, textarea):focus {
+    outline-color: var(--acento-apartado);
+    border-color: var(--acento-apartado);
+  }
+  body .com .com-secciones button.on,
+  body .mis-videos .mis-pestanas button.on,
+  body .m3d .m3d-tipos button.on { color: var(--acento-apartado); }
+  body .com .com-secciones button.on::after,
+  body .mis-videos .mis-pestanas button.on::after { background: var(--acento-apartado); }
+  body .m3d .m3d-tipos button.on { border-bottom-color: var(--acento-apartado); }
+
+  /* El color identifica el destino de publicación; el resto de la interfaz sigue neutro. */
+  [data-red="youtube"] { --red-acento: var(--acento-youtube); --red-final: var(--acento-youtube); }
+  [data-red="tiktok"] { --red-acento: var(--acento-tiktok); --red-final: var(--acento-tiktok-rosa); }
+  [data-red="instagram"] { --red-acento: var(--acento-instagram); --red-final: var(--acento-instagram-final); }
+  body :is([data-red] button.primary:not(.danger), [data-red] button.boton, [data-red] .acciones > .picker-trigger, button.youtube-boton[data-red], button.final-boton[data-red]) {
+    background: linear-gradient(125deg, color-mix(in srgb, var(--red-acento) 23%, transparent), color-mix(in srgb, var(--red-final) 16%, transparent)), var(--cristal-fondo);
+    border: 1px solid color-mix(in srgb, var(--red-acento) 48%, var(--line));
+    border-radius: 13px;
+    color: var(--text);
+    box-shadow: inset 0 1px 0 color-mix(in srgb, var(--text) 15%, transparent), 0 3px 10px color-mix(in srgb, var(--bg) 30%, transparent);
+    transition: border-color 160ms, background-color 160ms, box-shadow 160ms;
+  }
+  body :is([data-red] button.primary:not(.danger), [data-red] button.boton, [data-red] .acciones > .picker-trigger, button.youtube-boton[data-red], button.final-boton[data-red]):hover:not(:disabled) {
+    background: linear-gradient(125deg, color-mix(in srgb, var(--red-acento) 34%, transparent), color-mix(in srgb, var(--red-final) 25%, transparent)), var(--cristal-fondo);
+    border-color: var(--red-acento);
+    color: var(--text);
+  }
+  body :is([data-red] button.primary, [data-red] button.boton, button.youtube-boton[data-red], button.final-boton[data-red]):focus-visible { outline: 2px solid var(--red-acento); outline-offset: 3px; }
+  @media (prefers-reduced-motion: reduce) {
+    body :is([data-red] button.primary, [data-red] button.boton, button.youtube-boton[data-red], button.final-boton[data-red]) { transition: none; }
+  }
 }
-
-/* ——— Los fondos de signos (CampoAscii.tsx): solo existen en este tema. ——— */
-.campo-ascii { position: absolute; inset: 0 0 0 auto; width: min(45%, 330px); height: 100%; pointer-events: none; color: var(--gris-500); mask-image: linear-gradient(to right, transparent, #000 55%); }
-:root[data-tema='cristal'] :is(.fondo-ramas, .superficie-ascii) { position: relative; isolation: isolate; }
-:root[data-tema='cristal'] .superficie-ascii { overflow: hidden; border: 1px solid var(--linea-tarjeta); border-radius: var(--radio-tarjeta); background: radial-gradient(ellipse at top right, var(--panel-2), transparent 72%), var(--panel); }
-:root[data-tema='cristal'] .superficie-ascii > .campo-ascii { z-index: -1; }
-:root[data-tema='cristal'] .fondo-ramas > .campo-ascii { z-index: -1; inset: 0; width: 100%; color: var(--gris-400); opacity: 0.38; mask-image: radial-gradient(ellipse at 50% 58%, #000 35%, transparent 92%); }
-:root[data-tema='cristal'] .new-session.fondo-ramas > .campo-ascii { mask-image: linear-gradient(to bottom, transparent, #000 14%, #000 34%, transparent 83%); }
-@media (prefers-reduced-motion: no-preference) {
-  .campo-ascii { animation: entrada-ascii 520ms steps(12) both; }
-  @keyframes entrada-ascii { from { opacity: 0; } }
-}
-
-/* ——— La barra lateral: tarjetas sobre el fondo, lo elegido con una raya. ——— */
-:root[data-tema='cristal'] .sidebar { background: var(--bg); border-right-color: var(--linea-tarjeta); }
-:root[data-tema='cristal'] .new-chat { color: var(--suave); font-weight: 550; }
-:root[data-tema='cristal'] .new-chat:hover { color: var(--text); }
-:root[data-tema='cristal'] .new-chat.active { background: var(--amber-tinte); color: var(--text); box-shadow: inset 2px 0 var(--amber); }
-:root[data-tema='cristal'] .new-chat-icon { border: 0; color: var(--muted); }
-:root[data-tema='cristal'] .new-chat-icon .ico { width: 15px; height: 15px; }
-:root[data-tema='cristal'] :is(.new-chat.active, .new-chat:hover) .new-chat-icon { color: var(--amber); }
-:root[data-tema='cristal'] .barra-nuevo { margin-bottom: 8px; border: 1px solid color-mix(in srgb, var(--acento-codex) 30%, transparent); background: linear-gradient(145deg, color-mix(in srgb, var(--acento-codex) 15%, transparent), var(--panel)); color: var(--text); font-weight: 650; }
-:root[data-tema='cristal'] .barra-nuevo .new-chat-icon { color: var(--acento-codex); }
-:root[data-tema='cristal'] .sidebar .buscar { position: relative; isolation: isolate; overflow: hidden; border: 1px solid color-mix(in srgb, var(--acento-codex) 25%, var(--linea-tarjeta)); background: linear-gradient(145deg, color-mix(in srgb, var(--acento-codex) 7%, transparent), var(--bg)); }
-:root[data-tema='cristal'] .sidebar .buscar:focus-within { border-color: var(--acento-codex); }
-:root[data-tema='cristal'] .sidebar .buscar > .campo-ascii { z-index: -1; width: 72px; opacity: 0.72; color: var(--gris-400); }
-:root[data-tema='cristal'] .pie { margin: 0 10px 10px; padding: 5px; border: 1px solid var(--linea-tarjeta); border-radius: 12px; background: var(--panel); }
-:root[data-tema='cristal'] .pie button.on { background: linear-gradient(145deg, color-mix(in srgb, var(--acento-codex) 20%, transparent), var(--panel)); box-shadow: inset 0 1px 0 color-mix(in srgb, var(--acento-codex) 25%, transparent); }
-:root[data-tema='cristal'] .pie button > svg { color: var(--acento-codex); }
-
-/* ——— El inicio: los carteles y el estilo elegido, en tarjetas. ——— */
-:root[data-tema='cristal'] .new-head.superficie-ascii { overflow: visible; padding: 12px 16px; }
-:root[data-tema='cristal'] .new-head .estilo-version { padding: 1px 6px; border: 1px solid var(--linea-tarjeta); border-radius: 6px; font: 11px/1.5 var(--mono); }
-:root[data-tema='cristal'] .card { border-radius: var(--radio-tarjeta); }
-:root[data-tema='cristal'] .card:has(.card-fondo) { background: var(--panel); }
-:root[data-tema='cristal'] .card.active:has(.card-fondo) { background: var(--panel-2); }
-:root[data-tema='cristal'] .card > .campo-ascii { z-index: -1; inset: 0 0 auto auto; width: 58%; height: 56%; opacity: 0.26; mask-image: radial-gradient(ellipse at 90% 15%, #000 10%, transparent 76%); }
-:root[data-tema='cristal'] :is(.card.active, .card:hover) > .campo-ascii { opacity: 0.54; }
-:root[data-tema='cristal'] .card-version { border: 1px solid var(--line); background: var(--panel); color: var(--suave); font: 11px/1.2 var(--mono); }
-:root[data-tema='cristal'] .new-session .send:not(.stop) { background: var(--amber-2); }
-:root[data-tema='cristal'] .tool-output { color: var(--suave); }
-
-/* ——— Controles de cristal. El desenfoque, solo en el compositor. ——— */
-:root[data-tema='cristal'] :is(.boton, .m3d-accion, .mis-accion) { background: var(--cristal-fondo); border: 1px solid var(--cristal-borde); border-radius: 18px; color: var(--text); box-shadow: var(--cristal-reflejo); }
-:root[data-tema='cristal'] :is(.boton, .m3d-accion, .mis-accion):hover:not(:disabled) { background: linear-gradient(145deg, var(--amber-tinte), transparent 85%), var(--panel-2); border-color: var(--muted); color: var(--text); }
-:root[data-tema='cristal'] :is(.primary:not(.danger), .m3d-accion.principal, .send:not(.stop)) { background: linear-gradient(155deg, var(--gris-50), var(--gris-300) 68%, var(--gris-400)); border: 1px solid var(--gris-200); border-radius: 18px; color: var(--sobre-ambar); box-shadow: inset 0 1px 0 var(--gris-50), inset 0 -2px 3px color-mix(in srgb, var(--gris-600) 35%, transparent), 0 3px 12px color-mix(in srgb, var(--bg) 35%, transparent); }
-:root[data-tema='cristal'] :is(.primary:not(.danger), .m3d-accion.principal, .send:not(.stop)):hover:not(:disabled) { background: linear-gradient(155deg, var(--gris-50), var(--gris-200)); color: var(--sobre-ambar); }
-:root[data-tema='cristal'] .send:not(.stop) { border-radius: 50%; }
-:root[data-tema='cristal'] :is(.boton, .primary, .m3d-accion, .mis-accion):focus-visible { outline: 2px solid var(--text); outline-offset: 3px; }
-
-/* El compositor, con el color del agente elegido (`data-proveedor`). */
-:root[data-tema='cristal'] .composer { --acento-modelo: var(--gris-300); background: var(--cristal-fondo); border-color: var(--cristal-borde); border-radius: 25px; box-shadow: var(--cristal-reflejo); backdrop-filter: blur(12px); }
-:root[data-tema='cristal'] .composer:focus-within { border-color: var(--muted); }
-:root[data-tema='cristal'] .composer.dragging { border-color: var(--amber); border-style: dashed; }
-:root[data-tema='cristal'] [data-proveedor='claude'] { --acento-modelo: var(--acento-claude); }
-:root[data-tema='cristal'] [data-proveedor='codex'] { --acento-modelo: var(--acento-codex); }
-:root[data-tema='cristal'] [data-proveedor='gemini'] { --acento-modelo: var(--acento-gemini); }
-:root[data-tema='cristal'] [data-proveedor='deepseek'] { --acento-modelo: var(--acento-deepseek); }
-:root[data-tema='cristal'] [data-proveedor='opencode'] { --acento-modelo: var(--acento-opencode); }
-:root[data-tema='cristal'] [data-proveedor='grok'] { --acento-modelo: var(--acento-grok); }
-:root[data-tema='cristal'] [data-proveedor='antigravity'] { --acento-modelo: var(--acento-antigravity); }
-:root[data-tema='cristal'] [data-proveedor='cursor'] { --acento-modelo: var(--acento-cursor); }
-:root[data-tema='cristal'] [data-proveedor='muse'] { --acento-modelo: var(--acento-muse); }
-:root[data-tema='cristal'] [data-proveedor='pi'] { --acento-modelo: var(--acento-pi); }
-:root[data-tema='cristal'] [data-proveedor='openrouter'] { --acento-modelo: var(--acento-openrouter); }
-:root[data-tema='cristal'] [data-proveedor='freellmapi'] { --acento-modelo: var(--acento-freellmapi); }
-:root[data-tema='cristal'] .composer :is(.attach, .picker-trigger) { border: 1px solid color-mix(in srgb, var(--acento-modelo) 35%, transparent); border-radius: 12px; background: linear-gradient(150deg, color-mix(in srgb, var(--acento-modelo) 20%, transparent), color-mix(in srgb, var(--panel) 85%, transparent)); color: var(--text); box-shadow: inset 0 1px 0 color-mix(in srgb, var(--acento-modelo) 25%, transparent), 0 2px 6px color-mix(in srgb, var(--bg) 30%, transparent); }
-:root[data-tema='cristal'] .composer .attach { border-radius: 50%; }
-:root[data-tema='cristal'] .composer .picker-trigger:hover:not(:disabled) { background: linear-gradient(150deg, color-mix(in srgb, var(--acento-modelo) 30%, transparent), var(--panel-2)); }
-:root[data-tema='cristal'] .composer .send:not(.stop) { background: linear-gradient(145deg, var(--acento-modelo), color-mix(in srgb, var(--acento-modelo) 72%, var(--gris-500))); border-color: var(--acento-modelo); color: var(--gris-950); box-shadow: inset 0 1px 0 color-mix(in srgb, var(--acento-modelo) 50%, var(--gris-50)), 0 3px 12px color-mix(in srgb, var(--acento-modelo) 12%, transparent); }
-:root[data-tema='cristal'] .composer .send:not(.stop):hover:not(:disabled) { background: var(--acento-modelo); }
-:root[data-tema='cristal'] .dictado-boton { border-radius: 50%; border-color: color-mix(in srgb, var(--acento-modelo, var(--line)) 40%, var(--line)); background: var(--cristal-fondo); color: var(--text); box-shadow: var(--cristal-reflejo); }
-:root[data-tema='cristal'] .dictado-boton.grabando { color: var(--acento-modelo); border-color: var(--acento-modelo); background: linear-gradient(145deg, color-mix(in srgb, var(--acento-modelo) 22%, transparent), transparent), var(--cristal-fondo); }
-@media (prefers-reduced-transparency: reduce) {
-  :root[data-tema='cristal'] .composer { background: var(--panel); backdrop-filter: none; }
-  :root[data-tema='cristal'] :is(.boton, .m3d-accion, .mis-accion) { background: var(--panel-2); }
-}
-
-/* Los menús de modelos: cada familia con su color al pasar o al elegir. */
-:root[data-tema='cristal'] .picker-group[data-proveedor] .picker-option:is(.on, :hover, :focus-visible) { background: linear-gradient(135deg, color-mix(in srgb, var(--acento-modelo) 22%, transparent), transparent), var(--cristal-fondo); box-shadow: inset 2px 0 var(--acento-modelo), inset 0 1px 0 color-mix(in srgb, var(--acento-modelo) 20%, transparent); color: var(--text); }
-
-/* Cada apartado con su acento, sobre la base neutra. */
-:root[data-tema='cristal'] .ideas { --acento-apartado: var(--acento-claude); }
-:root[data-tema='cristal'] .mis-videos { --acento-apartado: var(--acento-voz); }
-:root[data-tema='cristal'] .m3d { --acento-apartado: var(--acento-imagen); }
-:root[data-tema='cristal'] .com { --acento-apartado: var(--acento-pi); }
-:root[data-tema='cristal'] :is(.estudio-imagenes, .editor-imagen) { --acento-apartado: var(--acento-imagen); --amber: var(--acento-imagen); }
-:root[data-tema='cristal'] :is(.ideas, .mis-videos, .m3d, .com) :is(.boton, .mis-accion, .m3d-accion) { background: linear-gradient(145deg, color-mix(in srgb, var(--acento-apartado) 15%, transparent), var(--panel)); border-color: color-mix(in srgb, var(--acento-apartado) 36%, transparent); }
-:root[data-tema='cristal'] :is(.ideas, .mis-videos, .m3d, .com) :is(.primary:not(.danger), .m3d-accion.principal) { background: linear-gradient(145deg, color-mix(in srgb, var(--acento-apartado) 75%, var(--gris-50)), var(--acento-apartado)); border-color: var(--acento-apartado); color: var(--gris-950); }
-:root[data-tema='cristal'] :is(.ideas, .mis-videos, .m3d, .com) :is(.boton, .primary, .mis-accion, .m3d-accion):hover:not(:disabled) { filter: brightness(1.08); }
-:root[data-tema='cristal'] :is(.youtube-lote-barra, .youtube-revision-pie, .youtube-chat) { --acento-modelo: var(--acento-youtube); }
-:root[data-tema='cristal'] .youtube-lote-barra { border-color: color-mix(in srgb, var(--acento-youtube) 35%, var(--line)); }
-
-/* El menú «Voz»: cada motor con su color. */
-:root[data-tema='cristal'] .voz-panel { --voz-acento: var(--acento-voz); }
-:root[data-tema='cristal'] .voz-pestanas button.on { border-color: color-mix(in srgb, var(--voz-acento) 45%, var(--line)); background: linear-gradient(135deg, color-mix(in srgb, var(--voz-acento) 18%, transparent), transparent), var(--cristal-fondo); box-shadow: var(--cristal-reflejo); }
-:root[data-tema='cristal'] .voz-fila.on { background: linear-gradient(130deg, color-mix(in srgb, var(--voz-acento) 17%, transparent), transparent), var(--panel-2); box-shadow: inset 2px 0 var(--voz-acento); }
-
-/* Opciones y los avisos: tarjetas con el borde de las tarjetas. */
-:root[data-tema='cristal'] .panel { border-color: var(--linea-tarjeta); border-radius: 14px; }
-:root[data-tema='cristal'] .opciones .interruptor.on { background: var(--acento-codex); }
-
-/* La marca de lo elegido que viaja por la barra lateral (`Movimiento.tsx`). */
-.movimiento-seleccion { position: fixed; z-index: 10000; pointer-events: none; transform-origin: top left; border: 1px solid color-mix(in srgb, var(--text) 25%, transparent); background: color-mix(in srgb, var(--text) 9%, transparent); box-shadow: inset 0 1px 0 color-mix(in srgb, var(--text) 15%, transparent); }
-@media (prefers-reduced-motion: reduce) {
-  .movimiento-seleccion { display: none; }
-}
-@media (prefers-reduced-motion: no-preference) {
-  :root[data-tema='cristal'] :is(.primary, .boton, .ghost, .send) { transition: color 150ms ease, background-color 150ms ease, border-color 150ms ease; }
-}
-:root[data-tema="cristal"] .imagen-cabecera > .campo-ascii { z-index: -1; opacity: .6; }
