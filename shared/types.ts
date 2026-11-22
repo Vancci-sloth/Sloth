@@ -458,6 +458,8 @@ export interface Tokens {
 }
 
 export interface SessionMeta {
+  /** El nombre de partida, mientras su agente no le ponga uno corto (`server/titulos.ts`). Renombrarlo lo quita. */
+  tituloPendiente?: string
   id: string
   cardId: string
   title: string

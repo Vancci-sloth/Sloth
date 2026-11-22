@@ -2,6 +2,7 @@ import { appendFileSync, closeSync, existsSync, mkdirSync, openSync, readdirSync
 import { cpus, freemem, totalmem } from 'node:os'
 import { join } from 'node:path'
 import { historialLigero } from '../shared/historial.ts'
+import { decodificarTitulo, tituloGenerado, tituloInicial } from './titulos.ts'
 import { leerHistorial, primerUsuario } from './historial.ts'
 import type { AgentEvent, FileDraft, SessionMeta } from '../shared/types.ts'
 import { NOMBRE_AGENTE, programaDe, proveedorDe } from '../shared/providers.ts'
@@ -149,6 +150,14 @@ export class Sessions {
         continue
       }
       this.metas.set(meta.id, meta)
+      // Los hilos de antes se llamaban como la ruta de su primer adjunto: se les pone su primer mensaje, limpio.
+      if (/^["']?[A-Za-z]:[\\/]/.test(meta.title)) {
+        const primero = this.load(meta.id).find((e) => e.t === 'user')
+        if (primero?.t === 'user' && meta.title === primero.text.split('\n')[0].slice(0, 80)) {
+          meta.title = tituloInicial(primero.text, meta.title)
+          this.save(meta)
+        }
+      }
       const cortado = meta.running
       // Los hilos de antes de guardar cómo acabó su último turno lo leen una vez de su historial.
       if (!cortado && meta.acaboBien === undefined) {
@@ -233,9 +242,11 @@ export class Sessions {
   }
 
   /** Con `carpeta`, el hilo nace sabiendo dónde trabaja: la de su video, nuevo o que ya existe. */
-  create(input: { cardId: string; title: string; model: string; effort?: string; cwd: string; carpeta?: string }): SessionMeta {
+  /** Con `generarTitulo`, su agente le pone un título corto en su primer turno (`server/titulos.ts`). */
+  create(input: { cardId: string; title: string; model: string; effort?: string; cwd: string; carpeta?: string; generarTitulo?: boolean }): SessionMeta {
     const now = Date.now()
-    const meta: SessionMeta = { id: now.toString(36) + Math.random().toString(36).slice(2, 6), ...input, createdAt: now, updatedAt: now, running: false }
+    const { generarTitulo, ...campos } = input
+    const meta: SessionMeta = { id: now.toString(36) + Math.random().toString(36).slice(2, 6), ...campos, ...(generarTitulo ? { tituloPendiente: input.title } : {}), createdAt: now, updatedAt: now, running: false }
     this.metas.set(meta.id, meta)
     this.events.set(meta.id, [])
     this.save(meta)
@@ -276,7 +287,11 @@ export class Sessions {
     const traspaso = meta.vieneDe ? { de: NOMBRE_AGENTE[meta.vieneDe], historial: join(this.dir, `${meta.id}.jsonl`) } : undefined
     const antes = meta.resumir ? `${resumenDelHilo(this.load(meta.id), meta.carpeta ?? meta.lote?.carpeta, traspaso)}\n\n` : ''
     this.emit(meta.id, { t: 'turn_start', at: Date.now() })
-    this.runFor(meta).send(antes + conRutas(text, images), pide, images)
+    // Mientras el hilo tenga su nombre de partida, su agente le pone uno corto como parte del mismo trabajo.
+    const titulo = meta.tituloPendiente === meta.title
+      ? `\n\nPara Sloth: como parte de este mismo trabajo, al principio, escribe en ${JSON.stringify(this.archivoTitulo(meta))} un título de 2 a 7 palabras en español para esta conversación (solo el título, 80 letras como mucho). Que diga qué se hace y para qué, sin rutas, nombres de archivos ni la voz elegida. Luego sigue con lo que se te pide.`
+      : ''
+    this.runFor(meta).send(antes + conRutas(text, images) + titulo, pide, images)
   }
 
   /**
@@ -482,7 +497,30 @@ export class Sessions {
     const meta = this.metas.get(id)
     if (!meta) return
     meta.title = title
+    delete meta.tituloPendiente
     this.save(meta)
+  }
+
+  /** Donde el agente deja el título corto del hilo (`turno`). */
+  private archivoTitulo(meta: SessionMeta) {
+    return join(meta.cwd, `.sloth-titulo-${meta.id}.txt`)
+  }
+
+  /** Al acabar un turno, el título que dejó el agente; si alguien ya lo renombró, se queda el suyo. */
+  private tomarTitulo(meta: SessionMeta) {
+    const archivo = this.archivoTitulo(meta)
+    if (!existsSync(archivo)) return
+    try {
+      const nuevo = statSync(archivo).size <= 512 ? tituloGenerado(decodificarTitulo(readFileSync(archivo))) : undefined
+      if (nuevo && meta.tituloPendiente === meta.title) {
+        meta.title = nuevo
+        delete meta.tituloPendiente
+        this.save(meta)
+      }
+      rmSync(archivo, { force: true })
+    } catch {
+      // Si el archivo sigue ocupado, se queda el título que tiene.
+    }
   }
 
   /** Borra la sesión del disco. Con el agente trabajando no: se cortaría a medias. */
@@ -696,7 +734,10 @@ export class Sessions {
     this.push(id, list.length - 1, [event])
     const running = event.t === 'turn_end' ? false : event.t === 'turn_start' ? true : meta.running
     if (event.t === 'turn_end' && event.ok) delete meta.retomas
-    if (event.t === 'turn_end') meta.acaboBien = event.ok
+    if (event.t === 'turn_end') {
+      meta.acaboBien = event.ok
+      if (meta.tituloPendiente) this.tomarTitulo(meta)
+    }
     if (running !== meta.running || event.t === 'user') {
       meta.running = running
       meta.updatedAt = Date.now()

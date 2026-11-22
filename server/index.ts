@@ -56,6 +56,7 @@ import { equipo } from './equipo.ts' // tu equipo
 import { celular } from './celular.ts' // tu celular
 import { licencia } from './licencia.ts' // suscripción
 import { Sessions, ultimoTexto } from './sessions.ts'
+import { pedidoParaTitulo, tituloInicial } from './titulos.ts'
 import { actividadAgentes } from './actividad-agentes.ts' // actividad de los agentes
 import { mantenerVoz } from './voz-viva.ts'
 import { avisoDeVideos } from '../shared/limites.ts'
@@ -765,16 +766,18 @@ async function api(req: IncomingMessage, res: ServerResponse, url: URL): Promise
     // Uno que sale de Ideas se llama como la idea (su línea `Título:`); los demás, como su primer mensaje, hasta que llegue
     // el título corto.
     const titulo = /^Título: (.+)$/m.exec(input.text)?.[1].trim()
-    const title = (titulo ?? input.text.split('\n')[0]).slice(0, 80) || (input.images?.length ? 'Imagen' : card.title)
+    const title = titulo?.slice(0, 80) || tituloInicial(input.text, input.images?.length ? 'Imagen' : card.title)
     // Un video nuevo también nace con su carpeta, como los de un lote: la skill la crea con el nombre de la línea `Carpeta:`.
     const nueva = card.etapas?.length ? carpetaDeVideo(card, title) : undefined // panel de etapas
-    const meta = sessions.create({ cardId: card.id, title, model: input.model, effort: input.effort, cwd: card.cwd, carpeta: nueva })
+    // El título corto: el de Claude lo pone Haiku aparte; los demás agentes, en su primer turno (`server/titulos.ts`).
+    const pedido = pedidoParaTitulo(input.text)
+    const claude = proveedorDe(input.model) === 'claude'
+    const meta = sessions.create({ cardId: card.id, title, model: input.model, effort: input.effort, cwd: card.cwd, carpeta: nueva, generarTitulo: !titulo && !!pedido && !claude && !card.sinHerramientas })
     const text = [input.text, nueva && `Carpeta: ${nueva}`].filter(Boolean).join('\n\n')
     sessions.send(meta.id, text, card.skill ? skillRef(card.skill) : undefined, input.images)
     // El primer mensaje recortado se cambia por un título corto cuando llega, como un renombrado. Nadie lo espera; si
     // falla, o mientras alguien le puso otro nombre, se queda el que tiene. Sin las líneas que añade la app.
-    const pedido = input.text.replace(/^(Formato|Subagentes): .*$/gm, '').trim()
-    if (!titulo && pedido && proveedorDe(input.model) === 'claude')
+    if (!titulo && pedido && claude)
       void tituloCorto(pedido)
         .then((corto) => corto && sessions.meta(meta.id)?.title === title && sessions.rename(meta.id, corto))
         .catch((e) => console.error('Título corto:', e instanceof Error ? e.message : e))
