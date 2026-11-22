@@ -1927,6 +1927,8 @@ export interface EstadoNavegador {
   adelante: boolean
   agente: boolean
   zoom: number
+  /** La silenciaste a mano; además, una página que no se ve nunca suena (`electron/audio-navegador.ts`). */
+  silenciado?: boolean
   icono?: string
   /** Estás entrando con Google en este navegador (Edge o Chrome): Google no deja hacerlo dentro de la app. */
   google?: string
@@ -1939,7 +1941,7 @@ export interface PantallaNavegador {
   alto: number
 }
 
-export type AccionNavegador = 'atras' | 'adelante' | 'recargar' | 'parar' | 'fuera' | 'acercar' | 'alejar' | 'zoomNormal' | 'menu' | 'cerrar'
+export type AccionNavegador = 'atras' | 'adelante' | 'recargar' | 'parar' | 'fuera' | 'acercar' | 'alejar' | 'zoomNormal' | 'menu' | 'cerrar' | 'silenciar'
 
 export interface PuenteNavegador {
   /**

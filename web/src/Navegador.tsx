@@ -382,12 +382,17 @@ export function PanelNavegador({ hilo, trabajando }: { hilo: string; trabajando:
         <button className="navegador-boton" disabled={!e?.url} title="Abrir en tu navegador" onClick={() => hacer('fuera')}>
           <Icono de="fuera" />
         </button>
+        {!redes && !enLaWeb && (
+          <button className={`navegador-boton${e?.silenciado ? ' on' : ''}`} disabled={!e?.url} title={e?.silenciado ? 'Activar el sonido de esta pestaña' : 'Silenciar esta pestaña'} aria-label={e?.silenciado ? 'Activar el sonido de esta pestaña' : 'Silenciar esta pestaña'} aria-pressed={!!e?.silenciado} onClick={() => hacer('silenciar')}>
+            <Icono de={e?.silenciado ? 'silencio' : 'sonido'} />
+          </button>
+        )}
         {!enLaWeb && (
           <button className="navegador-boton" disabled={!e?.url} title="Más" onClick={() => hacer('menu')}>
             <Icono de="puntos" />
           </button>
         )}
-        <button className="navegador-boton" title="Esconder el navegador" onClick={() => abrirNavegador(hilo, false)}>
+        <button className="navegador-boton" title="Esconder el navegador (y callarlo)" onClick={() => abrirNavegador(hilo, false)}>
           <Icono de="cerrar" />
         </button>
       </div>

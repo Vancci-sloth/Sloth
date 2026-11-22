@@ -35,6 +35,7 @@ import { WebSocketServer, type WebSocket } from 'ws'
 import { guardar } from '../server/disco.ts'
 import { crearRelevo, type Relevo } from './relevo.ts'
 import { actividadNavegador } from './actividad-navegador.ts'
+import { audioNavegador } from './audio-navegador.ts'
 import { type EnGoogle, vigilarGoogle } from './google.ts'
 import { type AccionNavegador, type EntradaNavegador, type EstadoNavegador, NAVEGADOR_REDES, NAVEGADOR_VOZ, type PantallaNavegador } from '../shared/types.ts'
 import { entradaCdp } from '../shared/entrada-cdp.ts'
@@ -61,6 +62,8 @@ interface Hoja {
   /** Las conexiones del agente, cada una con su relevo. */
   conexiones: Map<WebSocket, Relevo>
   actividad: ReturnType<typeof actividadNavegador>
+  /** Solo suena la que se ve; `silenciar` es la preferencia de quien la mira. */
+  audio: ReturnType<typeof audioNavegador>
   /** La última vez que se vio o se usó. */
   usada: number
   /** El navegador donde estás entrando con Google (`google.ts`), mientras tanto. */
@@ -200,6 +203,7 @@ export function ventanaDelNavegador(v: BrowserWindow) {
   v.on('closed', () => {
     if (ventana === v) ventana = undefined
     vista = null
+    for (const h of hojas.values()) h.audio.ver(false)
   })
 }
 
@@ -216,8 +220,9 @@ function abrir(hilo: string): Hoja {
     wc.setBackgroundThrottling(frenable(hilo) && ahorro)
     if (wc.debugger.isAttached()) await wc.debugger.sendCommand('Emulation.setFocusEmulationEnabled', { enabled: !ahorro })
   })
-  // La de las redes publica escondida: el video que sube no suena. La de la voz tampoco suena al generar.
-  if (PERFILES[hilo]) wc.setAudioMuted(true)
+  // Solo suena la página que se ve: una escondida (otro hilo, el panel cerrado, Sloth minimizada) se calla y, al volver,
+  // respeta el silencio que le pusiste. La de las redes publica escondida y la de la voz genera: esas nunca suenan.
+  const audio = audioNavegador((si) => { if (!wc.isDestroyed()) wc.setAudioMuted(si) }, !!PERFILES[hilo])
   // Google no deja entrar dentro de la app: se entra en Edge (`google.ts`). Las redes y la voz lo hacen a su manera.
   if (!PERFILES[hilo]) {
     vigilarGoogle(wc.session, carpeta, wc, enGoogle)
@@ -231,7 +236,7 @@ function abrir(hilo: string): Hoja {
     wc.once('did-navigate', () => r())
     wc.once('did-stop-loading', () => r())
   })
-  const h: Hoja = { hilo, vista: v, conexiones: new Map(), actividad, usada: Date.now(), zoom: 1, escala: 1, emulada: '', caidas: [], descargas: null, guid: null, lista }
+  const h: Hoja = { hilo, vista: v, conexiones: new Map(), actividad, audio, usada: Date.now(), zoom: 1, escala: 1, emulada: '', caidas: [], descargas: null, guid: null, lista }
   hojas.set(hilo, h)
   void wc.loadURL('about:blank')
   wc.setWindowOpenHandler(({ url, disposition, postBody }) => {
@@ -350,6 +355,7 @@ function estado(h: Hoja): EstadoNavegador {
     adelante: wc.navigationHistory.canGoForward(),
     agente: h.conexiones.size > 0,
     zoom: h.zoom,
+    silenciado: h.audio.silenciado,
     ...(h.icono ? { icono: h.icono } : {}),
     ...(h.google ? { google: h.google } : {}),
     ...(h.error ? { error: h.error } : {})
@@ -396,8 +402,10 @@ function colocar(h: Hoja) {
   const v = h.vista
   const e = estado(h)
   const visible = !!ventana && vista?.hilo === h.hilo && !!e.url && !e.error && !e.google
-  // Con Sloth minimizada o escondida tampoco la ve nadie: la vista sigue puesta, pero la página puede descansar.
-  h.actividad.ver(visible && ventana!.isVisible() && !ventana!.isMinimized())
+  // Con Sloth minimizada o escondida tampoco la ve nadie: la vista sigue puesta, pero la página puede descansar y callarse.
+  const laVen = visible && ventana!.isVisible() && !ventana!.isMinimized()
+  h.actividad.ver(laVen)
+  h.audio.ver(laVen)
   if (!visible || !ventana || !vista) return v.setVisible(false)
   // La caja llega en píxeles de la interfaz: con zoom, no son los de la ventana.
   const z = ventana.webContents.getZoomFactor()
@@ -430,6 +438,10 @@ function hacer(hilo: string, accion: AccionNavegador) {
   const h = hojas.get(hilo)
   if (!h) return
   const wc = h.vista.webContents
+  if (accion === 'silenciar') {
+    h.audio.alternar()
+    mandar(estado(h))
+  }
   if (accion === 'atras') wc.navigationHistory.goBack()
   if (accion === 'adelante') wc.navigationHistory.goForward()
   if (accion === 'recargar') void (h.fallida ? wc.loadURL(h.fallida).catch(() => {}) : wc.reload())
