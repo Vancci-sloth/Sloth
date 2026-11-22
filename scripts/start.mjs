@@ -4,12 +4,15 @@ import { spawn } from 'node:child_process'
 import { existsSync, readFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { delimiter, dirname, join } from 'node:path'
+import { createInterface } from 'node:readline'
 import { fileURLToPath } from 'node:url'
 
 const APP = join(dirname(fileURLToPath(import.meta.url)), '..')
 const PORT = process.env.PORT ?? '4848'
 const URL = `http://localhost:${PORT}`
 let opened = process.argv.includes('--no-open')
+// Compilar Electron mientras arranca el servidor evita hacerlo después de anunciar la dirección.
+const ventanaPreparada = opened ? Promise.resolve() : import('./electron.mjs').then((m) => m.prepararVentana()).then(() => null, (error) => error)
 // La app compilada (`scripts/compilar.mjs`) trae el servidor ya armado; el repo lo corre con tsx.
 const SERVIDOR = existsSync(join(APP, 'server', 'index.mjs')) ? ['server/index.mjs'] : ['--import', 'tsx', 'server/index.ts']
 // Lo que corren los agentes (`node`, `npm`, `codex`) sale de este Node y de los paquetes de Sloth, aunque la computadora
@@ -47,7 +50,10 @@ process.env.PATH = [...camino, process.env.PATH].join(delimiter)
  */
 async function abrir() {
   opened = true
+  console.log('Abriendo la ventana de Sloth…')
   try {
+    const errorPreparando = await ventanaPreparada
+    if (errorPreparando) throw errorPreparando
     const { abrirVentana } = await import('./electron.mjs')
     if (await abrirVentana(URL)) return
   } catch (error) {
@@ -59,9 +65,14 @@ async function abrir() {
 
 function run() {
   const child = spawn(process.execPath, SERVIDOR, { cwd: APP, stdio: ['inherit', 'pipe', 'inherit'] })
-  child.stdout.on('data', (d) => {
-    process.stdout.write(d)
-    if (!opened && String(d).includes('Sloth en')) void abrir()
+  child.on('error', (error) => {
+    console.error(`No se pudo arrancar Sloth: ${error.message}`)
+    process.exitCode = 1
+  })
+  child.stdout.pipe(process.stdout, { end: false })
+  const salida = createInterface({ input: child.stdout })
+  salida.on('line', (linea) => {
+    if (!opened && linea.endsWith(` en ${URL}`)) void abrir()
   })
   child.on('exit', (code, signal) => {
     if (code === 75) return run()

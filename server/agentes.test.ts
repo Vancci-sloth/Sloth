@@ -7,7 +7,27 @@ import test from 'node:test'
 // Las piezas van a una carpeta de prueba: `agentes.ts` la lee al importarse.
 const appdata = mkdtempSync(join(tmpdir(), 'sloth-agentes-'))
 process.env.APPDATA = appdata
-const { cabe, descartarRoto, masNueva, rutaAgente, versionVisible } = await import('./agentes.ts')
+const { cabe, descartarRoto, masNueva, rutaAgente, versionVisible, entornoInstalacionNpm } = await import('./agentes.ts')
+const { correr } = await import('./version.ts')
+test('el instalador de agentes descarta la política de scripts heredada de npm start', () => {
+  const env = { npm_config_allow_scripts: 'opencode-ai', NPM_CONFIG_ALLOW_SCRIPTS: 'otro', npm_config_registry: 'https://registro.example', PATH: 'bin' }
+  const limpio = { ...env, ...entornoInstalacionNpm(env) }
+  assert.equal(limpio.npm_config_allow_scripts, undefined)
+  assert.equal(limpio.NPM_CONFIG_ALLOW_SCRIPTS, undefined)
+  assert.equal(limpio.npm_config_registry, env.npm_config_registry)
+  assert.equal(limpio.PATH, env.PATH)
+  assert.equal(env.npm_config_allow_scripts, 'opencode-ai')
+})
+test('npm instala una pieza local sin EALLOWSCRIPTS con la política heredada saneada', async () => {
+  const origen = join(appdata, 'pieza-local')
+  const destino = join(appdata, 'instalacion-local')
+  mkdirSync(origen, { recursive: true })
+  mkdirSync(destino, { recursive: true })
+  writeFileSync(join(origen, 'package.json'), JSON.stringify({ name: 'sloth-pieza-prueba', version: '1.0.0' }))
+  const heredado = { ...process.env, npm_config_allow_scripts: 'opencode-ai' }
+  await correr(`npm install --prefix "${destino}" --no-save --no-audit --no-fund --ignore-scripts --offline --install-links --package-lock=false "${origen}"`, destino, { ...heredado, ...entornoInstalacionNpm(heredado) })
+  assert.ok(existsSync(join(destino, 'node_modules', 'sloth-pieza-prueba', 'package.json')))
+})
 test.after(() => rmSync(appdata, { recursive: true, force: true }))
 
 // Grok no viene en la app: solo se busca en lo bajado.

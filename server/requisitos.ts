@@ -243,6 +243,7 @@ export async function instalarPythonSloth(app: string, { raiz = PYTHONES, modelo
     await pip(...TORCH, ...PIP_SLOTH, ...(motor === 'parakeet' ? [PARAKEET] : []))
   }
   mkdirSync(modelos, { recursive: true })
+  paso = 'Comprobando los modelos de transcripción'
   return ejecutar(python, [...BANDERAS, '-c', BAJAR_MODELOS, modelos, motor], join(app, 'python', 'procesos'), verPaso)
 }
 
@@ -417,7 +418,11 @@ function ejecutar(exe: string, args: string[], cwd: string, alLeer?: (linea: str
     proc.stdout.on('data', leer)
     proc.stderr.on('data', leer)
     proc.on('error', falla)
-    proc.on('exit', (code) => (code === 0 ? ok(salida.trim()) : falla(new Error(salida.trim().slice(-600) || `${exe} salió con código ${code}`))))
+    proc.on('close', (code) => {
+      if (resto) alLeer?.(resto)
+      if (code === 0) ok(salida.trim())
+      else falla(new Error(salida.trim().slice(-600) || `${exe} salió con código ${code}`))
+    })
   })
 }
 
@@ -540,18 +545,19 @@ export async function requisitos(app: string, fresco = false, skill?: string): P
 function mirar(app: string, de: Pieza[]): Promise<Requisito[]> {
   return Promise.all(
     de.map(async (p): Promise<Requisito> => {
-      const hallado = await p.mirar(app)
+      const enCurso = instalacionDe(p.id)
+      const hallado = enCurso.estado ? null : await p.mirar(app)
       return {
         id: p.id,
         nombre: p.nombre,
         para: p.para,
         listo: hallado !== null,
         // Mientras se instala, en qué va; si no, lo que se encontró o lo que falta.
-        detalle: instalando?.id === p.id ? paso : hallado !== null ? hallado || undefined : await p.falta?.(app),
+        detalle: enCurso.estado ? enCurso.paso : hallado !== null ? hallado || undefined : await p.falta?.(app),
         instalable: !!p.instalar,
         aMano: p.aMano,
         opcional: p.opcional,
-        estado: instalando?.id === p.id ? 'instalando' : cola.some((c) => c.id === p.id) ? 'esperando' : undefined,
+        estado: enCurso.estado,
         error: fallos[p.id]
       }
     })
@@ -608,11 +614,15 @@ async function siguiente(app: string) {
   } catch (e) {
     fallos[pieza.id] = e instanceof Error ? e.message : String(e)
   }
+  try {
+    paso = 'Verificando la instalación'
+    refrescarPath()
+    if ((await pieza.mirar(app)) !== null) delete fallos[pieza.id]
+    else fallos[pieza.id] ??= 'La instalación terminó, pero Sloth todavía no encuentra todos los componentes. Puedes volver a intentarlo.'
+  } catch (e) {
+    fallos[pieza.id] ??= e instanceof Error ? e.message : String(e)
+  }
   paso = undefined
-  refrescarPath()
-  // Lo que cuenta es si ahora se encuentra: un instalador puede salir con error si ya estaba (fuera del PATH de este proceso).
-  if ((await pieza.mirar(app)) !== null) delete fallos[pieza.id]
-  else fallos[pieza.id] ??= 'Se instaló, pero no aparece. Cierra Sloth y vuelve a abrirlo.'
   await siguiente(app)
 }
 

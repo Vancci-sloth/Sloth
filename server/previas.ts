@@ -48,8 +48,9 @@ export function previas(dir: string, cards: () => Card[]) {
     await execFileP('ffmpeg', [
       '-nostdin', '-v', 'error', '-y',
       ...inicios.flatMap((s) => ['-ss', s.toFixed(2), '-t', String(largo), '-i', origen]),
-      '-filter_complex', `${tramos};${juntos}`,
-      '-map', '[clip]', '-an', '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '30', '-pix_fmt', 'yuv420p', '-movflags', '+faststart', `${tmp}.mp4`,
+      // Con pocos hilos: es una previa de fondo y no debe quitarle la máquina a un render.
+      '-filter_complex_threads', '1', '-filter_complex', `${tramos};${juntos}`,
+      '-map', '[clip]', '-an', '-c:v', 'libx264', '-threads', '2', '-preset', 'veryfast', '-crf', '30', '-pix_fmt', 'yuv420p', '-movflags', '+faststart', `${tmp}.mp4`,
       '-map', '[cuadro]', '-frames:v', '1', '-q:v', '4', `${tmp}.jpg`
     ], { timeout: 120_000 })
     renameSync(`${tmp}.mp4`, join(dir, `${nombre}.mp4`))

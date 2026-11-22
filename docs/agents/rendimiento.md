@@ -102,6 +102,15 @@ El muro de la tienda que se mueve (19 de noviembre, copia de desarrollo, Edge co
   principal un 1 %. Es de reproducirlos (se decodifican en la GPU, `D3D11VideoDecoder`), no de la app. Con adelantos de
   320 px baja a un 33 %: el adelanto ahorra descarga, casi nada de procesador.
 
+## Lo que se trajo de VyMotion (22 de noviembre)
+
+Sin medirlo aquí: `npm start` arma la ventana de Electron mientras arranca el servidor; Vite recibe React y `marked` ya
+dichos y precalienta `main.tsx`; los catálogos de los agentes se piden de dos en dos y uno que falla no frena a los demás;
+yt-dlp se mira a los dos minutos de abrir; las previas de las cards usan un hilo de filtro y dos de x264, y la cuenta de
+cada agente se lee una vez aunque la pidan varios a la vez (`leerCuenta`). Las voces de Fish, ElevenLabs, Vibi y Groq ya
+no se piden al abrir: solo la llave que aún no tiene su lista. Lo que VyMotion midió con su carrusel y sus vistas
+`lazy()` no se trajo.
+
 ## Lo que se midió y no vale la pena
 
 - Partir el JS de la interfaz con `lazy()`: se monta en 25 ms, y en 90 ms con la CPU 6× más lenta, ya en caché. En frío, unos

@@ -312,7 +312,10 @@ export const alBajarAgente = (fn: () => void) => void alBajarse.push(fn)
 
 export function estadoAgente(p: Proveedor): EstadoAgente {
   const g = programaDe(p)
-  return { nombre: AGENTES[g].nombre, instalado: !!rutaAgente(g), instalando: instalando.has(g), error: errores.get(g), pesa: AGENTES[g].pesa }
+  const instalado = !!rutaAgente(g)
+  // La pieza puede haberse recuperado en otro proceso o mediante «Actualizar los agentes».
+  if (instalado) errores.delete(g)
+  return { nombre: AGENTES[g].nombre, instalado, instalando: instalando.has(g), error: errores.get(g), pesa: AGENTES[g].pesa }
 }
 
 export const estadoAgentes = () =>
@@ -331,7 +334,10 @@ export const bajandoAgente = () => {
 export function asegurarAgente(proveedor: Proveedor): Promise<string> {
   const p = programaDe(proveedor)
   const ya = rutaAgente(p)
-  if (ya) return Promise.resolve(ya)
+  if (ya) {
+    errores.delete(p)
+    return Promise.resolve(ya)
+  }
   const enCurso = instalando.get(p)
   if (enCurso) return enCurso
   errores.delete(p)
@@ -361,6 +367,7 @@ export function asegurarAgente(proveedor: Proveedor): Promise<string> {
   descarga.then(
     () => {
       instalando.delete(p)
+      errores.delete(p)
       for (const fn of alBajarse) fn()
     },
     (e) => {
@@ -568,8 +575,13 @@ export function conAgente(p: Proveedor, opts: AgentOptions, arrancar: (opts: Age
 }
 
 /** Instala `paquete` en `dir` con el npm de Sloth, sin package.json propio ni scripts de instalación. */
+export function entornoInstalacionNpm(env: NodeJS.ProcessEnv): Record<string, undefined> {
+  // npm start exporta la política del .npmrc como variable de entorno. npm 11 la interpreta como un flag de CLI.
+  return Object.fromEntries(Object.keys(env).filter((nombre) => /^npm_config_allow[-_]scripts$/i.test(nombre)).map((nombre) => [nombre, undefined]))
+}
+
 function npm(dir: string, paquete: string) {
-  return correr(`npm install --prefix "${dir}" --no-save --no-audit --no-fund --ignore-scripts --loglevel=error ${paquete}`, dir)
+  return correr(`npm install --prefix "${dir}" --no-save --no-audit --no-fund --ignore-scripts --loglevel=error ${paquete}`, dir, entornoInstalacionNpm(process.env))
 }
 
 /**

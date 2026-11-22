@@ -426,14 +426,26 @@ function pedirModelos() {
     ['opencode', opencodeModels],
     ...Object.entries(OTROS).map(([p, o]): [Proveedor, () => Promise<Model[]>] => [p as Proveedor, o!.modelos])
   ]
-  void Promise.allSettled(pedidos.map(async ([p, pedir], i) => {
-    await new Promise((listo) => setTimeout(listo, i * ENTRE_AGENTES))
-    const lista = await pedir()
-    // Sin cuenta de OpenCode (o de los demás que no son Claude ni Codex) no hay sus modelos: quitarla los quita.
-    if (!lista.length && (p === 'claude' || p === 'codex' || !modelos.some((m) => proveedorDe(m.id) === p))) return
-    modelos = [...modelos.filter((m) => proveedorDe(m.id) !== p), ...lista]
-    broadcast({ type: 'models', models: modelos })
-  })).finally(() => {
+  // De dos en dos (como en VyMotion): cada uno lanza un programa, y todos a la vez frenaban el servidor al abrir. Si un
+  // catálogo falla, los demás siguen llegando.
+  let siguiente = 0
+  async function consultar() {
+    while (siguiente < pedidos.length) {
+      const [p, pedir] = pedidos[siguiente++]
+      try {
+        const lista = await pedir()
+        // Sin cuenta de OpenCode (o de los demás que no son Claude ni Codex) no hay sus modelos: quitarla los quita.
+        if (lista.length || (p !== 'claude' && p !== 'codex' && modelos.some((m) => proveedorDe(m.id) === p))) {
+          modelos = [...modelos.filter((m) => proveedorDe(m.id) !== p), ...lista]
+          broadcast({ type: 'models', models: modelos })
+        }
+      } catch {
+        // Sin ese catálogo por ahora.
+      }
+      if (siguiente < pedidos.length) await new Promise((listo) => setTimeout(listo, ENTRE_AGENTES))
+    }
+  }
+  void Promise.allSettled([consultar(), new Promise((listo) => setTimeout(listo, ENTRE_AGENTES)).then(consultar)]).finally(() => {
     cargandoModelos = false
     if (otraVez) {
       otraVez = false
@@ -1113,10 +1125,11 @@ async function interfazDelRepo(vite: typeof import('vite'), react: typeof import
       // Las dependencias (React) también, aunque Vite las vuelva a armar más tarde, con `NODE_ENV` ya devuelto. Sin
       // `keepProcessEnv`, la huella de las dependencias armadas incluye `NODE_ENV`, que cambia al devolverlo: Vite las volvía
       // a armar en cada arranque, y recargaba la página.
-      optimizeDeps: { rolldownOptions: { transform: { define: produccion } } },
+      // Las dependencias de siempre, ya dichas, y `main.tsx` precalentado: la primera carga no espera a descubrirlas.
+      optimizeDeps: { include: ['react', 'react-dom/client', 'marked'], rolldownOptions: { transform: { define: produccion } } },
       environments: { client: { keepProcessEnv: true } },
       // Por la web llega con el host del túnel (server/web.ts), que Vite no deja pasar si no lo conoce.
-      server: { middlewareMode: true, hmr: { server }, allowedHosts: ['.trycloudflare.com'] },
+      server: { middlewareMode: true, hmr: { server }, allowedHosts: ['.trycloudflare.com'], warmup: { clientFiles: ['./src/main.tsx'] } },
       appType: 'spa'
     })
     return servidor.middlewares
@@ -1207,6 +1220,7 @@ server.listen(PORT, '127.0.0.1', () => {
   }, TRAS_ABRIR)
   // yt-dlp al día, una vez al día: se mira cada hora por si a esa hora trabajaba algo.
   const ytDlp = () => void actualizarYtDlp(APP, () => !ocupado())
-  setTimeout(ytDlp, 30_000)
+  // A los dos minutos: al abrir, Sloth ya tiene bastante que hacer.
+  setTimeout(ytDlp, 120_000).unref()
   setInterval(ytDlp, 3_600_000).unref()
 })

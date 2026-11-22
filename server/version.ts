@@ -9,8 +9,8 @@ import { rutaAgente, versionFija, versionVisible } from './agentes.ts'
  */
 export type Agente = Proveedor
 
-/** Corre un comando y devuelve lo que escribió. Si falla, el error lleva el final de la salida. */
-export function correr(comando: string, cwd: string, env?: Record<string, string>): Promise<string> {
+/** Corre un comando y devuelve lo que escribió. Si falla, el error lleva el final de la salida. En `env`, `undefined` quita la variable. */
+export function correr(comando: string, cwd: string, env?: Record<string, string | undefined>): Promise<string> {
   return new Promise((ok, falla) => {
     const proc = spawn(comando, { cwd, shell: true, stdio: ['ignore', 'pipe', 'pipe'], ...(env ? { env: { ...process.env, ...env } } : {}) })
     let salida = ''

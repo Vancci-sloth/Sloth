@@ -22,8 +22,20 @@ export async function armarVentana(salida, { macFirmada = false, mac12 = false }
     define: { __MAC_FIRMADA__: String(macFirmada), __MAC12__: String(mac12) },
     logLevel: 'warning'
   }
-  await build({ ...comun, entryPoints: [join(REPO, 'electron', 'main.ts')], outfile: join(salida, 'main.cjs') })
-  await build({ ...comun, entryPoints: [join(REPO, 'electron', 'preload.ts')], outfile: join(salida, 'preload.cjs') })
+  await Promise.all([
+    build({ ...comun, entryPoints: [join(REPO, 'electron', 'main.ts')], outfile: join(salida, 'main.cjs') }),
+    build({ ...comun, entryPoints: [join(REPO, 'electron', 'preload.ts')], outfile: join(salida, 'preload.cjs') })
+  ])
+}
+
+const salida = join(REPO, 'node_modules', '.cache', 'sloth-ventana')
+let preparada
+/** Se prepara junto al servidor; abrir la ventana no vuelve a compilarla. */
+export function prepararVentana() {
+  return preparada ??= armarVentana(salida).catch((error) => {
+    preparada = undefined
+    throw error
+  })
 }
 
 /**
@@ -37,10 +49,18 @@ export async function abrirVentana(url) {
   } catch {
     return false
   }
-  const salida = join(REPO, 'node_modules', '.cache', 'sloth-ventana')
-  await armarVentana(salida)
+  await prepararVentana()
   // Si quien lanza Sloth corre dentro de otra app de Electron (un editor), esto haría de electron.exe un Node.
   const { ELECTRON_RUN_AS_NODE, ...env } = process.env
-  spawn(electron, [join(salida, 'main.cjs')], { detached: true, stdio: 'ignore', env: { ...env, SLOTH_VENTANA: url, SLOTH_APP: REPO } }).unref()
+  const ventana = spawn(electron, [join(salida, 'main.cjs')], { detached: true, stdio: ['ignore', 'ignore', 'inherit'], env: { ...env, SLOTH_VENTANA: url, SLOTH_APP: REPO } })
+  await new Promise((ok, fallo) => {
+    ventana.once('spawn', ok)
+    ventana.once('error', fallo)
+  })
+  ventana.on('error', (error) => console.error(`No se pudo mantener la ventana de Sloth: ${error.message}`))
+  ventana.on('exit', (codigo) => {
+    if (codigo) console.error(`La ventana de Sloth se cerró con código ${codigo}. Puedes abrir ${url} en el navegador.`)
+  })
+  ventana.unref()
   return true
 }

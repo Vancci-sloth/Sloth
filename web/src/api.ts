@@ -5,6 +5,17 @@ export class ErrorApi extends Error {
   }
 }
 
+const cuentasEnCurso = new Map<string, Promise<unknown>>()
+
+/** Una sola lectura de cada cuenta a la vez: al abrir, el inicio, la bienvenida y Opciones la piden juntos. */
+export function leerCuenta<T>(ruta: string): Promise<T> {
+  const antes = cuentasEnCurso.get(ruta)
+  if (antes) return antes as Promise<T>
+  const lectura = api<T>(ruta).finally(() => cuentasEnCurso.delete(ruta))
+  cuentasEnCurso.set(ruta, lectura)
+  return lectura
+}
+
 /** Quien le pregunta al usuario si sigue, cuando el servidor pide confirmar (`AvisoVideos.tsx`). */
 let preguntar: ((aviso: string) => Promise<boolean>) | undefined
 export const alPreguntar = (f: typeof preguntar) => void (preguntar = f)

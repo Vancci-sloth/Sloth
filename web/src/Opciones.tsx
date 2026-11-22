@@ -1,6 +1,6 @@
 import { type ReactNode, type Ref, useEffect, useRef, useState } from 'react'
 import { type CuentaClaude as Cuenta, type Opciones as Datos, type EstadoAgente, type LimitesClaude, type Model, type NavegadorDeFuera, NAVEGADOR_REDES, type Requisito, type VersionClaude } from '../../shared/types'
-import { api } from './api'
+import { api, leerCuenta } from './api'
 import { Arranque } from './Arranque'
 import { ActividadAgentes } from './ActividadAgente' // actividad de los agentes
 import { CampoAscii } from './CampoAscii' // fondos de los temas que los piden
@@ -594,7 +594,7 @@ function useCuentas(models: Model[]) {
       if (vivo) setCuentas(c)
     }
     const leer = () =>
-      Promise.all([api<Cuenta>('/api/claude/cuenta'), api<Cuenta>('/api/codex/cuenta'), api<Cuenta>('/api/opencode/cuenta')]).then(
+      Promise.all([leerCuenta<Cuenta>('/api/claude/cuenta'), leerCuenta<Cuenta>('/api/codex/cuenta'), leerCuenta<Cuenta>('/api/opencode/cuenta')]).then(
         ([claude, codex, opencode]) => saber(claude.conectada ? 'claude' : codex.conectada ? 'codex' : opencode.conectada ? 'opencode' : 'ninguna'),
         () => vivo && setCuentas('claude')
       )
