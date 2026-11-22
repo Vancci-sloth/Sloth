@@ -426,7 +426,7 @@ function pedirModelos() {
     ['opencode', opencodeModels],
     ...Object.entries(OTROS).map(([p, o]): [Proveedor, () => Promise<Model[]>] => [p as Proveedor, o!.modelos])
   ]
-  // De dos en dos (como en VyMotion): cada uno lanza un programa, y todos a la vez frenaban el servidor al abrir. Si un
+  // De dos en dos: cada uno lanza un programa, y todos a la vez frenaban el servidor al abrir. Si un
   // catálogo falla, los demás siguen llegando.
   let siguiente = 0
   async function consultar() {

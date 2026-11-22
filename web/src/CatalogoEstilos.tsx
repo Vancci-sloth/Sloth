@@ -11,7 +11,7 @@ import './CatalogoEstilos.css'
 /**
  * «Ver todos» los estilos (`#/estilos`, desde el estante del inicio): cada estilo de video con su icono, su versión y qué
  * hace, con un buscador, para elegir uno cuando ya no caben en el estante. «Usar estilo» abre su chat nuevo; «Crear
- * estilo», el de «Nuevo estilo». Viene del catálogo de VyMotion.
+ * estilo», el de «Nuevo estilo».
  */
 export function CatalogoEstilos({ cards, abrir }: { cards: Card[]; abrir(cardId: string): void }) {
   const [consulta, setConsulta] = useState('')

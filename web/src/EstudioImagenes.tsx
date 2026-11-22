@@ -14,7 +14,7 @@ import './EstudioImagenes.css'
  * «Imágenes» (`#/imagenes`, `server/flow/index.ts` → `/api/flow/estudio`): pides una imagen sin abrir un chat, con un
  * estilo, un modelo (los de Google Flow, con tus cuentas de Opciones, o ChatGPT) y un formato. Con «Prompt» y un modelo,
  * un agente escribe antes el pedido. Las hechas quedan en la galería; «Editar» abre el editor (`EditorImagen.tsx`,
- * `#/imagenes/editar/<id>`). Viene de VyMotion.
+ * `#/imagenes/editar/<id>`).
  */
 
 const RUTA = '/api/flow/estudio'

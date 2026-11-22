@@ -1,5 +1,5 @@
 /*
- * El tema Cristal (`web/src/temas.ts`), con el aspecto de VyMotion: una escala neutra de grises (Cod Gray) en vez del
+ * El tema Cristal (`web/src/temas.ts`): una escala neutra de grises (Cod Gray) en vez del
  * oscuro cálido, el acento en gris claro, controles de cristal con el color de cada agente, la barra lateral en tarjetas y
  * los fondos de signos de `CampoAscii.tsx`. Todo va bajo `:root[data-tema="cristal"]`: sin el atributo (tema Sloth) nada
  * de aquí aplica. Éxito y error se quedan con sus colores.

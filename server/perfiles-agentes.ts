@@ -1,5 +1,5 @@
 /**
- * Varias cuentas de Claude y de ChatGPT (Codex), cada una en su carpeta, como en VyMotion. La de siempre es la «original»
+ * Varias cuentas de Claude y de ChatGPT (Codex), cada una en su carpeta. La de siempre es la «original»
  * (`ORIGINAL`): la configuración que el agente ya usaba (`~/.claude` y `~/.codex` en la app que se vende; `data/claude` en
  * la copia del repo). No se mueve ni se copia: quien ya tenía su cuenta conectada la conserva tal cual. Las que se agregan
  * en Opciones viven en `data/cuentas-<agente>/<id>` (su `CLAUDE_CONFIG_DIR` o su `CODEX_HOME`), con las skills enlazadas.
