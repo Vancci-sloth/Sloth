@@ -359,6 +359,11 @@ a.link-chip:hover { border-color: var(--amber); }
 .picker-buscar { position: sticky; top: -4px; z-index: 1; display: block; width: calc(100% + 8px); margin: -4px -4px 4px; padding: 9px 14px; border: 0; border-bottom: 1px solid var(--line); border-radius: 12px 12px 0 0; background: var(--panel); font-size: 13px; outline: none; }
 .picker-buscar::placeholder { color: var(--muted); }
 .picker-label { display: block; padding: 6px 10px 4px; font-size: 11px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); }
+/* Los modelos de cada proveedor, bajo su logo. */
+.picker-group[data-proveedor] .picker-label { display: flex; align-items: center; gap: 7px; }
+.picker-label .logo.chico { width: 18px; height: 18px; border-radius: 5px; }
+.picker-label .logo.chico svg { width: 11px; height: 11px; }
+.picker-label .logo.chico img { width: 13px; height: 13px; }
 .picker-option { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; padding: 6px 10px; border-radius: 7px; font-size: 13px; text-align: left; white-space: nowrap; color: var(--text); }
 .picker-option:hover { background: var(--panel-2); }
 .picker-option.on { color: var(--amber); background: var(--amber-tinte); }

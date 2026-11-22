@@ -100,6 +100,8 @@ export function gruposModelos(models: Model[]) {
     { id: 'pi', label: 'Pi · beta · gratis' },
     { id: 'pi', label: 'Pi · beta · de pago (por millón de tokens)', pago: true },
   ].map((p) => ({
+    // Con su logo en la lista (`Picker`): de un vistazo se ve de quién es cada modelo.
+    proveedor: p.id as Proveedor,
     label: p.label,
     options: models
       .filter((m) => proveedorDe(m.id) === p.id && !!m.precio === !!p.pago)

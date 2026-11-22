@@ -7,6 +7,7 @@ import { imageUrl, Thumbs, type Attached } from './Images'
 import { esIcono, Icono } from './Iconos'
 import { FlowEnUso, LimitesContexto } from './LimitesContexto'
 import { Dictado } from './Dictado'
+import { Logo } from './Logos'
 import type { Resumen } from './eventos'
 import { compact } from './items'
 import { invocacion, LINK, LINK_ICON, linkParts, QUOTE_EVENT, QUOTE_ICON, quoteRef, THREAD, THREAD_ICON, threadIconOf } from './etiquetas'
@@ -454,8 +455,8 @@ export function Picker(props: {
   titulo?: string
   /** Con más de `BUSCAR_DESDE` opciones, un buscador arriba de la lista. */
   buscar?: boolean
-  /** `detalle` va a la derecha de la opción, apagado (lo que cuesta y tarda cada modelo). */
-  groups: { label: string; options: { value: string; label: string; detalle?: string }[] }[]
+  /** `detalle` va a la derecha de la opción, apagado (lo que cuesta y tarda cada modelo). Con `proveedor`, su logo. */
+  groups: { label: string; proveedor?: string; options: { value: string; label: string; detalle?: string }[] }[]
   onChange(value: string): void
 }) {
   const [open, setOpen] = useState(false)
@@ -556,8 +557,8 @@ export function Picker(props: {
           )}
           {largo && !groups.length && <span className="picker-label">Nada con ese nombre</span>}
           {groups.map((g) => (
-            <div key={g.label} className="picker-group">
-              <span className="picker-label">{g.label}</span>
+            <div key={g.label} className="picker-group" data-proveedor={g.proveedor}>
+              <span className="picker-label">{g.proveedor && <Logo de={g.proveedor} chico />}{g.label}</span>
               {g.options.map((o) => (
                 <button
                   type="button"
