@@ -23,8 +23,9 @@ import { opencodeModels } from './opencode.ts'
 import { conectandoOtro, OTROS, sinLimites } from './proveedores.ts'
 import { PROVEEDORES, type Proveedor, proveedorDe } from '../shared/providers.ts'
 import { paraMandar, salidaDe, sinSalidasLargas } from '../shared/historial.ts'
-import { conectandoCodex, conectarCodex, cuentaCodex, limitesCodex, salirCodex } from './cuenta-codex.ts'
-import { alEntrarClaude, conectando, conectarClaude, cuentaClaude, limitesClaude, salirClaude } from './cuenta.ts'
+import { alEntrarCodex, conectandoCodex, conectarCodex, cuentaCodex, limitesCodex, quitarPerfilCodex, salirCodex, usarPerfilCodex } from './cuenta-codex.ts'
+import { ORIGINAL, perfilesAgente, ponerAppPerfiles } from './perfiles-agentes.ts' // varias cuentas de Claude y de ChatGPT
+import { alEntrarClaude, conectando, conectarClaude, cuentaClaude, limitesClaude, quitarPerfilClaude, salirClaude, usarPerfilClaude } from './cuenta.ts'
 import { cancelarOpenCode, conectandoOpenCode, conectarOpenCode, cuentaOpenCode, limitesOpenCode, quitarCuentaOpenCode, usarCuentaOpenCode } from './cuenta-opencode.ts'
 import { enlacesApi } from './enlaces.ts' // tarjeta de los enlaces
 import { cerrarVigilantesOciosos, etapasApi, folderOf, mismaCwd, queFalta, videosApi, videosDe } from './etapas.ts' // panel de etapas
@@ -80,6 +81,7 @@ import { ventanasRemotas } from './ventanas-remotas.ts' // Sloth en la web
 import { deLaNube, latir, NUBE } from './nube.ts' // Sloth en la nube
 
 const APP = resolve(dirname(fileURLToPath(import.meta.url)), '..')
+ponerAppPerfiles(APP)
 const PORT = Number(process.env.PORT ?? 4848)
 const CARDS = join(APP, 'cards.json')
 /**
@@ -192,8 +194,9 @@ const conEtapas = (id: string) => !!cards().find((c) => c.id === sessions.meta(i
 /** La actividad de cada agente, de los historiales de los hilos (Opciones). */
 const usoAgente = actividadAgentes(join(APP, 'data', 'sessions'), () => sessions.list())
 sessions.esVideo = (meta) => !!cards().find((c) => c.id === meta.cardId)?.etapas?.some((e) => e.fase)
-// Con otra cuenta de Claude, los hilos quietos sueltan su Claude Code: el siguiente mensaje ya va con ella.
-alEntrarClaude(() => sessions.soltarQuietos('claude'))
+// Al volver a entrar en una cuenta de Claude o de ChatGPT, sus hilos quietos sueltan su agente: el siguiente mensaje ya va con ella.
+alEntrarClaude((id) => sessions.soltarQuietos('claude', id))
+alEntrarCodex((id) => sessions.soltarQuietos('codex', id))
 sessions.sinHerramientas = (meta) => cards().find((c) => c.id === meta.cardId)?.sinHerramientas
 // Quien lee un estilo de la comunidad por aprobar solo puede leer.
 sessions.soloLeer = (meta) => meta.cardId === REVISION_CARD.id
@@ -550,11 +553,15 @@ async function api(req: IncomingMessage, res: ServerResponse, url: URL): Promise
     return true
   }
   if (path === '/api/codex/conectar' && method === 'POST') {
-    send(res, 200, await conectarCodex(remoto(req)))
+    const { perfil } = await body<{ perfil?: string }>(req)
+    const id = perfil ?? perfilesAgente('codex').leer().activa
+    if (id !== 'nueva' && sessions.cuentaOcupada('codex', id)) return send(res, 409, { error: 'Espera a que acaben los hilos de esta cuenta de ChatGPT.' }), true
+    send(res, 200, await conectarCodex(remoto(req), perfil))
     pedirModelos()
     return true
   }
   if (path === '/api/codex/salir' && method === 'POST') {
+    if (sessions.cuentaOcupada('codex', perfilesAgente('codex').leer().activa)) return send(res, 409, { error: 'Espera a que acaben los hilos de esta cuenta de ChatGPT.' }), true
     try {
       send(res, 200, await salirCodex())
       pedirModelos()
@@ -626,10 +633,52 @@ async function api(req: IncomingMessage, res: ServerResponse, url: URL): Promise
   }
 
   if (path === '/api/claude/conectar' && method === 'POST') {
-    send(res, 200, await conectarClaude(APP, remoto(req)))
+    const { perfil } = await body<{ perfil?: string }>(req)
+    const id = perfil ?? perfilesAgente('claude').leer().activa
+    if (id !== 'nueva' && sessions.cuentaOcupada('claude', id)) return send(res, 409, { error: 'Espera a que acaben los hilos de esta cuenta de Claude.' }), true
+    send(res, 200, await conectarClaude(APP, remoto(req), perfil))
     return true
   }
+  // Las cuentas de Claude o de ChatGPT (`server/perfiles-agentes.ts`): cuáles hay, cuál usan los hilos nuevos, quitar una.
+  const cuentasDe = /^\/api\/(claude|codex)\/perfiles$/.exec(path)
+  if (cuentasDe && (method === 'GET' || method === 'POST')) {
+    const p = cuentasDe[1] as 'claude' | 'codex'
+    if (method === 'GET') return send(res, 200, perfilesAgente(p).leer()), true
+    const { usar, quitar } = await body<{ usar?: string; quitar?: string }>(req)
+    try {
+      if (usar) (p === 'claude' ? usarPerfilClaude : usarPerfilCodex)(usar)
+      if (quitar) {
+        if (sessions.cuentaOcupada(p, quitar)) throw new Error('Espera a que acaben los hilos de esa cuenta.')
+        ;(p === 'claude' ? quitarPerfilClaude : quitarPerfilCodex)(quitar)
+        sessions.soltarQuietos(p, quitar)
+      }
+    } catch (error) {
+      return send(res, 400, { error: error instanceof Error ? error.message : String(error) }), true
+    }
+    pedirModelos()
+    return send(res, 200, perfilesAgente(p).leer()), true
+  }
+  // Las otras cuentas de Claude con que puede seguir un hilo que llegó al límite de la suya (`LimiteClaude.tsx`).
+  const cuentaHilo = /^\/api\/sessions\/([\w-]+)\/cuenta-claude$/.exec(path)
+  if (cuentaHilo && (method === 'GET' || method === 'POST')) {
+    const meta = sessions.meta(cuentaHilo[1])
+    if (!meta || proveedorDe(meta.model) !== 'claude') return send(res, 404, { error: 'Este hilo no es de Claude.' }), true
+    if (method === 'POST') {
+      try {
+        const pide = String((await body<{ id?: string }>(req)).id ?? '')
+        sessions.cambiarCuentaClaude(meta.id, pide === 'activa' ? perfilesAgente('claude').leer().activa : pide)
+      } catch (error) {
+        return send(res, 400, { error: error instanceof Error ? error.message : String(error) }), true
+      }
+      return send(res, 200, {}), true
+    }
+    const suya = meta.perfilClaude ?? ORIGINAL
+    const { perfiles } = perfilesAgente('claude').leer()
+    const otras = perfiles.filter((c) => c.id !== suya && c.quien && !c.bloqueado).map((c) => ({ id: c.id, quien: c.quien! }))
+    return send(res, 200, { alternativas: suya === ORIGINAL ? otras : [{ id: ORIGINAL, quien: 'La cuenta original' }, ...otras] }), true
+  }
   if (path === '/api/claude/salir' && method === 'POST') {
+    if (sessions.cuentaOcupada('claude', perfilesAgente('claude').leer().activa)) return send(res, 409, { error: 'Espera a que acaben los hilos de esta cuenta de Claude.' }), true
     send(res, 200, await salirClaude(APP))
     return true
   }
@@ -654,7 +703,9 @@ async function api(req: IncomingMessage, res: ServerResponse, url: URL): Promise
   const lim = /^\/api\/(\w+)\/limites$/.exec(path)
   if (lim && PROVEEDORES.includes(lim[1] as Proveedor) && method === 'GET') {
     try {
-      send(res, 200, await (lim[1] === 'codex' ? limitesCodex() : lim[1] === 'opencode' ? limitesOpenCode() : lim[1] === 'claude' ? limitesClaude() : sinLimites()))
+      // Los de Claude, de la cuenta del hilo si se pide (`?hilo=`): un hilo puede ir con otra que la activa.
+      const hilo = lim[1] === 'claude' ? sessions.meta(url.searchParams.get('hilo') ?? '') : undefined
+      send(res, 200, await (lim[1] === 'codex' ? limitesCodex() : lim[1] === 'opencode' ? limitesOpenCode() : lim[1] === 'claude' ? limitesClaude(hilo ? (hilo.perfilClaude ?? ORIGINAL) : undefined) : sinLimites()))
     } catch (error) {
       send(res, 500, { error: error instanceof Error ? error.message : String(error) })
     }

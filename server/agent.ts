@@ -26,6 +26,9 @@ export interface AgentOptions {
   effort?: string
   /** Para retomar una sesión que ya existía. */
   resume?: string
+  /** La carpeta de la cuenta de Claude o de ChatGPT del hilo, si no es la original (`server/perfiles-agentes.ts`). */
+  configClaude?: string
+  configCodex?: string
   /** Un video de un lote: nadie lo mira mientras trabaja (su navegador va sin ventana y con un perfil limpio). */
   lote?: boolean
   /** El hilo: su agente usa la página del hilo en el navegador integrado. */

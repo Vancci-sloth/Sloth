@@ -244,6 +244,9 @@ Este es el mapa:
   (la que trae Sloth: se ponen al día al subirlas en package.json y publicar) y las credenciales de YouTube e Instagram (en las variables de entorno del usuario).
   `server/acceso.ts`: si Claude y Codex pagan con la suscripción o con una llave de API (Opciones → Agentes), guardada en
   `data/agentes.json`.
+  Varias cuentas de Claude y de ChatGPT (`server/perfiles-agentes.ts`): la original sigue donde estaba y las agregadas viven en
+  `data/cuentas-<agente>/<id>`; la activa es la de los hilos nuevos y cada hilo se queda con la suya (`perfilClaude`,
+  `perfilCodex`). Al llegar al límite, el hilo sigue con otra con el resumen (`cambiarCuentaClaude`, `LimiteClaude.tsx`).
 - Sloth en el celular (`movil/`, ADR 0025): una app de Expo para iOS y Android con dos modos (`modo.ts`). «En este
   celular» corre el agente en el teléfono (`src/local/`: Claude por la API con la llave de quien la usa, los estilos con
   su skill en `estilos.json`, hilos y archivos en el teléfono, y «Seguir en la computadora» para el video final).

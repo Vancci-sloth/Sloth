@@ -614,6 +614,7 @@ function Fallo({ item, datos, proveedor, sessionId, onResponder, relevos = [] }:
           <span className={fallo ? 'bad' : ''}>{fallo || e.ayuda}</span>
           {e.limite && agente === 'claude' && actual === 'claude' && (
             <LimiteClaude
+              hilo={sessionId}
               ocupado={enviando}
               onSeguir={() => {
                 setEnviando(true)

@@ -7,6 +7,9 @@ import { leerHistorial, primerUsuario } from './historial.ts'
 import type { AgentEvent, FileDraft, SessionMeta } from '../shared/types.ts'
 import { NOMBRE_AGENTE, programaDe, proveedorDe } from '../shared/providers.ts'
 import { llaveEnUso } from './acceso.ts'
+import { ORIGINAL, perfilesAgente } from './perfiles-agentes.ts'
+import { perfilClaudeAutorizando } from './cuenta.ts'
+import { perfilCodexAutorizando } from './cuenta-codex.ts'
 import { conRutas, sinArrancar, type AgentRun, type SkillRef } from './agent.ts'
 import { conAgente } from './agentes.ts'
 import { startClaude } from './claude.ts'
@@ -497,9 +500,36 @@ export class Sessions {
     this.save(meta)
   }
 
-  /** Cierra los procesos quietos de un agente: tras cambiar de cuenta, el siguiente mensaje abre uno con la nueva. */
-  soltarQuietos(proveedor: string) {
-    for (const [id] of this.runs) if (proveedorDe(this.metas.get(id)?.model ?? '') === proveedor) this.cerrarQuieto(id)
+  /**
+   * Cierra los procesos quietos de un agente: tras cambiar de cuenta, el siguiente mensaje abre uno con la nueva. Con
+   * `perfil`, solo los hilos de esa cuenta (los de las demás siguen con la suya).
+   */
+  soltarQuietos(proveedor: string, perfil?: string) {
+    for (const [id] of this.runs) {
+      const meta = this.metas.get(id)
+      if (!meta || proveedorDe(meta.model) !== proveedor) continue
+      const suya = proveedor === 'claude' ? meta.perfilClaude : meta.perfilCodex
+      if (!perfil || (suya ?? ORIGINAL) === perfil) this.cerrarQuieto(id)
+    }
+  }
+
+  /** Si algún hilo trabaja con esa cuenta: cerrarle la sesión o volver a autorizarla lo cortaría. */
+  cuentaOcupada(proveedor: 'claude' | 'codex', perfil: string) {
+    return [...this.metas.values()].some((m) => proveedorDe(m.model) === proveedor && ((proveedor === 'claude' ? m.perfilClaude : m.perfilCodex) ?? ORIGINAL) === perfil && (m.running || !!m.background?.length))
+  }
+
+  /**
+   * «Seguir con otra cuenta de Claude» (el aviso del límite, `LimiteClaude.tsx`): el hilo pasa a esa cuenta con el resumen
+   * de lo hablado, como un relevo: su sesión de antes vive en la carpeta de la otra.
+   */
+  cambiarCuentaClaude(id: string, perfil: string) {
+    const meta = this.metas.get(id)
+    if (!meta || proveedorDe(meta.model) !== 'claude') throw new Error('Este hilo no es de Claude.')
+    if (meta.running || meta.background?.length) throw new Error('Espera a que termine lo que hace Claude.')
+    if ((meta.perfilClaude ?? ORIGINAL) === perfil) return
+    if (perfilClaudeAutorizando(perfil) || !perfilesAgente('claude').autorizada(perfil)) throw new Error('Autoriza primero esa cuenta de Claude, en Opciones → Agentes.')
+    meta.perfilClaude = perfil
+    this.relevar(meta, false)
   }
 
   /** Le pone otro nombre. Sin tocar `updatedAt`: renombrarlo no lo sube en la lista ni lo marca como terminado. */
@@ -688,11 +718,14 @@ export class Sessions {
     if (live) return live
     // Un hilo de Codex sigue con la llave o con la cuenta con que empezó; los de antes de las llaves, con la cuenta.
     const conLlave = proveedorDe(meta.model) === 'codex' ? (meta.providerSessionId ? !!meta.conLlave : !!llaveEnUso('codex')) : undefined
-    const run = this.crearAgente({
+    const { perfilClaude, perfilCodex, espera } = this.cuentaDe(meta, conLlave)
+    const opciones: Parameters<typeof this.crearAgente>[0] = {
       cwd: meta.cwd,
       model: meta.model,
       effort: meta.effort,
       resume: meta.providerSessionId,
+      configClaude: perfilClaude ? perfilesAgente('claude').configuracion(perfilClaude) : undefined,
+      configCodex: perfilCodex ? perfilesAgente('codex').configuracion(perfilCodex) : undefined,
       lote: !!meta.lote,
       hilo: meta.id,
       conLlave,
@@ -714,13 +747,41 @@ export class Sessions {
       onProviderSession: (providerId) => {
         meta.providerSessionId = providerId
         meta.conLlave = conLlave || undefined
+        // Su sesión vive en la carpeta de esa cuenta: el hilo se queda con ella.
+        meta.perfilClaude = perfilClaude
+        meta.perfilCodex = perfilCodex
         delete meta.resumir
         delete meta.vieneDe
         this.save(meta)
       }
-    })
+    }
+    const run = espera ? sinArrancar(opciones, espera) : this.crearAgente(opciones)
     this.runs.set(meta.id, run)
     return run
+  }
+
+  /**
+   * Con qué cuenta de Claude o de ChatGPT trabaja el hilo (`server/perfiles-agentes.ts`): la suya, si ya tiene; uno de
+   * antes de que hubiera varias, o con la llave de API, la original; uno nuevo, la que usan los hilos nuevos. Si la suya
+   * se quitó, sigue en la activa con el resumen de lo hablado. Mientras se autoriza, espera (`espera`).
+   */
+  private cuentaDe(meta: SessionMeta, conLlave?: boolean): { perfilClaude?: string; perfilCodex?: string; espera?: string } {
+    const p = proveedorDe(meta.model)
+    if (p !== 'claude' && p !== 'codex') return {}
+    if (p === 'codex' && conLlave) return {}
+    const cuentas = perfilesAgente(p)
+    const guardada = p === 'claude' ? meta.perfilClaude : meta.perfilCodex
+    let perfil = guardada ?? (meta.providerSessionId || (p === 'claude' && llaveEnUso('claude')) ? ORIGINAL : cuentas.leer().activa)
+    if (!cuentas.autorizada(perfil) && !(p === 'claude' ? perfilClaudeAutorizando(perfil) : perfilCodexAutorizando(perfil))) {
+      // La suya ya no está (se quitó, o entró otro correo): sigue en la activa, con el resumen.
+      perfil = cuentas.autorizada(cuentas.leer().activa) ? cuentas.leer().activa : ORIGINAL
+      if (guardada) {
+        delete meta.providerSessionId
+        meta.resumir = true
+      }
+    }
+    const espera = (p === 'claude' ? perfilClaudeAutorizando(perfil) : perfilCodexAutorizando(perfil)) ? `Termina de autorizar esta cuenta de ${NOMBRE_AGENTE[p]} en Opciones → Agentes.` : undefined
+    return p === 'claude' ? { perfilClaude: perfil, espera } : { perfilCodex: perfil, espera }
   }
 
   private emit(id: string, event: AgentEvent) {

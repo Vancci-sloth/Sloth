@@ -195,3 +195,8 @@
 }
 @media (max-width: 690px) { .actividad-contenido { grid-template-columns: minmax(0, 1fr); } }
 .actividad-calendario button:focus-visible { outline: 2px solid var(--amber); outline-offset: 1px; }
+
+/* Las cuentas de Claude o de ChatGPT (CuentasDelAgente en Opciones.tsx). */
+.cuentas-agente-lista { margin: 8px 0 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 2px; }
+.cuentas-agente-lista li { display: flex; align-items: center; gap: 10px; padding: 4px 0; font-size: 13px; }
+.cuentas-agente-lista li > span:first-child { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

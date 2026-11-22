@@ -1105,11 +1105,11 @@ function CuentaCodex({ aviso = false, onFalta }: { aviso?: boolean; onFalta?(fal
   if (aviso && !falta) return null
   const cuenta = c.cuenta
   const url = cuenta?.conectando?.url
-  const conectar = () => {
+  const conectar = (perfil?: string) => {
     // Se abre en el clic para que el navegador no bloquee la pestaña mientras llega la URL.
     const ventana = window.open('about:blank', '_blank')
     if (ventana) ventana.opener = null
-    void c.conectar().then((cuenta) => {
+    void c.pedir('/api/codex/conectar', { perfil }).then((cuenta) => {
       if (ventana && cuenta?.conectando?.url) ventana.location.href = cuenta.conectando.url
       else ventana?.close()
     })
@@ -1158,7 +1158,7 @@ function CuentaCodex({ aviso = false, onFalta }: { aviso?: boolean; onFalta?(fal
           !cuenta.conectada && (
             <>
               {aviso && llave.boton}
-              <button className="primary" disabled={c.ocupado} onClick={conectar}>
+              <button className="primary" disabled={c.ocupado} onClick={() => conectar()}>
                 {c.ocupado ? 'Conectando…' : 'Conectar con ChatGPT'}
               </button>
             </>
@@ -1168,12 +1168,12 @@ function CuentaCodex({ aviso = false, onFalta }: { aviso?: boolean; onFalta?(fal
       {!aviso && cuenta && llave.selector}
       {llave.formulario}
       {url && <p className="fila-extra small"><a href={url} target="_blank" rel="noreferrer">Abrir inicio de sesión de ChatGPT ↗</a>{cuenta?.conectando?.codigo ? <> y escribe este código: <strong className="mono">{cuenta.conectando.codigo}</strong></> : null}. Vuelve aquí después de autorizar.</p>}
-      {!aviso && cuenta?.conectada && <Limites proveedor="codex" />}
+      {!aviso && cuenta?.conectada && <Limites key={cuenta.quien} proveedor="codex" />}
       <Fallo error={c.error} />
       {version.aviso}
     </div>
   )
-  return aviso ? <section className="panel cuenta-aviso">{contenido}</section> : contenido
+  return aviso ? <section className="panel cuenta-aviso">{contenido}</section> : <>{contenido}{cuenta && !llave.activa && <CuentasDelAgente c={c} p="codex" conectar={conectar} />}</>
 }
 
 /** `plus` → `Plus`: el plan como lo escribe su marca. */
@@ -1414,11 +1414,67 @@ function Agentes() {
         {llave.formulario}
         <Autorizando c={c} />
         {/* Con una llave de API no hay plan ni límites: se paga por uso. */}
-        {cuenta?.conectada && cuenta.plan && <Limites proveedor="claude" />}
+        {cuenta?.conectada && cuenta.plan && <Limites key={cuenta.quien} proveedor="claude" />}
         <Fallo error={c.error} />
         {version.aviso}
       </div>
+      {cuenta && !llave.activa && <CuentasDelAgente c={c} p="claude" conectar={(perfil) => void c.pedir('/api/claude/conectar', { perfil })} />}
     </>
+  )
+}
+
+/**
+ * Las cuentas de Claude o de ChatGPT (`server/perfiles-agentes.ts`): la original y las que agregues, cada una con su
+ * sesión. La activa es la de los hilos nuevos; cada hilo sigue con la suya. Con una sola, solo «Agregar otra cuenta».
+ */
+function CuentasDelAgente({ c, p, conectar }: { c: UsoCuenta; p: 'claude' | 'codex'; conectar(perfil: string): void }) {
+  const [datos, setDatos] = useState<{ activa: string; perfiles: { id: string; quien?: string; bloqueado?: boolean }[] }>()
+  const [error, setError] = useState('')
+  const ruta = `/api/${p}/perfiles`
+  const conectando = !!c.cuenta?.conectando
+  const leer = () => api<NonNullable<typeof datos>>(ruta).then((d) => (setDatos(d), setError('')), (e) => setError(e.message))
+  useEffect(() => void leer(), [conectando, c.cuenta?.quien])
+  const cambiar = (cuerpo: { usar?: string; quitar?: string }) =>
+    api<NonNullable<typeof datos>>(ruta, cuerpo).then((d) => {
+      setDatos(d)
+      setError('')
+      // La cuenta que se ve arriba es la activa: se vuelve a mirar.
+      void c.pedir(`/api/${p}/cuenta?fresco`, undefined)
+    }, (e) => setError(e.message))
+  const bloqueado = c.ocupado || conectando
+  const nombre = p === 'claude' ? 'Claude' : 'ChatGPT'
+  const lista = datos ? [{ id: 'original', quien: 'La cuenta original' as string | undefined, bloqueado: false }, ...datos.perfiles] : []
+  return (
+    <div className="item cuentas-agente">
+      <div className="fila">
+        <div className="fila-nombre">
+          <strong>Otras cuentas de {nombre}</strong>
+          <span>Los hilos nuevos usan la activa; cada hilo sigue con la suya. Si una llega a su límite, el hilo puede seguir con otra.</span>
+        </div>
+        <button className="boton" disabled={bloqueado || !datos} onClick={() => conectar('nueva')}>Agregar otra cuenta</button>
+      </div>
+      {datos && datos.perfiles.length > 0 && (
+        <ul className="cuentas-agente-lista">
+          {lista.map(({ id, quien, bloqueado: otroCorreo }) => {
+            const autorizada = !!quien && !otroCorreo
+            return (
+              <li key={id}>
+                <span title={quien}>{quien ?? 'Sin autorizar'}{otroCorreo && ' · entró otro correo'}</span>
+                {datos.activa === id && autorizada ? (
+                  <span className="estado">Activa</span>
+                ) : autorizada ? (
+                  <button className="ghost small" disabled={bloqueado} onClick={() => void cambiar({ usar: id })}>Usar en los hilos nuevos</button>
+                ) : (
+                  <button className="ghost small" disabled={bloqueado} onClick={() => conectar(id)}>Autorizar</button>
+                )}
+                {id !== 'original' && <button className="ghost small" disabled={bloqueado} title="Quita la cuenta y su sesión de esta computadora" onClick={() => confirm(`¿Quitar ${quien ?? 'esta cuenta'} de Sloth?`) && void cambiar({ quitar: id })}>Quitar</button>}
+              </li>
+            )
+          })}
+        </ul>
+      )}
+      <Fallo error={error} />
+    </div>
   )
 }
 

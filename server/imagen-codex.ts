@@ -1,6 +1,6 @@
 /**
  * Una imagen con ChatGPT para el estudio de Imágenes (`/api/flow/estudio`): `codex exec` con la cuenta de ChatGPT
- * conectada en Opciones (nunca con una llave de API) le pide a su herramienta `image_gen` una sola imagen, o editar la de
+ * activa de Opciones (nunca con una llave de API) le pide a su herramienta `image_gen` una sola imagen, o editar la de
  * `referencia`, y se toma la que dejó en `generated_images/<hilo>` de ese mismo pedido.
  */
 import { execFile } from 'node:child_process'
@@ -9,13 +9,17 @@ import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { rutaAgente } from './agentes.ts'
 import { cuentaCodex } from './cuenta-codex.ts'
+import { perfilActivo } from './perfiles-agentes.ts'
 
 export async function imagenCodex(prompt: string, formato: string, cwd: string, referencia?: string) {
   const exe = rutaAgente('codex')
   if (!exe || !(await cuentaCodex()).conectada) throw new Error('Conecta tu cuenta de ChatGPT en Opciones → Agentes.')
   const env = { ...process.env }
   for (const clave of ['OPENAI_API_KEY', 'CODEX_API_KEY', 'CODEX_ACCESS_TOKEN', 'OPENAI_IDENTITY_TOKEN_FILE', 'OPENAI_FEDERATION_RULE_ID']) delete env[clave]
-  const args = ['exec', '--skip-git-repo-check', '--json', '-s', 'read-only', '-C', cwd, '-c', 'model_provider="openai"', '-c', 'forced_login_method="chatgpt"']
+  // Con una cuenta agregada, su carpeta y su sesión en archivo (`codex-rpc.ts`).
+  const perfil = perfilActivo('codex')
+  if (perfil) env.CODEX_HOME = perfil
+  const args = ['exec', '--skip-git-repo-check', '--json', '-s', 'read-only', '-C', cwd, '-c', 'model_provider="openai"', '-c', 'forced_login_method="chatgpt"', ...(perfil ? ['-c', 'cli_auth_credentials_store="file"'] : [])]
   if (referencia) args.push('-i', referencia)
   args.push('-')
   const salida = await new Promise<string>((ok, fallo) => {

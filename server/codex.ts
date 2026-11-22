@@ -15,7 +15,7 @@ import { costoCodex } from './precios.ts'
 import { SKILLS } from './skills.ts'
 
 /** Codex conserva los hilos en su almacén; Sloth conserva su id y traduce el protocolo al mismo AgentEvent de Claude. */
-export function startCodex(opts: AgentOptions, connect: Conectar = (notify, exit, config, llave) => new CodexRpc(notify, exit, config, llave), precio = costoCodex): AgentRun {
+export function startCodex(opts: AgentOptions, connect: Conectar = (notify, exit, config, llave) => new CodexRpc(notify, exit, config, llave, opts.configCodex), precio = costoCodex): AgentRun {
   // Con la llave de API o con la cuenta de ChatGPT: un hilo retomado sigue con lo que empezó (`SessionMeta.conLlave`).
   const conLlave = opts.conLlave ?? !!llaveEnUso('codex')
   const llave = conLlave ? codexConLlave(true) ?? null : null

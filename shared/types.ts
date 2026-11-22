@@ -470,6 +470,9 @@ export interface SessionMeta {
   updatedAt: number
   /** El id del hilo en su proveedor, para retomarlo tras reiniciar. */
   providerSessionId?: string
+  /** Con qué cuenta de Claude o de ChatGPT trabaja (`server/perfiles-agentes.ts`); sin ella, la original. */
+  perfilClaude?: string
+  perfilCodex?: string
   /**
    * Codex: el hilo empezó con la llave de API, no con la cuenta de ChatGPT, y sigue con ella (`server/acceso.ts`). Codex le
    * reenvía al modelo su razonamiento, cifrado para lo que lo hizo.

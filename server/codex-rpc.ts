@@ -16,7 +16,9 @@ export class CodexRpc {
     private onExit: (error?: Error) => void = () => {},
     config: Record<string, unknown> = {},
     /** Con qué trabaja: la llave de API, o `null` para la cuenta de ChatGPT. Sin él, lo elegido en Opciones. */
-    llave: CodexLlave | null = codexConLlave() ?? null
+    llave: CodexLlave | null = codexConLlave() ?? null,
+    /** La carpeta de una cuenta de ChatGPT agregada (`server/perfiles-agentes.ts`); sin ella, la de siempre. */
+    directorio?: string
   ) {
     // El programa, de la app o bajado aparte (`server/agentes.ts`). Quien abre un hilo de Codex lo baja antes (`conAgente`).
     const exe = rutaAgente('codex')
@@ -26,7 +28,9 @@ export class CodexRpc {
     const env = { ...process.env }
     for (const key of ['OPENAI_API_KEY', 'CODEX_API_KEY', 'CODEX_ACCESS_TOKEN', 'OPENAI_IDENTITY_TOKEN_FILE', 'OPENAI_FEDERATION_RULE_ID']) delete env[key]
     Object.assign(env, llave?.env)
-    const ajustes = { ...config, ...(llave?.config ?? { model_provider: 'openai', forced_login_method: 'chatgpt' }) }
+    // Una cuenta agregada guarda su sesión en un archivo de su carpeta: en el llavero del sistema, todas pisarían la misma.
+    if (directorio && !llave) env.CODEX_HOME = directorio
+    const ajustes = { ...config, ...(directorio && !llave ? { cli_auth_credentials_store: 'file' } : {}), ...(llave?.config ?? { model_provider: 'openai', forced_login_method: 'chatgpt' }) }
     const args = ['app-server', '--listen', 'stdio://', ...Object.entries(ajustes).flatMap(([key, value]) => ['-c', `${key}=${toml(value)}`])]
     this.proc = spawn(exe, args, { env, windowsHide: true, stdio: 'pipe' })
     // stderr no es el protocolo; se drena sin guardar datos de autenticación ni volcarlos a la interfaz.

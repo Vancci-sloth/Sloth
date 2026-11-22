@@ -1,3 +1,4 @@
+import { entornoPerfilClaude } from './perfiles-agentes.ts'
 import { readFileSync } from 'node:fs'
 import { extname } from 'node:path'
 import { query, type AgentDefinition, type McpServerStatus, type ModelInfo, type Options, type Query, type SDKMessage, type SDKUserMessage } from '@anthropic-ai/claude-agent-sdk'
@@ -134,7 +135,7 @@ export function startClaude(opts: AgentOptions): AgentRun {
       cwd: opts.cwd,
       model: otra ? otra.modelo(opts.model) : opts.model,
       effort: opts.effort as never,
-      ...(otra ? { env: otra.entorno(opts.model, opts.effort) } : {}),
+      ...(otra ? { env: otra.entorno(opts.model, opts.effort) } : opts.configClaude ? { env: entornoPerfilClaude(opts.configClaude) } : {}),
       // Sin `summarized`, los modelos nuevos piensan en silencio: el texto del pensamiento llega vacío.
       thinking: otra || sinAdaptativo.has(opts.model) ? undefined : { type: 'adaptive', display: 'summarized' },
       resume: opts.resume,
