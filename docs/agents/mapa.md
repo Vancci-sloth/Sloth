@@ -160,6 +160,11 @@ Este es el mapa:
   referencias («Ingredientes») o fotogramas. Los agentes piden con el MCP `flow` (`mcp.mjs`, `skills/video-base/FLOW.md`).
   Lee el costo antes de generar y no pasa del tope. «Ayudar a mejorar Flow» se apaga para todos y se cambia en Opciones →
   Google Flow. El menú «Imágenes» del compositor manda la línea `Imágenes:` (ChatGPT o un modelo de Flow). ADR 0014, 0015 y 0016.
+- Imágenes (`web/src/EstudioImagenes.tsx`, `EditorImagen.tsx`, `/api/flow/estudio` en `server/flow/index.ts`): pedir una
+  imagen sin chat, con un estilo (`shared/estilos-imagen.ts`), un modelo de Flow (la misma fila y cuentas), ChatGPT
+  (`server/imagen-codex.ts`) o «Quitar fondo» en tu computadora (`server/flow/recorte.ts`, `video-base/scripts/recorte.py`).
+  El editor marca zonas a mano alzada (cambiar, quitar, conservar). Con «Prompt» y un modelo, `redactar` escribe el pedido
+  y queda un chat de solo lectura de la imagen (`server/flow/hilo-imagen.ts`, `SessionMeta.imagenEstudio`). En `data/imagenes`.
 - El navegador de cada hilo (`electron/navegador.ts`, el globo de `web/src/Navegador.tsx`): el Playwright MCP del agente
   (`server/navegador-agente.ts`, lanzado a demanda por `server/navegador-mcp.mjs`) entra en él por CDP. Sin ventana, un Chrome con `data/navegador`; en lotes, uno limpio.
   Sus capturas y los logs de consola quedan en `data/navegador-capturas/`. Copia lo mejor del de T3 Code (`C:\dev\t3code`):

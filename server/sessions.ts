@@ -170,7 +170,8 @@ export class Sessions {
       if (cortado) this.emit(meta.id, { t: 'turn_end', at: Date.now(), ok: false, error: 'el servidor se cerró a mitad del turno.', caida: true })
       // Lo que corría en segundo plano murió con el servidor.
       if (tareas.length) this.emit(meta.id, { t: 'background', tasks: [] })
-      this.retomar(meta, mensajes, cortado, tareas)
+      // El chat de una imagen del estudio no tiene agente que retomar: lo escribe el estudio (`hilo-imagen.ts`).
+      if (!meta.imagenEstudio) this.retomar(meta, mensajes, cortado, tareas)
     }
     // La memoria se libera sin que nada lo avise: cada tanto se mira si ya cabe el siguiente video.
     setTimeout(() => this.repartir())
@@ -243,7 +244,7 @@ export class Sessions {
 
   /** Con `carpeta`, el hilo nace sabiendo dónde trabaja: la de su video, nuevo o que ya existe. */
   /** Con `generarTitulo`, su agente le pone un título corto en su primer turno (`server/titulos.ts`). */
-  create(input: { cardId: string; title: string; model: string; effort?: string; cwd: string; carpeta?: string; generarTitulo?: boolean }): SessionMeta {
+  create(input: { cardId: string; title: string; model: string; effort?: string; cwd: string; carpeta?: string; generarTitulo?: boolean; imagenEstudio?: string }): SessionMeta {
     const now = Date.now()
     const { generarTitulo, ...campos } = input
     const meta: SessionMeta = { id: now.toString(36) + Math.random().toString(36).slice(2, 6), ...campos, ...(generarTitulo ? { tituloPendiente: input.title } : {}), createdAt: now, updatedAt: now, running: false }
@@ -253,11 +254,18 @@ export class Sessions {
     return meta
   }
 
+  /** Lo que pasó en el chat de una imagen del estudio (`hilo-imagen.ts`), sin mandarle nada a un agente. */
+  registrarImagen(id: string, ...events: AgentEvent[]) {
+    if (!this.metas.get(id)?.imagenEstudio) return
+    for (const event of events) this.emit(id, event)
+  }
+
   send(id: string, text: string, skill?: SkillRef, images: string[] = []): void {
     if (text.trim() === '/compact' && !images.length) return this.compactar(id)
     if (this.compactando.has(id)) throw new Error('Espera a que termine la compactación.')
     const meta = this.metas.get(id)
     if (!meta) throw new Error('No existe esa sesión')
+    if (meta.imagenEstudio) throw new Error('Este chat es de una imagen: pide el cambio desde su editor, en Imágenes.')
     // Escribirle a un video que esperaba lo arranca ya, y lo que escribiste le llega en ese primer turno.
     if (meta.pendiente) {
       this.empezar(meta)
@@ -419,6 +427,7 @@ export class Sessions {
     if (this.compactando.has(id)) throw new Error('Espera a que termine la compactación.')
     const meta = this.metas.get(id)
     if (!meta) throw new Error('No existe esa sesión')
+    if (meta.imagenEstudio) throw new Error('Este chat es de una imagen: pide el cambio desde su editor, en Imágenes.')
     if (!meta.running) return this.send(id, text, undefined, images)
     this.emit(id, { t: 'user', text, at: Date.now(), ...(images.length ? { images } : {}) })
     this.runFor(meta).steer(conRutas(text, images), images)
@@ -433,6 +442,7 @@ export class Sessions {
   compactar(id: string) {
     const meta = this.metas.get(id)
     if (!meta) throw new Error('No existe esa sesión')
+    if (meta.imagenEstudio) throw new Error('Este chat guarda el historial de una imagen.')
     if (this.compactando.has(id) || this.compactarPendiente.has(id)) return
     if (meta.running || meta.background?.length) {
       this.compactarPendiente.add(id)

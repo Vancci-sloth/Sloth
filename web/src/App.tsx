@@ -46,6 +46,8 @@ import { AvisoMacViejo } from './AvisoMacViejo'
 import { MarcaAgente } from './Logos'
 import { RevisionYoutube, YoutubeLote } from './YoutubeProgramar'
 import { CatalogoEstilos } from './CatalogoEstilos' // «Ver todos» los estilos
+import { EstudioImagenes } from './EstudioImagenes' // estudio de Imágenes
+import { rutaEditorImagen } from '../../shared/estilos-imagen'
 import { CalendarioYoutube } from './YoutubeCalendario'
 import { avisarTanda, AvisoRedes, ConNavegadorRedes, usePublicar } from './Redes' // redes
 import { NombreDelHilo, Renombrar } from './Renombrar'
@@ -69,6 +71,7 @@ type View =
   | { kind: 'videos'; estilo?: string }
   | { kind: 'modelos3d' } // modelos 3D
   | { kind: 'estilos' } // el catálogo de estilos
+  | { kind: 'imagenes'; imagenId?: string } // estudio de Imágenes, o el editor de una
   | { kind: 'comunidad' } // comunidad
   | { kind: 'admin'; pestana?: PestanaAdmin } // Administrador, solo en la computadora del creador
   /** La revisión de YouTube (`youtube-ruta.ts`): `volver` es la vista de donde se abrió. */
@@ -89,8 +92,9 @@ function readHash(): View {
     const volver = p.get('volver') ?? ''
     return { kind: 'youtube', cardId: p.get('cardId') || undefined, ruta: p.get('ruta') || undefined, volver: volver.startsWith('#/') && !volver.startsWith('#/youtube') ? volver : '#/mis-videos' }
   }
-  const [, kind, id] = location.hash.split('/')
+  const [, kind, id, otro] = location.hash.split('/')
   if (kind === 's' && id) return { kind: 'session', id }
+  if (kind === 'imagenes') return { kind: 'imagenes', imagenId: id === 'editar' ? otro : undefined } // estudio de Imágenes
   if (kind === 'd' && id) return { kind: 'draft', id }
   if (kind === 'opciones') return { kind: 'opciones' }
   if (kind === 'ideas') return { kind: 'ideas', canalId: id || undefined }
@@ -108,6 +112,7 @@ const irAPestanaAdmin = (pestana: PestanaAdmin) => go({ kind: 'admin', pestana }
 function go(view: View) {
   if (view.kind === 'youtube') return void (location.hash = view.volver)
   if (view.kind === 'estilos') return void (location.hash = '/estilos')
+  if (view.kind === 'imagenes') return void (location.hash = view.imagenId ? rutaEditorImagen(view.imagenId) : '/imagenes')
   location.hash =
     view.kind === 'session'
       ? `/s/${view.id}`
@@ -522,7 +527,7 @@ export function App() {
     <FilaHilo
       key={s.id}
       s={s}
-      icono={cardOf(s.cardId)?.icon ?? '•'}
+      icono={s.imagenEstudio ? 'imagen' : (cardOf(s.cardId)?.icon ?? '•')}
       activa={openId === s.id && !selected}
       marcada={selected ? selected.has(s.id) : undefined}
       plegada={plegada}
@@ -587,6 +592,13 @@ export function App() {
             <Icono de="video" />
           </span>{' '}
           Mis videos
+        </button>
+        {/* estudio de Imágenes */}
+        <button className={`new-chat${view.kind === 'imagenes' ? ' active' : ''}`} onClick={() => go({ kind: 'imagenes' })} title={plegada ? 'Imágenes' : undefined}>
+          <span className="new-chat-icon">
+            <Icono de="imagen" />
+          </span>{' '}
+          Imágenes
         </button>
         {/* modelos 3D */}
         <button className={`new-chat${view.kind === 'modelos3d' ? ' active' : ''}`} onClick={() => go({ kind: 'modelos3d' })} title={plegada ? 'Modelos 3D' : undefined}>
@@ -750,6 +762,7 @@ export function App() {
           />
         )}
         {view.kind === 'modelos3d' && <Modelos3D />} {/* modelos 3D */}
+        {view.kind === 'imagenes' && <EstudioImagenes models={models} imagenId={view.imagenId} abrir={(imagenId) => go({ kind: 'imagenes', imagenId })} />}
         {view.kind === 'estilos' && <CatalogoEstilos cards={cards} abrir={(cardId) => (setFreshId(newId()), go({ kind: 'new', cardId }))} />}
         {view.kind === 'youtube' && <RevisionYoutube key={`${view.cardId ?? ''}:${view.ruta ?? ''}`} cardId={view.cardId} ruta={view.ruta} cerrar={() => (location.hash = view.volver)} />}
         {view.kind === 'comunidad' && <Comunidad />}
@@ -1369,7 +1382,9 @@ const SessionView = memo(function SessionView({ id, session, card, models }: { i
   const totals = useResumen(id)
   // Un video del lote que espera su turno arranca con su propio mensaje: un clic no le manda otro.
   const pendiente = !!session?.pendiente
-  const onResponder = useMemo(() => (pendiente ? undefined : (text: string, images?: string[]) => api(`/api/sessions/${id}/send`, { text, images })), [id, pendiente])
+  // El chat de una imagen del estudio solo se lee: se edita desde su editor.
+  const deImagen = !!session?.imagenEstudio
+  const onResponder = useMemo(() => (pendiente || deImagen ? undefined : (text: string, images?: string[]) => api(`/api/sessions/${id}/send`, { text, images })), [id, pendiente, deImagen])
   // Con quién puede seguir el hilo si su agente llega al límite: el primer modelo de cada otro agente conectado.
   const actual = proveedorDe(session?.model ?? '')
   const relevos = useMemo(() => PROVEEDORES.filter((p) => p !== actual).flatMap((p) => (p === 'opencode' ? conOpenCode(models) : conPrimero(models, p))?.principal ?? []), [models, actual])
@@ -1379,7 +1394,7 @@ const SessionView = memo(function SessionView({ id, session, card, models }: { i
   const trabaja = session.running || !!session.background?.length
   const head = (extra?: ReactNode) => (
     <header className="session-head">
-      <span className="session-icon"><Icon icon={card?.icon ?? '•'} /></span>
+      <span className="session-icon"><Icon icon={deImagen ? 'imagen' : (card?.icon ?? '•')} /></span>
       <NombreDelHilo key={session.id} session={session} />
       <span className="spacer" />
       {totals.ms > 0 && <span className="muted small">{duration(totals.ms)}</span>}
@@ -1400,7 +1415,7 @@ const SessionView = memo(function SessionView({ id, session, card, models }: { i
         <MarcaAgente de={proveedorDe(session.model)} />
       </button>
       {extra}
-      <BotonNavegador hilo={session.id} trabajando={trabaja} />
+      {!deImagen && <BotonNavegador hilo={session.id} trabajando={trabaja} />}
     </header>
   )
   const chat = () => (
@@ -1418,6 +1433,11 @@ const SessionView = memo(function SessionView({ id, session, card, models }: { i
       />
       {/* Oculto y no quitado: guarda lo que escribías, y una cita del subagente le llega. */}
       <div className="session-composer" hidden={!!subagente}>
+        {deImagen && session.imagenEstudio && (
+          <p className="muted small historial-imagen-aviso">
+            Este chat es de una imagen: <a href={rutaEditorImagen(session.imagenEstudio)}>ábrela en el editor</a> para pedirle otro cambio.
+          </p>
+        )}
         {session.pendiente && (
           <div className="queue">
             <div className="queued">
@@ -1439,7 +1459,7 @@ const SessionView = memo(function SessionView({ id, session, card, models }: { i
         {/* Lo elegido en el video (un elemento, una escena, un tramo): el mensaje lo lleva delante. */}
         {esDeEstudio(card) && <ReferenciaVideo sessionId={session.id} />}
         {/* El hilo de un estilo de la comunidad que se cerró se sigue viendo, pero no sigue trabajando. */}
-        {card?.bloqueada ? <SinApoyo titulo={card.title} /> : <Composer
+        {deImagen ? null : card?.bloqueada ? <SinApoyo titulo={card.title} /> : <Composer
           key={`composer:${session.id}`}
           models={models}
           initial={{ model: session.model, effort: session.effort }}

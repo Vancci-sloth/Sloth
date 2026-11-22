@@ -21,6 +21,32 @@ function useDisponible() {
   return si
 }
 
+/**
+ * Para un campo de texto simple (el editor de imágenes): el borrador, lo dicho que aún se corrige (`visible` lo junta) y
+ * los eventos para `Dictado`. Lo confirmado entra al borrador sin repetirse.
+ */
+export function useDictadoEnCampo(maximo: number) {
+  const [texto, setTexto] = useState('')
+  const [parcial, setParcial] = useState('')
+  const [activo, setActivo] = useState(false)
+  const unir = (base: string, parte: string) => [base.trimEnd(), parte.trim()].filter(Boolean).join(' ').slice(0, maximo)
+  return {
+    texto,
+    setTexto,
+    activo,
+    visible: parcial ? unir(texto, parcial) : texto,
+    eventos: {
+      onActivo: setActivo,
+      onFin: () => setParcial(''),
+      onTexto: (parte: string, final: boolean) => {
+        if (!final) return setParcial(parte)
+        setTexto((base) => unir(base, parte))
+        setParcial('')
+      }
+    }
+  }
+}
+
 type Estado = 'quieto' | 'preparando' | 'grabando' | 'transcribiendo'
 
 export function Dictado({ onTexto, onFin, onActivo }: { onTexto(texto: string, final: boolean): void; onFin(): void; onActivo?(activo: boolean): void }) {

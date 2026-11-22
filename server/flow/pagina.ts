@@ -80,10 +80,12 @@ const NOVEDADES = 2500
  * de 2026) tapa toda la página, no se cierra con Escape y su botón de cerrar se apaga hasta pasar sus hojas; todo clic
  * fallaba con «locator.click: Timeout». Sale una vez por cuenta: al recargar ya no está (puede haber otro en cola).
  */
-async function ir(page: Page, url: string) {
+export async function ir(page: Page, url: string) {
   for (let i = 0; i < 3; i++) {
     await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60_000 })
     await page.waitForLoadState('networkidle', { timeout: 20_000 }).catch(() => {})
+    // Google a veces pasa por su página de cuentas para renovar la sesión, sin pedir nada: se espera a que vuelva.
+    if (page.url().startsWith('https://accounts.google.com/')) await page.waitForURL((u) => u.hostname !== 'accounts.google.com', { timeout: 12_000, waitUntil: 'domcontentloaded' }).catch(() => {})
     if (sinSesion(page.url())) throw new SinEmpezar('Flow ya no tiene la sesión de esta cuenta de Google: vuelve a conectarla (la de la voz en Opciones → Voz; las demás, agregándola otra vez en Opciones → Google Flow).', '', true)
     if (!(await page.locator('mat-dialog-container').first().waitFor({ timeout: NOVEDADES }).then(() => true, () => false))) return
   }
@@ -349,10 +351,12 @@ export async function prepararEnFlow(page: Page, proyecto: string | undefined, p
  * Un video lee el saldo justo antes de pedirlo: si Flow lo rechaza, se lee otra vez y `Rechazado` dice si gastó. Así se
  * sabe si se puede pedir de nuevo sin pagarlo dos veces.
  */
-export async function generarEnFlow(b: Browser, page: Page, proyecto: string | undefined, p: PedidoFlow, carpeta: string, alEntrar: (proyecto: string) => void) {
+/** `alAvanzar`: en qué paso va, para el estudio de Imágenes (`PASOS_IMAGEN`). */
+export async function generarEnFlow(b: Browser, page: Page, proyecto: string | undefined, p: PedidoFlow, carpeta: string, alEntrar: (proyecto: string) => void, alAvanzar?: (paso: 'configurar' | 'generar' | 'descargar') => void) {
   // El saldo, antes de entrar al proyecto: el menú de la cuenta no siempre se cierra con Escape, y abierto tapa el
   // compositor (el clic en la caja del prompt fallaba). Entrar al proyecto recarga la página y lo cierra.
   const saldoAntes = p.tipo === 'video' ? await saldoEnFlow(page).catch(() => null) : null
+  alAvanzar?.('configurar')
   const creditos = await prepararEnFlow(page, proyecto, p, alEntrar)
   // Después de preparar: cada imagen subida también es una tarjeta del proyecto, y se queda en su «100 %» un momento
   // más. Se espera a que acabe: si cambia después, parecería la tarjeta del pedido.
@@ -363,6 +367,7 @@ export async function generarEnFlow(b: Browser, page: Page, proyecto: string | u
   await page.keyboard.insertText(p.prompt.split(/\s+/).join(' '))
   await page.waitForTimeout(500)
   await icono(page, 'arrow_forward').last().click({ timeout: 10_000 })
+  alAvanzar?.('generar')
   try {
     await esperar(page, tarjeta, p.tipo, antes)
   } catch (e) {
@@ -375,5 +380,6 @@ export async function generarEnFlow(b: Browser, page: Page, proyecto: string | u
       .catch(() => null)
     throw new Rechazado(e.message, e.aviso, gastoDeRechazo(saldoAntes, despues), despues)
   }
+  alAvanzar?.('descargar')
   return { creditos, archivo: await bajar(page, b, tarjeta, carpeta) }
 }

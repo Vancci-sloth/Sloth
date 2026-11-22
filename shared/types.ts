@@ -478,6 +478,8 @@ export interface SessionMeta {
   running: boolean
   /** Fuera de la lista de la barra lateral, sin borrarse. */
   archived?: boolean
+  /** El chat de una imagen del estudio (`server/flow/hilo-imagen.ts`), por su imagen de partida: no se le escribe. */
+  imagenEstudio?: string
   /** Las tareas en segundo plano que siguen vivas, por su descripción. */
   background?: string[]
   /** Si es un video de un lote: cuál es, de cuántos, y la carpeta que le tocó dentro de `cwd`. */

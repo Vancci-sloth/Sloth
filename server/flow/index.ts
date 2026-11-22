@@ -1,5 +1,7 @@
 import { createHash, randomBytes } from 'node:crypto'
 import { copyFileSync, existsSync, mkdirSync, readFileSync, rmSync } from 'node:fs'
+import { open, readFile, readdir } from 'node:fs/promises'
+import { pipeline } from 'node:stream/promises'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { dirname, isAbsolute, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -8,10 +10,12 @@ import type { Browser } from 'playwright-core'
 import { A_LA_VEZ, AVISO_FRENADA, CALMA, type Descanso, descansoNuevo, elegirCuenta, espacioEntrePedidos, FORMATOS_IMAGEN, FORMATOS_VIDEO, type Motivo, MODELOS_IMAGEN, MODELOS_VIDEO, motivoDeAviso, esOmni, PAUSA_CUENTA, puede, RESOLUCIONES_OMNI, type Saldo, tipoDeArchivo, TOPE_CREDITOS, VIDEO_MAS_BARATO } from '../../shared/flow.ts'
 import type { EstadoFlow, GastoFlow, SaldoFlow, TrabajoFlow } from '../../shared/types.ts'
 import { VENTA } from '../../shared/venta.ts'
+import { areaDeContorno, ESTILOS_IMAGEN, HERRAMIENTAS_IMAGEN, LIMITE_MARCAS, LIMITE_PUNTOS_MARCA, MODELO_RECORTE, PEDIDO_RECORTE, type EstiloImagen, type ImagenEstudio, type MarcaImagen, type PasoImagen } from '../../shared/estilos-imagen.ts'
 import { guardar } from '../disco.ts'
 import { cuerpo, json } from '../http.ts'
 import { type CuentaFlow, cuentasFlow, nombreNavegador } from './cuentas.ts'
 import { generarEnFlow, leerSaldo, paginaFlow, ponerAportar, Rechazado, saldoEnFlow, SinEmpezar, URL_FLOW } from './pagina.ts'
+import type { PromptPreparado, registroDeImagen } from './hilo-imagen.ts'
 
 /**
  * Las imágenes (Nano Banana) y los videos (Veo) de Google Flow, en las cuentas de Google del usuario, como los generaría
@@ -43,9 +47,17 @@ import { generarEnFlow, leerSaldo, paginaFlow, ponerAportar, Rechazado, saldoEnF
  * `derechos` es la fecha en que el usuario confirmó que tiene los derechos de las imágenes que manda (referencias y
  * fotogramas) y que cumple la política de Google. Al subir una imagen, Flow pide aceptar eso mismo, y solo con esta
  * confirmación Sloth acepta por él (`subir` en `pagina.ts`): sin ella, un pedido con imágenes no se hace.
+ *
+ * El estudio de Imágenes (`/api/flow/estudio`, `web/src/EstudioImagenes.tsx`): cada quien pide una imagen sin agente, con un
+ * estilo (`shared/estilos-imagen.ts`), un modelo de Flow (por la misma fila y las mismas cuentas de aquí), ChatGPT
+ * (`imagen-codex.ts`) o el recorte local que quita el fondo (`recorte.ts`). Editar una de la galería la manda como
+ * referencia, con las zonas que marcaste (cambiar, quitar, conservar) dichas en el pedido. Con un modelo de «Prompt», un
+ * agente escribe antes el pedido (`preparar`) y el estudio lo guarda como un chat de la imagen (`hilo-imagen.ts`). Todo
+ * queda en `data/imagenes`: la imagen, su `.huella` y sus datos en un `.json`. Hasta `LIMITE_ESTUDIO` pedidos a la vez.
  */
 
 type Trabajo = TrabajoFlow & {
+  estudio?: EncargoImagen
   prompt: string
   salida: string
   huella: string
@@ -58,6 +70,7 @@ type Trabajo = TrabajoFlow & {
   ultimo?: string
 }
 interface Ajustes {
+  calmaHasta?: number
   aportar?: boolean
   derechos?: string
   proyectos?: Record<string, string>
@@ -85,8 +98,70 @@ const DIAS_DE_USO = 62
 const sumar = (a: GastoFlow, b: GastoFlow): GastoFlow => ({ videos: a.videos + b.videos, creditos: a.creditos + b.creditos })
 const NADA: GastoFlow = { videos: 0, creditos: 0 }
 
-export function flow(app: string, google: Google) {
+interface MotoresEstudio {
+  preparar(modelo: string, prompt: string, formato: string, carpeta: string): Promise<PromptPreparado>
+  chatgpt(prompt: string, formato: string, carpeta: string, referencia?: string): Promise<Uint8Array>
+  quitarFondo?(referencia: string, marcas: MarcaImagen[]): Promise<Uint8Array>
+  registrar?: ReturnType<typeof registroDeImagen>
+}
+type EncargoImagen = ImagenEstudio & { estado: 'en-fila' | 'preparando' | 'generando' | 'error'; error?: string; paso?: PasoImagen }
+const LIMITE_ESTUDIO = 6
+const ID_IMAGEN = /^\d{13}-[a-f0-9]{12}$/
+function marcaValida(m: MarcaImagen | null) {
+  return !!m && [m.x, m.y, m.ancho, m.alto].every((n) => Number.isFinite(n) && n >= 0 && n <= 100)
+    && m.ancho > 0 && m.alto > 0 && m.x + m.ancho <= 100.001 && m.y + m.alto <= 100.001
+    && (m.herramienta === undefined || (typeof m.herramienta === 'string' && Object.hasOwn(HERRAMIENTAS_IMAGEN, m.herramienta)))
+    && (m.contorno === undefined || (Array.isArray(m.contorno) && m.contorno.length >= 3 && m.contorno.length <= LIMITE_PUNTOS_MARCA
+      && m.contorno.every((p) => p && Number.isFinite(p.x) && Number.isFinite(p.y)
+        && p.x >= m.x && p.x <= Math.min(100, m.x + m.ancho + .001)
+        && p.y >= m.y && p.y <= Math.min(100, m.y + m.alto + .001))
+      && areaDeContorno(m.contorno) >= .5))
+}
+
+function describirMarca(m: MarcaImagen, i: number): string {
+  const instruccion = m.herramienta ? HERRAMIENTAS_IMAGEN[m.herramienta].instruccion : ''
+  const zona = m.contorno
+    ? `Contorno cerrado, pares (x,y) en % desde la esquina superior izquierda: ${m.contorno.map(({ x, y }) => `(${x},${y})`).join(' ')}. Solo el interior delimitado por este contorno pertenece a la zona.`
+    : `x=${m.x}%, y=${m.y}%, ancho=${m.ancho}%, alto=${m.alto}% desde la esquina superior izquierda.`
+  return `Zona ${i + 1}: ${zona} ${instruccion}`.trimEnd()
+}
+
+export function flow(app: string, google: Google, motores?: MotoresEstudio) {
   const carpeta = join(app, 'data', 'flow')
+  const estudio = join(app, 'data', 'imagenes')
+  const metadatosEstudio = new Map<string, ImagenEstudio>()
+  async function leerImagenEstudio(nombre: string) {
+    const cache = metadatosEstudio.get(nombre)
+    if (cache) return cache
+    try {
+      const datos = JSON.parse(await readFile(join(estudio, nombre), 'utf8')) as ImagenEstudio
+      metadatosEstudio.set(nombre, datos)
+      if (metadatosEstudio.size > 120) metadatosEstudio.delete(metadatosEstudio.keys().next().value!)
+      return datos
+    } catch { return null }
+  }
+  function guardarMetadatos({ estado, error, paso, ...imagen }: EncargoImagen) {
+    const nombre = `${imagen.id}.json`
+    guardar(join(estudio, nombre), JSON.stringify(imagen))
+    metadatosEstudio.delete(nombre)
+  }
+
+  async function imagenDePartida(actual: ImagenEstudio): Promise<ImagenEstudio> {
+    let base = actual
+    const visitadas = new Set<string>()
+    while (base.origen) {
+      visitadas.add(base.id)
+      const id = base.raiz ?? base.origen
+      if (!ID_IMAGEN.test(id) || visitadas.has(id)) break
+      const anterior = await leerImagenEstudio(`${id}.json`)
+      if (!anterior) return base.raiz ? { ...base, id } : base
+      base = anterior
+    }
+    return base
+  }
+  const encargos = new Map<string, EncargoImagen>()
+  let procesandoEstudio = false
+  const estudioOcupado = () => procesandoEstudio || [...encargos.values()].some((p) => p.estado === 'en-fila')
   const descargas = join(carpeta, 'descargas')
   const archivoAjustes = join(carpeta, 'ajustes.json')
   let ajustes: Ajustes = {}
@@ -115,7 +190,7 @@ export function flow(app: string, google: Google) {
   const aplicado = new Map<string, boolean>()
   /** Cuándo puede empezar el siguiente pedido, y hasta cuándo se va con calma tras una frenada. */
   let siguiente = 0
-  let calmaHasta = 0
+  let calmaHasta = ajustes.calmaHasta ?? 0
   let despertar: NodeJS.Timeout | undefined
 
   // Una cuenta que acaba de generar cuenta como ocupada durante su pausa.
@@ -130,13 +205,18 @@ export function flow(app: string, google: Google) {
   function descansar(correo: string, motivo: Motivo) {
     const ahora = Date.now()
     ajustes.descansos = { ...ajustes.descansos, [correo]: descansoNuevo(motivo, ahora, ajustes.descansos?.[correo], ajustes.saldos?.[correo]?.renueva) }
-    if (motivo === 'frenada') calmaHasta = ahora + CALMA
+    if (motivo === 'frenada') ajustes.calmaHasta = calmaHasta = ahora + CALMA
     guardarAjustes()
   }
 
   /** Lo que se leyó que le queda: sin para un video, descansa; con, deja de descansar por créditos. */
   function apuntarSaldo(correo: string, s: Saldo | null) {
     if (!s) return
+    // Leer el saldo confirma acceso real a Flow; no levanta un bloqueo temporal de Google.
+    if (ajustes.descansos?.[correo]?.motivo === 'sesion') {
+      const { [correo]: _, ...resto } = ajustes.descansos
+      ajustes.descansos = resto
+    }
     const maximo = Math.max(ajustes.saldos?.[correo]?.maximo ?? 0, s.creditos)
     ajustes.saldos = { ...ajustes.saldos, [correo]: { ...s, leido: Date.now(), maximo } }
     if (s.creditos < VIDEO_MAS_BARATO) return descansar(correo, 'creditos')
@@ -193,7 +273,10 @@ export function flow(app: string, google: Google) {
             if (ajustes.proyectos?.[c.correo] === proyecto) return
             ajustes.proyectos = { ...ajustes.proyectos, [c.correo]: proyecto }
             guardarAjustes()
+          }, (paso) => {
+            if (t.estudio) t.estudio.paso = paso
           })
+          if (t.estudio) t.estudio.paso = 'guardar'
           if (tipoDeArchivo(readFileSync(hecho.archivo)) !== t.tipo) throw new Error('Lo que bajó de Flow no es lo pedido (¿se fue la sesión?).')
           mkdirSync(dirname(t.salida), { recursive: true })
           copyFileSync(hecho.archivo, t.salida)
@@ -221,12 +304,17 @@ export function flow(app: string, google: Google) {
         if (e.gasto) apuntarUso(c.correo, e.gasto, 0)
         if (frenada) descansar(c.correo, 'frenada')
       }
-      if (e instanceof SinEmpezar) descansar(c.correo, e.sesion ? 'sesion' : motivoDeAviso(e.aviso, t.tipo))
-      if (e instanceof SinEmpezar || (frenada && e.gasto === 0)) {
+      const motivo = e instanceof SinEmpezar ? e.sesion ? 'sesion' : motivoDeAviso(e.aviso, t.tipo) : undefined
+      if (motivo) descansar(c.correo, motivo)
+      if (t.estudio && (frenada || motivo === 'frenada')) {
+        t.estado = 'error'
+        t.error = `Google Flow limitó temporalmente la generación. Vuelve a probar después de las ${hora(ajustes.descansos?.[c.correo]?.hasta ?? Date.now() + CALMA)} o elige ChatGPT.`
+      } else if (e instanceof SinEmpezar || (frenada && e.gasto === 0)) {
         // No gastó: el pedido vuelve al frente de la fila, para otra cuenta.
         t.probadas.push(c.correo)
         t.ultimo = `${c.correo}: ${mensaje(e)}`
         t.estado = 'en-fila'
+        if (t.estudio) t.estudio.paso = 'turno'
         t.cuenta = undefined
         fila.unshift(t)
       } else {
@@ -318,7 +406,7 @@ export function flow(app: string, google: Google) {
     repartirEn(5000)
   }
 
-  function pedir(d: Pick<Trabajo, 'tipo' | 'prompt' | 'formato' | 'modelo' | 'resolucion' | 'salida' | 'tope' | 'referencias' | 'cuadros'>): Trabajo {
+  function pedir(d: Pick<Trabajo, 'tipo' | 'prompt' | 'formato' | 'modelo' | 'resolucion' | 'salida' | 'tope' | 'referencias' | 'cuadros' | 'estudio'>): Trabajo {
     // Sin resolución (Veo), la huella de siempre: lo ya hecho no se repite.
     const suma = createHash('sha1').update(`${d.tipo}\n${d.modelo}${d.resolucion ? ` ${d.resolucion}` : ''}\n${d.formato}\n${d.prompt}`)
     // Lo que importa de una imagen es lo que tiene, no dónde está. Los fotogramas, aparte: no son referencias.
@@ -338,7 +426,7 @@ export function flow(app: string, google: Google) {
     return t
   }
 
-  const publico = ({ prompt: _p, salida: _s, huella: _h, tope: _t, formato: _f, referencias: _r, cuadros: _c, probadas: _pr, ultimo: _u, ...t }: Trabajo): TrabajoFlow => t
+  const publico = ({ prompt: _p, salida: _s, huella: _h, tope: _t, formato: _f, referencias: _r, cuadros: _c, probadas: _pr, ultimo: _u, estudio: _e, ...t }: Trabajo): TrabajoFlow => t
   const estado = (): EstadoFlow => {
     const ahora = Date.now()
     const hoy = dia(ahora)
@@ -372,9 +460,205 @@ export function flow(app: string, google: Google) {
   /** Una imagen que manda el agente: ruta absoluta de un .png, .jpg o .webp que existe. */
   const imagenMala = (rutas: string[]) => rutas.find((r) => !isAbsolute(r) || !IMAGEN.test(r) || !existsSync(r))
 
+  function pausaEstudio() {
+    if (!calmaHasta || calmaHasta <= Date.now()) return undefined
+    return `Google Flow limitó temporalmente la generación. Prueba después de las ${hora(calmaHasta)} o elige ChatGPT.`
+  }
+
+  async function procesarEstudio() {
+    if (procesandoEstudio) return
+    procesandoEstudio = true
+    try {
+      for (const actual of encargos.values()) {
+        if (actual.estado !== 'en-fila') continue
+        const { id, prompt, estilo, modelo, formato, orquestador, origen, marcas } = actual
+        const chatgpt = modelo === 'chatgpt'
+        const recorte = modelo === MODELO_RECORTE
+        let registro: ReturnType<NonNullable<MotoresEstudio['registrar']>>
+        try {
+          if (origen) {
+            actual.estado = 'preparando'
+            actual.paso = 'referencia'
+          }
+          const base = origen ? await imagenDePartida(actual) : actual
+          if (origen) {
+            actual.raiz = base.id
+            guardarMetadatos(actual)
+          }
+          registro = motores?.registrar?.(base, actual)
+          const pausa = !chatgpt && !recorte && pausaEstudio()
+          if (pausa) throw new Error(pausa)
+          if (!chatgpt && !recorte && !cuentas().length) throw new Error(SIN_CUENTA)
+          const salida = join(estudio, `${id}.jpg`)
+          if (recorte) {
+            actual.estado = 'generando'
+            actual.paso = 'recortar'
+            const bytes = await motores!.quitarFondo!(join(estudio, `${origen}.jpg`), marcas ?? [])
+            if (bytes[0] !== 0x89 || tipoDeArchivo(bytes) !== 'imagen') throw new Error('El recorte no devolvió un PNG válido.')
+            actual.paso = 'guardar'
+            guardar(salida, bytes)
+            guardar(`${salida}.huella`, MODELO_RECORTE)
+            registro?.terminar()
+            encargos.delete(id)
+            continue
+          }
+          const carpetaPedido = join(estudio, 'pedidos', id)
+          if (chatgpt || orquestador || origen) mkdirSync(carpetaPedido, { recursive: true })
+          let referencia: string | undefined
+          if (origen) {
+            actual.estado = 'preparando'
+            actual.paso = 'referencia'
+            const bytes = await readFile(join(estudio, `${origen}.jpg`))
+            if (tipoDeArchivo(bytes) !== 'imagen') throw new Error('La imagen original no está disponible.')
+            referencia = join(carpetaPedido, bytes[0] === 0x89 ? 'original.png' : 'original.jpg')
+            guardar(referencia, bytes)
+          }
+          const guia = ESTILOS_IMAGEN[estilo].guia
+          const descripcion = [
+            origen ? 'Edita la imagen original adjunta. Conserva el contenido, la identidad y el encuadre fuera de los cambios pedidos. No dibujes marcas ni números en el resultado.' : '',
+            `Instrucción original del usuario: ${prompt}`,
+            guia && !origen ? `Dirección visual: ${guia}` : '',
+            ...(marcas ?? []).map(describirMarca)
+          ].filter(Boolean).join('\n\n')
+          actual.estado = orquestador ? 'preparando' : 'generando'
+          if (orquestador) actual.paso = 'prompt'
+          const preparado = orquestador ? await motores!.preparar(orquestador, descripcion, formato, carpetaPedido) : undefined
+          if (preparado) {
+            actual.promptPreparado = preparado.texto
+            guardarMetadatos(actual)
+            registro?.promptListo(preparado)
+          }
+          const texto = preparado ? `${descripcion}\n\nSugerencias de composición (solo si respetan la instrucción original): ${preparado.texto}` : descripcion
+          actual.estado = 'generando'
+          if (chatgpt) {
+            actual.paso = 'generar'
+            const bytes = await motores!.chatgpt(texto, formato, carpetaPedido, referencia)
+            if (tipoDeArchivo(bytes) !== 'imagen') throw new Error('ChatGPT devolvió un archivo de imagen inválido.')
+            actual.paso = 'guardar'
+            guardar(salida, bytes)
+            guardar(`${salida}.huella`, 'chatgpt')
+          } else {
+            const pausa = pausaEstudio()
+            if (pausa) throw new Error(pausa)
+            actual.paso = 'turno'
+            const trabajo = pedir({ tipo: 'imagen', prompt: texto, modelo, formato, salida, tope: 0, referencias: referencia ? [referencia] : [], cuadros: [], estudio: actual })
+            while (trabajo.estado === 'en-fila' || trabajo.estado === 'generando') {
+              await new Promise((r) => setTimeout(r, 600))
+            }
+            if (trabajo.estado !== 'lista') throw new Error(trabajo.error || 'Google Flow no terminó la imagen.')
+          }
+          registro?.terminar()
+          encargos.delete(id)
+        } catch (e) {
+          actual.estado = 'error'
+          actual.error = mensaje(e)
+          registro?.terminar(actual.error)
+          const errores = [...encargos.values()].filter((p) => p.estado === 'error')
+          for (const anterior of errores.slice(0, -12)) encargos.delete(anterior.id)
+        }
+      }
+    } finally { procesandoEstudio = false }
+  }
+
   async function api(req: IncomingMessage, res: ServerResponse, path: string): Promise<boolean> {
     if (!path.startsWith('/api/flow')) return false
     const metodo = req.method ?? 'GET'
+    if (path === '/api/flow/estudio' && metodo === 'GET') {
+      const pedidos = [...encargos.values()].map((p) => ({ ...p }))
+      const nombres = await readdir(estudio).catch((e) => {
+        if (e.code === 'ENOENT') return []
+        throw e
+      })
+      const disponibles = new Set(nombres)
+      const completa = (id: string) => disponibles.has(`${id}.jpg.huella`) && disponibles.has(`${id}.jpg`) && disponibles.has(`${id}.json`)
+      const imagenId = new URL(req.url ?? path, 'http://localhost').searchParams.get('imagen')
+      const seleccionada = imagenId && ID_IMAGEN.test(imagenId) && completa(imagenId)
+        ? leerImagenEstudio(`${imagenId}.json`) : null
+      const imagenes = await Promise.all(nombres.filter((n) => /^\d{13}-[a-f0-9]{12}\.json$/.test(n))
+        .filter((n) => completa(n.slice(0, -5)))
+        .sort().reverse().slice(0, 60).map((n) => n === `${imagenId}.json` ? seleccionada : leerImagenEstudio(n)))
+      const terminadas = new Set(imagenes.flatMap((imagen) => imagen ? [imagen.id] : []))
+      return json(res, 200, { imagenes: imagenes.filter(Boolean), pedidos: pedidos.filter((p) => !terminadas.has(p.id)), conectado: cuentas().length > 0, chatgpt: !!motores, recorte: !!motores?.quitarFondo, derechos: !!ajustes.derechos,
+        ...(imagenId === null ? {} : { imagen: await seleccionada }) })
+    }
+    if (path === '/api/flow/estudio' && metodo === 'POST') {
+      const d = await cuerpo<Partial<ImagenEstudio> | null>(req) ?? {}
+      const { estilo, modelo, formato, orquestador, origen, marcas } = d
+      const chatgpt = modelo === 'chatgpt'
+      const recorte = modelo === MODELO_RECORTE
+      const prompt = recorte ? PEDIDO_RECORTE : typeof d.prompt === 'string' ? d.prompt.trim() : ''
+      if (!prompt || prompt.length > 4000) return json(res, 400, { error: 'Escribe una descripción de hasta 4000 caracteres.' })
+      if (typeof estilo !== 'string' || !Object.hasOwn(ESTILOS_IMAGEN, estilo) || !modelo || (!chatgpt && !recorte && !MODELOS_IMAGEN.includes(modelo)) ||
+          typeof formato !== 'string' || !Object.hasOwn(FORMATOS_IMAGEN, formato))
+        return json(res, 400, { error: 'Elige un estilo, modelo y formato disponibles.' })
+      if (orquestador !== undefined && (typeof orquestador !== 'string' || orquestador.length > 160))
+        return json(res, 400, { error: 'Elige un orquestador de la lista.' })
+      if ((chatgpt || orquestador) && !motores) return json(res, 409, { error: 'Los agentes del estudio no están disponibles.' })
+      if (origen !== undefined && (typeof origen !== 'string' || !ID_IMAGEN.test(origen) || !existsSync(join(estudio, `${origen}.jpg.huella`))))
+        return json(res, 400, { error: 'Elige una imagen de la galería para editar.' })
+      if (marcas !== undefined && (!origen || !Array.isArray(marcas) || marcas.length > LIMITE_MARCAS || !marcas.every(marcaValida)))
+        return json(res, 400, { error: 'Las zonas marcadas no son válidas.' })
+      if (recorte && (!origen || orquestador || marcas?.some((m) => m.herramienta !== 'conservar')))
+        return json(res, 400, { error: 'Elige una imagen y usa solo marcas de conservación para el recorte local.' })
+      if (recorte && !motores?.quitarFondo) return json(res, 409, { error: 'El recorte local no está disponible.' })
+      if (origen && !chatgpt && !recorte && !ajustes.derechos) return json(res, 409, { error: SIN_DERECHOS })
+      if (!chatgpt && !recorte && !cuentas().length) return json(res, 409, { error: SIN_CUENTA })
+      const pausa = !chatgpt && !recorte && pausaEstudio()
+      if (pausa) return json(res, 429, { error: pausa })
+      if ([...encargos.values()].filter((p) => p.estado !== 'error').length >= LIMITE_ESTUDIO)
+        return json(res, 409, { error: 'La cola está llena. Espera a que termine alguna imagen.' })
+      const creada = Date.now()
+      const id = `${creada}-${randomBytes(6).toString('hex')}`
+      const imagen = { id, prompt, estilo: estilo as EstiloImagen, modelo, formato, creada,
+        ...(orquestador ? { orquestador } : {}), ...(origen ? { origen, marcas } : {}) }
+      mkdirSync(estudio, { recursive: true })
+      guardar(join(estudio, `${id}.json`), JSON.stringify(imagen))
+      const actual: EncargoImagen = { ...imagen, estado: 'en-fila' }
+      encargos.set(id, actual)
+      void procesarEstudio()
+      return json(res, 200, actual)
+    }
+    const borrarImagen = /^\/api\/flow\/estudio\/(\d{13}-[a-f0-9]{12})\/borrar$/.exec(path)
+    if (borrarImagen && metodo === 'POST') {
+      const id = borrarImagen[1]
+      const encargo = encargos.get(id)
+      if ([...encargos.values()].some((p) => p.origen === id && p.estado !== 'error'))
+        return json(res, 409, { error: 'Esta imagen se está usando para una edición. Espera a que termine para borrarla.' })
+      if (encargo && encargo.estado !== 'en-fila' && encargo.estado !== 'error')
+        return json(res, 409, { error: 'Este pedido ya empezó. Podrás borrarlo cuando termine.' })
+      const datos = join(estudio, `${id}.json`)
+      const imagen = join(estudio, `${id}.jpg`)
+      if (!encargo && !existsSync(`${imagen}.huella`))
+        return json(res, 404, { error: 'El pedido ya no está en la galería.' })
+      rmSync(imagen, { force: true })
+      rmSync(`${imagen}.huella`, { force: true })
+      rmSync(datos, { force: true })
+      metadatosEstudio.delete(`${id}.json`)
+      encargos.delete(id)
+      return json(res, 200, { ok: true })
+    }
+    const foto = /^\/api\/flow\/estudio\/(\d{13}-[a-f0-9]{12})$/.exec(path)
+    if (foto && metodo === 'GET') {
+      const ruta = join(estudio, `${foto[1]}.jpg`)
+      if (!existsSync(`${ruta}.huella`)) return json(res, 404, { error: 'No encuentro esta imagen.' })
+      const archivo = await open(ruta, 'r').catch(() => null)
+      if (!archivo) return json(res, 404, { error: 'No encuentro esta imagen.' })
+      try {
+        const { size } = await archivo.stat()
+        const firma = Buffer.alloc(8)
+        await archivo.read(firma, 0, firma.length, 0)
+        if (tipoDeArchivo(firma) !== 'imagen') return json(res, 404, { error: 'El archivo no es una imagen válida.' })
+        const png = firma[0] === 0x89
+        res.writeHead(200, {
+          'Content-Type': png ? 'image/png' : 'image/jpeg',
+          'Content-Length': size,
+          'Content-Disposition': `inline; filename="sloth-${foto[1]}.${png ? 'png' : 'jpg'}"`,
+          'Cache-Control': 'private, max-age=86400'
+        })
+        await pipeline(archivo.createReadStream({ start: 0, autoClose: false }), res).catch(() => {})
+      } finally { await archivo.close() }
+      return true
+    }
     if (path === '/api/flow' && metodo === 'GET') return json(res, 200, estado())
     if (path === '/api/flow/ajustes' && metodo === 'POST') {
       const d = await cuerpo<{ aportar?: boolean; derechos?: boolean }>(req)
@@ -457,7 +741,7 @@ export function flow(app: string, google: Google) {
   return {
     api,
     /** Por qué no se puede reiniciar el servidor: cortaría un pedido ya pagado o en fila, o la ventana donde entras con Google. */
-    ocupado: () => (ocupadas.size || fila.length ? 'Sloth está generando en Google Flow. Espera a que termine.' : otras.agregando() ? 'Hay una ventana abierta para entrar con Google en Flow: termina o ciérrala.' : null)
+    ocupado: () => (estudioOcupado() ? 'Hay un pedido en curso en Imágenes.' : ocupadas.size || fila.length ? 'Sloth está generando en Google Flow. Espera a que termine.' : otras.agregando() ? 'Hay una ventana abierta para entrar con Google en Flow: termina o ciérrala.' : null)
   }
 }
 
