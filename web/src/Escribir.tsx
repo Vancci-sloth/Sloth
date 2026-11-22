@@ -4,11 +4,16 @@ import { faltaEnGuia, guiaDe } from '../../shared/guia'
 import { NOMBRE_AGENTE, type Proveedor } from '../../shared/providers'
 import type { AdjuntoComunidad, AyudaMejora, OrigenMejora, VideoHecho, VideosDeTodos } from '../../shared/types'
 import { api } from './api'
+import { TarjetasEnlaces } from './Enlaces'
+import { LINK } from './etiquetas'
 import { GuiaCampos } from './Guia'
 import { Desplegable } from './Desplegable'
 import { Icono as IconoBase, type NombreIcono } from './Iconos'
 import { MarcaAgente } from './Logos'
 import './Escribir.css'
+
+/** Las URLs únicas del texto (hasta 4), para la vista previa de enlaces debajo del compositor. */
+const enlacesDelTexto = (texto: string) => [...new Set(texto.split(new RegExp(`(${LINK.source})`, 'g')).filter((_, i) => i % 2))].slice(0, 4)
 
 /**
  * Donde se escribe en la comunidad: una publicación nueva, una que se edita o una mejora pedida desde un hilo
@@ -239,7 +244,8 @@ export function Escribir(props: {
         placeholder={props.placeholder}
         onChange={(e) => setTexto(e.target.value)}
         onKeyDown={(e) => {
-          if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
+          // Enter hace salto de línea; se publica solo con el botón. Cmd/Ctrl+Enter publica, como atajo.
+          if (e.key === 'Enter' && (e.metaKey || e.ctrlKey) && !e.nativeEvent.isComposing) {
             e.preventDefault()
             void listo()
           }
@@ -252,6 +258,8 @@ export function Escribir(props: {
           void subirImagenes(archivos)
         }}
       />
+      {/* Mientras escribes, la vista previa de los enlaces que pegaste (YouTube, etc.), como se verá en la comunidad. */}
+      <TarjetasEnlaces enlaces={enlacesDelTexto(texto)} />
       {estilo && <GuiaCampos valor={estilo.guia ?? {}} onCambio={(g) => setAdjuntos((l) => l.map((a) => (a === estilo ? { ...a, guia: g as AdjuntoComunidad['guia'] } : a)))} />}
       {(adjuntos.length > 0 || subiendo.length > 0) && (
         <div className="esc-fotos">

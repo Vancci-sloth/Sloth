@@ -1,9 +1,10 @@
-import { type CSSProperties, type DragEvent, useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
+import { type CSSProperties, type DragEvent, type ReactNode, useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
 import type { AdjuntoComunidad, Autor, AvisoComunidad, CategoriaComunidad, ComentarioComunidad, FeedComunidad, OrdenComunidad, PublicacionComunidad, RoadmapComunidad } from '../../shared/types'
 import { api, ErrorApi } from './api'
 import { abiertaGuardada, BORRADA, buscarAqui, conocidas, consulta as consultaDe, guardado, guardar as guardarVista, guardarAbierta, indiceListo, olvidar, olvidarTodo, palabrasDe, pedir, pedirIndice, pedirPublicacion, precargarPublicacion, precargarVista, recordar, ultimoFeed } from './comunidadDatos'
 import { Confirm } from './Confirm'
 import { Escribir, type Escrito, subirImagen } from './Escribir'
+import { TarjetasEnlaces } from './Enlaces'
 import { abrirBorrador, abrirHilo, CompartirTuyo, type Instalado, TrasInstalar } from './Estilos'
 import { LINK } from './etiquetas'
 import { Unirse } from './Licencia'
@@ -797,6 +798,9 @@ function Tarjeta({ p, yo, nueva, visto, onAbrir, onFoco, onMegusta }: { p: Publi
   const imagen = portada && (portada.tipo === 'imagen' ? portada.url : portada.posterUrl)
   const estilo = p.adjuntos.find((a) => a.tipo === 'estilo')
   const fotos = p.adjuntos.filter((a) => a.tipo !== 'estilo').length
+  // En el feed, la vista previa de los enlaces del texto (hasta 2, para no recargar). Van encima del botón que cubre la
+  // tarjeta (CSS `.com-post .enlaces`), para que se puedan abrir sin que el clic abra el post.
+  const enlacesFeed = enlacesDe(p.texto ?? '', 2)
   // Nuevo: llegó después de la última vez que la abriste, y no lo escribiste tú.
   const nuevoComentario = !!p.ultimoComentario && (!visto || p.ultimoComentario > visto) && p.comentaron[0]?.id !== yo?.id
   // Se abre con su título, un botón que cubre toda la tarjeta (`.com-post-abrir::after`); me gusta va encima. Al pasar
@@ -806,9 +810,9 @@ function Tarjeta({ p, yo, nueva, visto, onAbrir, onFoco, onMegusta }: { p: Publi
   const adelantar = () => precargarPublicacion(p.id)
   const detenerse = () => (clearTimeout(espera.current), (espera.current = setTimeout(adelantar, 120)))
   useEffect(() => () => clearTimeout(espera.current), [])
-  const abrir = (
-    <button className="com-post-abrir" onClick={onAbrir} onFocus={() => (onFoco(), adelantar())} onPointerDown={(e) => e.button === 0 && adelantar()}>
-      {p.titulo || p.texto || (estilo ? estilo.nombre : 'Una imagen')}
+  const botonAbrir = (contenido: ReactNode, etiqueta?: string) => (
+    <button className="com-post-abrir" aria-label={etiqueta} onClick={onAbrir} onFocus={() => (onFoco(), adelantar())} onPointerDown={(e) => e.button === 0 && adelantar()}>
+      {contenido}
     </button>
   )
   return (
@@ -836,13 +840,25 @@ function Tarjeta({ p, yo, nueva, visto, onAbrir, onFoco, onMegusta }: { p: Publi
       </header>
       <div className="com-post-cuerpo">
         <div className="com-post-textos">
-          {p.titulo ? <h3>{abrir}</h3> : <div className="com-post-solo">{abrir}</div>}
-          {p.titulo && p.texto && <p>{p.texto}</p>}
+          {p.titulo ? (
+            <h3>{botonAbrir(p.titulo)}</h3>
+          ) : p.texto ? (
+            // Sin título, el texto es el contenido: sus enlaces son clicables (encima del overlay) y el botón vacío,
+            // detrás, abre el post al tocar el resto.
+            <div className="com-post-solo">
+              <Texto texto={p.texto} className="com-post-texto" />
+              {botonAbrir(null, p.texto.slice(0, 120))}
+            </div>
+          ) : (
+            <div className="com-post-solo">{botonAbrir(estilo ? estilo.nombre : 'Una imagen')}</div>
+          )}
+          {p.titulo && p.texto && <Texto texto={p.texto} className="com-post-texto" />}
           {estilo && (
             <span className="com-estilo-linea">
               <Icono de="claqueta" /> Estilo para instalar · {estilo.nombre}
             </span>
           )}
+          {!!enlacesFeed.length && <TarjetasEnlaces enlaces={enlacesFeed} />}
         </div>
         {portada && (
           <div className={`com-post-portada${portada.tipo === 'video' && portada.vertical ? ' vertical' : ''}`}>
@@ -881,10 +897,20 @@ function Tarjeta({ p, yo, nueva, visto, onAbrir, onFoco, onMegusta }: { p: Publi
   )
 }
 
-/** El texto de una publicación o un comentario, con sus enlaces. */
-export function Texto({ texto, className }: { texto: string; className: string }) {
+/** Las URLs únicas de un texto (las partes impares del split por `LINK`), hasta `max`, para su vista previa. */
+function enlacesDe(texto: string, max: number): string[] {
+  return [...new Set(texto.split(new RegExp(`(${LINK.source})`, 'g')).filter((_, i) => i % 2))].slice(0, max)
+}
+
+/**
+ * El texto de una publicación o un comentario, con sus enlaces clicables. Con `conEnlaces`, además, debajo van las tarjetas
+ * de vista previa de los enlaces (miniatura, sitio y título; YouTube, TikTok y Vimeo por oEmbed), reusando las del inicio
+ * (`web/src/Enlaces.tsx`, `server/enlaces.ts`). Solo las primeras, para no recargar: un enlace sin título no enseña nada.
+ */
+export function Texto({ texto, className, conEnlaces }: { texto: string; className: string; conEnlaces?: boolean }) {
   const partes = texto.split(new RegExp(`(${LINK.source})`, 'g'))
-  return (
+  const enlaces = conEnlaces ? enlacesDe(texto, 4) : []
+  const parrafo = (
     <p className={className}>
       {partes.map((p, i) =>
         i % 2 ? (
@@ -896,6 +922,13 @@ export function Texto({ texto, className }: { texto: string; className: string }
         )
       )}
     </p>
+  )
+  if (!enlaces.length) return parrafo
+  return (
+    <>
+      {parrafo}
+      <TarjetasEnlaces enlaces={enlaces} />
+    </>
   )
 }
 
@@ -1109,7 +1142,7 @@ function Abierta(props: {
             ) : (
               <>
                 {p.titulo && <h2 className="com-abierta-titulo">{p.titulo}</h2>}
-                {p.texto && <Texto texto={p.texto} className="com-abierta-texto" />}
+                {p.texto && <Texto texto={p.texto} className="com-abierta-texto" conEnlaces />}
                 {video && (
                   <video className={`com-video${video.vertical ? ' vertical' : ''}`} src={video.url} poster={video.posterUrl} controls loop playsInline preload="metadata" />
                 )}
@@ -1343,7 +1376,7 @@ function Comentario(props: {
               )}
             </span>
           </div>
-          {c.texto && <Texto texto={c.texto} className="com-comentario-texto" />}
+          {c.texto && <Texto texto={c.texto} className="com-comentario-texto" conEnlaces />}
           {!!c.adjuntos?.length && (
             <div className={`com-comentario-fotos n${c.adjuntos.length}`}>
               {c.adjuntos.map((a) => (

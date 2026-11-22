@@ -213,6 +213,21 @@
 .com-post-abrir { display: block; width: 100%; min-height: 28px; padding: 0; color: inherit; font: inherit; text-align: left; letter-spacing: inherit; outline: none; }
 .com-post-abrir::after { content: ''; position: absolute; inset: 0; border-radius: inherit; }
 .com-post-pie > button { position: relative; z-index: 1; }
+/* La vista previa de enlaces en el feed, encima del botón que cubre la tarjeta: así se abre el enlace sin abrir el post. */
+.com-post .enlaces { position: relative; z-index: 1; margin-top: 10px; }
+.com-abierta .enlaces { margin-top: 10px; }
+/* Enlaces del texto en ámbar (detalle y feed); en el feed, encima del botón que abre el post para que se puedan abrir. */
+.com-abierta-texto a, .com-comentario-texto a, .com-post-texto a { color: var(--amber); }
+.com-abierta-texto a:hover, .com-comentario-texto a:hover, .com-post-texto a:hover { text-decoration: underline; }
+.com-post-texto a { position: relative; z-index: 1; }
+/* El texto de un post sin título es su contenido principal: más líneas y sin atenuar (sus enlaces ya van encima del overlay). */
+.com-post-solo .com-post-texto { opacity: 1; -webkit-line-clamp: 4; font-size: 15.5px; }
+/* Vista previa de enlaces en la comunidad: más grande y cuidada que la compacta del inicio. */
+.com-post .enlace, .com-abierta .enlace { gap: 14px; padding: 10px; border-radius: 14px; background: var(--panel-2); max-width: 520px; }
+.com-post .enlace img, .com-abierta .enlace img { width: 160px; height: 90px; border-radius: 10px; }
+.com-post .enlace-texto, .com-abierta .enlace-texto { gap: 4px; }
+.com-post .enlace-texto small, .com-abierta .enlace-texto small { font-size: 12.5px; }
+.com-post .enlace-texto strong, .com-abierta .enlace-texto strong { font-size: 15px; white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
 /* Lo que tiene su explicación al pasar el ratón (la fecha completa, «En revisión») también va encima. */
 .com-post .com-meta time, .com-post .com-ultimo, .com-post .com-estado { position: relative; z-index: 1; }
 
