@@ -46,6 +46,8 @@ import { AvisoMacViejo } from './AvisoMacViejo'
 import { MarcaAgente } from './Logos'
 import { RevisionYoutube, YoutubeLote } from './YoutubeProgramar'
 import { CatalogoEstilos } from './CatalogoEstilos' // «Ver todos» los estilos
+import { CampoAscii } from './CampoAscii' // fondos de los temas que los piden
+import { useEntradaEstilo, useTransicionApartado } from './Movimiento'
 import { EstudioImagenes } from './EstudioImagenes' // estudio de Imágenes
 import { rutaEditorImagen } from '../../shared/estilos-imagen'
 import { CalendarioYoutube } from './YoutubeCalendario'
@@ -151,6 +153,8 @@ function guardarRespuesta(id: string, d: Draft) {
 
 export function App() {
   const [view, setView] = useState<View>(readHash)
+  const pagina = useRef<HTMLElement>(null)
+  useTransicionApartado(pagina, view.kind === 'session' ? 'hilo' : JSON.stringify(view))
   const [cards, setCards] = useState<Card[]>([])
   const [models, setModels] = useState<Model[]>([])
   const [sessions, setSessions] = useState<SessionMeta[]>([])
@@ -560,7 +564,7 @@ export function App() {
         </div>
         {/* Abre al apretar, como los menús del sistema; con el teclado (Enter, espacio), al soltar. */}
         <button
-          className={`new-chat${view.kind === 'new' ? ' active' : ''}`}
+          className={`new-chat barra-nuevo${view.kind === 'new' ? ' active' : ''}`}
           onPointerDown={(e) => {
             // Con el dedo o el lápiz, abre al soltar (el clic); con el ratón, ya.
             abrioAlApretar.current = e.button === 0 && e.pointerType === 'mouse'
@@ -654,6 +658,7 @@ export function App() {
             onChange={(e) => setBusca(e.target.value)}
             onKeyDown={(e) => e.key === 'Escape' && (setBusca(''), e.currentTarget.blur())}
           />
+          <CampoAscii variante="malla" />
           {busca ? (
             <button className="buscar-x" title="Borrar la búsqueda" onClick={() => setBusca('')}>
               ✕
@@ -737,7 +742,7 @@ export function App() {
         <Pie running={sessions.some((s) => s.running || !!s.background?.length)} connected={connected} enOpciones={view.kind === 'opciones'} fallo={falloEstado} plegada={plegada} />
       </aside>
 
-      <main className="main">
+      <main className="main" ref={pagina}>
         <Bienvenida models={models} />
         <AvisoMacViejo />
         <AvisoVideos />
@@ -912,6 +917,9 @@ function NewSession(props: {
   onCreated(id: string): void
 }) {
   const { card, models } = props
+  // El nombre y la descripción del estilo elegido entran al cambiarlo, en los temas con movimiento.
+  const cabecera = useRef<HTMLDivElement>(null)
+  useEntradaEstilo(cabecera, card.id)
   // El modelo: «Optimizado» usa lo medido para esta card (el hilo y cada subagente) o, sin medir, lo último que elegiste
   // a mano; «Avanzado», lo que elegiste para ella.
   const [avanzados, setAvanzados] = useStored<Record<string, Avanzado>>('modelos', {})
@@ -1129,7 +1137,8 @@ function NewSession(props: {
   )
 
   return (
-    <div className="new-session" {...soltar.props}>
+    <div className="new-session fondo-ramas" {...soltar.props}>
+      <CampoAscii variante="ramas" />
       {soltar.aviso}
       {/* Arriba las skills (o, con un estilo elegido, sus videos), que hacen scroll solas; abajo la skill elegida y el
           compositor, que no se mueven de su sitio. */}
@@ -1170,7 +1179,8 @@ function NewSession(props: {
       </div>
       <div className="new-bottom">
         {/* En una línea el icono, el nombre y la versión: le deja el alto a los carteles. */}
-        <div className="new-head">
+        <div ref={cabecera} className="new-head superficie-ascii">
+          <CampoAscii variante="orbita" />
           <h1>
             <span className="card-icon big" aria-hidden>
               <Icon icon={card.icon ?? '✦'} />
@@ -1251,10 +1261,13 @@ const Carteles = memo(function Carteles({ cards, activa, previas, sessions, acci
           {previas[c.id] ? (
             <video className="card-previa" src={previas[c.id].video} poster={previas[c.id].cuadro} muted loop playsInline preload="none" />
           ) : (
+            <>
+            <CampoAscii variante={c.icon === 'cubo' || c.icon === 'claqueta' ? 'malla' : c.icon === 'globo' || c.icon === 'risa' ? 'orbita' : 'onda'} />
             <span className="card-fondo">
               <span className="card-icon"><Icon icon={c.icon ?? '✦'} /></span>
               <span className="card-desc">{c.description}</span>
             </span>
+            </>
           )}
           {c.version && <span className="card-version" title={`Versión ${c.version} de este estilo`}>v{c.version}</span>}
           {/* En la app que se vende, las cards de Sloth ni se duplican ni se borran; las de tus estilos se borran. */}

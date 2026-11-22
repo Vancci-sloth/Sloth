@@ -22,7 +22,7 @@
 
 /* El buscador: `/` lo enfoca; los resultados salen debajo mientras escribes. */
 .com-buscar { position: relative; display: flex; align-items: center; gap: 8px; width: min(320px, 42vw); height: 40px; padding: 0 10px 0 12px; border-radius: 12px; border: 1px solid var(--line); background: var(--panel); color: var(--com-suave); transition: border-color 0.15s, box-shadow 0.15s; }
-.com-buscar:focus-within { border-color: #4a4236; box-shadow: 0 0 0 3px var(--amber-tinte); }
+.com-buscar:focus-within { border-color: var(--line-hover); box-shadow: 0 0 0 3px var(--amber-tinte); }
 .com-buscar input { flex: 1; min-width: 0; height: 100%; border: 0; outline: none; background: none; color: var(--text); font-size: 15px; }
 .com-buscar input::placeholder { color: var(--com-suave); }
 .com-buscar input::-webkit-search-cancel-button { display: none; }
@@ -38,7 +38,7 @@
 /* La campana y sus avisos: un panel que sale debajo, a la derecha. */
 .com-avisos { position: relative; }
 .com-campana { position: relative; width: 40px; height: 40px; display: grid; place-items: center; border-radius: 12px; border: 1px solid var(--line); background: var(--panel); color: var(--com-suave); transition: color 0.15s, border-color 0.15s, background 0.15s; }
-.com-campana:hover, .com-campana.on { color: var(--text); border-color: #4a4236; background: var(--panel-2); }
+.com-campana:hover, .com-campana.on { color: var(--text); border-color: var(--line-hover); background: var(--panel-2); }
 .com-campana .com-ico { width: 18px; height: 18px; }
 .com-campana-cuenta { position: absolute; top: -8px; right: -8px; min-width: 22px; height: 22px; padding: 0 5px; display: grid; place-items: center; border-radius: 7px; border: 2px solid var(--bg); background: var(--amber); color: var(--sobre-ambar); font-size: 14px; font-weight: 750; line-height: 1; font-variant-numeric: tabular-nums; }
 .com-avisos-panel { position: absolute; top: calc(100% + 8px); right: 0; z-index: 40; width: 380px; max-width: calc(100vw - 48px); padding: 8px; border-radius: 14px; border: 1px solid var(--line); background: var(--panel); box-shadow: 0 18px 48px rgba(0, 0, 0, 0.55); animation: com-sube 0.16s ease-out; }
@@ -139,7 +139,7 @@
 
 /* Escribe algo: cerrado, una fila con tu cara; abierto, el compositor con quién publica y dónde. */
 .com-escribe { display: flex; align-items: center; gap: 12px; width: 100%; margin-top: 22px; padding: 12px 16px; border-radius: 12px; border: 1px solid var(--line); background: linear-gradient(180deg, var(--panel-2), var(--panel)); color: var(--com-suave); font-size: 16px; text-align: left; transition: border-color 0.2s, box-shadow 0.2s; }
-.com-escribe:hover:not(:disabled) { border-color: #4a4236; box-shadow: 0 0 0 4px var(--amber-tinte); color: var(--text); }
+.com-escribe:hover:not(:disabled) { border-color: var(--line-hover); box-shadow: 0 0 0 4px var(--amber-tinte); color: var(--text); }
 /* En Estilos, escribir es compartir uno tuyo (`CompartirTuyo`). */
 .com-compartir-estilo { font-size: 14px; line-height: 1.4; }
 .com-compartir-estilo strong { display: block; color: var(--amber); font-size: 16px; font-weight: 650; }
@@ -153,7 +153,7 @@
 /* Dónde se publica, en el pie del compositor. */
 .com-elegir { color: var(--text); font-size: 14px; font-weight: 600; }
 .com-elegir > .picker-trigger { height: 32px; padding: 0 8px 0 10px; border-radius: 10px; border: 1px solid var(--line); transition: border-color 0.15s, color 0.15s; }
-.com-elegir > .picker-trigger:hover:not(:disabled), .com-elegir.open > .picker-trigger { border-color: #4a4236; background: none; }
+.com-elegir > .picker-trigger:hover:not(:disabled), .com-elegir.open > .picker-trigger { border-color: var(--line-hover); background: none; }
 .com-elegir .com-ico { width: 14px; height: 14px; }
 
 /* Las secciones, como pestañas de texto con su icono, y el orden a la derecha. La elegida, en ámbar y subrayada. */
@@ -182,11 +182,11 @@
 .com-paso.hecho .com-paso-marca { border-color: var(--ok); background: var(--ok); color: var(--bg); }
 .com-paso-marca .com-ico { width: 12px; height: 12px; stroke-width: 3.5; }
 
-.com-error { display: flex; align-items: center; gap: 10px; margin-top: 16px; padding: 9px 10px 9px 14px; border-radius: 10px; border: 1px solid rgba(224, 108, 85, 0.35); background: rgba(224, 108, 85, 0.1); color: var(--bad); font-size: 14px; }
+.com-error { display: flex; align-items: center; gap: 10px; margin-top: 16px; padding: 9px 10px 9px 14px; border-radius: 10px; border: 1px solid color-mix(in srgb, var(--bad) 35%, transparent); background: color-mix(in srgb, var(--bad) 10%, transparent); color: var(--bad); font-size: 14px; }
 .com-error-texto { margin: 0; line-height: 1.45; }
 .com-error-texto a { color: var(--text); text-decoration: underline; word-break: break-all; }
 .com-error button { flex: none; margin-left: auto; height: 32px; padding: 0 12px; border-radius: 8px; color: var(--text); font-size: 14px; font-weight: 600; }
-.com-error button:hover { background: rgba(224, 108, 85, 0.15); }
+.com-error button:hover { background: color-mix(in srgb, var(--bad) 15%, transparent); }
 .com-cargando { margin-top: 40px; text-align: center; color: var(--com-suave); font-size: 15px; }
 .com-cargando.chico { margin: 8px 0; font-size: 14px; text-align: left; }
 
@@ -202,10 +202,10 @@
 .com-feed { display: flex; flex-direction: column; gap: 14px; margin-top: 18px; }
 .com-fin { height: 1px; margin-top: -14px; }
 .com-post { position: relative; padding: 16px 18px 12px; border-radius: 14px; border: 1px solid var(--line); background: var(--panel); cursor: pointer; transition: border-color 0.2s, box-shadow 0.2s; }
-.com-post:hover { border-color: #4a4236; box-shadow: 0 12px 30px rgba(0, 0, 0, 0.35); }
+.com-post:hover { border-color: var(--line-hover); box-shadow: 0 12px 30px rgba(0, 0, 0, 0.35); }
 /* Con el teclado (j, k o Tab), la del cursor lleva el borde ámbar. */
 .com-post:has(.com-post-abrir:focus-visible) { border-color: var(--amber); box-shadow: 0 0 0 1px var(--amber); }
-.com-post.fijada { border-color: rgba(232, 163, 61, 0.45); box-shadow: 0 0 0 3px var(--amber-tinte); }
+.com-post.fijada { border-color: color-mix(in srgb, var(--amber) 45%, transparent); box-shadow: 0 0 0 3px var(--amber-tinte); }
 .com-post.nueva { animation: com-entra 0.4s cubic-bezier(0.2, 0.8, 0.2, 1), com-destello 1.8s ease-out; }
 @keyframes com-entra { from { opacity: 0; transform: translateY(-10px) scale(0.985); } }
 @keyframes com-destello { from { border-color: var(--amber); box-shadow: 0 0 0 1px var(--amber), 0 0 28px var(--amber-tinte); } }
@@ -237,9 +237,9 @@
 .com-post-portada { position: relative; width: 132px; height: 96px; flex: none; overflow: hidden; border-radius: 10px; border: 1px solid var(--line); background: var(--panel-2); }
 .com-post-portada.vertical { width: 76px; height: 116px; }
 .com-post-portada img, .com-post-portada video { width: 100%; height: 100%; object-fit: cover; display: block; }
-.com-play { position: absolute; left: 50%; top: 50%; width: 34px; height: 34px; margin: -17px 0 0 -17px; display: grid; place-items: center; border-radius: 50%; background: rgba(15, 14, 12, 0.72); color: var(--text); pointer-events: none; }
+.com-play { position: absolute; left: 50%; top: 50%; width: 34px; height: 34px; margin: -17px 0 0 -17px; display: grid; place-items: center; border-radius: 50%; background: color-mix(in srgb, var(--bg) 72%, transparent); color: var(--text); pointer-events: none; }
 .com-play .com-ico { width: 14px; height: 14px; margin-left: 2px; fill: currentColor; }
-.com-mas-fotos { position: absolute; right: 5px; bottom: 5px; padding: 1px 6px; border-radius: 6px; background: rgba(15, 14, 12, 0.8); font-size: 14px; font-weight: 700; }
+.com-mas-fotos { position: absolute; right: 5px; bottom: 5px; padding: 1px 6px; border-radius: 6px; background: color-mix(in srgb, var(--bg) 80%, transparent); font-size: 14px; font-weight: 700; }
 
 .com-post-pie { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 14px; margin-top: 12px; color: var(--com-suave); font-size: 14px; }
 .com-gusta { display: inline-flex; align-items: center; gap: 6px; height: 32px; margin-left: -8px; padding: 0 9px; border-radius: 10px; color: var(--com-suave); font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; transition: color 0.15s, background 0.15s; }
@@ -267,19 +267,19 @@
 .com-caras { display: flex; flex-wrap: wrap; margin-top: 14px; padding-left: 7px; }
 .com-caras .com-cara { margin-left: -7px; width: 30px; height: 30px; }
 .com-perfil { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; height: 40px; margin-top: 16px; border-radius: 10px; border: 1px solid var(--line); color: var(--text); font-size: 14px; font-weight: 650; transition: background 0.15s, border-color 0.15s; }
-.com-perfil:hover:not(:disabled) { background: var(--panel-2); border-color: #4a4236; }
+.com-perfil:hover:not(:disabled) { background: var(--panel-2); border-color: var(--line-hover); }
 .com-perfil .com-cara.chica { width: 22px; height: 22px; border-width: 1px; }
 
 /* Botones chicos: los iconos de una publicación y los del creador. */
 .com-icono { width: 32px; height: 32px; flex: none; display: grid; place-items: center; border-radius: 8px; color: var(--com-suave); transition: background 0.15s, color 0.15s; }
 .com-icono:hover { background: var(--panel-2); color: var(--text); }
 .com-icono.on { color: var(--amber); }
-.com-icono.peligro:hover { background: rgba(224, 108, 85, 0.13); color: var(--bad); }
+.com-icono.peligro:hover { background: color-mix(in srgb, var(--bad) 13%, transparent); color: var(--bad); }
 .com-boton { display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 12px; border-radius: 10px; color: var(--com-suave); font-size: 14px; font-weight: 600; transition: color 0.15s, background 0.15s; }
 .com-boton .com-ico { width: 14px; height: 14px; }
 .com-boton:hover:not(:disabled) { background: var(--panel-2); color: var(--text); }
 .com-boton.ok { color: var(--ok); }
-.com-boton.ok:hover { background: rgba(143, 193, 119, 0.13); color: var(--ok); }
+.com-boton.ok:hover { background: color-mix(in srgb, var(--ok) 13%, transparent); color: var(--ok); }
 
 /* Un estilo de la sección Estilos: en el feed, una línea; abierto, su caja para instalarlo. */
 .com-estilo-linea { display: flex; align-items: center; gap: 6px; margin-top: 8px; color: var(--amber); font-size: 14px; font-weight: 600; }
@@ -293,7 +293,7 @@
 .com-instalar-texto .com-instalar-error, .com-instalar-texto .com-falta, .visor-instalar .com-falta { color: var(--bad); }
 
 /* Una publicación abierta, sobre un velo. */
-.com-velo { --com-suave: color-mix(in srgb, var(--muted) 55%, var(--text)); position: fixed; inset: 0; z-index: 70; display: grid; place-items: start center; padding: 40px 24px; overflow-y: auto; background: rgba(15, 14, 12, 0.72); backdrop-filter: blur(3px); animation: com-velo 0.15s ease-out; }
+.com-velo { --com-suave: color-mix(in srgb, var(--muted) 55%, var(--text)); position: fixed; inset: 0; z-index: 70; display: grid; place-items: start center; padding: 40px 24px; overflow-y: auto; background: color-mix(in srgb, var(--bg) 72%, transparent); backdrop-filter: blur(3px); animation: com-velo 0.15s ease-out; }
 @keyframes com-velo { from { opacity: 0; } }
 .com-abierta { position: relative; width: min(760px, 100%); padding: 22px 26px 18px; border-radius: 18px; border: 1px solid var(--line); background: linear-gradient(180deg, var(--panel-2), var(--panel) 160px); box-shadow: 0 30px 80px rgba(0, 0, 0, 0.6); animation: com-sube 0.22s cubic-bezier(0.2, 0.8, 0.2, 1); }
 @keyframes com-sube { from { opacity: 0; transform: translateY(12px) scale(0.99); } }
@@ -316,9 +316,9 @@
 .com-fotos img { display: block; width: 100%; aspect-ratio: 4 / 3; object-fit: cover; }
 .com-fotos.n1 img { width: auto; max-width: 100%; max-height: 420px; aspect-ratio: auto; }
 /* Solo el creador: la versión que espera y «Liberar para todos», para el live */
-.com-liberar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; margin-top: 16px; padding: 8px 8px 8px 14px; border-radius: 12px; border: 1px dashed #4a4236; font-size: 14px; line-height: 1.45; }
+.com-liberar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; margin-top: 16px; padding: 8px 8px 8px 14px; border-radius: 12px; border: 1px dashed var(--line-hover); font-size: 14px; line-height: 1.45; }
 .com-liberar .com-boton { margin-left: auto; }
-.com-creador-barra { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 16px; padding: 10px; border-radius: 12px; border: 1px dashed #4a4236; }
+.com-creador-barra { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 16px; padding: 10px; border-radius: 12px; border: 1px dashed var(--line-hover); }
 .com-creador-barra .com-boton { max-width: 100%; }
 .com-abierta-pie { display: flex; align-items: center; gap: 16px; margin-top: 16px; padding: 10px 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); color: var(--com-suave); font-size: 14px; }
 .com-gusta.grande { margin-left: -6px; font-size: 14px; }
@@ -354,7 +354,7 @@
 .com-comentar { display: grid; grid-template-columns: 32px minmax(0, 1fr); gap: 4px 10px; align-items: center; }
 .com-comentar > .com-cara { width: 32px; height: 32px; font-size: 14px; }
 .com-comentar-caja { display: flex; align-items: flex-end; gap: 6px; padding: 4px 4px 4px 14px; border-radius: 12px; border: 1px solid var(--line); background: var(--bg); transition: border-color 0.15s, box-shadow 0.15s; }
-.com-comentar-caja:focus-within { border-color: #4a4236; box-shadow: 0 0 0 3px var(--amber-tinte); }
+.com-comentar-caja:focus-within { border-color: var(--line-hover); box-shadow: 0 0 0 3px var(--amber-tinte); }
 .com-comentar-caja textarea { flex: 1; min-height: 26px; max-height: 200px; margin: 5px 0; padding: 0; border: 0; outline: none; resize: none; background: none; color: var(--text); font-size: 15px; line-height: 1.5; }
 .com-comentar-caja textarea::placeholder { color: var(--com-suave); }
 .com-enviar { width: 32px; height: 32px; flex: none; display: grid; place-items: center; border-radius: 9px; background: var(--amber); color: var(--sobre-ambar); transition: background 0.15s; }
@@ -385,7 +385,7 @@
 .com-perfil-foto .com-cara.grande { width: 64px; height: 64px; font-size: 24px; }
 .com-perfil-foto > div { display: flex; flex-wrap: wrap; gap: 4px; }
 .com-perfil-nombre { display: block; width: 100%; margin-top: 16px; padding: 10px 14px; border-radius: 12px; border: 1px solid var(--line); outline: none; background: var(--bg); color: var(--text); font-size: 15px; transition: border-color 0.15s, box-shadow 0.15s; }
-.com-perfil-nombre:focus { border-color: #4a4236; box-shadow: 0 0 0 3px var(--amber-tinte); }
+.com-perfil-nombre:focus { border-color: var(--line-hover); box-shadow: 0 0 0 3px var(--amber-tinte); }
 /* Solo los Fundadores: salir en los créditos de la página */
 .com-creditos { display: flex; align-items: flex-start; gap: 8px; margin-top: 12px; color: var(--com-suave); font-size: 14px; line-height: 1.45; cursor: pointer; }
 .com-creditos input { margin-top: 2px; accent-color: var(--amber); }
@@ -393,7 +393,7 @@
 /* Reportar: los motivos, como opciones. */
 .com-motivos { display: flex; flex-direction: column; gap: 4px; margin-top: 14px; }
 .com-motivos button { display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-radius: 10px; border: 1px solid var(--line); color: var(--text); font-size: 15px; text-align: left; transition: border-color 0.15s, background 0.15s; }
-.com-motivos button:hover { border-color: #4a4236; }
+.com-motivos button:hover { border-color: var(--line-hover); }
 .com-motivos button.on { border-color: var(--amber); background: var(--amber-tinte); }
 .com-motivo-marca { width: 16px; height: 16px; flex: none; border-radius: 50%; border: 2px solid var(--line); }
 .com-motivos button.on .com-motivo-marca { border: 5px solid var(--amber); }
@@ -419,7 +419,7 @@
 .com-votar > p { margin: 0 0 12px; color: var(--com-suave); font-size: 14px; line-height: 1.45; }
 .com-votar ul { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
 .com-votar li button { display: grid; gap: 6px; width: 100%; padding: 9px 11px; border: 1px solid var(--line); border-radius: 10px; background: none; color: var(--text); font: inherit; font-size: 14px; text-align: left; cursor: pointer; transition: border-color 0.15s; }
-.com-votar li button:hover { border-color: #4a4236; }
+.com-votar li button:hover { border-color: var(--line-hover); }
 .com-votar li button.on { border-color: var(--amber); background: var(--amber-tinte); }
 .com-votar-fila { display: flex; justify-content: space-between; gap: 10px; }
 .com-votar-fila b { color: var(--com-suave); font-variant-numeric: tabular-nums; }

@@ -3,6 +3,8 @@ import { type CuentaClaude as Cuenta, type Opciones as Datos, type EstadoAgente,
 import { api } from './api'
 import { Arranque } from './Arranque'
 import { ActividadAgentes } from './ActividadAgente' // actividad de los agentes
+import { CampoAscii } from './CampoAscii' // fondos de los temas que los piden
+import { ponerTema, TEMAS, type Tema, useTema } from './temas'
 import { type Proveedor, proveedorDe } from '../../shared/providers'
 import { encender, encendido, notificar, sonar, usePermiso } from './avisos'
 import { abrirBienvenida } from './Bienvenida'
@@ -58,7 +60,8 @@ function Ajustes({ onDone, iniciando, onIniciando }: { onDone(): void; iniciando
     if (location.hash === `#${AGENTES}`) requestAnimationFrame(() => agentes.current?.scrollIntoView({ block: 'start' }))
   }, [])
   return (
-    <div className="opciones">
+    <div className="opciones fondo-ramas">
+      <CampoAscii variante="ramas" />
       <button className="ghost" onClick={onDone}>
         ← Volver
       </button>
@@ -159,6 +162,9 @@ function Ajustes({ onDone, iniciando, onIniciando }: { onDone(): void; iniciando
       </Grupo>
       <Grupo titulo="Avisos">
         <Avisos />
+      </Grupo>
+      <Grupo titulo="Apariencia" nota="Cambia al instante y se recuerda en esta computadora. Los fondos y el movimiento de Cristal se quedan quietos si tu sistema pide reducir el movimiento.">
+        <Apariencia />
       </Grupo>
       <TuCelular />
       <TuEquipo />
@@ -1662,6 +1668,29 @@ function VueltaWeb() {
         </button>
       </form>
       {aviso && <p className="small">{aviso}</p>}
+    </div>
+  )
+}
+
+/** Opciones → Apariencia: el tema de la interfaz (`temas.ts`). */
+function Apariencia() {
+  const tema = useTema()
+  return (
+    <div className="item">
+      <div className="fila">
+        <div className="fila-nombre">
+          <strong>Tema</strong>
+          <span>{TEMAS[tema].descripcion}</span>
+        </div>
+        <Picker
+          label={TEMAS[tema].nombre}
+          nombre="Tema"
+          value={tema}
+          abajo
+          groups={[{ label: 'Tema', options: (Object.keys(TEMAS) as Tema[]).map((t) => ({ value: t, label: TEMAS[t].nombre, detalle: t === 'sloth' ? 'el de siempre' : undefined })) }]}
+          onChange={(t) => ponerTema(t as Tema)}
+        />
+      </div>
     </div>
   )
 }

@@ -255,6 +255,10 @@ Este es el mapa:
   `web/src/items.ts`, la elección de modelo de `shared/modelos.ts` y los trazos de `web/src/trazos.ts`: nada de eso
   puede importar paquetes. Pestañas: Inicio (estilos y hilo nuevo con las líneas del compositor), Hilos (el chat en vivo
   y «Cómo va el video»), Mis videos (ver, guardar en la galería, compartir), Comunidad y Más. Compilar: `publicacion.md`.
+- Los temas (`web/src/temas.ts`, Opciones → Apariencia): «Sloth», el de siempre, y «Cristal», el aspecto de VyMotion. Cada
+  uno es `data-tema` en la raíz y su archivo `web/src/temas/<id>.css`, que cambia variables y estilos solo bajo su atributo;
+  los colores de los demás .css van en variables. Un tema puede encender los fondos de signos (`CampoAscii.tsx`) y el
+  movimiento (`Movimiento.tsx`), quietos con «reducir movimiento». Se guarda en el navegador.
 - `web/src`: React. `api.ts` habla con el servidor; `eventos.ts` guarda los eventos fuera de `App`, `items.ts` los junta
   en bloques y `Timeline.tsx` los dibuja; `Composer.tsx` es el campo de texto. Un desplegable es siempre `Desplegable`
   (`Desplegable.tsx`, sobre el `Picker` del compositor), nunca un `<select>`: un test lo para.

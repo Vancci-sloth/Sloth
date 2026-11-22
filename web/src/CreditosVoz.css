@@ -3,9 +3,9 @@
  * el aviso de un estilo que cambió. Encima de él si salen juntos. Nació con el aviso de los créditos de cada mes, que
  * ya no se dan.
  */
-.creditos-voz { position: fixed; inset: 0; z-index: 92; display: flex; overflow-y: auto; padding: 24px 16px; background: rgba(15, 14, 12, 0.62); backdrop-filter: blur(14px); }
+.creditos-voz { position: fixed; inset: 0; z-index: 92; display: flex; overflow-y: auto; padding: 24px 16px; background: color-mix(in srgb, var(--bg) 62%, transparent); backdrop-filter: blur(14px); }
 /* Con el aviso de un estilo debajo, que ya desenfoca: dos desenfoques encimados dejan borrosa también la caja. */
-body:has(.estilo-cambio) .creditos-voz { backdrop-filter: none; background: rgba(15, 14, 12, 0.4); }
+body:has(.estilo-cambio) .creditos-voz { backdrop-filter: none; background: color-mix(in srgb, var(--bg) 40%, transparent); }
 .cv-caja { position: relative; margin: auto; width: min(520px, 100%); display: flex; flex-direction: column; gap: 18px; padding: 32px; background: var(--panel); border: 1px solid var(--line); border-radius: 16px; box-shadow: 0 24px 64px rgba(0, 0, 0, 0.55); }
 .cv-cerrar { position: absolute; top: 14px; right: 14px; display: grid; place-items: center; width: 36px; height: 36px; border-radius: 10px; color: var(--muted); }
 .cv-cerrar:hover { color: var(--text); background: var(--panel-2); }

@@ -959,6 +959,8 @@ export function Composer(props: {
       )}
     <div
       className={`composer ${dragging ? 'dragging' : ''}`}
+      // De qué agente es el modelo elegido: los temas le dan su color (`temas/`).
+      data-proveedor={choice?.model ? proveedorDe(choice.model) : undefined}
       onDragOver={(e) => (e.preventDefault(), setDragging(true))}
       onDragLeave={() => setDragging(false)}
       onDrop={(e) => {

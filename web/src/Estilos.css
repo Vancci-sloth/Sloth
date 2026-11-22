@@ -7,7 +7,7 @@
 .compartir-paquete > .icon-trazo { flex: none; margin-top: 2px; }
 .compartir-paquete.bien { color: var(--text); }
 .compartir-paquete.bien > .icon-trazo { color: var(--ok); }
-.compartir-paquete.mal { border-color: var(--bad); background: rgba(224, 108, 85, 0.1); color: var(--text); }
+.compartir-paquete.mal { border-color: var(--bad); background: color-mix(in srgb, var(--bad) 10%, transparent); color: var(--text); }
 .compartir-paquete.mal strong { color: var(--bad); }
 .compartir-arreglar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 10px; }
 .compartir-arreglar .primary { padding: 7px 14px; font-size: 13px; }

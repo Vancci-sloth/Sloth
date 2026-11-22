@@ -4,6 +4,7 @@ import type { Card } from '../../shared/types'
 import { Icon } from './Composer'
 import { ImportarEstilo } from './Estilos'
 import { Icono } from './Iconos'
+import { CampoAscii } from './CampoAscii'
 import { filtrarBarra } from './menu-estilos'
 import './CatalogoEstilos.css'
 
@@ -20,7 +21,8 @@ export function CatalogoEstilos({ cards, abrir }: { cards: Card[]; abrir(cardId:
     consulta.trim()
   )
   return (
-    <section className="catalogo-estilos" aria-labelledby="catalogo-estilos-titulo">
+    <section className="catalogo-estilos fondo-ramas" aria-labelledby="catalogo-estilos-titulo">
+      <CampoAscii variante="ramas" />
       <div className="catalogo-estilos-contenido">
         <header className="catalogo-estilos-cabecera">
           <div>

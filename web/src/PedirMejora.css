@@ -7,7 +7,7 @@
 
 /* El botón de los hilos. Al pasar el ratón, el símbolo gira un poco. */
 .pedir-mejora { display: inline-flex; align-items: center; gap: 6px; padding: 4px 11px 4px 9px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); font-size: 12.5px; font-weight: 600; white-space: nowrap; transition: color 0.15s, border-color 0.15s, background 0.15s; }
-.pedir-mejora:hover { color: var(--text); border-color: #4a4236; background: var(--panel-2); }
+.pedir-mejora:hover { color: var(--text); border-color: var(--line-hover); background: var(--panel-2); }
 .pedir-mejora .marca-agente { transition: transform 0.35s cubic-bezier(0.2, 0.8, 0.2, 1); }
 .pedir-mejora:hover .marca-agente { transform: rotate(45deg) scale(1.12); }
 /* En el encabezado del hilo, solo el símbolo, redondo. */
@@ -23,7 +23,7 @@
 .cite-btn svg.marca-agente { stroke: none; }
 
 /* La caja, con el mismo resplandor del compositor de Mejoras. */
-.pm-velo { position: fixed; inset: 0; z-index: 70; display: grid; place-items: center; padding: 24px; background: rgba(15, 14, 12, 0.72); backdrop-filter: blur(3px); animation: pm-velo 0.15s ease-out; }
+.pm-velo { position: fixed; inset: 0; z-index: 70; display: grid; place-items: center; padding: 24px; background: color-mix(in srgb, var(--bg) 72%, transparent); backdrop-filter: blur(3px); animation: pm-velo 0.15s ease-out; }
 .pm-caja { position: relative; isolation: isolate; width: min(620px, 100%); max-height: calc(100vh - 48px); overflow-y: auto; padding: 20px 20px 14px; border-radius: 18px; border: 1px solid var(--line); background: linear-gradient(180deg, var(--panel-2), var(--panel) 140px); box-shadow: 0 30px 80px rgba(0, 0, 0, 0.6); animation: pm-entra 0.22s cubic-bezier(0.2, 0.8, 0.2, 1); }
 .pm-cabeza { display: flex; align-items: flex-start; gap: 12px; }
 .pm-cabeza > div { flex: 1; min-width: 0; }

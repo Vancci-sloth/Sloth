@@ -7,6 +7,7 @@ import { gruposModelos, Picker } from './Composer'
 import { Dictado } from './Dictado'
 import { EditorImagen } from './EditorImagen'
 import { Icono } from './Iconos'
+import { CampoAscii } from './CampoAscii'
 import './EstudioImagenes.css'
 
 /**
@@ -201,6 +202,7 @@ export function EstudioImagenes({ models, imagenId, abrir }: { models: Model[]; 
   return (
     <section ref={galeria} className="estudio-imagenes">
       <header className="imagen-cabecera">
+        <CampoAscii variante="orbita" />
         <span className="imagen-simbolo" aria-hidden="true"><Icono de="imagen" /></span>
         <div>
           <h1>Imágenes</h1>

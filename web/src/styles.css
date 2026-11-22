@@ -1,9 +1,11 @@
-/* La paleta de Sloth: oscuro cálido con acento ámbar. */
+/* La paleta de Sloth: oscuro cálido con acento ámbar. Es el tema «Sloth»; los demás la cambian en su archivo (`web/src/temas/`). */
 :root {
   --bg: #0f0e0c;
   --panel: #171512;
   --panel-2: #221f1b;
   --line: #2e2a24;
+  /* Un borde al pasar el ratón o con el foco. */
+  --line-hover: #4a4236;
   --text: #ede6d6;
   --muted: #9a907f;
   /* Lo secundario del inicio, que se tiene que leer bien: entre --muted y --text, más de 9,5:1 sobre el compositor (el menú
@@ -11,7 +13,7 @@
   --suave: color-mix(in srgb, var(--muted) 35%, var(--text));
   --amber: #e8a33d;
   --amber-2: #f4b04a;
-  --amber-tinte: rgba(232, 163, 61, 0.13);
+  --amber-tinte: color-mix(in srgb, var(--amber) 13%, transparent);
   --sobre-ambar: #1b1408;
   --ok: #8fc177;
   --bad: #e06c55;
@@ -53,7 +55,7 @@ input, textarea, select { font: inherit; color: inherit; }
 .select-pill button { padding: 5px 10px; border-radius: 9px; font-size: 12.5px; color: var(--muted); }
 .select-pill button:hover:not(:disabled) { background: var(--line); color: var(--text); }
 .select-pill button.danger { color: var(--bad); }
-.select-pill button.danger:hover:not(:disabled) { background: rgba(224, 108, 85, 0.13); color: var(--bad); }
+.select-pill button.danger:hover:not(:disabled) { background: color-mix(in srgb, var(--bad) 13%, transparent); color: var(--bad); }
 .select-count { min-width: 26px; height: 26px; padding: 0 7px; margin-right: 4px; display: grid; place-items: center; border-radius: 999px; background: var(--amber); color: var(--sobre-ambar); font-size: 12px; font-weight: 700; cursor: help; }
 .select-pill .select-close { padding: 5px 9px; }
 .select-error { position: absolute; top: calc(100% + 6px); left: 0; width: max-content; max-width: 280px; padding: 4px 10px; border-radius: 8px; background: var(--panel-2); border: 1px solid var(--line); }
@@ -143,7 +145,7 @@ a.estilo-importar { text-decoration: none; }
 /* Una columna: arriba su icono y qué hace (lo que quepa), abajo el nombre y su uso, enteros aunque ocupen dos líneas. */
 .card { position: relative; display: flex; flex-direction: column; aspect-ratio: 3 / 4; overflow: hidden; isolation: isolate; container-type: size; border-radius: 12px; border: 1px solid var(--line); background: var(--panel-2); text-align: left; transition: border-color 0.15s; }
 .card:has(.card-fondo) { background: radial-gradient(circle at 20% 0%, var(--amber-tinte), transparent 65%), var(--panel-2); }
-.card:hover { border-color: #4a4236; }
+.card:hover { border-color: var(--line-hover); }
 .card:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
 .card.active { border-color: var(--amber); box-shadow: 0 0 0 1px var(--amber); }
 .card-previa { position: absolute; inset: 0; z-index: -2; width: 100%; height: 100%; object-fit: cover; }
@@ -157,12 +159,12 @@ a.estilo-importar { text-decoration: none; }
 @container (max-height: 225px) { .card-desc { -webkit-line-clamp: 2; } }
 @container (max-height: 205px) { .card-desc { -webkit-line-clamp: 1; } }
 @container (max-height: 185px) { .card-desc { display: none; } }
-.card::after { content: ''; position: absolute; inset: 0; z-index: -1; background: linear-gradient(to top, rgba(15, 14, 12, 0.92), rgba(15, 14, 12, 0.35) 32%, transparent 55%); }
+.card::after { content: ''; position: absolute; inset: 0; z-index: -1; background: linear-gradient(to top, color-mix(in srgb, var(--bg) 92%, transparent), color-mix(in srgb, var(--bg) 35%, transparent) 32%, transparent 55%); }
 .card-pie { flex: none; margin-top: auto; display: flex; flex-direction: column; gap: 1px; padding: 26px 14px 12px; }
 /* Sobre una previa, el pie lleva su propia sombra, tan alta como él: con el nombre en dos líneas, la de la card no
    alcanzaba y se leía encima del video. El pie tiene el mismo alto con previa o sin ella: la previa llega después y,
    si no, lo movía. */
-.card:has(.card-previa) .card-pie { background: linear-gradient(to top, rgba(15, 14, 12, 0.94) 55%, rgba(15, 14, 12, 0.7) 80%, transparent); }
+.card:has(.card-previa) .card-pie { background: linear-gradient(to top, color-mix(in srgb, var(--bg) 94%, transparent) 55%, color-mix(in srgb, var(--bg) 70%, transparent) 80%, transparent); }
 .card-title { font-size: 15px; font-weight: 650; line-height: 1.3; overflow-wrap: anywhere; }
 /* Un estilo de la comunidad sin apoyo vigente (`Card.bloqueada`): apagado, con su candado junto al nombre. */
 .card.bloqueada .card-previa, .card.bloqueada .card-fondo { opacity: 0.4; }
@@ -211,14 +213,14 @@ a.estilo-importar { text-decoration: none; }
 .video-marco::after { content: ''; position: absolute; inset: 0; border-radius: inherit; box-shadow: inset 0 0 0 1px var(--line); pointer-events: none; transition: box-shadow 0.15s; }
 .video-tile:hover .video-marco::after { box-shadow: inset 0 0 0 2px var(--amber); }
 .video-tile:focus-visible .video-marco::after { box-shadow: inset 0 0 0 2px var(--amber), 0 0 0 3px var(--amber-tinte); }
-.video-dura { position: absolute; right: 6px; bottom: 6px; padding: 0 5px; border-radius: 6px; background: rgba(15, 14, 12, 0.85); color: var(--text); font-size: 14.5px; font-weight: 600; font-variant-numeric: tabular-nums; pointer-events: none; }
+.video-dura { position: absolute; right: 6px; bottom: 6px; padding: 0 5px; border-radius: 6px; background: color-mix(in srgb, var(--bg) 85%, transparent); color: var(--text); font-size: 14.5px; font-weight: 600; font-variant-numeric: tabular-nums; pointer-events: none; }
 /* Siempre de dos líneas de alto: la fecha y las marcas de una fila quedan a la misma altura. */
 .video-titulo { width: 0; min-width: 100%; min-height: 2.6em; font-size: 15px; font-weight: 600; line-height: 1.3; color: var(--text); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
 .video-meta { width: 0; min-width: 100%; display: flex; align-items: center; gap: 4px; margin-top: -2px; font-size: 14.5px; color: color-mix(in srgb, var(--muted) 60%, var(--text)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .video-meta .ico, .video-meta svg { width: 13px; height: 13px; flex: none; }
 /* Al pasar o con el foco, encima de la portada: elegir a la izquierda; bajar, compartir y borrar en columna a la derecha. */
 .video-acciones { position: absolute; top: 6px; left: 6px; right: 6px; display: flex; justify-content: space-between; align-items: flex-start; pointer-events: none; }
-.video-acciones button { pointer-events: auto; flex: none; width: 28px; height: 28px; display: grid; place-items: center; border-radius: 8px; background: rgba(15, 14, 12, 0.85); color: var(--text); opacity: 0; transition: opacity 0.12s, color 0.12s; }
+.video-acciones button { pointer-events: auto; flex: none; width: 28px; height: 28px; display: grid; place-items: center; border-radius: 8px; background: color-mix(in srgb, var(--bg) 85%, transparent); color: var(--text); opacity: 0; transition: opacity 0.12s, color 0.12s; }
 .video-acciones button svg { width: 15px; height: 15px; }
 .video-acciones-der { display: flex; flex-direction: column; gap: 4px; }
 .video-con-subida:hover .video-acciones button, .video-con-subida:focus-within .video-acciones button, .videos.eligiendo .video-elegir, .video-con-subida.elegido .video-elegir { opacity: 1; }
@@ -250,7 +252,7 @@ a.estilo-importar { text-decoration: none; }
 .barra-nombre { font-weight: 600; white-space: nowrap; }
 .barra-opcion.activa .barra-nombre { color: var(--amber-2); }
 .barra-detalle { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; color: var(--suave); }
-.composer:focus-within { border-color: #4a4236; }
+.composer:focus-within { border-color: var(--line-hover); }
 .composer.dragging { border-color: var(--amber); border-style: dashed; }
 .thumbs { display: flex; flex-wrap: wrap; gap: 8px; }
 .composer .thumbs { margin-bottom: 8px; }
@@ -258,12 +260,12 @@ a.estilo-importar { text-decoration: none; }
 .thumb > button:first-child { width: 100%; height: 100%; border: 1px solid var(--line); border-radius: var(--radio); overflow: hidden; }
 .thumb > button:first-child:hover { border-color: var(--amber); }
 .thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
-.thumb-x { position: absolute; top: 4px; right: 4px; width: 20px; height: 20px; border-radius: 6px; background: rgba(15, 14, 12, 0.8); border: 1px solid var(--line); color: var(--text); font-size: 14px; line-height: 1; }
+.thumb-x { position: absolute; top: 4px; right: 4px; width: 20px; height: 20px; border-radius: 6px; background: color-mix(in srgb, var(--bg) 80%, transparent); border: 1px solid var(--line); color: var(--text); font-size: 14px; line-height: 1; }
 .thumb-x:hover { border-color: var(--muted); }
 .tool-mirada { display: block; margin: 2px 0 8px 26px; max-width: min(100% - 26px, 420px); border: 1px solid var(--line); border-radius: var(--radio); overflow: hidden; background: var(--panel); cursor: zoom-in; }
 .tool-mirada:hover { border-color: var(--amber); }
 .tool-mirada img { display: block; width: 100%; max-height: 220px; object-fit: contain; }
-.lightbox { position: fixed; inset: 0; z-index: 50; background: rgba(15, 14, 12, 0.88); display: grid; place-items: center; padding: 40px; cursor: zoom-out; }
+.lightbox { position: fixed; inset: 0; z-index: 50; background: color-mix(in srgb, var(--bg) 88%, transparent); display: grid; place-items: center; padding: 40px; cursor: zoom-out; }
 .lightbox img, .lightbox video { max-width: 100%; max-height: 100%; border-radius: var(--radio); box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5); }
 /* «Uso»: un botón con cara de botón (no un % que parezca avance); abre con clic la tarjeta del chat y del plan. */
 .uso { position: relative; flex: none; }
@@ -408,7 +410,7 @@ a.link-chip:hover { border-color: var(--amber); }
 @keyframes rise { from { opacity: 0; transform: translateY(4px); } }
 @keyframes drop { from { opacity: 0; transform: translateY(-4px); } }
 .attach { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; color: var(--muted); border: 1px solid var(--line); }
-.attach:hover:not(:disabled) { color: var(--text); border-color: #4a4236; }
+.attach:hover:not(:disabled) { color: var(--text); border-color: var(--line-hover); }
 .send { width: 34px; height: 34px; border-radius: 50%; background: var(--amber); color: var(--sobre-ambar); font-weight: 800; font-size: 17px; }
 .send:hover:not(:disabled) { background: var(--amber-2); }
 .send.stop { background: var(--text); font-size: 12px; }
@@ -587,7 +589,7 @@ span.sub-avatar > .logo.chico svg { width: 13px; height: 13px; }
 .modal-body { color: var(--muted); font-size: 13.5px; }
 .modal-body code { font-family: var(--mono); font-size: 12.5px; color: var(--amber); }
 /* Lo que el aviso no puede dejar pasar: quitar algo también quita otra cosa. */
-.modal-body .aviso-grande { margin: 4px 0 12px; padding: 12px 14px; border: 1px solid var(--bad); border-radius: 12px; background: rgba(224, 108, 85, 0.13); color: var(--bad); font-size: 15px; font-weight: 600; line-height: 1.4; }
+.modal-body .aviso-grande { margin: 4px 0 12px; padding: 12px 14px; border: 1px solid var(--bad); border-radius: 12px; background: color-mix(in srgb, var(--bad) 13%, transparent); color: var(--bad); font-size: 15px; font-weight: 600; line-height: 1.4; }
 .modal-actions { display: flex; justify-content: flex-end; align-items: center; gap: 16px; margin-top: 20px; }
 .primary.danger { background: var(--bad); color: var(--sobre-ambar); }
 .primary.danger:hover:not(:disabled) { background: var(--bad); filter: brightness(1.1); }

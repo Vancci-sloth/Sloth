@@ -4,7 +4,7 @@
  */
 .esc { position: relative; isolation: isolate; padding: 14px 16px 10px; border-radius: 18px; border: 1px solid var(--line); background: linear-gradient(180deg, var(--panel-2), var(--panel)); transition: border-color 0.2s, box-shadow 0.2s; }
 .esc::before { content: ''; position: absolute; inset: -56px -72px -32px; z-index: -1; pointer-events: none; background: radial-gradient(34% 50% at 30% 48%, var(--amber-tinte), transparent 70%), radial-gradient(22% 34% at 24% 44%, var(--amber-tinte), transparent 70%); opacity: 0.85; transition: opacity 0.3s; }
-.esc:focus-within { border-color: #4a4236; box-shadow: 0 0 0 4px var(--amber-tinte); }
+.esc:focus-within { border-color: var(--line-hover); box-shadow: 0 0 0 4px var(--amber-tinte); }
 .esc:focus-within::before { opacity: 1; }
 .esc.soltando { border-color: var(--amber); border-style: dashed; box-shadow: 0 0 0 4px var(--amber-tinte); }
 .esc.compacto { padding: 12px 12px 8px 14px; border-radius: 12px; background: var(--panel-2); }
@@ -30,10 +30,10 @@
 .esc-elegir-estilo > .picker-trigger { height: 30px; padding: 0 9px; border-radius: 999px; }
 .esc-elegir-estilo > .picker-trigger:hover:not(:disabled), .esc-elegir-estilo.open > .picker-trigger { background: var(--line); color: var(--text); }
 .esc-miniatura img, .esc-miniatura video { width: 100%; height: 100%; object-fit: cover; display: block; }
-.esc-miniatura button { position: absolute; top: 4px; right: 4px; width: 20px; height: 20px; display: grid; place-items: center; border-radius: 50%; background: rgba(15, 14, 12, 0.82); color: var(--text); font-size: 13px; line-height: 1; opacity: 0; transition: opacity 0.15s; }
+.esc-miniatura button { position: absolute; top: 4px; right: 4px; width: 20px; height: 20px; display: grid; place-items: center; border-radius: 50%; background: color-mix(in srgb, var(--bg) 82%, transparent); color: var(--text); font-size: 13px; line-height: 1; opacity: 0; transition: opacity 0.15s; }
 .esc-miniatura:hover button, .esc-miniatura button:focus-visible { opacity: 1; }
 .esc-miniatura button:hover { color: var(--bad); }
-.esc-play { position: absolute; left: 50%; top: 50%; width: 24px; height: 24px; margin: -12px 0 0 -12px; display: grid; place-items: center; border-radius: 50%; background: rgba(15, 14, 12, 0.72); color: var(--text); pointer-events: none; }
+.esc-play { position: absolute; left: 50%; top: 50%; width: 24px; height: 24px; margin: -12px 0 0 -12px; display: grid; place-items: center; border-radius: 50%; background: color-mix(in srgb, var(--bg) 72%, transparent); color: var(--text); pointer-events: none; }
 .esc-play .esc-ico { width: 11px; height: 11px; margin-left: 2px; fill: currentColor; }
 .esc-miniatura.subiendo { background: linear-gradient(100deg, var(--panel-2) 30%, var(--line) 50%, var(--panel-2) 70%); background-size: 300% 100%; animation: esc-subiendo 1.2s steps(12) infinite; }
 .esc-miniatura.subiendo img { opacity: 0.45; }
@@ -70,7 +70,7 @@
 
 /* «Ayúdame a decirlo»: mientras Claude piensa, su símbolo gira. */
 .esc-ayuda { display: inline-flex; align-items: center; gap: 7px; height: 30px; padding: 0 12px 0 10px; border-radius: 999px; border: 1px solid var(--line); background: var(--panel); color: var(--text); font-size: 12.5px; font-weight: 600; white-space: nowrap; transition: border-color 0.15s, background 0.15s; }
-.esc-ayuda:hover:not(:disabled) { border-color: #4a4236; background: var(--panel-2); }
+.esc-ayuda:hover:not(:disabled) { border-color: var(--line-hover); background: var(--panel-2); }
 .esc-ayuda.pensando { opacity: 1; color: var(--muted); }
 .esc-ayuda.pensando .marca-agente { animation: esc-gira 1.4s steps(12) infinite; }
 @keyframes esc-gira { to { transform: rotate(360deg); } }
@@ -88,7 +88,7 @@
 .esc-usar:hover { background: var(--amber-2); }
 .esc-claude-preguntas { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; margin-top: 12px; }
 .esc-claude-preguntas span { color: var(--muted); font-size: 12px; }
-.esc-claude-preguntas button { padding: 6px 12px; border-radius: 10px; border: 1px dashed #4a4236; color: var(--text); font-size: 13px; line-height: 1.45; text-align: left; transition: border-color 0.15s, background 0.15s; }
+.esc-claude-preguntas button { padding: 6px 12px; border-radius: 10px; border: 1px dashed var(--line-hover); color: var(--text); font-size: 13px; line-height: 1.45; text-align: left; transition: border-color 0.15s, background 0.15s; }
 .esc-claude-preguntas button:hover { border-color: var(--amber); background: var(--amber-tinte); }
 
 @media (max-width: 720px) {

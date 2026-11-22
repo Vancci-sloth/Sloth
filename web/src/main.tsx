@@ -8,11 +8,18 @@ import { Recordatorio } from './Licencia'
 import { TraerSloth } from './Respaldo'
 import { VentanasRemotas } from './VentanasRemotas'
 import './styles.css'
+// Los temas (`temas.ts`): cada uno cambia la interfaz solo bajo su atributo en la raíz, que se pone antes de dibujar.
+import './temas/cristal.css'
+import { aplicarTema } from './temas'
+import { Movimiento } from './Movimiento'
+
+aplicarTema()
 
 // La app que se vende recuerda, cada tantos inicios, que se puede apoyar a Sloth.
 createRoot(document.getElementById('root')!).render(
   <>
     <App />
+    <Movimiento />
     {VENTA && <Recordatorio />}
     {/* Con la misma clave en otra computadora, ofrece traer lo de allá. */}
     <TraerSloth />
