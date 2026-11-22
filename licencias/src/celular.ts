@@ -25,7 +25,8 @@ export async function celular(req: Request, env: Env, c: Record<string, unknown>
   if (delCreador(req, env)) return json({ cobra, apoya: true, hasta })
   const equipo = String(c.equipo ?? '')
   if (!EQUIPO.test(equipo)) throw new Rechazo(400, 'Falta el identificador de este celular.')
-  if (!c.clave) return json({ cobra, hasta })
+  // Apagado, abre aunque la clave guardada ya no sirva: un error dejaría al celular con lo que supo antes.
+  if (!cobra || !c.clave) return json({ cobra, hasta })
   const fila = await porClave(env, c.clave)
   const otros = await env.DB.prepare('SELECT COUNT(*) AS n FROM celulares WHERE clave = ? AND equipo != ? AND visto > ?')
     .bind(fila.clave, equipo, new Date(ahora - VISTO).toISOString())
