@@ -16,6 +16,8 @@ Lo que recuerdas de Expo seguramente ya no es así. Antes de tocar una API de Ex
 ## Al editar
 
 - Instala con `npx expo install <paquete>`, no con `npm install`: elige la versión que va con el SDK.
+- Lo que no es nativo llega a las apps instaladas sin otro `.apk` (`expo-updates`); un paquete con código nativo, un
+  permiso o un plugin piden subir `version` en `app.json` y sacar otro. Cómo, en `docs/agents/publicacion.md`.
 - Comprueba con `npx tsc --noEmit` y `npx expo export --platform android --platform ios --output-dir <temporal>`.
 - `ios/` y `android/` no existen en el repo: se generan con la configuración de `app.json` y sus plugins.
 - Lo que se importa de `../shared` y `../web/src` no puede importar paquetes (los resuelve Metro desde fuera de esta
