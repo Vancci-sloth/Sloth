@@ -134,6 +134,7 @@ input, textarea, select { font: inherit; color: inherit; }
 /* «Importar» un estilo que te pasaron: texto con su icono, sin cápsula. */
 .estilo-importar { display: flex; align-items: center; gap: 6px; padding: 3px 6px; border-radius: 6px; color: var(--suave); font-size: 15px; transition: color 0.15s; }
 .estilo-importar:hover { color: var(--amber); }
+a.estilo-importar { text-decoration: none; }
 .importar-error { margin-right: 8px; }
 .cards { flex: 1; min-height: 0; overflow-y: auto; display: grid; grid-template-columns: repeat(auto-fill, minmax(168px, 1fr)); grid-auto-rows: max-content; gap: 14px; margin: 0 -6px; padding: 4px 6px 6px; }
 /* Encajadas: cada cartel del tamaño que cabe, juntos y pegados al compositor. */

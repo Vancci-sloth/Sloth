@@ -45,6 +45,7 @@ import { Bienvenida } from './Bienvenida'
 import { AvisoMacViejo } from './AvisoMacViejo'
 import { MarcaAgente } from './Logos'
 import { RevisionYoutube, YoutubeLote } from './YoutubeProgramar'
+import { CatalogoEstilos } from './CatalogoEstilos' // «Ver todos» los estilos
 import { CalendarioYoutube } from './YoutubeCalendario'
 import { avisarTanda, AvisoRedes, ConNavegadorRedes, usePublicar } from './Redes' // redes
 import { NombreDelHilo, Renombrar } from './Renombrar'
@@ -67,6 +68,7 @@ type View =
   | { kind: 'ideas'; canalId?: string }
   | { kind: 'videos'; estilo?: string }
   | { kind: 'modelos3d' } // modelos 3D
+  | { kind: 'estilos' } // el catálogo de estilos
   | { kind: 'comunidad' } // comunidad
   | { kind: 'admin'; pestana?: PestanaAdmin } // Administrador, solo en la computadora del creador
   /** La revisión de YouTube (`youtube-ruta.ts`): `volver` es la vista de donde se abrió. */
@@ -94,6 +96,7 @@ function readHash(): View {
   if (kind === 'ideas') return { kind: 'ideas', canalId: id || undefined }
   if (kind === 'mis-videos') return { kind: 'videos', estilo: id || undefined }
   if (kind === 'modelos-3d') return { kind: 'modelos3d' } // modelos 3D
+  if (kind === 'estilos') return { kind: 'estilos' } // el catálogo de estilos
   if (kind === 'comunidad' || kind === 'mejoras') return { kind: 'comunidad' } // comunidad (antes, Mejoras)
   if (kind === 'admin') return { kind: 'admin', pestana: esPestanaAdmin(id) ? id : undefined }
   return { kind: 'new', cardId: kind === 'new' ? id : undefined }
@@ -104,6 +107,7 @@ const irAPestanaAdmin = (pestana: PestanaAdmin) => go({ kind: 'admin', pestana }
 
 function go(view: View) {
   if (view.kind === 'youtube') return void (location.hash = view.volver)
+  if (view.kind === 'estilos') return void (location.hash = '/estilos')
   location.hash =
     view.kind === 'session'
       ? `/s/${view.id}`
@@ -746,6 +750,7 @@ export function App() {
           />
         )}
         {view.kind === 'modelos3d' && <Modelos3D />} {/* modelos 3D */}
+        {view.kind === 'estilos' && <CatalogoEstilos cards={cards} abrir={(cardId) => (setFreshId(newId()), go({ kind: 'new', cardId }))} />}
         {view.kind === 'youtube' && <RevisionYoutube key={`${view.cardId ?? ''}:${view.ruta ?? ''}`} cardId={view.cardId} ruta={view.ruta} cerrar={() => (location.hash = view.volver)} />}
         {view.kind === 'comunidad' && <Comunidad />}
         {/* Se arma oculto en cuanto Sloth queda quieto (o al entrar): abrirlo después es solo enseñarlo. */}
@@ -1139,6 +1144,9 @@ function NewSession(props: {
           <section className="estante">
             <header>
               <h2>Estilos</h2>
+              <a className="estilo-importar" href="#/estilos" title="Todos los estilos, con su descripción y un buscador">
+                <Icono de="buscar" className="icon-trazo" /> Ver todos
+              </a>
               <ImportarEstilo /> {/* estilos compartidos */}
             </header>
             {fallo && <p className="bad small">{fallo}</p>}
