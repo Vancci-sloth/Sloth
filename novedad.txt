@@ -1,1 +1,1 @@
-Arreglo express: si una cuenta de Google Flow pierde su sesión, Sloth ya no falla con «locator.waitFor: Timeout»: pasa el pedido a otra cuenta sin gastar y te dice cuál reconectar.
+Sloth por dentro, nuevo: los estilos en carrusel, Redes en un solo lugar, la página de Estilos, el estudio de Imágenes, Motion Graphics, dictar con el micrófono, voces de Vibi y Groq, varias cuentas de Claude y ChatGPT, Opciones por secciones con la actividad de cada agente y el tema Cristal.
