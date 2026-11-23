@@ -81,6 +81,8 @@ import { APERTURA_VOZ } from './voz-mensual.ts'
 import { bajarApoyo, reanudarPausadas } from './bajar-apoyo.ts'
 import { bajarCadaMes, comoBaja, comoSigue, pasoEn, precioDe, siVuelves, tuPrecioSeQueda } from './escalera.ts'
 import { olvidarRespaldos, respaldo } from './respaldo.ts'
+import { escapar, htmlDeCorreo } from './plantilla-correo.ts'
+import { LOGO_PNG } from './logo-correo.ts'
 import { HOST_ENTRADA, olvidarWeb, web } from './web.ts'
 import { youtube } from './youtube.ts'
 
@@ -563,6 +565,11 @@ async function atender(req: Request, env: Env, ctx: ExecutionContext, url: URL):
     if (req.method === 'GET' && url.pathname === '/precio') return json(await precios(env, url.searchParams.get('fundador') ?? undefined))
     // Los Fundadores que pidieron salir en los créditos de la página.
     if (req.method === 'GET' && url.pathname === '/creditos') return json({ fundadores: await creditos(env) })
+    // El logo de los correos (`plantilla-correo.ts`).
+    if (req.method === 'GET' && url.pathname === '/correo/sloth.png')
+      return new Response(Uint8Array.from(atob(LOGO_PNG), (c) => c.charCodeAt(0)), {
+        headers: { 'content-type': 'image/png', 'cache-control': 'public, max-age=31536000, immutable' }
+      })
     if (req.method === 'GET' && url.pathname === '/version') return json(await ultimaPara(req, env, sistema(url.searchParams.get('so'))))
     if (req.method === 'GET' && url.pathname === '/ultima') return await ultimaLigera(req, env, ctx, sistema(url.searchParams.get('so')))
     if ((req.method === 'GET' || req.method === 'HEAD') && url.pathname === '/descargar') {
@@ -2107,7 +2114,8 @@ export async function correo(env: Env, para: string, asunto: string, parrafos: s
     return false
   }
   const pie = `${PROVEEDOR} · ${env.CORREO_RESPUESTA}`
-  const html = `<div style="font:15px/1.6 system-ui,sans-serif;color:#1b1408;max-width:560px">${parrafos.map((p) => `<p>${escapar(p)}</p>`).join('')}<p style="color:#9a907f;font-size:12px">${escapar(pie)}</p></div>`
+  // El texto se viste solo, con los colores de Sloth (`plantilla-correo.ts`); `text` queda para quien no lee HTML.
+  const html = htmlDeCorreo(asunto, parrafos, { origen: env.ORIGEN, pie: PROVEEDOR, respuesta: env.CORREO_RESPUESTA, interno: para === env.CORREO_RESPUESTA })
   const cuerpo = JSON.stringify({ from: env.CORREO_DE, to: [para], reply_to: env.CORREO_RESPUESTA, subject: asunto, text: [...parrafos, '', pie].join('\n\n'), html })
   const llave = idempotencia ?? crypto.randomUUID()
   // Con demasiados a la vez (429) o una falla suya (5xx), Resend pide volver a intentar: dos veces más, con pausa.
@@ -2126,10 +2134,6 @@ export async function correo(env: Env, para: string, asunto: string, parrafos: s
     }
     throw new Error(`Resend respondió ${r.status}: ${(await r.text()).slice(0, 200)}`)
   }
-}
-
-function escapar(texto: string): string {
-  return texto.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 }
 
 /** «21 de noviembre de 2026», en la hora de la Ciudad de México. */
