@@ -258,7 +258,7 @@ const fotos = (page: Page) => page.locator('.base-prompt-box .prompt-top-row img
  * Las peticiones que la página tiene en vuelo y que mandan algo (no `GET`): mientras haya alguna, una subida avanza.
  * `quieta` dice cuánto lleva sin ninguna; así se distingue una conexión lenta (sigue mandando) de una caída (ya no manda).
  */
-function mirarEnvios(page: Page) {
+export function mirarEnvios(page: Page) {
   const enVuelo = new Set<unknown>()
   let ultima = Date.now()
   const empieza = (r: Request) => {
@@ -441,7 +441,7 @@ async function esperar(page: Page, tarjeta: Locator, tipo: PedidoFlow['tipo']) {
  * largas de algo ya pagado: en su lugar se vigila el avance: mientras sigan llegando bytes se espera, hasta `BAJADA_MAXIMA`;
  * solo falla si pasan `BAJADA_QUIETA` sin recibir nada.
  */
-async function bajar(page: Page, b: Browser, tarjeta: Locator, carpeta: string): Promise<string> {
+export async function bajar(page: Page, b: Browser, tarjeta: Locator, carpeta: string): Promise<string> {
   mkdirSync(carpeta, { recursive: true })
   const cdp = await b.newBrowserCDPSession()
   await cdp.send('Browser.setDownloadBehavior', { behavior: 'allowAndName', downloadPath: carpeta, eventsEnabled: true })

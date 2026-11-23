@@ -139,7 +139,13 @@ function describirMarca(m: MarcaImagen, i: number): string {
   return `Zona ${i + 1}: ${zona} ${instruccion}`.trimEnd()
 }
 
-export function flow(app: string, google: Google, motores?: MotoresEstudio) {
+/** Lo de fuera que usa la fila: la página de Flow y las cuentas agregadas. Las pruebas ponen lo suyo (`flow-red.test.ts`). */
+const EN_FLOW = { cuentasFlow, generarEnFlow, leerSaldo, paginaFlow, ponerAportar, saldoEnFlow }
+export type EnFlow = typeof EN_FLOW
+
+export function flow(app: string, google: Google, motores?: MotoresEstudio, deFuera: Partial<EnFlow> = {}) {
+  // Con los nombres de lo importado, para que lo demás no cambie.
+  const { cuentasFlow, generarEnFlow, leerSaldo, paginaFlow, ponerAportar, saldoEnFlow } = { ...EN_FLOW, ...deFuera }
   const carpeta = join(app, 'data', 'flow')
   const estudio = join(app, 'data', 'imagenes')
   const metadatosEstudio = new Map<string, ImagenEstudio>()
