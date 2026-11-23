@@ -255,11 +255,6 @@ async function elegir(page: Page, p: PedidoFlow): Promise<number> {
 const fotos = (page: Page) => page.locator('.base-prompt-box .prompt-top-row img')
 
 /**
- * Sube una imagen en el panel que abre `hueco` (el + de las referencias o un hueco de fotograma) y la elige. Va con un
- * nombre propio, para reconocerla en la lista, y al subir Flow puede pedir aceptar «Derechos para usar esta imagen»: eso
- * lo declaró el usuario en Sloth (`server/flow/index.ts`), y por eso aquí se acepta. `false` si no subió.
- */
-/**
  * Las peticiones que la página tiene en vuelo y que mandan algo (no `GET`): mientras haya alguna, una subida avanza.
  * `quieta` dice cuánto lleva sin ninguna; así se distingue una conexión lenta (sigue mandando) de una caída (ya no manda).
  */
@@ -287,27 +282,33 @@ function mirarEnvios(page: Page) {
   }
 }
 
+/**
+ * Sube una imagen en el panel que abre `hueco` (el + de las referencias o un hueco de fotograma) y la elige. Va con un
+ * nombre propio, para reconocerla en la lista, y al subir Flow puede pedir aceptar «Derechos para usar esta imagen»: eso
+ * lo declaró el usuario en Sloth (`server/flow/index.ts`), y por eso aquí se acepta. `false` si no subió.
+ */
 async function subir(page: Page, hueco: Locator, ruta: string): Promise<boolean> {
-  await hueco.click({ timeout: 10_000 })
+  // Desde antes de poner el archivo: la subida sale al ponerlo, y una petición que ya iba en camino no contaría.
+  const envios = mirarEnvios(page)
   const panel = page.locator('.cdk-overlay-pane').filter({ has: page.locator('mat-icon:text-is("upload")') }).last()
-  const [selector] = await Promise.all([page.waitForEvent('filechooser', { timeout: 15_000 }), panel.locator('button:has(mat-icon:text-is("upload"))').click({ timeout: 10_000 })])
   const ext = extname(ruta).toLowerCase()
   const nombre = `sloth-${randomBytes(4).toString('hex')}${ext}`
-  await selector.setFiles({ name: nombre, mimeType: ext === '.png' ? 'image/png' : ext === '.webp' ? 'image/webp' : 'image/jpeg', buffer: readFileSync(ruta) })
-  await page.locator('mat-dialog-container button').last().click({ timeout: 3000 }).catch(() => {})
-  // Elegirla mientras sube la deja marcada sin entrar al compositor. Subiendo, su renglón lleva una rueda (antes, una
-  // miniatura suya); al acabar, un icono: la miniatura de Flow ya no llega hasta recargar la lista (18 de noviembre de
-  // 2026), y esperarla dejó a todos sin referencias ni fotogramas. Si la rueda no se va, se elige igual: quien llama
-  // mira si entró al compositor. Con mala conexión una imagen tarda más de un minuto en subir: se espera mientras la
-  // página siga mandando datos (hasta `SUBIDA_MAXIMA`); si deja de mandar `SUBIDA_QUIETA`, la red no dio (`SinConexion`).
   const item = panel.locator('button[role=option]').filter({ hasText: nombre })
-  const yaSubio = item.filter({ hasNot: page.locator('[role=progressbar], img:not([src^="https://"])') }).first()
-  const envios = mirarEnvios(page)
   try {
+    await hueco.click({ timeout: 10_000 })
+    const [selector] = await Promise.all([page.waitForEvent('filechooser', { timeout: 15_000 }), panel.locator('button:has(mat-icon:text-is("upload"))').click({ timeout: 10_000 })])
+    await selector.setFiles({ name: nombre, mimeType: ext === '.png' ? 'image/png' : ext === '.webp' ? 'image/webp' : 'image/jpeg', buffer: readFileSync(ruta) })
+    await page.locator('mat-dialog-container button').last().click({ timeout: 3000 }).catch(() => {})
+    // Elegirla mientras sube la deja marcada sin entrar al compositor. Subiendo, su renglón lleva una rueda (antes, una
+    // miniatura suya); al acabar, un icono: la miniatura de Flow ya no llega hasta recargar la lista (18 de noviembre de
+    // 2026), y esperarla dejó a todos sin referencias ni fotogramas. Con mala conexión una imagen tarda más de un minuto
+    // en subir: se espera mientras la página siga mandando datos, hasta `SUBIDA_MAXIMA`. Si la rueda no se va (deja de
+    // mandar `SUBIDA_QUIETA`, o Flow cambió su lista), se elige igual: quien llama mira si entró al compositor, y si no
+    // entró, es la red (`SinConexion`).
+    const yaSubio = item.filter({ hasNot: page.locator('[role=progressbar], img:not([src^="https://"])') }).first()
     const desde = Date.now()
     while (!(await yaSubio.count())) {
-      if (envios.quieta() > SUBIDA_QUIETA) throw new SinConexion(`Flow no recibió la imagen ${ruta} en ${Math.round((Date.now() - desde) / 1000)} s (la conexión no dio)${await avisos(page)}. No se gastó nada.`)
-      if (Date.now() - desde > SUBIDA_MAXIMA) break
+      if (envios.quieta() > SUBIDA_QUIETA || Date.now() - desde > SUBIDA_MAXIMA) break
       await page.waitForTimeout(1000)
     }
   } finally {
@@ -348,11 +349,13 @@ const textoDe = (tarjeta: Locator) => tarjeta.evaluate((d) => (d as HTMLElement)
 
 /**
  * Espera a que salga la tarjeta del pedido (cambia la primera del proyecto). Mientras la página siga mandando algo, el
- * pedido aún va de camino, así que no se da por perdido hasta `APARECE_MAXIMO`. `false` si no salió.
+ * pedido aún va de camino, así que no se da por perdido hasta `APARECE_MAXIMO`. `false` si no salió. `pedir` lo manda:
+ * se mira la red desde antes, porque el pedido sale al pulsar la flecha y una petición que ya iba en camino no contaría.
  */
-async function aparece(page: Page, tarjeta: Locator, antes: string): Promise<boolean> {
+async function aparece(page: Page, tarjeta: Locator, antes: string, pedir: () => Promise<void>): Promise<boolean> {
   const envios = mirarEnvios(page)
   try {
+    await pedir()
     const desde = Date.now()
     while ((await firmaDe(tarjeta)) === antes) {
       const pasado = Date.now() - desde
@@ -511,15 +514,17 @@ export async function generarEnFlow(b: Browser, page: Page, proyecto: string | u
   const hay = (await tarjeta.count()) > 0
   const antes = hay ? await firmaDe(tarjeta) : ''
   const antesTexto = hay ? await textoDe(tarjeta) : ''
-  await page.locator('.base-prompt-box [role=textbox]').first().click({ timeout: 10_000 })
-  await page.keyboard.insertText(p.prompt.split(/\s+/).join(' '))
-  await page.waitForTimeout(500)
-  await icono(page, 'arrow_forward').last().click({ timeout: 10_000 })
-  alAvanzar?.('generar')
+  const salio = await aparece(page, tarjeta, antes, async () => {
+    await page.locator('.base-prompt-box [role=textbox]').first().click({ timeout: 10_000 })
+    await page.keyboard.insertText(p.prompt.split(/\s+/).join(' '))
+    await page.waitForTimeout(500)
+    await icono(page, 'arrow_forward').last().click({ timeout: 10_000 })
+    alAvanzar?.('generar')
+  })
   try {
     // Si la tarjeta no sale, antes de darlo por no empezado se comprueba recargando: con mala conexión tarda, y darlo por
     // no empezado mandaba el mismo video a otra cuenta, que lo cobraba de nuevo.
-    if (!(await aparece(page, tarjeta, antes))) await comprobarSiEmpezo(page, tarjeta, p, antesTexto, saldoAntes, creditos)
+    if (!salio) await comprobarSiEmpezo(page, tarjeta, p, antesTexto, saldoAntes, creditos)
     await esperar(page, tarjeta, p.tipo)
   } catch (e) {
     if (!(e instanceof Rechazado)) throw e
