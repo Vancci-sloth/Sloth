@@ -692,6 +692,35 @@ export function redes(app: string, sessions: Sessions, cards: () => Card[], avis
   for (const card of cards()) limpiar(card)
 
   /** Si hay algo de redes a medias que un reinicio cortaría, por qué: «Reiniciar backend» espera a que termine. */
+  /**
+   * Pone en la cola de cada red conectada los videos de un estilo con su texto, cada uno en su hueco del ritmo. Solo lo
+   * que no está en esa red, o falló: lo que descartaste no vuelve.
+   */
+  function programar(card: Card, borradores: Borrador[]) {
+    const validas = new Set(videosDe(card, sessions).map((v) => v.ruta))
+    const buenos = borradores.filter((b) => validas.has(b.ruta) && b.texto.trim())
+    for (const r of conectadas()) {
+      const faltan = buenos.filter((b) => {
+        const previa = publicacion(r.id, b.ruta)
+        return !previa || previa.estado === 'error'
+      })
+      for (const { b, cuando } of enOrden(r.id, faltan)) encolar(card, b, r.id, cuando)
+    }
+    guardar()
+    seguir()
+  }
+
+  /** Un video terminado a la cola, con el texto que escribe su agente, sin revisarlo: lo usa el piloto automático. // piloto */
+  async function programarVideo(cardId: string, ruta: string) {
+    if (roto) throw new Error(roto)
+    const card = cards().find((c) => c.id === cardId)
+    if (!card) throw new Error('No existe ese estilo')
+    if (!conectadas().length) throw new Error('No hay ninguna red conectada')
+    const b = await borrador(card, ruta)
+    if (!b.texto.trim()) throw new Error(b.aviso ?? 'No se pudo escribir su texto')
+    programar(card, [b])
+  }
+
   function ocupado(): string | null {
     const p = datos.publicaciones.find((x) => x.estado === 'subiendo')
     if (p) return `Se está subiendo un video a ${REDES.find((r) => r.id === p.red)?.nombre ?? p.red}. Espera a que termine.`
@@ -866,20 +895,8 @@ export function redes(app: string, sessions: Sessions, cards: () => Card[], avis
       const { cardId, borradores } = await body<{ cardId: string; borradores: Borrador[] }>(req)
       const card = cards().find((c) => c.id === cardId)
       if (!card) return json(res, 404, { error: 'No existe ese estilo' })
-      const redes = conectadas()
-      if (!redes.length) return json(res, 400, { error: 'Conecta una red en Opciones antes de programar.' })
-      const validas = new Set(videosDe(card, sessions).map((v) => v.ruta))
-      const buenos = borradores.filter((b) => validas.has(b.ruta) && b.texto.trim())
-      for (const r of redes) {
-        // Solo lo que no está en esa red, o falló: lo que descartaste no vuelve.
-        const faltan = buenos.filter((b) => {
-          const previa = publicacion(r.id, b.ruta)
-          return !previa || previa.estado === 'error'
-        })
-        for (const { b, cuando } of enOrden(r.id, faltan)) encolar(card, b, r.id, cuando)
-      }
-      guardar()
-      seguir()
+      if (!conectadas().length) return json(res, 400, { error: 'Conecta una red en Opciones antes de programar.' })
+      programar(card, borradores)
       return json(res, 200, { ok: true })
     }
 
@@ -938,7 +955,8 @@ export function redes(app: string, sessions: Sessions, cards: () => Card[], avis
   }
 
   // Para «Mis videos». Con redes.json dañado, ninguna: todo saldría «Sin programar».
-  return { api, ocupado, marcas: async (videos: VideoHecho[]) => (roto ? undefined : marcas(videos)) }
+  // `programarVideo` y `estadoRitmo`, para el piloto automático (`server/piloto.ts`).
+  return { api, ocupado, programarVideo, estadoRitmo, marcas: async (videos: VideoHecho[]) => (roto ? undefined : marcas(videos)) }
 }
 
 function tamano(ruta: string) {

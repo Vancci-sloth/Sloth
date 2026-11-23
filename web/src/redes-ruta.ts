@@ -1,5 +1,6 @@
 export const APARTADOS_REDES = {
   produccion: 'Producción',
+  piloto: 'Piloto',
   ideas: 'Ideas',
   publicaciones: 'Publicaciones',
   calendario: 'Calendario',

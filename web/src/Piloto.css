@@ -1,0 +1,44 @@
+/* Redes → Piloto (Piloto.tsx): el brief arriba y los dos modos, lado a lado, cada uno en su tarjeta. */
+.piloto { display: flex; flex-direction: column; gap: 16px; max-width: 1040px; }
+.piloto p { margin: 0; }
+.piloto a:not(.ghost) { color: var(--amber); }
+.piloto-intro { max-width: 720px; }
+.piloto h2 { display: flex; align-items: center; gap: 8px; }
+.piloto-brief, .piloto-modo, .piloto-lista { display: flex; flex-direction: column; gap: 10px; padding: 18px 20px; border: 1px solid var(--linea-tarjeta); border-radius: 14px; background: var(--panel); }
+.piloto-brief label, .piloto-label { display: flex; flex-direction: column; gap: 4px; min-width: 0; color: var(--muted); font-size: 12px; }
+.piloto-brief input, .piloto-brief textarea { padding: 7px 11px; border-radius: 8px; background: var(--panel-2); border: 1px solid var(--line); outline: none; color: var(--text); font-size: 13px; resize: vertical; }
+.piloto-brief input:focus, .piloto-brief textarea:focus { border-color: var(--amber); }
+.piloto-dos { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr)); gap: 10px; }
+.piloto-tres { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr)); gap: 10px; }
+.piloto-acciones { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; margin-top: 4px; }
+
+.piloto-modos { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr)); gap: 14px; }
+.piloto-modo header { display: flex; align-items: center; gap: 9px; }
+.piloto-modo header h2 { margin: 0; }
+.piloto-modo header .ico { color: var(--muted); }
+.piloto-estado { margin-left: auto; color: var(--muted); font-size: 12.5px; }
+.piloto-modo > p:not(.small) { font-size: 13.5px; }
+/* El automático encendido no se confunde con nada: borde y tinte ámbar, y su estado en ámbar. */
+.piloto-modo.auto.on { border-color: var(--amber); background: linear-gradient(var(--amber-tinte), var(--amber-tinte)), var(--panel); }
+.piloto-modo.auto.on header .ico, .piloto-modo.auto.on .piloto-estado { color: var(--amber); font-weight: 600; }
+.piloto-gasta { display: flex; align-items: flex-start; gap: 7px; color: var(--suave); }
+.piloto-gasta .ico { flex: none; width: 15px; height: 15px; margin-top: 1px; color: var(--amber); }
+.piloto-campo { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: 13px; }
+.piloto-campo input { width: 58px; padding: 4px 7px; border: 1px solid var(--line); border-radius: 7px; background: var(--panel-2); color: var(--text); font-variant-numeric: tabular-nums; color-scheme: dark; }
+.piloto-campo input:focus { outline: 1px solid var(--amber); outline-offset: 0; }
+.piloto .primary { padding: 7px 16px; }
+.piloto-hecho { color: var(--ok); }
+
+.piloto-lista { gap: 4px; }
+.piloto-lista h2 { margin-bottom: 4px; }
+.piloto-turno { display: grid; grid-template-columns: 82px minmax(0, 1fr) auto auto 22px; align-items: center; gap: 12px; min-height: 30px; }
+.piloto-turno + .piloto-turno { border-top: 1px solid var(--line); }
+.piloto-titulo { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.piloto-turno a.ghost { text-decoration: none; }
+.piloto-turno button.ghost { padding: 2px; }
+.piloto-turno .ico { width: 14px; height: 14px; }
+
+/* En la barra lateral, junto a lo de redes: en ámbar, mientras el automático está encendido. */
+.pie .aviso-piloto { display: flex; align-items: center; gap: 9px; height: 32px; padding: 0 8px; border-radius: 8px; color: var(--amber); font-size: 13px; text-align: left; }
+.pie .aviso-piloto::before { content: ''; width: 7px; height: 7px; margin: 0 5px 0 6px; border-radius: 50%; background: var(--amber); flex: none; }
+.plegada .pie .aviso-piloto { justify-content: center; gap: 0; padding: 0; font-size: 0; }
