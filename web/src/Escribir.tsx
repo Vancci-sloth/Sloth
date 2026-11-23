@@ -12,12 +12,15 @@ import { Icono as IconoBase, type NombreIcono } from './Iconos'
 import { MarcaAgente } from './Logos'
 import './Escribir.css'
 
+/** En Mac el atajo para mandar es Cmd+Enter; en lo demás, Ctrl+Enter. */
+const MAC = /Mac|iPhone|iPad/.test(navigator.userAgent)
+
 /** Las URLs únicas del texto (hasta 4), para la vista previa de enlaces debajo del compositor. */
 const enlacesDelTexto = (texto: string) => [...new Set(texto.split(new RegExp(`(${LINK.source})`, 'g')).filter((_, i) => i % 2))].slice(0, 4)
 
 /**
  * Donde se escribe en la comunidad: una publicación nueva, una que se edita o una mejora pedida desde un hilo
- * (`PedirMejora.tsx`). Crece con el texto; Enter lo manda y Mayús+Enter es otra línea (en el título, Enter baja al texto).
+ * (`PedirMejora.tsx`). Crece con el texto; Enter es otra línea y Ctrl+Enter (Cmd en Mac) lo manda (en el título, Enter baja al texto).
  * Las capturas se pegan, se sueltan o se eligen, y suben a la comunidad en cuanto llegan (`/api/comunidad/archivo`); un
  * video se elige de «Mis videos» y suben sus primeros 5 segundos con su portada (`/api/comunidad/video`): el entero se
  * enlaza en el texto. El de un estilo (`conEstilo`) sube entero: es lo que se ve en la tienda. En Estilos se elige además uno de tus estilos, que se empaqueta y sube (`/api/comunidad/estilo`),
@@ -373,7 +376,7 @@ export function Escribir(props: {
             {pensando ? `${nombre} está pensando…` : 'Ayúdame a decirlo'}
           </button>
         )}
-        <span className="esc-pista">Enter para {props.accion.toLowerCase()} · Mayús+Enter, otra línea</span>
+        <span className="esc-pista">{MAC ? 'Cmd' : 'Ctrl'}+Enter para {props.accion.toLowerCase()}</span>
         {props.extra}
         {props.onCancelar && (
           <button className="esc-cancelar" onClick={props.onCancelar}>
