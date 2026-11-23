@@ -104,7 +104,7 @@
       <stop offset="1" stop-color="#f4b04a" stop-opacity=".55"/>
     </linearGradient>
     <clipPath id="clipPanel"><rect x="90" y="190" width="900" height="460" rx="28"/></clipPath>
-    <clipPath id="clipPantalla"><rect x="370" y="50" width="340" height="236" rx="14"/></clipPath>
+    <clipPath id="clipPantalla"><rect x="400" y="120" width="280" height="180" rx="14"/></clipPath>
     <!-- Los puntos de la pantalla LED del escenario -->
     <pattern id="led" width="8" height="8" patternUnits="userSpaceOnUse"><path d="M8 0V8H0" fill="none" stroke="#0b0a09" stroke-width="2.5"/></pattern>
     <clipPath id="telS"><rect width="220" height="392" rx="18"/></clipPath>
@@ -209,6 +209,16 @@
     <clipPath id="clipFoto"><rect x="560" y="236" width="360" height="360" rx="14"/></clipPath>
     <clipPath id="clipMG"><rect x="120" y="214" width="520" height="292" rx="14"/></clipPath>
     <clipPath id="clipVentana"><rect x="160" y="230" width="760" height="380" rx="16"/></clipPath>
+    <!-- El clavo de donde cuelga cada cifra y cada video -->
+    <g id="clavo">
+      <path d="M-3 0 L3 0 L1.4 16 L0 22 L-1.4 16 Z" fill="#9a907f" stroke="#171719" stroke-width="2"/>
+      <ellipse cx="0" cy="0" rx="10" ry="4" fill="#ede6d6" stroke="#171719" stroke-width="2.5"/>
+    </g>
+    <!-- El apagón de los cortes: todo a oscuras menos el perezoso -->
+    <radialGradient id="apagonG" gradientUnits="userSpaceOnUse" cx="540" cy="450" r="340">
+      <stop offset="0" stop-color="#000" stop-opacity="0"/><stop offset=".45" stop-color="#000" stop-opacity=".4"/><stop offset="1" stop-color="#000" stop-opacity=".9"/>
+    </radialGradient>
+    <radialGradient id="cono" cx="50%" cy="42%" r="58%"><stop offset="0" stop-color="#2e2a24"/><stop offset="1" stop-color="#0b0a09"/></radialGradient>
 
     <g id="puntero"><path d="M0 0 L0 30 L8 23 L13.5 35 L19 32.5 L13.5 21 L24 21 Z" fill="#f2e7cf" stroke="#171719" stroke-width="2.5" stroke-linejoin="round" transform="scale(1.5)"/></g>
     <rect id="panel" x="90" y="190" width="900" height="460" rx="28" fill="#171512" stroke="#2e2a24" stroke-width="3"/>
@@ -221,22 +231,25 @@
 
   <!-- Cabecera de la guía -->
   <g id="cabecera" opacity="0">
-    <g transform="translate(90 50) scale(.15)"><use href="#cara"/></g>
+    <g transform="translate(90 50) scale(.15)"><g class="logo-cab abajo"><use href="#cara"/></g></g>
     <text x="180" y="112" font-size="46" font-weight="800" fill="#ede6d6">Lo nuevo de la <tspan fill="#e8a33d">0.5.0</tspan></text>
     <g id="barras"></g>
   </g>
 
-  <!-- 0 · El perreo: el perezoso sale al escenario con su martillo y clava el número a martillazos -->
+  <!-- 0 · El perreo del barrio: en el corte de la entrada todo está a oscuras; con la base, el martillazo prende la
+       fiesta y cada cifra del número se clava, una por tiempo, y queda colgando de su clavo -->
   <g class="escena" id="e0"><g class="cuerpo">
     <g class="tablado"></g>
+    <g class="publico"></g>
+    <rect class="apagon" width="1080" height="1080" fill="url(#apagonG)"/>
     <rect class="destello" width="1080" height="1080" fill="#f4b04a" opacity="0"/>
-    <g class="titulo"><text class="partir-letras" x="540" y="700" text-anchor="middle" font-size="64" font-weight="800" fill="#ede6d6" letter-spacing="1">Ya salió Sloth</text></g>
+    <g class="titulo"><text class="partir-palabras" x="540" y="700" text-anchor="middle" font-size="64" font-weight="800" fill="#ede6d6" letter-spacing="1">Ya salió Sloth</text></g>
     <g class="version-neon" style="transform-box: view-box; transform-origin: 540px 810px">
       <text class="neon-glow" x="540" y="880" text-anchor="middle" font-size="210" font-weight="900" fill="none" stroke="#f4b04a" stroke-width="44" stroke-opacity=".22" stroke-linejoin="round">0.5.0</text>
       <text class="partir-letras" x="540" y="880" text-anchor="middle" font-size="210" font-weight="900" fill="#f2e7cf" stroke="#e8a33d" stroke-width="16" stroke-linejoin="round" paint-order="stroke">0.5.0</text>
     </g>
+    <g class="clavos"></g>
     <g class="mazo-grande"><g class="giro"><use href="#martillo" transform="scale(.62)"/></g></g>
-    <g class="publico"></g>
   </g></g>
 
   <!-- 1 · El diseño nuevo: el carrusel de estilos y el compositor, con el celular que gira -->
@@ -282,6 +295,7 @@
       <g class="calendario"></g>
       <g class="miniaturas"></g>
       <g class="cuentas-r"></g>
+      <g class="mazo-chico"><g class="giro"><use href="#martillo"/></g></g>
     </g>
     <g class="kicker"><use href="#i-compartir" x="150" y="693" width="32" height="32" style="color:#e8a33d"/><text x="194" y="720" font-size="30" font-weight="800" fill="#e8a33d" letter-spacing="4">REDES</text></g>
     <text class="partir-palabras" x="150" y="795" font-size="60" font-weight="800" fill="#ede6d6">Redes en un solo lugar</text>
@@ -324,16 +338,17 @@
         <g class="dj">
           <g transform="translate(740 436) scale(.42) translate(-256 -265)"><use href="#sloth-perreo"/></g>
         </g>
-        <g class="mosaico"></g>
         <rect class="barrido-i izq" x="560" y="236" width="40" height="360" fill="url(#estelaScan)"/>
       </g>
       <rect x="560" y="236" width="360" height="360" rx="14" fill="none" stroke="#2e2a24" stroke-width="3"/>
+      <g class="mosaico"></g>
       <g class="listo-i">
         <rect x="574" y="550" width="176" height="34" rx="10" fill="#171512" stroke="#8fc177" stroke-width="2"/>
         <use href="#i-palomita" x="586" y="557" width="20" height="20" style="color:#8fc177"/>
         <text x="614" y="573" font-size="15" font-weight="800" fill="#8fc177">Sin fondo, en PNG</text>
       </g>
       <g class="cursor"><g class="punta" style="transform-box: fill-box; transform-origin: 0 0"><use href="#puntero"/></g></g>
+      <g class="mazo-chico"><g class="giro"><use href="#martillo"/></g></g>
     </g>
     <g class="kicker"><use href="#i-imagen" x="150" y="693" width="32" height="32" style="color:#e8a33d"/><text x="194" y="720" font-size="30" font-weight="800" fill="#e8a33d" letter-spacing="4">IMÁGENES</text></g>
     <text class="partir-palabras" x="150" y="795" font-size="60" font-weight="800" fill="#ede6d6">Estudio de Imágenes</text>
@@ -467,6 +482,7 @@
         <g class="cifras-c"></g>
         <g class="grafica-c"></g>
       </g>
+      <g class="mazo-chico"><g class="giro"><use href="#martillo"/></g></g>
     </g>
     <g class="kicker"><use href="#i-personas" x="150" y="693" width="32" height="32" style="color:#e8a33d"/><text x="194" y="720" font-size="30" font-weight="800" fill="#e8a33d" letter-spacing="4">AGENTES</text></g>
     <text class="partir-palabras" x="150" y="795" font-size="60" font-weight="800" fill="#ede6d6">Varias cuentas por agente</text>
@@ -481,10 +497,12 @@
       <g clip-path="url(#clipVentana)">
         <g class="ventana-sloth"></g>
         <g class="ventana-cristal"></g>
-        <rect class="barrido-c izq" x="160" y="230" width="90" height="380" fill="url(#estelaScan)"/>
+        <g class="trozos"></g>
+        <g class="grietas-v"></g>
       </g>
       <rect x="160" y="230" width="760" height="380" rx="16" fill="none" stroke="#2e2a24" stroke-width="3"/>
       <g class="cursor"><g class="punta" style="transform-box: fill-box; transform-origin: 0 0"><use href="#puntero"/></g></g>
+      <g class="mazo-chico"><g class="giro"><use href="#martillo"/></g></g>
     </g>
     <g class="kicker"><use href="#i-paleta" x="150" y="693" width="32" height="32" style="color:#e8a33d"/><text x="194" y="720" font-size="30" font-weight="800" fill="#e8a33d" letter-spacing="4">TEMAS</text></g>
     <text class="partir-palabras" x="150" y="795" font-size="60" font-weight="800" fill="#ede6d6">Tema Cristal</text>
@@ -497,16 +515,18 @@
     <use href="#panel"/>
     <g clip-path="url(#clipPanel)">
       <g class="lista"></g>
-      <g class="mazo-chico"><g class="giro"><use href="#martillo" transform="scale(.16)"/></g></g>
+      <g class="mazo-chico"><g class="giro"><use href="#martillo"/></g></g>
     </g>
     <g class="kicker"><use href="#i-mas" x="150" y="693" width="32" height="32" style="color:#e8a33d"/><text x="194" y="720" font-size="30" font-weight="800" fill="#e8a33d" letter-spacing="4">Y ADEMÁS</text></g>
     <text class="partir-palabras" x="150" y="795" font-size="60" font-weight="800" fill="#ede6d6">Y todavía hay más</text>
     <g class="linea"><text x="150" y="850" font-size="32" font-weight="500" fill="#9a907f">Todo esto también llega con la 0.5.0.</text></g>
   </g></g>
 
-  <!-- 10 · A crear: el mismo perreo, con el número en la pantalla -->
+  <!-- 10 · A crear: el mismo perreo; las letras caen a medio tiempo y el martillo sigue en cada corte -->
   <g class="escena" id="e10"><g class="cuerpo">
     <g class="tablado"></g>
+    <g class="publico"></g>
+    <rect class="apagon" width="1080" height="1080" fill="url(#apagonG)"/>
     <rect class="destello" width="1080" height="1080" fill="#f4b04a" opacity="0"/>
     <g class="neon" style="transform-box: view-box; transform-origin: 540px 724px">
       <text class="neon-glow" x="540" y="772" text-anchor="middle" font-size="140" font-weight="900" fill="none" stroke="#f4b04a" stroke-width="40" stroke-opacity=".22" stroke-linejoin="round">¡A crear!</text>
@@ -514,7 +534,6 @@
     </g>
     <g class="linea"><text x="540" y="838" text-anchor="middle" font-size="32" font-weight="600" fill="#ede6d6">Todo esto ya está en tu Sloth.</text></g>
     <g class="linea"><text x="540" y="882" text-anchor="middle" font-size="28" font-weight="500" fill="#9a907f" class="despedida">Actualiza desde la app o en sloth.vancci.org</text></g>
-    <g class="publico"></g>
   </g></g>
 </svg>
 <canvas id="chispas"></canvas>
@@ -689,10 +708,126 @@ function partir(t, modo) {
   }
   t.replaceWith(g);
 }
-/* ---------- El perreo: el escenario y el público ---------- */
+/* ---------- El reloj de la canción ---------- */
+// MARTILLAZO va a 100 por minuto (un tiempo cada 0,5998 s) y su base entra a los 19,232 s: ese es el tiempo 0, y es el
+// primero de un compás. Cada 12 o 16 tiempos se va el bajo en el cuarto tiempo del compás (un corte) y regresa de golpe:
+// ahí cae el martillazo. Medido sobre el audio del video oficial; los cortes van en tiempos desde el 0.
+const T0 = 19.232, TIEMPO = 0.5998;
+const BEAT = 600; // Lo que dura un tiempo en las animaciones, en milisegundos
+const CORTES = new Set([-4, -3, -2, -1, 19, 31, 55, 62, 63, 67, 79, 95, 108, 109, 110, 111, 143, 157, 158, 159]);
+const esCorte = (n) => CORTES.has(n);
+const esGolpe = (n) => !CORTES.has(n) && CORTES.has(n - 1);
+// Lo que suena manda: el reproductor de YouTube dice en qué segundo va (infoDelivery) y entre aviso y aviso se cuenta
+// con el reloj de la página. Sin reproductor (en un navegador, antes del primer clic), un reloj propio que empieza en
+// YT_DESDE; dentro de Sloth espera un momento a que cargue el video antes de echar a andar.
+const inicioPagina = performance.now();
+let tYT = null, tYTen = 0, pausaYT = false;
+addEventListener('message', (ev) => {
+  if (!/youtube/.test(ev.origin)) return;
+  let d;
+  try { d = typeof ev.data === 'string' ? JSON.parse(ev.data) : ev.data; } catch { return; }
+  const info = d && d.info;
+  if (!info || typeof info !== 'object') return;
+  if (typeof info.playerState === 'number') {
+    const pausa = info.playerState === 2;
+    if (pausa !== pausaYT && tYT !== null) { tYT = ahora(); tYTen = performance.now(); }
+    pausaYT = pausa;
+  }
+  const t = info.currentTime;
+  // Solo se corrige el reloj si se fue más de un poco: así no tiembla con cada aviso
+  if (typeof t === 'number' && t > 0 && (tYT === null || Math.abs(t - ahora()) > 0.12)) { tYT = t; tYTen = performance.now(); }
+});
+function ahora() {
+  if (tYT !== null) return pausaYT ? tYT : tYT + (performance.now() - tYTen) / 1000;
+  return YT_DESDE + Math.max(0, (performance.now() - inicioPagina) / 1000 - (enSloth ? 1.5 : 0));
+}
+const compas = () => (ahora() - T0) / TIEMPO;
+// Espera hasta el tiempo n (puede ser fraccionario); con «reducir movimiento», no espera.
+function aTiempo(n, vivo) {
+  return new Promise((res) => {
+    if (quieto) return res(vivo());
+    const mira = () => { if (!vivo()) return res(false); if (compas() >= n) return res(true); requestAnimationFrame(mira); };
+    mira();
+  });
+}
+// El siguiente tiempo que sea múltiplo de `cada` (4: el primero de un compás), al menos `minimo` tiempos adelante
+const proximo = (cada = 1, minimo = 1) => Math.ceil((compas() + minimo) / cada) * cada;
+// Lo que pasa en cada tiempo: quien se apunta recibe el número del tiempo mientras su escena siga viva
+const oyentes = new Set();
+function ritmo(vivo, fn) { oyentes.add((n) => (vivo() ? (fn(n), true) : false)); }
+let ultimoTiempo = null;
+function latir() {
+  const b = Math.floor(compas());
+  // Al empezar o tras un salto del reproductor, se sigue desde ahí sin disparar tiempos de golpe
+  if (ultimoTiempo === null || b < ultimoTiempo || b > ultimoTiempo + 4) ultimoTiempo = b;
+  else while (ultimoTiempo < b) { ultimoTiempo++; for (const o of [...oyentes]) if (!o(ultimoTiempo)) oyentes.delete(o); }
+  requestAnimationFrame(latir);
+}
+// Arranca en el primer cuadro, cuando ya está todo el guion (YT_DESDE, `actual`)
+requestAnimationFrame(latir);
+// Un golpe que dura un instante y deja todo como estaba (no se queda pegado como `A`)
+function late(el, kf, op = {}) {
+  if (quieto || !el) return null;
+  return el.animate(kf, { duration: BEAT, easing: 'ease-out', fill: 'none', ...op });
+}
+// En las novedades, el logo de la cabecera brinca con cada tiempo y los rayos laten
+oyentes.add((n) => {
+  if (actual >= 1 && actual < FIN) {
+    late(document.querySelector('.logo-cab'), [{ transform: 'translateY(0) scale(1.12, .88)' }, { transform: 'translateY(-16px) scale(.95, 1.05)', offset: 0.4 }, { transform: 'none' }], { duration: BEAT * 0.9 });
+    late(document.getElementById('rayos'), [{ opacity: n % 4 ? 0.4 : 0.55 }, { opacity: 0.3 }], { duration: BEAT * 0.8 });
+    if (esGolpe(n)) sacudir(en(escenas[actual], '.cuerpo'), 7);
+  }
+  return true;
+});
+
+/* ---------- El perreo del barrio: el escenario, las bocinas y la gente ---------- */
 const COLOR_FOCO = [C.amber2, C.crema, C.ok, C.bad];
 const giratorio = (g) => Object.assign(g.style, { transformBox: 'view-box', transformOrigin: '0 0' });
-// Focos, pantalla LED (con su texto), láseres, piso con luces y el perezoso reguetonero que sube con su martillo
+const origen = (g, x, y) => Object.assign(g.style, { transformBox: 'view-box', transformOrigin: `${x}px ${y}px` });
+const COLOR_PICADO = [C.amber, C.ok, C.bad, C.crema, C.amber2];
+// Una torre de bocinas de sonidero: la corneta arriba con su letrero y dos bajos que bombean con cada tiempo
+function bocina(t, x0) {
+  const b = el('g', { class: 'bocina' }, t);
+  el('rect', { x: x0, y: 254, width: 180, height: 80, rx: 8, fill: '#171512', stroke: C.line, 'stroke-width': 3 }, b);
+  el('path', { d: `M${x0 + 22} 266 H${x0 + 158} L${x0 + 128} 322 H${x0 + 52} Z`, fill: '#0b0a09', stroke: '#2e2a24', 'stroke-width': 2 }, b);
+  el('path', { d: `M${x0 + 62} 284 H${x0 + 118} L${x0 + 104} 312 H${x0 + 76} Z`, fill: '#171512' }, b);
+  el('rect', { x: x0, y: 334, width: 180, height: 20, rx: 4, fill: C.amber }, b);
+  el('text', { x: x0 + 90, y: 349, 'text-anchor': 'middle', 'font-size': 13, 'font-weight': 900, 'letter-spacing': 1.5, fill: '#1b1408' }, b).textContent = 'SONIDO SLOTH';
+  for (const y of [356, 502]) {
+    el('rect', { x: x0, y, width: 180, height: 144, rx: 8, fill: '#171512', stroke: C.line, 'stroke-width': 3 }, b);
+    for (const [dx, dy] of [[12, 12], [168, 12], [12, 132], [168, 132]]) el('circle', { cx: x0 + dx, cy: y + dy, r: 3.5, fill: C.line }, b);
+    el('circle', { cx: x0 + 90, cy: y + 72, r: 62, fill: '#0b0a09', stroke: C.line, 'stroke-width': 3 }, b);
+    const cono = el('g', { class: 'cono a' }, b);
+    el('circle', { cx: x0 + 90, cy: y + 72, r: 52, fill: 'url(#cono)', stroke: '#2e2a24', 'stroke-width': 2 }, cono);
+    el('circle', { cx: x0 + 90, cy: y + 72, r: 34, fill: 'none', stroke: '#221f1b', 'stroke-width': 3 }, cono);
+    el('circle', { cx: x0 + 90, cy: y + 72, r: 16, fill: '#2e2a24', stroke: '#171719', 'stroke-width': 2 }, cono);
+    el('path', { d: `M${x0 + 62} ${y + 52} A 36 36 0 0 1 ${x0 + 92} ${y + 38}`, fill: 'none', stroke: C.crema, 'stroke-opacity': 0.18, 'stroke-width': 4, 'stroke-linecap': 'round' }, cono);
+    el('circle', { class: 'onda-cono a', cx: x0 + 90, cy: y + 72, r: 60, fill: 'none', stroke: C.amber2, 'stroke-width': 3, opacity: 0 }, b);
+  }
+}
+// Un bailarín de la fila: patea con cada tiempo, como en el video
+function bailarin(t, x, color, k) {
+  const d = el('g', { class: 'bailarin', 'data-k': k, transform: `translate(${x} 606) scale(1.25)` }, t);
+  const c = el('g', { class: 'cuerpo-b' }, d);
+  giratorio(c);
+  const linea = { stroke: '#171719', 'stroke-width': 9, fill: 'none', 'stroke-linecap': 'round', 'stroke-linejoin': 'round' };
+  for (const [clase, s] of [['pierna-i', -1], ['pierna-d', 1]]) {
+    const p = el('g', { class: clase }, c);
+    origen(p, s * 8, -52);
+    el('path', { d: `M${s * 8} -52 L${s * 12} -6 L${s * 24} -2`, ...linea }, p);
+  }
+  el('rect', { x: -21, y: -102, width: 42, height: 56, rx: 15, fill: color, stroke: '#171719', 'stroke-width': 5 }, c);
+  el('path', { d: 'M-8 -98 L0 -86 L8 -98', fill: 'none', stroke: '#171719', 'stroke-width': 3, 'stroke-linejoin': 'round' }, c);
+  for (const [clase, s] of [['brazo-i', -1], ['brazo-d', 1]]) {
+    const a = el('g', { class: clase }, c);
+    origen(a, s * 17, -92);
+    el('path', { d: `M${s * 17} -92 L${s * 32} -68 L${s * 28} -50`, ...linea, 'stroke-width': 8 }, a);
+  }
+  el('use', { href: '#cara', transform: 'translate(-29 -163) scale(.115)' }, c);
+  el('rect', { x: -21, y: -144, width: 42, height: 9, rx: 4, fill: '#0b0a09' }, c);
+}
+// La calle de noche: foquitos, papel picado, focos, la pantalla, las bocinas, el templete con sus luces, las grietas
+// del martillazo, los bailarines y el perezoso reguetonero que sube con su martillo
 function tablado(e, texto) {
   const t = en(e, '.tablado');
   const focos = el('g', { class: 'focos' }, t);
@@ -700,77 +835,163 @@ function tablado(e, texto) {
     const pos = el('g', { transform: `translate(${x} -30)` }, focos);
     el('path', { class: 'foco arriba', d: 'M-14 0 L14 0 L170 980 L-170 980 Z', fill: `url(#foco${k})` }, pos);
   });
+  // Los foquitos: una tira de lado a lado; prenden pares y nones, uno por tiempo
+  el('path', { d: 'M-10 14 Q540 82 1090 14', fill: 'none', stroke: '#2e2a24', 'stroke-width': 3 }, t);
+  for (let k = 0; k <= 24; k++) {
+    const tt = k / 24, x = -10 + 1100 * tt, y = (1 - tt) ** 2 * 14 + 2 * tt * (1 - tt) * 82 + tt ** 2 * 14;
+    const f = el('g', { class: 'foquito', 'data-k': k }, t);
+    el('circle', { class: 'halo-f', cx: x, cy: y + 12, r: 15, fill: COLOR_PICADO[k % 5], 'fill-opacity': 0.22 }, f);
+    el('rect', { x: x - 3, y: y - 2, width: 6, height: 6, rx: 1, fill: '#2e2a24' }, f);
+    el('circle', { class: 'foco-f', cx: x, cy: y + 11, r: 6.5, fill: COLOR_PICADO[k % 5] }, f);
+  }
+  // El papel picado: banderitas con sus calados, menos en medio, donde va la pantalla
+  el('path', { d: 'M-10 40 Q540 132 1090 40', fill: 'none', stroke: C.muted, 'stroke-width': 2 }, t);
+  for (let k = 0; k < 19; k++) {
+    const x = 6 + k * 58;
+    if (x > 352 && x < 680) continue;
+    const tt = (x + 10) / 1100, y = (1 - tt) ** 2 * 40 + 2 * tt * (1 - tt) * 132 + tt ** 2 * 40;
+    const b = el('g', { class: 'picado arriba', 'data-k': k }, t);
+    const w = 48, h = 60, x0 = x - w / 2, sube = Array.from({ length: 6 }, (_, j) => `L${x0 + w - (j + 0.5) * (w / 6)} ${y + h - (j % 2 ? 0 : 7)}`).join(' ');
+    const calados = [`M${x - 6} ${y + 18} L${x} ${y + 12} L${x + 6} ${y + 18} L${x} ${y + 24} Z`, `M${x - 14} ${y + 34} a4 4 0 1 0 8 0 a4 4 0 1 0 -8 0`, `M${x + 6} ${y + 34} a4 4 0 1 0 8 0 a4 4 0 1 0 -8 0`, `M${x - 4} ${y + 42} h8 v8 h-8 Z`].join(' ');
+    el('path', { d: `M${x0} ${y} H${x0 + w} V${y + h - 4} ${sube} L${x0} ${y + h - 4} Z ${calados}`, fill: COLOR_PICADO[k % 5], 'fill-opacity': 0.88, 'fill-rule': 'evenodd' }, b);
+  }
+  // La pantalla
   const pantalla = el('g', { class: 'pantalla' }, t);
-  el('rect', { x: 370, y: 50, width: 340, height: 236, rx: 14, fill: '#0b0a09' }, pantalla);
+  el('rect', { x: 400, y: 120, width: 280, height: 180, rx: 14, fill: '#0b0a09' }, pantalla);
   const dentro = el('g', { 'clip-path': 'url(#clipPantalla)' }, pantalla);
-  for (let k = 0; k < 17; k++) el('rect', { class: 'barra-eq abajo', x: 374 + k * 20, y: 140, width: 14, height: 146, rx: 3, fill: COLORES[k % 4], 'fill-opacity': 0.4 }, dentro);
-  el('text', { class: 'titulo-pantalla', x: 540, y: 186, 'text-anchor': 'middle', 'font-size': 80, 'font-weight': 900, 'letter-spacing': 4, fill: C.amber }, dentro).textContent = texto;
-  el('rect', { x: 370, y: 50, width: 340, height: 236, fill: 'url(#led)' }, dentro);
-  el('rect', { x: 370, y: 50, width: 340, height: 236, rx: 14, fill: 'none', stroke: C.line, 'stroke-width': 4 }, pantalla);
+  for (let k = 0; k < 14; k++) el('rect', { class: 'barra-eq abajo', x: 404 + k * 20, y: 196, width: 14, height: 104, rx: 3, fill: COLORES[k % 4], 'fill-opacity': 0.4 }, dentro);
+  el('text', { class: 'titulo-pantalla', x: 540, y: 236, 'text-anchor': 'middle', 'font-size': 70, 'font-weight': 900, 'letter-spacing': 4, fill: C.amber }, dentro).textContent = texto;
+  el('rect', { x: 400, y: 120, width: 280, height: 180, fill: 'url(#led)' }, dentro);
+  el('rect', { x: 400, y: 120, width: 280, height: 180, rx: 14, fill: 'none', stroke: C.line, 'stroke-width': 4 }, pantalla);
+  // Los láseres salen de las cornetas
   const laseres = el('g', { class: 'laseres' }, t);
-  for (const [x, lado] of [[150, 1], [930, -1]]) {
-    const abanico = el('g', { class: 'abanico', 'data-lado': lado }, el('g', { transform: `translate(${x} 640)` }, laseres));
+  for (const [x, lado] of [[106, 1], [974, -1]]) {
+    const abanico = el('g', { class: 'abanico', 'data-lado': lado }, el('g', { transform: `translate(${x} 294)` }, laseres));
     [-62, -48, -34, -20].forEach((a, j) => {
-      const r = ((-90 + lado * (90 + a)) * Math.PI) / 180;
+      const r = ((-90 + lado * (90 + a + 40)) * Math.PI) / 180;
       el('line', { x1: 0, y1: 0, x2: Math.cos(r) * 1300, y2: Math.sin(r) * 1300, stroke: j % 2 ? C.ok : C.bad, 'stroke-width': 3, 'stroke-opacity': 0.75 }, abanico);
     });
   }
+  bocina(t, 16); bocina(t, 884);
+  // El templete y sus luces, que corren de cuatro en cuatro
   el('path', { d: 'M210 590 H870 L960 646 H120 Z', fill: '#171512', stroke: C.line, 'stroke-width': 3 }, t);
-  for (let x = 146; x < 940; x += 33) el('rect', { class: 'led', x, y: 638, width: 18, height: 6, rx: 3, fill: C.amber2 }, t);
+  for (let x = 146, k = 0; x < 940; x += 33, k++) el('rect', { class: 'led', 'data-k': k, x, y: 638, width: 18, height: 6, rx: 3, fill: C.amber2, opacity: 0.25 }, t);
+  // Donde pega el martillo del perezoso: la onda y las grietas
+  el('ellipse', { class: 'onda-golpe a', cx: 768, cy: 612, rx: 24, ry: 7, fill: 'none', stroke: C.crema, 'stroke-width': 3, opacity: 0 }, t);
+  const grietas = el('g', { class: 'grietas' }, t);
+  for (const d of ['M768 612 L742 618 L716 614 L694 626', 'M768 612 L790 620 L812 616 L836 628', 'M768 612 L760 624 L766 638', 'M768 612 L778 626 L774 640', 'M742 618 L736 632', 'M812 616 L824 606']) {
+    el('path', { class: 'grieta', d, fill: 'none', stroke: '#0b0a09', 'stroke-width': 4, 'stroke-linecap': 'round', 'stroke-linejoin': 'round', pathLength: 1, 'stroke-dasharray': 1, 'stroke-dashoffset': 1 }, grietas);
+  }
+  // La fila de bailarines, a la izquierda; a la derecha cae el martillo
+  [[236, C.amber], [318, C.ok], [400, C.bad]].forEach(([x, color], k) => bailarin(t, x, color, k));
   el('ellipse', { class: 'sombra-idol a', cx: 540, cy: 594, rx: 110, ry: 13, fill: '#000', opacity: 0.55 }, t);
   const idol = el('g', { class: 'sube-idol' }, el('g', { transform: 'translate(540 466) scale(.5) translate(-256 -270)' }, t));
-  const baila = el('g', { class: 'baila abajo' }, idol);
-  el('use', { href: '#sloth-perreo' }, baila);
-  const mazo = el('g', { class: 'mazo-idol' }, el('g', { transform: 'translate(540 520)' }, baila));
+  const cuerpo = el('g', { class: 'cuerpo-idol abajo' }, idol);
+  el('use', { href: '#sloth-perreo' }, cuerpo);
+  const mazo = el('g', { class: 'mazo-idol' }, el('g', { transform: 'translate(540 520)' }, cuerpo));
   giratorio(mazo);
   el('use', { href: '#martillo', transform: 'scale(.62)' }, mazo);
 }
-// La fila de cabezas de abajo; unos levantan el celular para grabar
+// La gente de abajo: cabezas que se mueven con cada tiempo y celulares grabando
 function publico(e, base) {
   const pub = en(e, '.publico');
   for (let k = 0; k < 15; k++) {
-    const x = 18 + k * 75 + azar(-8, 8), y = base + azar(-8, 8);
+    const x = 18 + k * 75 + azar(-8, 8), y = base + azar(-8, 8), p = el('g', { class: 'persona', 'data-k': k }, pub);
     if (k % 2 === 0 || k % 5 === 3) {
-      el('line', { x1: x + 22, y1: y + 40, x2: x + 40, y2: y - 46, stroke: '#070706', 'stroke-width': 16, 'stroke-linecap': 'round' }, pub);
-      const cel = el('g', { class: 'vara', 'data-k': k }, el('g', { transform: `translate(${x + 40} ${y - 52})` }, pub));
+      el('line', { x1: x + 22, y1: y + 40, x2: x + 40, y2: y - 46, stroke: '#070706', 'stroke-width': 16, 'stroke-linecap': 'round' }, p);
+      const cel = el('g', { class: 'vara', 'data-k': k }, el('g', { transform: `translate(${x + 40} ${y - 52})` }, p));
       el('circle', { class: 'halo', cx: 0, cy: -30, r: 40, fill: C.amber, 'fill-opacity': 0.2 }, cel);
       el('rect', { x: -17, y: -60, width: 34, height: 60, rx: 7, fill: '#2e2a24', stroke: '#070706', 'stroke-width': 3 }, cel);
       el('rect', { class: 'pantallita', x: -12, y: -54, width: 24, height: 46, rx: 3, fill: C.amber, 'fill-opacity': 0.75 }, cel);
     }
-    el('path', { d: `M${x - 60} 1090 Q${x - 54} ${y + 28} ${x} ${y + 26} Q${x + 54} ${y + 28} ${x + 60} 1090 Z`, fill: '#070706' }, pub);
-    el('circle', { cx: x, cy: y - 6, r: 30, fill: '#070706' }, pub);
+    el('path', { d: `M${x - 60} 1090 Q${x - 54} ${y + 28} ${x} ${y + 26} Q${x + 54} ${y + 28} ${x + 60} 1090 Z`, fill: '#070706' }, p);
+    el('circle', { cx: x, cy: y - 6, r: 30, fill: '#070706' }, p);
   }
 }
-const BEAT = 600; // Los tiempos de la canción: 100 por minuto
 const tono = () => [C.amber, C.ok, C.bad, C.crema, C.amber].map((c, k) => ({ fill: c, offset: k / 4, easing: 'steps(1)' }));
 const fuego = () => [C.amber, C.amber2, C.crema, C.amber2, C.amber].map((c, k) => ({ fill: c, offset: k / 4, easing: 'steps(1)' }));
-// Arranca el perreo: pantalla, focos, ecualizador, luces, celulares, el perezoso subiendo y su martillo al ritmo
-function concierto(e) {
+// Lo que corre solo, sin ritmo: los focos, el ecualizador y los celulares; el perezoso sube por el elevador
+function arranque(e) {
   A(en(e, '.pantalla'), [{ opacity: 0 }, { opacity: 1, offset: 0.15 }, { opacity: 0.15, offset: 0.3 }, { opacity: 1, offset: 0.45 }, { opacity: 0.4, offset: 0.6 }, { opacity: 1 }], { duration: 800, easing: 'linear' });
   A(en(e, '.focos'), [{ opacity: 0 }, { opacity: 1 }], { duration: 900 });
   todos(e, '.foco').forEach((f, k) => A(f, [{ transform: `rotate(${k < 2 ? -26 : 26}deg)` }, { transform: `rotate(${k < 2 ? 16 : -16}deg)` }], { duration: 2100 + k * 380, iterations: Infinity, direction: 'alternate', easing: 'ease-in-out' }));
   todos(e, '.barra-eq').forEach((b) => A(b, [{ transform: 'scaleY(.15)' }, { transform: `scaleY(${azar(0.5, 1)})` }], { duration: azar(240, 520), iterations: Infinity, direction: 'alternate', easing: 'steps(4)' }));
-  todos(e, '.led').forEach((l, k) => A(l, [{ opacity: 0.15 }, { opacity: 1 }, { opacity: 0.15 }], { duration: BEAT * 2, delay: -k * 60, iterations: Infinity, easing: 'steps(3)' }));
   A(en(e, '.titulo-pantalla'), tono(), { duration: BEAT * 4, iterations: Infinity });
   todos(e, '.vara').forEach((v) => {
     A(v, [{ transform: 'rotate(-12deg)' }, { transform: 'rotate(12deg)' }], { duration: BEAT * 2, delay: -v.dataset.k * 70, iterations: Infinity, direction: 'alternate', easing: 'ease-in-out' });
     for (const c of todos(v, '.halo, .pantallita')) A(c, fuego(), { duration: BEAT * 2, delay: -v.dataset.k * 90, iterations: Infinity });
   });
-  // El martillo baja en cada tiempo fuerte
-  A(en(e, '.mazo-idol'), [{ transform: 'rotate(-14deg)' }, { transform: 'rotate(38deg)', offset: 0.42, easing: 'ease-out' }, { transform: 'rotate(30deg)', offset: 0.52 }, { transform: 'rotate(-14deg)' }], { duration: BEAT * 2, iterations: Infinity, easing: 'cubic-bezier(.6,0,.9,.4)' });
+  todos(e, '.picado').forEach((p) => A(p, [{ transform: 'rotate(-4deg)' }, { transform: 'rotate(4deg)' }], { duration: 1700 + p.dataset.k * 90, iterations: Infinity, direction: 'alternate', easing: 'ease-in-out' }));
   oculto(en(e, '.laseres')); oculto(en(e, '.neon-glow'));
   A(en(e, '.sube-idol'), [{ transform: 'translateY(560px)', opacity: 0 }, { opacity: 1, offset: 0.15 }, { transform: 'translateY(-50px)', offset: 0.72 }, { transform: 'none', opacity: 1 }], { duration: 1100, delay: 300, easing: 'cubic-bezier(.2,.8,.2,1)' });
   A(en(e, '.sombra-idol'), [{ transform: 'scale(0)' }, { transform: 'scale(1)' }], { duration: 500, delay: 1050 });
 }
-// El golpe grande: polvo, confeti, destello, láseres y el neón que late
+// El martillazo del perezoso al regresar la base: grietas, onda, polvo, confeti de las bocinas y la pantalla lo grita
+function golpeFiesta(e) {
+  todos(e, '.grieta').forEach((g, k) => {
+    A(g, [{ strokeDashoffset: 1, opacity: 1 }, { strokeDashoffset: 0, opacity: 1, offset: 0.12 }, { strokeDashoffset: 0, opacity: 1, offset: 0.7 }, { strokeDashoffset: 0, opacity: 0 }], { duration: BEAT * 4, delay: k * 20, easing: 'ease-out' });
+  });
+  late(en(e, '.onda-golpe'), [{ transform: 'scale(1)', opacity: 1 }, { transform: 'scale(9)', opacity: 0 }], { duration: 650 });
+  polvo(768, 616, 22, 60, [10, 26]);
+  estallido(768, 600, C.amber2, 34, 7);
+  confeti(106, 270, 40, -70, 40, [14, 22]); confeti(974, 270, 40, -110, 40, [14, 22]);
+  sacudir(en(e, '.cuerpo'), 12);
+  late(en(e, '.destello'), [{ opacity: 0.3 }, { opacity: 0 }], { duration: 500 });
+  todos(e, '.onda-cono').forEach((o) => late(o, [{ transform: 'scale(.9)', opacity: 0.9 }, { transform: 'scale(1.8)', opacity: 0 }], { duration: 550 }));
+  const tp = en(e, '.titulo-pantalla'), antes = tp.textContent;
+  if (antes !== 'MARTILLAZO') {
+    tp.textContent = 'MARTILLAZO'; tp.setAttribute('font-size', 40); tp.setAttribute('y', 226); tp.setAttribute('textLength', 252); tp.setAttribute('lengthAdjust', 'spacingAndGlyphs');
+    setTimeout(() => { tp.textContent = antes; tp.setAttribute('font-size', 70); tp.setAttribute('y', 236); tp.removeAttribute('textLength'); }, BEAT * 2);
+  }
+  todos(e, '.persona').forEach((p, k) => late(p, [{ transform: 'none' }, { transform: 'translateY(-34px)', offset: 0.35 }, { transform: 'none' }], { duration: BEAT * 1.1, delay: k * 12, easing: 'ease-out' }));
+  todos(e, '.bailarin').forEach((b, k) => {
+    late(en(b, '.cuerpo-b'), [{ transform: 'none' }, { transform: 'translateY(-38px)', offset: 0.35 }, { transform: 'none' }], { duration: BEAT * 1.1, delay: k * 40 });
+    for (const [c, r] of [['.brazo-i', 150], ['.brazo-d', -150]]) late(en(b, c), [{ transform: `rotate(${r}deg)` }, { transform: `rotate(${r}deg)`, offset: 0.7 }, { transform: 'none' }], { duration: BEAT * 1.4 });
+  });
+}
+// Cada tiempo de la fiesta. `oscuro(n)` dice si ese tiempo va a oscuras (un corte, o la entrada antes de la base).
+function fiesta(e, vivo, oscuro) {
+  const idol = en(e, '.cuerpo-idol'), mazo = en(e, '.mazo-idol'), apagon = en(e, '.apagon');
+  const conos = todos(e, '.cono'), leds = todos(e, '.led'), focos = todos(e, '.foquito'), gente = todos(e, '.persona'), fila = todos(e, '.bailarin');
+  ritmo(vivo, (n) => {
+    const fuerte = n % 4 === 0;
+    if (oscuro(n)) {
+      // El corte: se va la luz, todo se queda quieto y el perezoso levanta el martillo; baja justo al siguiente tiempo
+      late(apagon, [{ opacity: 1 }, { opacity: 1 }], { duration: BEAT * 0.98 });
+      late(idol, [{ transform: 'scale(1.03, .95)' }, { transform: 'scale(1.06, .9)' }], { duration: BEAT * 0.98, easing: 'ease-in' });
+      if (!oscuro(n + 1)) late(mazo, [{ transform: 'rotate(-14deg)' }, { transform: 'rotate(-78deg)', offset: 0.75 }, { transform: 'rotate(100deg)' }], { duration: BEAT, easing: 'cubic-bezier(.6,0,.9,.4)' });
+      else late(mazo, [{ transform: 'rotate(-14deg)' }, { transform: 'rotate(-60deg)' }], { duration: BEAT * 0.98 });
+      fila.forEach((b) => late(en(b, '.brazo-d'), [{ transform: 'rotate(-70deg)' }, { transform: 'rotate(-70deg)' }], { duration: BEAT * 0.98 }));
+      return;
+    }
+    if (oscuro(n - 1)) golpeFiesta(e);
+    // El perreo: brinca con cada tiempo y se ladea a uno y otro lado
+    const lado = n % 2 ? 1 : -1;
+    late(idol, [{ transform: `translateY(0) rotate(${lado * 6}deg) scale(1.06, .94)` }, { transform: `translateY(-24px) rotate(${lado * 2}deg) scale(.98, 1.03)`, offset: 0.42 }, { transform: `translateY(0) rotate(${-lado * 6}deg) scale(1.05, .95)` }], { duration: BEAT, easing: 'ease-in-out' });
+    if (oscuro(n - 1)) late(mazo, [{ transform: 'rotate(100deg)' }, { transform: 'rotate(88deg)', offset: 0.25 }, { transform: 'rotate(-14deg)' }], { duration: BEAT * 1.2, easing: 'ease-out' });
+    else if (fuerte) late(mazo, [{ transform: 'rotate(-14deg)' }, { transform: 'rotate(40deg)', offset: 0.3 }, { transform: 'rotate(-14deg)' }], { duration: BEAT, easing: 'ease-out' });
+    else late(mazo, [{ transform: 'rotate(-14deg)' }, { transform: 'rotate(4deg)', offset: 0.3 }, { transform: 'rotate(-14deg)' }], { duration: BEAT });
+    conos.forEach((c) => late(c, [{ transform: `scale(${fuerte ? 1.16 : 1.09})` }, { transform: 'scale(1)' }], { duration: BEAT * 0.7, easing: 'cubic-bezier(.2,.9,.3,1)' }));
+    leds.forEach((l) => { if (+l.dataset.k % 4 === ((n % 4) + 4) % 4) late(l, [{ opacity: 1 }, { opacity: 0.25 }], { duration: BEAT * 1.4 }); });
+    focos.forEach((f) => { if (+f.dataset.k % 2 === ((n % 2) + 2) % 2) late(en(f, '.foco-f'), [{ fill: C.crema }, { fill: COLOR_PICADO[f.dataset.k % 5] }], { duration: BEAT }); else late(f, [{ opacity: 0.45 }, { opacity: 0.45 }], { duration: BEAT * 0.95 }); });
+    gente.forEach((p, k) => { if (k % 2 === ((n % 2) + 2) % 2) late(p, [{ transform: 'translateY(9px)' }, { transform: 'none' }], { duration: BEAT * 0.8 }); });
+    // La fila patea, uno tras otro, con la pierna de cada tiempo
+    fila.forEach((b, k) => {
+      const pierna = en(b, lado > 0 ? '.pierna-d' : '.pierna-i');
+      late(pierna, [{ transform: 'none' }, { transform: `rotate(${lado * -72}deg)`, offset: 0.4 }, { transform: 'none' }], { duration: BEAT * 0.85, delay: k * 70, easing: 'ease-in-out' });
+      late(en(b, '.cuerpo-b'), [{ transform: 'none' }, { transform: `translateY(-8px) rotate(${lado * 5}deg)`, offset: 0.4 }, { transform: 'none' }], { duration: BEAT * 0.85, delay: k * 70 });
+      late(en(b, lado > 0 ? '.brazo-i' : '.brazo-d'), [{ transform: 'none' }, { transform: `rotate(${lado * 60}deg)`, offset: 0.4 }, { transform: 'none' }], { duration: BEAT * 0.85, delay: k * 70 });
+    });
+    if (fuerte) todos(e, '.picado').forEach((p) => late(p, [{ transform: 'scaleY(.88)' }, { transform: 'scaleY(1)' }], { duration: BEAT * 0.6, composite: 'add' }));
+  });
+}
+// El golpe grande del final de la entrada: los láseres prenden y el neón late
 function explota(e, neon) {
   polvo(120, 1010, 46, 130, [16, 40]); polvo(960, 1010, 46, 130, [16, 40]);
   confeti(-10, 1000, 80, -60, 30, [17, 28]); confeti(1090, 1000, 80, -120, 30, [17, 28]);
   confeti(540, 640, 70, -90, 120, [12, 22]);
   sacudir(en(e, '.cuerpo'), 14);
   A(en(e, '.destello'), [{ opacity: 0 }, { opacity: 0.32, offset: 0.15 }, { opacity: 0 }], { duration: 700, easing: 'ease-out' });
-  A(en(e, '.laseres'), [{ opacity: 0.9 }, { opacity: 0.25 }, { opacity: 0.9 }], { duration: BEAT / 2, iterations: Infinity, easing: 'steps(2)' });
-  todos(e, '.abanico').forEach((a) => A(a, [{ transform: 'rotate(0deg)' }, { transform: `rotate(${a.dataset.lado * 22}deg)` }], { duration: BEAT * 2, iterations: Infinity, direction: 'alternate', easing: 'ease-in-out' }));
   A(en(e, '.neon-glow'), [{ opacity: 1 }, { opacity: 0.35 }, { opacity: 1 }, { opacity: 0.8 }], { duration: BEAT * 2, iterations: Infinity, easing: 'steps(4)' });
   A(neon, [{ transform: 'scale(1)' }, { transform: 'scale(1.07)', offset: 0.12 }, { transform: 'scale(1)', offset: 0.45 }, { transform: 'scale(1)' }], { duration: BEAT, iterations: Infinity, fill: 'none' });
 }
@@ -781,13 +1002,26 @@ async function sigueLaFiesta(vivo) {
     await espera(azar(500, 1000));
   }
 }
-// Un martillazo: el martillo (con su mango en `mazo`) baja sobre (x, y) con la cara que golpea. Devuelve cuándo pega.
+// Prende los láseres de las cornetas
+function laseres(e) {
+  A(en(e, '.laseres'), [{ opacity: 0.9 }, { opacity: 0.25 }, { opacity: 0.9 }], { duration: BEAT / 2, iterations: Infinity, easing: 'steps(2)' });
+  todos(e, '.abanico').forEach((a) => A(a, [{ transform: 'rotate(0deg)' }, { transform: `rotate(${a.dataset.lado * 22}deg)` }], { duration: BEAT * 2, iterations: Infinity, direction: 'alternate', easing: 'ease-in-out' }));
+}
+// Un martillazo: el martillo (con su mango en `mazo`) baja sobre (x, y) con la cara que golpea; pega a PEGA de tiempo
 const PEGA = 0.55;
 function martillazo(mazo, x, y, s) {
+  en(mazo, 'use').setAttribute('transform', `scale(${s})`);
   mazo.setAttribute('transform', `translate(${(x + 282 * s).toFixed(1)} ${(y - 118 * s).toFixed(1)})`);
   A(mazo, [{ opacity: 1 }, { opacity: 1 }], { duration: 1 });
   A(en(mazo, '.giro'), [{ transform: 'rotate(-12deg)' }, { transform: 'rotate(-92deg)', offset: PEGA }, { transform: 'rotate(-80deg)', offset: 0.7 }, { transform: 'rotate(-28deg)' }], { duration: BEAT, easing: 'cubic-bezier(.6,0,.9,.4)' });
-  return BEAT * PEGA;
+}
+// Clava en el tiempo n: el martillo arranca antes para pegar justo en el tiempo; luego `alPegar`
+async function clavaEn(n, mazo, x, y, s, vivo, alPegar) {
+  if (!await aTiempo(n - PEGA, vivo)) return false;
+  martillazo(mazo, x, y, s);
+  if (!await aTiempo(n, vivo)) return false;
+  alPegar();
+  return true;
 }
 
 /* ---------- Las piezas de cada novedad ---------- */
@@ -812,15 +1046,15 @@ function carrusel(e) {
   });
   en(e, '.marco-c').classList.add('a');
 }
-// 2 · Redes: las pestañas, el calendario, los videos y las cuentas
+// 2 · Redes: las pestañas, el calendario, los videos (cada uno con su clavo) y las cuentas
 const PESTANAS = [['Producción', 'i-claqueta', 146], ['Ideas', 'i-idea', 96], ['Publicaciones', 'i-compartir', 168], ['Calendario', 'i-calendario', 146], ['Cuentas', 'i-personas', 118]];
 const VIDEOS_R = [['El Diff', 'i-claqueta', '0:54', 'TikTok', 1, 0], ['Explicativo', 'i-pizarra', '1:12', 'Instagram', 3, 0], ['Low-Poly', 'i-montana', '2:30', 'YouTube', 0, 1]];
 const celda = (col, fila) => [476 + col * 67, 356 + fila * 118];
 function redes(e) {
   const p = en(e, '.pestanas');
   let x = 128;
-  const marca = el('rect', { class: 'marca-tab izq', x: 128, y: 232, width: PESTANAS[0][2], height: 44, rx: 10, fill: C.p2, stroke: C.amber, 'stroke-width': 2 }, p);
-  PESTANAS.forEach(([nombre, icono, w], k) => {
+  el('rect', { class: 'marca-tab izq', x: 128, y: 232, width: PESTANAS[0][2], height: 44, rx: 10, fill: C.p2, stroke: C.amber, 'stroke-width': 2 }, p);
+  PESTANAS.forEach(([nombre, icono, w]) => {
     const t = el('g', { class: 'pestana', 'data-x': x, 'data-w': w }, p);
     el('use', { href: `#${icono}`, x: x + 14, y: 244, width: 20, height: 20, style: `color:${C.amber}` }, t);
     el('text', { x: x + 42, y: 260, 'font-size': 16, 'font-weight': 700, fill: C.text }, t).textContent = nombre;
@@ -837,11 +1071,14 @@ function redes(e) {
   const mins = en(e, '.miniaturas');
   VIDEOS_R.forEach(([nombre, icono, dura, red, c, f], k) => {
     const x0 = 140 + k * 100, m = el('g', { class: 'mini a', 'data-c': c, 'data-f': f, 'data-red': red }, mins);
-    el('rect', { x: x0, y: 314, width: 84, height: 150, rx: 10, fill: 'url(#telaB)', stroke: C.amber, 'stroke-width': 2 }, m);
-    el('use', { href: `#${icono}`, x: x0 + 26, y: 362, width: 32, height: 32, style: `color:${C.crema}` }, m);
-    el('rect', { x: x0 + 44, y: 438, width: 34, height: 18, rx: 5, fill: '#0b0a09', 'fill-opacity': 0.75 }, m);
-    el('text', { x: x0 + 61, y: 452, 'text-anchor': 'middle', 'font-size': 11, 'font-weight': 800, fill: C.text }, m).textContent = dura;
-    el('text', { class: 'nombre-mini', x: x0, y: 486, 'font-size': 13, 'font-weight': 700, fill: C.muted }, m).textContent = nombre;
+    const colgado = el('g', { class: 'colgado' }, m);
+    origen(colgado, x0 + 42, 322);
+    el('rect', { x: x0, y: 314, width: 84, height: 150, rx: 10, fill: 'url(#telaB)', stroke: C.amber, 'stroke-width': 2 }, colgado);
+    el('use', { href: `#${icono}`, x: x0 + 26, y: 362, width: 32, height: 32, style: `color:${C.crema}` }, colgado);
+    el('rect', { x: x0 + 44, y: 438, width: 34, height: 18, rx: 5, fill: '#0b0a09', 'fill-opacity': 0.75 }, colgado);
+    el('text', { x: x0 + 61, y: 452, 'text-anchor': 'middle', 'font-size': 11, 'font-weight': 800, fill: C.text }, colgado).textContent = dura;
+    el('text', { class: 'nombre-mini', x: x0, y: 486, 'font-size': 13, 'font-weight': 700, fill: C.muted }, colgado).textContent = nombre;
+    el('use', { class: 'clavo-m', href: '#clavo', transform: `translate(${x0 + 42} 322) scale(1.4)` }, m);
   });
   const ctas = en(e, '.cuentas-r');
   [['TikTok', '@tucanal'], ['Instagram', '@tucanal'], ['YouTube', 'Tu canal']].forEach(([red, quien], k) => {
@@ -853,15 +1090,16 @@ function redes(e) {
     el('use', { class: 'tic-r', href: '#i-palomita', x: 408, y: y + 11, width: 22, height: 22, style: `color:${C.ok}` }, f);
   });
 }
-// 3 · El mosaico que tapa la imagen mientras se hace
+// 3 · El mosaico que tapa la imagen mientras se hace; el martillo lo rompe
 function mosaico(e) {
   const m = en(e, '.mosaico');
-  for (let f = 0; f < 10; f++) for (let c = 0; c < 10; c++) el('rect', { class: 'tesela', x: 560 + c * 36, y: 236 + f * 36, width: 36, height: 36, fill: C.p2, stroke: '#171512', 'stroke-width': 1.5 }, m);
+  for (let f = 0; f < 10; f++) for (let c = 0; c < 10; c++) el('rect', { class: 'tesela a', x: 560 + c * 36, y: 236 + f * 36, width: 36, height: 36, fill: C.p2, stroke: '#171512', 'stroke-width': 1.5 }, m);
 }
 // 4 · Motion Graphics: capas con profundidad, palabras que entran a golpes, la línea de tiempo y lo que trae
 const PALABRAS_MG = ['TU', 'MARCA', 'SE', 'MUEVE'];
 function motion(e) {
   const capas = en(e, '.capas-mg');
+  el('rect', { class: 'flash-mg', x: 120, y: 214, width: 520, height: 292, fill: C.amber, opacity: 0 }, capas);
   const franjas = el('g', { transform: 'rotate(24 380 360)' }, capas);
   for (let k = 0; k < 9; k++) el('rect', { class: 'franja', x: -30 + k * 90, y: 120, width: 30, height: 500, fill: C.line, 'fill-opacity': 0.45 }, franjas);
   el('circle', { class: 'anillo a', cx: 380, cy: 360, r: 118, fill: 'none', stroke: C.line, 'stroke-width': 10, 'stroke-dasharray': '40 22' }, capas);
@@ -874,6 +1112,8 @@ function motion(e) {
   [[[134, 120, C.amber], [262, 170, C.amber], [440, 186, C.amber]], [[134, 220, C.ok], [362, 264, C.ok]], [[134, 492, C.muted]]].forEach((clips, f) => {
     for (const [x, w, c] of clips) el('rect', { x, y: 530 + f * 30, width: w - 6, height: 22, rx: 6, fill: c, 'fill-opacity': f === 2 ? 0.35 : 0.7 }, lin);
   });
+  // Las marcas de los tiempos en la pista de música
+  for (let k = 0; k < 16; k++) el('rect', { x: 140 + k * 30.75, y: 594, width: 3, height: k % 4 ? 8 : 14, rx: 1.5, fill: C.crema, 'fill-opacity': 0.5 }, lin);
   el('line', { class: 'cabezal-mg', x1: 134, y1: 522, x2: 134, y2: 622, stroke: C.crema, 'stroke-width': 3, 'stroke-linecap': 'round' }, lin);
   const ch = en(e, '.checks-mg');
   ['Letras que se mueven', 'Cámara y profundidad', 'Música o narración'].forEach((t, k) => {
@@ -894,7 +1134,7 @@ function dictado(e) {
   const o = en(e, '.ondas-d');
   for (let k = 0; k < 20; k++) el('rect', { class: 'onda-d a', x: 560 + k * 10, y: 428, width: 5, height: 28, rx: 2.5, fill: C.bad }, o);
   const an = en(e, '.anillos-d');
-  for (let k = 0; k < 2; k++) el('circle', { class: 'anillo-d a', r: 24, fill: 'none', stroke: C.bad, 'stroke-width': 3 }, an);
+  for (let k = 0; k < 3; k++) el('circle', { class: 'anillo-d a', r: 24, fill: 'none', stroke: C.bad, 'stroke-width': 3, opacity: 0 }, an);
 }
 // 6 · Las voces: las dos llaves y el menú «Voz» con sus grupos
 const LLAVES_V = [['Vibi', 'Voces de ElevenLabs, MiniMax y CapCut,', 'con los créditos de tu cuenta de Vibi.'], ['Groq', 'Voces Orpheus en inglés, con la', 'cuota gratis de su API.']];
@@ -932,13 +1172,15 @@ function voces(e) {
     y += 22;
   });
 }
-// 7 · Los mensajes del hilo, las cifras y la línea de la actividad
+// 7 · Los mensajes del hilo, las grietas del límite, las cifras y la línea de la actividad
 function cuentas(e) {
   const m = en(e, '.mensajes-c');
   [['u', 220], ['a', 300], ['a', 250], ['a', 280], ['a', 230], ['a', 300]].forEach(([quien, w], k) => {
     const y = 280 + k * 43, x = quien === 'u' ? 500 - 20 - w : 142;
     el('rect', { class: 'burbuja', x, y, width: w, height: 32, rx: 10, fill: quien === 'u' ? C.amber : C.p2, 'fill-opacity': quien === 'u' ? 0.22 : 1 }, m);
   });
+  const c1 = en(e, '.cuenta-1');
+  for (const d of ['M420 548 L408 566 L418 580 L404 600', 'M420 548 L436 570 L430 590', 'M408 566 L388 572']) el('path', { class: 'grieta-c', d, fill: 'none', stroke: C.crema, 'stroke-width': 2.5, 'stroke-linecap': 'round', pathLength: 1, 'stroke-dasharray': 1, 'stroke-dashoffset': 1 }, c1);
   const cf = en(e, '.cifras-c');
   [['Turnos', 1248, ''], ['Tokens', 3.2, ' M'], ['Días activos', 61, '']].forEach(([t, n, suf], k) => {
     const x = 560 + k * 130, g = el('g', {}, cf);
@@ -1007,6 +1249,39 @@ function ventana(g, T, cristal) {
     el('rect', { x: 520, y: y - 5, width: 356 * uso, height: 10, rx: 5, fill: T.acentos[k] }, g);
   });
 }
+// Los pedazos en que se rompe la ventana ámbar al martillazo: un anillo de triángulos alrededor del golpe y otro de
+// pedazos hasta la orilla; cada uno es la misma ventana recortada (`#dibujo-sloth`)
+const GOLPE_V = [832, 400];
+function trozos(e) {
+  const defs = svg.querySelector('defs'), g = en(e, '.trozos'), gr = en(e, '.grietas-v'), [px, py] = GOLPE_V;
+  const R = [160, 230, 920, 610];
+  const borde = (a) => {
+    const dx = Math.cos(a), dy = Math.sin(a);
+    const ts = [dx > 0 ? (R[2] - px) / dx : dx < 0 ? (R[0] - px) / dx : Infinity, dy > 0 ? (R[3] - py) / dy : dy < 0 ? (R[1] - py) / dy : Infinity];
+    const t = Math.min(...ts);
+    return [px + dx * t, py + dy * t];
+  };
+  const esquinas = [[R[0], R[1]], [R[2], R[1]], [R[2], R[3]], [R[0], R[3]]].map(([x, y]) => Math.atan2(y - py, x - px));
+  const angulos = [...Array.from({ length: 14 }, (_, k) => (k / 14) * Math.PI * 2 + azar(-0.12, 0.12)), ...esquinas].map((a) => (a + Math.PI * 4) % (Math.PI * 2)).sort((a, b) => a - b);
+  const anillo = angulos.map((a) => { const [bx, by] = borde(a), d = Math.hypot(bx - px, by - py), r = Math.min(d * 0.5, azar(70, 120)); return [px + Math.cos(a) * r, py + Math.sin(a) * r]; });
+  const fuera = angulos.map(borde);
+  const piezas = [];
+  for (let k = 0; k < angulos.length; k++) {
+    const j = (k + 1) % angulos.length;
+    piezas.push([[px, py], anillo[k], anillo[j]], [anillo[k], fuera[k], fuera[j], anillo[j]]);
+  }
+  piezas.forEach((pts, k) => {
+    const cp = el('clipPath', { id: `trozo${k}` }, defs);
+    el('polygon', { points: pts.map((p) => p.map((n) => n.toFixed(1)).join(',')).join(' ') }, cp);
+    const cx = pts.reduce((s, p) => s + p[0], 0) / pts.length, cy = pts.reduce((s, p) => s + p[1], 0) / pts.length;
+    const t = el('g', { class: 'trozo', 'data-cx': cx.toFixed(1), 'data-cy': cy.toFixed(1) }, g);
+    origen(t, cx, cy);
+    el('use', { href: '#dibujo-sloth', 'clip-path': `url(#trozo${k})` }, t);
+    el('polygon', { points: pts.map((p) => p.map((n) => n.toFixed(1)).join(',')).join(' '), fill: 'none', stroke: C.crema, 'stroke-opacity': 0.5, 'stroke-width': 1.5 }, t);
+  });
+  const lineas = [...fuera.map((f, k) => `M${px} ${py} L${anillo[k][0].toFixed(1)} ${anillo[k][1].toFixed(1)} L${f[0].toFixed(1)} ${f[1].toFixed(1)}`), `M${anillo.map((p) => p.map((n) => n.toFixed(1)).join(' ')).join(' L')} Z`];
+  for (const d of lineas) el('path', { class: 'grieta-v', d, fill: 'none', stroke: C.crema, 'stroke-width': 2.5, 'stroke-linejoin': 'round', pathLength: 1, 'stroke-dasharray': 1, 'stroke-dashoffset': 1 }, gr);
+}
 // 9 · Una lista de renglones, cada uno con su icono
 function lista(e, filas, alto) {
   filas.forEach(([texto, donde, icono], k) => {
@@ -1029,7 +1304,7 @@ function construir() {
     el('rect', { x, y: 150, width: w, height: 8, rx: 4, fill: C.line }, bg);
     el('rect', { x, y: 150, width: w, height: 8, rx: 4, fill: C.amber, class: 'izq barra-llena', style: 'transform: scaleX(0)' }, bg);
   }
-  // Los focos (un degradado por color) y el escenario del perreo, al principio y al final
+  // Los focos (un degradado por color) y la fiesta, al principio y al final
   const defs = svg.querySelector('defs');
   COLOR_FOCO.forEach((c, k) => {
     const g = el('linearGradient', { id: `foco${k}`, x1: 0, y1: 0, x2: 0, y2: 1 }, defs);
@@ -1040,7 +1315,8 @@ function construir() {
   tablado(escenas[FIN], document.title.replace('Sloth ', '')); publico(escenas[FIN], 1075);
   todos(svg, '.giro').forEach(giratorio);
   carrusel(escenas[1]); redes(escenas[2]); mosaico(escenas[3]); motion(escenas[4]); dictado(escenas[5]); voces(escenas[6]); cuentas(escenas[7]);
-  ventana(en(escenas[8], '.ventana-sloth'), TEMA_SLOTH, false); ventana(en(escenas[8], '.ventana-cristal'), TEMA_CRISTAL, true);
+  ventana(el('g', { id: 'dibujo-sloth' }, en(escenas[8], '.ventana-sloth')), TEMA_SLOTH, false); ventana(en(escenas[8], '.ventana-cristal'), TEMA_CRISTAL, true);
+  trozos(escenas[8]);
   lista(escenas[9], [
     ['Estilos: todos en una página, con su descripción y un buscador', 'Estilos', 'i-claqueta'],
     ['La revisión de YouTube es su propia página, con «Organizar en chat»', 'YouTube', 'i-video'],
@@ -1083,38 +1359,64 @@ async function teclear(t, texto, ms, vivo) {
   }
   return true;
 }
+// Lo que levanta un martillazo pequeño: polvo, chispas y un temblor
+function impacto(x, y, el_, f = 5) {
+  polvo(x, y + 8, 10, 16, [4, 10]);
+  chispa(x, y, C.amber2); chispa(x, y, C.amber2); chispa(x, y, C.crema);
+  if (el_) sacudir(el_, f);
+}
 
 /* ---------- Las escenas ---------- */
 const guiones = [
-  // 0 · El perreo: el número se clava a martillazos, uno por tiempo
+  // 0 · El perreo: la entrada va a oscuras, con el título palabra por palabra; con la base, el martillazo prende la
+  // fiesta y cada cifra se clava en su tiempo y queda colgando de su clavo
   async (e, vivo) => {
-    concierto(e);
-    todos(en(e, '.titulo'), '.letra').forEach((l, k) => A(l, [{ opacity: 0, transform: 'translateY(34px) scale(.3)' }, { opacity: 1, transform: 'none' }], { duration: 520, delay: 1000 + k * 40, easing: REBOTE }));
-    const letras = todos(en(e, '.version-neon'), '.letra'), mazo = en(e, '.mazo-grande');
-    letras.forEach((l) => { l.classList.add('abajo'); oculto(l); });
-    oculto(mazo);
-    await espera(1500); if (!vivo()) return;
-    for (const l of letras) {
-      const b = l.getBBox(), x = b.x + b.width / 2, arriba = l.textContent === '.' ? 846 : 730;
-      const pega = martillazo(mazo, x, arriba, 0.62);
-      A(l, [{ opacity: 0, transform: 'translateY(-40px) scale(1.1, .4)' }, { opacity: 1, transform: 'scale(1.18, .62)', offset: 0.25 }, { opacity: 1, transform: 'none' }], { duration: 420, delay: pega, easing: REBOTE });
-      await espera(pega); if (!vivo()) return;
-      sacudir(en(e, '.cuerpo'), 9);
-      A(en(e, '.pantalla'), [{ opacity: 0.35 }, { opacity: 1 }], { duration: 200 });
-      estallido(x, arriba, C.amber2, 26, 6);
-      polvo(x, 884, 16, b.width / 2 + 12);
-      await espera(BEAT - pega); if (!vivo()) return;
+    arranque(e);
+    const B = compas() < -0.5 ? 0 : proximo(4, 4);
+    fiesta(e, vivo, (n) => esCorte(n) || n < B);
+    const apagon = en(e, '.apagon');
+    A(apagon, [{ opacity: 1 }, { opacity: 1 }], { duration: 1 });
+    const palabras = todos(en(e, '.titulo'), '.palabra'), letras = todos(en(e, '.version-neon'), '.letra'), mazo = en(e, '.mazo-grande');
+    palabras.forEach(oculto); letras.forEach(oculto); oculto(mazo);
+    // Los clavos, uno sobre cada cifra
+    const clavos = en(e, '.clavos');
+    clavos.textContent = '';
+    const puntos = letras.map((l) => { const b = l.getBBox(); return [b.x + b.width / 2, l.textContent === '.' ? 838 : 722]; });
+    const usosClavo = puntos.map(([x, y]) => { const c = el('use', { href: '#clavo', transform: `translate(${x.toFixed(1)} ${y}) scale(1.6)` }, clavos); oculto(c); return c; });
+    // «Ya salió Sloth», una palabra por tiempo, en el corte de la entrada
+    for (const [k, p] of palabras.entries()) {
+      if (!await aTiempo(B - 3 + k, vivo)) return;
+      A(p, [{ opacity: 0, transform: 'translateY(30px) scale(.6)' }, { opacity: 1, transform: 'none' }], { duration: 380, easing: REBOTE });
+      sacudir(p, 4);
+    }
+    if (!await aTiempo(B, vivo)) return;
+    A(apagon, [{ opacity: 1 }, { opacity: 0 }], { duration: 200 });
+    laseres(e);
+    // Cada cifra: el clavo asoma, el martillo lo hunde en su tiempo y la cifra cae y se mece colgada
+    for (const [k, l] of letras.entries()) {
+      const [x, y] = puntos[k];
+      const ok = await clavaEn(B + 1 + k, mazo, x, y - 8, 0.62, vivo, () => {
+        A(usosClavo[k], [{ opacity: 1, transform: 'translateY(-8px)' }, { opacity: 1, transform: 'none' }], { duration: 90, easing: 'ease-in' });
+        origen(l, x, y);
+        A(l, [{ opacity: 0, transform: 'translateY(-60px) rotate(0deg)' }, { opacity: 1, transform: 'rotate(-22deg)', offset: 0.18 }, { transform: 'rotate(15deg)', offset: 0.38 }, { transform: 'rotate(-9deg)', offset: 0.56 }, { transform: 'rotate(5deg)', offset: 0.72 }, { transform: 'rotate(-2deg)', offset: 0.86 }, { opacity: 1, transform: 'none' }], { duration: 1500, easing: 'ease-out' });
+        sacudir(en(e, '.cuerpo'), 7);
+        late(en(e, '.pantalla'), [{ opacity: 0.35 }, { opacity: 1 }], { duration: 200 });
+        estallido(x, y, C.amber2, 22, 6);
+        polvo(x, y + 4, 10, 18, [5, 12]);
+      });
+      if (!ok) return;
     }
     A(mazo, [{ opacity: 1 }, { opacity: 0 }], { duration: 300 });
+    if (!await aTiempo(B + 8, vivo)) return;
     explota(e, en(e, '.version-neon'));
-    await espera(1400); if (!vivo()) return;
     pulsar();
     sigueLaFiesta(vivo);
   },
-  // 1 · El diseño nuevo: el carrusel va y viene hasta Motion Graphics, y el celular se acuesta al elegir Horizontal
+  // 1 · El diseño nuevo: el carrusel cambia de estilo en cada tiempo hasta Motion Graphics, y en cada compás el
+  // celular se acuesta o se para
   async (e, vivo) => {
     textos(e);
-    const cartas = todos(e, '.tarjeta-c'), marca = en(e, '.marca-formato'), tel = en(e, '.telefono'), pide = en(e, '.pide'), cur = en(e, '.cursor');
+    const cartas = todos(e, '.tarjeta-c'), marca = en(e, '.marca-formato'), tel = en(e, '.telefono'), pide = en(e, '.pide'), cur = en(e, '.cursor'), marco = en(e, '.marco-c');
     let c = 2;
     const girar = (a, ms) => {
       cartas.forEach((t, k) => A(t, [enLugar(lugar(k - c)), enLugar(lugar(k - a))], { duration: ms, easing: 'cubic-bezier(.3,1.25,.5,1)' }));
@@ -1124,167 +1426,201 @@ const guiones = [
     };
     girar(2, 1);
     A(en(e, '.carrusel'), [{ opacity: 0, transform: 'translateY(30px)' }, { opacity: 1, transform: 'none' }], { duration: 650, delay: 80, easing: REBOTE });
-    A(en(e, '.marco-c'), [{ opacity: 0, transform: 'scale(.8)' }, { opacity: 1, transform: 'none' }], { duration: 500, delay: 450, easing: REBOTE });
+    A(marco, [{ opacity: 0, transform: 'scale(.8)' }, { opacity: 1, transform: 'none' }], { duration: 500, delay: 450, easing: REBOTE });
     aparece(en(e, '.compositor'), { duration: 600, delay: 250 });
     oculto(cur);
     A(marca, [{ transform: 'none' }, { transform: 'none' }], { duration: 1 });
     A(tel, [{ transform: 'rotate(0deg)' }, { transform: 'rotate(0deg)' }], { duration: 1 });
-    await espera(1300); if (!vivo()) return;
-    for (const a of [3, 4, 3, 2, 1, 0]) {
-      girar(a, 520);
-      A(en(e, '.marco-c'), [{ transform: 'scale(1.07)' }, { transform: 'none' }], { duration: 320, delay: 240 });
-      await espera(BEAT); if (!vivo()) return;
+    ritmo(vivo, (n) => late(marco, [{ transform: `scale(${n % 4 ? 1.03 : 1.06})` }, { transform: 'none' }], { duration: BEAT * 0.6 }));
+    const B = proximo(4, 2);
+    for (const [k, a] of [3, 4, 3, 2, 1, 0].entries()) {
+      if (!await aTiempo(B + k, vivo)) return;
+      girar(a, 420);
     }
     confeti(540, 300, 40, -90, 120, [6, 12]);
     await mover(cur, [900, 640], [723, 567], 700); if (!vivo()) return;
-    // Vertical y Horizontal, al ritmo: la marca va de uno a otro y el celular gira
-    for (let horizontal = true; vivo(); horizontal = !horizontal) {
+    // Vertical y Horizontal, una vez por compás
+    for (let horizontal = true, n = B + 8; vivo(); horizontal = !horizontal, n += 4) {
+      if (!await aTiempo(n, vivo)) return;
       clic(e, cur, horizontal ? 723 : 636, 567);
       A(marca, [{ transform: horizontal ? 'none' : 'translateX(82px) scaleX(1.15)' }, { transform: horizontal ? 'translateX(82px) scaleX(1.15)' : 'none' }], { duration: 450, easing: REBOTE });
       A(tel, [{ transform: `rotate(${horizontal ? 0 : 90}deg)` }, { transform: `rotate(${horizontal ? 90 : 0}deg)` }], { duration: 520, easing: 'cubic-bezier(.22,1.35,.36,1)' });
       confeti(horizontal ? 723 : 636, 560, 18, -90, 120, [3, 8]);
-      await espera(BEAT * 4); if (!vivo()) return;
-      await mover(cur, horizontal ? [723, 567] : [636, 567], horizontal ? [636, 567] : [723, 567], 400); if (!vivo()) return;
+      if (!await aTiempo(n + 2.5, vivo)) return;
+      await mover(cur, horizontal ? [723, 567] : [636, 567], horizontal ? [636, 567] : [723, 567], 400);
     }
   },
-  // 2 · Redes: la marca recorre las pestañas, los videos caen en su día y las cuentas quedan conectadas
+  // 2 · Redes: la marca recorre las pestañas a tiempo, cada video vuela a su día y se clava, y las cuentas quedan
   async (e, vivo) => {
     textos(e);
-    const marca = en(e, '.marca-tab'), tabs = todos(e, '.pestana'), minis = todos(e, '.mini'), dias = todos(e, '.dia'), ctas = todos(e, '.cuenta-r');
+    const marca = en(e, '.marca-tab'), tabs = todos(e, '.pestana'), minis = todos(e, '.mini'), dias = todos(e, '.dia'), ctas = todos(e, '.cuenta-r'), mazo = en(e, '.mazo-chico');
     tabs.forEach((t, k) => aparece(t, { duration: 450, delay: 100 + k * 70 }));
     A(marca, [{ opacity: 0, transform: 'none' }, { opacity: 1, transform: 'none' }], { duration: 400, delay: 300 });
-    minis.forEach(oculto); oculto(en(e, '.calendario')); ctas.forEach(oculto);
+    minis.forEach((m) => { oculto(m); oculto(en(m, '.clavo-m')); }); oculto(en(e, '.calendario')); ctas.forEach(oculto); oculto(mazo);
     const x0 = +tabs[0].dataset.x, w0 = +tabs[0].dataset.w;
     let antes = 'none';
     const ir_ = (k) => {
       const t = `translateX(${+tabs[k].dataset.x - x0}px) scaleX(${(+tabs[k].dataset.w / w0).toFixed(3)})`;
-      A(marca, [{ opacity: 1, transform: antes }, { opacity: 1, transform: t }], { duration: 420, easing: 'cubic-bezier(.3,1.2,.5,1)' });
+      A(marca, [{ opacity: 1, transform: antes }, { opacity: 1, transform: t }], { duration: 380, easing: 'cubic-bezier(.3,1.2,.5,1)' });
       antes = t;
     };
-    await espera(1100); if (!vivo()) return;
-    ir_(1); await espera(BEAT * 1.5); if (!vivo()) return;
+    const B = proximo(4, 2);
+    if (!await aTiempo(B, vivo)) return;
+    ir_(1);
+    if (!await aTiempo(B + 2, vivo)) return;
     ir_(2);
-    minis.forEach((m, k) => salta(m, { delay: 150 + k * 120 }));
-    await espera(BEAT * 2); if (!vivo()) return;
+    for (const [k, m] of minis.entries()) { if (!await aTiempo(B + 2 + k * 0.5, vivo)) return; salta(m, { duration: 450 }); }
+    if (!await aTiempo(B + 4, vivo)) return;
     ir_(3);
     aparece(en(e, '.calendario'), { duration: 500 });
-    await espera(800); if (!vivo()) return;
-    for (const m of minis) {
+    for (const [k, m] of minis.entries()) {
       const b = en(m, 'rect').getBBox(), [cx, cy] = celda(+m.dataset.c, +m.dataset.f);
       const dx = cx + 30.5 - (b.x + b.width / 2), dy = cy + 62 - (b.y + b.height / 2);
-      A(m, [{ opacity: 1, transform: 'none' }, { opacity: 1, transform: `translate(${dx}px, ${dy - 60}px) scale(.6)`, offset: 0.6 }, { opacity: 1, transform: `translate(${dx}px, ${dy}px) scale(.52)` }], { duration: 560, easing: 'cubic-bezier(.45,0,.2,1)' });
+      const n = B + 6 + k * 2;
+      if (!await aTiempo(n - 1, vivo)) return;
+      A(m, [{ opacity: 1, transform: 'none' }, { opacity: 1, transform: `translate(${dx}px, ${dy - 60}px) scale(.6)`, offset: 0.6 }, { opacity: 1, transform: `translate(${dx}px, ${dy}px) scale(.52)` }], { duration: BEAT * 0.8, easing: 'cubic-bezier(.45,0,.2,1)' });
       A(en(m, '.nombre-mini'), [{ opacity: 1 }, { opacity: 0 }], { duration: 200 });
-      await espera(560); if (!vivo()) return;
-      const dia = dias.find((d) => d.dataset.c === m.dataset.c && d.dataset.f === m.dataset.f);
-      A(en(dia, '.dia-borde'), [{ stroke: C.amber }, { stroke: C.amber }], { duration: 1 });
-      const chip = el('g', { class: 'temporal' }, dia);
-      el('rect', { x: cx + 4, y: cy + 86, width: 53, height: 18, rx: 5, fill: C.amber }, chip);
-      el('text', { x: cx + 30.5, y: cy + 99, 'text-anchor': 'middle', 'font-size': 10, 'font-weight': 800, fill: '#1b1408' }, chip).textContent = m.dataset.red;
-      salta(chip, { duration: 400 });
-      sacudir(dia, 4);
-      confeti(cx + 30, cy + 60, 16, -90, 130, [3, 8]);
-      await espera(BEAT - 120); if (!vivo()) return;
+      if (!await aTiempo(n - 0.5, vivo)) return;
+      const clavo = en(m, '.clavo-m');
+      A(clavo, [{ opacity: 0 }, { opacity: 1 }], { duration: 120 });
+      const [nx, ny] = aLienzo(clavo);
+      const ok = await clavaEn(n, mazo, nx, ny - 6, 0.13, vivo, () => {
+        A(en(m, '.colgado'), [{ transform: 'rotate(14deg)' }, { transform: 'rotate(-10deg)', offset: 0.25 }, { transform: 'rotate(6deg)', offset: 0.5 }, { transform: 'rotate(-3deg)', offset: 0.75 }, { transform: 'none' }], { duration: 1200, easing: 'ease-out' });
+        const dia = dias.find((d) => d.dataset.c === m.dataset.c && d.dataset.f === m.dataset.f);
+        A(en(dia, '.dia-borde'), [{ stroke: C.amber }, { stroke: C.amber }], { duration: 1 });
+        const chip = el('g', { class: 'temporal' }, dia);
+        el('rect', { x: cx + 4, y: cy + 86, width: 53, height: 18, rx: 5, fill: C.amber }, chip);
+        el('text', { x: cx + 30.5, y: cy + 99, 'text-anchor': 'middle', 'font-size': 10, 'font-weight': 800, fill: '#1b1408' }, chip).textContent = m.dataset.red;
+        salta(chip, { duration: 400, delay: 120 });
+        impacto(nx, ny, dia, 4);
+      });
+      if (!ok) return;
     }
+    A(mazo, [{ opacity: 1 }, { opacity: 0 }], { duration: 300 });
+    const C4 = proximo(4, 1);
+    if (!await aTiempo(C4, vivo)) return;
     ir_(4);
-    ctas.forEach((c, k) => {
-      A(c, [{ opacity: 0, transform: 'translateX(-40px)' }, { opacity: 1, transform: 'none' }], { duration: 450, delay: 150 + k * 120 });
-      salta(en(c, '.tic-r'), { duration: 450, delay: 500 + k * 120 });
-    });
-    await espera(900); if (!vivo()) return;
+    for (const [k, c] of ctas.entries()) {
+      if (!await aTiempo(C4 + k, vivo)) return;
+      A(c, [{ opacity: 0, transform: 'translateX(-40px)' }, { opacity: 1, transform: 'none' }], { duration: 380, easing: REBOTE });
+      salta(en(c, '.tic-r'), { duration: 420, delay: 180 });
+    }
     confeti(290, 420, 50, -90, 140, [6, 12]);
   },
-  // 3 · Imágenes: se pide, el mosaico se abre en la imagen y «Quitar fondo» la deja sola
+  // 3 · Imágenes: se pide, el mosaico tiembla un compás, el martillo lo rompe y salta la imagen; luego «Quitar fondo»
   async (e, vivo) => {
     textos(e);
-    const cur = en(e, '.cursor'), t1 = en(e, '.escribe-1'), t2 = en(e, '.escribe-2'), teselas = todos(e, '.tesela');
+    const cur = en(e, '.cursor'), t1 = en(e, '.escribe-1'), t2 = en(e, '.escribe-2'), teselas = todos(e, '.tesela'), mazo = en(e, '.mazo-chico');
     t1.textContent = ''; t2.textContent = '';
     aparece(en(e, '.pedido-i'), { duration: 500, delay: 80 });
-    oculto(en(e, '.editar-i')); oculto(en(e, '.listo-i')); oculto(en(e, '.barrido-i')); oculto(cur);
-    A(en(e, '.dj'), [{ transform: 'translateY(0)' }, { transform: 'translateY(-10px)' }], { duration: BEAT / 2, iterations: Infinity, direction: 'alternate', easing: 'cubic-bezier(.5,0,.5,1)' });
-    A(en(e, '.sol'), [{ opacity: 0.75 }, { opacity: 1 }], { duration: BEAT, iterations: Infinity, direction: 'alternate', easing: 'steps(3)' });
+    oculto(en(e, '.editar-i')); oculto(en(e, '.listo-i')); oculto(en(e, '.barrido-i')); oculto(cur); oculto(mazo);
+    en(e, '.sol').classList.add('a');
+    ritmo(vivo, (n) => {
+      late(en(e, '.dj'), [{ transform: 'translateY(0)' }, { transform: 'translateY(-12px)', offset: 0.4 }, { transform: 'none' }], { duration: BEAT * 0.9 });
+      late(en(e, '.sol'), [{ opacity: 1, transform: 'scale(1.12)' }, { opacity: 0.8, transform: 'none' }], { duration: BEAT * 0.9 });
+      if (n % 2 === 0) late(en(e, '.olas-foto'), [{ transform: 'translateX(-10px)' }, { transform: 'none' }], { duration: BEAT });
+    });
     await espera(900); if (!vivo()) return;
     if (!await teclear(t1, 'Un perezoso DJ con lentes', 34, vivo)) return;
     if (!await teclear(t2, 'oscuros, en la playa', 34, vivo)) return;
     await mover(cur, [900, 640], [330, 478], 650); if (!vivo()) return;
+    const B = proximo(4, 1);
+    if (!await aTiempo(B, vivo)) return;
     clic(e, cur, 330, 478);
     en(e, '.crear-i').animate([{ opacity: 1 }, { opacity: 0.7 }, { opacity: 1 }], { duration: 300 });
     A(cur, [{ opacity: 1 }, { opacity: 0 }], { duration: 300, delay: 300 });
-    // La imagen sale de golpe en golpe, tesela por tesela
-    const orden = teselas.map((t) => [Math.random() + (+t.getAttribute('x') - 560) / 720, t]).sort((a, b) => a[0] - b[0]);
-    orden.forEach(([, t], k) => A(t, [{ opacity: 1 }, { opacity: 0 }], { duration: 160, delay: 200 + (k / orden.length) * 1500, easing: 'steps(2)' }));
-    await espera(1800); if (!vivo()) return;
+    // Mientras se hace, el mosaico parpadea con cada tiempo
+    ritmo(() => vivo() && compas() < B + 4, (n) => teselas.forEach((t, k) => { if ((k + n) % 3 === 0) late(t, [{ fill: C.line }, { fill: C.p2 }], { duration: BEAT }); }));
+    const [px, py] = [740, 400];
+    const ok = await clavaEn(B + 4, mazo, px, py, 0.3, vivo, () => {
+      teselas.forEach((t) => {
+        const x = +t.getAttribute('x') + 18, y = +t.getAttribute('y') + 18, d = Math.hypot(x - px, y - py) || 1;
+        const f = azar(140, 260), dx = ((x - px) / d) * f, dy = ((y - py) / d) * f + azar(160, 320);
+        A(t, [{ opacity: 1, transform: 'none' }, { opacity: 1, transform: `translate(${dx * 0.4}px, ${dy * 0.15 - 40}px) rotate(${azar(-90, 90)}deg)`, offset: 0.35 }, { opacity: 0, transform: `translate(${dx}px, ${dy}px) rotate(${azar(-240, 240)}deg) scale(.5)` }], { duration: azar(700, 1000), delay: d * 0.7, easing: 'cubic-bezier(.2,.6,.5,1)' });
+      });
+      impacto(px, py, en(e, '.cuerpo'), 10);
+      estallido(px, py, C.amber2, 40, 8);
+      A(mazo, [{ opacity: 1 }, { opacity: 0 }], { duration: 250, delay: 300 });
+    });
+    if (!ok) return;
     confeti(740, 420, 40, -90, 140, [5, 11]);
-    aparece(en(e, '.editar-i'), { duration: 450 });
-    await espera(700); if (!vivo()) return;
-    await mover(cur, [330, 478], [428, 543], 600); if (!vivo()) return;
+    aparece(en(e, '.editar-i'), { duration: 450, delay: 300 });
+    if (!await aTiempo(B + 6, vivo)) return;
+    await mover(cur, [330, 478], [428, 543], BEAT * 1.6); if (!vivo()) return;
+    if (!await aTiempo(B + 8, vivo)) return;
     clic(e, cur, 428, 543);
     A(en(e, '.quitar-borde'), [{ stroke: C.amber }, { stroke: C.amber }], { duration: 1 });
     A(cur, [{ opacity: 1 }, { opacity: 0 }], { duration: 300, delay: 300 });
-    A(en(e, '.barrido-i'), [{ opacity: 1, transform: 'translateX(-40px)' }, { opacity: 1, transform: 'translateX(330px)', offset: 0.92 }, { opacity: 0, transform: 'translateX(360px)' }], { duration: 900, easing: 'cubic-bezier(.45,0,.55,1)' });
-    A(en(e, '.fondo-foto'), [{ opacity: 1 }, { opacity: 0 }], { duration: 800, delay: 100, easing: 'linear' });
-    await espera(950); if (!vivo()) return;
+    A(en(e, '.barrido-i'), [{ opacity: 1, transform: 'translateX(-40px)' }, { opacity: 1, transform: 'translateX(330px)', offset: 0.92 }, { opacity: 0, transform: 'translateX(360px)' }], { duration: BEAT * 2, easing: 'cubic-bezier(.45,0,.55,1)' });
+    A(en(e, '.fondo-foto'), [{ opacity: 1 }, { opacity: 0 }], { duration: BEAT * 1.8, delay: 100, easing: 'linear' });
+    if (!await aTiempo(B + 10, vivo)) return;
     salta(en(e, '.listo-i'), { duration: 500 });
     confeti(740, 560, 60, -90, 150, [6, 13]);
   },
-  // 4 · Motion Graphics: las palabras entran a golpes al ritmo, las capas giran y el preview pasa a render
+  // 4 · Motion Graphics: cada palabra entra en su tiempo, el fondo destella con el bombo y el cabezal recorre un
+  // compás de la pista por vuelta
   async (e, vivo) => {
     textos(e);
-    const pal = todos(e, '.palabra-mg'), checks = todos(e, '.check-mg');
+    const pal = todos(e, '.palabra-mg'), checks = todos(e, '.check-mg'), cabezal = en(e, '.cabezal-mg');
     pal.forEach(oculto);
     checks.forEach((c) => { oculto(c); oculto(en(c, '.tic')); });
     oculto(en(e, '.render-mg')); oculto(en(e, '.hecho-mg'));
     aparece(en(e, '.lado-mg'), { duration: 550, delay: 150 });
     todos(e, '.anillo').forEach((a, k) => A(a, [{ transform: 'rotate(0deg)' }, { transform: `rotate(${k ? -360 : 360}deg)` }], { duration: k ? 6000 : 9000, iterations: Infinity, easing: 'linear' }));
     todos(e, '.franja').forEach((f) => A(f, [{ transform: 'translateX(0)' }, { transform: 'translateX(90px)' }], { duration: BEAT * 4, iterations: Infinity, easing: 'linear' }));
-    todos(e, '.punto-mg').forEach((p, k) => A(p, [{ transform: 'scale(.6)' }, { transform: 'scale(1.3)' }], { duration: BEAT, delay: -k * 150, iterations: Infinity, direction: 'alternate', easing: 'steps(3)' }));
-    A(en(e, '.cabezal-mg'), [{ transform: 'translateX(0)' }, { transform: 'translateX(492px)' }], { duration: BEAT * 8, iterations: Infinity, easing: 'linear' });
-    // Las casillas de lo que trae, una por tiempo, y luego el render
-    (async () => {
-      await espera(900);
-      for (const c of checks) {
-        if (!vivo()) return;
-        aparece(c, { duration: 400 });
-        salta(en(c, '.tic'), { duration: 420, delay: 200 });
-        await espera(BEAT);
+    let previa = null, k = 0;
+    ritmo(vivo, (n) => {
+      late(en(e, '.flash-mg'), [{ opacity: n % 4 ? 0.06 : 0.12 }, { opacity: 0 }], { duration: BEAT * 0.7 });
+      todos(e, '.punto-mg').forEach((p, j) => { if ((n + j) % 2 === 0) late(p, [{ transform: 'scale(1.5)' }, { transform: 'none' }], { duration: BEAT * 0.7 }); });
+      if (n % 4 === 0) late(cabezal, [{ transform: 'translateX(0)' }, { transform: 'translateX(492px)' }], { duration: BEAT * 4, easing: 'linear' });
+      if (n % 2 === 0) {
+        if (previa) A(previa, [{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'translateY(-70px) scale(.8)' }], { duration: 220, easing: 'ease-in' });
+        const p = pal[k];
+        A(p, [{ opacity: 0, transform: 'scale(2.6) rotate(-10deg)' }, { opacity: 1, transform: 'scale(.92)', offset: 0.7 }, { opacity: 1, transform: 'none' }], { duration: 260, easing: 'cubic-bezier(.6,0,.9,.45)' });
+        setTimeout(() => { if (!vivo()) return; sacudir(en(e, '.capas-mg'), 6); const b = p.getBBox(); chispa(b.x, b.y + b.height / 2, C.amber2); chispa(b.x + b.width, b.y + b.height / 2, C.amber2); }, 240);
+        previa = p; k = (k + 1) % pal.length;
       }
-      if (!vivo()) return;
-      A(en(e, '.render-mg'), [{ opacity: 0 }, { opacity: 1 }], { duration: 250 });
-      A(en(e, '.barra-mg'), [{ transform: 'scaleX(0)' }, { transform: 'scaleX(1)' }], { duration: 1500, delay: 150, easing: 'cubic-bezier(.4,0,.6,1)' });
-      await espera(1750); if (!vivo()) return;
-      A(en(e, '.hecho-mg'), [{ opacity: 0, transform: 'scale(.94)' }, { opacity: 1, transform: 'none' }], { duration: 400, easing: REBOTE });
-      confeti(812, 560, 50, -90, 150, [6, 12]);
-    })();
-    await espera(700);
-    let previa = null;
-    for (let k = 0; vivo(); k = (k + 1) % pal.length) {
-      if (previa) A(previa, [{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'translateY(-70px) scale(.8)' }], { duration: 260, easing: 'ease-in' });
-      A(pal[k], [{ opacity: 0, transform: 'scale(2.6) rotate(-10deg)' }, { opacity: 1, transform: 'scale(.92)', offset: 0.7 }, { opacity: 1, transform: 'none' }], { duration: 320, easing: 'cubic-bezier(.6,0,.9,.45)' });
-      await espera(300); if (!vivo()) return;
-      sacudir(en(e, '.capas-mg'), 6);
-      const b = pal[k].getBBox();
-      chispa(b.x, b.y + b.height / 2, C.amber2); chispa(b.x + b.width, b.y + b.height / 2, C.amber2);
-      previa = pal[k];
-      await espera(BEAT * 2 - 300);
+    });
+    const B = proximo(4, 2);
+    for (const [j, c] of checks.entries()) {
+      if (!await aTiempo(B + j, vivo)) return;
+      aparece(c, { duration: 380 });
+      salta(en(c, '.tic'), { duration: 420, delay: 150 });
     }
+    if (!await aTiempo(B + 4, vivo)) return;
+    A(en(e, '.render-mg'), [{ opacity: 0 }, { opacity: 1 }], { duration: 250 });
+    A(en(e, '.barra-mg'), [{ transform: 'scaleX(0)' }, { transform: 'scaleX(1)' }], { duration: BEAT * 4, easing: 'steps(8)' });
+    if (!await aTiempo(B + 8, vivo)) return;
+    A(en(e, '.hecho-mg'), [{ opacity: 0, transform: 'scale(.94)' }, { opacity: 1, transform: 'none' }], { duration: 400, easing: REBOTE });
+    confeti(812, 560, 50, -90, 150, [6, 12]);
   },
-  // 5 · Dictado: el micrófono escucha, lo dicho entra palabra por palabra y espera a que lo mandes tú
+  // 5 · Dictado: el micrófono oye la canción (la onda salta con el bombo) y lo dicho entra palabra por palabra, a
+  // medio tiempo; al final espera a que lo mandes tú
   async (e, vivo) => {
     textos(e);
-    const renglones = todos(e, '.renglon-d'), caret = en(e, '.caret-d'), mic = en(e, '.boton-mic');
+    const renglones = todos(e, '.renglon-d'), caret = en(e, '.caret-d'), mic = en(e, '.boton-mic'), ondas = todos(e, '.onda-d'), anillos = todos(e, '.anillo-d');
     renglones.forEach((r) => (r.textContent = ''));
     aparece(en(e, '.compositor-d'), { duration: 550, delay: 80 });
     oculto(en(e, '.tip-d')); oculto(en(e, '.grabando')); oculto(en(e, '.ondas-d'));
-    A(caret, [{ opacity: 1 }, { opacity: 0 }], { duration: 900, iterations: Infinity, easing: 'steps(2)' });
-    await espera(1300); if (!vivo()) return;
+    A(caret, [{ opacity: 1 }, { opacity: 0 }], { duration: BEAT, iterations: Infinity, easing: 'steps(2)' });
+    mic.classList.add('a');
+    let oyendo = false;
+    ritmo(vivo, (n) => {
+      if (!oyendo) return;
+      late(anillos[((n % 3) + 3) % 3], [{ transform: 'scale(1)', opacity: 0.9 }, { transform: 'scale(2.1)', opacity: 0 }], { duration: BEAT * 1.6 });
+      ondas.forEach((o, k) => late(o, [{ transform: `scaleY(${(n % 4 ? 0.9 : 1.3) * (1 - Math.abs(k - 9.5) / 14) + azar(0, 0.3)})` }, { transform: 'scaleY(.25)' }], { duration: BEAT * 0.9, easing: 'cubic-bezier(.2,.9,.3,1)' }));
+      late(mic, [{ transform: 'scale(1.08)' }, { transform: 'none' }], { duration: BEAT * 0.5 });
+    });
+    const B = proximo(4, 2);
+    if (!await aTiempo(B - 1, vivo)) return;
     mic.animate([{ transform: 'scale(1)' }, { transform: 'scale(.85)' }, { transform: 'scale(1)' }], { duration: 260 });
     A(mic, [{ fill: C.p2, stroke: C.line }, { fill: '#3a1f19', stroke: C.bad }], { duration: 200 });
-    const anillos = todos(e, '.anillo-d').map((a, k) => A(a, [{ transform: 'scale(1)', opacity: 0.9 }, { transform: 'scale(1.9)', opacity: 0 }], { duration: BEAT * 2, delay: k * BEAT, iterations: Infinity, easing: 'ease-out' }));
     A(en(e, '.grabando'), [{ opacity: 0 }, { opacity: 1 }], { duration: 250 });
     A(en(e, '.ondas-d'), [{ opacity: 0 }, { opacity: 1 }], { duration: 250 });
-    const ondas = todos(e, '.onda-d').map((o) => A(o, [{ transform: 'scaleY(.2)' }, { transform: `scaleY(${azar(0.5, 1.2).toFixed(2)})` }], { duration: azar(180, 380), iterations: Infinity, direction: 'alternate', easing: 'steps(3)' }));
+    oyendo = true;
     const t0 = performance.now(), reloj = en(e, '.reloj-d');
     const tic = setInterval(() => { if (!vivo()) return clearInterval(tic); reloj.textContent = `0:0${Math.min(9, Math.floor((performance.now() - t0) / 1000))}`; }, 250);
-    // Cada palabra sale primero gris (lo que aún se corrige) y luego blanca
+    // Cada palabra sale primero gris (lo que aún se corrige) y al cuarto de tiempo se queda blanca
     const pinta = (r, finales, parcial) => {
       r.textContent = '';
       if (finales.length) el('tspan', { fill: C.text }, r).textContent = finales.join(' ') + (parcial ? ' ' : '');
@@ -1292,143 +1628,202 @@ const guiones = [
       const b = r.getBBox();
       caret.setAttribute('x', (b.width ? b.x + b.width + 4 : 196).toFixed(1)); caret.setAttribute('y', +r.getAttribute('y') - 22);
     };
+    let paso = 0;
     for (let k = 0; k < DICHO.length; k++) {
-      for (let i = 0; i < DICHO[k].length; i++) {
+      for (let i = 0; i < DICHO[k].length; i++, paso++) {
+        if (!await aTiempo(B + paso * 0.5, vivo)) return;
         pinta(renglones[k], DICHO[k].slice(0, i), DICHO[k][i]);
-        await espera(150); if (!vivo()) return;
+        if (!await aTiempo(B + paso * 0.5 + 0.25, vivo)) return;
         pinta(renglones[k], DICHO[k].slice(0, i + 1), '');
-        await espera(120); if (!vivo()) return;
       }
     }
-    await espera(500); if (!vivo()) return;
+    const fin = proximo(4, 1);
+    if (!await aTiempo(fin, vivo)) return;
     clearInterval(tic);
-    anillos.forEach((a) => a.cancel()); ondas.forEach((o) => o.cancel());
+    oyendo = false;
     A(mic, [{ fill: '#3a1f19', stroke: C.bad }, { fill: C.p2, stroke: C.line }], { duration: 300 });
     A(en(e, '.grabando'), [{ opacity: 1 }, { opacity: 0 }], { duration: 300 });
     A(en(e, '.ondas-d'), [{ opacity: 1 }, { opacity: 0 }], { duration: 300 });
     A(en(e, '.enviar-d'), [{ fillOpacity: 0.45 }, { fillOpacity: 1 }], { duration: 300 });
-    en(e, '.enviar-d').animate([{ transform: 'scale(1)' }, { transform: 'scale(1.15)' }, { transform: 'scale(1)' }], { duration: 400, delay: 200 });
+    en(e, '.enviar-d').classList.add('a');
+    ritmo(vivo, () => late(en(e, '.enviar-d'), [{ transform: 'scale(1.14)' }, { transform: 'none' }], { duration: BEAT * 0.6 }));
     aparece(en(e, '.tip-d'), { duration: 500, delay: 250 });
-    await espera(500); if (!vivo()) return;
     confeti(540, 540, 60, -90, 150, [6, 12]);
   },
-  // 6 · Voces: cada llave se escribe y queda conectada, y sus voces entran al menú; la elegida suena
+  // 6 · Voces: cada llave se escribe y queda conectada en su tiempo, sus voces entran al menú una por tiempo, y la
+  // elegida cambia en cada compás mientras su onda salta con el bombo
   async (e, vivo) => {
     textos(e);
-    const llaves = todos(e, '.llave-v'), grupos = todos(e, '.grupo-v'), filas = todos(e, '.fila-v'), sel = en(e, '.sel-v');
+    const llaves = todos(e, '.llave-v'), grupos = todos(e, '.grupo-v'), filas = todos(e, '.fila-v'), sel = en(e, '.sel-v'), ondas = todos(e, '.onda-v');
     llaves.forEach((l, k) => { aparece(l, { duration: 500, delay: 100 + k * 150 }); oculto(en(l, '.conectada')); en(l, '.llave-txt').textContent = ''; });
     aparece(en(e, '.menu-v'), { duration: 500, delay: 250 });
-    grupos.forEach(oculto); oculto(sel); oculto(en(e, '.ondas-v'));
-    await espera(1100); if (!vivo()) return;
+    grupos.forEach(oculto); filas.forEach(oculto); oculto(sel); oculto(en(e, '.ondas-v'));
+    let suena = false;
+    ritmo(vivo, (n) => {
+      if (!suena) return;
+      ondas.forEach((o, k) => late(o, [{ transform: `scaleY(${(n % 4 ? 0.9 : 1.25) * (0.5 + 0.5 * Math.sin(k * 0.7 + n)) + 0.3})` }, { transform: 'scaleY(.3)' }], { duration: BEAT * 0.9, easing: 'cubic-bezier(.2,.9,.3,1)' }));
+    });
+    const B = proximo(4, 3);
     for (const [k, l] of llaves.entries()) {
+      if (!await aTiempo(B + k * 4 - 2, vivo)) return;
       if (!await teclear(en(l, '.llave-txt'), '••••••••••••••••••••', 40, vivo)) return;
+      if (!await aTiempo(B + k * 4, vivo)) return;
       salta(en(l, '.conectada'), { duration: 420 });
       A(en(l, '.llave-borde'), [{ stroke: C.ok }, { stroke: C.line }], { duration: 900 });
-      const g = grupos[k];
-      A(g, [{ opacity: 0, transform: 'translateY(16px)' }, { opacity: 1, transform: 'none' }], { duration: 450, delay: 150, easing: REBOTE });
       const [x, y] = aLienzo(en(l, '.conectada'));
       confeti(x, y, 20, -90, 130, [3, 8]);
-      await espera(BEAT); if (!vivo()) return;
+      A(grupos[k], [{ opacity: 0 }, { opacity: 1 }], { duration: 200 });
+      for (const [j, f] of todos(grupos[k], '.fila-v').entries()) {
+        if (!await aTiempo(B + k * 4 + 1 + j, vivo)) return;
+        A(f, [{ opacity: 0, transform: 'translateX(30px)' }, { opacity: 1, transform: 'none' }], { duration: 320, easing: REBOTE });
+      }
     }
-    // La voz elegida va de una en una y suena
     A(en(e, '.ondas-v'), [{ opacity: 0 }, { opacity: 1 }], { duration: 300 });
-    todos(e, '.onda-v').forEach((o, k) => A(o, [{ transform: 'scaleY(.2)' }, { transform: `scaleY(${azar(0.5, 1.3).toFixed(2)})` }], { duration: azar(200, 420), delay: -k * 40, iterations: Infinity, direction: 'alternate', easing: 'steps(3)' }));
+    suena = true;
     let antes = null;
-    for (let k = 0; vivo(); k = (k + 1) % filas.length) {
+    for (let k = 0, n = proximo(4, 1); vivo(); k = (k + 1) % filas.length, n += 4) {
+      if (!await aTiempo(n, vivo)) return;
       const y = +filas[k].dataset.y;
-      A(sel, [{ opacity: 1, transform: `translateY(${antes ?? y}px)` }, { opacity: 1, transform: `translateY(${y}px)` }], { duration: 380, easing: REBOTE });
+      A(sel, [{ opacity: 1, transform: `translateY(${antes ?? y}px)` }, { opacity: 1, transform: `translateY(${y}px)` }], { duration: 320, easing: REBOTE });
       antes = y;
-      await espera(BEAT * 2);
     }
   },
-  // 7 · Cuentas y actividad: una cuenta llega al límite, el hilo sigue con otra y la gráfica se dibuja
+  // 7 · Cuentas y actividad: la cuenta se llena a saltos, el martillo le pega al límite y sale volando, entra la otra
+  // y el hilo sigue; la gráfica se dibuja a tiempo
   async (e, vivo) => {
     textos(e);
-    const burbujas = todos(e, '.burbuja');
-    burbujas.forEach(oculto);
+    const burbujas = todos(e, '.burbuja'), mazo = en(e, '.mazo-chico');
+    burbujas.forEach(oculto); oculto(mazo);
     aparece(en(e, '.hilo-c'), { duration: 500, delay: 80 });
     aparece(en(e, '.actividad-c'), { duration: 500, delay: 250 });
     oculto(en(e, '.cuenta-2')); oculto(en(e, '.limite-c'));
     A(en(e, '.uso-c'), [{ transform: 'scaleX(.2)' }, { transform: 'scaleX(.2)' }], { duration: 1 });
     A(en(e, '.linea-act'), [{ strokeDashoffset: 1 }, { strokeDashoffset: 1 }], { duration: 1 });
     oculto(en(e, '.area-act')); oculto(en(e, '.punto-act'));
-    // La actividad: las cifras suben y la línea se dibuja
+    en(e, '.cuenta-1').classList.add('a');
+    const B = proximo(4, 2);
+    // La actividad: las cifras suben y la línea se dibuja en dos compases, a saltos
     (async () => {
-      await espera(700); if (!vivo()) return;
+      if (!await aTiempo(B, vivo)) return;
       todos(e, '.cifra-c').forEach((t) => {
         const n = +t.dataset.n, suf = t.dataset.suf;
-        tween(1600, (p) => (t.textContent = (n % 1 ? (n * p).toFixed(1).replace('.', ',') : Math.round(n * p).toLocaleString('es-MX')) + suf), vivo);
+        tween(BEAT * 8, (p) => (t.textContent = (n % 1 ? (n * p).toFixed(1).replace('.', ',') : Math.round(n * p).toLocaleString('es-MX')) + suf), vivo);
       });
-      A(en(e, '.linea-act'), [{ strokeDashoffset: 1 }, { strokeDashoffset: 0 }], { duration: 1800, easing: 'cubic-bezier(.4,0,.2,1)' });
-      A(en(e, '.area-act'), [{ opacity: 0 }, { opacity: 1 }], { duration: 900, delay: 900 });
-      await espera(1800); if (!vivo()) return;
+      A(en(e, '.linea-act'), [{ strokeDashoffset: 1 }, { strokeDashoffset: 0 }], { duration: BEAT * 8, easing: 'steps(16)' });
+      A(en(e, '.area-act'), [{ opacity: 0 }, { opacity: 1 }], { duration: BEAT * 4, delay: BEAT * 4 });
+      if (!await aTiempo(B + 8, vivo)) return;
       salta(en(e, '.punto-act'), { duration: 400 });
-      A(en(e, '.punto-act'), [{ transform: 'scale(1)' }, { transform: 'scale(1.45)' }], { duration: BEAT, delay: 400, iterations: Infinity, direction: 'alternate', easing: 'steps(3)' });
+      ritmo(vivo, () => late(en(e, '.punto-act'), [{ transform: 'scale(1.5)' }, { transform: 'none' }], { duration: BEAT * 0.7 }));
     })();
-    await espera(900); if (!vivo()) return;
-    for (const b of burbujas.slice(0, 3)) {
-      A(b, [{ opacity: 0, transform: 'translateY(12px)' }, { opacity: 1, transform: 'none' }], { duration: 380, easing: REBOTE });
-      await espera(BEAT * 0.75); if (!vivo()) return;
+    for (const [k, b] of burbujas.slice(0, 3).entries()) {
+      if (!await aTiempo(B + k, vivo)) return;
+      A(b, [{ opacity: 0, transform: 'translateY(12px)' }, { opacity: 1, transform: 'none' }], { duration: 320, easing: REBOTE });
     }
-    A(en(e, '.uso-c'), [{ transform: 'scaleX(.2)', fill: C.amber }, { transform: 'scaleX(.85)', fill: C.amber, offset: 0.7 }, { transform: 'scaleX(1)', fill: C.bad }], { duration: 1300, easing: 'ease-in' });
-    await espera(1300); if (!vivo()) return;
-    salta(en(e, '.limite-c'), { duration: 400 });
-    sacudir(en(e, '.cuenta-1'), 8);
-    await espera(BEAT * 1.5); if (!vivo()) return;
-    A(en(e, '.cuenta-1'), [{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'translateX(-380px)' }], { duration: 420, easing: 'cubic-bezier(.5,0,.8,.3)' });
-    A(en(e, '.cuenta-2'), [{ opacity: 0, transform: 'translateX(380px)' }, { opacity: 1, transform: 'none' }], { duration: 520, delay: 220, easing: REBOTE });
-    A(en(e, '.uso-c2'), [{ transform: 'scaleX(0)' }, { transform: 'scaleX(.14)' }], { duration: 600, delay: 600 });
-    await espera(800); if (!vivo()) return;
+    // La barra se llena a saltos, uno por tiempo, y se pone roja
+    if (!await aTiempo(B + 3, vivo)) return;
+    A(en(e, '.uso-c'), [{ transform: 'scaleX(.2)', fill: C.amber }, { transform: 'scaleX(.9)', fill: C.amber, offset: 0.75 }, { transform: 'scaleX(1)', fill: C.bad }], { duration: BEAT * 4, easing: 'steps(4)' });
+    if (!await aTiempo(B + 7, vivo)) return;
+    salta(en(e, '.limite-c'), { duration: 380 });
+    const ok = await clavaEn(B + 8, mazo, 420, 548, 0.2, vivo, () => {
+      todos(e, '.grieta-c').forEach((g) => A(g, [{ strokeDashoffset: 1 }, { strokeDashoffset: 0 }], { duration: 120 }));
+      impacto(420, 548, en(e, '.cuenta-1'), 8);
+      estallido(420, 548, C.bad, 26, 6);
+    });
+    if (!ok) return;
+    A(mazo, [{ opacity: 1 }, { opacity: 0 }], { duration: 250, delay: 200 });
+    if (!await aTiempo(B + 9, vivo)) return;
+    A(en(e, '.cuenta-1'), [{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'translate(-420px, 80px) rotate(-38deg)' }], { duration: 520, easing: 'cubic-bezier(.5,0,.8,.3)' });
+    A(en(e, '.cuenta-2'), [{ opacity: 0, transform: 'translateX(380px)' }, { opacity: 1, transform: 'none' }], { duration: 420, delay: 120, easing: REBOTE });
+    A(en(e, '.uso-c2'), [{ transform: 'scaleX(0)' }, { transform: 'scaleX(.14)' }], { duration: 600, delay: 500 });
     confeti(320, 560, 40, -90, 140, [5, 11]);
-    for (const b of burbujas.slice(3)) {
-      A(b, [{ opacity: 0, transform: 'translateY(12px)' }, { opacity: 1, transform: 'none' }], { duration: 380, easing: REBOTE });
-      await espera(BEAT * 0.75); if (!vivo()) return;
+    for (const [k, b] of burbujas.slice(3).entries()) {
+      if (!await aTiempo(B + 10 + k, vivo)) return;
+      A(b, [{ opacity: 0, transform: 'translateY(12px)' }, { opacity: 1, transform: 'none' }], { duration: 320, easing: REBOTE });
     }
   },
-  // 8 · Cristal: el cursor cambia de tema y la ventana pasa de ámbar a vidrio, y de vuelta
+  // 8 · Cristal: el martillo estrella la ventana ámbar justo en «Cristal», se cuartea, al siguiente tiempo cae en
+  // pedazos y debajo queda la de vidrio; dos compases después «Sloth» la vuelve a armar, y otra vez
   async (e, vivo) => {
     textos(e);
-    const cur = en(e, '.cursor'), cristal = en(e, '.ventana-cristal'), barrido = en(e, '.barrido-c');
-    A(en(e, '.ventana-sloth'), [{ opacity: 0, transform: 'translateY(30px)' }, { opacity: 1, transform: 'none' }], { duration: 600, delay: 80, easing: REBOTE });
-    oculto(cristal); oculto(barrido); oculto(cur);
-    await espera(1300); if (!vivo()) return;
-    await mover(cur, [900, 640], [832, 400], 700); if (!vivo()) return;
-    for (let aCristal = true; vivo(); aCristal = !aCristal) {
-      clic(e, cur, aCristal ? 832 : 739, 400);
-      A(barrido, [{ opacity: 1, transform: 'translateX(-90px)' }, { opacity: 1, transform: 'translateX(740px)', offset: 0.92 }, { opacity: 0, transform: 'translateX(760px)' }], { duration: 650, easing: 'cubic-bezier(.45,0,.55,1)' });
-      A(cristal, [{ opacity: aCristal ? 0 : 1 }, { opacity: aCristal ? 1 : 0 }], { duration: 420, delay: 120 });
-      if (aCristal) confeti(540, 420, 50, -90, 150, [6, 12]);
-      await espera(BEAT * 5); if (!vivo()) return;
-      await mover(cur, aCristal ? [832, 400] : [739, 400], aCristal ? [739, 400] : [832, 400], 450); if (!vivo()) return;
+    const cur = en(e, '.cursor'), cristal = en(e, '.ventana-cristal'), sloth = en(e, '.ventana-sloth'), piezas = todos(e, '.trozo'), grietas = todos(e, '.grieta-v'), mazo = en(e, '.mazo-chico');
+    const [px, py] = GOLPE_V;
+    A(sloth, [{ opacity: 0, transform: 'translateY(30px)' }, { opacity: 1, transform: 'none' }], { duration: 600, delay: 80, easing: REBOTE });
+    oculto(cristal); oculto(cur); oculto(mazo);
+    piezas.forEach(oculto);
+    grietas.forEach((g) => A(g, [{ strokeDashoffset: 1 }, { strokeDashoffset: 1 }], { duration: 1 }));
+    await mover(cur, [900, 640], [px, py], 700); if (!vivo()) return;
+    for (let n = proximo(4, 2); vivo(); n += 16) {
+      const ok = await clavaEn(n, mazo, px, py - 8, 0.3, vivo, () => {
+        clic(e, cur, px, py);
+        A(cur, [{ opacity: 1 }, { opacity: 0 }], { duration: 200 });
+        A(sloth, [{ opacity: 0 }, { opacity: 0 }], { duration: 1 });
+        A(cristal, [{ opacity: 1 }, { opacity: 1 }], { duration: 1 });
+        piezas.forEach((p) => A(p, [{ opacity: 1, transform: 'none' }, { opacity: 1, transform: 'none' }], { duration: 1 }));
+        grietas.forEach((g, k) => A(g, [{ strokeDashoffset: 1, opacity: 1 }, { strokeDashoffset: 0, opacity: 1 }], { duration: 160, delay: k * 6, easing: 'ease-out' }));
+        impacto(px, py, en(e, '.cuerpo'), 11);
+        estallido(px, py, C.crema, 46, 8);
+        A(mazo, [{ opacity: 1 }, { opacity: 0 }], { duration: 250, delay: 250 });
+      });
+      if (!ok) return;
+      // Al siguiente tiempo se cae: cada pedazo brinca, gira y se va, los de cerca del golpe primero
+      if (!await aTiempo(n + 1, vivo)) return;
+      piezas.forEach((p) => {
+        const cx = +p.dataset.cx, cy = +p.dataset.cy, d = Math.hypot(cx - px, cy - py);
+        A(p, [{ opacity: 1, transform: 'none' }, { opacity: 1, transform: `translate(${(cx - px) * 0.08}px, -14px) rotate(${azar(-8, 8)}deg)`, offset: 0.2 }, { opacity: 0, transform: `translate(${(cx - px) * 0.4 + azar(-40, 40)}px, ${azar(380, 560)}px) rotate(${azar(-70, 70)}deg) scale(.85)` }], { duration: azar(800, 1100), delay: d * 0.5, easing: 'cubic-bezier(.5,0,.9,.6)' });
+      });
+      grietas.forEach((g) => A(g, [{ strokeDashoffset: 0, opacity: 1 }, { strokeDashoffset: 0, opacity: 0 }], { duration: 300 }));
+      confeti(540, 300, 50, -90, 150, [6, 12]);
+      // Dos compases después, «Sloth»: los pedazos regresan a su lugar y la ventana ámbar vuelve
+      if (!await aTiempo(n + 7, vivo)) return;
+      await mover(cur, [px, py + 60], [739, 400], 450); if (!vivo()) return;
+      if (!await aTiempo(n + 8, vivo)) return;
+      clic(e, cur, 739, 400);
+      piezas.forEach((p) => {
+        const cx = +p.dataset.cx, cy = +p.dataset.cy, d = Math.hypot(cx - px, cy - py);
+        A(p, [{ opacity: 0, transform: `translate(${(cx - px) * 0.4}px, 460px) rotate(${azar(-70, 70)}deg) scale(.85)` }, { opacity: 1, transform: 'none' }], { duration: BEAT * 1.4, delay: Math.max(0, 600 - d) * 0.4, easing: 'cubic-bezier(.2,.9,.3,1)' });
+      });
+      if (!await aTiempo(n + 10, vivo)) return;
+      A(sloth, [{ opacity: 1 }, { opacity: 1 }], { duration: 1 });
+      A(cristal, [{ opacity: 0 }, { opacity: 0 }], { duration: 1 });
+      piezas.forEach((p) => A(p, [{ opacity: 0 }, { opacity: 0 }], { duration: 1 }));
+      await mover(cur, [739, 400], [px, py], 500);
     }
   },
-  // 9 · Y además: los renglones entran y el martillo los clava, uno por tiempo
+  // 9 · Y además: los renglones entran y el martillo los clava, uno por tiempo; ya clavados, brillan en su tiempo
   async (e, vivo) => {
     textos(e);
     const filas = todos(e, '.fila'), mazo = en(e, '.mazo-chico');
     oculto(mazo);
     filas.forEach((f, k) => A(f, [{ opacity: 0, transform: 'translateX(-40px)' }, { opacity: 1, transform: 'none' }], { duration: 500, delay: 100 + k * 80 }));
-    await espera(1000 + filas.length * 80); if (!vivo()) return;
-    for (const f of filas) {
-      const y = +f.dataset.y, pega = martillazo(mazo, 157, y - 11, 0.16);
-      await espera(pega); if (!vivo()) return;
-      en(f, '.icono').animate([{ transform: 'scale(1.3, .45)' }, { transform: 'scale(.9, 1.2)' }, { transform: 'none' }], { duration: 360, easing: 'ease-out' });
-      polvo(157, y + 12, 8, 14, [3, 8]);
-      sacudir(f, 4);
-      A(en(f, '.fila-borde'), [{ stroke: C.amber }, { stroke: C.line }], { duration: 700 });
-      chispa(157, y, C.amber2); chispa(157, y, C.amber2);
-      await espera(BEAT - pega); if (!vivo()) return;
+    const B = proximo(4, 3);
+    for (const [k, f] of filas.entries()) {
+      const y = +f.dataset.y;
+      const ok = await clavaEn(B + k, mazo, 157, y - 11, 0.16, vivo, () => {
+        en(f, '.icono').animate([{ transform: 'scale(1.3, .45)' }, { transform: 'scale(.9, 1.2)' }, { transform: 'none' }], { duration: 360, easing: 'ease-out' });
+        impacto(157, y, f, 4);
+        A(en(f, '.fila-borde'), [{ stroke: C.amber }, { stroke: C.line }], { duration: 700 });
+      });
+      if (!ok) return;
     }
     A(mazo, [{ opacity: 1 }, { opacity: 0 }], { duration: 300 });
     confeti(540, 650, 90, -90, 120, [10, 18]);
+    ritmo(vivo, (n) => late(en(filas[((n % filas.length) + filas.length) % filas.length], '.fila-borde'), [{ stroke: C.amber }, { stroke: C.line }], { duration: BEAT * 1.2 }));
   },
-  // 10 · A crear: el mismo perreo y las letras caen al ritmo
+  // 10 · A crear: el mismo perreo; las letras caen a medio tiempo desde el siguiente compás y el neón explota
   async (e, vivo) => {
-    concierto(e);
-    const letras = todos(en(e, '.neon'), '.letra');
-    letras.forEach((l, k) => A(l, [{ opacity: 0, transform: 'scale(2.6) rotate(-10deg)' }, { opacity: 1, transform: 'scale(.9)', offset: 0.7 }, { opacity: 1, transform: 'none' }], { duration: 300, delay: 1300 + k * (BEAT / 4), easing: 'cubic-bezier(.6,0,.9,.45)' }));
-    todos(e, '.linea').forEach((l, k) => aparece(l, { delay: 1300 + letras.length * (BEAT / 4) + 300 + k * 150 }));
-    await espera(1300 + letras.length * (BEAT / 4) + 200); if (!vivo()) return;
+    arranque(e);
+    A(en(e, '.apagon'), [{ opacity: 0 }, { opacity: 0 }], { duration: 1 });
+    fiesta(e, vivo, esCorte);
+    laseres(e);
+    const letras = todos(en(e, '.neon'), '.letra'), lineas = todos(e, '.linea');
+    letras.forEach(oculto); lineas.forEach(oculto);
+    const B = proximo(4, 2);
+    for (const [k, l] of letras.entries()) {
+      if (!await aTiempo(B + k * 0.5, vivo)) return;
+      A(l, [{ opacity: 0, transform: 'scale(2.6) rotate(-10deg)' }, { opacity: 1, transform: 'scale(.9)', offset: 0.7 }, { opacity: 1, transform: 'none' }], { duration: 260, easing: 'cubic-bezier(.6,0,.9,.45)' });
+    }
+    for (const [k, l] of lineas.entries()) { if (!await aTiempo(B + 5 + k, vivo)) return; aparece(l); }
+    if (!await aTiempo(B + 8, vivo)) return;
     explota(e, en(e, '.neon'));
     sigueLaFiesta(vivo);
   },
@@ -1451,21 +1846,21 @@ function pulsar() {
   pulso = sigBtn.animate([{ boxShadow: '0 0 0 0 rgba(232, 163, 61, .6)' }, { boxShadow: '0 0 0 16px rgba(232, 163, 61, 0)' }], { duration: 1400, iterations: Infinity });
 }
 // La canción: arranca con el perreo (el reproductor oficial de YouTube, que se carga hasta entonces), sigue en las
-// novedades en chiquito y se quita con «Terminar» (el final). Dentro de Sloth suena sola (Electron deja reproducir sin
+// novedades en chiquito y sigue en el final, que es la misma fiesta; se calla al cerrar la guía. Dentro de Sloth suena sola (Electron deja reproducir sin
 // clic); en un navegador, que no deja sonar nada sin un clic, espera y arranca con el primer clic o tecla.
 const YT_ID = 'NEJ3bnieiIU'; // MARTILLAZO - Dani Flow, Uzielito Mix & El Bogueto (Official Video), del canal de Dani Flow
-const YT_DESDE = 17; // El segundo donde arranca la fiesta: un respiro y, a los 19 s, entra la base (cuando cae el primer martillazo)
+const YT_DESDE = 17; // El segundo donde arranca: el corte de la entrada y, a los 19,2 s, la base (el primer martillazo)
 const sonando = document.getElementById('sonando'), yt = document.getElementById('yt'), baile = document.getElementById('baile');
 const ordenar = (func) => yt.contentWindow?.postMessage(JSON.stringify({ event: 'command', func, args: [] }), '*');
 // Sin este saludo, el reproductor no siempre atiende las órdenes de la página.
 yt.addEventListener('load', () => yt.contentWindow.postMessage(JSON.stringify({ event: 'listening', id: 1, channel: 'widget' }), '*'));
 const darSonido = () => {
   removeEventListener('pointerdown', darSonido, true); removeEventListener('keydown', darSonido, true);
-  if (yt.src && actual < FIN) ordenar('playVideo');
+  if (yt.src) ordenar('playVideo');
 };
 if (!enSloth) { addEventListener('pointerdown', darSonido, true); addEventListener('keydown', darSonido, true); }
 function musica(i) {
-  const suena = i < FIN;
+  const suena = true;
   for (const el of [sonando, baile]) {
     el.classList.toggle('fuera', !suena);
     el.classList.toggle('mini', i >= 1 && i < FIN);
