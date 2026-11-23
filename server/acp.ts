@@ -8,7 +8,7 @@ import { RpcLineas } from './rpc-lineas.ts'
 
 /**
  * Los agentes que hablan ACP (Agent Client Protocol) por stdio: Grok (`grok agent stdio`), Antigravity (el servidor ACP
- * de Google) y Gemini CLI (`gemini --acp`). Como lo hace T3 Code (`packages/provider-acp`), pero solo lo que usa Sloth:
+ * de Google), Gemini CLI (`gemini --acp`) y omp (`omp acp`). Como lo hace T3 Code (`packages/provider-acp`), pero solo lo que usa Sloth:
  * sin permisos (se acepta cada herramienta, como con los demás agentes), sin terminal ni escritura de archivos del lado
  * de Sloth (el agente las hace él mismo) y un proceso por hilo, salvo los `compartido`: uno para todos sus hilos, cada
  * uno en su sesión.
@@ -239,6 +239,13 @@ export function startAcp(sabor: SaborAcp, opts: AgentOptions): AgentRun {
   let pendiente: { text: string; images: string[] }[] = []
   let tokens = CERO
   let costo = 0
+  /**
+   * El costo que dice `usage_update` (omp) es el de toda la sesión: al turno va lo que creció (`costoSesion`). De una sesión
+   * retomada no se sabe lo de antes hasta su primer aviso (`undefined`), y ese turno va sin costo antes que con el de toda la
+   * sesión.
+   */
+  let gastado: number | undefined = 0
+  let costoSesion = 0
   /** Lo que escribió desde su última herramienta: un error de `errorDe` es todo su último mensaje. */
   let ultimo = ''
   let mudez: ReturnType<typeof setTimeout> | undefined
@@ -247,9 +254,11 @@ export function startAcp(sabor: SaborAcp, opts: AgentOptions): AgentRun {
     if (!busy) return
     busy = false
     clearTimeout(mudez)
-    emit({ t: 'turn_end', at: Date.now(), ok, error, tokens, ...(costo ? { costUsd: costo } : {}), ...extra })
+    const usd = costoSesion || costo
+    emit({ t: 'turn_end', at: Date.now(), ok, error, tokens, ...(usd ? { costUsd: usd } : {}), ...extra })
     tokens = CERO
     costo = 0
+    costoSesion = 0
   }
 
   /** Cierra el turno con lo que diga `errorDe`, si su último mensaje es un error. */
@@ -328,11 +337,15 @@ export function startAcp(sabor: SaborAcp, opts: AgentOptions): AgentRun {
           ventana = u.size
           if (!sabor.contextoOpaco) emit({ t: 'context', used: u.used, max: u.size })
         }
+        if (u.cost?.currency === 'USD' && typeof u.cost.amount === 'number') {
+          if (gastado !== undefined) costoSesion += Math.max(0, u.cost.amount - gastado)
+          gastado = u.cost.amount
+        }
         return
     }
   }
 
-  /** Los tokens y el costo de un turno, como los dan Grok y Gemini (que cuenta aparte lo que piensa). */
+  /** Los tokens y el costo de un turno, como los dan Grok, Gemini (que cuenta aparte lo que piensa) y omp. */
   function contar(u: any) {
     if (!u) return
     const cache = (u.cachedReadTokens ?? 0) + (u.cacheCreationTokens ?? 0)
@@ -399,6 +412,7 @@ export function startAcp(sabor: SaborAcp, opts: AgentOptions): AgentRun {
           () => void c.sesiones.delete(opts.resume!)
         )
         cargando = false
+        if (abierta) gastado = undefined
       }
     }
     if (!abierta) {

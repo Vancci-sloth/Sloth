@@ -834,7 +834,7 @@ export function CuentaOpenCode({ aviso = false, onFalta }: { aviso?: boolean; on
 }
 
 /** Los agentes que llegaron después de Claude, Codex y OpenCode (`server/proveedores.ts`), en el orden de Opciones. */
-export const OTROS_AGENTES = ['deepseek', 'openrouter', 'freellmapi', 'grok', 'antigravity', 'gemini', 'cursor', 'muse', 'pi'] as const satisfies readonly Proveedor[]
+export const OTROS_AGENTES = ['deepseek', 'openrouter', 'freellmapi', 'grok', 'antigravity', 'gemini', 'cursor', 'muse', 'pi', 'omp'] as const satisfies readonly Proveedor[]
 type OtroAgente = (typeof OTROS_AGENTES)[number]
 
 /**
@@ -947,6 +947,19 @@ const OTROS: Record<OtroAgente, { titulo: string; logo: string; como: 'ventana' 
       <>
         En la ventana de Pi, elige tu proveedor y sigue sus pasos: se cierra sola al terminar. Pi también usa las llaves de API que tengas en las variables
         de tu usuario, pero no las que guardaste en Sloth, salvo que se lo elijas aquí.
+      </>
+    )
+  },
+  omp: {
+    titulo: 'omp · oh-my-pi',
+    logo: 'omp',
+    como: 'ventana',
+    beta: true,
+    texto: 'omp es Pi con más herramientas, y trabaja con el proveedor que conectes en él: tu plan de Claude, de ChatGPT o de Copilot, o una llave de API (DeepSeek, OpenRouter…).',
+    ayuda: (
+      <>
+        En la ventana de omp, elige tu proveedor y sigue sus pasos. Si ya tienes omp instalado, Sloth usa ese, con sus mismas cuentas. omp también usa las
+        llaves de API que tengas en las variables de tu usuario, pero no las que guardaste en Sloth.
       </>
     )
   }

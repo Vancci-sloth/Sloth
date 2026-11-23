@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
@@ -88,4 +88,25 @@ test('de Claude Code va el más nuevo: el de la app o el que se actualizó', () 
   assert.equal(rutaAgente('claude'), nueva)
   assert.equal(versionVisible('claude'), '2.99.0.0')
   rmSync(versiones, { recursive: true, force: true })
+})
+
+test('omp: el que se instala con Sloth abierta se ve sin reiniciar, y manda sobre el que bajaría Sloth', async () => {
+  const { buscarOmpDelSistema } = await import('./agentes.ts')
+  const bin = join(appdata, 'bin-omp')
+  mkdirSync(bin, { recursive: true })
+  const antes = process.env.PATH
+  process.env.PATH = [bin, antes].join(process.platform === 'win32' ? ';' : ':')
+  try {
+    const falso = join(bin, process.platform === 'win32' ? 'omp.exe' : 'omp')
+    assert.notEqual(await buscarOmpDelSistema(), falso)
+    // Uno que no arranca no cuenta; uno que dice su versión, sí (en Windows, el Node de las pruebas hace de omp).
+    writeFileSync(falso, 'no soy un programa', { mode: 0o755 })
+    assert.notEqual(await buscarOmpDelSistema(), falso)
+    if (process.platform === 'win32') copyFileSync(process.execPath, falso)
+    else writeFileSync(falso, '#!/bin/sh\necho omp/19.0.0\n', { mode: 0o755 })
+    assert.equal(await buscarOmpDelSistema(), falso)
+    assert.equal(rutaAgente('omp'), falso)
+  } finally {
+    process.env.PATH = antes
+  }
 })
