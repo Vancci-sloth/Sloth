@@ -69,7 +69,7 @@ async function pedir(ruta, datos) {
 function contar(t) {
   if (t.estado === 'lista') return `Lista: ${t.archivo} (${t.modelo}${t.resolucion ? ` en ${t.resolucion}` : ''}, ${t.creditos} créditos gastados${t.cuenta ? `, con ${t.cuenta}` : ''}, pedido ${t.id}).${t.quedan === undefined ? '' : ` Les quedan ${t.quedan} créditos a las cuentas.`}`
   if (t.estado === 'error') throw new Error(`No salió: ${t.error}`)
-  return `Sigue ${t.estado === 'en-fila' ? 'esperando su turno' : 'generándose'} (${t.modelo}). Llama a estado_flow con id "${t.id}" para esperarlo; mientras, sigue con lo que no lo necesita.`
+  return `Sigue ${t.estado === 'en-fila' ? 'esperando su turno' : 'generándose'} (${t.modelo}).${t.aviso ? ` ${t.aviso}` : ''} Llama a estado_flow con id "${t.id}" para esperarlo; mientras, sigue con lo que no lo necesita.`
 }
 
 const hora = (ms) => new Date(ms).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })

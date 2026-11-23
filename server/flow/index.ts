@@ -367,6 +367,7 @@ export function flow(app: string, google: Google, motores?: MotoresEstudio) {
     t.desde = ahora + ESPERAS_RED[n - 1]
     t.aviso = `La conexión con Flow va lenta (${mensaje(e)}). Sloth lo reintenta solo a las ${hora(t.desde)} (intento ${n + 1} de ${ESPERAS_RED.length + 1}), sin gastar créditos: no lo pidas otra vez.`
     t.estado = 'en-fila'
+    if (t.estudio) t.estudio.paso = 'turno'
     fila.unshift(t)
   }
 
