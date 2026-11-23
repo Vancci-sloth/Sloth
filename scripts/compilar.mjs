@@ -197,12 +197,54 @@ if (WINDOWS) {
   cpSync(join(NODE, 'node_modules', 'npm'), join(SALIDA, 'node', 'node_modules', 'npm'), { recursive: true })
 } else {
   // Como lo instala nodejs.org: bin/node y lib/node_modules/npm. Allí npm y npx son enlaces; aquí, dos guiones, que un
-  // enlace no llega igual al empaquetado.
+  // enlace no llega igual al empaquetado. El Node de Homebrew enlaza libnode.dylib y otras libs del Cellar: no viaja
+  // solo. Si es ese, bajamos el tarball oficial de la misma versión (un solo binario portable).
+  const destino = join(SALIDA, 'node')
   const NODE = dirname(dirname(process.execPath))
-  cpSync(process.execPath, join(SALIDA, 'node', 'bin', 'node'))
-  cpSync(join(NODE, 'lib', 'node_modules', 'npm'), join(SALIDA, 'node', 'lib', 'node_modules', 'npm'), { recursive: true })
+  const npmJunto = join(NODE, 'lib', 'node_modules', 'npm')
+  const brew =
+    !existsSync(npmJunto) ||
+    (() => {
+      try {
+        const libs = execFileSync('otool', ['-L', process.execPath], { encoding: 'utf8' })
+        return libs.includes('@rpath/libnode') || /\/opt\/homebrew\/|\/usr\/local\/opt\//.test(libs)
+      } catch {
+        return true
+      }
+    })()
+  if (brew) {
+    const ver = process.version.slice(1)
+    const arch = process.arch === 'arm64' ? 'arm64' : 'x64'
+    const nombre = `node-v${ver}-darwin-${arch}`
+    const cache = join(DIST, 'cache-node')
+    const tar = join(cache, `${nombre}.tar.gz`)
+    const extr = join(cache, nombre)
+    mkdirSync(cache, { recursive: true })
+    if (!existsSync(tar)) {
+      const url = `https://nodejs.org/dist/v${ver}/${nombre}.tar.gz`
+      console.log(`  Bajando Node oficial ${ver} (${arch})…`)
+      execFileSync('curl', ['-fsSL', '-o', tar, url], { stdio: 'inherit' })
+    }
+    rmSync(extr, { recursive: true, force: true })
+    execFileSync('tar', ['-xzf', tar, '-C', cache], { stdio: 'inherit' })
+    mkdirSync(join(destino, 'bin'), { recursive: true })
+    mkdirSync(join(destino, 'lib', 'node_modules'), { recursive: true })
+    cpSync(join(extr, 'bin', 'node'), join(destino, 'bin', 'node'))
+    cpSync(join(extr, 'lib', 'node_modules', 'npm'), join(destino, 'lib', 'node_modules', 'npm'), { recursive: true })
+    rmSync(extr, { recursive: true, force: true })
+  } else {
+    const npmGlobal = join(execFileSync('npm', ['prefix', '-g'], { encoding: 'utf8' }).trim(), 'lib', 'node_modules', 'npm')
+    const npm = existsSync(npmJunto) ? npmJunto : npmGlobal
+    if (!existsSync(npm)) throw new Error(`No encontré npm para empaquetar (ni en ${npmJunto} ni en ${npmGlobal}).`)
+    mkdirSync(join(destino, 'bin'), { recursive: true })
+    mkdirSync(join(destino, 'lib', 'node_modules'), { recursive: true })
+    cpSync(process.execPath, join(destino, 'bin', 'node'))
+    cpSync(npm, join(destino, 'lib', 'node_modules', 'npm'), { recursive: true })
+  }
+  // `.bin` con enlaces absolutos (Homebrew) hace fallar a electron-builder con EEXIST; la app solo usa npm-cli.js.
+  rmSync(join(destino, 'lib', 'node_modules', 'npm', 'node_modules', '.bin'), { recursive: true, force: true })
   for (const [f, cli] of [['npm', 'npm-cli.js'], ['npx', 'npx-cli.js']])
-    writeFileSync(join(SALIDA, 'node', 'bin', f), `#!/bin/sh\nd="$(dirname "$0")"\nexec "$d/node" "$d/../lib/node_modules/npm/bin/${cli}" "$@"\n`, { mode: 0o755 })
+    writeFileSync(join(destino, 'bin', f), `#!/bin/sh\nd="$(dirname "$0")"\nexec "$d/node" "$d/../lib/node_modules/npm/bin/${cli}" "$@"\n`, { mode: 0o755 })
 }
 
 paso('Armando la ventana')

@@ -1,0 +1,12 @@
+{
+  "nombre": "Sazón en Equilibrio",
+  "handle": "@sazonenequilibriope",
+  "canal": "https://www.youtube.com/@sazonenequilibriope",
+  "logo": "marca/logo.png",
+  "colores": {
+    "verde": "#173E32",
+    "crema": "#F0F0E0"
+  },
+  "voz": "elevenlabs:p18tR9wFA5Ng9WhfWI0o",
+  "cierre": "Sígueme para más recetas."
+}

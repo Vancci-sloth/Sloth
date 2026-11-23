@@ -237,12 +237,18 @@ async function confirmar(page: Page, texto: string, cuando: string) {
 
   const [fecha, hora] = cuando.split(' ')
   const etiqueta = `${Number(fecha.slice(8))} ${MESES3[Number(fecha.slice(5, 7)) - 1]}, ${hora.padStart(5, '0')}`
-  let fila = await buscar(page, texto, fecha)
-  if (!fila?.includes(etiqueta)) {
-    await page.reload({ waitUntil: 'domcontentloaded' })
-    fila = await buscar(page, texto, fecha)
+  const inicio = texto.trim().replace(/\s+/g, ' ').slice(0, 40)
+  const yaSale = async () => {
+    let fila = await buscar(page, texto, fecha)
+    if (fila?.includes(etiqueta) || (fila && horaDe(fila) === cuando)) return true
+    // TikTok a veces pone la hora en un nodo hermano del título: la página ya muestra gancho + etiqueta.
+    const cuerpo = (await page.evaluate(() => document.body.innerText.replace(/\s+/g, ' '))).slice(0, 20000)
+    return cuerpo.includes(inicio) && cuerpo.includes(etiqueta)
   }
-  if (!fila?.includes(etiqueta)) throw new Error(`En la lista de TikTok no sale programado para el ${etiqueta}.`)
+  if (await yaSale()) return
+  await page.reload({ waitUntil: 'domcontentloaded' })
+  await page.waitForTimeout(1500)
+  if (!(await yaSale())) throw new Error(`En la lista de TikTok no sale programado para el ${etiqueta}.`)
 }
 
 /**
@@ -258,8 +264,14 @@ async function buscar(page: Page, texto: string, hasta: string): Promise<string 
   for (let i = 0, quieto = 0; i < 150 && quieto < 4; i++) {
     const { fila, horas } = await page.evaluate(
       ({ inicio, re }) => {
-        const filas = [...document.querySelectorAll<HTMLElement>('div')].filter((d) => d.innerText?.includes(inicio) && d.innerText.length < 400)
-        const fila = filas.sort((a, b) => b.innerText.length - a.innerText.length)[0]?.innerText.replace(/\s+/g, ' ') ?? null
+        // Antes el tope era 400 y TikTok ya mete «21 nov, 12:00 (GMT-5) Lima» + privacidad: la fila real
+        // pasaba de 400 y Sloth solo veía el título, sin la hora, y fallaba al confirmar.
+        const filas = [...document.querySelectorAll<HTMLElement>('div')].filter(
+          (d) => d.innerText?.includes(inicio) && d.innerText.length < 1200 && d.innerText.length > inicio.length + 5
+        )
+        const conHora = filas.filter((d) => new RegExp(re).test(d.innerText))
+        const candidatas = conHora.length ? conHora : filas
+        const fila = candidatas.sort((a, b) => a.innerText.length - b.innerText.length)[0]?.innerText.replace(/\s+/g, ' ') ?? null
         return { fila, horas: [...document.body.innerText.matchAll(new RegExp(re, 'g'))].map((m) => m[0]) }
       },
       { inicio, re: HORA.source }

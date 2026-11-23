@@ -676,6 +676,47 @@
     ]
   },
   {
+    "id": "recetas-cocina",
+    "title": "Recetas de cocina",
+    "description": "Shorts de recetas con gancho fijo arriba, planos cenitales, subtítulos palabra a palabra y cierre «sígueme», con los colores y el logo de la marca. Narración con ElevenLabs Isabella.",
+    "skill": "recetas-cocina",
+    "version": "1.0",
+    "icon": "imagen",
+    "voz": false,
+    "etapas": [
+      {
+        "nombre": "Guion",
+        "listo": "guion.md",
+        "fase": "guion"
+      },
+      {
+        "nombre": "Voz",
+        "listo": "fuentes/voz/ai-studio.wav",
+        "fase": "sonido"
+      },
+      {
+        "nombre": "Imágenes",
+        "listo": "cuadros/*.{jpg,jpeg,png,webp}",
+        "fase": "video"
+      },
+      {
+        "nombre": "Revisión",
+        "listo": "revision/hoja.png",
+        "fase": "video"
+      },
+      {
+        "nombre": "Video",
+        "listo": "out/receta.mp4",
+        "fase": "video"
+      },
+      {
+        "nombre": "Portada",
+        "listo": "{portada.png,portada/*.png}",
+        "fase": "entrega"
+      }
+    ]
+  },
+  {
     "id": "nuevo-estilo",
     "title": "Nuevo estilo",
     "description": "Cuéntale el video que quieres hacer, o pásale ejemplos, y Sloth arma tu propio estilo con su card, listo para usarlo como los demás.",
