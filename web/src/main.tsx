@@ -3,6 +3,7 @@ import { enLaWeb } from './web'
 import { createRoot } from 'react-dom/client'
 import { VENTA } from '../../shared/venta'
 import { App } from './App'
+import { AvisoPaypal } from './AvisoPaypal'
 import { ConexionWeb } from './ConexionWeb'
 import { Recordatorio } from './Licencia'
 import { TraerSloth } from './Respaldo'
@@ -21,6 +22,8 @@ createRoot(document.getElementById('root')!).render(
     <App />
     <Movimiento />
     {VENTA && <Recordatorio />}
+    {/* A quien apoyó con PayPal, que Sloth ya no cobra: que cancele su suscripción allá. */}
+    {VENTA && <AvisoPaypal />}
     {/* Con la misma clave en otra computadora, ofrece traer lo de allá. */}
     <TraerSloth />
     {/* Desde la web, si se pierde la conexión con la computadora. */}

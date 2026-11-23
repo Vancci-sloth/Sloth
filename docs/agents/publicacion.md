@@ -197,7 +197,10 @@ gustes» (antes, $15 de Fundador y $30 de Donador PRO). A quien había pagado m�
 con `node scripts/bajar-apoyo.mjs 2026-11-14T02:40:00Z` (`licencias/src/bajar-apoyo.ts`), a 35 personas: las de Stripe
 bajaron a $10 con el cobro aplazado; las de Mercado Pago, a 199 MXN y en pausa, y el cron las reanuda ese día
 (`reanudar`). Las 11 de PayPal se cancelaron (`--cancelar-paypal`), con su folio y sus días: con la cuenta en revisión,
-PayPal no deja cambiarlas ni pausarlas (`USER_ACCOUNT_RESTRICTED`), y si quieren seguir apoyan otra vez. Si el apoyo
+PayPal no deja cambiarlas ni pausarlas (`USER_ACCOUNT_RESTRICTED`), y si quieren seguir apoyan otra vez. Desde el
+23 de noviembre, a quien apoyó con una suscripción de PayPal la licencia firmada le dice `cancelarPaypal`
+(`cancelarPaypal()` en `licencias/src/index.ts`): su app le pide en grande que la cancele en su PayPal
+(`web/src/AvisoPaypal.tsx`) y Opciones lo enseña como apoyo hasta su fecha, no como «Cancelado». Si el apoyo
 vuelve a bajar, se cambia el precio, se despliega y se corre igual con la fecha del cambio (`--probar` primero).
 
 Desde el 18 de noviembre de 2026 ese precio es una escalera (`licencias/src/escalera.ts`, migración 0032): por cada 50

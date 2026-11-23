@@ -24,3 +24,21 @@
 
 /* Abajo de la barra lateral: el botón de la versión nueva (Actualizar.tsx). */
 .pie button.aviso-sloth { color: var(--amber); }
+
+/* El aviso de emergencia a quien apoyó con PayPal (AvisoPaypal.tsx): grande, encima de todo. */
+.modal-backdrop.aviso-paypal-fondo { z-index: 1000; }
+.modal.aviso-paypal {
+  width: min(600px, calc(100vw - 32px)); display: flex; flex-direction: column; gap: 16px; padding: 0 30px 26px;
+  border: 2px solid var(--bad); border-radius: 14px; overflow: hidden;
+}
+.aviso-paypal-banda {
+  display: flex; align-items: center; gap: 10px; margin: 0 -30px; padding: 12px 30px;
+  background: var(--bad); color: var(--bg); font-size: 15px; font-weight: 750; text-transform: uppercase; letter-spacing: 0.06em;
+}
+.aviso-paypal-banda .icon-trazo { width: 22px; height: 22px; }
+.aviso-paypal h1 { margin: 4px 0 0; font-size: 28px; line-height: 1.2; }
+.aviso-paypal p { margin: 0; color: var(--muted); font-size: 15px; line-height: 1.55; }
+.aviso-paypal p b, .aviso-paypal li b { color: var(--text); }
+.aviso-paypal .aviso-paypal-grande { color: var(--text); font-size: 18px; font-weight: 600; }
+.aviso-paypal ol { margin: 0; padding-left: 22px; display: flex; flex-direction: column; gap: 6px; color: var(--muted); font-size: 15px; }
+.aviso-paypal .licencia-pie { justify-content: flex-start; }

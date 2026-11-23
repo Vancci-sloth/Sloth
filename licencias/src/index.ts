@@ -469,6 +469,23 @@ export async function apoyaHoy(env: Env, email: string): Promise<boolean> {
     .first())
 }
 
+/**
+ * Si el correo tiene una suscripción de PayPal que llegó a pagarse, y hasta cuándo vale lo que pagó por ahí. Sloth ya
+ * no acepta pagos por PayPal (la cuenta sigue en revisión desde el 5 de noviembre de 2026): la app le pide, en grande,
+ * que la cancele en su PayPal (`web/src/AvisoPaypal.tsx`), y lo enseña como apoyo, no como «Cancelado». No a quien ya
+ * apoya cada mes con otra pasarela ni a quien pagó una sola vez con PayPal, que no tiene nada que cancelar.
+ */
+export async function cancelarPaypal(env: Env, email: string): Promise<{ hasta?: string } | undefined> {
+  const f = await env.DB.prepare(
+    `SELECT MAX(pagado_hasta) AS hasta FROM licencias l WHERE l.email = ? AND l.paypal IS NOT NULL AND l.autorizada IS NOT NULL AND l.modo = 'produccion'
+     AND NOT EXISTS (SELECT 1 FROM licencias o WHERE o.email = l.email AND o.paypal IS NULL AND o.estado = 'authorized' AND o.modo = 'produccion')
+     HAVING COUNT(*) > 0`
+  )
+    .bind(email)
+    .first<{ hasta: string | null }>()
+  return f ? { hasta: f.hasta ?? undefined } : undefined
+}
+
 /** Un enlace de invitación de Fundador que sigue en pie (`enlaces_fundador`): sin revocar y sin que nadie haya pagado con él. */
 async function enlaceFundador(env: Env, codigo: unknown): Promise<boolean> {
   if (typeof codigo !== 'string' || !/^[A-Za-z0-9]{8,32}$/.test(codigo)) return false
@@ -1820,7 +1837,8 @@ async function firmada(env: Env, f: Fila, equipo: string, ahora: number): Promis
     emitido: new Date(ahora).toISOString(),
     enlace: f.estado === 'pending' ? (f.enlace ?? undefined) : undefined,
     folio: f.folio ?? undefined,
-    fundador: fundador || undefined
+    fundador: fundador || undefined,
+    cancelarPaypal: await cancelarPaypal(env, f.email)
   })
   const llave = await crypto.subtle.importKey('pkcs8', base64(env.FIRMA), { name: 'Ed25519' }, false, ['sign'])
   const firma = await crypto.subtle.sign({ name: 'Ed25519' }, llave, new TextEncoder().encode(datos))

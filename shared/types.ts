@@ -1686,6 +1686,11 @@ export interface Licencia {
   folio?: string
   /** De las primeras personas que apoyaron: fundadora para siempre, aunque cancele. */
   fundador?: boolean
+  /**
+   * Su correo apoyó con una suscripción de PayPal, que Sloth ya no cobra: la app le pide en grande que la cancele allá
+   * (`web/src/AvisoPaypal.tsx`). `hasta`: cuándo se acaba lo que pagó por PayPal.
+   */
+  cancelarPaypal?: { hasta?: string }
   error?: string
 }
 

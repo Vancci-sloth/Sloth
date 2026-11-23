@@ -132,7 +132,7 @@ export function licencia(app: string, alCambiar?: (sinApoyo: boolean) => void) {
 
   function estado(): Licencia {
     const d = firmado()
-    return { activa: activa(), clave: a.clave, email: d?.email ?? a.email, plan: d?.plan, monto: d?.monto, estado: d?.estado, pagadaHasta: d?.pagadaHasta, folio: d?.folio, fundador: d?.fundador, error: error || undefined }
+    return { activa: activa(), clave: a.clave, email: d?.email ?? a.email, plan: d?.plan, monto: d?.monto, estado: d?.estado, pagadaHasta: d?.pagadaHasta, folio: d?.folio, fundador: d?.fundador, cancelarPaypal: d?.cancelarPaypal, error: error || undefined }
   }
 
   async function cobro<T>(ruta: string, cuerpo: object): Promise<T> {

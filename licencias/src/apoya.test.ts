@@ -29,7 +29,7 @@ function cobro() {
   /** Lo que firma el cobro para esa clave en esta computadora. */
   const firmado = async (clave: string) => {
     const r = await worker.fetch(new Request('https://cobro.x/licencia', { method: 'POST', body: JSON.stringify({ clave, equipo: EQUIPO }) }), env as never, ctx)
-    return JSON.parse(((await r.json()) as { datos: string }).datos) as { apoya?: boolean; activa: boolean }
+    return JSON.parse(((await r.json()) as { datos: string }).datos) as { apoya?: boolean; activa: boolean; cancelarPaypal?: { hasta?: string } }
   }
   return { db, fila, firmado }
 }
@@ -57,4 +57,27 @@ test('quien apoyó desde la tienda sigue con la clave de su cuenta gratis: apoya
   // Dejó de pagar y lo pagado se acabó.
   c.db.prepare("UPDATE licencias SET estado = 'cancelled', pagado_hasta = ? WHERE clave = 'SLOTH-HHHH-HHHH-HHHH-HHHH'").run(ayer)
   assert.equal((await c.firmado('SLOTH-GGGG-GGGG-GGGG-GGGG')).apoya, false)
+})
+
+test('solo a quien tiene una suscripción de PayPal pagada le pide cancelarla allá, con hasta cuándo vale lo que pagó', async () => {
+  const c = cobro()
+  const pp = (clave: string, email: string, estado: string, paypal: string, autorizada: string | null) => {
+    c.fila(clave, email, 'mensual', estado, manana)
+    c.db.prepare('UPDATE licencias SET paypal = ?, autorizada = ? WHERE clave = ?').run(paypal, autorizada, clave)
+  }
+  pp('SLOTH-PPPP-PPPP-PPPP-PPPP', 'paypal@x.com', 'cancelled', 'I-UNO', '2026-10-20')
+  c.fila('SLOTH-QQQQ-QQQQ-QQQQ-QQQQ', 'paypal@x.com', 'cuenta', 'gratis', null)
+  pp('SLOTH-RRRR-RRRR-RRRR-RRRR', 'sinpagar@x.com', 'pending', 'I-DOS', null)
+  pp('SLOTH-SSSS-SSSS-SSSS-SSSS', 'yastripe@x.com', 'cancelled', 'I-TRES', '2026-10-20')
+  c.fila('SLOTH-TTTT-TTTT-TTTT-TTTT', 'yastripe@x.com', 'mensual', 'authorized', manana)
+  c.db.prepare("UPDATE licencias SET stripe = 'sub_x' WHERE clave = 'SLOTH-TTTT-TTTT-TTTT-TTTT'").run()
+  c.fila('SLOTH-UUUU-UUUU-UUUU-UUUU', 'tarjeta@x.com', 'mensual', 'authorized', manana)
+
+  const conPaypal = await c.firmado('SLOTH-PPPP-PPPP-PPPP-PPPP')
+  assert.deepEqual(conPaypal.cancelarPaypal, { hasta: manana })
+  assert.equal(conPaypal.apoya, true, 'lo pagado por PayPal sigue valiendo')
+  assert.deepEqual((await c.firmado('SLOTH-QQQQ-QQQQ-QQQQ-QQQQ')).cancelarPaypal, { hasta: manana }, 'también con la clave de su cuenta gratis')
+  assert.equal((await c.firmado('SLOTH-RRRR-RRRR-RRRR-RRRR')).cancelarPaypal, undefined, 'nunca pagó: no hay nada que cancelar')
+  assert.equal((await c.firmado('SLOTH-SSSS-SSSS-SSSS-SSSS')).cancelarPaypal, undefined, 'ya apoya con tarjeta')
+  assert.equal((await c.firmado('SLOTH-UUUU-UUUU-UUUU-UUUU')).cancelarPaypal, undefined)
 })

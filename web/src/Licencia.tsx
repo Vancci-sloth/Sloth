@@ -304,6 +304,9 @@ export function SuscripcionOpciones() {
           ? `${l.monto ? `${dinero(l.monto)} ${cada}` : 'Activo'}${l.pagadaHasta ? ` · próximo cobro el ${fecha(l.pagadaHasta)}` : ''}`
           : l.estado === 'pagado' && l.activa
             ? `Pagado hasta el ${fecha(l.pagadaHasta)} · no se renueva solo`
+            : // Lo de PayPal lo canceló Sloth, no quien apoya: no se le dice «Cancelado» (`AvisoPaypal`).
+              l.cancelarPaypal && l.activa
+              ? `Apoyas a Sloth hasta el ${fecha(l.pagadaHasta)} · cancela tu suscripción en PayPal: Sloth ya no cobra por ahí`
             : l.activa
             ? `Cancelado: vale hasta el ${fecha(l.pagadaHasta)}${l.folio ? ` · folio ${l.folio}` : ''}`
             : 'Terminó'
