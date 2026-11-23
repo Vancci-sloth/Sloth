@@ -143,6 +143,8 @@ test('OAuth comprueba el estado y el canal; solo sube finales y evita repetir un
   assert.equal(estado.id, 'video-final')
   assert.equal(estado.estado, 'terminado')
   assert.equal(estado.url, undefined)
+  // «terminado» se guarda un instante antes de soltar la subida y la cola: en una máquina lenta, se espera a que acaben.
+  for (let n = 0; servicio.ocupado() && n < 50; n++) await new Promise((r) => setTimeout(r, 10))
   assert.equal(servicio.ocupado(), null)
   servicio = crear()
   assert.equal((await pedir('/subida', datos)).status, 200)
