@@ -87,8 +87,8 @@ salen para todos (`[para todos]`) son de dos clases, y el aviso dice cuál es (p
   ya quedó, en `novedad.txt` y en un anuncio titulado `ACTUALIZACION EXPRESS (…)` ([anuncios.md](anuncios.md)).
 
 1. Actualiza `novedad.txt`: un renglón corto con lo que trae la versión, que se ve al pasar el cursor sobre «Actualizar».
-   Una versión puede llevar además su guía animada (`web/src/Novedades.tsx`, la 0.4.3 en
-   `web/public/novedades/0.4.3.html`, que reemplaza a la de antes), que sale una vez al abrirla a quien actualizó. Su
+   Una versión puede llevar además su guía animada (`web/src/Novedades.tsx`, la 0.5.0 en
+   `web/public/novedades/0.5.0.html`, que reemplaza a la de antes), que sale una vez al abrirla a quien actualizó. Su
    número en `Novedades.tsx` debe ser el que saldrá: `version-venta.mjs` sube solo la última cifra de la publicada, y un
    salto (0.5.0) se pone a mano en `package.json`.
 2. Comprueba el diff completo entre `origin/venta` y `main`: se publicará todo lo que haya entrado a `main`. Guarda la
