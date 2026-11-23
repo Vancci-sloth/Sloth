@@ -380,7 +380,11 @@ async function aparece(page: Page, tarjeta: Locator, antes: string, pedir: () =>
 async function comprobarSiEmpezo(page: Page, tarjeta: Locator, p: PedidoFlow, antesTexto: string, saldoAntes: Saldo | null, creditos: number): Promise<void> {
   const aviso = await avisos(page)
   if (aviso) throw new SinEmpezar(`Flow no empezó a generar${aviso}.`, aviso)
-  await ir(page, page.url())
+  // Un video ya pedido que no se pudo comprobar (la página no recargó o se fue la sesión) no pasa a otra cuenta: pudo cobrarse.
+  await ir(page, page.url()).catch((e: unknown) => {
+    if (p.tipo === 'video') throw new Error(`Flow no enseñó el video y no pude recargar el proyecto para ver si lo cobró (${primeraLinea(e)}). No lo pidas otra vez sin decírselo al usuario.`)
+    throw esDeRed(e) ? new SinConexion(`La tarjeta de la imagen no salió y Flow no recargó (${primeraLinea(e)}). No se gastó nada.`) : e
+  })
   await tarjeta.waitFor({ timeout: 20_000 }).catch(() => {})
   const ahora = await textoDe(tarjeta)
   if (ahora && ahora !== antesTexto) return
@@ -475,6 +479,7 @@ async function bajar(page: Page, b: Browser, tarjeta: Locator, carpeta: string):
 
 /** Un fallo de la red o una página que tardó, no algo que Flow dijo: antes de pedir nada, se puede reintentar. */
 const esDeRed = (e: unknown) => e instanceof Error && (e.name === 'TimeoutError' || /net::ERR_|Timeout \d+ms exceeded/i.test(e.message))
+const primeraLinea = (e: unknown) => String(e instanceof Error ? e.message : e).split('\n')[0]
 
 /**
  * Deja el compositor listo para generar, sin generar: entra al proyecto, elige lo pedido, comprueba el costo y pone las
@@ -505,7 +510,7 @@ export async function generarEnFlow(b: Browser, page: Page, proyecto: string | u
   alAvanzar?.('configurar')
   // Hasta pulsar la flecha no se gasta nada: un corte de la red hasta ahí se puede reintentar (`SinConexion`).
   const creditos = await prepararEnFlow(page, proyecto, p, alEntrar).catch((e: unknown) => {
-    throw esDeRed(e) ? new SinConexion(`La conexión con Flow falló antes de pedirlo (${(e as Error).message.split('\n')[0]}). No se gastó nada.`) : e
+    throw esDeRed(e) ? new SinConexion(`La conexión con Flow falló antes de pedirlo (${primeraLinea(e)}). No se gastó nada.`) : e
   })
   // Después de preparar: cada imagen subida también es una tarjeta del proyecto, y se queda en su «100 %» un momento
   // más. Se espera a que acabe: si cambia después, parecería la tarjeta del pedido.
@@ -542,7 +547,7 @@ export async function generarEnFlow(b: Browser, page: Page, proyecto: string | u
     try {
       return { creditos, archivo: await bajar(page, b, tarjeta, carpeta) }
     } catch (e) {
-      if (intento >= 3) throw new Error(`${e instanceof Error ? e.message : e} Ya se hizo (y se pagó) en el proyecto de Flow de Sloth: no lo pidas otra vez; el usuario lo baja en Opciones → Google Flow → Abrir Flow.`)
+      if (intento >= 3) throw new Error(`${primeraLinea(e)} Ya se hizo${p.tipo === 'video' ? ' (y se pagó)' : ''} en el proyecto de Flow de Sloth: no lo pidas otra vez; el usuario lo baja en Opciones → Google Flow → Abrir Flow.`)
       await page.keyboard.press('Escape').catch(() => {})
       await page.waitForTimeout(5000 * intento)
     }
