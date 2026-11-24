@@ -116,6 +116,8 @@ export function startCursor(opts: AgentOptions): AgentRun {
   let detenido = false
   let primero = true
   let turno = 0
+  /** Delante de `turno` en los ids: cada proceso cuenta desde 0, y lo de un hilo retomado se pegaba a lo primero del hilo. */
+  const vez = Date.now().toString(36)
   let parte = 0
   let pendiente: string[] = []
   const herramientas = new Set<string>()
@@ -171,7 +173,7 @@ export function startCursor(opts: AgentOptions): AgentRun {
     switch (u.type) {
       case 'text-delta':
       case 'thinking-delta':
-        if (u.text) emit({ t: u.type === 'text-delta' ? 'text' : 'thinking', id: `${turno}:${parte}${u.type === 'thinking-delta' ? ':pensamiento' : ''}`, delta: u.text })
+        if (u.text) emit({ t: u.type === 'text-delta' ? 'text' : 'thinking', id: `${vez}:${turno}:${parte}${u.type === 'thinking-delta' ? ':pensamiento' : ''}`, delta: u.text })
         return
       case 'tool-call-started':
       case 'tool-call-completed': {

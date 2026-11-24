@@ -111,6 +111,21 @@ test('ACP: un turno elige el modelo y el esfuerzo, acepta el permiso una vez y c
   assert.deepEqual(fin && fin.t === 'turn_end' && { ok: fin.ok, tokens: fin.tokens, costUsd: fin.costUsd }, { ok: true, tokens: { input: 400, output: 50, cacheRead: 600 }, costUsd: 0.0025 })
 })
 
+test('ACP: lo que escribe un proceso nuevo del mismo hilo (al retomarlo) no lleva el id de lo de antes', async () => {
+  const ids: string[] = []
+  for (let i = 0; i < 2; i++) {
+    const { run, events, listo } = correr()
+    run.send('hola')
+    await listo
+    run.close()
+    const primero = events.find((e) => e.t === 'text')
+    if (primero?.t === 'text') ids.push(primero.id)
+  }
+  // Si se repitiera, la interfaz pegaría el texto del segundo al primer mensaje del hilo.
+  assert.equal(ids.length, 2)
+  assert.notEqual(ids[0], ids[1])
+})
+
 test('ACP: el turno que Grok abre solo al acabar una tarea de fondo se cierra, con su costo', async () => {
   const { run, events, listo } = correr({ DE_FONDO: '1' })
   run.send('hola')
@@ -463,4 +478,53 @@ test('ACP: sin cuenta, el turno acaba pidiendo conectarla', async () => {
   run.close()
   const fin = events.find((e) => e.t === 'turn_end')
   assert.deepEqual(fin && fin.t === 'turn_end' && { ok: fin.ok, error: fin.error }, { ok: false, error: 'Conecta tu cuenta de Grok en Opciones.' })
+})
+
+/**
+ * Uno que contesta como omp 19.1.1: `usage_update` con el costo en dólares de toda la sesión (cada turno cuesta 0.002),
+ * los tokens del turno en `result.usage`, y `session/resume` sin repetir nada.
+ */
+const COMO_OMP = `
+let resto = '', gastado = Number(process.env.GASTADO ?? 0)
+const decir = (m) => process.stdout.write(JSON.stringify({ jsonrpc: '2.0', ...m }) + '\\n')
+process.stdin.on('data', (d) => {
+  resto += d
+  let i
+  while ((i = resto.indexOf('\\n')) >= 0) {
+    const m = JSON.parse(resto.slice(0, i))
+    resto = resto.slice(i + 1)
+    if (m.method === 'initialize') decir({ id: m.id, result: { protocolVersion: 1, agentCapabilities: { loadSession: true, sessionCapabilities: { resume: {} } } } })
+    else if (m.method === 'session/new') decir({ id: m.id, result: { sessionId: 'o1' } })
+    else if (m.method === 'session/prompt') {
+      gastado += 0.002
+      decir({ method: 'session/update', params: { sessionId: m.params.sessionId, update: { sessionUpdate: 'usage_update', size: 128000, used: 1200, cost: { amount: gastado, currency: 'USD' } } } })
+      decir({ id: m.id, result: { stopReason: 'end_turn', usage: { inputTokens: 1200, outputTokens: 10, totalTokens: 1210 } } })
+    } else if (m.id !== undefined) decir({ id: m.id, result: {} })
+  }
+})
+`
+const SCRIPT_OMP = join(dirname(SCRIPT), 'omp.mjs')
+writeFileSync(SCRIPT_OMP, COMO_OMP)
+
+/** Dos turnos en una sesión de omp, nueva o retomada (con lo que ya llevaba gastado): el costo de cada uno. */
+async function costosOmp(resume?: string) {
+  const fines: { costUsd?: number; tokens?: unknown }[] = []
+  let fin!: () => void
+  let listo = new Promise<void>((ok) => (fin = ok))
+  const sabor: SaborAcp = { nombre: 'omp', prefijo: 'omp', lanzar: () => ({ command: process.execPath, args: [SCRIPT_OMP], env: { ...process.env, GASTADO: resume ? '0.01' : '0' } }), sinCuenta: 'Conecta un proveedor.' }
+  const run = startAcp(sabor, { cwd: tmpdir(), model: 'omp:simulador/eco', resume, onEvent: (e) => e.t === 'turn_end' && (fines.push({ costUsd: e.costUsd, tokens: e.tokens }), fin()), onProviderSession() {} })
+  for (const texto of ['uno', 'dos']) {
+    run.send(texto)
+    await listo
+    listo = new Promise<void>((ok) => (fin = ok))
+  }
+  run.close()
+  return fines.map((f) => ({ ...f, costUsd: f.costUsd && Math.round(f.costUsd * 1e6) / 1e6 }))
+}
+
+test('ACP: el costo de `usage_update` es el de la sesión, y a cada turno va lo que creció', async () => {
+  const tokens = { input: 1200, output: 10, cacheRead: 0 }
+  assert.deepEqual(await costosOmp(), [{ costUsd: 0.002, tokens }, { costUsd: 0.002, tokens }])
+  // Retomada, lo de antes no se sabe hasta el primer aviso: ese turno va sin costo, no con el de toda la sesión.
+  assert.deepEqual(await costosOmp('o1'), [{ costUsd: undefined, tokens }, { costUsd: 0.002, tokens }])
 })

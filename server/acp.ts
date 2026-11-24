@@ -8,7 +8,7 @@ import { RpcLineas } from './rpc-lineas.ts'
 
 /**
  * Los agentes que hablan ACP (Agent Client Protocol) por stdio: Grok (`grok agent stdio`), Antigravity (el servidor ACP
- * de Google) y Gemini CLI (`gemini --acp`). Como lo hace T3 Code (`packages/provider-acp`), pero solo lo que usa Sloth:
+ * de Google), Gemini CLI (`gemini --acp`) y omp (`omp acp`). Como lo hace T3 Code (`packages/provider-acp`), pero solo lo que usa Sloth:
  * sin permisos (se acepta cada herramienta, como con los demás agentes), sin terminal ni escritura de archivos del lado
  * de Sloth (el agente las hace él mismo) y un proceso por hilo, salvo los `compartido`: uno para todos sus hilos, cada
  * uno en su sesión.
@@ -236,9 +236,21 @@ export function startAcp(sabor: SaborAcp, opts: AgentOptions): AgentRun {
   /** El número del mensaje del turno: cada herramienta abre otro, para que el texto de después no se pegue al de antes. */
   let parte = 0
   let turno = 0
+  /**
+   * Va delante de `turno` en los ids: cada proceso cuenta desde 0, y sin esto lo primero que escribe un hilo retomado
+   * llevaba el id de lo primero del hilo y se pegaba a ese mensaje.
+   */
+  const vez = Date.now().toString(36)
   let pendiente: { text: string; images: string[] }[] = []
   let tokens = CERO
   let costo = 0
+  /**
+   * El costo que dice `usage_update` (omp) es el de toda la sesión: al turno va lo que creció (`costoSesion`). De una sesión
+   * retomada no se sabe lo de antes hasta su primer aviso (`undefined`), y ese turno va sin costo antes que con el de toda la
+   * sesión.
+   */
+  let gastado: number | undefined = 0
+  let costoSesion = 0
   /** Lo que escribió desde su última herramienta: un error de `errorDe` es todo su último mensaje. */
   let ultimo = ''
   let mudez: ReturnType<typeof setTimeout> | undefined
@@ -247,9 +259,11 @@ export function startAcp(sabor: SaborAcp, opts: AgentOptions): AgentRun {
     if (!busy) return
     busy = false
     clearTimeout(mudez)
-    emit({ t: 'turn_end', at: Date.now(), ok, error, tokens, ...(costo ? { costUsd: costo } : {}), ...extra })
+    const usd = costoSesion || costo
+    emit({ t: 'turn_end', at: Date.now(), ok, error, tokens, ...(usd ? { costUsd: usd } : {}), ...extra })
     tokens = CERO
     costo = 0
+    costoSesion = 0
   }
 
   /** Cierra el turno con lo que diga `errorDe`, si su último mensaje es un error. */
@@ -303,7 +317,7 @@ export function startAcp(sabor: SaborAcp, opts: AgentOptions): AgentRun {
       case 'agent_thought_chunk': {
         const texto = u.content?.type === 'text' ? u.content.text : ''
         if (texto && u.sessionUpdate === 'agent_message_chunk') ultimo += texto
-        if (texto) emit({ t: u.sessionUpdate === 'agent_message_chunk' ? 'text' : 'thinking', id: `${turno}:${parte}${u.sessionUpdate === 'agent_thought_chunk' ? ':pensamiento' : ''}`, delta: texto })
+        if (texto) emit({ t: u.sessionUpdate === 'agent_message_chunk' ? 'text' : 'thinking', id: `${vez}:${turno}:${parte}${u.sessionUpdate === 'agent_thought_chunk' ? ':pensamiento' : ''}`, delta: texto })
         return
       }
       case 'tool_call': {
@@ -320,19 +334,23 @@ export function startAcp(sabor: SaborAcp, opts: AgentOptions): AgentRun {
       case 'plan':
         // Como la lista de tareas de Claude (TodoWrite), que la interfaz ya dibuja.
         parte++
-        emit({ t: 'tool', id: `plan:${turno}:${parte}`, name: 'TodoWrite', input: { todos: (u.entries ?? []).map((e: any) => ({ content: e.content, status: e.status === 'in_progress' ? 'in_progress' : e.status })) } })
-        emit({ t: 'tool_update', id: `plan:${turno}:${parte}`, done: true, output: '' })
+        emit({ t: 'tool', id: `plan:${vez}:${turno}:${parte}`, name: 'TodoWrite', input: { todos: (u.entries ?? []).map((e: any) => ({ content: e.content, status: e.status === 'in_progress' ? 'in_progress' : e.status })) } })
+        emit({ t: 'tool_update', id: `plan:${vez}:${turno}:${parte}`, done: true, output: '' })
         return
       case 'usage_update':
         if (typeof u.used === 'number' && typeof u.size === 'number') {
           ventana = u.size
           if (!sabor.contextoOpaco) emit({ t: 'context', used: u.used, max: u.size })
         }
+        if (u.cost?.currency === 'USD' && typeof u.cost.amount === 'number') {
+          if (gastado !== undefined) costoSesion += Math.max(0, u.cost.amount - gastado)
+          gastado = u.cost.amount
+        }
         return
     }
   }
 
-  /** Los tokens y el costo de un turno, como los dan Grok y Gemini (que cuenta aparte lo que piensa). */
+  /** Los tokens y el costo de un turno, como los dan Grok, Gemini (que cuenta aparte lo que piensa) y omp. */
   function contar(u: any) {
     if (!u) return
     const cache = (u.cachedReadTokens ?? 0) + (u.cacheCreationTokens ?? 0)
@@ -399,6 +417,7 @@ export function startAcp(sabor: SaborAcp, opts: AgentOptions): AgentRun {
           () => void c.sesiones.delete(opts.resume!)
         )
         cargando = false
+        if (abierta) gastado = undefined
       }
     }
     if (!abierta) {

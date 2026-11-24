@@ -99,6 +99,7 @@ export function gruposModelos(models: Model[]) {
     { id: 'muse', label: 'Muse Code (Meta)' },
     { id: 'pi', label: 'Pi · beta · gratis' },
     { id: 'pi', label: 'Pi · beta · de pago (por millón de tokens)', pago: true },
+    { id: 'omp', label: 'omp · beta' },
   ].map((p) => ({
     // Con su logo en la lista (`Picker`): de un vistazo se ve de quién es cada modelo.
     proveedor: p.id as Proveedor,
