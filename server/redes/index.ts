@@ -691,7 +691,6 @@ export function redes(app: string, sessions: Sessions, cards: () => Card[], avis
   // Lo que ya estaba programado de antes.
   for (const card of cards()) limpiar(card)
 
-  /** Si hay algo de redes a medias que un reinicio cortaría, por qué: «Reiniciar backend» espera a que termine. */
   /**
    * Pone en la cola de cada red conectada los videos de un estilo con su texto, cada uno en su hueco del ritmo. Solo lo
    * que no está en esa red, o falló: lo que descartaste no vuelve.
@@ -721,6 +720,7 @@ export function redes(app: string, sessions: Sessions, cards: () => Card[], avis
     programar(card, [b])
   }
 
+  /** Si hay algo de redes a medias que un reinicio cortaría, por qué: «Reiniciar backend» espera a que termine. */
   function ocupado(): string | null {
     const p = datos.publicaciones.find((x) => x.estado === 'subiendo')
     if (p) return `Se está subiendo un video a ${REDES.find((r) => r.id === p.red)?.nombre ?? p.red}. Espera a que termine.`
