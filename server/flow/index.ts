@@ -14,7 +14,7 @@ import { areaDeContorno, ESTILOS_IMAGEN, HERRAMIENTAS_IMAGEN, LIMITE_MARCAS, LIM
 import { guardar } from '../disco.ts'
 import { cuerpo, json } from '../http.ts'
 import { type CuentaFlow, cuentasFlow, nombreNavegador } from './cuentas.ts'
-import { generarEnFlow, leerSaldo, paginaFlow, ponerAportar, Rechazado, saldoEnFlow, SinEmpezar, URL_FLOW } from './pagina.ts'
+import { generarEnFlow, leerSaldo, paginaFlow, ponerAportar, Rechazado, saldoEnFlow, SinConexion, SinEmpezar, URL_FLOW } from './pagina.ts'
 import type { PromptPreparado, registroDeImagen } from './hilo-imagen.ts'
 
 /**
@@ -32,6 +32,12 @@ import type { PromptPreparado, registroDeImagen } from './hilo-imagen.ts'
  * solo si se comprobó que no gastó (`Rechazado`); si gastó o no se supo, falla diciéndolo. Los pedidos van con ritmo
  * (`espacioEntrePedidos`, `PAUSA_CUENTA`), y tras una frenada, de uno en uno durante `CALMA`: todas las cuentas salen de
  * la misma conexión, y Google las ve juntas.
+ *
+ * Si la conexión no da antes de pedir nada (una subida que no entra, una página que no carga: `SinConexion`), no gastó y
+ * la cuenta no tiene la culpa: el pedido vuelve al frente de la fila y se reintenta solo, cada vez más espaciado
+ * (`ESPERAS_RED`). Con dos fallos de red seguidos la fila va de uno en uno —hasta que uno salga bien o pase un rato sin más
+ * fallos (`CALMA_RED`)—, para no saturar la conexión. El agente solo espera; se le avisa cuándo será el siguiente intento
+ * (`TrabajoFlow.aviso`).
  *
  * Gasta los créditos del usuario, y por eso: cada pedido lee el costo antes de generar y no pasa de `tope`; si no cambió
  * nada desde el último archivo de esa ruta (`.huella`), no pide nada, y uno igual que ya está en fila no se repite.
@@ -68,6 +74,9 @@ type Trabajo = TrabajoFlow & {
   /** Las cuentas donde Flow no lo empezó, y lo último que dijo. */
   probadas: string[]
   ultimo?: string
+  /** Las veces que no salió por la conexión, y desde cuándo puede volver a probar. */
+  fallosDeRed?: number
+  desde?: number
 }
 interface Ajustes {
   calmaHasta?: number
@@ -87,6 +96,10 @@ export interface Google {
 }
 
 const ESPERA_MAXIMA = 50_000
+/** Lo que espera un pedido antes de reintentar tras cada fallo de la conexión. Tras el último, falla. */
+const ESPERAS_RED = [30_000, 60_000, 120_000, 240_000]
+/** Tras 2 fallos de red seguidos la fila va de uno en uno; vuelve a la normalidad si pasa este rato sin más fallos. */
+const CALMA_RED = 120_000
 const SIN_CUENTA = 'No hay cuenta de Google conectada: que el usuario conecte una en Opciones → Voz o agregue una en Opciones → Google Flow.'
 const SIN_DERECHOS = 'Para mandar imágenes a Flow (referencias o fotogramas), el usuario debe confirmar que tiene sus derechos, en Opciones → Google Flow. No se generó nada.'
 const IMAGEN = /\.(png|jpe?g|webp)$/i
@@ -126,7 +139,13 @@ function describirMarca(m: MarcaImagen, i: number): string {
   return `Zona ${i + 1}: ${zona} ${instruccion}`.trimEnd()
 }
 
-export function flow(app: string, google: Google, motores?: MotoresEstudio) {
+/** Lo de fuera que usa la fila: la página de Flow y las cuentas agregadas. Las pruebas ponen lo suyo (`flow-red.test.ts`). */
+const EN_FLOW = { cuentasFlow, generarEnFlow, leerSaldo, paginaFlow, ponerAportar, saldoEnFlow }
+export type EnFlow = typeof EN_FLOW
+
+export function flow(app: string, google: Google, motores?: MotoresEstudio, deFuera: Partial<EnFlow> = {}) {
+  // Con los nombres de lo importado, para que lo demás no cambie.
+  const { cuentasFlow, generarEnFlow, leerSaldo, paginaFlow, ponerAportar, saldoEnFlow } = { ...EN_FLOW, ...deFuera }
   const carpeta = join(app, 'data', 'flow')
   const estudio = join(app, 'data', 'imagenes')
   const metadatosEstudio = new Map<string, ImagenEstudio>()
@@ -191,6 +210,9 @@ export function flow(app: string, google: Google, motores?: MotoresEstudio) {
   /** Cuándo puede empezar el siguiente pedido, y hasta cuándo se va con calma tras una frenada. */
   let siguiente = 0
   let calmaHasta = ajustes.calmaHasta ?? 0
+  /** Los fallos de red seguidos (de cualquier pedido) y cuándo fue el último: con dos recientes, la fila va de uno en uno. */
+  let fallosDeRed = 0
+  let ultimoFalloRed = 0
   let despertar: NodeJS.Timeout | undefined
 
   // Una cuenta que acaba de generar cuenta como ocupada durante su pausa.
@@ -289,7 +311,9 @@ export function flow(app: string, google: Google, motores?: MotoresEstudio) {
             t.quedan = quedan(Date.now())
           }
           t.archivo = t.salida
+          t.aviso = undefined
           t.estado = 'lista'
+          fallosDeRed = 0
         } catch (e) {
           await page.screenshot({ path: join(carpeta, 'error.png') }).catch(() => {})
           throw e
@@ -298,6 +322,7 @@ export function flow(app: string, google: Google, motores?: MotoresEstudio) {
         }
       })
     } catch (e) {
+      if (e instanceof SinConexion) return reintentarPorRed(t, e)
       const frenada = e instanceof Rechazado && AVISO_FRENADA.test(e.aviso)
       if (e instanceof Rechazado) {
         if (e.saldo) apuntarSaldo(c.correo, e.saldo)
@@ -325,6 +350,32 @@ export function flow(app: string, google: Google, motores?: MotoresEstudio) {
       acabo.set(c.correo, Date.now())
       rmSync(bajada, { recursive: true, force: true })
     }
+  }
+
+  /**
+   * La conexión no dio y no se gastó nada: el pedido vuelve al frente de la fila para dentro de un rato (`ESPERAS_RED`, cada
+   * vez más), en la cuenta que esté libre entonces: la que falló no descansa, porque la culpa fue de la red. Tras los
+   * intentos de la lista, se rinde. No se pide de nuevo: se le avisa al agente.
+   */
+  function reintentarPorRed(t: Trabajo, e: SinConexion) {
+    const ahora = Date.now()
+    // Decaimiento: un fallo de hace rato no suma, para no dejar la fila frenada después de que la conexión se recuperó.
+    if (ahora - ultimoFalloRed > CALMA_RED) fallosDeRed = 0
+    fallosDeRed++
+    ultimoFalloRed = ahora
+    const n = (t.fallosDeRed = (t.fallosDeRed ?? 0) + 1)
+    t.cuenta = undefined
+    if (n > ESPERAS_RED.length) {
+      t.estado = 'error'
+      t.aviso = undefined
+      t.error = `${mensaje(e)} Lo intenté ${n} veces y la conexión con Flow no dio. Espera a que mejore y pídelo otra vez.`
+      return
+    }
+    t.desde = ahora + ESPERAS_RED[n - 1]
+    t.aviso = `${mensaje(e)} Sloth lo reintenta solo a las ${hora(t.desde)} (intento ${n + 1} de ${ESPERAS_RED.length + 1}), sin gastar créditos: no lo pidas otra vez.`
+    t.estado = 'en-fila'
+    if (t.estudio) t.estudio.paso = 'turno'
+    fila.unshift(t)
   }
 
   /** Lo que se le dice al agente de un pedido rechazado: si gastó y si puede pedirlo otra vez. */
@@ -381,9 +432,11 @@ export function flow(app: string, google: Google, motores?: MotoresEstudio) {
   function repartir() {
     const ahora = Date.now()
     if (ahora < siguiente) return repartirEn(siguiente - ahora)
-    const calma = calmaHasta > ahora
+    const calma = calmaHasta > ahora || (fallosDeRed >= 2 && ahora - ultimoFalloRed < CALMA_RED)
     for (const t of [...fila]) {
       if (ocupadas.size >= (calma ? 1 : A_LA_VEZ)) return
+      // Un pedido que espera su reintento por la red: aún no.
+      if (t.desde && t.desde > ahora) continue
       const elegida = elegirCuenta(usos(ahora), t.tipo, ahora, t.probadas)
       if (elegida === 'esperar') continue
       fila.splice(fila.indexOf(t), 1)
@@ -426,7 +479,7 @@ export function flow(app: string, google: Google, motores?: MotoresEstudio) {
     return t
   }
 
-  const publico = ({ prompt: _p, salida: _s, huella: _h, tope: _t, formato: _f, referencias: _r, cuadros: _c, probadas: _pr, ultimo: _u, estudio: _e, ...t }: Trabajo): TrabajoFlow => t
+  const publico = ({ prompt: _p, salida: _s, huella: _h, tope: _t, formato: _f, referencias: _r, cuadros: _c, probadas: _pr, ultimo: _u, estudio: _e, fallosDeRed: _fr, desde: _d, ...t }: Trabajo): TrabajoFlow => t
   const estado = (): EstadoFlow => {
     const ahora = Date.now()
     const hoy = dia(ahora)
