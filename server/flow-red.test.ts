@@ -87,7 +87,7 @@ test('sin conexión, el pedido se reintenta solo a los 30, 60, 120 y 240 s, sin 
   await vaciar()
   let e = await trabajo(id)
   assert.equal(e.estado, 'en-fila')
-  assert.match(e.aviso ?? '', /va lenta .*reintenta solo a las .* \(intento 2 de 5\), sin gastar créditos: no lo pidas otra vez\./)
+  assert.match(e.aviso ?? '', /^Flow no recibió la imagen \(la conexión no dio\)\. No se gastó nada\. Sloth lo reintenta solo a las .* \(intento 2 de 5\), sin gastar créditos: no lo pidas otra vez\./)
   assert.equal(e.cuenta, undefined)
   // Que la red no diera no es culpa de la cuenta: no descansa.
   assert.equal((await api('/api/flow')).cuentas[0].descansa, undefined)

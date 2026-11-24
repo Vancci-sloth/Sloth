@@ -354,7 +354,8 @@ export function flow(app: string, google: Google, motores?: MotoresEstudio, deFu
 
   /**
    * La conexión no dio y no se gastó nada: el pedido vuelve al frente de la fila para dentro de un rato (`ESPERAS_RED`, cada
-   * vez más), en la misma cuenta. Tras los intentos de la lista, se rinde. No se pide de nuevo: se le avisa al agente.
+   * vez más), en la cuenta que esté libre entonces: la que falló no descansa, porque la culpa fue de la red. Tras los
+   * intentos de la lista, se rinde. No se pide de nuevo: se le avisa al agente.
    */
   function reintentarPorRed(t: Trabajo, e: SinConexion) {
     const ahora = Date.now()
@@ -371,7 +372,7 @@ export function flow(app: string, google: Google, motores?: MotoresEstudio, deFu
       return
     }
     t.desde = ahora + ESPERAS_RED[n - 1]
-    t.aviso = `La conexión con Flow va lenta (${mensaje(e)}). Sloth lo reintenta solo a las ${hora(t.desde)} (intento ${n + 1} de ${ESPERAS_RED.length + 1}), sin gastar créditos: no lo pidas otra vez.`
+    t.aviso = `${mensaje(e)} Sloth lo reintenta solo a las ${hora(t.desde)} (intento ${n + 1} de ${ESPERAS_RED.length + 1}), sin gastar créditos: no lo pidas otra vez.`
     t.estado = 'en-fila'
     if (t.estudio) t.estudio.paso = 'turno'
     fila.unshift(t)
