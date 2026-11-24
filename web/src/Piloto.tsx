@@ -42,7 +42,10 @@ export function Piloto() {
     setError('')
     setHecho('')
     try {
-      setV(await api<VistaPiloto>(ruta, datos))
+      const x = await api<VistaPiloto>(ruta, datos)
+      setV(x)
+      // El servidor recorta espacios y líneas vacías: el campo queda como se guardó, o «Guardar» no se iría nunca.
+      if (ruta === '/api/piloto/brief') setB(x.config.brief)
       if (listo) setHecho(listo)
     } catch (e) {
       // Decir que no al aviso de más de dos videos no es un fallo: llega sin texto.
