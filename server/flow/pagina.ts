@@ -124,9 +124,16 @@ async function avisos(page: Page): Promise<string> {
 
 /**
  * Enciende o apaga «Ayudar a mejorar Flow» (que Google use lo que generas para mejorar sus productos), en el menú
- * principal. Lee lo guardado con calma, y al acabar recarga y vuelve a leer: si no quedó como se pidió, falla.
+ * principal. Lee lo guardado con calma, y al acabar recarga y vuelve a leer: si no quedó como se pidió, falla. Es lo
+ * primero que abre Flow en el primer pedido de cada cuenta: sin red, falla aquí, antes de pedir nada (`SinConexion`).
  */
-export async function ponerAportar(page: Page, quiere: boolean) {
+export function ponerAportar(page: Page, quiere: boolean) {
+  return aportar(page, quiere).catch((e: unknown) => {
+    throw esDeRed(e) ? new SinConexion(`La conexión con Flow falló antes de pedirlo (${primeraLinea(e)}). No se gastó nada.`) : e
+  })
+}
+
+async function aportar(page: Page, quiere: boolean) {
   const leer = async () => {
     await ir(page, URL_FLOW)
     await icono(page, 'more_vert').first().click({ timeout: 20_000 })

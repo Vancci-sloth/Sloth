@@ -13,7 +13,7 @@ import type { TrabajoFlow } from '../shared/types.ts'
 import { chromiumDelSistema } from './chromium.ts'
 import type { CuentaFlow } from './flow/cuentas.ts'
 import { type EnFlow, flow } from './flow/index.ts'
-import { bajar, mirarEnvios, SinConexion } from './flow/pagina.ts'
+import { bajar, mirarEnvios, ponerAportar, SinConexion } from './flow/pagina.ts'
 
 // La resiliencia de red de Flow (#42) sin Google: la fila con una página de Flow de mentira y el reloj de mentira, la
 // descarga con un CDP de mentira, y `mirarEnvios` con un Chromium de verdad y la red frenada por CDP.
@@ -159,6 +159,12 @@ test('con dos fallos de red seguidos la fila va de uno en uno, y cuando uno sale
   assert.deepEqual(empiezan.slice(0, 5), ['a@voz@0', 'b@otra@15', 'a@voz@30', 'b@otra@90', 'c@voz@105'])
   assert.equal(maximoEnCalma, 1)
   assert.equal(maximoDespues, 2)
+})
+
+test('sin red en el primer pedido de una cuenta, «Ayudar a mejorar Flow» falla con SinConexion, y lo demás no', async () => {
+  const conError = (mensaje: string) => ({ goto: async () => { throw new Error(mensaje) } }) as unknown as Page
+  await assert.rejects(ponerAportar(conError('page.goto: net::ERR_INTERNET_DISCONNECTED at https://flow.google.com/'), false), (e: Error) => e instanceof SinConexion && /No se gastó nada/.test(e.message))
+  await assert.rejects(ponerAportar(conError('Flow cambió su menú'), false), (e: Error) => !(e instanceof SinConexion))
 })
 
 /** Una descarga de mentira: el CDP del navegador avisa cuando empieza y cuánto lleva. */
