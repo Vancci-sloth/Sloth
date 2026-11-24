@@ -155,7 +155,7 @@ export function Piloto() {
           </header>
           <p>
             Cada día que toca en tu <a href={rutaRedes('calendario')}>ritmo de publicación</a>, hace hasta {auto.tope} {auto.tope === 1 ? 'video' : 'videos'} solo y {auto.tope === 1 ? 'lo programa' : 'los programa'} sin
-            preguntarte en la cola de redes, en sus horas{v.hoy.horas.length ? ` (hoy, ${conY(v.hoy.horas)})` : ''}. Trabaja mientras Sloth está abierto.
+            preguntarte en la cola de redes, en sus horas{v.hoy.horas.length ? ` (hoy le quedan ${conY(v.hoy.horas)})` : ''}. Trabaja mientras Sloth está abierto.
           </p>
           <p className="piloto-gasta small">
             <Icono de="alerta" /> Gasta tokens de tu agente y créditos (voz, imágenes) sin que nadie mire, y publica en tus cuentas sin que lo revises.
@@ -186,7 +186,7 @@ export function Piloto() {
           </div>
           {auto.encendido && (
             <p className="muted small">
-              Hoy lleva {v.hoy.hechos} de {auto.tope}.{v.hoy.horas.length ? '' : ' Hoy no toca publicar en tu ritmo.'}
+              Hoy lleva {v.hoy.hechos} de {auto.tope}.{v.hoy.horas.length ? '' : ' Hoy ya no le quedan horas en tu ritmo: sigue el próximo día que toca.'}
             </p>
           )}
           {!auto.encendido && !v.hoy.conectada && (

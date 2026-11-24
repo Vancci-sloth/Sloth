@@ -221,11 +221,14 @@ test('piloto automático: solo en las horas del ritmo que quedan hoy', (t) => {
   tarde.reloj.t = OCHO + 4.5 * HORA
   encender(tarde.p, 3)
   assert.equal(tarde.p.automatico().hechos, 1)
+  // La pestaña enseña solo las que aún sirven, no las que ya pasaron.
+  assert.deepEqual(tarde.p.vista().hoy.horas, ['14:00'])
   // Pasadas las horas de hoy, ninguno.
   const noche = montar(t)
   noche.reloj.t = OCHO + 14 * HORA
   encender(noche.p, 3)
   assert.equal(noche.p.automatico().motivo, 'sin_horas')
+  assert.deepEqual(noche.p.vista().hoy.horas, [])
   assert.equal(noche.creados.length, 0)
   // Un día que no toca, ninguno.
   const libre = montar(t, { ritmo: { ...RITMO, cadaDias: 2, inicio: '2026-11-22' } })

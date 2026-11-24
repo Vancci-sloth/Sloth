@@ -74,7 +74,7 @@ export interface VistaPiloto {
   hoy: {
     /** Los que ya pidió hoy. */
     hechos: number
-    /** Las horas del ritmo de redes de hoy; vacío si hoy no toca. */
+    /** Las horas del ritmo de redes de hoy que aún dan tiempo de hacer su video; vacío si ya no queda ninguna o hoy no toca. */
     horas: string[]
     /** Hay una red conectada donde programar. */
     conectada: boolean

@@ -257,7 +257,8 @@ export function piloto(o: OpcionesPiloto) {
       estilos: estilosDeVideo(o.cards()).map((c) => ({ id: c.id, title: c.title })),
       hoy: {
         hechos: a.turnos.filter((t) => t.modo === 'auto' && t.fecha === hoy()).length,
-        horas: r && tocaElDia(r.ritmo, hoy()) ? horasDelRitmo(r.ritmo) : [],
+        // Solo las que aún dan tiempo de hacer su video: las que ya pasaron no le sirven al automático.
+        horas: r ? horasPorDelante(r.ritmo, ahora()) : [],
         conectada: !!r?.conectada
       }
     }
