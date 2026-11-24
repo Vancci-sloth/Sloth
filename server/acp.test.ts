@@ -111,6 +111,21 @@ test('ACP: un turno elige el modelo y el esfuerzo, acepta el permiso una vez y c
   assert.deepEqual(fin && fin.t === 'turn_end' && { ok: fin.ok, tokens: fin.tokens, costUsd: fin.costUsd }, { ok: true, tokens: { input: 400, output: 50, cacheRead: 600 }, costUsd: 0.0025 })
 })
 
+test('ACP: lo que escribe un proceso nuevo del mismo hilo (al retomarlo) no lleva el id de lo de antes', async () => {
+  const ids: string[] = []
+  for (let i = 0; i < 2; i++) {
+    const { run, events, listo } = correr()
+    run.send('hola')
+    await listo
+    run.close()
+    const primero = events.find((e) => e.t === 'text')
+    if (primero?.t === 'text') ids.push(primero.id)
+  }
+  // Si se repitiera, la interfaz pegaría el texto del segundo al primer mensaje del hilo.
+  assert.equal(ids.length, 2)
+  assert.notEqual(ids[0], ids[1])
+})
+
 test('ACP: el turno que Grok abre solo al acabar una tarea de fondo se cierra, con su costo', async () => {
   const { run, events, listo } = correr({ DE_FONDO: '1' })
   run.send('hola')

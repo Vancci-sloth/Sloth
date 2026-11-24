@@ -236,6 +236,11 @@ export function startAcp(sabor: SaborAcp, opts: AgentOptions): AgentRun {
   /** El número del mensaje del turno: cada herramienta abre otro, para que el texto de después no se pegue al de antes. */
   let parte = 0
   let turno = 0
+  /**
+   * Va delante de `turno` en los ids: cada proceso cuenta desde 0, y sin esto lo primero que escribe un hilo retomado
+   * llevaba el id de lo primero del hilo y se pegaba a ese mensaje.
+   */
+  const vez = Date.now().toString(36)
   let pendiente: { text: string; images: string[] }[] = []
   let tokens = CERO
   let costo = 0
@@ -312,7 +317,7 @@ export function startAcp(sabor: SaborAcp, opts: AgentOptions): AgentRun {
       case 'agent_thought_chunk': {
         const texto = u.content?.type === 'text' ? u.content.text : ''
         if (texto && u.sessionUpdate === 'agent_message_chunk') ultimo += texto
-        if (texto) emit({ t: u.sessionUpdate === 'agent_message_chunk' ? 'text' : 'thinking', id: `${turno}:${parte}${u.sessionUpdate === 'agent_thought_chunk' ? ':pensamiento' : ''}`, delta: texto })
+        if (texto) emit({ t: u.sessionUpdate === 'agent_message_chunk' ? 'text' : 'thinking', id: `${vez}:${turno}:${parte}${u.sessionUpdate === 'agent_thought_chunk' ? ':pensamiento' : ''}`, delta: texto })
         return
       }
       case 'tool_call': {
@@ -329,8 +334,8 @@ export function startAcp(sabor: SaborAcp, opts: AgentOptions): AgentRun {
       case 'plan':
         // Como la lista de tareas de Claude (TodoWrite), que la interfaz ya dibuja.
         parte++
-        emit({ t: 'tool', id: `plan:${turno}:${parte}`, name: 'TodoWrite', input: { todos: (u.entries ?? []).map((e: any) => ({ content: e.content, status: e.status === 'in_progress' ? 'in_progress' : e.status })) } })
-        emit({ t: 'tool_update', id: `plan:${turno}:${parte}`, done: true, output: '' })
+        emit({ t: 'tool', id: `plan:${vez}:${turno}:${parte}`, name: 'TodoWrite', input: { todos: (u.entries ?? []).map((e: any) => ({ content: e.content, status: e.status === 'in_progress' ? 'in_progress' : e.status })) } })
+        emit({ t: 'tool_update', id: `plan:${vez}:${turno}:${parte}`, done: true, output: '' })
         return
       case 'usage_update':
         if (typeof u.used === 'number' && typeof u.size === 'number') {

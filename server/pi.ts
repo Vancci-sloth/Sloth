@@ -188,6 +188,8 @@ export function startPi(opts: AgentOptions): AgentRun {
   let costo = 0
   let ventana = 0
   let turno = 0
+  /** Delante de `turno` en los ids: cada proceso cuenta desde 0, y lo de un hilo retomado se pegaba a lo primero del hilo. */
+  const vez = Date.now().toString(36)
   let mensaje = 0
   let usado = 0
 
@@ -214,7 +216,7 @@ export function startPi(opts: AgentOptions): AgentRun {
         return
       case 'message_update': {
         const a = e.assistantMessageEvent
-        if (a?.delta && (a.type === 'text_delta' || a.type === 'thinking_delta')) emit({ t: a.type === 'text_delta' ? 'text' : 'thinking', id: `${turno}:${mensaje}:${a.contentIndex ?? 0}${a.type === 'thinking_delta' ? ':pensamiento' : ''}`, delta: a.delta })
+        if (a?.delta && (a.type === 'text_delta' || a.type === 'thinking_delta')) emit({ t: a.type === 'text_delta' ? 'text' : 'thinking', id: `${vez}:${turno}:${mensaje}:${a.contentIndex ?? 0}${a.type === 'thinking_delta' ? ':pensamiento' : ''}`, delta: a.delta })
         const total = e.usage?.totalTokens
         // Solo cuando cambia: cada trozo de texto lo repite.
         if (typeof total === 'number' && ventana && total !== usado) emit({ t: 'context', used: (usado = total), max: ventana })
