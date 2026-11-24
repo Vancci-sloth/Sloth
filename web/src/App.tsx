@@ -48,6 +48,7 @@ import { RevisionYoutube, YoutubeLote } from './YoutubeProgramar'
 import { rutaEditorImagen } from '../../shared/estilos-imagen'
 import { CalendarioYoutube } from './YoutubeCalendario'
 import { avisarTanda, AvisoRedes, ConNavegadorRedes, usePublicar } from './Redes' // redes
+import { AvisoPiloto } from './Piloto' // piloto
 import { NombreDelHilo, Renombrar } from './Renombrar'
 import { Segmento } from './Segmento'
 import { nombreDeVoz, SelectorVoz, useVoz, vozPosible } from './Voz' // voz de AI Studio, Fish Audio o ElevenLabs
@@ -1842,6 +1843,7 @@ function Pie({ running, connected, enOpciones, fallo, plegada }: { running: bool
   return (
     <div className="pie">
       <AvisoRedes connected={connected} /> {/* redes */}
+      <AvisoPiloto connected={connected} /> {/* piloto */}
       <button className={enOpciones ? 'on' : ''} aria-current={enOpciones ? 'page' : undefined} title={plegada ? 'Opciones' : undefined} onClick={() => go({ kind: 'opciones' })}>
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
           <path d="M4 7h9M17 7h3M4 17h3M11 17h9" />

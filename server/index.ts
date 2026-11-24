@@ -47,6 +47,8 @@ import { REVISION_CARD } from '../shared/revision.ts'
 import { PUBLICACIONES_CARD } from '../shared/publicaciones.ts' // «Organizar en chat» de YouTube
 import { carpetaTrabajo } from './trabajo.ts'
 import { redes } from './redes/index.ts' // redes
+import { piloto } from './piloto.ts' // piloto
+import { elegirModelos, lineaSubagentes } from '../shared/modelos.ts' // piloto
 import { elegirNavegador, navegadorDeFuera, navegadorEn } from './chromium.ts'
 import { voz } from './voz/index.ts' // voz de AI Studio
 import { flow } from './flow/index.ts' // Google Flow
@@ -251,6 +253,35 @@ function cards(): Card[] {
 // Quien apoya conecta su canal con la app de Google de Sloth, que vive en el cobro; los demás, con la suya.
 const subirLargos = youtube(APP, sessions, cards, `http://127.0.0.1:${PORT}/api/youtube/oauth`, undefined, () => modelos, undefined, appSloth(() => llaveDelCreador() ?? suscripcion.credencial()))
 const publicar = redes(APP, sessions, cards, broadcast, subirLargos.lectura) // redes
+// El piloto (`server/piloto.ts`): videos de una marca con su brief, a mano o, si lo enciendes, solos y a la cola de redes. // piloto
+const elPiloto = piloto({
+  dir: join(APP, 'data', 'piloto'),
+  cards,
+  hilos: {
+    // Como un lote: un hilo por video, cada uno con su carpeta, en el modelo medido para la card (o el de siempre).
+    crear: ({ card, videos }) => {
+      mkdirSync(card.cwd, { recursive: true })
+      const { choice, tareas } = elegirModelos(card.modelos, modelos, undefined)
+      if (!choice) throw new Error('No hay ningún modelo disponible: conecta un agente en Opciones.')
+      const n = videos.length
+      const carpetas = carpetasDeLote(card, n)
+      const lote = videos.map((v, i) => ({ carpeta: carpetas[i], title: v.title, text: [v.text, 'Formato: vertical', lineaSubagentes(tareas), `Lote: video ${i + 1} de ${n}. Carpeta: ${carpetas[i]}`].filter(Boolean).join('\n\n') }))
+      return sessions.crearLote({ cardId: card.id, model: choice.model, effort: choice.effort, cwd: card.cwd }, lote, card.skill ? skillRef(card.skill) : undefined).map((m) => m.id)
+    },
+    estado: (id) => {
+      const m = sessions.meta(id)
+      return m && { trabajando: !!(m.running || m.background?.length || m.pendiente), t: m.updatedAt }
+    }
+  },
+  // El vertical más largo del hilo: en un episodio con cortes, el entero.
+  videoDe: (card, sesion) =>
+    videosDe(card, sessions)
+      .filter((v) => v.sessionId === sesion && v.vertical !== false)
+      .sort((a, b) => (b.segundos ?? 0) - (a.segundos ?? 0))[0]?.ruta,
+  redes: { ritmo: publicar.estadoRitmo, programar: publicar.programarVideo },
+  aviso: (n) => avisoDeVideos(sessions.videosTrabajando(), n)
+}) // piloto
+elPiloto.arrancar() // piloto
 
 // Cada card de estilo enseña su último video terminado, en pequeño.
 const previa = previas(join(APP, 'data', 'previas'), cards) // previas de las cards
@@ -914,6 +945,7 @@ async function api(req: IncomingMessage, res: ServerResponse, url: URL): Promise
   if (await etapasApi(req, res, url, sessions, cards(), broadcast, miniatura)) return true // panel de etapas
   if (await videosApi(req, res, url, sessions, cards(), publicar?.marcas, cuadro, { hacer: previaChica, lista: previaLista })) return true // panel de etapas; `publicar.marcas`, de redes
   if (publicar && (await publicar.api(req, res, url))) return true // redes
+  if (await elPiloto.api(req, res, path)) return true // piloto
   if (subirLargos && (await subirLargos.api(req, res, url))) return true // videos largos de YouTube
   if (await previa.api(req, res, url)) return true // previas de las cards
   if (idear && (await idear.api(req, res, url))) return true // ideas

@@ -10,6 +10,9 @@ necesita para mirarla o moverla sin escribir scripts nuevos.
 - Se publica lo de **El Diff**. Los de `video-explicativo` llevan el cierre de su propio canal: pregunta antes de
   programar uno en las cuentas del usuario.
 - «Súbelos todos» se refiere a los de El Diff. Antes de encolar varios, enseña la lista (estilo y carpeta) y espera el sí.
+- El piloto automático (Redes → Piloto, `server/piloto.ts`) programa solo lo que hace, en el siguiente hueco del ritmo,
+  con el texto que escribe el agente (`programarVideo`). Lo enciende el usuario; un hilo no lo enciende ni lo usa para
+  programar lo de otros.
 - «Borrar los que ya subí» se refiere a los archivos del disco (a la Papelera), no a las publicaciones. Si no está claro,
   pregunta en una línea.
 
