@@ -13,7 +13,7 @@ import type { TrabajoFlow } from '../shared/types.ts'
 import { chromiumDelSistema } from './chromium.ts'
 import type { CuentaFlow } from './flow/cuentas.ts'
 import { type EnFlow, flow } from './flow/index.ts'
-import { bajar, mirarEnvios, ponerAportar, SinConexion } from './flow/pagina.ts'
+import { bajar, esperar, mirarEnvios, ponerAportar, Rechazado, SinConexion } from './flow/pagina.ts'
 
 // La resiliencia de red de Flow (#42) sin Google: la fila con una página de Flow de mentira y el reloj de mentira, la
 // descarga con un CDP de mentira, y `mirarEnvios` con un Chromium de verdad y la red frenada por CDP.
@@ -165,6 +165,41 @@ test('sin red en el primer pedido de una cuenta, «Ayudar a mejorar Flow» falla
   const conError = (mensaje: string) => ({ goto: async () => { throw new Error(mensaje) } }) as unknown as Page
   await assert.rejects(ponerAportar(conError('page.goto: net::ERR_INTERNET_DISCONNECTED at https://flow.google.com/'), false), (e: Error) => e instanceof SinConexion && /No se gastó nada/.test(e.message))
   await assert.rejects(ponerAportar(conError('Flow cambió su menú'), false), (e: Error) => !(e instanceof SinConexion))
+})
+
+/**
+ * Un proyecto de Flow de mentira para `esperar`: la primera tarjeta enseña `antes` (sin % ni imagen, como una que falló)
+ * y, al recargar, `despues` (`lista`: con su imagen).
+ */
+function proyecto(t: TestContext, antes: string, despues: { texto: string; lista: boolean }) {
+  t.mock.timers.enable({ apis: ['Date'], now: INICIO })
+  let recargas = 0
+  const page = {
+    url: () => 'https://flow.google.com/project/p1',
+    goto: async () => void recargas++,
+    waitForLoadState: async () => {},
+    waitForTimeout: async (ms: number) => void t.mock.timers.tick(ms),
+    locator: () => ({ first: () => ({ waitFor: async () => { throw new Error('sin novedades') } }) })
+  } as unknown as Page
+  const ahora = () => (recargas ? despues : { texto: antes, lista: false })
+  const tarjeta = {
+    waitFor: async () => {},
+    // Con argumento, lo que mira `esperar`; sin él, el texto (`textoDe`).
+    evaluate: async (_fn: unknown, video?: boolean) => (video === undefined ? ahora().texto : { avanza: false, ...ahora() })
+  } as unknown as Locator
+  return { page, tarjeta, recargas: () => recargas }
+}
+
+test('una tarjeta fallida que al recargar ya no está no baja la del pedido anterior: se rechaza con lo que decía', async (t) => {
+  const p = proyecto(t, 'Error No se ha podido generar esta imagen. No se te ha cobrado por esta generación.', { texto: 'Perezoso en taza', lista: true })
+  await assert.rejects(esperar(p.page, p.tarjeta, 'imagen', 'Perezoso en taza'), (e: Error) => e instanceof Rechazado && /No se ha podido generar esta imagen/.test(e.message))
+  assert.equal(p.recargas(), 1)
+})
+
+test('una tarjeta quieta que al recargar está hecha se da por lista', async (t) => {
+  const p = proyecto(t, 'Perezoso nuevo', { texto: 'Perezoso nuevo', lista: true })
+  await esperar(p.page, p.tarjeta, 'imagen', 'Perezoso en taza')
+  assert.equal(p.recargas(), 1)
 })
 
 /** Una descarga de mentira: el CDP del navegador avisa cuando empieza y cuánto lleva. */

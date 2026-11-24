@@ -407,12 +407,18 @@ async function comprobarSiEmpezo(page: Page, tarjeta: Locator, p: PedidoFlow, an
 /**
  * Espera a que acabe la tarjeta del pedido: mientras va enseña su % y, al acabar, su imagen o su botón de reproducir.
  * Sin % un rato (`SIN_AVANCE`), puede ser que la página dejó de refrescarse con mala conexión: se recarga y se mira otra
- * vez. Solo si tras recargar tampoco avanza, Flow lo rechazó y deja la tarjeta con su motivo.
+ * vez. Solo si tras recargar tampoco avanza, Flow lo rechazó y deja la tarjeta con su motivo. Una tarjeta fallida
+ * («No se ha podido generar») no vuelve al recargar: si la primera es otra vez `antesTexto`, la de antes del pedido, se
+ * rechaza con lo que decía, y no se baja la de otro pedido como si fuera esta.
  */
-async function esperar(page: Page, tarjeta: Locator, tipo: PedidoFlow['tipo']) {
+export async function esperar(page: Page, tarjeta: Locator, tipo: PedidoFlow['tipo'], antesTexto: string) {
   const fin = Date.now() + TERMINA
   let sinAvance = Date.now()
   let recargada = false
+  const rechazo = (texto: string) => {
+    const aviso = texto.replace(/\s+/g, ' ').trim().slice(0, 200)
+    return new Rechazado(`Flow no lo generó: ${aviso}`, aviso)
+  }
   while (Date.now() < fin) {
     const e = await tarjeta
       .evaluate((d, video) => {
@@ -431,12 +437,12 @@ async function esperar(page: Page, tarjeta: Locator, tipo: PedidoFlow['tipo']) {
       if (!recargada) {
         await ir(page, page.url()).catch(() => {})
         await tarjeta.waitFor({ timeout: 20_000 }).catch(() => {})
+        if (antesTexto && (await textoDe(tarjeta)) === antesTexto) throw rechazo(e.texto)
         recargada = true
         sinAvance = Date.now()
         continue
       }
-      const aviso = e.texto.replace(/\s+/g, ' ').trim().slice(0, 200)
-      throw new Rechazado(`Flow no lo generó: ${aviso}`, aviso)
+      throw rechazo(e.texto)
     }
     await page.waitForTimeout(2000)
   }
@@ -537,7 +543,7 @@ export async function generarEnFlow(b: Browser, page: Page, proyecto: string | u
     // Si la tarjeta no sale, antes de darlo por no empezado se comprueba recargando: con mala conexión tarda, y darlo por
     // no empezado mandaba el mismo video a otra cuenta, que lo cobraba de nuevo.
     if (!salio) await comprobarSiEmpezo(page, tarjeta, p, antesTexto, saldoAntes, creditos)
-    await esperar(page, tarjeta, p.tipo)
+    await esperar(page, tarjeta, p.tipo, antesTexto)
   } catch (e) {
     if (!(e instanceof Rechazado)) throw e
     if (p.tipo === 'imagen') throw new Rechazado(e.message, e.aviso, 0)
