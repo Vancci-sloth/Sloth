@@ -1,11 +1,11 @@
 import { execFile } from 'node:child_process'
 import { createHash } from 'node:crypto'
-import { existsSync, mkdirSync, readdirSync, readFileSync, statSync } from 'node:fs'
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync } from 'node:fs'
 import { writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { promisify } from 'node:util'
 import type { Card, VideoHecho } from '../shared/types.ts'
-import type { CuentaYoutube, EstadoRecomendacionYoutube, RecomendacionYoutube, ReferenciaYoutube } from '../shared/youtube.ts'
+import { VIGENCIA_YOUTUBE, type CuentaYoutube, type EstadoRecomendacionYoutube, type RecomendacionYoutube, type ReferenciaYoutube } from '../shared/youtube.ts'
 import { guardar, huella } from './disco.ts'
 import { carpetaYoutube } from './youtube-catalogo.ts'
 import { carpetaTrabajo } from './trabajo.ts'
@@ -40,11 +40,24 @@ export function recomendacionesYoutube(app: string, api: ApiPublicaYoutube, reda
       else { r.estado = 'error'; r.fase = 'Interrumpido'; r.error = 'Sloth se cerró durante el análisis. Puedes reintentar.' }
     }
   } catch { roto = true }
+  /**
+   * Una recomendación lleva datos públicos de otros videos de YouTube (títulos, vistas, miniaturas): a los 30 días se
+   * borra con su carpeta de análisis (`VIGENCIA_YOUTUBE`). Se vuelve a pedir con el mismo botón.
+   */
+  function vencer(h: string) {
+    const r = trabajos[h]
+    if (!r?.resultado || ['cola', 'trabajando'].includes(r.estado) || !(Date.now() - r.resultado.fecha >= VIGENCIA_YOUTUBE)) return false
+    delete trabajos[h]
+    rmSync(join(app, 'data', 'youtube', 'analisis', h), { recursive: true, force: true })
+    return true
+  }
   const activos = new Set<string>()
   let orden = Math.max(Date.now(), ...Object.values(trabajos).map((r) => r.orden ?? 0))
   const guardarDatos = () => { mkdirSync(join(app, 'data', 'youtube'), { recursive: true }); guardar(archivo, JSON.stringify(trabajos, null, 2)) }
+  if (!roto && Object.keys(trabajos).filter(vencer).length) guardarDatos()
   const cola = () => Object.keys(trabajos).filter((h) => trabajos[h].estado === 'cola').sort((a, b) => (trabajos[a].orden ?? 0) - (trabajos[b].orden ?? 0))
   function estado(h: string): EstadoRecomendacionYoutube | undefined {
+    if (vencer(h)) guardarDatos()
     const r = trabajos[h]
     const posicion = r?.estado === 'cola' ? cola().indexOf(h) + 1 : undefined
     return r && { estado: r.estado, fase: posicion ? `En cola · posición ${posicion}` : r.fase, error: r.error, resultado: r.resultado, descripcion: r.descripcion, modelo: r.modelo, posicion }

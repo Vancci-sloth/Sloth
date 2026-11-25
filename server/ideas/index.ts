@@ -3,6 +3,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 import { basename, isAbsolute, join, relative } from 'node:path'
 import { CANAL_CARD, esVertical, IDEAS_CARD, redDeReferencia, sinInvestigar, skillDe, TU_INSTAGRAM } from '../../shared/ideas.ts'
 import type { Canal, CanalCompleto, EnVivo, IdeaElegida, Ideas, Investigacion, Rendimiento, ServerPush, SessionMeta, Temas, TrabajoYT, Transcripcion, VueltaAnterior } from '../../shared/types.ts'
+import { VIGENCIA_YOUTUBE } from '../../shared/youtube.ts'
 import { guardar } from '../disco.ts'
 import { llaveYoutube, tokenMeta } from '../opciones.ts'
 import { carpetaTrabajo } from '../trabajo.ts'
@@ -144,9 +145,19 @@ export function ideas(app: string, sessions: Sessions, avisar: (push: ServerPush
     const propio = investigacion(id)?.canales.find((x) => x.propio)?.id
     return !!canal && !esVertical(canal) && !!propio && propio === youtube?.canal()
   }
-  /** `rendimiento.json`, con lo de Studio (`studio.json`) puesto en cada video. */
+  /**
+   * `rendimiento.json`, con lo de Studio (`studio.json`) puesto en cada video. Son datos de la API de YouTube: las políticas
+   * (III.E.4) piden no guardarlos más de 30 días sin volver a leerlos, y borrarlos si el canal se desconecta. Pasado el
+   * plazo se borran y, con el canal conectado, se leen otra vez solos.
+   */
   function rendimiento(id: string): Rendimiento | null {
-    const r = leer<Rendimiento>(id, 'rendimiento.json')
+    let r = leer<Rendimiento>(id, 'rendimiento.json')
+    const tuyo = esTuyo(id)
+    if (r && (!tuyo || !(Date.now() - r.medido < VIGENCIA_YOUTUBE))) {
+      rmSync(join(carpeta(id), 'rendimiento.json'), { force: true })
+      r = null
+      if (tuyo) void medir(id).catch(() => undefined)
+    }
     const s = leer<Studio>(id, 'studio.json')
     if (!r || !s?.videos) return r
     return { ...r, studio: s.medido, videos: r.videos.map((v) => ({ ...v, ...s.videos![v.id] })) }

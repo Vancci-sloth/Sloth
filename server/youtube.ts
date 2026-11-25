@@ -4,12 +4,14 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 import { join, relative, resolve, isAbsolute } from 'node:path'
 import { fechaRitmo, huecos, RITMO_YOUTUBE, validarRitmo } from '../shared/ritmo.ts'
 import type { Card, EstadoRitmo, Model, Ritmo, VideoHecho } from '../shared/types.ts'
+import { VIGENCIA_YOUTUBE } from '../shared/youtube.ts'
 import type { BorradorYoutube, CalendarioYoutube, CatalogoYoutube, ConexionYoutube, CuentaYoutube, DatosYoutube, EstadoSubidaYoutube, VideoParaYoutube } from '../shared/youtube.ts'
 import { aLaPapelera, guardar, huella } from './disco.ts'
 import { folderOf, servir, videosDe } from './etapas.ts'
 import { leer, escribir } from './opciones.ts'
 import type { Credencial } from './comunidad.ts'
 import { COBRO } from './licencia.ts'
+import { VENTA } from '../shared/venta.ts'
 import type { Sessions } from './sessions.ts'
 import { errorYoutube, subirYoutube, type SubidaYoutube } from './youtube-subida.ts'
 import { carpetaYoutube, formaYoutube, miniaturasYoutube, propuestaYoutube, validarMiniatura } from './youtube-catalogo.ts'
@@ -33,10 +35,17 @@ const REFRESH = 'YOUTUBE_REFRESH_TOKEN'
 const PERMISOS = 'YOUTUBE_SCOPES'
 /** `1` si el canal se conectó con la app de Sloth: su permiso se renueva en el cobro, no directo con Google. */
 const CON_SLOTH = 'YOUTUBE_CON_SLOTH'
-const SCOPES = 'https://www.googleapis.com/auth/youtube.upload https://www.googleapis.com/auth/youtube.readonly https://www.googleapis.com/auth/youtube.force-ssl'
+/**
+ * El permiso más chico que deja subir (`videos.insert`), poner la miniatura, ver si ya se procesó y programar o mover la
+ * fecha (`videos.update`, que no acepta `youtube.upload` ni `youtube.readonly`). Es lo que verificó Google en la app de
+ * Sloth: otro permiso de más en la app que se vende la deja «sin verificar». `youtube.readonly` solo lo pide el repo, para
+ * leer YouTube Analytics en Ideas → «Tus videos», que no va en la venta.
+ */
+const SCOPES = ['https://www.googleapis.com/auth/youtube.force-ssl', ...(VENTA ? [] : ['https://www.googleapis.com/auth/youtube.readonly'])].join(' ')
 const TOKEN = 'https://oauth2.googleapis.com/token'
 type Credenciales = { leer(nombre: string): string; escribir(nombre: string, valor: string | null): void }
-type Datos = { cuenta: CuentaYoutube | null; subidas: Record<string, SubidaYoutube>; borradores: Partial<Record<string, BorradorYoutube>>; ritmo?: Ritmo }
+/** `revisado`: cuándo se confirmó con Google que el permiso sigue y se volvió a leer el nombre del canal. */
+type Datos = { cuenta: CuentaYoutube | null; revisado?: number; subidas: Record<string, SubidaYoutube>; borradores: Partial<Record<string, BorradorYoutube>>; ritmo?: Ritmo }
 /** Lo más pronto que «Pasar al ritmo nuevo» pone o mueve una fecha: YouTube pide que falten al menos dos minutos. */
 const MARGEN = 10 * 60_000
 /** Cada cuánto se vuelve a preguntar al cobro si la app de Sloth está lista y si esta computadora apoya. */
@@ -119,6 +128,8 @@ export function youtube(app: string, sessions: Sessions, cards: () => Card[], re
   let acceso: { token: string; hasta: number } | null = null
   let renovando: Promise<string> | null = null
   let autorizando = false
+  /** Google dijo `invalid_grant`: el permiso se retiró (en la cuenta de Google) o caducó. */
+  let retirado = false
   let activa: string | null = null
   let procesando = false
   let eliminando = false
@@ -147,7 +158,7 @@ export function youtube(app: string, sessions: Sessions, cards: () => Card[], re
       // El cobro dice que ya no apoya: el permiso queda, y vuelve a servir al apoyar otra vez.
       if (viaSloth && res.status === 402) { infoSloth = { ...infoSloth, apoya: false }; throw new Error(j.error ?? 'Conectar YouTube con la app de Sloth es para quienes apoyan a Sloth.') }
       if (viaSloth && res.status !== 400) throw new Error(j.error && res.status < 500 ? j.error : 'No hay conexión con el cobro de Sloth, que renueva el permiso de YouTube. Reintenta en un momento.')
-      if (j.error === 'invalid_grant') error = 'Google retiró el permiso o caducó. Vuelve a conectar el canal.'
+      if (j.error === 'invalid_grant') { retirado = true; error = 'Google retiró el permiso o caducó. Vuelve a conectar el canal.' }
       throw new Error(error ?? (viaSloth ? 'Google no pudo autorizar el canal. Vuelve a conectarlo.' : 'Google no pudo autorizar el canal. Revisa las credenciales OAuth de escritorio y vuelve a conectarlo.'))
     }
     acceso = { token: j.access_token, hasta: Date.now() + (j.expires_in ?? 3600) * 1000 }
@@ -520,6 +531,8 @@ export function youtube(app: string, sessions: Sessions, cards: () => Card[], re
           credenciales.escribir(CON_SLOTH, p.sloth ? '1' : null)
           credenciales.escribir(PERMISOS, j.scope ?? SCOPES)
           datos.cuenta = canal
+          datos.revisado = Date.now()
+          retirado = false
           guardarDatos()
           error = undefined
           void seguir()
@@ -573,7 +586,26 @@ export function youtube(app: string, sessions: Sessions, cards: () => Card[], re
       return json(res, 400, { error: e instanceof Error ? e.message : 'No se pudo completar la petición de YouTube.' })
     }
   }
-  setTimeout(() => { void seguir() }, 0).unref()
+  /**
+   * Cada 30 días se confirma con Google que el permiso sigue y se vuelve a leer el nombre del canal, como piden las
+   * políticas de la API de YouTube (III.E.4). Si el permiso se retiró desde la cuenta de Google, se olvida aquí también.
+   */
+  async function revisar() {
+    if (!conectado() || !datos.cuenta || Date.now() - (datos.revisado ?? 0) < VIGENCIA_YOUTUBE || activa || procesando || permiso || autorizando) return
+    try {
+      const canal = await cuenta()
+      if (canal.id === datos.cuenta?.id) datos.cuenta = canal
+      datos.revisado = Date.now()
+      guardarDatos()
+    } catch {
+      if (!retirado || permiso || autorizando) return
+      await revocar()
+      datos.cuenta = null
+      guardarDatos()
+    }
+  }
+  setTimeout(() => { void seguir(); void revisar() }, 0).unref()
+  setInterval(() => { void revisar() }, 24 * 3600_000).unref()
   /** El canal conectado y un token para leer sus números (Ideas → «Tus videos»). */
   const lectura = { canal: () => (conectado() ? datos.cuenta?.id : undefined), cuenta: () => (conectado() ? datos.cuenta : null), token }
   return { api, lectura, ocupado: () => eliminando ? 'Se están enviando videos de YouTube a la Papelera.' : activa || procesando ? 'Se está preparando una publicación de YouTube. Espera a que termine.' : recomendar.ocupado() ?? (autorizando || permiso && permiso.hasta > Date.now() ? 'Se está conectando el canal de YouTube.' : null) }

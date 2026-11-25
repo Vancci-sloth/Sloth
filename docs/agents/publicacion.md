@@ -247,6 +247,10 @@ Lo que pide Google, en el proyecto de Sloth:
 - Verificar la app (Centro de verificación): página de inicio y aviso de privacidad en `sloth.vancci.org` (dominio
   verificado en Search Console), la justificación de cada permiso (`SCOPES` en `server/youtube.ts`) y un video «No
   listado» del flujo de «Conectar canal» y de una subida. Sin verificar, son 100 usuarios en toda la vida del proyecto.
+  La venta pide solo `youtube.force-ssl` (en Acceso a datos debe estar ese y nada más); un permiso nuevo es otra
+  verificación y otra línea en `sloth.vancci.org/privacidad#youtube`, que tiene su resumen en inglés (`#google-en`) para
+  los revisores. Su clave de prueba es la de `soporte@vancci.org` (`npm run fundador -- dar soporte@vancci.org 3`, que
+  la vuelve a mandar con `0`). Lo que se guarda de la API vence a los 30 días (`VIGENCIA_YOUTUBE`, políticas III.E.4).
 - Más de 100 subidas al día entre todos: auditoría y cuota en el
   [formulario de YouTube](https://support.google.com/youtube/contact/yt_api_form) (aparte `videos.insert`, con su cuenta).
   Una sola app de Sloth: varios proyectos para sumar cuota violan las políticas (III.D.1).

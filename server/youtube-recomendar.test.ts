@@ -227,3 +227,19 @@ test('la descripción lleva los capítulos del video terminado y no lo vuelve a 
   }
   assert.equal(escuchado, 1)
 })
+
+test('a los 30 días la recomendación se borra con su análisis: lleva datos de la API de YouTube', (t) => {
+  const base = resolve('data'); mkdirSync(base, { recursive: true })
+  const app = mkdtempSync(join(base, 'prueba-youtube-vence-'))
+  t.after(() => { assert.ok(app.startsWith(base + sep)); rmSync(app, { recursive: true, force: true }) })
+  const vieja = 'a'.repeat(64), nueva = 'b'.repeat(64)
+  const lista = (fecha: number) => ({ estado: 'listo', fase: '', resultado: { ...propuesta(), tema: 'x', fecha, fotogramas: [], referencias: [] } })
+  for (const h of [vieja, nueva]) { mkdirSync(join(app, 'data', 'youtube', 'analisis', h), { recursive: true }); guardar(join(app, 'data', 'youtube', 'analisis', h, 'ref.jpg'), 'jpg') }
+  guardar(join(app, 'data', 'youtube', 'recomendaciones.json'), JSON.stringify({ [vieja]: lista(Date.now() - 31 * 86_400_000), [nueva]: lista(Date.now() - 86_400_000) }))
+  const s = recomendacionesYoutube(app, async () => ({}))
+  assert.equal(s.estado(vieja), undefined)
+  assert.equal(s.estado(nueva)?.estado, 'listo')
+  assert.equal(existsSync(join(app, 'data', 'youtube', 'analisis', vieja)), false)
+  assert.equal(existsSync(join(app, 'data', 'youtube', 'analisis', nueva)), true)
+  assert.deepEqual(Object.keys(JSON.parse(readFileSync(join(app, 'data', 'youtube', 'recomendaciones.json'), 'utf8'))), [nueva])
+})

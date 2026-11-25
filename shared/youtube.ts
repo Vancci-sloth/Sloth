@@ -104,6 +104,12 @@ export interface RecomendacionYoutube {
   fecha: number
 }
 
+/**
+ * Lo más que Sloth guarda lo que leyó de la API de YouTube sin volver a leerlo: las políticas (III.E.4) piden borrarlo o
+ * actualizarlo a los 30 días.
+ */
+export const VIGENCIA_YOUTUBE = 30 * 24 * 3600_000
+
 export interface EstadoRecomendacionYoutube {
   estado: 'cola' | 'trabajando' | 'listo' | 'error'
   fase: string
