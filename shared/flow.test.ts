@@ -169,6 +169,7 @@ test('sin cupo de Vids la cuenta descansa de Vids hasta el día 1; su frenada, d
 test('lo que baja se reconoce por sus bytes, no por el nombre', () => {
   assert.equal(tipoDeArchivo(Uint8Array.from([0xff, 0xd8, 0xff, 0xe0, 0, 0, 0, 0])), 'imagen')
   assert.equal(tipoDeArchivo(Uint8Array.from([0, 0, 0, 0x20, 0x66, 0x74, 0x79, 0x70])), 'video')
+  assert.equal(tipoDeArchivo(new TextEncoder().encode('RIFF\0\0\0\0WEBPVP8 ')), 'imagen')
   assert.equal(tipoDeArchivo(new TextEncoder().encode('<!doctype html>')), null)
 })
 

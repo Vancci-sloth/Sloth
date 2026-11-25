@@ -8,6 +8,7 @@ import { herramientasIdeas } from './ideas/mcp.ts' // ideas
 import { navegadorAgente } from './navegador-agente.ts'
 import { mcpVoz } from './voz/index.ts'
 import { mcpFlow } from './flow/index.ts'
+import { mcpMeta } from './meta/index.ts'
 import { alBajarAgente, descartarRoto, programaClaude, rutaAgente } from './agentes.ts'
 import { sitiosDeAgente } from './tope-agentes.ts'
 import { conConsejo, otraApi } from './otra-api.ts'
@@ -150,7 +151,7 @@ export function startClaude(opts: AgentOptions): AgentRun {
       ...(otra ? {} : { agents: { guionista: GUIONISTA } }),
       // El navegador del agente, la voz de AI Studio, Google Flow y, en un canal de Ideas, sus herramientas (`parecidos`; en uno vertical,
       // también las de TikTok e Instagram): se suman a los MCP del usuario.
-      mcpServers: { ...navegadorAgente(opts.lote, opts.hilo), ...mcpVoz(), ...mcpFlow(), ...herramientasIdeas(opts.cwd) },
+      mcpServers: { ...navegadorAgente(opts.lote, opts.hilo), ...mcpVoz(), ...mcpFlow(), ...mcpMeta(), ...herramientasIdeas(opts.cwd) },
       ...(opts.soloLeer ? SOLO_LEER : {}),
       includePartialMessages: true,
       // Un subagente espera su sitio en la máquina antes de arrancar (`TOPE_AGENTES`). El que lanza otro subagente ya tiene

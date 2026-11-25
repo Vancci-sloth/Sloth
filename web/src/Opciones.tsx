@@ -29,6 +29,7 @@ import { ConNavegadorRedes, RedesOpciones } from './Redes' // redes
 import { YoutubeOpciones } from './Youtube'
 import { useVoz, VozOpciones } from './Voz' // voz de AI Studio
 import { FlowOpciones } from './Flow' // Google Flow
+import { MetaOpciones } from './Meta' // Meta Muse
 import { VENTA } from '../../shared/venta'
 import './Opciones.css'
 
@@ -198,7 +199,7 @@ type Apartado = readonly [id: string, titulo: string, icono: NombreIcono]
 
 const CREACION = [
   ['google', 'Google AI Studio', 'microfono'], ['sloth', 'Voces de Sloth', 'sonido'], ['externos', 'Proveedores externos', 'globo'],
-  ['flow', 'Google Flow', 'imagen'], ['privacidad', 'Privacidad de Flow', 'escudo']
+  ['flow', 'Google Flow', 'imagen'], ['privacidad', 'Privacidad de Flow', 'escudo'], ['meta', 'Meta Muse', 'imagen']
 ] as const satisfies readonly Apartado[]
 
 const EQUIPO = [
@@ -228,9 +229,10 @@ function OpcionesCreacion({ apartado }: { apartado?: string }) {
       {activa === 'externos' && <p>Conecta un proveedor con su llave de API para añadir sus voces al selector.</p>}
       {activa === 'flow' && <p>Gestiona las cuentas y los créditos para generar imágenes con Nano Banana y clips con Veo.</p>}
       {activa === 'privacidad' && <p>Decide si Flow puede usar tus generaciones para mejorar sus productos y si puedes enviar imágenes de referencia.</p>}
+      {activa === 'meta' && <p>Agrega tus cuentas de Meta para generar imágenes y videos con Muse; Sloth reparte los pedidos entre ellas.</p>}
     </header>
     <div className={`panel${activa === 'externos' ? ' opciones-proveedores' : ''}`}>
-      {esFlow ? <FlowOpciones voz={voz} privacidad={activa === 'privacidad'} /> : <VozOpciones voz={voz} vista={activa} />}
+      {activa === 'meta' ? <MetaOpciones /> : esFlow ? <FlowOpciones voz={voz} privacidad={activa === 'privacidad'} /> : <VozOpciones voz={voz} vista={activa} />}
     </div>
   </NavegacionOpciones>
 }

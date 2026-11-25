@@ -49,8 +49,8 @@ const puertoLibre = () =>
 const navegador = () => chromiumDelSistema(process.platform === 'darwin')
 export const nombreNavegador = () => nombreDe(navegador() ?? (process.platform === 'win32' ? 'msedge' : undefined))
 
-/** El Edge de un perfil: lo abre, lo usa con Playwright y lo cierra. */
-function edgeDe(perfil: string) {
+/** El Edge de un perfil: lo abre, lo usa con Playwright y lo cierra. `inicio`, donde abre su ventana. También el de Meta Muse. */
+export function edgeDe(perfil: string, inicio = URL_FLOW) {
   // Edge solo escribe `DevToolsActivePort` con el puerto `0`: el elegido se guarda aquí, para hallar su Edge tras reiniciar.
   const archivoPuerto = join(perfil, 'puerto-sloth')
   const puerto = () => {
@@ -92,7 +92,7 @@ function edgeDe(perfil: string) {
   }
 
   /** Lo abre, si no lo estaba. Con `ventana`, en `url` y como un Edge cualquiera; si no, sin ventana ni sonido. */
-  async function lanzar(ventana: boolean, url = URL_FLOW) {
+  async function lanzar(ventana: boolean, url = inicio) {
     if (await responde()) {
       if (!ventana) return
       await cerrar()
@@ -117,23 +117,27 @@ function edgeDe(perfil: string) {
     return r
   }
 
+  /** Si tiene la cookie `nombre` de `dominio` (o de un subdominio), sin tocar sus pestañas. */
+  const tiene = (dominio: RegExp, nombre: RegExp) =>
+    alNavegador<{ cookies: { name: string; domain: string }[] }>('Storage.getCookies').then(
+      ({ cookies }) => cookies.some((c) => nombre.test(c.name) && dominio.test(c.domain.replace(/^\./, ''))),
+      () => false
+    )
+
   return {
     lanzar,
     cerrar,
     paginas,
+    tiene,
     /**
      * Si ya tiene la sesión de Google y la de Flow. La de Flow (`OSID` en su dominio) la pone Google un momento después de
      * llegar: sin ella, el Edge sin ventana tenía que pedirla otra vez y Google no se la daba, así que Flow abría sin
      * cuenta («Entraste, pero Flow no dijo con qué cuenta»), a quien cerraba la ventana en cuanto veía Flow.
      */
-    sesiones: () =>
-      alNavegador<{ cookies: { name: string; domain: string }[] }>('Storage.getCookies').then(
-        ({ cookies }) => {
-          const de = (dominio: RegExp, nombre: RegExp) => cookies.some((c) => nombre.test(c.name) && dominio.test(c.domain.replace(/^\./, '')))
-          return { google: de(/(^|\.)google\.com$/, /^SAPISID$/), flow: de(new RegExp(`^${new URL(URL_FLOW).hostname.replaceAll('.', '\\.')}$`), /^(__Secure-)?OSID$/) }
-        },
-        () => ({ google: false, flow: false })
-      ),
+    sesiones: async () => {
+      const google = await tiene(/(^|\.)google\.com$/, /^SAPISID$/)
+      return { google, flow: google && (await tiene(new RegExp(`^${new URL(URL_FLOW).hostname.replaceAll('.', '\\.')}$`), /^(__Secure-)?OSID$/)) }
+    },
     enEdge: <T>(fn: (b: Browser) => Promise<T>) =>
       enTurno(async () => {
         await lanzar(false)

@@ -168,6 +168,11 @@ Este es el mapa:
   Google Flow. El menú «Imágenes» del compositor manda la línea `Imágenes:` (ChatGPT o un modelo de Flow). ADR 0014, 0015 y 0016.
   Google Vids es un modelo más de video (`vids.ts`, «Google Vids · Omni»): misma fila y cuentas, su propio cupo y descanso
   (`descansosVids`). ADR 0027.
+- `server/meta/` y `web/src/Meta.tsx`: imágenes y videos de 10 s de Meta Muse (muse.ai), con las cuentas de Meta que se
+  agregan en Opciones → Meta Muse, cada una en su Edge (`edgeDe` de `flow/cuentas.ts`). El reparto (a la de menos uso de
+  la semana) está en `shared/meta.ts`. `pagina.ts` le pide en un chat nuevo y saca el archivo de la página; lee el uso
+  de la semana antes y después. Los agentes piden con el MCP `meta`
+  (`mcp.mjs`, `skills/video-base/FLOW.md`). ADR 0028.
 - Imágenes (`web/src/EstudioImagenes.tsx`, `EditorImagen.tsx`, `/api/flow/estudio` en `server/flow/index.ts`): pedir una
   imagen sin chat, con un estilo (`shared/estilos-imagen.ts`), un modelo de Flow (la misma fila y cuentas), ChatGPT
   (`server/imagen-codex.ts`) o «Quitar fondo» en tu computadora (`server/flow/recorte.ts`, `video-base/scripts/recorte.py`).

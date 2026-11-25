@@ -254,6 +254,8 @@ export function elegirCuenta(cuentas: UsoCuenta[], tipo: 'imagen' | 'video', aho
 export function tipoDeArchivo(b: Uint8Array): 'imagen' | 'video' | null {
   if (b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff) return 'imagen'
   if (b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4e && b[3] === 0x47) return 'imagen'
+  // WebP, el de Meta Muse.
+  if (String.fromCharCode(...b.subarray(0, 4)) === 'RIFF' && String.fromCharCode(...b.subarray(8, 12)) === 'WEBP') return 'imagen'
   if (String.fromCharCode(...b.subarray(4, 8)) === 'ftyp') return 'video'
   return null
 }

@@ -4,6 +4,7 @@ import type { SkillRef } from './agent.ts'
 import { OPCIONES, UN_VIDEO_POR_HILO } from './claude.ts'
 import { mcpVoz } from './voz/index.ts'
 import { mcpFlow } from './flow/index.ts'
+import { mcpMeta } from './meta/index.ts'
 import { navegadorAgente, USA_EL_NAVEGADOR } from './navegador-agente.ts'
 import { SKILLS } from './skills.ts'
 import { conSobreTi } from './sobre-ti.ts'
@@ -45,7 +46,7 @@ interface McpLocal {
  * dentro del servidor de Sloth: como con Codex, solo llegan a Claude.
  */
 export function mcpSloth(lote?: boolean, hilo?: string): Record<string, McpLocal> {
-  const todos = { ...navegadorAgente(lote, hilo), ...mcpVoz(), ...mcpFlow() } as Record<string, { command: string; args?: string[]; env?: Record<string, string | undefined> }>
+  const todos = { ...navegadorAgente(lote, hilo), ...mcpVoz(), ...mcpFlow(), ...mcpMeta() } as Record<string, { command: string; args?: string[]; env?: Record<string, string | undefined> }>
   return Object.fromEntries(
     Object.entries(todos).map(([nombre, s]) => [
       nombre,

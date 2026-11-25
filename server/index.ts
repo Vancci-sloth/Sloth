@@ -52,6 +52,7 @@ import { elegirModelos, lineaSubagentes } from '../shared/modelos.ts' // piloto
 import { elegirNavegador, navegadorDeFuera, navegadorEn } from './chromium.ts'
 import { voz } from './voz/index.ts' // voz de AI Studio
 import { flow } from './flow/index.ts' // Google Flow
+import { meta } from './meta/index.ts' // Meta Muse
 import { appSloth, youtube } from './youtube.ts'
 import { peticionDeConfianza } from './origen.ts'
 import { actualizarYtDlp, BANDERAS, instalandoAlgo, instalar, pythonSlothEntero, requisitos, rutaPythonSloth } from './requisitos.ts'
@@ -399,6 +400,8 @@ const generarFlow = flow(APP, narrar.google, {
     return { texto, uso: { model: id } }
   }
 }) // Google Flow
+// Las imágenes y videos de Meta Muse, con la cuenta de Meta del usuario, en su propio Edge.
+const generarMeta = meta(APP) // Meta Muse
 
 // Si el agente (o tú) edita cards.json, las cards se actualizan solas. En la app que se vende, una card tuya que un
 // agente puso ahí pasa a tus-cards.json: la siguiente versión reemplaza cards.json.
@@ -421,6 +424,7 @@ function ocupado(): string | null {
   if (idear?.ocupado()) return idear.ocupado() // ideas: una investigación en curso
   if (narrar.ocupado()) return narrar.ocupado() // voz de AI Studio: una a medias
   if (generarFlow.ocupado()) return generarFlow.ocupado() // Google Flow: un pedido a medias
+  if (generarMeta.ocupado()) return generarMeta.ocupado() // Meta Muse: un pedido a medias
   if (acciones3d.ocupado()) return acciones3d.ocupado() // modelos 3D: una importación a medias
   if (subtitular.ocupado()) return subtitular.ocupado() // subtítulos: uno a medias
   return maquina.ocupado() ?? instalandoAlgo() ?? bajandoAgente() ?? conectando() ?? conectandoCodex() ?? conectandoOpenCode() ?? conectandoOtro()
@@ -567,6 +571,7 @@ async function api(req: IncomingMessage, res: ServerResponse, url: URL): Promise
   if (await movil.api(req, res, path)) return true // tu celular
   if (await narrar.api(req, res, path)) return true // voz de AI Studio
   if (await generarFlow.api(req, res, path)) return true // Google Flow
+  if (await generarMeta.api(req, res, path)) return true // Meta Muse
 
   if (path === '/api/actividad-agentes' && method === 'GET') {
     const p = url.searchParams.get('agente') as Proveedor

@@ -79,3 +79,22 @@ varias cuentas, hasta dos a la vez, con unos segundos entre pedidos), para que G
   modelo de Flow si el usuario lo acepta.
 - **Otro error de Flow:** dile el error tal cual. Si dice «No gastó créditos», puedes pedirlo otra vez cambiando lo que
   Flow no aceptó. Si no, no lo repitas sin decírselo al usuario: puede gastar otra vez.
+
+## Meta Muse, la otra opción
+
+Si el usuario agregó cuentas de Meta (Opciones → Meta Muse), el MCP `meta` (en Claude, `mcp__meta__generar_imagen`,
+`mcp__meta__generar_video` y `mcp__meta__estado_meta`) genera con Muse. Úsalo cuando el usuario lo pida o cuando Flow no
+pueda (sin cuentas, o todas sin créditos): no reemplaza la línea `Imágenes:` ni la `Clips:`.
+
+- `generar_imagen`: deja `.png`, `.jpg` o `.webp` según la extensión de `salida` (1152×2048 en 9:16). Junta o edita
+  hasta 9 `referencias`.
+- `generar_video`: 10 s con sonido, unos 700×1250 en 9:16. Lo dicho va entre comillas, unas 25 palabras. Con
+  `primerCuadro`, anima esa imagen: lo fiable para que el personaje salga igual.
+- No cobra por pedido: gasta el uso **semanal** de su plan (en el gratis, cerca del 1 % una imagen y del 9 % un video:
+  unos 10 videos a la semana por cuenta). Sloth reparte entre sus cuentas y, si una gastó su semana, pasa sola a otra
+  sin gastar. Antes de varios videos, `estado_meta` sin `id` dice cuánto lleva cada una; díselo al usuario.
+- Tarda de 20 s (imagen) a un minuto (video). Con varias cuentas, hasta dos a la vez; lo que no depende de lo anterior
+  pídelo seguido.
+- **Si falla:** si ninguna cuenta puede (sin sesión o con la semana gastada), el error dice cuándo vuelven; que
+  agregue otra o revise la sesión en Opciones → Meta Muse. Si Muse contestó sin el archivo (se negó
+  o preguntó algo), el error trae lo que dijo: cambia el pedido, no lo repitas igual.
