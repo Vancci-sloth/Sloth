@@ -45,6 +45,19 @@ interface Subiendo {
 const Icono = ({ de }: { de: NombreIcono }) => <IconoBase de={de} className="esc-ico" />
 let siguiente = 0
 
+/**
+ * Una imagen de la comunidad en grande, sobre todo lo demás. Va a `document.body`: dentro de la publicación abierta, el
+ * desenfoque de su velo (`backdrop-filter`) volvía `fixed` relativo al velo y la imagen salía arriba, con scroll.
+ */
+export function Ampliada(props: { src: string; onCerrar: () => void }) {
+  return createPortal(
+    <div className="lightbox encima" onClick={props.onCerrar}>
+      <img src={props.src} alt="" />
+    </div>,
+    document.body
+  )
+}
+
 /** Sube una imagen a la comunidad: de una publicación o de un comentario. */
 export async function subirImagen(f: File): Promise<AdjuntoComunidad> {
   const r = await fetch(`/api/comunidad/archivo?tipo=${encodeURIComponent(f.type)}`, { method: 'POST', body: f })
@@ -89,6 +102,7 @@ export function Escribir(props: {
   const [texto, setTexto] = useState(props.inicial?.texto ?? '')
   const [adjuntos, setAdjuntos] = useState<AdjuntoComunidad[]>(props.inicial?.adjuntos ?? [])
   const [subiendo, setSubiendo] = useState<Subiendo[]>([])
+  const [ampliada, setAmpliada] = useState<string | null>(null)
   const [ocupado, setOcupado] = useState(false)
   const [error, setError] = useState('')
   const [encima, setEncima] = useState(false)
@@ -274,7 +288,7 @@ export function Escribir(props: {
                   {a.nombre}
                 </span>
               ) : a.tipo === 'imagen' ? (
-                <img src={a.url} alt="" />
+                <img src={a.url} alt="" title="Ver en grande" onClick={() => setAmpliada(a.url)} />
               ) : a.posterUrl ? (
                 <img src={a.posterUrl} alt="" />
               ) : (
@@ -302,6 +316,7 @@ export function Escribir(props: {
           ))}
         </div>
       )}
+      {ampliada && <Ampliada src={ampliada} onCerrar={() => setAmpliada(null)} />}
       {propuesta && (vigente || propuesta.preguntas.length > 0) && (
         <div className="esc-claude">
           <div className="esc-claude-cabeza">
@@ -421,7 +436,7 @@ function MisVideosParaElegir({ entero, onElegir, onCerrar }: { entero?: boolean;
   const marca = useRef<HTMLSpanElement>(null)
   useEffect(() => {
     api<VideosDeTodos>('/api/videos').then(
-      (r) => setVideos(r.videos.slice(0, 60)),
+      (r) => setVideos(r.videos),
       (e: Error) => setError(e.message)
     )
     const fuera = (e: MouseEvent) => {

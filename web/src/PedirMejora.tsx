@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { NOMBRE_AGENTE, proveedorDe } from '../../shared/providers'
 import type { OrigenMejora, PublicacionComunidad, SessionMeta } from '../../shared/types'
 import { api } from './api'
@@ -16,9 +16,14 @@ import './PedirMejora.css'
  * comunidad, donde todos la ven; el hilo de donde salió no se publica (se queda en esta computadora, `server/comunidad.ts`).
  * Un aviso lleva a ella.
  */
+/** Menos palabras que esto no alcanzan a contar una mejora: casi siempre es un mensaje para el agente. */
+const CORTA = 6
+
 export function PedirMejora({ sessions }: { sessions: SessionMeta[] }) {
   const [origen, setOrigen] = useState<OrigenMejora | null>(null)
   const [anotada, setAnotada] = useState<PublicacionComunidad | null>(null)
+  // Lo corto que ya se avisó: si lo vuelve a mandar igual, es a propósito y se publica.
+  const avisado = useRef('')
 
   useEffect(() => {
     const abrir = (e: Event) => {
@@ -75,6 +80,12 @@ export function PedirMejora({ sessions }: { sessions: SessionMeta[] }) {
               agente={agente}
               origen={origen}
               onListo={async ({ texto, adjuntos }) => {
+                // «sigue», «corrígelo», «no me funciona»: es un mensaje para el agente que se escribió aquí por error
+                // (el símbolo del agente en el encabezado abre esta ventana), y se publicaba para toda la comunidad.
+                if (texto.split(/\s+/).length < CORTA && texto !== avisado.current) {
+                  avisado.current = texto
+                  throw new Error(`Esto se publica en la comunidad, no le llega a ${NOMBRE_AGENTE[agente]}. Si era para el video, escríbelo en el chat del hilo. Si es una mejora para Sloth, cuenta qué pasó y qué debería ser distinto, o vuelve a publicarla así.`)
+                }
                 const m = await api<PublicacionComunidad>('/api/mejoras', { texto, adjuntos, origen })
                 setOrigen(null)
                 setAnotada(m)

@@ -57,7 +57,8 @@ varias cuentas, hasta dos a la vez, con unos segundos entre pedidos), para que G
 ## Si falla
 
 - **Sin cuenta conectada, o se fue la sesión:** dile al usuario que conecte la de la voz en Opciones → Voz o agregue una
-  en Opciones → Google Flow.
+  en Opciones → Google Flow, y que te avise. Al avisarte, vuelve a pedirlo en este mismo hilo: Sloth toma la cuenta al
+  momento, no hace falta abrir otro chat.
 - **Ninguna cuenta puede ahora** (sin créditos o frenadas): el error dice cuándo vuelven a probar. No gastó nada. Dile al
   usuario cuántos clips faltan, y que puede esperar o agregar cuentas en Opciones → Google Flow.
 - **Pide confirmar los derechos de las imágenes:** dile al usuario que los confirme en Opciones → Google Flow (o en

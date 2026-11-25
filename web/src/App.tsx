@@ -1560,7 +1560,7 @@ const SessionView = memo(function SessionView({ id, session, card, models }: { i
             <div className="queued">
               <span className="muted small">{session.lote?.pausa ? 'Lote en pausa' : 'En espera'}</span>
               <span className="queued-text" title={session.lote?.pausa}>
-                {session.lote?.pausa ?? `Video ${session.lote?.n} de ${session.lote?.de}: empieza solo cuando haya sitio en la máquina.`}
+                {session.lote?.pausa ?? (session.lote ? `Video ${session.lote.n} de ${session.lote.de}: empieza solo cuando haya sitio en la máquina.` : 'En la cola: empieza solo cuando acabe uno de los videos que trabajan.')}
               </span>
               {session.lote?.pausa && (
                 <Pedir ruta={`/api/lotes/${session.lote.id}/seguir`} title="Los que esperan vuelven a arrancar cuando haya sitio">

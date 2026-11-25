@@ -544,10 +544,13 @@ function aWav(file: string): Promise<string | null> {
   })
 }
 
-/** Si arrancar `nuevos` videos pasa de los que van sin aviso y no lo han confirmado: lo contesta, y la interfaz pregunta. */
-function pideConfirmar(res: ServerResponse, confirmado: boolean | undefined, nuevos = 1): boolean {
+/**
+ * Si arrancar `nuevos` videos pasa de los que van sin aviso y no lo han confirmado: lo contesta, y la interfaz pregunta.
+ * `cola`: el pedido también se puede poner en la cola (`enCola`), y la interfaz lo ofrece.
+ */
+function pideConfirmar(res: ServerResponse, confirmado: boolean | undefined, nuevos = 1, cola = false): boolean {
   const aviso = confirmado ? undefined : avisoDeVideos(sessions.videosTrabajando(), nuevos)
-  if (aviso) send(res, 409, { confirmar: true, error: aviso })
+  if (aviso) send(res, 409, { confirmar: true, error: aviso, ...(cola ? { cola: true } : {}) })
   return !!aviso
 }
 
@@ -873,12 +876,12 @@ async function api(req: IncomingMessage, res: ServerResponse, url: URL): Promise
   }
 
   if (path === '/api/sessions' && method === 'POST') {
-    const input = await body<{ cardId: string; model: string; effort?: string; text: string; images?: string[]; masDeDos?: boolean }>(req)
+    const input = await body<{ cardId: string; model: string; effort?: string; text: string; images?: string[]; masDeDos?: boolean; enCola?: boolean }>(req)
     // «Organizar en chat» (revisión de YouTube) abre un chat de una card que no sale en el inicio.
     const card = input.cardId === PUBLICACIONES_CARD.id ? { ...PUBLICACIONES_CARD, cwd: join(carpetaTrabajo(APP), PUBLICACIONES_CARD.id) } : cards().find((c) => c.id === input.cardId)
     if (!card) return send(res, 404, { error: 'No existe esa card' }), true
     if (card.bloqueada) return send(res, 402, { error: SIN_APOYO }), true
-    if (card.etapas?.some((e) => e.fase) && pideConfirmar(res, input.masDeDos)) return true
+    if (card.etapas?.some((e) => e.fase) && pideConfirmar(res, input.masDeDos, 1, true)) return true
     mkdirSync(card.cwd, { recursive: true })
     // Uno que sale de Ideas se llama como la idea (su línea `Título:`); los demás, como su primer mensaje, hasta que llegue
     // el título corto.
@@ -891,7 +894,8 @@ async function api(req: IncomingMessage, res: ServerResponse, url: URL): Promise
     const claude = proveedorDe(input.model) === 'claude'
     const meta = sessions.create({ cardId: card.id, title, model: input.model, effort: input.effort, cwd: card.cwd, carpeta: nueva, generarTitulo: !titulo && !!pedido && !claude && !card.sinHerramientas })
     const text = [input.text, nueva && `Carpeta: ${nueva}`].filter(Boolean).join('\n\n')
-    sessions.send(meta.id, text, card.skill ? skillRef(card.skill) : undefined, input.images)
+    if (input.enCola) sessions.encolar(meta.id, text, card.skill ? skillRef(card.skill) : undefined, input.images)
+    else sessions.send(meta.id, text, card.skill ? skillRef(card.skill) : undefined, input.images)
     // El primer mensaje recortado se cambia por un título corto cuando llega, como un renombrado. Nadie lo espera; si
     // falla, o mientras alguien le puso otro nombre, se queda el que tiene. Sin las líneas que añade la app.
     if (!titulo && pedido && claude)

@@ -105,11 +105,14 @@ Sloth la enseña en el inicio en cuanto ese archivo cambia, y enlaza la skill do
 5. **Probar.** Haz dos videos de prueba cortos (de 10 a 15 s) siguiendo la skill nueva, uno vertical y uno horizontal,
    en `<skills>/../trabajo/<id>/prueba-vertical` y `prueba-horizontal`: si pide la voz del usuario, usa una de
    `edge-tts` solo para probar. Arregla lo que falle en la skill, no en el video. Listo cuando salen los dos MP4, los
-   miraste en una hoja y el horizontal se ve pensado para YouTube, no un vertical estirado.
+   miraste en una hoja y el horizontal se ve pensado para YouTube, no un vertical estirado. No entregues con una prueba
+   pendiente: si una no sale (sin créditos, sin cuenta, un error que no puedes arreglar), di cuál, por qué y qué tiene
+   que hacer el usuario, y que la card no está lista hasta que salga.
 6. **Pasarlo por la vara.** Repasa [lo que necesita todo estilo](../video-base/ESTILO.md), sus 30 requisitos uno por
    uno, y arregla el que no cumpla: es con lo que se aprueba si luego lo comparte. Listo cuando los cumple todos.
-7. **Entregar.** Dile al usuario en pocas líneas qué hace su estilo, que ya tiene su card en el inicio (con su nombre)
-   para usarlo como los demás, qué le va a pedir cada vez y dónde están las dos pruebas.
+7. **Entregar.** Antes, mira que los dos MP4 de prueba existan en el disco. Empieza con una línea clara: «Tu card
+   «<nombre>» ya está lista: ya puedes usarla.» (o, si faltó una prueba, «Tu card aún no está lista: falta…»). Luego,
+   en pocas líneas, qué hace su estilo, qué le va a pedir cada vez y dónde están las dos pruebas.
 
 ## Cambiar un estilo tuyo
 

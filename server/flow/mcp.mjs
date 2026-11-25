@@ -76,7 +76,7 @@ const hora = (ms) => new Date(ms).toLocaleTimeString('es-MX', { hour: '2-digit',
 
 /** Los créditos de cada cuenta, de lo último que se leyó en su Flow. */
 function saldos(e) {
-  if (!e.cuentas.length) return 'No hay cuentas de Google en Flow: el usuario las conecta en Opciones → Google Flow.'
+  if (!e.cuentas.length) return 'No hay cuentas de Google en Flow: el usuario las conecta en Opciones → Google Flow. En cuanto la conecte, vuelve a llamar aquí mismo: Sloth la toma al momento, sin abrir otro chat.'
   const ahora = Date.now()
   const renglones = e.cuentas.map((c) => {
     const s = c.saldo

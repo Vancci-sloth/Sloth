@@ -225,11 +225,17 @@ function* cajas(b: Buffer): Generator<[string, Buffer]> {
   }
 }
 
-/** Los videos terminados de una carpeta: los de la etapa «Video», si está hecha. Los que empiezan por `_` son a medias. */
+/**
+ * Los videos terminados de una carpeta: los de la etapa «Video», si está hecha. Los que empiezan por `_` son a medias.
+ * Un estilo hecho por alguien cuya etapa final se llama de otro modo («Render», «Video final») usa la última que muestra
+ * un MP4: si no, sus videos no salían en «Mis videos» ni se podían poner en la comunidad.
+ */
 export function terminados(card: Card, folder: string): Archivo[] {
-  return (card.etapas ?? [])
-    .filter((e) => e.nombre === 'Video' && e.muestra && listos(folder, e.listo).length)
-    .flatMap((e) => files(folder, e.muestra!))
+  const etapas = card.etapas ?? []
+  const delVideo = etapas.some((e) => e.nombre === 'Video') ? etapas.filter((e) => e.nombre === 'Video' && e.muestra) : etapas.filter((e) => /\.mp4\b/i.test(e.muestra ?? e.listo)).slice(-1)
+  return delVideo
+    .filter((e) => listos(folder, e.listo).length)
+    .flatMap((e) => files(folder, e.muestra ?? e.listo))
     .filter((a) => a.ruta.endsWith('.mp4') && !basename(a.ruta).startsWith('_'))
 }
 

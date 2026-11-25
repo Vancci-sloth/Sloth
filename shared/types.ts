@@ -509,6 +509,8 @@ export interface SessionMeta {
   skill?: string
   /** El primer mensaje de un video del lote que aún no empieza: espera a que haya sitio en la máquina. */
   pendiente?: { text: string; images?: string[] }
+  /** Un video suelto puesto en la cola (el aviso de más de dos a la vez): arranca cuando trabajen menos de dos. */
+  enCola?: boolean
 }
 
 export interface Lote {

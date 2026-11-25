@@ -388,7 +388,7 @@ export function errorLlano(error = '', caida = false, agente: Proveedor = 'claud
   const nombre = NOMBRE_AGENTE[agente]
   // La caída la marca el servidor. Los hilos de antes de la marca traen la frase con que sessions.ts cierra el turno.
   if (caida || /^el servidor se cerró a mitad del turno/.test(error)) {
-    return { titulo: 'Se cortó a mitad del trabajo', ayuda: 'Lo que ya hizo sigue en su carpeta. Pulsa «Reintentar» y sigue desde ahí.', reintentar: true }
+    return { titulo: 'Se cortó a mitad del trabajo', ayuda: 'Lo que ya hizo sigue en su carpeta, y Sloth lo retoma sola desde ahí. Si no arranca, pulsa «Reintentar».', reintentar: true }
   }
   if (/^lo detuviste/i.test(error)) return { titulo: 'Lo detuviste', ayuda: 'Dile qué cambiar, o pulsa «Reintentar» para que siga.', reintentar: true, tuyo: true }
   if (agente === 'opencode' && /^Conecta tu cuenta de OpenCode/.test(error)) {
@@ -402,6 +402,24 @@ export function errorLlano(error = '', caida = false, agente: Proveedor = 'claud
     return { titulo: 'El modelo gratis está saturado', ayuda: 'Espera unos minutos y pulsa «Reintentar», o elige otro modelo gratis.', reintentar: true }
   }
   if (agente === 'antigravity' && /^Se acabó tu cuota/.test(error)) return { titulo: 'Se acabó tu cuota de Antigravity', ayuda: error, reintentar: true, limite: true }
+  // El proveedor no atiende desde tu país (o desde el de la VPN que usas): no es un límite, cambiar de agente sí sirve.
+  if (/unsupported_country|not (available|supported) in your (country|region|location)|location is not supported|region (is )?not supported|country.{0,30}not supported/i.test(error)) {
+    return {
+      titulo: `${nombre} no está disponible en tu país`,
+      ayuda: `${nombre} no da servicio desde donde te conectas. Si usas una VPN, apágala: a veces te pone en otro país. Si no, sigue abajo con otra IA (Claude, OpenRouter u OpenCode suelen funcionar en más países): le pasa lo hablado.`,
+      reintentar: true,
+      limite: true
+    }
+  }
+  // Una llave de API o una cuenta de pago sin saldo: no se renueva sola como el plan, se recarga en la página del servicio.
+  if (/insufficient_quota|exceeded your current quota|insufficient (balance|credits?|funds)|payment required|\b402\b|RESOURCE_EXHAUSTED|quota (exceeded|exhausted)|exceeded.{0,20}quota/i.test(error)) {
+    return {
+      titulo: `Se acabó el saldo o la cuota de ${nombre}`,
+      ayuda: `No es Sloth: la cuenta o la llave con que usas ${nombre} se quedó sin saldo o llegó a su cuota. Recárgala en la página de ${nombre} (o espera a que se renueve, si es gratis) y pulsa «Reintentar», o sigue ya abajo con otra IA: le pasa lo hablado y retoma donde se quedó.`,
+      reintentar: true,
+      limite: true
+    }
+  }
   if (/hit your .*limit|usage limit|rate.?limit|out of usage|spend limit|credit balance|\b429\b/i.test(error)) {
     const cuando = reinicio(error)
     // Con Claude, el aviso deja entrar con otra cuenta (`LimiteClaude.tsx`).
@@ -418,8 +436,8 @@ export function errorLlano(error = '', caida = false, agente: Proveedor = 'claud
       reintentar: true
     }
   }
-  if (/overload|API Error:? 5\d\d|ETIMEDOUT|timed? ?out|service unavailable|internal server error|bad gateway/i.test(error)) {
-    return { titulo: `${nombre} no respondió`, ayuda: 'Suele ser pasajero: espera un momento y pulsa «Reintentar».', reintentar: true }
+  if (/overload|API Error:? 5\d\d|internal error|ETIMEDOUT|timed? ?out|service unavailable|internal server error|bad gateway/i.test(error)) {
+    return { titulo: `${nombre} no respondió`, ayuda: 'Suele ser pasajero: Sloth lo reintenta sola en un momento, dos veces. Si sigue igual, pulsa «Reintentar».', reintentar: true }
   }
   if (/prompt is too long|too many tokens|context (window|length)/i.test(error)) {
     return { titulo: 'La conversación ya es demasiado larga', ayuda: 'Abre un hilo nuevo y cuéntale dónde se quedó este.', reintentar: false }

@@ -100,7 +100,11 @@ const ESPERA_MAXIMA = 50_000
 const ESPERAS_RED = [30_000, 60_000, 120_000, 240_000]
 /** Tras 2 fallos de red seguidos la fila va de uno en uno; vuelve a la normalidad si pasa este rato sin más fallos. */
 const CALMA_RED = 120_000
-const SIN_CUENTA = 'No hay cuenta de Google conectada: que el usuario conecte una en Opciones → Voz o agregue una en Opciones → Google Flow.'
+const SIN_CUENTA =
+  'No hay cuenta de Google conectada: que el usuario conecte una en Opciones → Voz o agregue una en Opciones → Google Flow. En cuanto la conecte, vuelve a pedirlo en este mismo hilo: Sloth la toma al momento, sin abrir otro chat.'
+/** Mientras se agrega una cuenta en Opciones → Google Flow: cuenta al cerrar la ventana del navegador donde se entró. */
+const AGREGANDO =
+  'El usuario está agregando una cuenta de Google en Opciones → Google Flow: cuenta en cuanto cierre la ventana del navegador donde entró (ya dentro de Flow). Pídele que la cierre y vuelve a pedirlo en este mismo hilo.'
 const SIN_DERECHOS = 'Para mandar imágenes a Flow (referencias o fotogramas), el usuario debe confirmar que tiene sus derechos, en Opciones → Google Flow. No se generó nada.'
 const IMAGEN = /\.(png|jpe?g|webp)$/i
 const POR_QUE: Record<Motivo, string> = { creditos: 'sin créditos de video', frenada: 'Flow la frenó por pedir mucho', sesion: 'perdió la sesión' }
@@ -191,6 +195,7 @@ export function flow(app: string, google: Google, motores?: MotoresEstudio, deFu
   }
   const guardarAjustes = () => (mkdirSync(carpeta, { recursive: true }), guardar(archivoAjustes, JSON.stringify(ajustes, null, 1)))
   const otras = cuentasFlow(carpeta)
+  const sinCuenta = () => (otras.agregando() ? AGREGANDO : SIN_CUENTA)
 
   /** Todas las cuentas con que genera: primero la de la voz. */
   function cuentas(): CuentaFlow[] {
@@ -541,7 +546,7 @@ export function flow(app: string, google: Google, motores?: MotoresEstudio, deFu
           registro = motores?.registrar?.(base, actual)
           const pausa = !chatgpt && !recorte && pausaEstudio()
           if (pausa) throw new Error(pausa)
-          if (!chatgpt && !recorte && !cuentas().length) throw new Error(SIN_CUENTA)
+          if (!chatgpt && !recorte && !cuentas().length) throw new Error(sinCuenta())
           const salida = join(estudio, `${id}.jpg`)
           if (recorte) {
             actual.estado = 'generando'
@@ -655,7 +660,7 @@ export function flow(app: string, google: Google, motores?: MotoresEstudio, deFu
         return json(res, 400, { error: 'Elige una imagen y usa solo marcas de conservación para el recorte local.' })
       if (recorte && !motores?.quitarFondo) return json(res, 409, { error: 'El recorte local no está disponible.' })
       if (origen && !chatgpt && !recorte && !ajustes.derechos) return json(res, 409, { error: SIN_DERECHOS })
-      if (!chatgpt && !recorte && !cuentas().length) return json(res, 409, { error: SIN_CUENTA })
+      if (!chatgpt && !recorte && !cuentas().length) return json(res, 409, { error: sinCuenta() })
       const pausa = !chatgpt && !recorte && pausaEstudio()
       if (pausa) return json(res, 429, { error: pausa })
       if ([...encargos.values()].filter((p) => p.estado !== 'error').length >= LIMITE_ESTUDIO)
@@ -723,7 +728,7 @@ export function flow(app: string, google: Google, motores?: MotoresEstudio, deFu
     if (path === '/api/flow/abrir' && metodo === 'POST') {
       const { correo } = await cuerpo<{ correo?: string }>(req)
       const c = cuentas().find((x) => x.correo === correo) ?? cuentas()[0]
-      if (!c) return json(res, 409, { error: SIN_CUENTA })
+      if (!c) return json(res, 409, { error: sinCuenta() })
       if (ocupadas.has(c.correo)) return json(res, 409, { error: `${c.correo} está generando: ábrela cuando acabe.` })
       await c.abrir(URL_FLOW)
       return json(res, 200, estado())
@@ -768,7 +773,7 @@ export function flow(app: string, google: Google, motores?: MotoresEstudio, deFu
       if (!resolucion && d.resolucion && d.resolucion !== '720p') return json(res, 400, { error: 'Solo Omni deja elegir la resolución: Veo sale en 720p.' })
       if (!d.prompt?.trim() || !d.salida || !isAbsolute(d.salida) || !(video ? /\.mp4$/i : /\.jpe?g$/i).test(d.salida))
         return json(res, 400, { error: `Pide el prompt y la ruta absoluta del ${video ? '.mp4' : '.jpg'} donde va.` })
-      if (!cuentas().length) return json(res, 409, { error: SIN_CUENTA })
+      if (!cuentas().length) return json(res, 409, { error: sinCuenta() })
       const referencias = d.referencias ?? []
       const cuadros = video && d.primerCuadro ? [d.primerCuadro, ...(d.ultimoCuadro ? [d.ultimoCuadro] : [])] : []
       if (!video && (d.primerCuadro || d.ultimoCuadro)) return json(res, 400, { error: 'Los fotogramas son para generar_video.' })
