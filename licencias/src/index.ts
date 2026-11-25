@@ -79,6 +79,7 @@ import { olvidarRegistroVoz, voz } from './voz.ts'
 import { dictado, olvidarDictado } from './dictado.ts'
 import { entregarRifas } from './rifa.ts'
 import { APERTURA_VOZ } from './voz-mensual.ts'
+import { avisoCorreo } from './aviso-correo.ts'
 import { bajarApoyo, reanudarPausadas } from './bajar-apoyo.ts'
 import { bajarCadaMes, comoBaja, comoSigue, pasoEn, precioDe, siVuelves, tuPrecioSeQueda } from './escalera.ts'
 import { olvidarRespaldos, respaldo } from './respaldo.ts'
@@ -613,6 +614,7 @@ async function atender(req: Request, env: Env, ctx: ExecutionContext, url: URL):
     if (req.method === 'POST' && url.pathname === '/pago') return await pago(env, await cuerpo(req))
     if (req.method === 'POST' && url.pathname === '/a-mano') return await aMano(req, env)
     if (req.method === 'POST' && url.pathname === '/bajar-apoyo') return await bajarApoyo(req, env)
+    if (req.method === 'POST' && url.pathname === '/aviso-correo') return await avisoCorreo(req, env)
     if (req.method === 'POST' && url.pathname === '/celular') return await celular(req, env, await cuerpo(req))
     if (url.pathname.startsWith('/celular/')) return await actualizarCelular(req, env, url)
     if (url.pathname === '/comunidad' || url.pathname.startsWith('/comunidad/')) return await comunidad(req, env, url, ctx)

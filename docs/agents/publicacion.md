@@ -204,6 +204,13 @@ PayPal no deja cambiarlas ni pausarlas (`USER_ACCOUNT_RESTRICTED`), y si quieren
 (`web/src/AvisoPaypal.tsx`) y Opciones lo enseña como apoyo hasta su fecha, no como «Cancelado». Si el apoyo
 vuelve a bajar, se cambia el precio, se despliega y se corre igual con la fecha del cambio (`--probar` primero).
 
+Los términos piden avisar por correo 30 días antes de cambiarlos a quien apoya o tiene un lugar gratis. El aviso se
+escribe en `AVISOS` (`licencias/src/aviso-correo.ts`, con un id como `terminos-2026-11-24`), se despliega el cobro y se
+corre `node scripts/aviso-correo.mjs <id> --prueba [correo]` (solo a ese correo), `--probar` (a quiénes falta) y, sin
+opción, a todos: `avisos_correo` (migración 0039) anota a quién le llegó, así que repetirlo sigue donde se quedó. El
+24 de noviembre de 2026 salió `terminos-2026-11-24` (los términos y el aviso de privacidad al día; aplican el 24 de
+diciembre).
+
 Desde el 18 de noviembre de 2026 ese precio es una escalera (`licencias/src/escalera.ts`, migración 0032): por cada 50
 personas que apoyan hoy (`apoyan` en `/precio`) el apoyo sube $5 USD ($100 MXN), y a quien entra con el precio del día
 le baja $5 cada mes que paga, hasta $10 (199 MXN): con 50 personas, $15 el primer mes y $10 después; con 100, $20, $15
