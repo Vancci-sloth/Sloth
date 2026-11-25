@@ -326,3 +326,47 @@ test('con la app de Sloth, quien apoya conecta su canal sin JSON propio; el perm
   assert.deepEqual(revocados, ['refresh-sloth'])
   assert.equal(credenciales.size, 0)
 })
+
+test('cada 30 días confirma con Google el permiso y el nombre del canal; si se retiró en la cuenta de Google, lo olvida', async (t) => {
+  const base = resolve('data')
+  mkdirSync(base, { recursive: true })
+  const dir = mkdtempSync(join(base, 'prueba-youtube-revisar-'))
+  t.after(() => { assert.ok(dir.startsWith(base + sep)); rmSync(dir, { recursive: true, force: true }) })
+  const sessions = new Sessions(join(dir, 'sesiones'), () => {}, () => {}, () => {}, () => {})
+  t.mock.method(sessions, 'list', () => [])
+  let retirado = false
+  const revocados: string[] = []
+  t.mock.method(globalThis, 'fetch', async (input: string | URL | Request, init?: RequestInit) => {
+    const url = String(input)
+    if (url === 'https://oauth2.googleapis.com/token') return retirado ? Response.json({ error: 'invalid_grant' }, { status: 400 }) : Response.json({ access_token: 'acceso', expires_in: 3600 })
+    if (url === 'https://oauth2.googleapis.com/revoke') { revocados.push((init!.body as URLSearchParams).get('token')!); return new Response(null) }
+    if (url.startsWith('https://www.googleapis.com/youtube/v3/channels')) return Response.json({ items: [{ id: 'canal-1', snippet: { title: 'Nombre nuevo' } }] })
+    throw new Error(`fetch inesperado: ${url}`)
+  })
+  const archivo = join(dir, 'data', 'youtube.json')
+  const abrir = (revisado: number) => {
+    mkdirSync(join(dir, 'data'), { recursive: true })
+    writeFileSync(archivo, JSON.stringify({ cuenta: { id: 'canal-1', nombre: 'Nombre viejo' }, revisado, subidas: {}, borradores: {} }))
+    const credenciales = new Map([['YOUTUBE_CLIENT_ID', 'id'], ['YOUTUBE_CLIENT_SECRET', 'secreto'], ['YOUTUBE_REFRESH_TOKEN', 'refresh']])
+    youtube(dir, sessions, () => [], 'http://127.0.0.1/retorno', { leer: (n) => credenciales.get(n) ?? '', escribir: (n, v) => { if (v) credenciales.set(n, v); else credenciales.delete(n) } })
+    return credenciales
+  }
+  const esperar = async (listo: () => boolean) => { const fin = Date.now() + 5000; while (!listo() && Date.now() < fin) await new Promise((ok) => setTimeout(ok, 10)) }
+  const leido = () => JSON.parse(readFileSync(archivo, 'utf8'))
+
+  abrir(Date.now() - 86_400_000)
+  await new Promise((ok) => setTimeout(ok, 50))
+  assert.equal(leido().cuenta.nombre, 'Nombre viejo', 'antes de 30 días no pregunta')
+
+  abrir(Date.now() - 31 * 86_400_000)
+  await esperar(() => leido().cuenta?.nombre === 'Nombre nuevo')
+  assert.equal(leido().cuenta.nombre, 'Nombre nuevo')
+  assert.ok(Date.now() - leido().revisado < 60_000)
+
+  retirado = true
+  const credenciales = abrir(Date.now() - 31 * 86_400_000)
+  await esperar(() => leido().cuenta === null)
+  assert.equal(leido().cuenta, null)
+  assert.equal(credenciales.has('YOUTUBE_REFRESH_TOKEN'), false)
+  assert.deepEqual(revocados, ['refresh'])
+})
