@@ -34,6 +34,7 @@
 import type { Autor, EstiloTienda, FondoComunidad, OrdenTienda, PruebasEstilo, TiendaEstilos } from '../../shared/types.ts'
 import { aLaVista, apoya, armar, conCupo, esCreador, esDe, type Guardada, type Miembro, miembros, OCULTAR, palabrasDe, sinAcentos, urlDe } from './comunidad.ts'
 import { esPeriodo, fondo, periodoFondo } from './fondo.ts'
+import { guardado, olvidar } from './guardado.ts'
 import { cuerpo, type Env, Rechazo } from './index.ts'
 
 export const PUNTOS = { persona: 3, video: 1, tope: 10, variante: 10 }
@@ -45,7 +46,8 @@ const POR_ENVIO = 50
 const HUELLA = /^[0-9a-f]{16,64}$/
 const ID = /^[a-z0-9]+$/
 const PRUEBA = /^[a-z0-9]{20}\.(png|jpg|webp)$/
-const GUARDADO = 60_000
+/** Cada cuánto se recuentan los números de la tienda, para todas las copias del Worker. */
+const NUMEROS = 60_000
 
 export interface VideosDeEquipo {
   publicacion: string
@@ -165,15 +167,20 @@ export interface Numeros {
   /** De qué estilo salió cada uno. */
   origen: Map<string, string>
 }
-let guardados: (Numeros & { hasta: number }) | undefined
+/** Los números como van en la tabla `guardado`: cada `Map`, como su lista. */
+type NumerosGuardados = { [K in keyof Numeros]: Numeros[K] extends Map<infer L, infer V> ? [L, V][] : Numeros[K] }
 
-/** Los números del periodo en curso: se recorren a lo más cada minuto (D1 cobra por fila leída). */
+/**
+ * Los números del periodo en curso, guardados para todas las copias del Worker (`guardado.ts`): recorren `estilo_usos`
+ * entera, y en la memoria de cada copia se recorrían una vez por copia.
+ */
 export async function numerosActuales(env: Env): Promise<Numeros> {
-  const ahora = Date.now()
-  const periodo = periodoFondo(new Date(ahora))
-  if (guardados && guardados.periodo === periodo && guardados.hasta > ahora) return guardados
-  guardados = { ...(await numerosDe(env, periodo)), hasta: ahora + GUARDADO }
-  return guardados
+  const periodo = periodoFondo(new Date())
+  const g = await guardado<NumerosGuardados>(env, `numeros:${periodo}`, async () => {
+    const n = await numerosDe(env, periodo)
+    return { ...n, estilos: [...n.estilos], siempre: [...n.siempre], mes: [...n.mes], origen: [...n.origen] }
+  }, false, NUMEROS)
+  return { ...g, estilos: new Map(g.estilos), siempre: new Map(g.siempre), mes: new Map(g.mes), origen: new Map(g.origen) }
 }
 
 /**
@@ -226,7 +233,7 @@ export async function numerosDe(env: Env, periodo: string): Promise<Numeros> {
 }
 
 /** Que los números se vuelvan a leer: cambió quién participa o qué cuenta. */
-export const olvidarNumeros = () => void (guardados = undefined)
+export const olvidarNumeros = (env: Pick<Env, 'DB'>) => olvidar(env, 'numeros:')
 
 /**
  * `GET /comunidad/estilos`: los que `yo` puede ver (lo suyo por aprobar también), con sus números, buscados y ordenados.
@@ -253,9 +260,12 @@ export async function tienda(env: Env, yo: Miembro, url: URL): Promise<TiendaEst
   const pubs = await armar(env, yo, filas.results)
   const titulos = new Map<string, string>()
   const faltan = [...new Set(pubs.map((p) => n.origen.get(p.id)).filter((d): d is string => !!d))]
-  if (faltan.length)
-    for (const r of (await env.DB.prepare(`SELECT id, titulo FROM publicaciones WHERE ${aLaVista()} AND id IN (${faltan.map(() => '?').join(', ')})`).bind(...faltan).all<{ id: string; titulo: string }>()).results)
+  // D1 acepta hasta 100 valores por consulta.
+  for (let i = 0; i < faltan.length; i += 90) {
+    const parte = faltan.slice(i, i + 90)
+    for (const r of (await env.DB.prepare(`SELECT id, titulo FROM publicaciones WHERE ${aLaVista()} AND id IN (${parte.map(() => '?').join(', ')})`).bind(...parte).all<{ id: string; titulo: string }>()).results)
       titulos.set(r.id, r.titulo)
+  }
   const estilos: EstiloTienda[] = pubs.map((p) => {
     const s = n.siempre.get(p.id) ?? { descargas: 0, videos: 0, personas: 0, variantes: 0 }
     const mes = n.mes.get(p.id) ?? { personas: 0, videos: 0, variantes: 0, puntos: 0 }
@@ -325,7 +335,7 @@ export async function usos(req: Request, env: Env, yo: Miembro): Promise<{ ok: t
     )
   )
   const contados = resultado.reduce((s, r) => s + (r.meta.changes ?? 0), 0)
-  if (contados) guardados = undefined
+  // Lo contado sale en la tienda al recontar (`NUMEROS`): olvidarlo en cada uso haría recontar a todas las copias sin parar.
   return { ok: true, contados }
 }
 
@@ -380,6 +390,6 @@ export async function descartar(req: Request, env: Env, yo: Miembro): Promise<{ 
   }
   if (!consultas.length) return { ok: true, cambiados: 0 }
   const r = await env.DB.batch(consultas)
-  guardados = undefined
+  await olvidarNumeros(env)
   return { ok: true, cambiados: r.reduce((s, x) => s + (x.meta.changes ?? 0), 0) }
 }

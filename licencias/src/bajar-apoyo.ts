@@ -154,7 +154,7 @@ export async function cambiarMonto(env: Env, f: Pick<Fila, 'stripe' | 'paypal' |
     const item = s.items.data[0]
     // El producto que crea Checkout queda archivado y no acepta precios nuevos: va a uno propio, activo, que se crea una vez.
     await stripe(env, 'POST', '/v1/products', { id: PRODUCTO_STRIPE, name: 'Sloth - apoyo mensual' }).catch((e) => {
-      if (!(e instanceof Rechazo) || e.status !== 400 || !/already exists/i.test(e.message)) throw e
+      if (!(e instanceof Rechazo) || e.status !== 400 || !/already exists/i.test(e.detalle ?? '')) throw e
     })
     await stripe(env, 'POST', `/v1/subscriptions/${encodeURIComponent(f.stripe!)}`, {
       'items[0][id]': item.id,

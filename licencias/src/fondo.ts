@@ -19,6 +19,7 @@
  * isolate).
  */
 import type { FondoComunidad } from '../../shared/types.ts'
+import { guardado } from './guardado.ts'
 import type { Env } from './index.ts'
 import { stripe } from './stripe.ts'
 import { mesDe, periodoVoz } from './voz-mensual.ts'
@@ -236,16 +237,15 @@ export function pagosDeSloth(sesiones: Sesion[], facturas: Factura[], tramo: { d
   }
 }
 
-/** Lo último que se leyó de cada periodo. */
-const guardados = new Map<string, { leido: number; fondo: FondoComunidad }>()
-
 /** El fondo del periodo de `ahora`. */
 export const fondo = (env: Env, ahora = new Date()): Promise<FondoComunidad> => fondoDe(env, periodoFondo(ahora), ahora)
 
-/** El fondo de un periodo: en vivo si sigue abierto, entero si ya cerró. Se lee de Stripe a lo más cada minuto. */
+/**
+ * El fondo de un periodo: en vivo si sigue abierto, entero si ya cerró. Se lee de Stripe a lo más cada minuto para
+ * todas las copias del Worker (`guardado.ts`): son hasta 150 páginas de Stripe, y se abre con la comunidad. Si Stripe no
+ * contesta, sale lo último que se leyó.
+ */
 export async function fondoDe(env: Env, periodo: string, ahora = new Date()): Promise<FondoComunidad> {
-  const guardado = guardados.get(periodo)
-  if (guardado && ahora.getTime() - guardado.leido < CADA) return guardado.fondo
   const tramo = tramoDe(periodo)
   const vacio: FondoComunidad = {
     periodo,
@@ -256,7 +256,7 @@ export async function fondoDe(env: Env, periodo: string, ahora = new Date()): Pr
     ...(periodo === PRIMER_PERIODO ? { primero: true, desde: new Date(tramo.desde * 1000).toISOString() } : {})
   }
   if (!env.STRIPE_SECRET_KEY) return vacio
-  try {
+  return guardado(env, `fondo:${periodo}`, async () => {
     const antes = { desde: Math.max(INICIO, tramo.desde - ATRAS), hasta: tramo.hasta }
     const [movimientos, sesiones, facturas] = await Promise.all([
       todos<Movimiento & { id: string }>(env, '/v1/balance_transactions', tramo, { 'expand[]': 'data.source' }, VERSION),
@@ -268,12 +268,6 @@ export async function fondoDe(env: Env, periodo: string, ahora = new Date()): Pr
       movimientos.filter((m) => deSloth(m, pagos)),
       proporcionDeImpuesto(cobrados)
     )
-    const fondo = { ...vacio, montos: montosDe(cuentas), cuentas }
-    guardados.set(periodo, { leido: ahora.getTime(), fondo })
-    return fondo
-  } catch (e) {
-    // Si Stripe no contesta, lo último que se leyó de ese periodo; si no hay, que no salga.
-    if (guardado) return guardado.fondo
-    throw e
-  }
+    return { ...vacio, montos: montosDe(cuentas), cuentas }
+  }, false, CADA)
 }

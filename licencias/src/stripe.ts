@@ -157,7 +157,7 @@ export async function stripe<T>(env: Env, metodo: string, ruta: string, formular
   if (!r.ok) {
     // Solo el estado y el mensaje: nada del cliente.
     console.error('Stripe', metodo, ruta.replace(/\?.*$/, '').replace(/\/\w+_\w{8,}/, '/…'), r.status, datos.error?.message ?? '')
-    throw new Rechazo(r.status, datos.error?.message ?? `Stripe respondió ${r.status}`)
+    throw new Rechazo(r.status, 'Stripe no respondió bien. Intenta otra vez en un momento.', datos.error?.message)
   }
   return datos as T
 }

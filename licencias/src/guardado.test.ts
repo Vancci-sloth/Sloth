@@ -115,3 +115,36 @@ test('lo guardado vale 10 minutos, se recuenta si se pide y no rompe la respuest
   assert.deepEqual(await guardado(env, 'prueba', calcular), { n: 3 })
   assert.equal(error.mock.callCount(), 1)
 })
+
+test('al vencer, recuenta uno solo y los que llegan a la vez siguen con lo de antes', async (t) => {
+  const { db, env } = preparar(t)
+  let veces = 0
+  let soltar = () => {}
+  const lento = async () => {
+    veces++
+    await new Promise<void>((r) => (soltar = r))
+    return { n: veces }
+  }
+  db.prepare("INSERT INTO guardado (nombre, valor, hasta) VALUES ('prueba', '{\"n\":0}', 0)").run()
+  const primero = guardado(env, 'prueba', lento)
+  await new Promise((r) => setTimeout(r, 10))
+  // Mientras el primero recuenta, cinco más: ninguno vuelve a recorrer.
+  const otros = await Promise.all(Array.from({ length: 5 }, () => guardado(env, 'prueba', lento)))
+  assert.deepEqual(otros, Array(5).fill({ n: 0 }))
+  soltar()
+  assert.deepEqual(await primero, { n: 1 })
+  assert.equal(veces, 1)
+  assert.deepEqual(await guardado(env, 'prueba', lento), { n: 1 })
+})
+
+test('si recontar falla, sale lo último guardado; sin nada guardado, el error', async (t) => {
+  const { db, env } = preparar(t)
+  const error = t.mock.method(console, 'error', () => {})
+  const falla = async () => {
+    throw new Error('Stripe no contesta')
+  }
+  await assert.rejects(guardado(env, 'prueba', falla), /Stripe no contesta/)
+  db.prepare("INSERT INTO guardado (nombre, valor, hasta) VALUES ('prueba', '{\"n\":7}', 0)").run()
+  assert.deepEqual(await guardado(env, 'prueba', falla), { n: 7 })
+  assert.equal(error.mock.callCount(), 1)
+})

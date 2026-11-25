@@ -112,6 +112,16 @@ const SUELTO = 2 * 24 * 3600_000
 /** El identificador que manda la app (`server/licencia.ts`): el de la computadora resumido, o un UUID. Otro lo inventó alguien. */
 export const DE_LA_APP = /^(?:[0-9a-f]{32}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/
 
+/**
+ * Lo que más filas lee: buscar recorre las publicaciones y los comentarios enteros, el índice trae hasta 2.000 filas y
+ * cada voto vuelve a contar el roadmap. La app pide el índice una vez por sesión y busca 250 ms después de teclear: estos
+ * topes no los toca nadie que use Sloth, sí un script que vacíe D1. Llegar no deja vigilado a nadie.
+ */
+const LEER_AL_DIA = { buscar: 300, indice: 40, votos: 30 }
+async function puedeLeer(env: Env, yo: Miembro, tipo: keyof typeof LEER_AL_DIA) {
+  if (!esCreador(yo) && !(await cupo(env, yo.id, tipo, LEER_AL_DIA[tipo]))) throw new Rechazo(429, 'Por hoy ya fue mucho de esto. Vuelve a intentar mañana.')
+}
+
 /** El cupo del día de `yo`. Quien llega al tope queda vigilado: se le avisa por correo. */
 export async function conCupo(env: Env, yo: Miembro, tipo: keyof typeof AL_DIA): Promise<boolean> {
   if (await cupo(env, yo.id, tipo, AL_DIA[tipo])) return true
@@ -121,6 +131,8 @@ export async function conCupo(env: Env, yo: Miembro, tipo: keyof typeof AL_DIA):
 }
 /** Con tantos reportes de personas distintas, una publicación o un comentario deja de verse hasta que el creador lo revise. */
 export const OCULTAR = 3
+/** Desde cuándo cuenta para ocultar el reporte de un miembro nuevo. */
+const REPORTA_DESDE = 7 * 24 * 3600_000
 /** Cada cuánto se anota que alguien entró. */
 const VISTO = 10 * 60_000
 const DIA = 24 * 3600_000
@@ -200,11 +212,13 @@ export async function comunidad(req: Request, env: Env, url: URL, ctx: Execution
   const yo = await quien(req, env)
   if (ruta === '/comunidad' && req.method === 'GET') return json(await feed(env, yo, url))
   if (ruta === '/comunidad/indice' && req.method === 'GET') {
+    await puedeLeer(env, yo, 'indice')
     const { sql, valores } = consultaIndice({ id: yo.id, creador: esCreador(yo) })
     return json({ publicaciones: (await env.DB.prepare(sql).bind(...valores).all()).results })
   }
   if (ruta === '/comunidad/buscar' && req.method === 'GET') {
     const { sql, valores } = consultaBuscar({ id: yo.id, creador: esCreador(yo) }, url.searchParams.get('q') ?? '')
+    if (sql) await puedeLeer(env, yo, 'buscar')
     const filas = sql ? ((await env.DB.prepare(sql).bind(...valores).all()).results as unknown as Guardada[]) : []
     return json({ publicaciones: await armar(env, yo, filas) })
   }
@@ -213,6 +227,7 @@ export async function comunidad(req: Request, env: Env, url: URL, ctx: Execution
   if (ruta === '/comunidad/roadmap' && req.method === 'POST') {
     const meta = String((await cuerpo(req)).meta ?? '')
     if (!METAS.some((m) => m.id === meta)) throw new Rechazo(400, 'Esa meta no está en el roadmap.')
+    await puedeLeer(env, yo, 'votos')
     await env.DB.prepare('INSERT INTO votos (miembro, meta, creado) VALUES (?, ?, ?) ON CONFLICT (miembro) DO UPDATE SET meta = excluded.meta, creado = excluded.creado')
       .bind(yo.id, meta, new Date().toISOString())
       .run()
@@ -529,20 +544,26 @@ function alDia(guia: unknown, prueba: unknown): { guia?: GuiaEstilo } {
  */
 export async function armar(env: Env, yo: Miembro, filas: Guardada[], entera = false): Promise<PublicacionComunidad[]> {
   if (!filas.length) return []
-  const ids = filas.map((f) => f.id)
-  const marcas = ids.map(() => '?').join(', ')
-  const [gustan, comentaron] = await env.DB.batch([
-    env.DB.prepare(`SELECT publicacion FROM likes WHERE miembro = ? AND publicacion IN (${marcas})`).bind(yo.id, ...ids),
-    env.DB.prepare(
-      `SELECT publicacion, autor FROM (
-        SELECT publicacion, autor, ROW_NUMBER() OVER (PARTITION BY publicacion ORDER BY MAX(creada) DESC) AS n
-        FROM comentarios WHERE publicacion IN (${marcas}) GROUP BY publicacion, autor
-      ) WHERE n <= 5 ORDER BY publicacion, n`
-    ).bind(...ids)
-  ])
-  const caras = comentaron.results as { publicacion: string; autor: string }[]
+  // D1 acepta hasta 100 valores por consulta: la tienda arma hasta 300 de una vez, así que van de 90 en 90.
+  const partes: string[][] = []
+  for (let i = 0; i < filas.length; i += 90) partes.push(filas.slice(i, i + 90).map((f) => f.id))
+  const leidas = await env.DB.batch(
+    partes.flatMap((ids) => {
+      const marcas = ids.map(() => '?').join(', ')
+      return [
+        env.DB.prepare(`SELECT publicacion FROM likes WHERE miembro = ? AND publicacion IN (${marcas})`).bind(yo.id, ...ids),
+        env.DB.prepare(
+          `SELECT publicacion, autor FROM (
+            SELECT publicacion, autor, ROW_NUMBER() OVER (PARTITION BY publicacion ORDER BY MAX(creada) DESC) AS n
+            FROM comentarios WHERE publicacion IN (${marcas}) GROUP BY publicacion, autor
+          ) WHERE n <= 5 ORDER BY publicacion, n`
+        ).bind(...ids)
+      ]
+    })
+  )
+  const caras = leidas.filter((_, i) => i % 2).flatMap((r) => r.results as { publicacion: string; autor: string }[])
   const autores = await miembros(env, [...filas.map((f) => f.autor), ...caras.map((c) => c.autor)])
-  const leGustan = new Set((gustan.results as { publicacion: string }[]).map((g) => g.publicacion))
+  const leGustan = new Set(leidas.filter((_, i) => !(i % 2)).flatMap((r) => (r.results as { publicacion: string }[]).map((g) => g.publicacion)))
   return filas.map((g) => {
     const suya = g.autor === yo.id || esCreador(yo)
     const publica = !g.aprobada ? publicaDe(g) : undefined
@@ -834,7 +855,7 @@ async function cambiar(env: Env, yo: Miembro, f: Guardada, c: Record<string, unk
       : [])
   ])
   // Un estilo que entra o sale de la tienda: sus números se vuelven a contar.
-  if (nueva.aprobada !== f.aprobada || nueva.categoria !== f.categoria) olvidarNumeros()
+  if (nueva.aprobada !== f.aprobada || nueva.categoria !== f.categoria) await olvidarNumeros(env)
   // Lo que se quitó al editar ya no se usa: ni en lo nuevo ni en lo que sigue a la vista.
   const siguen = usadas(nueva)
   await quitarArchivos(env, usadas(f).filter((l) => !siguen.includes(l)))
@@ -865,7 +886,7 @@ async function borrar(env: Env, yo: Miembro, f: Guardada): Promise<{ ok: true }>
     env.DB.prepare('DELETE FROM comentarios WHERE publicacion = ?').bind(f.id),
     env.DB.prepare('DELETE FROM publicaciones WHERE id = ?').bind(f.id)
   ])
-  if (f.categoria === 'estilos') olvidarNumeros()
+  if (f.categoria === 'estilos') await olvidarNumeros(env)
   await quitarArchivos(env, [...usadas(f), ...fotos])
   return { ok: true }
 }
@@ -951,8 +972,16 @@ async function reportar(env: Env, yo: Miembro, tabla: 'publicaciones' | 'comenta
   const puesto = await env.DB.prepare('INSERT INTO reportes (objeto, miembro, motivo, creado) VALUES (?, ?, ?, ?) ON CONFLICT DO NOTHING').bind(x.id, yo.id, motivo, new Date().toISOString()).run()
   if (!puesto.meta.changes) return { ok: true }
   const publicacion = x.publicacion ?? x.id
+  // Para ocultar solo cuentan los reportes de quien ya lleva `REPORTA_DESDE` en la comunidad: tres cuentas gratis recién
+  // hechas no esconden nada. Lo del creador y los estilos aprobados no se ocultan solos: le llega el aviso y él decide.
+  const intocable = `autor IN (SELECT id FROM miembros WHERE clave = '${CREADOR}')${tabla === 'publicaciones' ? " OR (categoria = 'estilos' AND aprobada != 0)" : ''}`
   await env.DB.batch([
-    env.DB.prepare(`UPDATE ${tabla} SET reportes = (SELECT COUNT(*) FROM reportes WHERE objeto = ?) WHERE id = ?`).bind(x.id, x.id),
+    env.DB.prepare(
+      `UPDATE ${tabla} SET reportes = MIN(
+        (SELECT COUNT(*) FROM reportes r JOIN miembros m ON m.id = r.miembro WHERE r.objeto = ?1 AND m.creado < ?2),
+        CASE WHEN ${intocable} THEN ?3 ELSE 1000000 END
+      ) WHERE id = ?1`
+    ).bind(x.id, new Date(Date.now() - REPORTA_DESDE).toISOString(), OCULTAR - 1),
     env.DB.prepare(
       "INSERT INTO avisos (id, para, de, tipo, publicacion, comentario, texto, creado) SELECT ?, id, ?, 'reporte', ?, ?, ?, ? FROM miembros WHERE clave = ? AND id != ?"
     ).bind(nuevoId(), yo.id, publicacion, tabla === 'comentarios' ? x.id : null, motivo, new Date().toISOString(), CREADOR, yo.id)
@@ -1142,13 +1171,27 @@ async function servirArchivo(req: Request, env: Env, llave: string): Promise<Res
   }
   return servir(req, env, `comunidad/${llave}`, cabeza.size, {
     'content-type': hilo ? 'application/json' : (cabeza.httpMetadata?.contentType ?? 'application/octet-stream'),
-    'cache-control': estilo || hilo ? 'private, no-store' : 'public, max-age=31536000, immutable'
+    'cache-control': estilo || hilo ? 'private, no-store' : 'public, max-age=31536000, immutable',
+    // Lo subió un miembro: abierto directo en el navegador, que nunca corra como página de api.sloth.vancci.org.
+    'x-content-type-options': 'nosniff',
+    'content-security-policy': "default-src 'none'; sandbox"
   })
 }
 
-/** Si ese archivo va en una publicación de `yo` (o en la versión suya que sigue a la vista). */
-const enLoSuyo = async (env: Env, yo: Miembro, llave: string) =>
-  !!(await env.DB.prepare("SELECT 1 FROM publicaciones WHERE autor = ? AND (instr(adjuntos, ?) > 0 OR instr(coalesce(publica, ''), ?) > 0) LIMIT 1").bind(yo.id, llave, llave).first())
+/**
+ * Si ese archivo es la `llave` de un adjunto en una publicación de `yo` (o en la versión suya que sigue a la vista).
+ * Se mira el campo, no el texto entero: el nombre de un estilo lo escribe quien publica, y con la llave de otro ahí
+ * bajaría el paquete ajeno sin apoyar.
+ */
+export const enLoSuyo = async (env: Env, yo: Pick<Miembro, 'id'>, llave: string) =>
+  !!(await env.DB.prepare(
+    `SELECT 1 FROM publicaciones p WHERE p.autor = ?1 AND (
+      EXISTS (SELECT 1 FROM json_each(p.adjuntos) j WHERE json_extract(j.value, '$.llave') = ?2)
+      OR EXISTS (SELECT 1 FROM json_each(coalesce(json_extract(p.publica, '$.adjuntos'), '[]')) j WHERE json_extract(j.value, '$.llave') = ?2)
+    ) LIMIT 1`
+  )
+    .bind(yo.id, llave)
+    .first())
 
 function llavesDe(adjuntos: string): string[] {
   return (JSON.parse(adjuntos) as Adjunto[]).flatMap((a) => [a.llave, ...(a.poster ? [a.poster] : []), ...(a.previa ? [a.previa] : []), ...(a.prueba?.evidencia ? [a.prueba.evidencia] : [])])

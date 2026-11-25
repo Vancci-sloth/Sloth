@@ -519,9 +519,12 @@ const abreALaPrimera = (u: Ultima) => !!u.firmada && !u.sinTicket
 
 export class Rechazo extends Error {
   status: number
-  constructor(status: number, mensaje: string) {
+  /** Lo que dijo la pasarela: para decidir en el código, nunca para el cliente (puede traer pedazos de una llave). */
+  detalle?: string
+  constructor(status: number, mensaje: string, detalle?: string) {
     super(mensaje)
     this.status = status
+    this.detalle = detalle
   }
 }
 
@@ -725,7 +728,10 @@ async function anteriorDe(env: Env, so: Sistema): Promise<Ultima | undefined> {
  * última no: con el número de `/ultima`, que es público, cualquiera armaría su nombre.
  */
 async function actualizaciones(req: Request, env: Env, url: URL): Promise<Response> {
-  const archivo = decodeURIComponent(url.pathname.slice('/actualizaciones/'.length))
+  let archivo = ''
+  try {
+    archivo = decodeURIComponent(url.pathname.slice('/actualizaciones/'.length))
+  } catch {}
   if (!publicable(archivo)) throw new Rechazo(404, 'No existe')
   const yml = AL_DIA.test(archivo)
   let llave = archivo
@@ -1196,6 +1202,9 @@ async function guardarIdPaypal(env: Env, llave: string, id: string): Promise<str
  * cobrado de la orden que deja de ser la última. Da adónde ir a pagar.
  */
 async function renovar(env: Env, f: Fila): Promise<string> {
+  // Cada vez abre un cobro nuevo en la pasarela: un enlace del correo pedido sin parar (un escáner, o quien lo tenga)
+  // los apilaría, y los de Stripe pendientes se vuelven a leer en cada `refrescar`.
+  if (!(await cupo(env, f.id, 'renovar', 10))) throw new Rechazo(429, 'Ya pediste muchos enlaces para pagar hoy. Usa el último que abriste o intenta mañana.')
   // Con tarjeta, otra sesión de Stripe.
   if (f.stripe) {
     const s = await pagoStripe(env, f)
@@ -1317,9 +1326,15 @@ async function cancelar(env: Env, c: Record<string, unknown>): Promise<Response>
     if (fila.estado !== 'cancelled') throw new Rechazo(502, `${pasarela(fila)} no pudo cancelar la suscripción. Intenta otra vez en un momento.`)
   }
   // El comprobante de la cancelación (Profeco pide dar un folio), una sola vez.
+  // Dos «Cancelar» a la vez: solo el que pone el folio manda el correo; el otro lee el folio que quedó.
+  let pusoFolio = false
   if (fila.estado === 'cancelled' && !fila.folio) {
-    fila = { ...fila, folio: `C-${letras(8)}`, cancelada: new Date().toISOString() }
-    await env.DB.prepare('UPDATE licencias SET folio = ?, cancelada = ? WHERE id = ?').bind(fila.folio, fila.cancelada, fila.id).run()
+    const nuevo = { folio: `C-${letras(8)}`, cancelada: new Date().toISOString() }
+    const r = await env.DB.prepare('UPDATE licencias SET folio = ?, cancelada = ? WHERE id = ? AND folio IS NULL').bind(nuevo.folio, nuevo.cancelada, fila.id).run()
+    pusoFolio = r.meta.changes > 0
+    fila = pusoFolio ? { ...fila, ...nuevo } : ((await env.DB.prepare('SELECT * FROM licencias WHERE id = ?').bind(fila.id).first<Fila>()) ?? fila)
+  }
+  if (pusoFolio && fila.folio) {
     const hasta = fila.pagado_hasta && Date.parse(fila.pagado_hasta) > Date.now() ? ` Sloth sigue abierta hasta el ${fecha(fila.pagado_hasta)}, lo que ya pagaste.` : ''
     // Con la escalera (`escalera.ts`), quien vuelve entra con el precio del día.
     const vuelve = pasoEn(env, fila.moneda) ? [siVuelves(fila, (await apoyoDeHoy(env))(fila.moneda))] : []
@@ -1852,16 +1867,19 @@ async function firmada(env: Env, f: Fila, equipo: string, ahora: number): Promis
   return json({ datos, firma: btoa(String.fromCharCode(...new Uint8Array(firma))) })
 }
 
-/** Guarda que esta computadora usa la clave. `false` si ya la usan `EQUIPOS` otras. */
-async function recordarEquipo(env: Env, clave: string, equipo: string, ahora: number): Promise<boolean> {
-  const otros = await env.DB.prepare('SELECT COUNT(*) AS n FROM equipos WHERE clave = ? AND equipo != ? AND visto > ?')
-    .bind(clave, equipo, new Date(ahora - VISTO).toISOString())
-    .first<{ n: number }>()
-  if ((otros?.n ?? 0) >= EQUIPOS) return false
-  await env.DB.prepare('INSERT INTO equipos (clave, equipo, visto) VALUES (?, ?, ?) ON CONFLICT (clave, equipo) DO UPDATE SET visto = excluded.visto')
-    .bind(clave, equipo, new Date(ahora).toISOString())
+/**
+ * Anota que `?2` usa la clave `?1` si las demás vistas desde `?4` son menos de `?5`. Contar y anotar es un solo paso:
+ * si fueran dos, varias computadoras que piden a la vez pasarían todas el conteo.
+ */
+export const EQUIPO_NUEVO =
+  'INSERT INTO {tabla} (clave, equipo, visto) SELECT ?1, ?2, ?3 WHERE (SELECT COUNT(*) FROM {tabla} WHERE clave = ?1 AND equipo != ?2 AND visto > ?4) < ?5 ON CONFLICT (clave, equipo) DO UPDATE SET visto = excluded.visto'
+
+/** Guarda que esta computadora (o este celular, con `tabla`) usa la clave. `false` si ya la usan `max` otras. */
+export async function recordarEquipo(env: Env, clave: string, equipo: string, ahora: number, tabla: 'equipos' | 'celulares' = 'equipos', max = EQUIPOS): Promise<boolean> {
+  const r = await env.DB.prepare(EQUIPO_NUEVO.replaceAll('{tabla}', tabla))
+    .bind(clave, equipo, new Date(ahora).toISOString(), new Date(ahora - VISTO).toISOString(), max)
     .run()
-  return true
+  return r.meta.changes > 0
 }
 
 export async function porClave(env: Env, valor: unknown): Promise<Fila> {
@@ -1991,7 +2009,7 @@ export async function mp<T>(env: Env, metodo: string, ruta: string, cuerpo?: unk
   if (!r.ok) {
     // Solo el estado y el mensaje: nada del cliente.
     console.error('Mercado Pago', metodo, ruta.replace(/\?.*$/, '').replace(/\/[\w-]{12,}$/, '/…'), r.status, datos.message ?? '')
-    throw new Rechazo(r.status, datos.message ?? `Mercado Pago respondió ${r.status}`)
+    throw new Rechazo(r.status, 'Mercado Pago no respondió bien. Intenta otra vez en un momento.', datos.message)
   }
   return datos as T
 }
@@ -2025,7 +2043,7 @@ export async function paypal<T>(env: Env, metodo: string, ruta: string, cuerpo?:
   if (!r.ok) {
     // Solo el estado y el error: nada del cliente.
     console.error('PayPal', metodo, ruta.replace(/\/[\w-]{12,}(?=\/|$)/g, '/…'), r.status, datos.name ?? '', datos.details?.[0]?.issue ?? '')
-    throw new Rechazo(r.status, datos.message ?? `PayPal respondió ${r.status}`)
+    throw new Rechazo(r.status, 'PayPal no respondió bien. Intenta otra vez en un momento.', datos.message)
   }
   return datos as T
 }
@@ -2042,7 +2060,7 @@ async function nowpayments<T>(env: Env, metodo: string, ruta: string, cuerpo?: u
   if (!r.ok) {
     // Solo el estado y el mensaje: nada del cliente.
     console.error('NOWPayments', metodo, ruta.replace(/\/\d+$/, '/…'), r.status, datos.message ?? '')
-    throw new Rechazo(r.status, datos.message ?? `NOWPayments respondió ${r.status}`)
+    throw new Rechazo(r.status, 'NOWPayments no respondió bien. Intenta otra vez en un momento.', datos.message)
   }
   return datos as T
 }

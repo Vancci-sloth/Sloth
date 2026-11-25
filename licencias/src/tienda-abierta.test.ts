@@ -5,7 +5,7 @@ import { DatabaseSync } from 'node:sqlite'
 import test from 'node:test'
 import type { Miembro } from './comunidad.ts'
 import type { Env } from './index.ts'
-import { olvidarNumeros, tienda } from './tienda.ts'
+import { tienda } from './tienda.ts'
 
 function preparar(t: { after(fn: () => void): void }) {
   const db = new DatabaseSync(':memory:')
@@ -26,10 +26,8 @@ function preparar(t: { after(fn: () => void): void }) {
   globalThis.fetch = (async () => {
     throw new Error('sin red')
   }) as typeof fetch
-  olvidarNumeros()
   t.after(() => {
     globalThis.fetch = anterior
-    olvidarNumeros()
     db.close()
   })
   const miembro = (id: string, insignia: Miembro['insignia'] = null): Miembro => {

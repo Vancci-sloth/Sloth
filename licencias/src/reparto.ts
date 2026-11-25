@@ -109,7 +109,7 @@ export async function participar(req: Request, env: Env, yo: Miembro, c: Record<
     if (e instanceof Error && /UNIQUE/i.test(e.message)) throw new Rechazo(409, deOtro)
     throw e
   }
-  olvidarNumeros()
+  await olvidarNumeros(env)
   await avisarCambio(env, yo, antes ? `Se cambió el Binance ID de tu cuenta de Sloth: ahora termina en ${binance.slice(-4)}.` : `Ya participas en el fondo de la comunidad de Sloth. Tu parte se manda al Binance ID que termina en ${binance.slice(-4)}.`)
   return mio(env, yo)
 }
@@ -123,7 +123,7 @@ export async function salir(req: Request, env: Env, yo: Miembro): Promise<MiFond
     env.DB.prepare('UPDATE miembros SET binance = NULL, binance_desde = ? WHERE id = ?').bind(ahora, yo.id),
     env.DB.prepare("INSERT INTO binance_cambios (miembro, binance, red, cuando) VALUES (?, '', ?, ?)").bind(yo.id, await redDe(req, env), ahora)
   ])
-  olvidarNumeros()
+  await olvidarNumeros(env)
   await avisarCambio(env, yo, 'Se quitó el Binance ID de tu cuenta de Sloth: tus estilos ya no se llevan del fondo de la comunidad.')
   return mio(env, yo)
 }
