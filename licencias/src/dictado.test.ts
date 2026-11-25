@@ -7,6 +7,8 @@ import { MAX_BYTES, SOLO_APOYO, abrirDeepgram, dictado, enOrden, impedimento, ll
 const sinSaldo = async () => undefined
 
 class TuboDePrueba implements Tubo {
+  // Como un WebSocket del Worker con la fecha de compatibilidad del cobro.
+  binaryType: 'blob' | 'arraybuffer' = 'blob'
   enviados: (string | ArrayBuffer)[] = []
   cerrado = false
   private oyentes: Record<string, ((e?: unknown) => void)[]> = {}
@@ -141,6 +143,17 @@ test('el puente corta lo que pasa de 12 MB y le dice a la app por qué', () => {
   assert.match(JSON.parse(app.enviados[0] as string).error, /demasiado largo/)
   assert.ok(app.cerrado && deepgram.cerrado)
   assert.deepEqual(anotado, [1])
+})
+
+test('el puente pide el audio como ArrayBuffer, y si aun así llega otra cosa no la manda a Deepgram como texto', () => {
+  const app = new TuboDePrueba(), deepgram = new TuboDePrueba()
+  puente(app, deepgram, () => {})
+  assert.equal(app.binaryType, 'arraybuffer')
+  assert.equal(deepgram.binaryType, 'arraybuffer')
+  app.emitir('message', { data: new Blob([new Uint8Array([1, 2, 3])]) })
+  assert.equal(deepgram.enviados.length, 0)
+  assert.match(JSON.parse(app.enviados[0] as string).error, /No se pudo dictar/)
+  assert.ok(app.cerrado && deepgram.cerrado)
 })
 
 test('antes de cada dictado se mira el saldo: la que no alcanza se salta sin intentar y se anota; si ninguna alcanza, se prueban igual', async () => {

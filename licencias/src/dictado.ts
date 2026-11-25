@@ -226,6 +226,8 @@ export async function dictado(req: Request, env: Env, ctx: ExecutionContext, url
 
 /** Lo que hace falta de un WebSocket del Worker (así se prueba sin uno). */
 export interface Tubo {
+  /** Con la fecha de compatibilidad del cobro, lo binario llega como Blob si no se pide `arraybuffer`. */
+  binaryType?: 'blob' | 'arraybuffer'
   send(dato: string | ArrayBuffer): void
   close(codigo?: number): void
   addEventListener(tipo: 'message', f: (e: { data: string | ArrayBuffer }) => void): void
@@ -237,6 +239,9 @@ export interface Tubo {
  * otro y dice cuántos segundos duró (`alTerminar`, una vez).
  */
 export function puente(app: Tubo, deepgram: Tubo, alTerminar: (segundos: number) => void, ahora = Date.now) {
+  // Sin esto, el audio llega como Blob: no se puede contar ni reenviar (Deepgram recibía «[object Blob]»).
+  app.binaryType = 'arraybuffer'
+  deepgram.binaryType = 'arraybuffer'
   const inicio = ahora()
   let bytes = 0
   let terminado = false
@@ -267,6 +272,7 @@ export function puente(app: Tubo, deepgram: Tubo, alTerminar: (segundos: number)
       if (e.data === 'fin') deepgram.send(JSON.stringify({ type: 'CloseStream' }))
       return
     }
+    if (!(e.data instanceof ArrayBuffer)) return fallar('No se pudo dictar. Intenta de nuevo.')
     bytes += e.data.byteLength
     if (bytes > MAX_BYTES) return fallar('El dictado es demasiado largo. Intenta uno más corto.')
     deepgram.send(e.data)
