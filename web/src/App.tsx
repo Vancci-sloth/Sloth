@@ -18,6 +18,7 @@ import { useDesplazando } from './desplazando'
 import { useRecordado } from './recordado'
 import { avisarAnuncio, useAvisos } from './avisos'
 import { TituloDeFila, useBarraPlegada, vistaDeLote, vistaDeVideo, type Plegado, type Vista } from './Barra'
+import { aProyecto, ElegirProyecto, nombresDeProyectos, ProyectoFila, proyectosDe } from './Proyectos'
 import { Composer, Icon, Picker, type Choice, type Draft } from './Composer'
 import { LINK, pedirMejora, threadIcons, threadRef } from './etiquetas'
 import { Confirm } from './Confirm'
@@ -394,18 +395,31 @@ export function App() {
     if (icon) threadIcons.set(s.id, icon)
   }
   const archived = sessions.filter((s) => s.archived)
-  // Los videos de un lote van juntos, donde cae el más reciente.
-  const lista: (SessionMeta | SessionMeta[])[] = []
-  const lotes = new Map<string, SessionMeta[]>()
-  for (const s of sessions.filter((s) => !s.archived)) {
-    if (!s.lote) {
-      lista.push(s)
-      continue
+  // Los videos de un lote van juntos, donde cae el más reciente. Los de un proyecto, en su carpeta (`Proyectos.tsx`).
+  const agrupar = (hilos: SessionMeta[]) => {
+    const lista: (SessionMeta | SessionMeta[])[] = []
+    const lotes = new Map<string, SessionMeta[]>()
+    for (const s of hilos) {
+      if (!s.lote) {
+        lista.push(s)
+        continue
+      }
+      let grupo = lotes.get(s.lote.id)
+      if (!grupo) lotes.set(s.lote.id, (grupo = [])), lista.push(grupo)
+      grupo.push(s)
     }
-    let grupo = lotes.get(s.lote.id)
-    if (!grupo) lotes.set(s.lote.id, (grupo = [])), lista.push(grupo)
-    grupo.push(s)
+    return lista
   }
+  const lista = agrupar(sessions.filter((s) => !s.archived && !s.proyecto))
+  const proyectos = proyectosDe(sessions).map((p) => ({ ...p, items: agrupar(p.hilos) }))
+  const [proyectosAbiertos, setProyectosAbiertos] = useStored<Record<string, boolean>>('proyectos', {})
+  /** Una carpeta, abierta si la abriste o si el hilo que miras está en ella. */
+  const abiertoProyecto = (p: { nombre: string; hilos: SessionMeta[] }) => proyectosAbiertos[p.nombre] ?? p.hilos.some((s) => s.id === openId)
+  // El + de una carpeta: el chat nuevo nace en ella. Se olvida al salir del chat nuevo.
+  const [proyectoNuevo, setProyectoNuevo] = useState<string | null>(null)
+  useEffect(() => {
+    if (view.kind !== 'new') setProyectoNuevo(null)
+  }, [view.kind])
   const [abiertos, setAbiertos] = useStored<Record<string, boolean>>('lotes', {})
   /** Un lote con sus videos en orden. Abierto si lo abriste, o si el hilo que miras es de este lote. */
   const delLote = (grupo: SessionMeta[]) => {
@@ -498,17 +512,18 @@ export function App() {
    */
   function pick(id: string, range: boolean) {
     const next = new Set(selected)
+    const visibles = (items: typeof lista) =>
+      items.flatMap((x) => {
+        if (!Array.isArray(x)) return [x]
+        const lote = delLote(x)
+        return lote.abierto ? lote.videos : []
+      })
     const order = (
       q
         ? encontrados
         : [
-            ...secciones.flatMap((sec) =>
-              sec.items.flatMap((x) => {
-                if (!Array.isArray(x)) return [x]
-                const lote = delLote(x)
-                return lote.abierto ? lote.videos : []
-              })
-            ),
+            ...proyectos.flatMap((p) => (abiertoProyecto(p) ? visibles(p.items) : [])),
+            ...secciones.flatMap((sec) => visibles(sec.items)),
             ...(showArchived ? archived : [])
           ]
     ).map((s) => s.id)
@@ -557,6 +572,12 @@ export function App() {
       acciones={accionesFila}
     />
   )
+  /** Un hilo suelto o un lote, en la lista por fechas o en su carpeta. */
+  const item = (x: SessionMeta | SessionMeta[]) => {
+    if (!Array.isArray(x)) return row(x)
+    const { id, videos, abierto } = delLote(x)
+    return <LoteFila key={id} videos={videos} card={cardOf(videos[0].cardId)} abierto={abierto} onToggle={() => setAbiertos({ ...abiertos, [id]: !abierto })} fila={row} vista={vistaDeLote(videos, avances)} />
+  }
   const lastCard = () => cardOf(localStorage.getItem('card') ?? '') ?? cards[0]
   const cardSolicitada = view.kind === 'new' ? view.cardId : view.kind === 'draft' ? drafts[view.id]?.cardId : undefined
   const creador = cardOf(NUEVO_ESTILO)
@@ -718,15 +739,28 @@ export function App() {
               </button>
             </div>
           ))}
+          {proyectos.length > 0 && <div className="barra-seccion">Proyectos</div>}
+          {proyectos.map((p) => {
+            const abierto = abiertoProyecto(p)
+            return (
+              <ProyectoFila
+                key={`proyecto-${p.nombre}`}
+                nombre={p.nombre}
+                hilos={p.hilos}
+                abierto={abierto}
+                plegada={plegada}
+                onToggle={() => setProyectosAbiertos({ ...proyectosAbiertos, [p.nombre]: !abierto })}
+                onNuevo={() => (newChat(), setProyectoNuevo(p.nombre))}
+              >
+                {p.items.map(item)}
+              </ProyectoFila>
+            )
+          })}
           {secciones.flatMap((sec) => [
             <div key={`seccion-${sec.nombre}`} className="barra-seccion">
               {sec.nombre}
             </div>,
-            ...sec.items.map((x) => {
-              if (!Array.isArray(x)) return row(x)
-              const { id, videos, abierto } = delLote(x)
-              return <LoteFila key={id} videos={videos} card={cardOf(videos[0].cardId)} abierto={abierto} onToggle={() => setAbiertos({ ...abiertos, [id]: !abierto })} fila={row} vista={vistaDeLote(videos, avances)} />
-            }),
+            ...sec.items.map(item),
           ])}
           {/* Los archivados, al final y plegados: casi siempre se llega a ellos buscando. */}
           {archived.length > 0 && (
@@ -746,6 +780,7 @@ export function App() {
         {selected && (
           <SelectBar
             picked={sessions.filter((s) => selected.has(s.id))}
+            proyectos={nombresDeProyectos(sessions)}
             y={pickY}
             app={app}
             onClose={() => setSelected(null)}
@@ -756,6 +791,7 @@ export function App() {
           <SessionMenu
             {...menu}
             app={app}
+            proyectos={nombresDeProyectos(sessions)}
             onClose={() => setMenu(null)}
             onSelect={() => {
               if (!selected) setPickY(menu.y)
@@ -820,6 +856,14 @@ export function App() {
         {newCard && draftId && (
           <div className="avisos-nuevo">
             <AvisoEquipo /> {/* tu equipo */}
+            {proyectoNuevo && view.kind === 'new' && (
+              <div className="proyecto-aviso small">
+                <Icono de="carpeta" /> Este chat nace en el proyecto «{proyectoNuevo}».
+                <button className="ghost small" title="Que vaya a la lista por fechas" onClick={() => setProyectoNuevo(null)}>
+                  Quitar
+                </button>
+              </div>
+            )}
           </div>
         )}
         {newCard && draftId && (
@@ -845,8 +889,10 @@ export function App() {
               setDrafts((all) => (all[draftId] ? { ...all, [draftId]: { ...all[draftId], cardId: c.id } } : all))
               if (view.kind === 'new') go({ kind: 'new', cardId: c.id })
             }}
-            onCreated={(id) => {
+            onCreated={(id, todos) => {
               setDrafts(({ [draftId]: _, ...rest }) => rest)
+              // Nació desde el + de una carpeta: va a ella, también los videos de un lote.
+              if (proyectoNuevo) void aProyecto(todos ?? [id], proyectoNuevo).catch(() => {})
               go({ kind: 'session', id })
             }}
           />
@@ -950,7 +996,8 @@ function NewSession(props: {
   onDraft(draft: Draft): void
   onNuevoEstilo(): void
   onPick(c: Card): void
-  onCreated(id: string): void
+  /** `todos`: los videos de un lote, que nacen varios a la vez. */
+  onCreated(id: string, todos?: string[]): void
 }) {
   const { card, models } = props
   // El nombre y la descripción del estilo elegido entran al cambiarlo, en los temas con movimiento.
@@ -1165,7 +1212,7 @@ function NewSession(props: {
           text = [text, ...pide].filter(Boolean).join('\n\n')
           if (porEnlace) {
             const metas = await api<SessionMeta[]>('/api/lotes', { cardId: card.id, text, enlaces, images, ...choice })
-            return props.onCreated(metas[0].id)
+            return props.onCreated(metas[0].id, metas.map((m) => m.id))
           }
           const meta = await api<SessionMeta>('/api/sessions', { cardId: card.id, text, images, ...choice })
           props.onCreated(meta.id)
@@ -1625,9 +1672,11 @@ const SIN_TAREAS: string[] = []
  * El clic derecho sobre un hilo. «Copiar referencia» copia la ruta de su historial: pegada en otro hilo, el agente la
  * lee y tiene el contexto, trabaje donde trabaje. «Renombrar» lo renombra en su fila, como el doble clic.
  */
-function SessionMenu({ session, x, y, app, onClose, onSelect, onDeleted, onRename }: { session: SessionMeta; x: number; y: number; app: string; onClose(): void; onSelect(): void; onDeleted(id: string): void; onRename(): void }) {
+function SessionMenu({ session, x, y, app, proyectos, onClose, onSelect, onDeleted, onRename }: { session: SessionMeta; x: number; y: number; app: string; proyectos: string[]; onClose(): void; onSelect(): void; onDeleted(id: string): void; onRename(): void }) {
   const [error, setError] = useState('')
   const [borrar, setBorrar] = useState(false)
+  // «Mover a un proyecto»: el menú cambia a la lista de carpetas.
+  const [aCarpeta, setACarpeta] = useState(false)
   const busy = session.running || !!session.background?.length
 
   useEffect(() => {
@@ -1669,7 +1718,11 @@ function SessionMenu({ session, x, y, app, onClose, onSelect, onDeleted, onRenam
 
   return (
     <div className="menu-backdrop" onClick={onClose} onContextMenu={(e) => (e.preventDefault(), onClose())}>
-      <div className="menu" style={{ left: Math.min(x, innerWidth - 230), top: Math.min(y, innerHeight - 180) }} onClick={(e) => e.stopPropagation()}>
+      <div className="menu" style={{ left: Math.min(x, innerWidth - 230), top: Math.max(8, Math.min(y, innerHeight - (aCarpeta ? 110 + 34 * proyectos.length : 220))) }} onClick={(e) => e.stopPropagation()}>
+        {aCarpeta ? (
+          <ElegirProyecto proyectos={proyectos} actual={session.proyecto} onElegir={(p) => run(() => aProyecto([session.id], p))} />
+        ) : (
+          <>
         <button
           title="Para dárselo como contexto a otro hilo"
           onClick={() => run(() => navigator.clipboard.writeText(threadRef(session.title, session.id, app)))}
@@ -1679,6 +1732,9 @@ function SessionMenu({ session, x, y, app, onClose, onSelect, onDeleted, onRenam
         <button title="También con doble clic en el hilo" onClick={() => run(async () => onRename())}>
           Renombrar
         </button>
+        <button title="Lo junta en una carpeta de la barra lateral" onClick={() => setACarpeta(true)}>
+          {session.proyecto ? 'Mover a otro proyecto' : 'Mover a un proyecto'}
+        </button>
         <button title="Para archivar o eliminar varios a la vez (también con Ctrl+clic)" onClick={() => run(async () => onSelect())}>
           Seleccionar
         </button>
@@ -1686,6 +1742,8 @@ function SessionMenu({ session, x, y, app, onClose, onSelect, onDeleted, onRenam
         <button className="danger" disabled={busy} title={busy ? 'El agente sigue trabajando en este hilo' : undefined} onClick={() => setBorrar(true)}>
           Eliminar
         </button>
+          </>
+        )}
         {error && <div className="bad small menu-error">{error}</div>}
       </div>
     </div>
@@ -1696,8 +1754,11 @@ function SessionMenu({ session, x, y, app, onClose, onSelect, onDeleted, onRenam
  * La barra de los hilos seleccionados: copiar sus referencias, archivarlos o eliminarlos de una vez. Archivar los desarchiva si ya lo estaban
  * todos. Los que siguen trabajando no se eliminan.
  */
-function SelectBar({ picked, y, app, onClose, onDeleted }: { picked: SessionMeta[]; y: number; app: string; onClose(): void; onDeleted(ids: string[]): void }) {
+function SelectBar({ picked, y, app, proyectos, onClose, onDeleted }: { picked: SessionMeta[]; y: number; app: string; proyectos: string[]; onClose(): void; onDeleted(ids: string[]): void }) {
   const [asking, setAsking] = useState(false)
+  const [aCarpeta, setACarpeta] = useState(false)
+  // Si todos van en la misma carpeta, se ofrece sacarlos de ella.
+  const mismo = new Set(picked.map((s) => s.proyecto)).size === 1 ? picked[0]?.proyecto : undefined
   const [error, setError] = useState('')
   const [copied, setCopied] = useState(false)
   const allArchived = picked.length > 0 && picked.every((s) => s.archived)
@@ -1706,10 +1767,20 @@ function SelectBar({ picked, y, app, onClose, onDeleted }: { picked: SessionMeta
 
   useEffect(() => {
     if (asking) return // el Escape es del modal
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
+    // Con la lista de carpetas abierta, Escape solo la cierra.
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && (aCarpeta ? setACarpeta(false) : onClose())
     addEventListener('keydown', onKey)
     return () => removeEventListener('keydown', onKey)
-  }, [asking, onClose])
+  }, [asking, aCarpeta, onClose])
+
+  async function aCarpetaDe(proyecto: string) {
+    try {
+      await aProyecto(picked.map((s) => s.id), proyecto)
+      onClose()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    }
+  }
 
   async function archive() {
     try {
@@ -1745,6 +1816,9 @@ function SelectBar({ picked, y, app, onClose, onDeleted }: { picked: SessionMeta
         <button disabled={!picked.length} onClick={archive}>
           {allArchived ? 'Desarchivar' : 'Archivar'}
         </button>
+        <button disabled={!picked.length} aria-expanded={aCarpeta} title="Los junta en una carpeta de la barra lateral" onClick={() => setACarpeta(!aCarpeta)}>
+          A un proyecto
+        </button>
         <button className="danger" disabled={!free.length} onClick={() => setAsking(true)}>
           Eliminar
         </button>
@@ -1752,6 +1826,11 @@ function SelectBar({ picked, y, app, onClose, onDeleted }: { picked: SessionMeta
           ✕
         </button>
       </div>
+      {aCarpeta && (
+        <div className="menu select-proyecto">
+          <ElegirProyecto proyectos={proyectos} actual={mismo} onElegir={aCarpetaDe} />
+        </div>
+      )}
       {asking && (
         <Confirm
           title={free.length === 1 ? `¿Eliminar «${free[0].title}»?` : `¿Eliminar ${free.length} hilos?`}

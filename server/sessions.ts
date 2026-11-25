@@ -552,6 +552,14 @@ export class Sessions {
     this.save(meta)
   }
 
+  /** Lo mete en una carpeta de «Proyectos» de la barra lateral; sin nombre, lo saca. No cambia su fecha. */
+  aProyecto(id: string, proyecto: string) {
+    const meta = this.metas.get(id)
+    if (!meta) return
+    meta.proyecto = proyecto || undefined
+    this.save(meta)
+  }
+
   /** Un hilo archivado no espera respuesta: si está quieto, su proceso se cierra. */
   archive(id: string, archived: boolean) {
     const meta = this.metas.get(id)

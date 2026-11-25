@@ -481,6 +481,8 @@ export interface SessionMeta {
   running: boolean
   /** Fuera de la lista de la barra lateral, sin borrarse. */
   archived?: boolean
+  /** La carpeta de «Proyectos» donde va en la barra lateral, por su nombre. Sin ella, va por fecha. */
+  proyecto?: string
   /** El chat de una imagen del estudio (`server/flow/hilo-imagen.ts`), por su imagen de partida: no se le escribe. */
   imagenEstudio?: string
   /** Las tareas en segundo plano que siguen vivas, por su descripción. */

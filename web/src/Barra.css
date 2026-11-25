@@ -97,6 +97,37 @@ button.barra-seccion:hover { color: var(--text); }
 .lote-pausa { display: flex; flex-wrap: wrap; align-items: center; gap: 0 8px; padding: 0 8px 4px 36px; }
 .lote-pausa .ghost { padding: 2px 4px; color: var(--amber); }
 
+/* Una carpeta de «Proyectos» (`Proyectos.tsx`): se abre como un lote. Su + sale al pasar el ratón, en lugar de la cuenta. */
+.proyecto-row { cursor: pointer; }
+.proyecto-row .session-title { color: var(--text); }
+.proyecto-row .session-icon .ico { width: 15px; height: 15px; }
+.proyecto-row::after { content: ''; flex: none; width: 5px; height: 5px; margin: 0 3px 0 1px; border-right: 1.5px solid; border-bottom: 1.5px solid; opacity: 0.6; transform: rotate(-45deg); transition: transform 0.15s; }
+.proyecto-row.abierto::after { transform: rotate(45deg); }
+.proyecto-nuevo { display: none; flex: none; width: 18px; height: 18px; place-items: center; border-radius: 5px; color: var(--muted); }
+.proyecto-nuevo .ico { width: 13px; height: 13px; }
+.proyecto-nuevo:hover { background: var(--line); color: var(--text); }
+.proyecto-row:hover .proyecto-nuevo, .proyecto-row:focus-within .proyecto-nuevo { display: grid; }
+.proyecto-row:hover .lote-cuenta, .proyecto-row:focus-within .lote-cuenta { display: none; }
+.proyecto-error { padding: 0 8px 4px 36px; }
+.plegada .proyecto-row::after, .plegada .proyecto-row .proyecto-nuevo { display: none; }
+
+/* A qué proyecto va: en el menú de un hilo y bajo la selección. */
+.elegir-proyecto { display: flex; flex-direction: column; min-width: 220px; max-height: min(320px, 60vh); overflow-y: auto; }
+.elegir-proyecto > button { display: flex; align-items: center; gap: 8px; }
+.elegir-proyecto > button .ico { flex: none; width: 14px; height: 14px; color: var(--muted); }
+.elegir-proyecto > button span { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.proyecto-campo { display: flex; align-items: center; gap: 8px; padding: 4px 6px 4px 10px; border-radius: 6px; }
+.proyecto-campo:focus-within { background: var(--panel-2); }
+.proyecto-campo > .ico { flex: none; width: 14px; height: 14px; color: var(--muted); }
+.proyecto-campo input { flex: 1; min-width: 0; padding: 3px 0; border: 0; background: none; color: var(--text); font: inherit; outline: none; }
+.proyecto-campo input::placeholder { color: var(--muted); }
+.menu .proyecto-campo .proyecto-crear { flex: none; padding: 3px 8px; color: var(--amber); font-weight: 600; }
+.elegir-proyecto .proyecto-sacar { margin-top: 2px; border-top: 1px solid var(--line); border-radius: 0 0 6px 6px; color: var(--muted); }
+.menu.select-proyecto { position: static; }
+/* El chat nuevo que nace en una carpeta, arriba a la derecha con los demás avisos. */
+.proyecto-aviso { display: flex; align-items: center; gap: 6px; padding: 5px 6px 5px 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); color: var(--muted); }
+.proyecto-aviso .ico { width: 14px; height: 14px; }
+
 /* Abajo: Opciones y Reiniciar backend, como filas con su icono. */
 .pie { display: flex; flex: none; flex-direction: column; gap: 2px; margin: 0 10px 10px; padding: 5px; border: 1px solid var(--linea-tarjeta); border-radius: 12px; background: var(--panel); }
 .pie button { display: flex; align-items: center; gap: 9px; height: 32px; padding: 0 8px; border-radius: 8px; color: var(--muted); font-size: 13px; text-align: left; transition: background 0.15s, color 0.15s; }

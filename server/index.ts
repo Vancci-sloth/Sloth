@@ -980,6 +980,11 @@ async function api(req: IncomingMessage, res: ServerResponse, url: URL): Promise
       const { archived } = await body<{ archived: boolean }>(req)
       sessions.archive(id, archived)
       send(res, 200, { ok: true })
+    } else if (action === 'proyecto') {
+      // Una línea corta: es el nombre de su carpeta en la barra lateral. Vacío, lo saca de la carpeta.
+      const { proyecto } = await body<{ proyecto?: string | null }>(req)
+      sessions.aProyecto(id, String(proyecto ?? '').replace(/\s+/g, ' ').trim().slice(0, 40))
+      send(res, 200, { ok: true })
     } else if (action === 'rename') {
       // Una línea, del largo de los títulos que salen del primer mensaje.
       const { title } = await body<{ title?: string }>(req)
