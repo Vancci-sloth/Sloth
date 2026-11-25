@@ -554,7 +554,7 @@ function pideConfirmar(res: ServerResponse, confirmado: boolean | undefined, nue
 async function api(req: IncomingMessage, res: ServerResponse, url: URL): Promise<boolean> {
   const path = url.pathname
   const method = req.method ?? 'GET'
-  if (path === '/api/dictado') return dictado(APP, req, res) // dictado con Deepgram
+  if (path === '/api/dictado') return dictado(credencialDictado, req, res) // dictado con Deepgram, por el cobro
 
   if (path === '/api/state' && method === 'GET') {
     if (!cargandoModelos && (['claude', 'codex', 'opencode'] as const).some((p) => rutaAgente(p) && !modelos.some((m) => proveedorDe(m.id) === p))) pedirModelos()
@@ -1213,12 +1213,16 @@ server.on('request', async (req, res) => {
 })
 
 const wss = new WebSocketServer({ noServer: true })
-// El dictado: trozos de audio de 250 ms, que Deepgram pasa a texto (`server/dictado-vivo.ts`).
+// El dictado: trozos de audio de 250 ms, que Deepgram pasa a texto por el cobro (`server/dictado-vivo.ts`).
 const dictados = new WebSocketServer({ noServer: true, maxPayload: 1024 * 1024 })
+/** Con qué se dicta: la cuenta de esta computadora, o la llave del creador en la suya. */
+function credencialDictado() {
+  return llaveDelCreador() ?? suscripcion.credencial()
+}
 server.on('upgrade', (req, socket, head) => {
   if (req.url === '/api/dictado/vivo') {
     if (!deConfianza(req) && web.confianza(req) !== 'sesion') return void socket.destroy()
-    return void dictados.handleUpgrade(req, socket, head, (cliente) => dictadoVivo(APP, cliente))
+    return void dictados.handleUpgrade(req, socket, head, (cliente) => void dictadoVivo(cliente, credencialDictado))
   }
   // Otro WebSocket (el de Vite, en el repo) solo desde esta computadora o con sesión de la web: si no, se cierra y no se
   // queda colgado.

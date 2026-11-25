@@ -275,5 +275,6 @@ Este es el mapa:
   SKILL.md, la marca y «Sobre ti»; lo que solo decide el usuario queda como hueco en el campo (`huecoChip` en
   `Composer.tsx`), con sus opciones. Un hueco sin llenar le llega al agente como «Decídelo tú».
 - El dictado (`web/src/Dictado.tsx`, `server/dictado.ts`, `server/dictado-vivo.ts`): el micrófono del compositor manda tu
-  voz a Deepgram, con la llave de cada quien (`DEEPGRAM_API_KEY` o `data/deepgram.key`), y lo dicho entra al campo sin
-  mandarse. Sin llave no sale. `docs/DEEPGRAM-SERVICIO.md`.
+  voz a Deepgram y lo dicho entra al campo sin mandarse. Solo para quien apoya: va por el cobro
+  (`licencias/src/dictado.ts`), que tiene las llaves de Sloth y salta a la siguiente cuando una se acaba, con tope al
+  día. Sin apoyo no sale. `docs/DEEPGRAM-SERVICIO.md`.

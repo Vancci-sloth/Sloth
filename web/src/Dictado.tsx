@@ -4,11 +4,11 @@ import { Icono } from './Iconos'
 
 /**
  * El micrófono del compositor (`server/dictado.ts`): graba solo al pulsarlo, hasta un minuto, y lo que dices entra al
- * campo para revisarlo antes de mandarlo; nunca lo manda solo. El audio va a Deepgram, y el botón lo dice. Sin la llave
- * de Deepgram en esta computadora, el botón no sale.
+ * campo para revisarlo antes de mandarlo; nunca lo manda solo. El audio va a Deepgram, y el botón lo dice. Es para quien
+ * apoya a Sloth (va por el cobro, con las llaves de Sloth); a los demás el botón no les sale.
  */
 
-/** Si esta computadora tiene llave de Deepgram. Se pregunta una vez por ventana. */
+/** Si se puede dictar (si apoyas y hay llaves en el cobro). Se pregunta una vez por ventana. */
 let disponible: Promise<boolean> | undefined
 function useDisponible() {
   const [si, setSi] = useState(false)

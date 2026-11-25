@@ -463,8 +463,11 @@ async function cuentasDe(env: Env, externos: string[]): Promise<Record<string, {
 
 // ── Lo de todos ─────────────────────────────────────────────────────────────────────────────────────────────────
 
-/** Quién pide: el creador, con su llave (`delCreador`), o una cuenta o un apoyo activos en una computadora que lo usa. */
-async function quien(req: Request, env: Env): Promise<Quien> {
+/**
+ * Quién pide: el creador, con su llave (`delCreador`), o una cuenta o un apoyo activos en una computadora que lo usa.
+ * `pidio` es lo que se anota al vigilar a quien no viene de la app. También lo usa el dictado (`dictado.ts`).
+ */
+export async function quien(req: Request, env: Env, pidio = 'pidió voces de Voices Cloning'): Promise<Quien> {
   if (delCreador(req, env)) return { externo: CREADOR_VOZ, creador: true }
   const clave = (req.headers.get('x-sloth-clave') ?? '').replace(/\s+/g, '').toUpperCase()
   const equipo = req.headers.get('x-sloth-equipo') ?? ''
@@ -479,7 +482,7 @@ async function quien(req: Request, env: Env): Promise<Quien> {
   if (fila?.vetada) throw new Rechazo(403, BLOQUEADA)
   if (!fila || !vigencia(fila as Parameters<typeof vigencia>[0], Date.now()).activa) throw new Rechazo(401, 'Para usar las voces de Sloth, crea tu cuenta gratis de Sloth.')
   if (!DE_LA_APP.test(equipo)) {
-    await vigilar(env, fila.email, 'pidió voces de Voices Cloning sin la app de Sloth, con un identificador de computadora inventado')
+    await vigilar(env, fila.email, `${pidio} sin la app de Sloth, con un identificador de computadora inventado`)
     throw new Rechazo(403, 'Detectamos actividad sospechosa: esto no viene de la app de Sloth. Tu cuenta queda vigilada.')
   }
   return { externo: fila.externo, creador: false, email: fila.email }

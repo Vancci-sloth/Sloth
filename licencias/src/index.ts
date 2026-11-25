@@ -76,6 +76,7 @@ import { aLaVista, comunidad, creditos, olvidarSueltos } from './comunidad.ts'
 import { guardado } from './guardado.ts'
 import { cancelarStripe, firmaDeStripe, leerStripe, modoStripe, pagoDeSesion, sesion, sesionStripe, suscripcionStripe, type PagoStripe, type SesionStripe } from './stripe.ts'
 import { olvidarRegistroVoz, voz } from './voz.ts'
+import { dictado, olvidarDictado } from './dictado.ts'
 import { entregarRifas } from './rifa.ts'
 import { APERTURA_VOZ } from './voz-mensual.ts'
 import { bajarApoyo, reanudarPausadas } from './bajar-apoyo.ts'
@@ -167,6 +168,16 @@ export interface Env {
   VOZ_SOLO_CREADOR?: string
   /** Con `"1"`, la app del celular solo abre a quien apoya hoy (`celular.ts`). */
   CELULAR_SOLO_APOYO?: string
+  /**
+   * Las llaves de Deepgram de Sloth para el dictado de quien apoya (`dictado.ts`): `DEEPGRAM_API_KEY` y, si hay más,
+   * `DEEPGRAM_API_KEY_2`, `_3`…, que se usan en orden y se saltan al acabarse. Sin ninguna, no se ofrece.
+   */
+  DEEPGRAM_API_KEY?: string
+  [llave: `DEEPGRAM_API_KEY_${number}`]: string | undefined
+  /** Los minutos que dicta cada quien al día con esas llaves; 30 si no se pone. */
+  DICTADO_MINUTOS?: number
+  /** Con menos saldo que esto (en dólares), una llave se salta; 0.05 si no se pone. */
+  DICTADO_SALDO_MINIMO?: number
 }
 
 /**
@@ -557,6 +568,7 @@ export default {
     ctx.waitUntil(avisarCobros(env).catch((e) => console.error('Avisos de cobro', e instanceof Error ? e.message : e)))
     ctx.waitUntil(env.DB.prepare('DELETE FROM cupos WHERE creado < ?').bind(new Date(Date.now() - 2 * DIA).toISOString()).run())
     ctx.waitUntil(olvidarRegistroVoz(env).catch((e) => console.error('Registro de la voz', e instanceof Error ? e.message : e)))
+    ctx.waitUntil(olvidarDictado(env).catch((e) => console.error('Uso del dictado', e instanceof Error ? e.message : e)))
     ctx.waitUntil(olvidarSueltos(env).catch((e) => console.error('Archivos sueltos de la comunidad', e instanceof Error ? e.message : e)))
     ctx.waitUntil(olvidarRespaldos(env).catch((e) => console.error('Copias que nadie renueva', e instanceof Error ? e.message : e)))
     ctx.waitUntil(olvidarWeb(env).catch((e) => console.error('Sloth en la web', e instanceof Error ? e.message : e)))
@@ -605,6 +617,7 @@ async function atender(req: Request, env: Env, ctx: ExecutionContext, url: URL):
     if (url.pathname.startsWith('/celular/')) return await actualizarCelular(req, env, url)
     if (url.pathname === '/comunidad' || url.pathname.startsWith('/comunidad/')) return await comunidad(req, env, url, ctx)
     if (url.pathname === '/voz' || url.pathname.startsWith('/voz/')) return await voz(req, env, ctx, url)
+    if (url.pathname === '/dictado' || url.pathname.startsWith('/dictado/')) return await dictado(req, env, ctx, url)
     if (url.pathname === '/respaldo' || url.pathname.startsWith('/respaldo/')) return await respaldo(req, env, url)
     if (url.pathname === '/youtube' || url.pathname.startsWith('/youtube/')) return await youtube(req, env, url)
     if (url.pathname === '/web' || url.pathname.startsWith('/web/')) return await web(req, env, url)
