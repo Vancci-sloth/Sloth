@@ -8,7 +8,7 @@ import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Switch, Text, V
 import type { NativeStackScreenProps } from '@react-navigation/native-stack'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { elegirModelos, CON_CHATGPT, conOpenCode, conPrimero, gruposModelos, lineaSubagentes, type Avanzado, type Choice } from '../../../shared/modelos'
-import { lineaClips, OPCIONES_CLIPS } from '../../../shared/flow'
+import { lineaClips, OPCIONES_CLIPS, precioClip } from '../../../shared/flow'
 import { lineaMusica, lineaVoz, MOTORES } from '../../../shared/voz'
 import { PROVEEDORES, proveedorDe, type Proveedor } from '../../../shared/providers'
 import type { EstadoVoz, Marcas, SessionMeta } from '../../../shared/types'
@@ -147,9 +147,9 @@ export function NuevoHilo({ route, navigation }: NativeStackScreenProps<Rutas, '
           {card.clips && (
             <Elegir
               etiqueta="Clips"
-              titulo="Con qué hace los clips en Google Flow"
+              titulo="Con qué hace los clips: Google Flow o Google Vids"
               valor={clips}
-              opciones={Object.entries(OPCIONES_CLIPS).map(([k, o]) => ({ id: k, texto: k, detalle: `${o.creditos} créditos cada clip de 8 s` }))}
+              opciones={Object.entries(OPCIONES_CLIPS).map(([k, o]) => ({ id: k, texto: k, detalle: `${precioClip(o)} cada clip` }))}
               onCambio={(v) => (setClips(v), recordar(`clips.${id}`, v))}
             />
           )}

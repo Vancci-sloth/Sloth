@@ -5,8 +5,19 @@
  */
 
 export const MODELOS_IMAGEN = ['Nano Banana 2.1', 'Nano Banana Pro', 'Nano Banana 2 Lite']
+/**
+ * Google Vids: Omni en el editor de Vids (`server/flow/vids.ts`), con las mismas cuentas y la misma fila que Flow. No
+ * gasta créditos de Flow sino el cupo de video de Vids de cada cuenta, que es aparte (una cuenta gratis también tiene, y
+ * Google no dice cuánto). Sale en 720p (1080p pide un plan de pago) y dura de 3 a 15 s.
+ */
+export const MODELO_VIDS = 'Google Vids · Omni'
+export const esVids = (modelo: string) => modelo === MODELO_VIDS
+export const SEGUNDOS_VIDS = { min: 3, max: 15, porDefecto: 8 }
+/** Las imágenes que Vids toma como ingredientes («Imagen 1» a «Imagen 3» en el prompt): solo PNG y JPEG. */
+export const INGREDIENTES_VIDS = 3
+
 /** Flow avisa que Fast, Quality y Omni 1.1 dejan de estar el 5 de diciembre de 2026 (visto el 6 de noviembre). */
-export const MODELOS_VIDEO = ['Veo 3.1 - Lite', 'Veo 3.1 - Fast', 'Veo 3.1 - Quality', 'Omni 1.2 Flash', 'Omni 1.1 Flash']
+export const MODELOS_VIDEO = ['Veo 3.1 - Lite', 'Veo 3.1 - Fast', 'Veo 3.1 - Quality', 'Omni 1.2 Flash', 'Omni 1.1 Flash', MODELO_VIDS]
 
 /** Las proporciones de cada tipo, con el icono de su botón en Flow (el texto cambia con el idioma; el icono, no). */
 export const FORMATOS_VIDEO: Record<string, string> = { '9:16': 'crop_9_16', '16:9': 'crop_16_9' }
@@ -48,8 +59,12 @@ export const OPCIONES_CLIPS: Record<string, { modelo: string; resolucion?: strin
   'Omni 1.2 Flash · 720p': { modelo: 'Omni 1.2 Flash', resolucion: '720p', creditos: 24 },
   'Omni 1.2 Flash · 360p': { modelo: 'Omni 1.2 Flash', resolucion: '360p', creditos: 8 },
   'Omni 1.1 Flash · 720p': { modelo: 'Omni 1.1 Flash', resolucion: '720p', creditos: 12 },
-  'Omni 1.1 Flash · 360p': { modelo: 'Omni 1.1 Flash', resolucion: '360p', creditos: 6 }
+  'Omni 1.1 Flash · 360p': { modelo: 'Omni 1.1 Flash', resolucion: '360p', creditos: 6 },
+  [MODELO_VIDS]: { modelo: MODELO_VIDS, creditos: 0 }
 }
+
+/** Lo que cuesta un clip de esa opción, para los menús: créditos de Flow, o el cupo de Vids. */
+export const precioClip = (o: { modelo: string; creditos: number }) => (esVids(o.modelo) ? 'cupo de Vids, sin créditos' : `${o.creditos} créditos`)
 
 /**
  * La línea del primer mensaje con lo elegido en el menú «Clips». Lo eligió el usuario, así que el tope es lo que cuesta.
@@ -58,6 +73,7 @@ export const OPCIONES_CLIPS: Record<string, { modelo: string; resolucion?: strin
 export function lineaClips(opcion: string): string {
   const o = OPCIONES_CLIPS[opcion]
   if (!o) return ''
+  if (esVids(o.modelo)) return `Clips: genéralos en Google Vids (Omni, 720p), que no gasta créditos de Flow (en generar_video, modelo "${MODELO_VIDS}"; video-base/FLOW.md).`
   const res = o.resolucion ? ` en ${o.resolucion}` : ''
   const params = `modelo "${o.modelo}"${o.resolucion ? `, resolucion "${o.resolucion}"` : ''} y tope ${o.creditos}`
   return `Clips: genéralos en Google Flow con ${o.modelo}${res}, ${o.creditos} créditos cada uno (en generar_video, ${params}; video-base/FLOW.md).`
@@ -188,6 +204,29 @@ export function motivoDeAviso(aviso: string, tipo: 'imagen' | 'video'): Motivo {
   if (AVISO_FRENADA.test(aviso)) return 'frenada'
   if (PALABRA_CREDITOS.test(aviso) || /cuota|quota|l[ií]mite|limit|agot|insuficient|insufficient|upgrade|mejora tu plan/i.test(aviso)) return 'creditos'
   return tipo === 'video' ? 'creditos' : 'frenada'
+}
+
+/**
+ * El motivo, de un aviso de Vids al pedir (en el idioma de la cuenta), o `null` si no es de cupo. Se vio en su página
+ * (23 de noviembre de 2026): «Has alcanzado el límite de vídeos que puedes generar en Vids.» es el cupo, que se renueva
+ * cada mes, y «Has alcanzado un límite provisional de generación de vídeos. Espera un minuto…», una frenada corta.
+ */
+export function motivoDeVids(aviso: string): Motivo | null {
+  if (/provisional|temporar|un minuto|a minute/i.test(aviso)) return 'frenada'
+  if (/l[ií]mite|limit|cuota|quota/i.test(aviso)) return 'creditos'
+  return null
+}
+
+/**
+ * El descanso de Vids, aparte del de Flow: sin cupo, hasta que se renueve (el día 1 a las 00:00 de California, unas 8:00
+ * UTC; en verano es una hora antes, y probar de más solo tarda); frenada, 2 min, que es lo que pide su aviso.
+ */
+export function descansoVids(motivo: Motivo, ahora: number): Descanso {
+  if (motivo === 'creditos') {
+    const d = new Date(ahora)
+    return { hasta: Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 1, 8), motivo }
+  }
+  return { hasta: ahora + (motivo === 'frenada' ? 2 * 60_000 : DESCANSO.sesion), motivo }
 }
 
 /** Una cuenta para el reparto: si está generando, cuándo generó por última vez y si descansa (hasta cuándo, en ms). */

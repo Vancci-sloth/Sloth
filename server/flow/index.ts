@@ -7,7 +7,7 @@ import { dirname, isAbsolute, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type { McpStdioServerConfig } from '@anthropic-ai/claude-agent-sdk'
 import type { Browser } from 'playwright-core'
-import { A_LA_VEZ, AVISO_FRENADA, CALMA, type Descanso, descansoNuevo, elegirCuenta, espacioEntrePedidos, FORMATOS_IMAGEN, FORMATOS_VIDEO, type Motivo, MODELOS_IMAGEN, MODELOS_VIDEO, motivoDeAviso, esOmni, PAUSA_CUENTA, puede, RESOLUCIONES_OMNI, type Saldo, tipoDeArchivo, TOPE_CREDITOS, VIDEO_MAS_BARATO } from '../../shared/flow.ts'
+import { A_LA_VEZ, AVISO_FRENADA, CALMA, type Descanso, descansoNuevo, descansoVids, elegirCuenta, espacioEntrePedidos, esVids, FORMATOS_IMAGEN, FORMATOS_VIDEO, INGREDIENTES_VIDS, type Motivo, MODELOS_IMAGEN, MODELOS_VIDEO, motivoDeAviso, motivoDeVids, esOmni, PAUSA_CUENTA, puede, RESOLUCIONES_OMNI, type Saldo, SEGUNDOS_VIDS, tipoDeArchivo, TOPE_CREDITOS, VIDEO_MAS_BARATO } from '../../shared/flow.ts'
 import type { EstadoFlow, GastoFlow, SaldoFlow, TrabajoFlow } from '../../shared/types.ts'
 import { VENTA } from '../../shared/venta.ts'
 import { areaDeContorno, ESTILOS_IMAGEN, HERRAMIENTAS_IMAGEN, LIMITE_MARCAS, LIMITE_PUNTOS_MARCA, MODELO_RECORTE, PEDIDO_RECORTE, type EstiloImagen, type ImagenEstudio, type MarcaImagen, type PasoImagen } from '../../shared/estilos-imagen.ts'
@@ -16,6 +16,7 @@ import { cuerpo, json } from '../http.ts'
 import { type CuentaFlow, cuentasFlow, nombreNavegador } from './cuentas.ts'
 import { generarEnFlow, leerSaldo, paginaFlow, ponerAportar, Rechazado, saldoEnFlow, SinConexion, SinEmpezar, URL_FLOW } from './pagina.ts'
 import type { PromptPreparado, registroDeImagen } from './hilo-imagen.ts'
+import { generarEnVids, paginaVids } from './vids.ts'
 
 /**
  * Las imágenes (Nano Banana) y los videos (Veo) de Google Flow, en las cuentas de Google del usuario, como los generaría
@@ -49,6 +50,10 @@ import type { PromptPreparado, registroDeImagen } from './hilo-imagen.ts'
  * `aportar` es «Ayudar a mejorar Flow»: que Google use lo generado para sus productos. Sale apagado aunque en Flow venga
  * encendido, y cada quien lo cambia en Opciones. Se pone en cada cuenta antes de su primer pedido; si no se puede, no se
  * genera.
+ *
+ * Google Vids (`vids.ts`, `MODELO_VIDS`) es un modelo más de video, en la misma fila y con las mismas cuentas: no gasta
+ * créditos de Flow sino el cupo de Vids de cada cuenta, que va aparte. Por eso su descanso también (`descansosVids`): una
+ * cuenta sin cupo de Vids sigue haciendo videos en Flow, y al revés. Vids no dice cuánto le queda a una cuenta.
  *
  * `derechos` es la fecha en que el usuario confirmó que tiene los derechos de las imágenes que manda (referencias y
  * fotogramas) y que cumple la política de Google. Al subir una imagen, Flow pide aceptar eso mismo, y solo con esta
@@ -84,6 +89,9 @@ interface Ajustes {
   derechos?: string
   proyectos?: Record<string, string>
   descansos?: Record<string, Descanso>
+  /** Los de Google Vids, que tiene su propio cupo, y su archivo para Sloth en cada cuenta. */
+  descansosVids?: Record<string, Descanso>
+  proyectosVids?: Record<string, string>
   saldos?: Record<string, SaldoFlow>
   /** Por día (AAAA-MM-DD, del equipo) y por cuenta, los videos hechos y sus créditos. */
   uso?: Record<string, Record<string, GastoFlow>>
@@ -215,10 +223,13 @@ export function flow(app: string, google: Google, motores?: MotoresEstudio, deFu
   let ultimoFalloRed = 0
   let despertar: NodeJS.Timeout | undefined
 
-  // Una cuenta que acaba de generar cuenta como ocupada durante su pausa.
-  const usos = (ahora: number) =>
+  // Una cuenta que acaba de generar cuenta como ocupada durante su pausa. Para Vids cuenta su propio descanso, y de los
+  // de Flow, el de la sesión y el de una frenada (Google ve las dos páginas juntas), no el de sus créditos.
+  const usos = (ahora: number, vids = false) =>
     cuentas().map((c) => {
-      const d = ajustes.descansos?.[c.correo]
+      const flow = ajustes.descansos?.[c.correo]
+      const deFlow = vids && flow?.motivo === 'creditos' ? undefined : flow
+      const d = [deFlow, vids ? ajustes.descansosVids?.[c.correo] : undefined].filter((x): x is Descanso => !!x && x.hasta > ahora).sort((a, b) => b.hasta - a.hasta)[0]
       const ocupada = ocupadas.has(c.correo) || (acabo.get(c.correo) ?? 0) + PAUSA_CUENTA > ahora
       return { correo: c.correo, ocupada, usada: usada.get(c.correo) ?? 0, descansa: d && d.hasta > ahora ? d : undefined }
     })
@@ -228,6 +239,13 @@ export function flow(app: string, google: Google, motores?: MotoresEstudio, deFu
     const ahora = Date.now()
     ajustes.descansos = { ...ajustes.descansos, [correo]: descansoNuevo(motivo, ahora, ajustes.descansos?.[correo], ajustes.saldos?.[correo]?.renueva) }
     if (motivo === 'frenada') ajustes.calmaHasta = calmaHasta = ahora + CALMA
+    guardarAjustes()
+  }
+
+  /** Descansa solo de Vids. Su frenada no calma a Flow: es un límite de un minuto, no «actividad inusual». */
+  function descansarVids(correo: string, motivo: Motivo) {
+    if (motivo === 'sesion') return descansar(correo, motivo)
+    ajustes.descansosVids = { ...ajustes.descansosVids, [correo]: descansoVids(motivo, Date.now()) }
     guardarAjustes()
   }
 
@@ -269,22 +287,43 @@ export function flow(app: string, google: Google, motores?: MotoresEstudio, deFu
   /** Por qué ninguna cuenta puede con `t` ahora, dicho para el agente. */
   function porQueNinguna(t: Trabajo): string {
     const ahora = Date.now()
-    const descansan = usos(ahora).filter((c) => !puede(c, t.tipo, ahora) && c.descansa)
+    const vids = esVids(t.modelo)
+    const descansan = usos(ahora, vids).filter((c) => !puede(c, t.tipo, ahora) && c.descansa)
     const vuelve = Math.min(...descansan.map((c) => c.descansa!.hasta))
-    const cuales = descansan.map((c) => `${c.correo} (${POR_QUE[c.descansa!.motivo]})`).join(', ')
+    const motivo = (m: Motivo) => (vids && m === 'creditos' ? 'sin cupo de Google Vids este mes' : vids && m === 'frenada' ? 'Google Vids pidió esperar' : POR_QUE[m])
+    const cuales = descansan.map((c) => `${c.correo} (${motivo(c.descansa!.motivo)})`).join(', ')
     const antes = t.ultimo ? `${t.ultimo} ` : ''
-    return `${antes}Ninguna cuenta de Google puede generarlo ahora${cuales ? `: ${cuales}` : ''}.${descansan.length ? ` Vuelven a probar desde las ${hora(vuelve)}.` : ''} No se gastó nada. Para tener más, el usuario puede agregar cuentas en Opciones → Google Flow.`
+    // El cupo de Vids vuelve el día 1: más allá de hoy, con su fecha.
+    const cuando = vuelve - ahora > 20 * 60 * 60_000 ? `el ${new Date(vuelve).toLocaleString('es-MX', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })}` : `las ${hora(vuelve)}`
+    return `${antes}Ninguna cuenta de Google puede generarlo ahora${cuales ? `: ${cuales}` : ''}.${descansan.length ? ` Vuelven a probar desde ${cuando}.` : ''} No se gastó nada. Para tener más, el usuario puede agregar cuentas en Opciones → Google Flow.`
   }
 
   async function generar(t: Trabajo, c: CuentaFlow) {
     t.estado = 'generando'
     t.cuenta = c.correo
     const bajada = join(descargas, t.id)
+    const vids = esVids(t.modelo)
     try {
       await c.enEdge(async (b) => {
-        const page = await paginaFlow(b)
+        const page = await (vids ? paginaVids(b) : paginaFlow(b))
         try {
           if ((t.referencias.length || t.cuadros.length) && !ajustes.derechos) throw new Error(SIN_DERECHOS)
+          if (vids) {
+            const pedido = { prompt: t.prompt, formato: t.formato, segundos: t.segundos ?? SEGUNDOS_VIDS.porDefecto, referencias: t.referencias }
+            const hecho = await generarEnVids(page, ajustes.proyectosVids?.[c.correo], pedido, bajada, (archivo) => {
+              if (ajustes.proyectosVids?.[c.correo] === archivo) return
+              ajustes.proyectosVids = { ...ajustes.proyectosVids, [c.correo]: archivo }
+              guardarAjustes()
+            })
+            mkdirSync(dirname(t.salida), { recursive: true })
+            copyFileSync(hecho.archivo, t.salida)
+            guardar(`${t.salida}.huella`, t.huella)
+            t.creditos = 0
+            apuntarUso(c.correo, 0)
+            t.archivo = t.salida
+            t.estado = 'lista'
+            return
+          }
           const aportar = ajustes.aportar === true
           if (aplicado.get(c.correo) !== aportar) {
             await ponerAportar(page, aportar)
@@ -323,6 +362,7 @@ export function flow(app: string, google: Google, motores?: MotoresEstudio, deFu
       })
     } catch (e) {
       if (e instanceof SinConexion) return reintentarPorRed(t, e)
+      if (vids) return fallaVids(t, c, e)
       const frenada = e instanceof Rechazado && AVISO_FRENADA.test(e.aviso)
       if (e instanceof Rechazado) {
         if (e.saldo) apuntarSaldo(c.correo, e.saldo)
@@ -376,6 +416,24 @@ export function flow(app: string, google: Google, motores?: MotoresEstudio, deFu
     t.estado = 'en-fila'
     if (t.estudio) t.estudio.paso = 'turno'
     fila.unshift(t)
+  }
+
+  /**
+   * Un pedido de Vids que no salió. Sin empezar (sin cupo, un límite corto o sin sesión) no gastó: la cuenta descansa de
+   * Vids y el pedido pasa a otra. Lo demás falla diciéndolo: Vids no dice si lo cobró.
+   */
+  function fallaVids(t: Trabajo, c: CuentaFlow, e: unknown) {
+    if (e instanceof SinEmpezar) {
+      descansarVids(c.correo, e.sesion ? 'sesion' : (motivoDeVids(e.aviso) ?? 'creditos'))
+      t.probadas.push(c.correo)
+      t.ultimo = `${c.correo}: ${mensaje(e)}`
+      t.estado = 'en-fila'
+      t.cuenta = undefined
+      fila.unshift(t)
+      return
+    }
+    t.estado = 'error'
+    t.error = e instanceof Rechazado ? `${mensaje(e)} No se sabe si gastó el cupo de Vids de la cuenta: no lo pidas otra vez sin decírselo al usuario.` : mensaje(e)
   }
 
   /** Lo que se le dice al agente de un pedido rechazado: si gastó y si puede pedirlo otra vez. */
@@ -437,7 +495,7 @@ export function flow(app: string, google: Google, motores?: MotoresEstudio, deFu
       if (ocupadas.size >= (calma ? 1 : A_LA_VEZ)) return
       // Un pedido que espera su reintento por la red: aún no.
       if (t.desde && t.desde > ahora) continue
-      const elegida = elegirCuenta(usos(ahora), t.tipo, ahora, t.probadas)
+      const elegida = elegirCuenta(usos(ahora, esVids(t.modelo)), t.tipo, ahora, t.probadas)
       if (elegida === 'esperar') continue
       fila.splice(fila.indexOf(t), 1)
       if (elegida === 'ninguna') {
@@ -459,9 +517,9 @@ export function flow(app: string, google: Google, motores?: MotoresEstudio, deFu
     repartirEn(5000)
   }
 
-  function pedir(d: Pick<Trabajo, 'tipo' | 'prompt' | 'formato' | 'modelo' | 'resolucion' | 'salida' | 'tope' | 'referencias' | 'cuadros' | 'estudio'>): Trabajo {
-    // Sin resolución (Veo), la huella de siempre: lo ya hecho no se repite.
-    const suma = createHash('sha1').update(`${d.tipo}\n${d.modelo}${d.resolucion ? ` ${d.resolucion}` : ''}\n${d.formato}\n${d.prompt}`)
+  function pedir(d: Pick<Trabajo, 'tipo' | 'prompt' | 'formato' | 'modelo' | 'resolucion' | 'segundos' | 'salida' | 'tope' | 'referencias' | 'cuadros' | 'estudio'>): Trabajo {
+    // Sin resolución (Veo) ni segundos (Flow), la huella de siempre: lo ya hecho no se repite.
+    const suma = createHash('sha1').update(`${d.tipo}\n${d.modelo}${d.resolucion ? ` ${d.resolucion}` : ''}${d.segundos ? ` ${d.segundos} s` : ''}\n${d.formato}\n${d.prompt}`)
     // Lo que importa de una imagen es lo que tiene, no dónde está. Los fotogramas, aparte: no son referencias.
     for (const r of d.referencias) suma.update(readFileSync(r))
     if (d.cuadros.length) suma.update('\nfotogramas\n')
@@ -488,12 +546,14 @@ export function flow(app: string, google: Google, motores?: MotoresEstudio, deFu
     return {
       cuentas: cuentas().map((c) => {
         const d = ajustes.descansos?.[c.correo]
+        const dv = ajustes.descansosVids?.[c.correo]
         const saldo = ajustes.saldos?.[c.correo]
         return {
           correo: c.correo,
           deLaVoz: c.deLaVoz,
           generando: ocupadas.has(c.correo),
           ...(d && d.hasta > ahora ? { descansa: d } : {}),
+          ...(dv && dv.hasta > ahora ? { descansaVids: dv } : {}),
           ...(saldo ? { saldo } : {}),
           hoy: deHoy[c.correo] ?? NADA
         }
@@ -754,7 +814,7 @@ export function flow(app: string, google: Google, motores?: MotoresEstudio, deFu
       return json(res, 200, estado())
     }
     if (path === '/api/flow/generar' && metodo === 'POST') {
-      const d = await cuerpo<{ tipo?: string; prompt?: string; formato?: string; modelo?: string; resolucion?: string; salida?: string; tope?: number; referencias?: string[]; primerCuadro?: string; ultimoCuadro?: string }>(req)
+      const d = await cuerpo<{ tipo?: string; prompt?: string; formato?: string; modelo?: string; resolucion?: string; segundos?: number; salida?: string; tope?: number; referencias?: string[]; primerCuadro?: string; ultimoCuadro?: string }>(req)
       if (d.tipo !== 'imagen' && d.tipo !== 'video') return json(res, 400, { error: 'El tipo es imagen o video.' })
       const video = d.tipo === 'video'
       const modelos = video ? MODELOS_VIDEO : MODELOS_IMAGEN
@@ -777,8 +837,18 @@ export function flow(app: string, google: Google, motores?: MotoresEstudio, deFu
         return json(res, 400, { error: 'Flow hace un video desde fotogramas o con referencias, no las dos: pon a los personajes en el primer cuadro (generar_imagen con sus referencias) y anímalo.' })
       const mala = imagenMala([...referencias, ...cuadros])
       if (mala) return json(res, 400, { error: `No encuentro la imagen ${mala}: pasa la ruta absoluta de un .png, .jpg o .webp.` })
+      const vids = esVids(modelo)
+      const { min, max, porDefecto } = SEGUNDOS_VIDS
+      if (!vids && d.segundos !== undefined && d.segundos !== 8) return json(res, 400, { error: 'Los videos de Flow duran 8 s: elegir la duración es solo de Google Vids.' })
+      const segundos = vids ? (d.segundos ?? porDefecto) : undefined
+      if (segundos !== undefined && (!Number.isInteger(segundos) || segundos < min || segundos > max)) return json(res, 400, { error: `Un video de Google Vids dura de ${min} a ${max} s.` })
+      if (vids && cuadros.length)
+        return json(res, 400, { error: 'Google Vids no parte de un primer cuadro: pasa la imagen en referencias y di en el prompt que el video empieza en «Imagen 1».' })
+      if (vids && referencias.length > INGREDIENTES_VIDS) return json(res, 400, { error: `Google Vids toma hasta ${INGREDIENTES_VIDS} referencias.` })
+      const webp = vids && referencias.find((r) => /\.webp$/i.test(r))
+      if (webp) return json(res, 400, { error: `Google Vids solo toma PNG y JPEG: convierte ${webp}.` })
       if ((referencias.length || cuadros.length) && !ajustes.derechos) return json(res, 409, { error: SIN_DERECHOS })
-      return json(res, 200, publico(pedir({ tipo: d.tipo, prompt: d.prompt.trim(), formato, modelo, resolucion, salida: resolve(d.salida), tope: d.tope ?? TOPE_CREDITOS, referencias, cuadros })))
+      return json(res, 200, publico(pedir({ tipo: d.tipo, prompt: d.prompt.trim(), formato, modelo, resolucion, segundos, salida: resolve(d.salida), tope: d.tope ?? TOPE_CREDITOS, referencias, cuadros })))
     }
     const t = /^\/api\/flow\/trabajos\/(\w+)$/.exec(path)
     if (t && metodo === 'GET') {

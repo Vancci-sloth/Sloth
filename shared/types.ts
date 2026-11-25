@@ -1884,6 +1884,8 @@ export interface CuentaEnFlow {
   deLaVoz: boolean
   generando: boolean
   descansa?: { hasta: number; motivo: 'creditos' | 'frenada' | 'sesion' }
+  /** Lo mismo en Google Vids, que tiene su propio cupo: sin él, la cuenta sigue haciendo videos en Flow. */
+  descansaVids?: { hasta: number; motivo: 'creditos' | 'frenada' | 'sesion' }
   saldo?: SaldoFlow
   hoy: GastoFlow
 }
@@ -1916,6 +1918,8 @@ export interface TrabajoFlow {
   modelo: string
   /** La de Omni; Veo, siempre 720p. */
   resolucion?: string
+  /** Lo que dura un video de Google Vids (de 3 a 15 s); los de Flow duran 8. */
+  segundos?: number
   /** La cuenta de Google con que se genera o se generó. */
   cuenta?: string
   archivo?: string

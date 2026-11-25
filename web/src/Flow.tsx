@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { IMAGEN_CHATGPT, MODELOS_IMAGEN, OPCIONES_CLIPS } from '../../shared/flow'
+import { esVids, IMAGEN_CHATGPT, MODELOS_IMAGEN, OPCIONES_CLIPS } from '../../shared/flow'
 import type { CuentaClaude, CuentaEnFlow, EstadoFlow, GastoFlow } from '../../shared/types'
 import { api, leerCuenta } from './api'
 import { Picker } from './Composer'
@@ -13,7 +13,7 @@ import type { UsoVoz } from './Voz'
  * con cada una hay que abrir Flow y aceptar su aviso, que es de cada quien. «Ayudar a mejorar Flow» sale apagado: cada quien decide si Google usa lo que
  * genera. Quien manda referencias confirma que tiene sus derechos (`AvisoDerechos`). En el compositor de un video, el menú
  * «Imágenes»: con ChatGPT o con un modelo de Flow (`lineaImagenes`, `shared/flow.ts`), y en los estilos que hacen clips,
- * «Clips»: el modelo de Veo u Omni (`lineaClips`).
+ * «Clips»: el modelo de Veo u Omni, o Google Vids (`lineaClips`).
  */
 
 const POLITICA = 'https://policies.google.com/terms/generative-ai/use-policy'
@@ -57,6 +57,7 @@ export type UsoFlow = ReturnType<typeof useFlow>
 
 const POR_QUE: Record<NonNullable<CuentaEnFlow['descansa']>['motivo'], string> = { creditos: 'Sin créditos de video', frenada: 'Flow la frenó', sesion: 'Sin sesión' }
 const hora = (ms: number) => new Date(ms).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })
+const dia = (ms: number) => new Date(ms).toLocaleDateString('es-MX', { day: 'numeric', month: 'short' })
 
 const videos = (g: GastoFlow) => `${g.videos} ${g.videos === 1 ? 'video' : 'videos'} (${g.creditos} créditos)`
 
@@ -71,7 +72,9 @@ function cuantoLeQueda(c: CuentaEnFlow): string {
 /** Cómo está una cuenta, y la clase de su punto (`.estado`). */
 function comoEsta(c: CuentaEnFlow): [string, string] {
   const hoy = c.hoy.videos ? ` · hoy ${c.hoy.videos} ${c.hoy.videos === 1 ? 'video' : 'videos'}` : ''
-  const extra = ` · ${cuantoLeQueda(c)}${hoy}`
+  // Su cupo de Google Vids va aparte: sin él, la cuenta sigue en Flow.
+  const vids = c.descansaVids ? ` · Google Vids ${c.descansaVids.motivo === 'creditos' ? `sin cupo hasta el ${dia(c.descansaVids.hasta)}` : `la frenó hasta las ${hora(c.descansaVids.hasta)}`}` : ''
+  const extra = ` · ${cuantoLeQueda(c)}${hoy}${vids}`
   if (c.generando) return [`Generando${extra}`, 'moviendo']
   if (c.descansa) return [`${POR_QUE[c.descansa.motivo]} · vuelve a probar a las ${hora(c.descansa.hasta)}${hoy}`, 'falta']
   return [`${c.deLaVoz ? 'Lista · la de la voz' : 'Lista'}${extra}`, '']
@@ -140,7 +143,7 @@ export function SelectorImagenes({ valor, hayChatGPT, voz, flow, onCambio }: { v
   )
 }
 
-/** El menú «Clips» del compositor de un estilo con `clips`: con qué modelo de Flow se hacen y cuánto cuesta cada uno. */
+/** El menú «Clips» del compositor de un estilo con `clips`: con qué modelo de Flow (o Google Vids) se hacen y cuánto cuesta cada uno. */
 export function SelectorClips({ valor, onCambio }: { valor: string; onCambio(modelo: string): void }) {
   return (
     <Picker
@@ -150,7 +153,11 @@ export function SelectorClips({ valor, onCambio }: { valor: string; onCambio(mod
       groups={[
         {
           label: 'Google Flow · créditos por clip de 8 s',
-          options: Object.entries(OPCIONES_CLIPS).map(([id, o]) => ({ value: id, label: `${id} · ${o.creditos}` }))
+          options: Object.entries(OPCIONES_CLIPS).filter(([, o]) => !esVids(o.modelo)).map(([id, o]) => ({ value: id, label: `${id} · ${o.creditos}` }))
+        },
+        {
+          label: 'Google Vids · su propio cupo, sin créditos',
+          options: Object.entries(OPCIONES_CLIPS).filter(([, o]) => esVids(o.modelo)).map(([id]) => ({ value: id, label: id }))
         }
       ]}
       onChange={onCambio}
@@ -190,7 +197,7 @@ export function FlowOpciones({ voz, privacidad }: { voz: UsoVoz; privacidad: boo
           <strong>Cuentas de Google</strong>
           <span>
             {n
-              ? `Veo y Nano Banana con ${n === 1 ? 'una cuenta' : `${n} cuentas`} · quedan ${e?.quedan ?? 0} créditos${e?.enFila ? ` · generando ${e.enFila}` : ''}`
+              ? `Veo, Nano Banana y Google Vids con ${n === 1 ? 'una cuenta' : `${n} cuentas`} · quedan ${e?.quedan ?? 0} créditos${e?.enFila ? ` · generando ${e.enFila}` : ''}`
               : 'Agrega una cuenta aquí o conéctala en Google AI Studio.'}
           </span>
         </div>
@@ -206,7 +213,7 @@ export function FlowOpciones({ voz, privacidad }: { voz: UsoVoz; privacidad: boo
       </div>
       {e?.agregando && (
         <p className="muted small fila-extra">
-          Cuando Flow abra con tu foto arriba a la derecha, acepta su aviso si te lo enseña y cierra la ventana: la cuenta queda en Sloth. Cada cuenta gratis da 50 créditos al día; cuando una se queda sin ellos, Sloth sigue con otra.
+          Cuando Flow abra con tu foto arriba a la derecha, acepta su aviso si te lo enseña y cierra la ventana: la cuenta queda en Sloth. Cada cuenta gratis da 50 créditos al día y su propio cupo de Google Vids; cuando una se queda sin ellos, Sloth sigue con otra.
         </p>
       )}
       {n > 0 && e && (

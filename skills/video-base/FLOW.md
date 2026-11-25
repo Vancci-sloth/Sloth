@@ -42,6 +42,13 @@ Los clips, cuando el usuario los pida o tu skill lo diga.
     personajes en `referencias` (gratis) y anímalo. El cuadro va en el mismo `formato` que el video.
   - **`referencias`** (hasta 3): sigue a esos personajes sin partir de una imagen. No va con `primerCuadro`.
 
+**Google Vids** (`modelo` `"Google Vids · Omni"`) hace el clip en Vids con las mismas cuentas y **no gasta créditos de
+Flow**: usa el cupo de video de Vids de cada cuenta, que va aparte y que Vids no dice cuánto es. Sale en 720p, dura
+`segundos` (de 3 a 15; sin él, 8) y toma hasta 3 `referencias` PNG o JPEG, que en el prompt se llaman «Imagen 1», «Imagen
+2» e «Imagen 3». No acepta `primerCuadro`: pasa esa imagen en `referencias` y di en el prompt que el clip empieza en
+«Imagen 1». Úsalo cuando el usuario lo pida (en el chat o con la línea `Clips:`), o si Flow se quedó sin créditos y el
+usuario aceptó probar Vids.
+
 Usa Veo 3.1 - Lite salvo que el usuario (en el chat o con la línea `Clips:`) o tu skill pidan otro. Cada pedido da un resultado. Antes de un lote de clips,
 llama a `estado_flow` sin `id`: dice cuántos créditos le quedan a cada cuenta y cuántos videos van hoy. Dile al usuario
 cuántos clips son, cuánto gastan y si alcanzan. Cada video hecho dice también cuánto queda. Si un pedido cuesta más que `tope` (20), no se genera: no subas el tope sin que el
@@ -68,5 +75,7 @@ varias cuentas, hasta dos a la vez, con unos segundos entre pedidos), para que G
 - **Flow lo rechazó por «actividad inusual»:** si no gastó, Sloth ya lo pasó a otra cuenta, y solo te llega el error si
   ninguna pudo. Si el error dice que cobró o que no se supo, no lo repitas: dile al usuario qué clips faltan y cuánto
   se gastó. Con una sola cuenta, que espere a que se le quite (el error dice cuándo) o agregue otra.
+- **Google Vids sin cupo:** el error dice qué cuentas no tienen y cuándo vuelven (el día 1). No gastó: puedes pasar a un
+  modelo de Flow si el usuario lo acepta.
 - **Otro error de Flow:** dile el error tal cual. Si dice «No gastó créditos», puedes pedirlo otra vez cambiando lo que
   Flow no aceptó. Si no, no lo repitas sin decírselo al usuario: puede gastar otra vez.

@@ -33,17 +33,18 @@ const HERRAMIENTAS = [
   {
     name: 'generar_video',
     description:
-      'Genera UN video de 8 s con audio (y las voces que diga el prompt) en Google Flow, con las cuentas de Google del usuario, y deja el MP4 en `salida` (720p; Omni, en la `resolucion` que pidas). GASTA los créditos del usuario: Lite 10, Fast 20, Quality 100, Omni 1.2 Flash 24 en 720p u 8 en 360p, Omni 1.1 Flash 12 en 720p o 6 en 360p (Fast, Quality y Omni 1.1 se van de Flow el 5 de diciembre). Lee el costo antes de generar y, si pasa de `tope`, no genera. Con `primerCuadro`, el video empieza en esa imagen (y acaba en `ultimoCuadro`, si lo pasas): así salen iguales los personajes y el lugar. Con `referencias`, sigue a esos personajes sin partir de una imagen. Las dos cosas a la vez, no. Tarda cerca de un minuto; si no acaba en 40 s, devuelve un id para esperarlo con estado_flow. Si una cuenta se quedó sin créditos, pasa sola a otra. Si nada cambió desde el último archivo de esa ruta, sale al momento y sin gastar.',
+      'Genera UN video de 8 s con audio (y las voces que diga el prompt) en Google Flow, con las cuentas de Google del usuario, y deja el MP4 en `salida` (720p; Omni, en la `resolucion` que pidas). GASTA los créditos del usuario: Lite 10, Fast 20, Quality 100, Omni 1.2 Flash 24 en 720p u 8 en 360p, Omni 1.1 Flash 12 en 720p o 6 en 360p (Fast, Quality y Omni 1.1 se van de Flow el 5 de diciembre). Lee el costo antes de generar y, si pasa de `tope`, no genera. Con modelo "Google Vids · Omni" lo hace en Google Vids, con las mismas cuentas: no gasta créditos de Flow sino el cupo de video de Vids de cada cuenta (aparte; Google no dice cuánto queda), sale en 720p, dura `segundos` (3 a 15) y toma hasta 3 `referencias` PNG o JPEG, que en el prompt son «Imagen 1», «Imagen 2» e «Imagen 3»; no acepta primerCuadro. Con `primerCuadro`, el video empieza en esa imagen (y acaba en `ultimoCuadro`, si lo pasas): así salen iguales los personajes y el lugar. Con `referencias`, sigue a esos personajes sin partir de una imagen. Las dos cosas a la vez, no. Tarda cerca de un minuto; si no acaba en 40 s, devuelve un id para esperarlo con estado_flow. Si una cuenta se quedó sin créditos, pasa sola a otra. Si nada cambió desde el último archivo de esa ruta, sale al momento y sin gastar.',
     inputSchema: {
       type: 'object',
       properties: {
         prompt: PROMPT,
         formato: { type: 'string', enum: ['9:16', '16:9'], description: 'La proporción; sin ella, 9:16. La del primer cuadro tiene que ser la misma' },
-        modelo: { type: 'string', enum: ['Veo 3.1 - Lite', 'Veo 3.1 - Fast', 'Veo 3.1 - Quality', 'Omni 1.2 Flash', 'Omni 1.1 Flash'], description: 'Sin él, Veo 3.1 - Lite' },
-        resolucion: { type: 'string', enum: ['720p', '360p'], description: 'Solo con Omni; sin ella, 720p. 360p cuesta mucho menos y se ve borroso' },
+        modelo: { type: 'string', enum: ['Veo 3.1 - Lite', 'Veo 3.1 - Fast', 'Veo 3.1 - Quality', 'Omni 1.2 Flash', 'Omni 1.1 Flash', 'Google Vids · Omni'], description: 'Sin él, Veo 3.1 - Lite' },
+        resolucion: { type: 'string', enum: ['720p', '360p'], description: 'Solo con Omni de Flow; sin ella, 720p. 360p cuesta mucho menos y se ve borroso' },
+        segundos: { type: 'number', minimum: 3, maximum: 15, description: 'Solo con Google Vids: lo que dura, de 3 a 15; sin él, 8. Los de Flow duran 8' },
         primerCuadro: { type: 'string', description: 'La ruta absoluta de la imagen (.png, .jpg o .webp) donde empieza el video' },
         ultimoCuadro: { type: 'string', description: 'La ruta absoluta de la imagen donde acaba; solo con primerCuadro' },
-        referencias: { type: 'array', items: { type: 'string' }, description: 'Las rutas absolutas de hasta 3 imágenes de los personajes u objetos que salen; sin primerCuadro' },
+        referencias: { type: 'array', items: { type: 'string' }, description: 'Las rutas absolutas de hasta 3 imágenes de los personajes u objetos que salen; sin primerCuadro. En Google Vids, solo .png o .jpg' },
         salida: { type: 'string', description: 'La ruta absoluta del .mp4 que deja' },
         tope: { type: 'number', description: 'Lo más que puede costar, en créditos; sin él, 20. Súbelo solo si el usuario lo pidió.' }
       },
@@ -73,6 +74,7 @@ function contar(t) {
 }
 
 const hora = (ms) => new Date(ms).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })
+const fecha = (ms) => new Date(ms).toLocaleString('es-MX', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
 
 /** Los créditos de cada cuenta, de lo último que se leyó en su Flow. */
 function saldos(e) {
@@ -81,7 +83,7 @@ function saldos(e) {
   const renglones = e.cuentas.map((c) => {
     const s = c.saldo
     const cuanto = !s ? 'aún no se sabe cuánto le queda' : s.renueva && s.renueva <= ahora ? `ya se le renovaron los créditos (a las ${hora(s.renueva)})` : `${s.creditos} créditos${s.renueva ? `, se renuevan a las ${hora(s.renueva)}` : ''}`
-    const descansa = c.descansa ? `; no genera videos hasta las ${hora(c.descansa.hasta)}` : ''
+    const descansa = `${c.descansa ? `; no genera videos hasta las ${hora(c.descansa.hasta)}` : ''}${c.descansaVids ? `; en Google Vids, no hasta el ${fecha(c.descansaVids.hasta)}` : ''}`
     return `- ${c.correo}: ${cuanto}${descansa}. Hoy, ${c.hoy.videos} ${c.hoy.videos === 1 ? 'video' : 'videos'}.`
   })
   return `${renglones.join('\n')}\nEntre las que se saben, quedan ${e.quedan} créditos. Hoy van ${e.uso.hoy.videos} videos (${e.uso.hoy.creditos} créditos); este mes, ${e.uso.mes.videos} (${e.uso.mes.creditos}).`
