@@ -13,6 +13,7 @@ const puente: PuenteSloth = {
   actualizacion: () => ipcRenderer.invoke('actualizacion'),
   actualizar: () => ipcRenderer.invoke('actualizar'),
   traer: () => ipcRenderer.send('traer'),
+  pintar: (fondo, claro) => ipcRenderer.send('pintar', fondo, claro),
   anclada: () => ipcRenderer.invoke('anclada'),
   anclar: () => ipcRenderer.invoke('anclar'),
   disco: {

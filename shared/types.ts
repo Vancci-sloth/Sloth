@@ -1720,6 +1720,8 @@ export interface PuenteSloth {
   actualizar(): Promise<ActualizacionSloth>
   /** La ventana al frente (al pulsar un aviso). */
   traer(): void
+  /** La barra de título y el fondo de la ventana, del color del tema (`web/src/temas.ts`). No está en una ventana de antes. */
+  pintar?(fondo: string, claro: boolean): void
   /** Si Sloth está anclada a la barra de tareas; `null` donde no se puede ofrecer (fuera de la app instalada en Windows). */
   anclada(): Promise<boolean | null>
   /** Pide a Windows anclarla, que pregunta en su ventana. `windows`: Windows no dejó pedirlo. */

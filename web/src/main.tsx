@@ -11,6 +11,7 @@ import { VentanasRemotas } from './VentanasRemotas'
 import './styles.css'
 // Los temas (`temas.ts`): cada uno cambia la interfaz solo bajo su atributo en la raíz, que se pone antes de dibujar.
 import './temas/cristal.css'
+import './temas/claro.css'
 import { aplicarTema } from './temas'
 import { Movimiento } from './Movimiento'
 
