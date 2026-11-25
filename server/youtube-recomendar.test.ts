@@ -5,7 +5,7 @@ import { basename, join, resolve, sep } from 'node:path'
 import test from 'node:test'
 import type { ReferenciaYoutube } from '../shared/youtube.ts'
 import { guardar, huella } from './disco.ts'
-import { enlacesYoutube, recomendacionesYoutube, validarDescripcionYoutube, validarRecomendacion } from './youtube-recomendar.ts'
+import { capitulosYoutube, enlacesYoutube, frasesYoutube, marcaYoutube, recomendacionesYoutube, validarDescripcionYoutube, validarRecomendacion } from './youtube-recomendar.ts'
 
 test('la descripción respeta los bytes de YouTube y solo enlaza fuentes verificadas', () => {
   const fuente = 'https://www.youtube.com/watch?v=referencia1'
@@ -182,4 +182,48 @@ test('el análisis adjunta fotogramas y miniaturas reales, conserva su resultado
   assert.equal(llamadas, 3)
   assert.equal(readFileSync(join(app, 'data', 'youtube.json'), 'utf8'), antes)
   assert.equal(recomendacionesYoutube(app, api).estado(h)?.descripcion?.texto, descrito.descripcion?.texto)
+})
+
+test('los capítulos caen en frases del video, abren en 0:00 y respetan los 10 s de YouTube', () => {
+  const segmentos = [0, 4, 31, 33, 62, 95, 118].map((inicio) => ({ inicio }))
+  assert.deepEqual(capitulosYoutube([
+    { inicio: 2, titulo: '0:02 - El problema' }, { inicio: 30, titulo: 'La prueba' }, { inicio: 35, titulo: 'Demasiado cerca' },
+    { inicio: 64, titulo: '3. El <resultado>' }, { inicio: 118, titulo: 'Casi al final' }
+  ], segmentos, 120), [{ inicio: 0, titulo: 'El problema' }, { inicio: 31, titulo: 'La prueba' }, { inicio: 62, titulo: 'El resultado' }])
+  assert.deepEqual(capitulosYoutube([{ inicio: 31, titulo: 'La prueba' }, { inicio: 62, titulo: 'El resultado' }], segmentos, 120).map((c) => c.titulo), ['Introducción', 'La prueba', 'El resultado'])
+  assert.deepEqual(capitulosYoutube([{ inicio: 0, titulo: 'Uno' }, { inicio: 31, titulo: 'Dos' }], segmentos, 120), [])
+  assert.deepEqual(capitulosYoutube([{ inicio: 0, titulo: 'Uno' }, { inicio: 31, titulo: 'Dos' }, { inicio: 62, titulo: 'Tres' }], [], 120), [])
+  assert.deepEqual(frasesYoutube([{ inicio: 10, fin: 30, texto: 'Primero el guion. Luego, la cámara.' }]), [{ inicio: 10, texto: 'Primero el guion.' }, { inicio: 20, texto: 'Luego, la cámara.' }])
+  assert.equal(marcaYoutube(62, 120), '1:02')
+  assert.equal(marcaYoutube(62, 3700), '0:01:02')
+})
+
+test('la descripción lleva los capítulos del video terminado y no lo vuelve a escuchar', async (t) => {
+  const base = resolve('data'); mkdirSync(base, { recursive: true })
+  const app = mkdtempSync(join(base, 'prueba-youtube-capitulos-'))
+  t.after(() => { assert.ok(app.startsWith(base + sep)); rmSync(app, { recursive: true, force: true }) })
+  const folder = join(app, 'episodio'); mkdirSync(folder)
+  const ruta = join(folder, 'video.mp4')
+  execFileSync('ffmpeg', ['-nostdin', '-v', 'error', '-f', 'lavfi', '-i', 'color=c=gray:s=64x36:r=5:d=90', '-c:v', 'libx264', '-pix_fmt', 'yuv420p', ruta], { windowsHide: true })
+  guardar(join(folder, 'guion.md'), '# Editor con Claude\n' + 'Una prueba de montar videos con Claude Code. '.repeat(8))
+  let escuchado = 0
+  const servicio = recomendacionesYoutube(app, async () => ({}), async (_model, _cwd, prompt) => {
+    assert.ok(prompt.includes('31: Ahora la prueba de verdad'))
+    return JSON.stringify({ texto: 'Monté un video con Claude.', razon: 'Resumen del guion.', capitulos: [{ inicio: 0, titulo: 'El reto' }, { inicio: 30, titulo: 'La prueba' }, { inicio: 61, titulo: 'Lo que salió' }] })
+  }, async () => null, async () => {
+    escuchado++
+    return [{ inicio: 0, fin: 30, texto: 'Hoy hago un reto' }, { inicio: 31.4, fin: 60, texto: 'Ahora la prueba de verdad' }, { inicio: 62, fin: 89, texto: 'Y esto salió' }]
+  })
+  const v = { cardId: 'prueba', ruta, archivo: 'video.mp4', titulo: 'Editor', src: '', t: 1 }
+  const card = { id: 'prueba', title: 'Prueba', description: '', cwd: folder }
+  for (let vez = 0; vez < 2; vez++) {
+    servicio.iniciar(v, card, 'sonnet', [], undefined, null, { tipo: 'descripcion', titulo: `Editor ${vez}` })
+    const limite = Date.now() + 15000
+    while (servicio.ocupado() && Date.now() < limite) await new Promise((ok) => setTimeout(ok, 50))
+    const estado = servicio.estado(huella(ruta))!
+    assert.equal(estado.estado, 'listo', estado.error ?? 'Debe generar la descripción')
+    assert.equal(estado.descripcion?.texto, 'Monté un video con Claude.\n\nCapítulos:\n0:00 El reto\n0:31 La prueba\n1:02 Lo que salió')
+    assert.match(estado.descripcion?.razon ?? '', /3 capítulos/)
+  }
+  assert.equal(escuchado, 1)
 })

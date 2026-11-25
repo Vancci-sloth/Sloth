@@ -11,7 +11,7 @@ import { carpetaYoutube } from './youtube-catalogo.ts'
 import { carpetaTrabajo } from './trabajo.ts'
 import { buscarReferenciasYoutube, type ApiPublicaYoutube } from './youtube-referencias.ts'
 import { jsonYoutube, redactarYoutube } from './youtube-redactor.ts'
-import { subtitulosYoutube } from './ideas/transcribir.ts'
+import { subtitulosYoutube, transcribirArchivo } from './ideas/transcribir.ts'
 import { DESCRIPCION_YOUTUBE, PLAN_YOUTUBE, RECOMENDACION_YOUTUBE } from './youtube-esquemas.ts'
 
 /**
@@ -19,6 +19,8 @@ import { DESCRIPCION_YOUTUBE, PLAN_YOUTUBE, RECOMENDACION_YOUTUBE } from './yout
  * reales al agente. Guarda propuestas y evidencia sin cambiar el título elegido ni aprobar una publicación. El mismo
  * análisis sirve para ambos botones; procesa dos videos a la vez y guarda la cola para retomarla al abrir Sloth.
  * Una solicitud conserva el modelo, esfuerzo y contenido recibidos; no se duplica mientras ese video ya espera o trabaja.
+ * La descripción lleva al final sus capítulos: Sloth escucha el video terminado con Whisper (una vez por versión), el
+ * agente elige los cambios de tema y `capitulosYoutube` los deja como YouTube los acepta, con los tiempos de ese montaje.
  */
 const execFileP = promisify(execFile)
 type Redactar = typeof redactarYoutube
@@ -27,7 +29,7 @@ type Entrada = { v: VideoHecho; model: string; contexto: string; tema?: string; 
 type Trabajo = EstadoRecomendacionYoutube & { firma?: string; orden?: number; pendiente?: Entrada }
 const SIMULTANEOS = 2
 
-export function recomendacionesYoutube(app: string, api: ApiPublicaYoutube, redactar: Redactar = redactarYoutube, subtitulos = subtitulosYoutube) {
+export function recomendacionesYoutube(app: string, api: ApiPublicaYoutube, redactar: Redactar = redactarYoutube, subtitulos = subtitulosYoutube, escuchar = transcribirArchivo) {
   const archivo = join(app, 'data', 'youtube', 'recomendaciones.json')
   const trabajos: Record<string, Trabajo> = {}
   let roto = false
@@ -126,15 +128,46 @@ export function recomendacionesYoutube(app: string, api: ApiPublicaYoutube, reda
     const referencias = analisis?.referencias.filter((r) => r.observacion).map((r) => ({ titulo: r.titulo, url: r.url })) ?? []
     const evidencia = `${contexto}\n\nFuentes del análisis previo:\n${JSON.stringify(referencias)}`
     const urls = enlacesYoutube(evidencia)
+    etapa(huella(v.ruta), 'Escuchando el video terminado para marcar sus capítulos…')
+    const oido = await oir(v, dir)
+    etapa(huella(v.ruta), 'Redactando la descripción y sus capítulos…')
     const salida = jsonYoutube(await redactar(model, dir, [
       'Redacta una descripción de YouTube lista para publicar para este video, en español de México. Usa el guion como fuente del contenido y el estilo del canal.',
       `Título elegido por el usuario: ${JSON.stringify(titulo)}. Es contexto editorial, no prueba de hechos.`,
       'Abre con dos líneas claras sobre lo que encontrará el espectador; sigue con un resumen breve y natural. Atribuye las pruebas de otros creadores cuando el guion las relate. No copies descripciones ajenas.',
-      'Puedes incluir las fuentes pertinentes del guion y hasta tres hashtags relevantes. Usa solo enlaces de la lista permitida. No inventes descuentos, enlaces del canal, patrocinios, pruebas propias ni afirmaciones que el contenido no respalde. No incluyas capítulos ni marcas de tiempo: no se verificó su correspondencia con el montaje final.',
-      'Texto plano con saltos de línea, sin HTML ni < o >. Máximo 5000 bytes UTF-8; apunta a 1200–2500 bytes. Responde JSON {"texto":"Descripción lista para publicar","razon":"Breve explicación de su enfoque"}.',
-      `Enlaces permitidos: ${JSON.stringify(urls)}`, evidencia
+      'Puedes incluir las fuentes pertinentes del guion y hasta tres hashtags relevantes. Usa solo enlaces de la lista permitida. No inventes descuentos, enlaces del canal, patrocinios, pruebas propias ni afirmaciones que el contenido no respalde. No pongas capítulos ni marcas de tiempo en el texto: van aparte, en "capitulos", y Sloth los añade al final.',
+      oido.segmentos.length
+        ? `Capítulos: marca cada cambio de tema real del video con la transcripción del video terminado de abajo, que dice en qué segundo empieza cada frase. El primero empieza en 0. Cada uno dura al menos 10 s, y el último empieza 10 s o más antes del final (${Math.floor(oido.duracion)} s). Usa como "inicio" el segundo de una frase de la transcripción; según la duración, de 3 a 15 capítulos, uno cada uno a tres minutos suele bastar. Títulos cortos (hasta 50 caracteres) que digan lo que pasa en ese tramo, sin numerarlos ni ponerles hora.`
+        : 'Este video no tiene voz transcrita: responde "capitulos": [].',
+      'Texto plano con saltos de línea, sin HTML ni < o >. Máximo 4000 bytes UTF-8; apunta a 1200–2500 bytes. Responde JSON {"texto":"Descripción lista para publicar","razon":"Breve explicación de su enfoque","capitulos":[{"inicio":0,"titulo":"De qué va"}]}.',
+      `Enlaces permitidos: ${JSON.stringify(urls)}`, evidencia,
+      ...(oido.segmentos.length ? [`Transcripción del video terminado (segundo: frase):\n${oido.segmentos.map((s) => `${Math.floor(s.inicio)}: ${s.texto}`).join('\n').slice(0, 40_000)}`] : [])
     ].join('\n\n'), [], DESCRIPCION_YOUTUBE, effort))
-    return validarDescripcionYoutube(salida, urls)
+    const descripcion = validarDescripcionYoutube(salida, urls)
+    const capitulos = capitulosYoutube((salida as { capitulos?: unknown } | null)?.capitulos, oido.segmentos, oido.duracion)
+    const conCapitulos = capitulos.length ? `${descripcion.texto}\n\nCapítulos:\n${capitulos.map((c) => `${marcaYoutube(c.inicio, oido.duracion)} ${c.titulo}`).join('\n')}` : descripcion.texto
+    const caben = Buffer.byteLength(conCapitulos, 'utf8') <= 5000
+    const nota = oido.aviso ?? (!capitulos.length ? 'Sin capítulos: no salieron al menos tres tramos de 10 s o más.' : !caben ? 'Sin capítulos: con ellos la descripción pasaba de 5000 bytes.' : `${capitulos.length} capítulos, con los tiempos del video terminado.`)
+    return { texto: caben ? conCapitulos : descripcion.texto, razon: `${descripcion.razon} ${nota}`.trim() }
+  }
+  /** Lo dicho en el video terminado y su duración, guardados por huella: otra descripción del mismo video no lo vuelve a escuchar. */
+  async function oir(v: VideoHecho, dir: string): Promise<{ segmentos: { inicio: number; texto: string }[]; duracion: number; aviso?: string }> {
+    const file = join(dir, 'transcripcion.json')
+    try { return JSON.parse(readFileSync(file, 'utf8')) } catch { /* Aún no se escucha este video. */ }
+    let duracion = 0
+    try {
+      const { stdout } = await execFileP('ffprobe', ['-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', v.ruta], { timeout: 15_000, windowsHide: true })
+      duracion = Number(stdout.trim())
+    } catch { /* Sin duración no hay capítulos, pero la descripción sigue. */ }
+    if (!Number.isFinite(duracion) || duracion < 30) return { segmentos: [], duracion: 0, aviso: 'Sin capítulos: YouTube los pide en videos de 30 s o más.' }
+    try {
+      const segmentos = frasesYoutube(await escuchar(v.ruta, AbortSignal.timeout(45 * 60_000)))
+      const oido = { segmentos, duracion, ...(segmentos.length ? {} : { aviso: 'Sin capítulos: el video no tiene voz que transcribir.' }) }
+      guardar(file, JSON.stringify(oido))
+      return oido
+    } catch (e) {
+      return { segmentos: [], duracion, aviso: `Sin capítulos: no se pudo escuchar el video (${e instanceof Error ? e.message.slice(0, 200) : 'error desconocido'}).` }
+    }
   }
   async function hacer(v: VideoHecho, model: string, contexto: string, tema?: string, effort?: string): Promise<RecomendacionYoutube> {
     const h = huella(v.ruta)
@@ -224,6 +257,51 @@ export function validarDescripcionYoutube(input: unknown, permitidos: string[]) 
   if (!r || typeof r.texto !== 'string' || !r.texto.trim() || Buffer.byteLength(r.texto, 'utf8') > 5000 || /[<>]/.test(r.texto) || typeof r.razon !== 'string') throw new Error('La descripción debe ser un texto de hasta 5000 bytes, sin HTML. Reintenta.')
   if (enlacesYoutube(r.texto).some((url) => !permitidos.includes(url))) throw new Error('La descripción incluye un enlace que no está en las fuentes del video. Reintenta.')
   return { texto: r.texto.trim(), razon: r.razon }
+}
+
+/**
+ * Los capítulos que YouTube acepta: el primero en 0:00, al menos tres, de 10 s o más, en orden. Cada inicio se lleva a la
+ * frase más cercana de la transcripción, para que caiga donde de verdad empieza el tramo; el que queda a menos de 10 s del
+ * anterior o del final se quita. Si el agente no abrió en 0, el principio se llama «Introducción». Con menos de tres, nada.
+ */
+export function capitulosYoutube(input: unknown, segmentos: { inicio: number }[], duracion: number): { inicio: number; titulo: string }[] {
+  if (!Array.isArray(input) || !segmentos.length || !(duracion >= 30)) return []
+  const inicios = [0, ...segmentos.map((s) => Math.floor(s.inicio))]
+  const cerca = (t: number) => inicios.reduce((a, b) => (Math.abs(b - t) < Math.abs(a - t) ? b : a))
+  const propuestos = input.flatMap((c: { inicio?: unknown; titulo?: unknown } | null) => {
+    if (typeof c?.inicio !== 'number' || !Number.isFinite(c.inicio) || typeof c.titulo !== 'string') return []
+    const titulo = c.titulo.replace(/[<>]/g, '').replace(/\s+/g, ' ').replace(/^(?:\d{1,2}:)?\d{1,2}:\d{2}\s*[-–—:]?\s*|^\d+[.)]\s+/, '').trim().slice(0, 80).trim()
+    return titulo ? [{ inicio: cerca(Math.max(0, c.inicio)), titulo }] : []
+  }).sort((a, b) => a.inicio - b.inicio)
+  if (propuestos[0] && propuestos[0].inicio >= 10) propuestos.unshift({ inicio: 0, titulo: 'Introducción' })
+  else if (propuestos[0]) propuestos[0].inicio = 0
+  const capitulos: { inicio: number; titulo: string }[] = []
+  for (const c of propuestos) if (!capitulos.length || (c.inicio - capitulos.at(-1)!.inicio >= 10 && duracion - c.inicio >= 10)) capitulos.push(c)
+  return capitulos.length >= 3 ? capitulos : []
+}
+
+/**
+ * Whisper da trozos de hasta 30 s sin el tiempo de cada palabra: cada trozo se parte en sus frases y el tiempo del trozo
+ * se reparte por sus letras. Así un capítulo puede abrir a media pieza, cerca de donde de verdad cambia el tema.
+ */
+export function frasesYoutube(segmentos: { inicio: number; fin: number; texto: string }[]) {
+  return segmentos.flatMap((s) => {
+    const frases = s.texto.match(/[^.!?…]+(?:[.!?…]+["'»”)]*|$)/g)?.map((f) => f.trim()).filter(Boolean) ?? []
+    const letras = frases.reduce((n, f) => n + f.length, 0)
+    let antes = 0
+    return frases.map((texto) => {
+      const inicio = s.inicio + ((s.fin - s.inicio) * antes) / (letras || 1)
+      antes += texto.length
+      return { inicio, texto }
+    })
+  })
+}
+
+/** 0:00, o 0:00:00 en un video de una hora o más (todas con la misma forma, como las lee YouTube). */
+export function marcaYoutube(segundos: number, duracion: number) {
+  const s = Math.floor(segundos)
+  const dos = (n: number) => String(n).padStart(2, '0')
+  return duracion >= 3600 ? `${Math.floor(s / 3600)}:${dos(Math.floor(s / 60) % 60)}:${dos(s % 60)}` : `${Math.floor(s / 60)}:${dos(s % 60)}`
 }
 
 export function validarRecomendacion(input: unknown, referencias: ReferenciaYoutube[]): Omit<RecomendacionYoutube, 'tema' | 'fecha' | 'fotogramas'> {

@@ -446,6 +446,35 @@ async function whisper(python: string, wavs: string[], ctx: CtxTranscribir, term
   }
 }
 
+/**
+ * Lo que se dice en un video del disco, con el segundo de cada trozo en ese archivo: los capítulos de YouTube salen del
+ * montaje final, no del guion. El mismo Whisper (o Parakeet) de la investigación; sin voz, la lista va vacía.
+ */
+export async function transcribirArchivo(ruta: string, signal: AbortSignal): Promise<Segmento[]> {
+  const python = rutaPythonSloth()
+  if (!python) throw new Error('Falta el Python de Sloth para escuchar el video.')
+  const tmp = mkdtempSync(join(tmpdir(), 'sloth-capitulos-'))
+  try {
+    const wav = join(tmp, 'voz.wav')
+    await lanzar('ffmpeg', ['-nostdin', '-v', 'error', '-y', '-i', ruta, '-vn', '-ac', '1', '-ar', '16000', '-c:a', 'pcm_s16le', wav], signal, { plazo: 10 * 60_000 })
+    const salida = await lanzar(python, ['-E', '-s', '-B', '-X', 'utf8', 'transcribir-lote.py'], signal, {
+      cwd: PROCESOS,
+      entrada: JSON.stringify({ files: [wav], options: { modelos: MODELOS } }),
+      plazo: 60 * 60_000
+    })
+    let d: Dicho | undefined
+    try {
+      d = (JSON.parse(salida) as Record<string, Dicho>)[wav]
+    } catch {}
+    if (!d || 'error' in d) throw new Error(d && 'error' in d ? d.error : 'transcribir-lote.py no devolvió lo esperado.')
+    return d.segmentos.map((s) => ({ inicio: s.start, fin: s.end, texto: s.text.trim() })).filter((s) => s.texto)
+  } finally {
+    try {
+      rmSync(tmp, { recursive: true, force: true, maxRetries: 5, retryDelay: 500 })
+    } catch {}
+  }
+}
+
 /** yt-dlp sin `-J`, con el Python con que lo lanza `ytdlp()`. Devuelve lo que imprimió. */
 function conYtdlp(args: string[], signal: AbortSignal) {
   const l = ytdlp()
