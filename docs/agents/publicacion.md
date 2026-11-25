@@ -110,7 +110,8 @@ salen para todos (`[para todos]`) son de dos clases, y el aviso dice cuál es (p
    a un cliente se mira ahí y en `git log origin/venta`, no en las fechas de los commits. Verifica también los metadatos
    de `/actualizaciones/latest.yml`, `latest-mac.yml`, `latest-arm64-mac.yml`, `latest-mac12-mac.yml` y `latest-linux.yml`, y los enlaces de
    descarga de cada sistema.
-   Para esperar el flujo, `gh run watch <id> --exit-status` de fondo.
+   Para esperar el flujo, `gh run watch <id> --exit-status` de fondo. Si los cinco salen bien, el job `release` deja
+   la release `v<versión>` en GitHub con `novedad.txt` (`scripts/release-github.mjs`): compruébala en Releases.
 5. Cuando los cinco salieron bien, cuéntalo en Anuncios de la comunidad, sin preguntar: escribe el anuncio como lo
    escribe Vancci ([anuncios.md](anuncios.md)) y publícalo con `node scripts/anuncio.mjs <archivo>`. Luego, también
    sin preguntar, avisa a quien pidió en la comunidad lo que trae la versión: `node scripts/mejoras.mjs` enseña las
@@ -279,6 +280,12 @@ token con «DNS Write» o quitarlos en el panel. Los que había de Vercel quedar
 Comprueba la página publicada en `https://sloth.vancci.org`, incluidos los enlaces de descarga y pago que hayas cambiado
 y que un video conteste 206 a `curl -L -H "Range: bytes=0-1"`. Cambiar este repo o desplegar `licencias/` no modifica
 esa página.
+
+Lo que leen los buscadores de IA (ChatGPT, Perplexity, Gemini) está en la raíz: `/ias`, `/estilos`, `/preguntas`,
+`llms.txt` y `llms-full.txt`, cada página con su JSON-LD. Al cambiar algo de Sloth que esas páginas cuentan (una IA,
+un estilo, el precio, los requisitos), cámbialo también ahí y en la fecha del `sitemap.xml`. Después de publicar,
+avisa a Bing (de donde busca ChatGPT) con IndexNow: un `POST https://api.indexnow.org/indexnow` con `host`
+`sloth.vancci.org`, la llave del archivo `<llave>.txt` de `web/public/sloth/` (su `keyLocation`) y las URL cambiadas.
 
 Con qué se paga lo dice el cobro (`/precio`): hasta que contesta, y si no contesta, la página ofrece solo tarjeta.
 PayPal sale solo si el cobro lo da (sin `sinPaypal`). Si la página enseña algo raro en el pago, mira primero `/precio`.

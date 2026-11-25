@@ -88,3 +88,20 @@ jobs:
           PARA_TODOS: ${{ (inputs.para_todos || contains(github.event.head_commit.message, '[para todos]')) && '1' || '' }}
           # Para que el cobro sepa si la de Mac se abre a la primera.
           FIRMADA: ${{ secrets.CSC_LINK != '' && '1' || '' }}
+
+  # Cada versión publicada deja su release en GitHub con lo que trae (novedad.txt): sin ellas el repo se ve sin
+  # actualizaciones. Los instaladores no se suben aquí: se bajan del cobro, que da a cada quien la que le toca.
+  release:
+    needs: [version, publicar]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+      - run: node scripts/release-github.mjs > notas.md
+        env:
+          PARA_TODOS: ${{ (inputs.para_todos || contains(github.event.head_commit.message, '[para todos]')) && '1' || '' }}
+      - run: gh release create "v$VERSION" --target "$GITHUB_SHA" --title "Sloth $VERSION" --notes-file notas.md --latest
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+          GH_TOKEN: ${{ github.token }}
