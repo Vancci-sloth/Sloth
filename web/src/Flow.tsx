@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { esVids, IMAGEN_CHATGPT, MODELOS_IMAGEN, OPCIONES_CLIPS } from '../../shared/flow'
+import { IMAGEN_CHATGPT, MODELOS_IMAGEN, OPCIONES_CLIPS } from '../../shared/flow'
 import type { CuentaClaude, CuentaEnFlow, EstadoFlow, GastoFlow } from '../../shared/types'
 import { api, leerCuenta } from './api'
 import { Picker } from './Composer'
@@ -13,7 +13,7 @@ import type { UsoVoz } from './Voz'
  * con cada una hay que abrir Flow y aceptar su aviso, que es de cada quien. «Ayudar a mejorar Flow» sale apagado: cada quien decide si Google usa lo que
  * genera. Quien manda referencias confirma que tiene sus derechos (`AvisoDerechos`). En el compositor de un video, el menú
  * «Imágenes»: con ChatGPT o con un modelo de Flow (`lineaImagenes`, `shared/flow.ts`), y en los estilos que hacen clips,
- * «Clips»: el modelo de Veo u Omni, o Google Vids (`lineaClips`).
+ * «Clips»: el modelo de Veo u Omni (`lineaClips`).
  */
 
 const POLITICA = 'https://policies.google.com/terms/generative-ai/use-policy'
@@ -22,7 +22,7 @@ const POLITICA = 'https://policies.google.com/terms/generative-ai/use-policy'
 function AvisoDerechos({ onHecho, onCerrar }: { onHecho(e: EstadoFlow): void; onCerrar(): void }) {
   return (
     <Confirm title="Derechos de tus imágenes" action="Confirmo" onConfirm={() => api<EstadoFlow>('/api/flow/ajustes', { derechos: true }).then(onHecho)} onClose={onCerrar}>
-      Para que el personaje y el estilo salgan iguales, Sloth sube a Google Flow tus imágenes de referencia, y al subirlas acepta en tu nombre lo que Flow pide. Confirma que:
+      Para que el personaje y el estilo salgan iguales, VyMotion sube a Google Flow tus imágenes de referencia, y al subirlas acepta en tu nombre lo que Flow pide. Confirma que:
       <ul>
         <li>Tienes los derechos necesarios de las imágenes que mandas, incluido el contenido de menores.</li>
         <li>No generas contenido que infrinja los derechos de otras personas, ni que engañe, hostigue o dañe.</li>
@@ -57,7 +57,6 @@ export type UsoFlow = ReturnType<typeof useFlow>
 
 const POR_QUE: Record<NonNullable<CuentaEnFlow['descansa']>['motivo'], string> = { creditos: 'Sin créditos de video', frenada: 'Flow la frenó', sesion: 'Sin sesión' }
 const hora = (ms: number) => new Date(ms).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })
-const dia = (ms: number) => new Date(ms).toLocaleDateString('es-MX', { day: 'numeric', month: 'short' })
 
 const videos = (g: GastoFlow) => `${g.videos} ${g.videos === 1 ? 'video' : 'videos'} (${g.creditos} créditos)`
 
@@ -72,9 +71,7 @@ function cuantoLeQueda(c: CuentaEnFlow): string {
 /** Cómo está una cuenta, y la clase de su punto (`.estado`). */
 function comoEsta(c: CuentaEnFlow): [string, string] {
   const hoy = c.hoy.videos ? ` · hoy ${c.hoy.videos} ${c.hoy.videos === 1 ? 'video' : 'videos'}` : ''
-  // Su cupo de Google Vids va aparte: sin él, la cuenta sigue en Flow.
-  const vids = c.descansaVids ? ` · Google Vids ${c.descansaVids.motivo === 'creditos' ? `sin cupo hasta el ${dia(c.descansaVids.hasta)}` : `la frenó hasta las ${hora(c.descansaVids.hasta)}`}` : ''
-  const extra = ` · ${cuantoLeQueda(c)}${hoy}${vids}`
+  const extra = ` · ${cuantoLeQueda(c)}${hoy}`
   if (c.generando) return [`Generando${extra}`, 'moviendo']
   if (c.descansa) return [`${POR_QUE[c.descansa.motivo]} · vuelve a probar a las ${hora(c.descansa.hasta)}${hoy}`, 'falta']
   return [`${c.deLaVoz ? 'Lista · la de la voz' : 'Lista'}${extra}`, '']
@@ -116,8 +113,8 @@ export function SelectorImagenes({ valor, hayChatGPT, voz, flow, onCambio }: { v
         menuWidth={300}
         disabled={!voz.estado || voz.estado.conectando}
         groups={[
-          ...(hayChatGPT ? [{ label: 'ChatGPT', options: [{ value: IMAGEN_CHATGPT, label: 'ChatGPT' }] }] : []),
-          { label: 'Google Flow · gratis', options: cuenta ? MODELOS_IMAGEN.map((m) => ({ value: m, label: m })) : [{ value: CONECTAR, label: 'Conectar tu cuenta de Google…' }] }
+          ...(hayChatGPT ? [{ label: 'ChatGPT', options: [{ value: IMAGEN_CHATGPT, label: 'ChatGPT', logo: 'codex' }] }] : []),
+          { label: 'Google Flow · gratis', options: cuenta ? MODELOS_IMAGEN.map((m) => ({ value: m, label: m, logo: 'flow' })) : [{ value: CONECTAR, label: 'Conectar tu cuenta de Google…', logo: 'flow' }] }
         ]}
         onChange={(v) => {
           if (v === CONECTAR) voz.conectar()
@@ -143,7 +140,7 @@ export function SelectorImagenes({ valor, hayChatGPT, voz, flow, onCambio }: { v
   )
 }
 
-/** El menú «Clips» del compositor de un estilo con `clips`: con qué modelo de Flow (o Google Vids) se hacen y cuánto cuesta cada uno. */
+/** El menú «Clips» del compositor de un estilo con `clips`: con qué modelo de Flow se hacen y cuánto cuesta cada uno. */
 export function SelectorClips({ valor, onCambio }: { valor: string; onCambio(modelo: string): void }) {
   return (
     <Picker
@@ -153,11 +150,7 @@ export function SelectorClips({ valor, onCambio }: { valor: string; onCambio(mod
       groups={[
         {
           label: 'Google Flow · créditos por clip de 8 s',
-          options: Object.entries(OPCIONES_CLIPS).filter(([, o]) => !esVids(o.modelo)).map(([id, o]) => ({ value: id, label: `${id} · ${o.creditos}` }))
-        },
-        {
-          label: 'Google Vids · su propio cupo, sin créditos',
-          options: Object.entries(OPCIONES_CLIPS).filter(([, o]) => esVids(o.modelo)).map(([id]) => ({ value: id, label: id }))
+          options: Object.entries(OPCIONES_CLIPS).map(([id, o]) => ({ value: id, label: `${id} · ${o.creditos}` }))
         }
       ]}
       onChange={onCambio}
@@ -197,7 +190,7 @@ export function FlowOpciones({ voz, privacidad }: { voz: UsoVoz; privacidad: boo
           <strong>Cuentas de Google</strong>
           <span>
             {n
-              ? `Veo, Nano Banana y Google Vids con ${n === 1 ? 'una cuenta' : `${n} cuentas`} · quedan ${e?.quedan ?? 0} créditos${e?.enFila ? ` · generando ${e.enFila}` : ''}`
+              ? `Veo y Nano Banana con ${n === 1 ? 'una cuenta' : `${n} cuentas`} · quedan ${e?.quedan ?? 0} créditos${e?.enFila ? ` · generando ${e.enFila}` : ''}`
               : 'Agrega una cuenta aquí o conéctala en Google AI Studio.'}
           </span>
         </div>
@@ -213,7 +206,7 @@ export function FlowOpciones({ voz, privacidad }: { voz: UsoVoz; privacidad: boo
       </div>
       {e?.agregando && (
         <p className="muted small fila-extra">
-          Cuando Flow abra con tu foto arriba a la derecha, acepta su aviso si te lo enseña y cierra la ventana: la cuenta queda en Sloth. Cada cuenta gratis da 50 créditos al día y su propio cupo de Google Vids; cuando una se queda sin ellos, Sloth sigue con otra.
+          Cuando Flow abra con tu foto arriba a la derecha, acepta su aviso si te lo enseña y cierra la ventana: la cuenta queda en VyMotion. Cada cuenta gratis da 50 créditos al día; cuando una se queda sin ellos, VyMotion sigue con otra.
         </p>
       )}
       {n > 0 && e && (
@@ -244,7 +237,7 @@ export function FlowOpciones({ voz, privacidad }: { voz: UsoVoz; privacidad: boo
                       options: [
                         { value: 'abrir', label: 'Abrir Flow' },
                         { value: 'conectar', label: 'Revisar sesión (conservar cuenta)' },
-                        { value: 'quitar', label: c.deLaVoz ? 'Quitar de Sloth (también de AI Studio)' : 'Quitar de Sloth' }
+                        { value: 'quitar', label: c.deLaVoz ? 'Quitar de VyMotion (también de AI Studio)' : 'Quitar de VyMotion' }
                       ]
                     }
                   ]}
@@ -284,11 +277,11 @@ export function FlowOpciones({ voz, privacidad }: { voz: UsoVoz; privacidad: boo
         (quitandoVoz ? (
           <Confirm title="Quitar la cuenta de Flow y de AI Studio" action="Quitar de los dos" danger onConfirm={voz.desconectar} onClose={() => setQuitando(undefined)}>
             <p className="aviso-grande">{quitando} también es la cuenta de la Voz: se quita de AI Studio, y el agente ya no podrá generar la voz de tus videos.</p>
-            Sloth deja de generar con ella en Flow y en AI Studio. Lo que ya generó sigue en tu cuenta. Para volver a usarla, conéctala otra vez en Voz.
+            VyMotion deja de generar con ella en Flow y en AI Studio. Lo que ya generó sigue en tu cuenta. Para volver a usarla, conéctala otra vez en Voz.
           </Confirm>
         ) : (
           <Confirm title="Quitar la cuenta" action="Quitar" danger onConfirm={() => api<EstadoFlow>('/api/flow/cuentas/quitar', { correo: quitando }).then(poner)} onClose={() => setQuitando(undefined)}>
-            Sloth deja de generar con {quitando} y borra su sesión. Lo que ya generó sigue en su Flow. Para volver a usarla, agrégala otra vez.
+            VyMotion deja de generar con {quitando} y borra su sesión. Lo que ya generó sigue en su Flow. Para volver a usarla, agrégala otra vez.
           </Confirm>
         ))}
       {(error ?? e?.error) && !e?.agregando && <p className="bad small fila-extra">{error ?? e?.error}</p>}

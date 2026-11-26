@@ -11,5 +11,5 @@
     "lib": ["ES2023", "DOM", "DOM.Iterable"],
     "types": ["node"]
   },
-  "include": ["shared", "server", "web/src", "electron", "scripts", "movil/src/enlace.ts", "movil/src/enlace.test.ts", "movil/src/local/puro.ts", "movil/src/local/puro.test.ts"]
+  "include": ["shared", "server", "web/src", "electron", "scripts"]
 }

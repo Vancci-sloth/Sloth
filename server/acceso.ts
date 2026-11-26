@@ -12,7 +12,7 @@ import { guardar } from './disco.ts'
  *
  * Las llaves van en `data/agentes.json`, no en las variables del usuario: ahí las leerían también su Claude Code y su
  * Codex de la terminal, que dejarían de usar su suscripción.
- * - Claude: Claude Code usa `ANTHROPIC_API_KEY` antes que la cuenta. Va en el entorno de Sloth, que heredan todos sus
+ * - Claude: Claude Code usa `ANTHROPIC_API_KEY` antes que la cuenta. Va en el entorno de VyMotion, que heredan todos sus
  *   `query` y `claude auth status`; con la cuenta se quita, también si venía de fuera.
  * - Codex: el app-server usa un proveedor propio que la lee de su entorno (`codexConLlave`), así el inicio de sesión de
  *   ChatGPT queda como estaba. `codex exec` de las skills (las imágenes) la lee de `CODEX_API_KEY`. Cada hilo sigue con
@@ -24,8 +24,6 @@ import { guardar } from './disco.ts'
  *   revendedor) en vez de a api.anthropic.com, como el «custom base URL» de Cline. Claude Code la lee de
  *   `ANTHROPIC_BASE_URL`, que solo se pone mientras se paga con esa llave.
  * - Los agentes nuevos no ven estas llaves (`entornoSinLlaves`); a Pi se le pueden prestar en Opciones (`entornoAgente`).
- * - DeepSeek, OpenRouter y FreeLLMAPI solo trabajan con su llave, en el Claude Code de Sloth (`entornoClaudeCon`).
- *   FreeLLMAPI corre en la computadora de cada quien: lleva además su dirección, que se busca sola si no se escribe.
  */
 const ARCHIVO = join(resolve(dirname(fileURLToPath(import.meta.url)), '..'), 'data', 'agentes.json')
 const ENTORNO = { claude: 'ANTHROPIC_API_KEY', codex: 'CODEX_API_KEY' } as const
@@ -34,7 +32,7 @@ const CODEX_API = 'sloth-api'
 const CODEX_ENV = 'SLOTH_OPENAI_API_KEY'
 
 /** `prestar`: el agente (Pi) usa las llaves que guardaste para los demás (`entornoAgente`). */
-type Guardado = Partial<Record<Proveedor, { llave?: string; api?: boolean; prestar?: boolean; direccion?: string }>>
+type Guardado = Partial<Record<Proveedor, { llave?: string; api?: boolean; prestar?: boolean; direccion?: string }>> & { openRouterPi?: string }
 
 let datos: Guardado = {}
 try {
@@ -42,7 +40,7 @@ try {
 } catch {
   // Sin archivo, los dos con su cuenta.
 }
-/** La dirección que puso Sloth en `ANTHROPIC_BASE_URL`: la de fuera, si la había, no se toca. */
+/** La dirección que puso VyMotion en `ANTHROPIC_BASE_URL`: la de fuera, si la había, no se toca. */
 let direccionPuesta: string | undefined
 aplicar()
 
@@ -66,7 +64,7 @@ export function llaveEnUso(p: Proveedor) {
 }
 
 /**
- * El entorno de Sloth sin las llaves que puso él (`aplicar`): las de Claude y Codex son para ellos. Pi, por ejemplo, usa
+ * El entorno de VyMotion sin las llaves que puso él (`aplicar`): las de Claude y Codex son para ellos. Pi, por ejemplo, usa
  * `ANTHROPIC_API_KEY` si la ve, y cobraría en tu llave de Anthropic sin que lo eligieras.
  */
 export function entornoSinLlaves(): NodeJS.ProcessEnv {
@@ -90,8 +88,26 @@ export function llavesPrestadas(p: Proveedor) {
   return env
 }
 
-/** El entorno de un agente nuevo: sin las llaves de Sloth (`entornoSinLlaves`), salvo las que le prestaste. */
-export const entornoAgente = (p: Proveedor): NodeJS.ProcessEnv => ({ ...entornoSinLlaves(), ...llavesPrestadas(p) })
+/** El entorno de un agente nuevo: sin las llaves de VyMotion (`entornoSinLlaves`), salvo las que le prestaste. */
+export const entornoAgente = (p: Proveedor): NodeJS.ProcessEnv => ({
+  ...entornoSinLlaves(), ...llavesPrestadas(p),
+  ...(p === 'pi' && datos.openRouterPi ? { OPENROUTER_API_KEY: datos.openRouterPi } : {})
+})
+
+export const estadoOpenRouter = () => ({ final: datos.openRouterPi?.slice(-4) })
+
+export async function cambiarOpenRouter(llave: string | null) {
+  const nueva = llave?.trim()
+  if (llave !== null && !nueva) throw new Error('Pega primero tu llave de OpenRouter.')
+  if (nueva) {
+    const r = await fetch('https://openrouter.ai/api/v1/key', { headers: { authorization: `Bearer ${nueva}` }, signal: AbortSignal.timeout(12_000) })
+    if (r.status === 401 || r.status === 403) throw new Error('OpenRouter no aceptó la llave.')
+    if (!r.ok) throw new Error(`OpenRouter respondió ${r.status}. Vuelve a intentarlo.`)
+  }
+  datos = { ...datos, openRouterPi: nueva || undefined }
+  escribir()
+  return estadoOpenRouter()
+}
 
 /** Lo que Opciones enseña de las llaves que se le pueden prestar a `p`: si se le prestan y de quién son. */
 export function llavesPrestables(p: Proveedor) {
@@ -111,33 +127,8 @@ function escribir() {
   if (process.platform !== 'win32') chmodSync(ARCHIVO, 0o600)
 }
 
-/** La llave guardada, aunque ahora se pague con la cuenta. DeepSeek, OpenRouter, FreeLLMAPI y Gemini solo trabajan con ella. */
+/** La llave guardada, aunque ahora se pague con la cuenta. DeepSeek y Gemini solo trabajan con ella. */
 export const llaveGuardada = (p: Proveedor) => datos[p]?.llave
-
-/** Adónde va la llave, si no es a la API de su marca: el servicio compatible de Claude, o el FreeLLMAPI de cada quien. */
-export const direccionGuardada = (p: Proveedor) => datos[p]?.direccion
-
-/**
- * El entorno con que Claude Code trabaja contra otra API compatible con la de Anthropic (DeepSeek, OpenRouter,
- * FreeLLMAPI). Los alias que piden las skills y sus subagentes (`opus`, `sonnet`, `fable`) van al modelo del hilo, y
- * `haiku` (los títulos, lo rápido) a `rapido`, o al mismo. `ventana`: hasta dónde se llena el contexto antes de compactar;
- * sin ella, Claude Code supone 200 000. Sin la llave de Anthropic ni el token de la cuenta de Claude, que irían a esa API.
- */
-export function entornoClaudeCon(o: { direccion: string; llave: string; modelo: string; rapido?: string; ventana?: number; effort?: string }): Record<string, string> {
-  const { ANTHROPIC_API_KEY: _, CLAUDE_CODE_OAUTH_TOKEN: __, ...env } = process.env as Record<string, string>
-  return {
-    ...env,
-    ANTHROPIC_BASE_URL: o.direccion,
-    ANTHROPIC_AUTH_TOKEN: o.llave,
-    ANTHROPIC_MODEL: o.modelo,
-    ANTHROPIC_DEFAULT_FABLE_MODEL: o.modelo,
-    ANTHROPIC_DEFAULT_OPUS_MODEL: o.modelo,
-    ANTHROPIC_DEFAULT_SONNET_MODEL: o.modelo,
-    ANTHROPIC_DEFAULT_HAIKU_MODEL: o.rapido ?? o.modelo,
-    ...(o.ventana ? { CLAUDE_CODE_AUTO_COMPACT_WINDOW: String(o.ventana) } : {}),
-    ...(o.effort ? { CLAUDE_CODE_EFFORT_LEVEL: o.effort } : {})
-  }
-}
 
 /** Lo que Opciones sabe de la llave guardada: su final y si es con ella como se paga. */
 export function llaveDe(p: Proveedor): LlaveAgente | undefined {
@@ -169,18 +160,13 @@ export type CodexLlave = NonNullable<ReturnType<typeof codexConLlave>>
 
 /**
  * Cambia cómo paga `p`. `llave`: la nueva (se prueba antes de guardarla), `null` para quitarla (y volver a la cuenta),
- * o nada para usar la que ya estaba. `direccion` (Claude y FreeLLMAPI) va con una llave nueva: vacía, la de Anthropic o,
- * con FreeLLMAPI, el que se encuentre en esta computadora.
+ * o nada para usar la que ya estaba. `direccion` (solo Claude) va con una llave nueva: vacía, la de Anthropic.
  */
 export async function cambiarAcceso(p: Proveedor, api: boolean, llave?: string | null, direccion?: string) {
   const nueva = llave === undefined ? datos[p]?.llave : llave?.trim() || undefined
   if (api && !nueva) throw new Error('Pega primero tu llave de API.')
-  const local = p === 'freellmapi'
-  let dir = p !== 'claude' && !local ? undefined : llave === undefined ? datos[p]?.direccion : normalizarDireccion(direccion, local)
-  if (llave && nueva) {
-    if (local && !dir) dir = await buscarFreeLLMAPI(nueva)
-    else await probar(p, nueva, dir)
-  }
+  const dir = p !== 'claude' ? undefined : llave === undefined ? datos[p]?.direccion : normalizarDireccion(direccion)
+  if (llave && nueva) await probar(p, nueva, dir)
   datos = { ...datos, [p]: { ...(nueva ? { llave: nueva, api, ...(dir ? { direccion: dir } : {}) } : {}), prestar: datos[p]?.prestar } }
   escribir()
   aplicar()
@@ -188,15 +174,14 @@ export async function cambiarAcceso(p: Proveedor, api: boolean, llave?: string |
 
 /**
  * «https://proxy.com/v1/» → «https://proxy.com»: Claude Code le añade `/v1/messages`. Vacía o la de Anthropic, nada.
- * `local` (FreeLLMAPI, que suele estar en esta computadora o en la red de casa): sin `http://` delante, se le pone ese.
  */
-export function normalizarDireccion(d?: string, local = false) {
+export function normalizarDireccion(d?: string) {
   const t = d?.trim().replace(/\/+$/, '').replace(/\/v1$/, '')
   if (!t) return undefined
   if (/^[a-z][a-z0-9+.-]*:\/\//i.test(t) && !/^https?:\/\//i.test(t)) throw new Error('La dirección debe empezar con https://')
   let url: URL
   try {
-    url = new URL(/^https?:\/\//i.test(t) ? t : `${local ? 'http' : 'https'}://${t}`)
+    url = new URL(/^https?:\/\//i.test(t) ? t : `https://${t}`)
   } catch {
     throw new Error('Esa dirección no es válida. Debe ser como https://api.ejemplo.com')
   }
@@ -206,18 +191,16 @@ export function normalizarDireccion(d?: string, local = false) {
 }
 
 /** Pide la lista de modelos, que no gasta nada: así se sabe si la llave vale. */
-async function probar(p: Proveedor, llave: string, direccion?: string) {
-  if (direccion) return probarDireccion(llave, direccion)
-  // La lista de modelos de OpenRouter es pública: su llave se prueba preguntando por ella misma.
-  const conBearer = p === 'deepseek' ? 'https://api.deepseek.com/models' : p === 'openrouter' ? 'https://openrouter.ai/api/v1/key' : 'https://api.openai.com/v1/models'
+export async function probar(p: Proveedor, llave: string, direccion?: string) {
+  if (p === 'claude' && direccion) return probarDireccion(llave, direccion)
   const res =
     p === 'claude'
       ? await fetch('https://api.anthropic.com/v1/models', { headers: { 'x-api-key': llave, 'anthropic-version': '2023-06-01' } })
       : p === 'gemini'
         ? await fetch('https://generativelanguage.googleapis.com/v1beta/models?pageSize=1', { headers: { 'x-goog-api-key': llave } })
-        : await fetch(conBearer, { headers: { authorization: `Bearer ${llave}` } })
+        : await fetch(p === 'deepseek' ? 'https://api.deepseek.com/models' : p === 'cursor' ? 'https://api.cursor.com/v1/models' : 'https://api.openai.com/v1/models', { headers: { authorization: `Bearer ${llave}` }, signal: AbortSignal.timeout(15_000) })
   if (res.ok) return
-  const marca = p === 'claude' ? 'Anthropic' : p === 'deepseek' ? 'DeepSeek' : p === 'openrouter' ? 'OpenRouter' : p === 'gemini' ? 'Google' : 'OpenAI'
+  const marca = p === 'claude' ? 'Anthropic' : p === 'deepseek' ? 'DeepSeek' : p === 'gemini' ? 'Google' : p === 'cursor' ? 'Cursor' : 'OpenAI'
   // Google contesta 400 a una llave que no vale.
   if (res.status === 401 || res.status === 403 || (p === 'gemini' && res.status === 400)) throw new Error(`${marca} no aceptó esa llave. Revísala y vuelve a pegarla.`)
   throw new Error(`${marca} respondió ${res.status}. Vuelve a intentarlo en un momento.`)
@@ -227,37 +210,15 @@ async function probar(p: Proveedor, llave: string, direccion?: string) {
  * Con otra dirección, la llave se prueba ahí. Hay servicios que no tienen la lista de modelos (404): basta con que
  * contesten y no rechacen la llave.
  */
-async function probarDireccion(llave: string, direccion: string, plazo = 15_000) {
+async function probarDireccion(llave: string, direccion: string) {
   const { host } = new URL(direccion)
   let res: Response
   try {
-    res = await fetch(`${direccion}/v1/models`, { headers: { 'x-api-key': llave, 'anthropic-version': '2023-06-01' }, signal: AbortSignal.timeout(plazo) })
+    res = await fetch(`${direccion}/v1/models`, { headers: { 'x-api-key': llave, 'anthropic-version': '2023-06-01' }, signal: AbortSignal.timeout(15_000) })
   } catch {
-    throw new SinRespuesta(`No se pudo conectar con ${host}. Revisa la dirección.`)
+    throw new Error(`No se pudo conectar con ${host}. Revisa la dirección.`)
   }
   if (res.ok || res.status === 404 || res.status === 405) return
   if (res.status === 401 || res.status === 403) throw new Error(`${host} no aceptó esa llave. Revísala y vuelve a pegarla.`)
   throw new Error(`${host} respondió ${res.status}. Revisa la dirección o vuelve a intentarlo en un momento.`)
-}
-
-/** En esa dirección no hay nadie: se prueba la siguiente (`buscarFreeLLMAPI`). */
-class SinRespuesta extends Error {}
-
-/** Dónde escucha FreeLLMAPI en la computadora de cada quien: su app de escritorio y su instalación con Docker. */
-const FREELLMAPI_AQUI = ['http://127.0.0.1:31415', 'http://127.0.0.1:3001']
-
-/**
- * Sin dirección, FreeLLMAPI se busca en esta computadora: la primera de `FREELLMAPI_AQUI` que conteste y acepte la
- * llave. Si contesta y la rechaza, se dice eso y no se sigue buscando.
- */
-async function buscarFreeLLMAPI(llave: string) {
-  for (const direccion of FREELLMAPI_AQUI) {
-    try {
-      await probarDireccion(llave, direccion, 3000)
-      return direccion
-    } catch (error) {
-      if (!(error instanceof SinRespuesta)) throw error
-    }
-  }
-  throw new Error('No encontré FreeLLMAPI en esta computadora. Ábrelo y vuelve a intentarlo, o escribe su dirección si está en otra.')
 }

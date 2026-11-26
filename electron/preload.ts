@@ -1,9 +1,9 @@
 /**
- * Lo que la ventana de Sloth (main.ts) le da a la interfaz: `window.sloth` (`PuenteSloth`). Corre antes que la página,
+ * Lo que la ventana de VyMotion (main.ts) le da a la interfaz: `window.sloth` (`PuenteSloth`). Corre antes que la página,
  * aislado de ella.
  */
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron'
-import type { EstadoNavegador, PuenteSloth } from '../shared/types.ts'
+import type { AvisoVentana, EstadoNavegador, PuenteSloth } from '../shared/types.ts'
 
 /** La de macOS 12 (scripts/compilar.mjs). */
 declare const __MAC12__: boolean
@@ -15,6 +15,15 @@ const puente: PuenteSloth = {
   traer: () => ipcRenderer.send('traer'),
   anclada: () => ipcRenderer.invoke('anclada'),
   anclar: () => ipcRenderer.invoke('anclar'),
+  avisos: {
+    escuchar: (recibir) => {
+      const listener = (_e: IpcRendererEvent, aviso: AvisoVentana) => recibir(aviso)
+      ipcRenderer.on('aviso:mostrar', listener)
+      ipcRenderer.send('aviso:listo')
+      return () => void ipcRenderer.off('aviso:mostrar', listener)
+    },
+    responder: (id, aceptar, recordar) => ipcRenderer.send('aviso:respuesta', id, aceptar, recordar)
+  },
   disco: {
     donde: () => ipcRenderer.invoke('disco:donde'),
     llevar: () => ipcRenderer.invoke('disco:llevar')

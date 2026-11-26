@@ -9,12 +9,12 @@ import { fileURLToPath } from 'node:url'
  * con WebFetch (`browser_navigate`, `browser_snapshot`, `browser_take_screenshot`…). No se confunde con el de las redes
  * (`server/redes/navegador.ts`).
  *
- * Con la ventana de Sloth abierta, un hilo normal usa su página del navegador integrado (`electron/navegador.ts`): lo que
+ * Con la ventana de VyMotion abierta, un hilo normal usa su página del navegador integrado (`electron/navegador.ts`): lo que
  * abre el agente se ve en el hilo, sin otra ventana. Playwright se conecta a ella por CDP, a la dirección que la ventana
  * anota en `data/navegador-integrado.json`.
  *
- * Sin la ventana (Sloth en Edge), usa el Chrome del sistema o, sin él, el Edge que trae Windows: no baja navegadores. Un
- * hilo normal lo abre con ventana y con el perfil de Sloth (`data/navegador`, no el tuyo), donde siguen iniciadas las
+ * Sin la ventana (VyMotion en Edge), usa el Chrome del sistema o, sin él, el Edge que trae Windows: no baja navegadores. Un
+ * hilo normal lo abre con ventana y con el perfil de VyMotion (`data/navegador`, no el tuyo), donde siguen iniciadas las
  * cuentas que abras en él. Solo un proceso puede tener abierto un perfil: si otro hilo lo tiene, Playwright le contesta al
  * agente «Browser is already in use for …\data\navegador». Por eso se cierra tras `OCIOSO` sin usarse, y el siguiente
  * uso lo vuelve a abrir. Un video de un lote, que nadie mira, lo abre sin ventana y con un perfil limpio en memoria: así
@@ -40,7 +40,7 @@ const A_DEMANDA = join(APP, 'server', 'navegador-mcp.mjs')
  * Lo que se les dice a los agentes que no son Claude. Sin esto, Codex abría las páginas con curl o con su propio navegador
  * (5 de 6 veces): no se veían en el hilo, y lo que pinta la página con JavaScript no siempre llegaba.
  */
-export const USA_EL_NAVEGADOR = 'Para abrir o leer una página web usa siempre las herramientas browser_ del servidor MCP navegador de Sloth (browser_navigate para abrirla, browser_snapshot para leerla): lo que abres ahí se ve en el hilo y carga como en un navegador de verdad. No uses curl ni otro navegador para eso, ni contestes de memoria lo que hay en una página.'
+export const USA_EL_NAVEGADOR = 'Para abrir o leer una página web usa siempre las herramientas browser_ del servidor MCP navegador de VyMotion (browser_navigate para abrirla, browser_snapshot para leerla): lo que abres ahí se ve en el hilo y carga como en un navegador de verdad. No uses curl ni otro navegador para eso, ni contestes de memoria lo que hay en una página.'
 
 /** Donde se instalan Chrome y Edge en cada sistema: donde los busca Playwright. */
 const programas = [process.env.LOCALAPPDATA, process.env.PROGRAMFILES, process.env['PROGRAMFILES(X86)']].filter((p): p is string => !!p)
@@ -69,7 +69,7 @@ function cli(): { js: string; version: string } | null {
 }
 
 /**
- * La dirección del navegador integrado, si la ventana de Sloth que la anotó sigue abierta. `redes` y `voz`: tiene la
+ * La dirección del navegador integrado, si la ventana de VyMotion que la anotó sigue abierta. `redes` y `voz`: tiene la
  * página de las redes (`server/redes/navegador.ts`) o la de la voz (`server/voz/`), con su propio perfil.
  */
 export function integrado(): { puerto: number; secreto: string; redes: boolean; voz: boolean } | null {
@@ -85,9 +85,11 @@ export function integrado(): { puerto: number; secreto: string; redes: boolean; 
 
 /**
  * Para `mcpServers` del SDK. Vacío si falta el paquete o el navegador: el hilo trabaja igual, sin él. `hilo`: el hilo
- * cuya página del navegador integrado usa, si la ventana de Sloth está abierta.
+ * cuya página del navegador integrado usa, si la ventana de VyMotion está abierta.
  */
-export function navegadorAgente(lote?: boolean, hilo?: string): Record<string, McpStdioServerConfig> {
+export function navegadorAgente(lote?: boolean, hilo?: string | null): Record<string, McpStdioServerConfig> {
+  // Los trabajos del editor 3D se verifican con su render local. Abrir el formulario aquí repetiría el pedido.
+  if (hilo === null) return {}
   const playwright = cli()
   if (!playwright) return {}
   const { js, version } = playwright
@@ -105,7 +107,7 @@ export function navegadorAgente(lote?: boolean, hilo?: string): Record<string, M
   if (!canal) return {}
   const args = ['--browser', canal, ...salida]
   if (lote) args.push('--isolated', '--headless')
-  // Si otro hilo ya tiene abierto el perfil, este arranca con uno limpio, con ventana: con el de Sloth, Playwright le
+  // Si otro hilo ya tiene abierto el perfil, este arranca con uno limpio, con ventana: con el de VyMotion, Playwright le
   // contestaría «Browser is already in use» en cuanto lo usara.
   else if (existsSync(PERFIL) && perfilAbierto()) args.push('--isolated')
   else args.push('--user-data-dir', PERFIL, '--idle-timeout', String(OCIOSO))

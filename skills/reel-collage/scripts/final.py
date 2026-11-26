@@ -2,7 +2,7 @@
 Render final en el tamaño de su formato (1080x1920 o 1920x1080, `FORMATO` de src/datos.ts), audio masterizado para
 redes (-14 LUFS, true peak <= -1 dBTP) y comprobación.
 
-    python -B final.py <nombre>          deja out/reel-<nombre>.mp4 (el panel de etapas de Sloth busca out/reel-*.mp4)
+    python -B final.py <nombre>          deja out/reel-<nombre>.mp4 (el panel de etapas de VyMotion busca out/reel-*.mp4)
 
 En vertical, si ya está `portada.png`, la vuelve a poner de primer fotograma. En horizontal no: ahí `portada.png` es la
 miniatura de YouTube y no entra en el video (PORTADA.md de video-base).

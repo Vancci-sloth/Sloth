@@ -6,14 +6,14 @@ Fecha: 2026-11-04
 
 Al día siguiente de salir las varias cuentas (ADR 0015), un usuario hizo una frutinovela y Flow rechazó tres clips con
 el aviso de «actividad inusual», mientras los demás seguían. El aviso salió en la tarjeta del clip, ya empezado, y no
-antes de empezar. Sloth solo reconocía la frenada cuando Flow no empezaba: un rechazo en la tarjeta era un error más, la
+antes de empezar. VyMotion solo reconocía la frenada cuando Flow no empezaba: un rechazo en la tarjeta era un error más, la
 cuenta seguía recibiendo pedidos y el agente no sabía si se habían cobrado créditos.
 
 En el foro de Google hay quejas del mismo aviso, también de cuentas de pago, y Google no ha dicho la causa. Se habla de
 pedidos a la vez, de VPN y de lotes. Varios cuentan que Flow cobró créditos por clips que no hizo.
 
-Quien lo vio tenía una sola cuenta, gratis y sin VPN: Sloth ya le generaba de uno en uno, así que los pedidos a la vez no
-fueron la causa. Lo que sí se encontró, abriendo Edge como lo abre Sloth: sin ventana, cada pedido decía
+Quien lo vio tenía una sola cuenta, gratis y sin VPN: VyMotion ya le generaba de uno en uno, así que los pedidos a la vez no
+fueron la causa. Lo que sí se encontró, abriendo Edge como lo abre VyMotion: sin ventana, cada pedido decía
 `HeadlessChrome`, y la pantalla medía 800×600 con la página a 800×1000. Las dos cosas delatan un navegador automático.
 
 ## Decisión

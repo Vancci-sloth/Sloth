@@ -3,7 +3,6 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 import { basename, isAbsolute, join, relative } from 'node:path'
 import { CANAL_CARD, esVertical, IDEAS_CARD, redDeReferencia, sinInvestigar, skillDe, TU_INSTAGRAM } from '../../shared/ideas.ts'
 import type { Canal, CanalCompleto, EnVivo, IdeaElegida, Ideas, Investigacion, Rendimiento, ServerPush, SessionMeta, Temas, TrabajoYT, Transcripcion, VueltaAnterior } from '../../shared/types.ts'
-import { VIGENCIA_YOUTUBE } from '../../shared/youtube.ts'
 import { guardar } from '../disco.ts'
 import { llaveYoutube, tokenMeta } from '../opciones.ts'
 import { carpetaTrabajo } from '../trabajo.ts'
@@ -145,19 +144,9 @@ export function ideas(app: string, sessions: Sessions, avisar: (push: ServerPush
     const propio = investigacion(id)?.canales.find((x) => x.propio)?.id
     return !!canal && !esVertical(canal) && !!propio && propio === youtube?.canal()
   }
-  /**
-   * `rendimiento.json`, con lo de Studio (`studio.json`) puesto en cada video. Son datos de la API de YouTube: las políticas
-   * (III.E.4) piden no guardarlos más de 30 días sin volver a leerlos, y borrarlos si el canal se desconecta. Pasado el
-   * plazo se borran y, con el canal conectado, se leen otra vez solos.
-   */
+  /** `rendimiento.json`, con lo de Studio (`studio.json`) puesto en cada video. */
   function rendimiento(id: string): Rendimiento | null {
-    let r = leer<Rendimiento>(id, 'rendimiento.json')
-    const tuyo = esTuyo(id)
-    if (r && (!tuyo || !(Date.now() - r.medido < VIGENCIA_YOUTUBE))) {
-      rmSync(join(carpeta(id), 'rendimiento.json'), { force: true })
-      r = null
-      if (tuyo) void medir(id).catch(() => undefined)
-    }
+    const r = leer<Rendimiento>(id, 'rendimiento.json')
     const s = leer<Studio>(id, 'studio.json')
     if (!r || !s?.videos) return r
     return { ...r, studio: s.medido, videos: r.videos.map((v) => ({ ...v, ...s.videos![v.id] })) }
@@ -400,7 +389,7 @@ export function ideas(app: string, sessions: Sessions, avisar: (push: ServerPush
     const vertical = esVertical(canal)
     if (!canal.semillas.length && !canal.referencias.length && !canal.handle && !canal.instagram)
       throw new Error(vertical ? 'Pon al menos un término de búsqueda o una cuenta que conozcas.' : 'Pon al menos un término de búsqueda o un canal de referencia.')
-    if (!ytdlp()) throw new Error('Falta yt-dlp: instala el Python de Sloth, o corre «python -m pip install yt-dlp».')
+    if (!ytdlp()) throw new Error('Falta yt-dlp: instala el Python de VyMotion, o corre «python -m pip install yt-dlp».')
     const t: TrabajoYT = { canalId: id, estado: 'trabajando', fase: 'Empezando', hecho: 0, total: 1, pasos: [], empezo: Date.now(), ...(luego ? { proponer: true } : {}) }
     trabajos.set(id, t)
     const parar = new AbortController()
@@ -533,8 +522,8 @@ export function ideas(app: string, sessions: Sessions, avisar: (push: ServerPush
       `Propón ideas de ${vertical ? 'video vertical (TikTok e Instagram)' : 'video largo'} para el canal «${c.canal.nombre}» con lo que hay en esta carpeta: canal.json y resumen.json (lo ya contado de investigacion.json). Sigue «Proponer ideas» de la skill.`,
       c.ideas &&
         [
-          'Ya hay ideas de una vuelta anterior (ideas.json). Sloth ya la guardó en anteriores/, así que puedes reescribir el archivo: mejora las que sigan valiendo, quita las que la investigación nueva desmienta y no repitas las descartadas de estado.json.',
-          elegidas.length && `Las que el usuario eligió (${elegidas.join(', ')}) se quedan con su mismo id: puedes mejorarlas. Si alguna falta al terminar, Sloth la vuelve a poner como estaba.`
+          'Ya hay ideas de una vuelta anterior (ideas.json). VyMotion ya la guardó en anteriores/, así que puedes reescribir el archivo: mejora las que sigan valiendo, quita las que la investigación nueva desmienta y no repitas las descartadas de estado.json.',
+          elegidas.length && `Las que el usuario eligió (${elegidas.join(', ')}) se quedan con su mismo id: puedes mejorarlas. Si alguna falta al terminar, VyMotion la vuelve a poner como estaba.`
         ]
           .filter(Boolean)
           .join(' '),
@@ -560,7 +549,7 @@ export function ideas(app: string, sessions: Sessions, avisar: (push: ServerPush
     if (!eleccion.model) throw new Error('Falta elegir el modelo.')
     await medir(id)
     const canal = leer<Canal>(id, 'canal.json')!
-    const meta = hilo(id, `Tus videos · ${canal.nombre}`, `Diagnostica cómo le fue a mis videos de «${canal.nombre}»: sigue «Diagnosticar tus videos» de la skill. Sloth acaba de dejar los números en rendimiento.json.`, eleccion)
+    const meta = hilo(id, `Tus videos · ${canal.nombre}`, `Diagnostica cómo le fue a mis videos de «${canal.nombre}»: sigue «Diagnosticar tus videos» de la skill. VyMotion acaba de dejar los números en rendimiento.json.`, eleccion)
     const ahora = estado(id)
     ahora.diagnostico = meta.id
     escribir(id, 'estado.json', ahora)

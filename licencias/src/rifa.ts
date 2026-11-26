@@ -1,6 +1,6 @@
 /**
- * La rifa de la comunidad: el creador rifa créditos de voz de Sloth (o algo que da a mano) entre las cuentas gratis y
- * quienes apoyan con menos del sugerido. Arriba de la comunidad sale «Participa en la rifa · Llévate créditos de Sloth» (`web/src/Rifa.tsx`)
+ * La rifa de la comunidad: el creador rifa créditos de voz de VyMotion (o algo que da a mano) entre las cuentas gratis y
+ * quienes apoyan con menos del sugerido. Arriba de la comunidad sale «Participa en la rifa · Llévate créditos de VyMotion» (`web/src/Rifa.tsx`)
  * y en Administrador se abre, se sortea con la ruleta y se cierra (`web/src/RifaAdmin.tsx`).
  *
  * - Participa una persona por correo (`externo`, el id de la primera licencia de su correo, el mismo usuario que en las
@@ -13,8 +13,8 @@
  *   participa en los siguientes. Solo una abierta a la vez.
  * - Sortear elige al azar (`crypto.getRandomValues`, sin sesgo) y guarda el sorteo y sus ganadores en una sola
  *   transacción: con la rifa ya cerrada no entra nada, y dos sorteos cruzados no dan el mismo ganador dos veces.
- * - A cada ganador se le suman sus créditos en su cuenta de voz de Sloth (el repartidor de `voz.ts`),
- *   le llega un correo y, en su Sloth, el aviso a pantalla completa (`web/src/GanasteRifa.tsx`, que sale de
+ * - A cada ganador se le suman sus créditos en su cuenta de voz de VyMotion (el repartidor de `voz.ts`),
+ *   le llega un correo y, en su VyMotion, el aviso a pantalla completa (`web/src/GanasteRifa.tsx`, que sale de
  *   `GET /comunidad/avisos?cuenta`). La suma no se repite sola si pudo haber llegado (`revisar`); el creador decide en
  *   Administrador. Lo que quedó a medias, y los correos que no salieron, los retoma el cron (`entregarRifas`).
  *
@@ -50,7 +50,7 @@ function porQue(env: Env, f: Fuera): string {
   const d = desdeCuanto(env)
   if (f === 'vetada') return 'Tu cuenta está bloqueada.'
   if (f === 'fundador') return `Los Fundadores no participan en la rifa: es para las cuentas gratis y los apoyos de menos de $${d.monto} ${d.moneda}.`
-  return `Tú ya apoyas a Sloth con $${d.monto} ${d.moneda} o más: la rifa es para las cuentas gratis y los apoyos de menos.`
+  return `Tú ya apoyas a VyMotion con $${d.monto} ${d.moneda} o más: la rifa es para las cuentas gratis y los apoyos de menos.`
 }
 
 /**
@@ -104,7 +104,7 @@ export async function rifa(req: Request, env: Env, ctx: ExecutionContext, yo: Qu
     await env.DB.prepare('UPDATE rifa_ganadores SET visto = ? WHERE rifa = ? AND miembro = ? AND visto IS NULL').bind(new Date().toISOString(), id, yo.id).run()
     return { ok: true }
   }
-  if (!yo.creador) throw new Rechazo(403, 'Eso solo lo hace el creador de Sloth.')
+  if (!yo.creador) throw new Rechazo(403, 'Eso solo lo hace el creador de VyMotion.')
   if (req.method === 'GET' && ruta === '/comunidad/rifa/admin') return panel(env)
   if (req.method !== 'POST') throw new Rechazo(404, 'No existe')
   const c = await cuerpo(req)
@@ -170,7 +170,7 @@ async function vista(env: Env, yo: QuienRifa): Promise<RifaComunidad> {
   }
 }
 
-/** Lo que ganó el miembro `miembro` y aún no ve en su Sloth (el aviso a pantalla completa). */
+/** Lo que ganó el miembro `miembro` y aún no ve en su VyMotion (el aviso a pantalla completa). */
 export async function ganada(env: Env, miembro: string): Promise<RifaGanada | undefined> {
   const g = await env.DB.prepare('SELECT rifa, premio, creditos, estado FROM rifa_ganadores WHERE miembro = ? AND visto IS NULL ORDER BY cuando DESC LIMIT 1')
     .bind(miembro)
@@ -183,7 +183,7 @@ async function participar(env: Env, yo: QuienRifa): Promise<RifaComunidad> {
   const abierta = await abiertaAhora(env)
   if (!abierta) throw new Rechazo(409, 'Ahora no hay ninguna rifa abierta.')
   const p = await persona(env, yo.clave)
-  if (!p) throw new Rechazo(401, 'Para participar, crea tu cuenta gratis de Sloth.')
+  if (!p) throw new Rechazo(401, 'Para participar, crea tu cuenta gratis de VyMotion.')
   if (p.fuera) throw new Rechazo(403, porQue(env, p.fuera))
   await env.DB.prepare('INSERT OR IGNORE INTO rifa_participantes (rifa, externo, miembro, desde) VALUES (?, ?, ?, ?)').bind(abierta.id, p.externo, yo.id, new Date().toISOString()).run()
   return vista(env, yo)
@@ -191,10 +191,10 @@ async function participar(env: Env, yo: QuienRifa): Promise<RifaComunidad> {
 
 // ── El creador ──────────────────────────────────────────────────────────────────────────────────────────────────
 
-/** Lo que se lleva cada ganador de un premio con créditos, sin nombre: «1 llave de 10,000 créditos de Sloth». */
-export const premioDe = (creditos: number) => `1 llave de ${creditos.toLocaleString('en-US')} créditos de Sloth`
+/** Lo que se lleva cada ganador de un premio con créditos, sin nombre: «1 llave de 10,000 créditos de VyMotion». */
+export const premioDe = (creditos: number) => `1 llave de ${creditos.toLocaleString('en-US')} créditos de VyMotion`
 
-/** Abrir no dice qué se rifa: la comunidad solo ve «llévate créditos de Sloth». Qué y para cuántos, en cada sorteo. */
+/** Abrir no dice qué se rifa: la comunidad solo ve «llévate créditos de VyMotion». Qué y para cuántos, en cada sorteo. */
 async function crear(env: Env): Promise<RifaAdmin> {
   try {
     await env.DB.prepare("INSERT INTO rifas (id, estado, creada) VALUES (?, 'abierta', ?)").bind(letras(12).toLowerCase(), new Date().toISOString()).run()
@@ -274,7 +274,7 @@ async function sortear(env: Env, ctx: ExecutionContext, c: Record<string, unknow
   if (!r || r.estado !== 'abierta') throw new Rechazo(409, 'Esa rifa ya está cerrada.')
   const premios = premiosDelSorteo(c)
   if (premios.some((x) => x.creditos > 0)) {
-    if (!(await vozAbierta(env))) throw new Rechazo(409, 'Las voces de Sloth aún son solo para ti: los créditos se rifan cuando se publique la actualización que las abre.')
+    if (!(await vozAbierta(env))) throw new Rechazo(409, 'Las voces de VyMotion aún son solo para ti: los créditos se rifan cuando se publique la actualización que las abre.')
     if (!(await repartidorVoz(env, ctx))) throw new Rechazo(503, 'Falta la llave de socio de Voices Cloning en el cobro.')
   }
   // Entran quienes siguen pudiendo participar y aún no ganan en esta rifa.
@@ -441,7 +441,7 @@ export async function entregarPremio(env: Env, g: Ganador, repartidor: Repartido
 
 const mensaje = (e: unknown) => String(e instanceof Error ? e.message : e).slice(0, 300)
 
-/** El correo al ganador, en el tono de Vancci (`docs/agents/anuncios.md`), como el aviso de su Sloth (`GanasteRifa.tsx`). */
+/** El correo al ganador, en el tono de Vancci (`docs/agents/anuncios.md`), como el aviso de su VyMotion (`GanasteRifa.tsx`). */
 async function avisar(env: Env, g: Ganador): Promise<void> {
   const cuantos = g.creditos.toLocaleString('en-US')
   const enviada = await correo(
@@ -450,15 +450,15 @@ async function avisar(env: Env, g: Ganador): Promise<void> {
     `GANASTE LA RIFA DE SLOTH :))) · ${g.premio}`,
     [
       'Holaaaaa como estas, aqui Vancci.',
-      `NETA FELICIDADES, ganaste la rifa de Sloth: ${g.premio}. Gracias por estar en la comunidad, esto es para ti :)))`,
+      `NETA FELICIDADES, ganaste la rifa de VyMotion: ${g.premio}. Gracias por estar en la comunidad, esto es para ti :)))`,
       ...(g.creditos > 0
         ? [
-            `Ya te deje ${cuantos} CREDITOS DE VOZ en tu cuenta de Sloth, completamente gratis. No tienes que hacer nada mas, ya estan ahi.`,
-            'Para usarlos actualiza Sloth y entra a Opciones > Voz > Voces de Sloth, ahi los ves. Ya con eso escoges una voz o clonas LA TUYA con una grabacion, y el agente la usa solita para tus videos. Ojo, los creditos son SOLO para la voz, los agentes de IA siguen con su propia cuenta.'
+            `Ya te deje ${cuantos} CREDITOS DE VOZ en tu cuenta de VyMotion, completamente gratis. No tienes que hacer nada mas, ya estan ahi.`,
+            'Para usarlos actualiza VyMotion y entra a Opciones > Voz > Voces de VyMotion, ahi los ves. Ya con eso escoges una voz o clonas LA TUYA con una grabacion, y el agente la usa solita para tus videos. Ojo, los creditos son SOLO para la voz, los agentes de IA siguen con su propia cuenta.'
           ]
         : ['Te escribo en estos dias para darte tu premio. Si quieres adelantarte respondeme este correo y lo vemos.']),
       'Si algo no jala o tienes dudas respondeme este correo, contesto ABSOLUTAMENTE TODO. Un abrazoooooo',
-      'Vancci · Descarga o actualiza Sloth en https://sloth.vancci.org'
+      'Vancci · Descarga o actualiza VyMotion en https://sloth.vancci.org'
     ],
     `rifa/${g.rifa}/${g.externo}`
   )

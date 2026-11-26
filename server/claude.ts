@@ -1,18 +1,16 @@
-import { entornoPerfilClaude } from './perfiles-agentes.ts'
 import { readFileSync } from 'node:fs'
 import { extname } from 'node:path'
-import { query, type AgentDefinition, type McpServerStatus, type ModelInfo, type Options, type Query, type SDKMessage, type SDKUserMessage } from '@anthropic-ai/claude-agent-sdk'
+import { query, type AgentDefinition, type McpServerStatus, type ModelInfo, type Query, type SDKMessage, type SDKUserMessage } from '@anthropic-ai/claude-agent-sdk'
 import type { AgentEvent, Model, Tokens } from '../shared/types.ts'
 import { IMAGE_TYPES, Inbox, sinArrancar, stringify, type AgentOptions, type AgentRun, type SkillRef } from './agent.ts'
 import { herramientasIdeas } from './ideas/mcp.ts' // ideas
 import { navegadorAgente } from './navegador-agente.ts'
 import { mcpVoz } from './voz/index.ts'
 import { mcpFlow } from './flow/index.ts'
-import { mcpMeta } from './meta/index.ts'
 import { alBajarAgente, descartarRoto, programaClaude, rutaAgente } from './agentes.ts'
+import { entornoPerfilClaude, llaveDelPerfil } from './perfiles-agentes.ts'
 import { sitiosDeAgente } from './tope-agentes.ts'
-import { conConsejo, otraApi } from './otra-api.ts'
-import { llaveGuardada } from './acceso.ts'
+import { dolaresDeepSeek, entornoDeepSeek, modeloDeepSeek, SIN_LLAVE, tarifaDeepSeek } from './deepseek.ts'
 import { conSobreTi } from './sobre-ti.ts'
 import { proveedorDe } from '../shared/providers.ts'
 
@@ -76,8 +74,24 @@ export async function claudeModels(): Promise<Model[]> {
   return [...modelos.values()]
 }
 
-import { OPCIONES, UN_VIDEO_POR_HILO } from '../shared/instrucciones.ts'
-export { OPCIONES, UN_VIDEO_POR_HILO }
+/**
+ * VyMotion dibuja como botones las respuestas de una pregunta cerrada (`partirOpciones`, en web/src/items.ts). Así se lo
+ * pide al agente de cada hilo, sin tocar las skills. Una skill que ya dice cómo preguntar (la entrevista de Ideas) manda.
+ */
+export const OPCIONES = `VyMotion, la app donde te usan, enseña botones para contestar. Cuando le hagas al usuario una pregunta de respuestas cerradas (de 2 a 5, cortas), termina el mensaje con este bloque, una respuesta por línea y nada después:
+
+<opciones>
+Sí, sigue
+No, cámbialo
+</opciones>
+
+Al pulsar una, te llega su texto como mensaje del usuario. No lo uses en preguntas abiertas, ni si la skill dice cómo preguntar.`
+
+/**
+ * Un hilo es un video: su carpeta, sus etapas y su avance son de ese. Quien pide el siguiente en el mismo hilo no sabe
+ * si debe abrir otro (pasó en el grupo de WhatsApp), así que el agente se lo dice, sea cual sea.
+ */
+export const UN_VIDEO_POR_HILO = `En VyMotion, cada hilo es un solo video. Si en un hilo donde ya hiciste o empezaste uno el usuario pide otro video distinto (otro tema, otro episodio, otra parte), no lo empieces aquí: dile en una línea que el siguiente video lo haga en un hilo nuevo, con «Nuevo chat» arriba a la izquierda y la card del estilo, y que este hilo se queda con el video que ya tiene. Los cambios al mismo video, sus shorts o sus subidas sí siguen aquí.`
 
 /**
  * Los servidores MCP que `sinHerramientas` quita enteros (`mcp__openseo`, no `mcp__21st__bookmark`) y siguen encendidos.
@@ -106,39 +120,25 @@ async function apagarServidores(run: Query, quitar: string[] | undefined) {
 }
 
 /**
- * Quien lee algo ajeno (`AgentOptions.soloLeer`): solo Read, Grep y Glob, sin ningún MCP (ni los de Sloth ni los del
- * usuario), sin subagentes y sin la configuración de ninguna carpeta: el CLAUDE.md o el `.claude/settings.json` que
- * traiga lo que lee no se cargan. Si lo que lee intenta mandarlo, no tiene con qué escribir, ejecutar ni sacar nada.
- */
-export const SOLO_LEER = {
-  tools: ['Read', 'Grep', 'Glob'],
-  disallowedTools: ['mcp__*'],
-  mcpServers: {},
-  strictMcpConfig: true,
-  settingSources: [],
-  agents: {}
-} satisfies Partial<Options>
-
-/**
  * Claude con el Agent SDK, como lo usa T3 Code: el mismo Claude Code, con tus skills, tu CLAUDE.md y sin pedir
  * permisos. Los mensajes del usuario entran por una cola, así la sesión sigue viva entre turnos.
  */
 export function startClaude(opts: AgentOptions): AgentRun {
   const inbox = new Inbox<SDKUserMessage>()
-  // DeepSeek, OpenRouter y FreeLLMAPI son el mismo Claude Code contra otra API (`server/otra-api.ts`), que piensa a su manera.
-  const otra = otraApi(opts.model)
-  if (otra && !llaveGuardada(proveedorDe(opts.model))) return sinArrancar(opts, otra.sinLlave)
+  // DeepSeek es el mismo Claude Code contra la API de DeepSeek (`server/deepseek.ts`), que piensa a su manera.
+  const deepseek = proveedorDe(opts.model) === 'deepseek'
+  if (deepseek && !llaveDelPerfil('deepseek', opts.configAgente)) return sinArrancar(opts, SIN_LLAVE)
   const agentes = sitiosDeAgente()
   const run = query({
     prompt: inbox,
     options: {
       ...programaClaude(),
       cwd: opts.cwd,
-      model: otra ? otra.modelo(opts.model) : opts.model,
+      model: deepseek ? `${modeloDeepSeek(opts.model)}[1m]` : opts.model,
       effort: opts.effort as never,
-      ...(otra ? { env: otra.entorno(opts.model, opts.effort) } : opts.configClaude ? { env: entornoPerfilClaude(opts.configClaude) } : {}),
+      ...(deepseek ? { env: entornoDeepSeek(opts.model, opts.effort, opts.configAgente) } : opts.configClaude ? { env: entornoPerfilClaude(opts.configClaude) } : {}),
       // Sin `summarized`, los modelos nuevos piensan en silencio: el texto del pensamiento llega vacío.
-      thinking: otra || sinAdaptativo.has(opts.model) ? undefined : { type: 'adaptive', display: 'summarized' },
+      thinking: deepseek || sinAdaptativo.has(opts.model) ? undefined : { type: 'adaptive', display: 'summarized' },
       resume: opts.resume,
       permissionMode: 'bypassPermissions',
       allowDangerouslySkipPermissions: true,
@@ -148,11 +148,10 @@ export function startClaude(opts: AgentOptions): AgentRun {
       systemPrompt: { type: 'preset', preset: 'claude_code', append: conSobreTi(`${OPCIONES}\n\n${UN_VIDEO_POR_HILO}`) },
       // El guionista: Opus que escribe un solo archivo de un resumen, sin más herramientas que Write. Con todas, el que
       // escribía el guion de un video arrancaba con 38 mil tokens y costaba $0,26 por 100 palabras (6-nov).
-      ...(otra ? {} : { agents: { guionista: GUIONISTA } }),
+      ...(deepseek ? {} : { agents: { guionista: GUIONISTA } }),
       // El navegador del agente, la voz de AI Studio, Google Flow y, en un canal de Ideas, sus herramientas (`parecidos`; en uno vertical,
       // también las de TikTok e Instagram): se suman a los MCP del usuario.
-      mcpServers: { ...navegadorAgente(opts.lote, opts.hilo), ...mcpVoz(), ...mcpFlow(), ...mcpMeta(), ...herramientasIdeas(opts.cwd) },
-      ...(opts.soloLeer ? SOLO_LEER : {}),
+      mcpServers: { ...navegadorAgente(opts.lote, opts.hilo), ...mcpVoz(), ...mcpFlow(), ...herramientasIdeas(opts.cwd) },
       includePartialMessages: true,
       // Un subagente espera su sitio en la máquina antes de arrancar (`TOPE_AGENTES`). El que lanza otro subagente ya tiene
       // el suyo: si esperara, ninguno soltaría nada.
@@ -197,11 +196,10 @@ export function startClaude(opts: AgentOptions): AgentRun {
   const state = { idle: true, max: 0, measure: () => {}, tareas: [] as string[], detenido: false, agentes }
   // Todo evento sale por aquí, para que los trozos de texto viajen juntos y nada se les adelante.
   const emit = juntarTrozos(opts.onEvent)
-  // Con otra API, los dólares de Claude Code serían los de un modelo de Claude: se cuentan con los precios de esa API. Los
-  // de DeepSeek son de hora valle, y el turno que acaba en hora pico cuesta el doble (`tarifa`). Su error lleva qué hacer.
-  const conLoSuyo = (e: Extract<AgentEvent, { t: 'turn_end' }>) => ({ ...e, ...(e.costUsd && otra?.tarifa ? { costUsd: e.costUsd * otra.tarifa() } : {}), ...(e.error ? { error: conConsejo(e.error) } : {}) })
-  const read = otra
-    ? reader({ ...opts, onEvent: (e) => emit(e.t === 'turn_end' ? conLoSuyo(e) : e) }, state, otra.dolares)
+  // Con DeepSeek, los dólares de Claude Code serían los de un modelo de Claude: se cuentan con los precios de DeepSeek, en
+  // hora valle, y el turno que acaba en hora pico cuesta el doble.
+  const read = deepseek
+    ? reader({ ...opts, onEvent: (e) => emit(e.t === 'turn_end' && e.costUsd ? { ...e, costUsd: e.costUsd * tarifaDeepSeek() } : e) }, state, dolaresDeepSeek)
     : reader({ ...opts, onEvent: emit }, state)
 
   /** Lo que ocupa la conversación, contado por Claude Code como en `/context`. */
@@ -318,7 +316,7 @@ const CERO: Gasto = { usd: 0, tokens: { input: 0, output: 0, cacheRead: 0 } }
 type PorModelo = Record<string, { inputTokens: number; outputTokens: number; cacheReadInputTokens: number; cacheCreationInputTokens: number }>
 
 /**
- * Los dólares y los tokens de todos los modelos juntos. La escritura en caché cuenta como entrada, como en el resto de Sloth.
+ * Los dólares y los tokens de todos los modelos juntos. La escritura en caché cuenta como entrada, como en el resto de VyMotion.
  * Con `precio`, los dólares salen de los tokens de cada modelo y no de lo que calcula Claude Code (DeepSeek).
  */
 function gastoDe(usd: number, modelos: PorModelo | undefined, precio?: (modelos: PorModelo) => number): Gasto {
@@ -389,7 +387,7 @@ export function esperaACiegas(command: string): number {
 const CIEGAS = 5
 
 /**
- * Si Sloth frena el comando, por qué. Una espera larga, siempre. Y de fondo, cualquier bucle que espere (`until grep …
+ * Si VyMotion frena el comando, por qué. Una espera larga, siempre. Y de fondo, cualquier bucle que espere (`until grep …
  * salida.output; do sleep 4; done`): lo que vigila ya avisa al terminar, y si lo que busca nunca sale, el vigilante sigue
  * hasta su límite con el hilo «trabajando» (el de estafas del 4 de noviembre, 15 min de más).
  */
@@ -397,7 +395,7 @@ export function frenarEspera(command: string, deFondo: boolean): string | null {
   const segundos = esperaACiegas(command)
   const bucle = segundos > 0 && /\b(until|while|for|do)\b/i.test(command)
   if (segundos < CIEGAS && !(deFondo && bucle)) return null
-  return `Sloth no deja esperar con sleep${bucle ? ' en un bucle' : ` (${segundos} s)`}. Lo que lanzaste con run_in_background te avisa solo al terminar, con su salida, y un subagente también: no lo vigiles. Si mientras tanto no tienes nada que hacer, termina tu mensaje y su aviso te despierta.`
+  return `VyMotion no deja esperar con sleep${bucle ? ' en un bucle' : ` (${segundos} s)`}. Lo que lanzaste con run_in_background te avisa solo al terminar, con su salida, y un subagente también: no lo vigiles. Si mientras tanto no tienes nada que hacer, termina tu mensaje y su aviso te despierta.`
 }
 
 /**
@@ -441,11 +439,6 @@ export function reader(opts: AgentOptions, state: { idle: boolean; max: number; 
     if (path && text !== undefined) opts.onDraft?.({ id: w.id, path, text, at: w.sent })
   }
   let messageId = ''
-  // La llamada en curso empezó sin decir cuánto le entró: se espera a su final.
-  let sinEntrada = false
-  /** Lo que le entró a una llamada: lo nuevo y lo de la caché. */
-  const entrada = (u: { input_tokens?: number | null; cache_read_input_tokens?: number | null; cache_creation_input_tokens?: number | null }) =>
-    (u.input_tokens ?? 0) + (u.cache_read_input_tokens ?? 0) + (u.cache_creation_input_tokens ?? 0)
   // Los subagentes vivos: el id de su tarea y el de la herramienta `Agent` que los lanzó.
   const subagentes = new Map<string, string>()
   // El SDK da lo gastado acumulado (dólares y tokens de todas las llamadas, también las de los subagentes): lo de un turno
@@ -510,18 +503,12 @@ export function reader(opts: AgentOptions, state: { idle: boolean; max: number; 
         messageId = e.message.id
         // Durante el turno, cada llamada al modelo dice cuánto le entró: así el círculo se llena sin esperar al final.
         // Si aún no se sabe la ventana (primer turno, o tras reiniciar), se mide entera: trae las dos cosas.
-        // OpenRouter no lo dice al empezar (manda ceros) sino al acabar la llamada: ahí se lee, para no vaciar el círculo.
-        const entro = entrada(e.message.usage)
-        sinEntrada = !parent && !entro
+        const u = e.message.usage
         if (!parent && state.max) {
-          if (entro) opts.onEvent({ t: 'context', used: entro, max: state.max })
+          opts.onEvent({ t: 'context', used: u.input_tokens + (u.cache_read_input_tokens ?? 0) + (u.cache_creation_input_tokens ?? 0), max: state.max })
         } else if (!parent) {
           state.measure()
         }
-      }
-      if (e.type === 'message_delta' && sinEntrada && state.max) {
-        const entro = entrada(e.usage)
-        if (entro) opts.onEvent({ t: 'context', used: entro, max: state.max })
       }
       if (e.type === 'content_block_start' && e.content_block.type === 'tool_use' && (e.content_block.name === 'Write' || e.content_block.name === 'Bash')) {
         writing.set(`${messageId}:${e.index}`, { id: e.content_block.id, bash: e.content_block.name === 'Bash', json: '', sent: 0 })

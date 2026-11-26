@@ -85,7 +85,7 @@ test('la app de quien apoya ve la versión nueva y puede bajarla; sin apoyo, sig
 
 test('quien apoyó con el correo de su cuenta gratis recibe lo nuevo con la clave de esa cuenta, sin escribir la del apoyo', async () => {
   const c = cobro()
-  // «Desbloquea N estilos»: paga con tarjeta con el correo de su cuenta, y su Sloth se queda con la clave de la cuenta.
+  // «Desbloquea N estilos»: paga con tarjeta con el correo de su cuenta, y su VyMotion se queda con la clave de la cuenta.
   c.fila('SLOTH-GGGG-GGGG-GGGG-GGGG', 'tienda@x.com', 'cuenta', 'gratis', null)
   c.usa('SLOTH-GGGG-GGGG-GGGG-GGGG')
   assert.deepEqual(await c.leOfrece('SLOTH-GGGG-GGGG-GGGG-GGGG'), ANTERIOR, 'antes de apoyar')

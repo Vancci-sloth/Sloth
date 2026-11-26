@@ -7,7 +7,7 @@ import { createInterface } from 'node:readline'
 import { test } from 'node:test'
 import { hechoDeFlow } from '../shared/flow.ts'
 
-// El MCP de Flow (`flow/mcp.mjs`) contra un servidor de Sloth de mentira: lo que el agente ve al pedir un video.
+// El MCP de Flow (`flow/mcp.mjs`) contra un servidor de VyMotion de mentira: lo que el agente ve al pedir un video.
 test('el MCP de Flow pide el video, dice lo gastado y explica por qué no generó', async (t) => {
   const pedidos: string[] = []
   const sloth = createServer(async (req, res) => {
@@ -21,7 +21,6 @@ test('el MCP de Flow pide el video, dice lo gastado y explica por qué no gener�
     }
     if (req.url === '/api/flow/generar' && cuerpo.includes('imagen')) return res.end(JSON.stringify({ id: 'i', estado: 'lista', tipo: 'imagen', modelo: 'Nano Banana 2.1', archivo: 'C:\\v\\pose.jpg', creditos: 0 }))
     if (req.url === '/api/flow/generar') return res.end(JSON.stringify({ id: 'a', estado: 'en-fila', tipo: 'video', modelo: 'Veo 3.1 - Lite' }))
-    if (req.url?.startsWith('/api/flow/trabajos/lento')) return res.end(JSON.stringify({ id: 'lento', estado: 'en-fila', tipo: 'video', modelo: 'Veo 3.1 - Lite', aviso: 'La conexión con Flow va lenta. Sloth lo reintenta solo a las 10:30 (intento 2 de 5), sin gastar créditos: no lo pidas otra vez.' }))
     if (req.url?.startsWith('/api/flow/trabajos/a')) return res.end(JSON.stringify({ id: 'a', estado: 'lista', tipo: 'video', modelo: 'Veo 3.1 - Lite', archivo: 'C:\\v\\clip.mp4', creditos: 10, cuenta: 'otra@gmail.com', quedan: 40 }))
     if (req.url === '/api/flow') {
       const cuentas = [
@@ -60,10 +59,6 @@ test('el MCP de Flow pide el video, dice lo gastado y explica por qué no gener�
   const caro = (await llamar('tools/call', { name: 'generar_video', arguments: { prompt: 'caro', salida: 'C:\\v\\clip.mp4' } })).result
   assert.equal(caro.isError, true)
   assert.match(caro.content[0].text, /Cuesta 100 créditos/)
-  // Uno que espera a que la red se recupere: el agente sabe que Sloth lo reintenta y que no lo pida otra vez.
-  const lento = (await llamar('tools/call', { name: 'estado_flow', arguments: { id: 'lento' } })).result
-  assert.equal(lento.isError, undefined)
-  assert.match(lento.content[0].text, /^Sigue esperando su turno \(Veo 3\.1 - Lite\)\. La conexión con Flow va lenta\. .*no lo pidas otra vez\. Llama a estado_flow con id "lento"/)
   const saldos = (await llamar('tools/call', { name: 'estado_flow', arguments: {} })).result.content[0].text
   assert.match(saldos, /- una@gmail\.com: 40 créditos, se renuevan a las .+\. Hoy, 1 video\./)
   assert.match(saldos, /- otra@gmail\.com: aún no se sabe cuánto le queda\./)

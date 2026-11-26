@@ -1,4 +1,4 @@
-import { Fragment, memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { createContext, Fragment, memo, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { HERRAMIENTA_FLOW, hechoDeFlow, MODELOS_IMAGEN } from '../../shared/flow'
 import { NOMBRE_AGENTE, proveedorDe } from '../../shared/providers'
 import type { AgentEvent } from '../../shared/types'
@@ -13,17 +13,18 @@ import { imageUrl, Thumbs } from './Images'
 import { buildTimeline, compact, delHilo, duration, errorLlano, finDeRuta, REINTENTAR, toolSummary, type Item, type Subagente } from './items'
 import { bloquesDeMarkdown } from './markdown'
 import { BarraSubagente, FilaSubagente, GrupoSubagentes } from './Subagentes'
-import { abrirRuta } from './web'
 
 /** Una ruta del disco: `C:\…` en Windows; en Mac y Linux, de las carpetas de la gente (no `/api/…` y parecidas). */
 const RUTA = /^([A-Za-z]:[\\/]|\/(Users|home|Volumes|media|mnt|tmp)\/)/
 
-/** Desde la web, el archivo se baja al dispositivo (`abrirRuta`). */
-const abrirEnDisco = (path: string, sessionId?: string) => abrirRuta(path, sessionId).catch(() => {})
+export const UrlEditor3DActual = createContext<string | undefined>(undefined)
+
+const abrirEnDisco = (path: string, sessionId?: string) =>
+  fetch('/api/open', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ path, sessionId }) })
 
 /**
  * Un enlace del agente: la web y el correo, fuera (en la app, al navegador); un archivo, señalado en el Explorador o el
- * Finder: `C:\…`, `file:///…` o relativo a la carpeta del hilo (`out/video.mp4`). Nunca cambia la página de Sloth.
+ * Finder: `C:\…`, `file:///…` o relativo a la carpeta del hilo (`out/video.mp4`). Nunca cambia la página de VyMotion.
  */
 function onEnlace(e: React.MouseEvent, a: HTMLAnchorElement, sessionId?: string) {
   const href = a.getAttribute('href') ?? ''
@@ -65,6 +66,7 @@ function onMarkdownClick(e: React.MouseEvent, sessionId?: string) {
  * Van sin envoltorio, como si fueran un solo HTML (el CSS mira a los hijos de `.md`).
  */
 const Markdown = memo(function Markdown({ text, sessionId }: { text: string; sessionId?: string }) {
+  const editorActual = useContext(UrlEditor3DActual)
   const caja = useRef<HTMLDivElement>(null)
   const [grande, setGrande] = useState<string>()
   const pintados = useRef<{ html: string; nodos: ChildNode[] }[]>([])
@@ -72,10 +74,10 @@ const Markdown = memo(function Markdown({ text, sessionId }: { text: string; ses
   const bloques = useMemo(
     () =>
       // Una imagen del disco (`![](C:\…\perro.jpg)`) se pide al servidor, como las que lee el agente.
-      bloquesDeMarkdown(text, sessionId ? (ruta) => `/api/sessions/${sessionId}/imagen?ruta=${encodeURIComponent(ruta)}` : undefined).map((html) =>
+      bloquesDeMarkdown(text, sessionId ? (ruta) => `/api/sessions/${sessionId}/imagen?ruta=${encodeURIComponent(ruta)}` : undefined, editorActual).map((html) =>
         html.replaceAll('<pre>', '<div class="code-block"><button class="copy" type="button">Copiar</button><pre>').replaceAll('</pre>', '</pre></div>')
       ),
-    [text, sessionId]
+    [text, sessionId, editorActual]
   )
   useLayoutEffect(() => {
     const el = caja.current!
@@ -179,10 +181,11 @@ function plegarTrabajo(lista: Item[], acabado: boolean): (Item | Trabajo)[] {
  * la fila que cambió (`Row` va memorizada y `buildTimeline` deja igual lo que no cambió). `relevos`: un modelo de cada
  * otro agente conectado, con los que el hilo sigue si el suyo llega al límite.
  */
-export function Timeline({ running, background, sessionId, proveedor = 'claude', subagente, onSubagente, onResponder, relevos, desdeEvento = 0 }: { running: boolean; background: string[]; sessionId: string; proveedor?: string; subagente?: string; onSubagente?(id: string | null): void; onResponder?(text: string, images?: string[]): Promise<unknown>; relevos?: Choice[]; desdeEvento?: number }) {
+export function Timeline({ running, background, sessionId, proveedor = 'claude', subagente, onSubagente, onResponder, relevos, desdeEvento = 0, anteriores }: { running: boolean; background: string[]; sessionId: string; proveedor?: string; subagente?: string; onSubagente?(id: string | null): void; onResponder?(text: string, images?: string[]): Promise<unknown>; relevos?: Choice[]; desdeEvento?: number; anteriores?: AgentEvent[] }) {
   const events = useEventos(sessionId) ?? SIN_EVENTOS
   const visiblesEnHilo = useMemo(() => desdeEvento ? events.slice(desdeEvento) : events, [events, desdeEvento])
-  const items = buildTimeline(visiblesEnHilo)
+  const conversacion = useMemo(() => anteriores?.length ? [...anteriores, ...visiblesEnHilo] : visiblesEnHilo, [anteriores, visiblesEnHilo])
+  const items = buildTimeline(conversacion)
   const lanzador = subagente ? items.find((i): i is Extract<Item, { kind: 'tool' }> => i.kind === 'tool' && i.id === subagente && !!i.subagente) : undefined
   const sub = lanzador?.subagente
   // Al volver de un subagente lanzado por otro, se vuelve a ese.
@@ -275,6 +278,7 @@ export function Timeline({ running, background, sessionId, proveedor = 'claude',
     <>
       <div
         className="timeline"
+        data-scroll-chat
         ref={scroller}
         onScroll={(e) => {
           const el = e.currentTarget
@@ -336,7 +340,7 @@ export function Timeline({ running, background, sessionId, proveedor = 'claude',
             {sessionId && (
               <button
                 className="cite-btn"
-                title={`Pide una mejora a Sloth sobre esto; ${NOMBRE_AGENTE[proveedorDe(proveedor === 'claude' ? '' : `${proveedor}:`)]} te ayuda a decirla`}
+                title={`Pide una mejora a VyMotion sobre esto; ${NOMBRE_AGENTE[proveedorDe(proveedor === 'claude' ? '' : `${proveedor}:`)]} te ayuda a decirla`}
                 onClick={() => {
                   getSelection()?.removeAllRanges()
                   setCita(null)
@@ -518,13 +522,15 @@ const Row = memo(function Row({ item, sessionId, anidado, proveedor, onAbrir, on
         <div className="user-msg">
           <div className="bubble">
             <Thumbs images={item.images.map((path) => ({ path, src: imageUrl(path) }))} />
-            <WithQuotes text={item.text} />
+            <WithQuotes text={item.text.startsWith('Hazme un modelo 3D nuevo para la biblioteca de «Modelos 3D»')
+              ? item.text.replace(/^[\s\S]*?\nAl guardar, enlaza el resultado con [^\n]+\n\n/, '').replace(/\n\nZona marcada en el visor 3D, en coordenadas normalizadas: [\d., ]+$/, '')
+              : item.text} />
           </div>
         </div>
       )
     case 'text':
       return (
-        <div className={`assistant ${nested}`}>
+        <div className={`assistant ${nested}`} data-scroll-respuesta="">
           <Markdown text={item.text} sessionId={sessionId} />
           {item.opciones && <Respuestas opciones={item.opciones} onElegir={onResponder} />}
         </div>
@@ -665,7 +671,7 @@ export function Thinking({ text, nested = '' }: { text: string; nested?: string 
   )
 }
 
-/** Las herramientas que de verdad llegan (14.959 llamadas en los hilos de Sloth). Las demás llevan el engranaje. */
+/** Las herramientas que de verdad llegan (14.959 llamadas en los hilos de VyMotion). Las demás llevan el engranaje. */
 const ICONS: Record<string, string> = {
   Bash: '›_',
   PowerShell: '›_',

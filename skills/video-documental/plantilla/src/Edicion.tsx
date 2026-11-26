@@ -5,7 +5,7 @@
  * línea se lleva al cuadro que toca y los clips de video van con `OffthreadVideo`, para que el render los tenga cuadro a
  * cuadro; en el render final van como imágenes ya sacadas (`Cuadros`), que es varias veces más rápido.
  *
- * Así lo que se midió en las referencias (la skill venía para HyperFrames) se ve igual en el monitor de Sloth, en vivo,
+ * Así lo que se midió en las referencias (la skill venía para HyperFrames) se ve igual en el monitor de VyMotion, en vivo,
  * y en el render. Las rutas son de `public/`.
  */
 import gsap from "gsap";
@@ -69,7 +69,7 @@ function estilo(texto: string, z: number): CSSProperties {
 
 /**
  * Cada capa se dibuja con un componente que se llama como su dispositivo (`tile_reveal`, `broll`…): es lo que el estudio
- * de Sloth dice de lo que se elige en el cuadro.
+ * de VyMotion dice de lo que se elige en el cuadro.
  */
 type Props = HTMLAttributes<HTMLDivElement> & { "data-f0": number; "data-f1": number };
 const piezas = new Map<string, FC<Props>>();
@@ -123,7 +123,7 @@ export const Edicion: FC = () => {
   const linea = useRef<gsap.core.Timeline | null>(null);
   const [fuentes] = useState(() => delayRender("Las fuentes del estilo"));
 
-  // La línea de tiempo, una vez. Con `gsap.context`, los `#id` se buscan solo dentro de este video: el estudio de Sloth
+  // La línea de tiempo, una vez. Con `gsap.context`, los `#id` se buscan solo dentro de este video: el estudio de VyMotion
   // monta otro reproductor del mismo video, escondido, para recorrerlo.
   useLayoutEffect(() => {
     const ctx = gsap.context(() => {

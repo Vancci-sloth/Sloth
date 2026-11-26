@@ -8,7 +8,7 @@ comparten; el contrato entero, en MOTOR.md de video-base.
 
 La portada con IA también es de todos (`con_imagenes`, `pedir_portada`, `esperar_portada`; PORTADA.md).
 
-Solo la biblioteca estándar y FFmpeg: corre con el `python` del sistema y con el de Sloth.
+Solo la biblioteca estándar y FFmpeg: corre con el `python` del sistema y con el de VyMotion.
 """
 
 import atexit

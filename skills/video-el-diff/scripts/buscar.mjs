@@ -3,9 +3,9 @@
 //
 //   node <skill>/scripts/buscar.mjs "consulta 1" "consulta 2" ... [--n 5] [--horas 72]
 //
-// - Primero el radar de Sloth (`server/radar`): las cuentas de X que importan, los blogs de los laboratorios, los medios
+// - Primero el radar de VyMotion (`server/radar`): las cuentas de X que importan, los blogs de los laboratorios, los medios
 //   de tecnología, Hacker News y GitHub Trending, leídos en segundo plano. Busca en milisegundos, no cuesta nada y casi
-//   todo llega ya leído entero. Necesita a Sloth abierto.
+//   todo llega ya leído entero. Necesita a VyMotion abierto.
 // - Si además hay llave EXA_API_KEY (Exa, que trae el texto de cada página) o PERPLEXITY_API_KEY (Perplexity Search),
 //   también busca en la web. Las llaves son variables de entorno del usuario de Windows.
 // Sin radar ni llave sale con el código 3: busca con WebSearch (todas en un mismo mensaje) y lee lo hallado con leer.mjs.
@@ -17,7 +17,7 @@ import { execFileSync } from 'node:child_process'
 import { join } from 'node:path'
 import { CARPETA, guardarIndice, leerIndice, leerTodas, linea, nombreDe } from './leer.mjs'
 
-/** Una llave: la del proceso o, si Sloth la guardó después de arrancar, la del registro. */
+/** Una llave: la del proceso o, si VyMotion la guardó después de arrancar, la del registro. */
 function llave(nombre) {
   if (process.env[nombre]) return process.env[nombre]
   try {
@@ -52,9 +52,9 @@ async function post(url, cuerpo, cabeceras = {}) {
 const desde = HORAS ? new Date(Date.now() - Number(HORAS) * 3600e3) : null
 const fecha = (ms) => (ms ? new Date(ms).toISOString() : null)
 
-/** El radar de Sloth: por consulta, lo más pertinente y reciente, con el texto de lo que ya leyó entero. */
+/** El radar de VyMotion: por consulta, lo más pertinente y reciente, con el texto de lo que ya leyó entero. */
 async function radar() {
-  // El puerto del servidor de Sloth, que el agente hereda (`server/index.ts`).
+  // El puerto del servidor de VyMotion, que el agente hereda (`server/index.ts`).
   const puerto = process.env.PORT ?? 4848
   const d = await post(`http://127.0.0.1:${puerto}/api/radar/buscar`, { consultas, n: N, horas: HORAS ? Number(HORAS) : undefined, textos: true })
   return d.resultados.map(({ docs }) => docs.map((h) => ({
@@ -92,7 +92,7 @@ function guardarLeidas(hallados) {
     if (!h.texto || indice[h.url] || nuevos[h.url]) continue
     const n = nombreDe(h.url, usados)
     const leido = new Date().toISOString()
-    writeFileSync(join(CARPETA, `${n}.md`), `URL: ${h.url}\nLeído: ${leido} (${h.extra?.startsWith('Exa') ? 'por Exa' : 'del radar de Sloth'})\nTítulo: ${h.titulo ?? ''}\nPublicado: ${h.fecha ?? 'no lo dice'}\n---\n\n${h.texto}\n`)
+    writeFileSync(join(CARPETA, `${n}.md`), `URL: ${h.url}\nLeído: ${leido} (${h.extra?.startsWith('Exa') ? 'por Exa' : 'del radar de VyMotion'})\nTítulo: ${h.titulo ?? ''}\nPublicado: ${h.fecha ?? 'no lo dice'}\n---\n\n${h.texto}\n`)
     nuevos[h.url] = { archivo: `${n}.md`, titulo: h.titulo, fecha: h.fecha, leido, enlaces: [] }
   }
   guardarIndice(nuevos)
@@ -102,7 +102,7 @@ function guardarLeidas(hallados) {
 const t0 = Date.now()
 const web = EXA ? exa : PERPLEXITY ? perplexity : null
 const [delRadar, deLaWeb] = await Promise.all([
-  radar().catch((e) => ({ error: e.cause?.code === 'ECONNREFUSED' ? 'Sloth no está abierto' : e.message })),
+  radar().catch((e) => ({ error: e.cause?.code === 'ECONNREFUSED' ? 'VyMotion no está abierto' : e.message })),
   web ? Promise.all(consultas.map((q) => web(q).catch((e) => ({ error: e.message })))) : null
 ])
 if (delRadar.error && !web) {

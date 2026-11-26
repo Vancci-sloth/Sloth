@@ -1,17 +1,17 @@
 // El visor 3D de la biblioteca: el modelo de verdad (su `Muestra`, con el mismo código de los videos y quieta en su
 // `cuadro`) en una escena con la luz de estudio de la vitrina, que se gira, se acerca y se mueve con el ratón (o con
-// el dedo) en todos los ejes. Sloth lo tiene abierto en un iframe mientras está en «Modelos 3D» y le dice qué modelo
+// el dedo) en todos los ejes. VyMotion lo tiene abierto en un iframe mientras está en «Modelos 3D» y le dice qué modelo
 // enseñar (`mostrar`): cambiar de modelo no vuelve a cargar el visor. Tiene montados, escondidos, hasta 16: el que se
 // enseña, los que preparó el ratón y los que se ven en la rejilla (`precalentar`); con el visor quieto les compila los
 // materiales y les sube las texturas, así que enseñar uno de esos es solo encuadrarlo. Va dentro del Player de Remotion para que el
 // modelo tenga su cuadro (`useCurrentFrame`), con `ThreeCanvas` en vista previa. Dibuja solo cuando algo cambia
-// (`frameloop="demand"`): quieto, no gasta. Abre encuadrado como su foto (vitrina.tsx) y en el ángulo que Sloth le diga,
+// (`frameloop="demand"`): quieto, no gasta. Abre encuadrado como su foto (vitrina.tsx) y en el ángulo que VyMotion le diga,
 // para que al ponerse encima del giro no salte. Doble clic: como estaba. Mayús y las flechas: lo gira 10°.
 // `modelos.py visor` lo arma para toda la biblioteca con `scripts/visor.mjs` (un trozo por modelo, lo demás compartido).
 //
-// Mensajes. De Sloth: `mostrar` (el id, y `azimut` en grados), `girar` ([de lado, de arriba abajo]), `angosto` y
+// Mensajes. De VyMotion: `mostrar` (el id, y `azimut` en grados), `girar` ([de lado, de arriba abajo]), `angosto` y
 // `precalentar` (los ids que se ven en la rejilla: se montan y se preparan de fondo) y `pausa` (mientras se desplaza la
-// rejilla, nada de fondo). A Sloth
+// rejilla, nada de fondo). A VyMotion
 // (con `visor3d: true`): `hola` cuando ya oye, `listo` (con el id) cuando el modelo ya se ve, `falta`, `toca` al primer arrastre, `tecla` con
 // Esc, las flechas y Tab (la ficha las usa) y `rueda` en angosto, donde la rueda desplaza la ficha y no acerca (salvo con
 // Ctrl). En `window.__visor`, para medirlo desde fuera: los ángulos de la cámara, su distancia y cuándo respondió.
@@ -23,6 +23,7 @@ import { createRoot } from "react-dom/client";
 import { useCurrentFrame, useVideoConfig } from "remotion";
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+import { TransformControls } from "three/examples/jsm/controls/TransformControls.js";
 import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 import { MODELOS } from "./_visor_lista";
 
@@ -44,13 +45,69 @@ const medidas: Medidas = { id: "", listo: 0, respondio: 0, azimut: 0, polar: 0, 
 const fase = (nombre: string) => (medidas.fases[nombre] = Math.round(performance.now() - (medidas.fases.desde ?? 0)));
 (window as unknown as { __visor: Medidas }).__visor = medidas;
 const avisar = (m: Record<string, unknown>) => window.parent !== window && window.parent.postMessage({ visor3d: true, ...m }, "*");
-/** Lo que pide Sloth y aún no se aplica (el ángulo con que abre el siguiente modelo, un giro con el teclado). */
-const pedidos: { azimut: number | null; girar: [number, number] | null; reencuadrar: boolean; despertar: () => void } = {
+/** Lo que pide VyMotion y aún no se aplica (el ángulo con que abre el siguiente modelo, un giro con el teclado). */
+const pedidos: {
+  azimut: number | null;
+  girar: [number, number] | null;
+  reencuadrar: boolean;
+  vistaCambio: boolean;
+  orden: { herramienta?: string; accion?: string } | null;
+  despertar: () => void;
+} = {
   azimut: null,
   girar: null,
   reencuadrar: false,
+  vistaCambio: false,
+  orden: null,
   despertar: () => {},
 };
+/** La vista que pide la ficha: la malla (alambre) del modelo que se ve y la cuadrícula del suelo. */
+const vista = { malla: false, cuadricula: false };
+
+/**
+ * La edición a mano (`server/modelos3d-ediciones.ts`): lo que cada pieza cambió respecto a su original, por modelo (la
+ * ruta de la pieza en el árbol, `0/2`), la original de cada malla, la herramienta de la barra y lo hecho para deshacerlo.
+ */
+type Pieza = { p?: number[]; r?: number[]; s?: number[] };
+const ediciones = new Map<string, Record<string, Pieza>>();
+const originales = new WeakMap<THREE.Object3D, { pos: THREE.Vector3; quat: THREE.Quaternion; escala: THREE.Vector3 }>();
+const edicion = { herramienta: "ver" as "ver" | "mover" | "girar" | "escalar", historia: [] as string[], futuro: [] as string[] };
+const MODO = { mover: "translate", girar: "rotate", escalar: "scale" } as const;
+/** Quita la selección del modelo que se ve (al cambiar de modelo, o con «Ver»). */
+let soltarPieza: (() => void) | null = null;
+/** Quita los oyentes y el gizmo del modelo que se veía (al desmontar el visor o cambiar de modelo). */
+let edicionLimpiar: (() => void) | null = null;
+
+/** La ruta de una pieza dentro del modelo (los índices de sus padres, hasta `raiz`). */
+const rutaDe = (obj: THREE.Object3D, raiz: THREE.Object3D) => {
+  const partes: number[] = [];
+  for (let o: THREE.Object3D | null = obj; o && o !== raiz && o.parent; o = o.parent) partes.unshift(o.parent.children.indexOf(o));
+  return partes.join("/");
+};
+const mallas = (g: THREE.Object3D) => {
+  const lista: THREE.Mesh[] = [];
+  g.traverse((x) => {
+    if ((x as THREE.Mesh).isMesh) lista.push(x as THREE.Mesh);
+  });
+  return lista;
+};
+const redondea = (n: number) => Math.round(n * 1e4) / 1e4;
+/** Pone a cada pieza lo que el modelo dice de ella, sobre su original: aplicarlo otra vez no acumula nada. */
+function aplicarEdiciones(g: THREE.Group, id: string) {
+  const mapa = ediciones.get(id) ?? {};
+  for (const malla of mallas(g)) {
+    if (!originales.has(malla)) originales.set(malla, { pos: malla.position.clone(), quat: malla.quaternion.clone(), escala: malla.scale.clone() });
+    const o = originales.get(malla)!;
+    malla.position.copy(o.pos);
+    malla.quaternion.copy(o.quat);
+    malla.scale.copy(o.escala);
+    const c = mapa[rutaDe(malla, g)];
+    if (!c) continue;
+    if (c.p) malla.position.add(new THREE.Vector3(...c.p));
+    if (c.r) malla.quaternion.multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(...c.r)));
+    if (c.s) malla.scale.multiply(new THREE.Vector3(...c.s));
+  }
+}
 
 const direccion = (azimut: number) =>
   new THREE.Vector3(Math.sin(azimut) * Math.cos(ELEVACION), Math.sin(ELEVACION), Math.cos(azimut) * Math.cos(ELEVACION));
@@ -76,11 +133,32 @@ const Estudio: React.FC<{ id: string }> = ({ id }) => {
   /** Cada compilación lleva su turno: si mientras tanto se pidió otro modelo, la de antes ya no enseña nada. */
   const turno = useRef(0);
   const arrastrando = useRef(false);
+  const idRef = useRef(id);
+  idRef.current = id;
+  /** Lo que hace la barra de edición: se ejecuta en el cuadro siguiente (ver `orden` en `pedidos`). */
+  const orden = useRef<((o: { herramienta?: string; accion?: string }) => void) | null>(null);
   const tocado = useRef(false);
   const luz = useRef<THREE.DirectionalLight>(null);
   const relleno = useRef<THREE.DirectionalLight>(null);
   const contra = useRef<THREE.DirectionalLight>(null);
   const blanco = useMemo(() => new THREE.Object3D(), []);
+  /** Cuadrícula del suelo: una unidad, que se escala al tamaño del modelo al encuadrarlo. */
+  const rejilla = useMemo(() => {
+    const r = new THREE.GridHelper(1, 24, MIEL, "#5b5346");
+    r.visible = false;
+    (r.material as THREE.Material).transparent = true;
+    (r.material as THREE.Material).opacity = 0.45;
+    return r;
+  }, []);
+  /** Aplica la vista pedida: el alambre va al modelo que se ve (`g`); la cuadrícula, al suelo. */
+  const aplicarVista = (g?: THREE.Group) => {
+    rejilla.visible = vista.cuadricula;
+    g?.traverse((x) => {
+      const m = (x as THREE.Mesh).material;
+      for (const mat of Array.isArray(m) ? m : m ? [m] : []) if ("wireframe" in mat) (mat as THREE.MeshStandardMaterial).wireframe = vista.malla;
+    });
+    invalidate();
+  };
   const entorno = useMemo(() => {
     const pmrem = new THREE.PMREMGenerator(gl);
     const tex = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
@@ -103,7 +181,7 @@ const Estudio: React.FC<{ id: string }> = ({ id }) => {
     c.enableDamping = true;
     gl.domElement.style.touchAction = "none";
     // En angosto, el dedo de arriba abajo desplaza la ficha (el iframe va fijo, fuera de ella: su desplazamiento no le
-    // llega solo, se le pide a Sloth como la rueda); de lado, gira. Se decide con los primeros 8 px.
+    // llega solo, se le pide a VyMotion como la rueda); de lado, gira. Se decide con los primeros 8 px.
     let toque: { x: number; y: number; ultimo: number; modo: "" | "desplaza" | "gira" } | null = null;
     const baja = (e: PointerEvent) => {
       toque = angosto && e.pointerType === "touch" ? { x: e.clientX, y: e.clientY, ultimo: e.clientY, modo: "" } : null;
@@ -140,6 +218,138 @@ const Estudio: React.FC<{ id: string }> = ({ id }) => {
       if (arrastrando.current && !medidas.respondio) requestAnimationFrame(() => (medidas.respondio = performance.timeOrigin + performance.now()));
     });
     controles.current = c;
+    // La edición: el gizmo de three.js sobre la pieza elegida. Al soltarlo, lo que cambió se guarda como diferencia con
+    // la original y se avisa a VyMotion, que lo guarda en el servidor. Clic sobre una pieza la elige; sobre el vacío, la suelta.
+    const tc = new TransformControls(camera, gl.domElement);
+    const ayuda = tc.getHelper();
+    ayuda.visible = false;
+    scene.add(ayuda);
+    let inicio: string | null = null;
+    let presion: { x: number; y: number; libre: boolean } | null = null;
+    const reportar = () => {
+      avisar({ que: "ediciones", id: idRef.current, ediciones: ediciones.get(idRef.current) ?? {} });
+      avisar({ que: "historial", deshacer: edicion.historia.length > 0, rehacer: edicion.futuro.length > 0 });
+    };
+    const soltar = () => {
+      if (tc.object) avisar({ que: "pieza", id: idRef.current, nombre: "" });
+      tc.detach();
+      ayuda.visible = false;
+    };
+    const elegir = (malla: THREE.Mesh) => {
+      const g = grupos.get(idRef.current);
+      if (!g) return;
+      // Elegir una pieza ya la edita: con «Ver», pasa a «Mover» (y la barra lo muestra).
+      if (edicion.herramienta === "ver") {
+        edicion.herramienta = "mover";
+        avisar({ que: "herramienta", herramienta: "mover" });
+      }
+      tc.setMode(MODO[edicion.herramienta] ?? "translate");
+      tc.attach(malla);
+      ayuda.visible = true;
+      const i = mallas(g).indexOf(malla);
+      avisar({ que: "pieza", id: idRef.current, ruta: rutaDe(malla, g), nombre: malla.name || `Pieza ${i + 1}` });
+    };
+    const cambiar = () => {
+      const malla = tc.object as THREE.Mesh | undefined;
+      const g = grupos.get(idRef.current);
+      const o = malla && originales.get(malla);
+      if (!malla || !g || !o || inicio === null) return;
+      const dp = malla.position.clone().sub(o.pos);
+      const dq = new THREE.Euler().setFromQuaternion(o.quat.clone().invert().multiply(malla.quaternion));
+      const ds = malla.scale.clone().divide(o.escala);
+      const pieza: Pieza = {};
+      if (dp.length() > 1e-6) pieza.p = [dp.x, dp.y, dp.z].map(redondea);
+      if (Math.abs(dq.x) + Math.abs(dq.y) + Math.abs(dq.z) > 1e-6) pieza.r = [dq.x, dq.y, dq.z].map(redondea);
+      if (Math.abs(ds.x - 1) + Math.abs(ds.y - 1) + Math.abs(ds.z - 1) > 1e-6) pieza.s = [ds.x, ds.y, ds.z].map(redondea);
+      const nuevo = { ...(ediciones.get(idRef.current) ?? {}) };
+      const ruta = rutaDe(malla, g);
+      if (Object.keys(pieza).length) nuevo[ruta] = pieza;
+      else delete nuevo[ruta];
+      if (JSON.stringify(nuevo) === inicio) return;
+      edicion.historia.push(inicio);
+      edicion.futuro.length = 0;
+      ediciones.set(idRef.current, nuevo);
+      reportar();
+    };
+    tc.addEventListener("dragging-changed", (e: { value: boolean }) => {
+      c.enabled = !e.value;
+      if (e.value) inicio = JSON.stringify(ediciones.get(idRef.current) ?? {});
+      else if (inicio !== null) {
+        cambiar();
+        inicio = null;
+      }
+    });
+    tc.addEventListener("change", () => invalidate());
+    // Mientras se arrastra, la escala no baja del 5 % ni pasa de 20 veces la original, y nunca se invierte: la pieza no
+    // desaparece ni se guarda volteada.
+    tc.addEventListener("objectChange", () => {
+      const malla = tc.object as THREE.Mesh | undefined;
+      const o = malla && originales.get(malla);
+      if (!malla || !o) return;
+      malla.scale.set(
+        THREE.MathUtils.clamp(malla.scale.x, o.escala.x * 0.05, o.escala.x * 20),
+        THREE.MathUtils.clamp(malla.scale.y, o.escala.y * 0.05, o.escala.y * 20),
+        THREE.MathUtils.clamp(malla.scale.z, o.escala.z * 0.05, o.escala.z * 20),
+      );
+    });
+    // Lo que se hace con la barra. Deshacer y rehacer cambian el mapa entero y lo vuelven a aplicar al modelo.
+    const hacer = (o: { herramienta?: string; accion?: string }) => {
+      if (o.herramienta) {
+        edicion.herramienta = o.herramienta as typeof edicion.herramienta;
+        if (edicion.herramienta === "ver") soltar();
+        else tc.setMode(MODO[edicion.herramienta as keyof typeof MODO] ?? "translate");
+        ayuda.visible = !!tc.object && edicion.herramienta !== "ver";
+      }
+      if (o.accion === "deshacer" || o.accion === "rehacer") {
+        const de = o.accion === "deshacer" ? edicion.historia : edicion.futuro;
+        const a = o.accion === "deshacer" ? edicion.futuro : edicion.historia;
+        if (de.length) {
+          a.push(JSON.stringify(ediciones.get(idRef.current) ?? {}));
+          ediciones.set(idRef.current, JSON.parse(de.pop()!));
+          const g = grupos.get(idRef.current);
+          if (g) aplicarEdiciones(g, idRef.current);
+          reportar();
+        }
+      }
+      if (o.accion === "restablecer") {
+        edicion.historia.push(JSON.stringify(ediciones.get(idRef.current) ?? {}));
+        edicion.futuro.length = 0;
+        ediciones.set(idRef.current, {});
+        const g = grupos.get(idRef.current);
+        if (g) aplicarEdiciones(g, idRef.current);
+        reportar();
+      }
+      invalidate();
+    };
+    orden.current = hacer;
+    // Clic sobre una pieza: si el gizmo no está bajo el puntero, elige la pieza que se ve bajo él (o suelta la selección).
+    const bajaPieza = (e: PointerEvent) => (presion = { x: e.clientX, y: e.clientY, libre: tc.axis === null });
+    const subePieza = (e: PointerEvent) => {
+      const p = presion;
+      presion = null;
+      if (!p || !p.libre || Math.hypot(e.clientX - p.x, e.clientY - p.y) > 5) return;
+      const g = grupos.get(idRef.current);
+      if (!g) return;
+      const r = gl.domElement.getBoundingClientRect();
+      const ndc = new THREE.Vector2(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
+      const rayo = new THREE.Raycaster();
+      rayo.setFromCamera(ndc, camera);
+      const golpe = rayo.intersectObjects(mallas(g), false).find((h) => h.object.visible);
+      if (golpe) elegir(golpe.object as THREE.Mesh);
+      else soltar();
+      invalidate();
+    };
+    gl.domElement.addEventListener("pointerdown", bajaPieza);
+    gl.domElement.addEventListener("pointerup", subePieza);
+    soltarPieza = soltar;
+    edicionLimpiar = () => {
+      gl.domElement.removeEventListener("pointerdown", bajaPieza);
+      gl.domElement.removeEventListener("pointerup", subePieza);
+      scene.remove(ayuda);
+      tc.dispose();
+      orden.current = null;
+      soltarPieza = null;
+    };
     const deNuevo = () => {
       estado.current = "esperando";
       invalidate();
@@ -155,6 +365,7 @@ const Estudio: React.FC<{ id: string }> = ({ id }) => {
     gl.domElement.addEventListener("wheel", rueda, { capture: true, passive: false });
     return () => {
       c.dispose();
+      edicionLimpiar?.();
       gl.domElement.removeEventListener("pointerdown", baja, { capture: true });
       removeEventListener("pointermove", mueve, { capture: true });
       removeEventListener("pointerup", suelta, { capture: true });
@@ -166,6 +377,10 @@ const Estudio: React.FC<{ id: string }> = ({ id }) => {
   // Otro modelo: el de antes se esconde y este se encuadra (y se prepara, si aún no lo estaba).
   useEffect(() => {
     for (const [otro, g] of grupos) if (otro !== id) g.visible = false;
+    // Otro modelo: lo que se hizo con el de antes ya no deshace nada aquí, y la pieza elegida se suelta.
+    edicion.historia.length = 0;
+    edicion.futuro.length = 0;
+    soltarPieza?.();
     estado.current = "esperando";
     turno.current++;
     tocado.current = false;
@@ -186,6 +401,15 @@ const Estudio: React.FC<{ id: string }> = ({ id }) => {
   useFrame(() => {
     const g = grupos.get(id);
     const c = controles.current;
+    if (pedidos.vistaCambio) {
+      pedidos.vistaCambio = false;
+      aplicarVista(g);
+    }
+    if (pedidos.orden) {
+      const o = pedidos.orden;
+      pedidos.orden = null;
+      orden.current?.(o);
+    }
     if (!g || !c) return;
     // El mismo modelo, pedido otra vez desde otro ángulo: se vuelve a encuadrar (ya está compilado).
     if (pedidos.reencuadrar && estado.current === "listo") {
@@ -195,6 +419,8 @@ const Estudio: React.FC<{ id: string }> = ({ id }) => {
     // Aún no acaba de cargar: AlCargar despierta al visor cuando llegue.
     if (estado.current === "esperando" && !cargados.has(id)) return;
     if (estado.current === "esperando") {
+      // Las piezas movidas a mano (y sus cambios guardados) van antes de medir el cuadro.
+      aplicarEdiciones(g, id);
       g.updateMatrixWorld(true);
       const caja = new THREE.Box3().setFromObject(g, true);
       // Aún no llega (su código o sus texturas): se vuelve a mirar en el cuadro siguiente.
@@ -231,6 +457,8 @@ const Estudio: React.FC<{ id: string }> = ({ id }) => {
       const k = Math.max(1, radio);
       blanco.position.copy(centro);
       blanco.updateMatrixWorld();
+      rejilla.position.set(centro.x, caja.min.y - 0.001, centro.z);
+      rejilla.scale.setScalar(k * 6);
       if (luz.current) {
         luz.current.position.set(centro.x - 2.5 * k, centro.y + 10 * k, centro.z + 3 * k);
         const s = luz.current.shadow.camera;
@@ -244,13 +472,26 @@ const Estudio: React.FC<{ id: string }> = ({ id }) => {
         // Ya está listo (montado de fondo, doble clic, u otra vez el mismo desde otro ángulo): se encuadra y se enseña, y
         // se avisa cuando ya está pintado así.
         g.visible = true;
+        aplicarVista(g);
         estado.current = "listo";
         despues.current = 30;
         invalidate();
+        // Las cifras del modelo, para la barra de la ficha: triángulos (con índice o sin él) y piezas.
+        let triangulos = 0;
+        let piezas = 0;
+        const materiales = new Set<THREE.Material>();
+        g.traverse((x) => {
+          const malla = x as THREE.Mesh;
+          if (!malla.isMesh) return;
+          piezas++;
+          triangulos += (malla.geometry.index ? malla.geometry.index.count : malla.geometry.attributes.position?.count ?? 0) / 3;
+          for (const mat of Array.isArray(malla.material) ? malla.material : [malla.material]) materiales.add(mat);
+        });
         requestAnimationFrame(() =>
           requestAnimationFrame(() => {
             medidas.id = id;
             medidas.listo = performance.timeOrigin + performance.now();
+            avisar({ que: "estadisticas", id, triangulos: Math.round(triangulos), piezas, materiales: materiales.size });
             avisar({ que: "listo", id });
           }),
         );
@@ -296,7 +537,7 @@ const Estudio: React.FC<{ id: string }> = ({ id }) => {
     }, 200);
     return () => clearInterval(t);
   }, [id, gl, camera, scene]);
-  // Los pedidos de Sloth: girar con el teclado.
+  // Los pedidos de VyMotion: girar con el teclado.
   useEffect(() => {
     const oir = (e: MessageEvent) => {
       const g = (e.data as { girar?: [number, number] })?.girar;
@@ -310,6 +551,7 @@ const Estudio: React.FC<{ id: string }> = ({ id }) => {
   return (
     <>
       <primitive object={blanco} />
+      <primitive object={rejilla} />
       <directionalLight ref={luz} target={blanco} intensity={2.4} color="#fff4e6" castShadow shadow-mapSize={[2048, 2048]} shadow-bias={-0.0004} shadow-radius={8} />
       <directionalLight ref={relleno} target={blanco} intensity={0.9} color="#dfe8ff" />
       <directionalLight ref={contra} target={blanco} intensity={2.6} color={MIEL} />
@@ -318,7 +560,7 @@ const Estudio: React.FC<{ id: string }> = ({ id }) => {
   );
 };
 
-/** Solo la sombra en el piso: el fondo lo pone Sloth. */
+/** Solo la sombra en el piso: el fondo lo pone VyMotion. */
 const Sombra: React.FC = () => (
   <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.002, 0]} receiveShadow>
     <planeGeometry args={[200, 200]} />
@@ -341,8 +583,8 @@ const MONTADOS = 16;
 /** Si alguien arrastra el modelo: mientras tanto no se monta nada de fondo. */
 const arrastrandoYa = { ahora: false };
 /**
- * Lo de fondo (montar y preparar) espera a que la página de Sloth esté quieta: preparar un modelo ocupa la tarjeta
- * gráfica medio segundo, y a la vez que se desplaza la rejilla, se notaba. Sloth avisa con `pausa` al desplazar, y la
+ * Lo de fondo (montar y preparar) espera a que la página de VyMotion esté quieta: preparar un modelo ocupa la tarjeta
+ * gráfica medio segundo, y a la vez que se desplaza la rejilla, se notaba. VyMotion avisa con `pausa` al desplazar, y la
  * primera vez se espera un momento desde que el visor carga.
  */
 const quieta = { desde: performance.now() + 1500, pausa: false };
@@ -451,14 +693,14 @@ const Escena: React.FC<{ id: string; montados: string[] }> = ({ id, montados }) 
 
 /** El último modelo pedido (el que se enseña o se está armando). */
 const pedido = { id: parametros.get("id") ?? "" };
-/** Lo que Sloth pidió precalentar (lo último que se ve en la rejilla): se monta de fondo, uno a la vez, con el visor quieto. */
+/** Lo que VyMotion pidió precalentar (lo último que se ve en la rejilla): se monta de fondo, uno a la vez, con el visor quieto. */
 const porMontar: string[] = [];
 /** Cuándo se usó cada montado (se enseñó, se pidió o se vio en la rejilla): sobran, se quita el que hace más que no. */
 const usados = new Map<string, number>();
 let reloj = 0;
 const usar = (i: string) => usados.set(i, ++reloj);
 
-/** El visor: el Player con el modelo que pide Sloth (y los montados de fondo), quieto en el cuadro de su foto. */
+/** El visor: el Player con el modelo que pide VyMotion (y los montados de fondo), quieto en el cuadro de su foto. */
 const Visor: React.FC = () => {
   const [id, setId] = useState(pedido.id);
   const [montados, setMontados] = useState<string[]>(pedido.id ? [pedido.id] : []);
@@ -477,7 +719,7 @@ const Visor: React.FC = () => {
     });
   };
   const player = useRef<PlayerRef>(null);
-  // Del tamaño del iframe, también si cambia (Sloth lo pone encima de la ficha).
+  // Del tamaño del iframe, también si cambia (VyMotion lo pone encima de la ficha).
   const [tam, setTam] = useState({ w: innerWidth, h: innerHeight });
   useEffect(() => {
     const cambia = () => setTam({ w: innerWidth, h: innerHeight });
@@ -486,8 +728,41 @@ const Visor: React.FC = () => {
   }, []);
   useEffect(() => {
     const oir = (e: MessageEvent) => {
-      const d = e.data as { mostrar?: string; azimut?: number; angosto?: boolean; pausa?: boolean };
+      const d = e.data as {
+        mostrar?: string;
+        azimut?: number;
+        angosto?: boolean;
+        pausa?: boolean;
+        vista?: { malla?: boolean; cuadricula?: boolean };
+        encuadrar?: boolean;
+        ediciones?: Record<string, Pieza>;
+        edicion?: { herramienta?: string; accion?: string };
+      };
       if (typeof d?.angosto === "boolean") angosto = d.angosto;
+      // Las piezas que se movieron a mano en este modelo (su mapa completo, al mostrarlo o al cambiarlo desde la barra).
+      if (d?.mostrar && d.ediciones) {
+        ediciones.set(d.mostrar, d.ediciones);
+        if (d.mostrar === pedido.id) {
+          pedidos.reencuadrar = true;
+          pedidos.despertar();
+        }
+      }
+      // La barra de edición: herramienta (mover, girar, escalar o ver) y deshacer, rehacer o restablecer.
+      if (d?.edicion) {
+        pedidos.orden = d.edicion;
+        pedidos.despertar();
+      }
+      // La barra de la ficha: malla y cuadrícula se aplican al modelo que se ve; «Encuadrar» vuelve a la foto de inicio.
+      if (d?.vista) {
+        vista.malla = !!d.vista.malla;
+        vista.cuadricula = !!d.vista.cuadricula;
+        pedidos.vistaCambio = true;
+        pedidos.despertar();
+      }
+      if (d?.encuadrar) {
+        pedidos.reencuadrar = true;
+        pedidos.despertar();
+      }
       if (typeof d?.pausa === "boolean") {
         quieta.pausa = d.pausa;
         // Al volver a estar quieta, todavía un momento.
@@ -519,7 +794,7 @@ const Visor: React.FC = () => {
     };
     addEventListener("message", oir);
     addEventListener("message", precalentar);
-    // Ya oye: Sloth le manda lo que tenía guardado.
+    // Ya oye: VyMotion le manda lo que tenía guardado.
     avisar({ que: "hola" });
     return () => (removeEventListener("message", oir), removeEventListener("message", precalentar));
   }, []);
@@ -555,8 +830,15 @@ const Visor: React.FC = () => {
   );
 };
 
-// Esc, las flechas y Tab son de la ficha de Sloth, también con el foco aquí dentro; con Mayús, las flechas giran el modelo.
+// Esc, las flechas y Tab son de la ficha de VyMotion, también con el foco aquí dentro; con Mayús, las flechas giran el modelo.
 addEventListener("keydown", (e) => {
+  // Ctrl+Z deshace, Ctrl+Mayús+Z o Ctrl+Y rehacen (lo mismo que los botones de la barra).
+  if ((e.ctrlKey || e.metaKey) && (e.key.toLowerCase() === "z" || e.key.toLowerCase() === "y")) {
+    e.preventDefault();
+    const rehacer = e.key.toLowerCase() === "y" || e.shiftKey;
+    window.postMessage({ edicion: { accion: rehacer ? "rehacer" : "deshacer" } }, "*");
+    return;
+  }
   const flecha = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[e.key] as [number, number] | undefined;
   if (e.shiftKey && flecha) {
     e.preventDefault();

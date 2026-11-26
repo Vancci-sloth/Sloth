@@ -42,7 +42,7 @@ const perfil = Object.assign(new EventEmitter(), {
 })
 const servidores: Server[] = []
 ;(globalThis as any).__slothNavegadorPrueba = {
-  app: { getName: () => 'Sloth' }, ipcMain, Menu: {}, shell: {}, session: { fromPartition: () => perfil }, WebContentsView: Vista,
+  app: { getName: () => 'VyMotion' }, ipcMain, Menu: {}, shell: {}, session: { fromPartition: () => perfil }, WebContentsView: Vista,
   createServer: (...args: Parameters<typeof createServer>) => { const s = createServer(...args); servidores.push(s); return s }
 }
 registerHooks({ resolve(specifier, context, next) {
@@ -55,7 +55,7 @@ registerHooks({ resolve(specifier, context, next) {
 const { iniciarNavegador, ventanaDelNavegador } = await import('./navegador.ts')
 const avanzar = async () => { for (let i = 0; i < 4; i++) await setImmediate() }
 
-test('la página a la vista descansa con Sloth minimizada o escondida y despierta al volver', async (t) => {
+test('la página a la vista descansa con VyMotion minimizada o escondida y despierta al volver', async (t) => {
   t.mock.timers.enable({ apis: ['setTimeout'] })
   const dir = mkdtempSync(join(tmpdir(), 'sloth-navegador-'))
   const ventana = Object.assign(new EventEmitter(), {

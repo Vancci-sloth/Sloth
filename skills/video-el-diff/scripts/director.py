@@ -87,7 +87,7 @@ def marca() -> dict:
 
 def narrado(md: str) -> tuple[list[str], dict[int, str]]:
     """
-    Lo que lee la voz (lo mismo que `textoParaVoz` de Sloth: todo menos los encabezados y los comentarios), palabra por
+    Lo que lee la voz (lo mismo que `textoParaVoz` de VyMotion: todo menos los encabezados y los comentarios), palabra por
     palabra, y en qué palabra empieza cada sección `##`.
     """
     crudas, secciones = [], {}

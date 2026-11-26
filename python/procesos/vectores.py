@@ -6,7 +6,7 @@ videos parecidos. Lo lanza `server/ideas/vectores.ts`.
 El modelo es multilingual-e5-small (`E5`, 384 dimensiones, versión fijada): pone en el mismo sitio «faceless youtube
 channel» y «canal sin mostrar la cara». A diferencia de los demás procesos, este **sí baja su modelo** la primera vez
 (unos 490 MB, de Hugging Face, a `%APPDATA%/youtube/modelos/multilingual-e5-small-<versión>`); después ya no sale a
-internet. Se usa con transformers, sin sentence-transformers (el Python de Sloth no lo tiene y no se le instala nada):
+internet. Se usa con transformers, sin sentence-transformers (el Python de VyMotion no lo tiene y no se le instala nada):
 la media de los tokens y los prefijos que pide e5, «passage: » para lo que dice un video y «query: » para una búsqueda.
 
 Dos modos, en `options.modo`:

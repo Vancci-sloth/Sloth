@@ -5,8 +5,8 @@
 //
 //   node out/_visor.mjs <carpeta del visor> <id>:<cuadro> [<id>:<cuadro>…]
 //
-// Se arma en una carpeta aparte, propia de este proceso, y luego reemplaza a la anterior: Sloth nunca sirve un visor a
-// medias, y dos armados a la vez (un lote de vistas, o una vista y Sloth) no se pisan: queda el último.
+// Se arma en una carpeta aparte, propia de este proceso, y luego reemplaza a la anterior: VyMotion nunca sirve un visor a
+// medias, y dos armados a la vez (un lote de vistas, o una vista y VyMotion) no se pisan: queda el último.
 import { build } from "esbuild";
 import { cpSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { readdirSync } from "node:fs";

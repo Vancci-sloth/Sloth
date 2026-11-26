@@ -1,7 +1,7 @@
 /**
- * La app de escritorio de Sloth, con Electron. En la que se vende (`npm run compilar`) es Sloth.exe: levanta el servidor
+ * La app de escritorio de VyMotion, con Electron. En la que se vende (`npm run compilar`) es Sloth.exe: levanta el servidor
  * con su propio Node (`node\node.exe app\scripts\start.mjs`) y lo enseña en su ventana; al cerrarla se cierra todo, sin
- * quedarse de fondo. También pone las versiones nuevas: electron-updater pregunta al cobro de Sloth y baja
+ * quedarse de fondo. También pone las versiones nuevas: electron-updater pregunta al cobro de VyMotion y baja
  * el instalador completo en Windows y solo lo que cambió en Mac y Linux. En el repo, `npm start` levanta el servidor
  * y abre esta misma ventana con `SLOTH_VENTANA`, su dirección: entonces solo se pone la ventana.
  *
@@ -28,28 +28,24 @@ import { guardarAnteriores } from '../server/anteriores.ts'
 import { MODELOS_VIEJOS } from './modelos-viejos.ts'
 import { destinoDe, donde, junto, libre, mudar, pesadas, porCopiar, porQueNo, recuperar } from './mudanza.ts'
 import { iniciarNavegador, ventanaDelNavegador } from './navegador.ts'
-import type { ActualizacionSloth } from '../shared/types.ts'
+import type { ActualizacionSloth, AvisoVentana } from '../shared/types.ts'
 
 /** En el repo: la dirección del servidor que ya levantó `npm start`. */
 const SOLO_VENTANA = process.env.SLOTH_VENTANA
-/**
- * En la nube (ADR 0026, `.devcontainer/sloth-nube.sh`): la ventana está en una pantalla que nadie ve. Ningún aviso que
- * espere un clic: lo que diría queda en el registro, y si el servidor se cae, Sloth sale y la nube la vuelve a abrir.
- */
-const NUBE = !!process.env.SLOTH_NUBE
 const URL_SLOTH = SOLO_VENTANA ?? `http://localhost:${process.env.PORT ?? '4848'}`
+const ORIGEN_SLOTH = new URL(URL_SLOTH).origin
 const WINDOWS = process.platform === 'win32'
 const MAC = process.platform === 'darwin'
 /** La de macOS 12, con Electron 43 y Node 22 (scripts/compilar.mjs). */
 declare const __MAC12__: boolean
 /** El sistema ante el cobro (`?so=`): la de Mac con Apple Silicon y la de macOS 12 tienen su propia última versión. */
 const SO = MAC ? (__MAC12__ ? 'mac12' : process.arch === 'arm64' ? 'mac-arm64' : 'mac') : WINDOWS ? 'windows' : 'linux'
-/** Fuera de Windows, dónde viven Sloth y lo tuyo: la app no se puede escribir. */
+/** Fuera de Windows, dónde viven VyMotion y lo tuyo: la app no se puede escribir. */
 const DATOS = MAC ? join(homedir(), 'Library', 'Application Support', 'Sloth') : join(process.env.XDG_DATA_HOME || join(homedir(), '.local', 'share'), 'sloth')
 /** La carpeta de Sloth.exe. */
 const RAIZ = dirname(process.execPath)
 const APP = SOLO_VENTANA ? (process.env.SLOTH_APP ?? process.cwd()) : WINDOWS ? join(RAIZ, 'app') : DATOS
-/** El cobro de Sloth (`licencias/`): de ahí bajan el instalador y las actualizaciones. */
+/** El cobro de VyMotion (`licencias/`): de ahí bajan el instalador y las actualizaciones. */
 const COBRO = 'https://api.sloth.vancci.org'
 /**
  * En Mac, electron-updater solo pone la versión nueva en una app firmada por Apple (scripts/compilar.mjs). Sin firma,
@@ -63,7 +59,7 @@ const LUGAR = join(APP, 'data', 'ventana.json')
 /** Existe si marcaste «No volver a mostrar» en el aviso al cerrar. */
 const SIN_AVISO = join(APP, 'data', 'sin-aviso-al-cerrar.json')
 /** --bg de web/src/styles.css: el fondo mientras carga y el de la barra de título. */
-const FONDO = '#0f0e0c'
+const FONDO = '#0d0d0d'
 /** Cada cuánto se pregunta si hay versión nueva. */
 const CADA = 6 * 3600_000
 /**
@@ -71,7 +67,7 @@ const CADA = 6 * 3600_000
  * una o se liberó para todos en un live, y se pregunta ya.
  */
 const VISTAZO = 5 * 60_000
-/** Cada cuánto se mira si cambió la clave de Sloth (se escribió la de un apoyo): el servidor la da sin salir a internet. */
+/** Cada cuánto se mira si cambió la clave de VyMotion (se escribió la de un apoyo): el servidor la da sin salir a internet. */
 const CLAVE_NUEVA = 60_000
 /**
  * Si la descarga pasa este tiempo sin avanzar, está muerta: al irse el internet, la de Electron no siempre falla, se
@@ -86,10 +82,10 @@ const INTENTOS = 5
 let ventana: BrowserWindow | undefined
 let servidor: ChildProcess | undefined
 let registro: WriteStream | undefined
-/** El servidor ya dijo «Sloth en …»: la ventana puede cargar la interfaz. */
+/** El servidor ya dijo «VyMotion en …»: la ventana puede cargar la interfaz. */
 let listo = !!SOLO_VENTANA
 let cerrando = false
-/** Llevando lo pesado a otro disco (`llevar`): el servidor está parado y Sloth no se deja cerrar. */
+/** Llevando lo pesado a otro disco (`llevar`): el servidor está parado y VyMotion no se deja cerrar. */
 let mudando = false
 let actualizacion: ActualizacionSloth = { actual: app.getVersion(), ...(A_MANO && { aMano: true }) }
 /** La descarga en curso: cancelarla la da por muerta. */
@@ -102,7 +98,8 @@ let primera: Promise<unknown> = Promise.resolve()
 let avisarListo = () => {}
 const servidorListo = new Promise<void>((ok) => (avisarListo = ok))
 
-// Su propio nombre ante Windows: la ventana se junta con el acceso anclado y los avisos salen a nombre de Sloth.
+// Su propio nombre ante Windows: la ventana se junta con el acceso anclado y los avisos salen a nombre de VyMotion.
+app.setName('VyMotion')
 app.setAppUserModelId(SOLO_VENTANA ? 'Sloth.Dev' : 'Sloth.App')
 app.setPath('userData', join(APP, 'data', 'ventana'))
 nativeTheme.themeSource = 'dark'
@@ -112,7 +109,7 @@ else {
   mudarPerfil()
   app.on('second-instance', () => abrir())
   app.on('activate', () => abrir())
-  // Cerrar la ventana cierra Sloth entera, también en Mac: el servidor y lo que lanzó se detienen (`before-quit`).
+  // Cerrar la ventana cierra VyMotion entera, también en Mac: el servidor y lo que lanzó se detienen (`before-quit`).
   app.on('window-all-closed', () => app.quit())
   app.on('before-quit', (e) => {
     if (mudando) return e.preventDefault()
@@ -124,32 +121,38 @@ else {
     await primera
     return actualizacion
   })
-  ipcMain.handle('actualizar', () => actualizar())
+  ipcMain.handle('actualizar', () => {
+    if (A_MANO) fuera(`${COBRO}/descargar?so=${SO}&visto`)
+    else if (actualizacion.nueva && actualizacion.avance === undefined) {
+      actualizacion = { ...actualizacion, avance: 0, error: undefined }
+      fallos = 0
+      bajar()
+    }
+    return actualizacion
+  })
   ipcMain.handle('anclada', () => anclada())
   ipcMain.handle('anclar', () => anclar())
   ipcMain.handle('disco:donde', () => (SOLO_VENTANA ? null : donde(APP)))
   ipcMain.handle('disco:llevar', () => llevar())
+  ipcMain.on('aviso:listo', (e) => {
+    if (!esInterfaz(e)) return
+    interfazLista = e.sender
+    if (avisoAlVolver) {
+      e.sender.send('aviso:mostrar', avisoAlVolver)
+      avisoAlVolver = undefined
+    }
+  })
+  ipcMain.on('aviso:respuesta', (e, id: number, aceptar: boolean, recordar: boolean) => {
+    if (!esInterfaz(e) || respuestaAviso?.id !== id) return
+    terminarAviso(aceptar === true, recordar === true)
+  })
   void app.whenReady().then(iniciar)
-}
-
-/** «Actualizar»: baja la versión nueva (o, en un Mac sin firma, abre su descarga). Lo pide la interfaz de la ventana o la web. */
-function actualizar() {
-  if (A_MANO) fuera(`${COBRO}/descargar?so=${SO}&visto`)
-  else if (actualizacion.nueva && actualizacion.avance === undefined) {
-    actualizacion = { ...actualizacion, avance: 0, error: undefined }
-    fallos = 0
-    bajar()
-  }
-  return actualizacion
 }
 
 async function iniciar() {
   permisos()
   Menu.setApplicationMenu(menu())
-  iniciarNavegador(APP, {
-    actualizacion: async () => (await primera, actualizacion),
-    actualizar
-  })
+  iniciarNavegador(APP)
   abrir()
   if (SOLO_VENTANA) return
   mkdirSync(join(APP, 'data'), { recursive: true })
@@ -160,13 +163,13 @@ async function iniciar() {
     // Instalada en otro disco que el de tu usuario: la IA local y lo demás pesado nacen allí, junto a la app.
     if (WINDOWS) junto(APP, pesadas(APP))
   } catch (e) {
-    anotar(`No se pudo poner lo pesado junto a Sloth: ${e instanceof Error ? e.message : e}`)
+    anotar(`No se pudo poner lo pesado junto a VyMotion: ${e instanceof Error ? e.message : e}`)
   }
   try {
     if (!WINDOWS) await prepararApp()
     await prepararSkills()
   } catch (e) {
-    anotar(`No se pudo poner esta versión de Sloth: ${e instanceof Error ? e.message : e}`)
+    anotar(`No se pudo poner esta versión de VyMotion: ${e instanceof Error ? e.message : e}`)
   }
   arrancar()
   actualizaciones()
@@ -178,14 +181,14 @@ function abrir() {
   const { maximizada, ...medidas } = lugar()
   const v = new BrowserWindow({
     ...medidas,
-    title: 'Sloth',
+    title: 'VyMotion',
     show: false,
     backgroundColor: FONDO,
-    // En Windows 11, la barra de título y el borde del color de Sloth (Electron los vuelve a pintar al enfocarla). En
+    // En Windows 11, la barra de título y el borde del color de VyMotion (Electron los vuelve a pintar al enfocarla). En
     // Windows 10 solo se oscurecen.
     accentColor: FONDO,
-    // La compilada lleva el logo en Sloth.exe y en Sloth.app; en el repo es electron.exe, con el suyo. Linux lo pide siempre.
-    icon: MAC || (WINDOWS && app.isPackaged) ? undefined : app.isPackaged ? join(process.resourcesPath, 'icon.png') : join(APP, 'assets', WINDOWS ? 'icon.ico' : 'icon.png'),
+    // PNG explícito para la ventana: no depende del icono que Windows conserve del ejecutable.
+    icon: app.isPackaged ? join(process.resourcesPath, 'icon.png') : join(APP, 'assets', 'icon.png'),
     webPreferences: { preload: join(__dirname, 'preload.cjs'), sandbox: true, autoplayPolicy: 'no-user-gesture-required' }
   })
   ventana = v
@@ -199,50 +202,91 @@ function abrir() {
   // Si la interfaz se cae, se recarga. Si se cae una y otra vez, recargarla sin parar solo calentaba la máquina: tras la
   // tercera en un minuto se avisa, y Ctrl+R la vuelve a cargar.
   let caidas: number[] = []
+  v.webContents.on('did-start-navigation', (d) => {
+    if (d.isMainFrame && !d.isSameDocument) soltarInterfaz(v.webContents)
+  })
   v.webContents.on('render-process-gone', (_e, d) => {
+    soltarInterfaz(v.webContents)
     if (d.reason === 'clean-exit') return
     caidas = [...caidas.filter((t) => Date.now() - t < 60_000), Date.now()]
     if (caidas.length <= 3) v.reload()
-    else if (caidas.length === 4 && !NUBE) dialog.showErrorBox('Sloth', 'La ventana se cerró varias veces seguidas. Recárgala con Ctrl+R: los agentes y tus archivos siguen trabajando.')
+    else if (caidas.length === 4) dialog.showErrorBox('VyMotion', 'La ventana se cerró varias veces seguidas. Recárgala con Ctrl+R: los agentes y tus archivos siguen trabajando.')
   })
   v.on('close', (e) => {
     if (mudando) {
       e.preventDefault()
-      return void dialog.showMessageBox(v, { type: 'info', title: 'Sloth', message: 'Espera a que Sloth acabe de mover tus cosas.', detail: 'Si se cierra a medias, tus videos quedarían partidos entre los dos discos.', noLink: true })
+      void v.webContents.executeJavaScript("document.getElementById('aviso-mudanza')?.removeAttribute('hidden')").catch(() => {})
+      return
     }
-    // Solo si el servidor es de esta ventana: si no (el repo, o Sloth ya abierta de otra forma), cerrarla no detiene nada.
+    // Solo si el servidor es de esta ventana: si no (el repo, o VyMotion ya abierta de otra forma), cerrarla no detiene nada.
     if (servidor && !cerrando && !existsSync(SIN_AVISO)) {
       e.preventDefault()
       void avisarAlCerrar(v)
     } else guardarLugar(v)
   })
-  v.on('closed', () => (ventana = undefined))
+  const contenido = v.webContents
+  v.on('closed', () => {
+    soltarInterfaz(contenido)
+    ventana = undefined
+  })
   if (maximizada) v.maximize()
   v.show()
   if (listo) void v.loadURL(URL_SLOTH)
 }
 
 let avisando = false
+let interfazLista: WebContents | undefined
+let ultimoAviso = 0
+let avisoAlVolver: AvisoVentana | undefined
+type RespuestaAviso = { aceptar: boolean; recordar: boolean }
+let respuestaAviso: { id: number; resolver(respuesta: RespuestaAviso): void } | undefined
+
+function esInterfaz(e: Electron.IpcMainEvent) {
+  return e.sender === ventana?.webContents && e.senderFrame === e.sender.mainFrame && URL.canParse(e.senderFrame.url)
+    && new URL(e.senderFrame.url).origin === ORIGEN_SLOTH
+}
+
+function terminarAviso(aceptar = false, recordar = false) {
+  const pendiente = respuestaAviso
+  respuestaAviso = undefined
+  pendiente?.resolver({ aceptar, recordar })
+}
+
+function soltarInterfaz(contenido: WebContents) {
+  if (interfazLista !== contenido) return
+  interfazLista = undefined
+  terminarAviso()
+}
+
+function pedirAviso(v: BrowserWindow, aviso: Omit<AvisoVentana, 'id'>): Promise<RespuestaAviso> {
+  if (respuestaAviso || interfazLista !== v.webContents) return Promise.resolve({ aceptar: false, recordar: false })
+  return new Promise((resolver) => {
+    const id = ++ultimoAviso
+    respuestaAviso = { id, resolver }
+    try { v.webContents.send('aviso:mostrar', { ...aviso, id }) }
+    catch { terminarAviso() }
+  })
+}
 
 /** Qué pasa al cerrar la ventana, hasta que marques «No volver a mostrar». */
 async function avisarAlCerrar(v: BrowserWindow) {
   if (avisando) return
   avisando = true
-  const { response, checkboxChecked } = await dialog.showMessageBox(v, {
-    type: 'question',
-    title: 'Sloth',
-    message: '¿Cerrar Sloth?',
-    detail: 'Se cierra por completo, sin quedarse de fondo: se detiene todo lo que esté haciendo, también los videos a medias.',
-    buttons: ['Cerrar Sloth', 'Cancelar'],
-    defaultId: 0,
-    cancelId: 1,
-    // Botones normales: si no, Windows los pinta como enlaces grandes con flecha.
-    noLink: true,
-    checkboxLabel: 'No volver a mostrar'
-  })
-  avisando = false
-  if (response !== 0) return
-  if (checkboxChecked) {
+  const titulo = '¿Cerrar VyMotion?'
+  const detalle = 'Se detendrá todo lo que esté haciendo, incluidos los videos que se están generando.'
+  let respuesta: RespuestaAviso
+  try {
+    if (interfazLista === v.webContents) respuesta = await pedirAviso(v, { titulo, detalle, accion: 'Cerrar VyMotion', recordar: true })
+    else {
+      const { response, checkboxChecked } = await dialog.showMessageBox(v, {
+        type: 'question', title: 'VyMotion', message: titulo, detail: detalle,
+        buttons: ['Cerrar VyMotion', 'Cancelar'], defaultId: 1, cancelId: 1, noLink: true, checkboxLabel: 'No volver a mostrar'
+      })
+      respuesta = { aceptar: response === 0, recordar: checkboxChecked }
+    }
+  } finally { avisando = false }
+  if (!respuesta.aceptar || v.isDestroyed()) return
+  if (respuesta.recordar) {
     try {
       guardar(SIN_AVISO, '{}')
     } catch {
@@ -320,7 +364,7 @@ function enlaces(wc: WebContents) {
   })
 }
 
-/** Lo que pide la interfaz (avisos, portapapeles, micrófono) se da sin preguntar: es Sloth. A nadie más. */
+/** Lo que pide la interfaz (avisos, portapapeles, micrófono) se da sin preguntar: es VyMotion. A nadie más. */
 function permisos() {
   session.defaultSession.setPermissionRequestHandler((_wc, _permiso, responder, d) => responder(propia(d.requestingUrl)))
   session.defaultSession.setPermissionCheckHandler((_wc, _permiso, origen) => propia(origen))
@@ -349,14 +393,14 @@ async function prepararApp() {
     await cp(join(de, cosa), join(APP, cosa), { recursive: true, verbatimSymlinks: true })
   }
   // La copia hereda la marca de «bajado de internet» del .dmg, y macOS revisaría uno a uno los programas de los paquetes
-  // (Claude Code, Codex) al lanzarlos: ya se revisó Sloth al abrirla.
+  // (Claude Code, Codex) al lanzarlos: ya se revisó VyMotion al abrirla.
   if (MAC) spawnSync('xattr', ['-dr', 'com.apple.quarantine', join(APP, 'node_modules')])
 }
 
 /**
  * Las skills viajan en resources\skills y se ponen en app\skills al estrenar cada versión, como hacía el instalador de
  * antes: lo que cada skill guarda de los tuyos (las huellas, el banco de temas, la biblioteca 3D) se queda. Los modelos
- * 3D del dueño de Sloth que traían las versiones de antes (la moneda incluida) se van, menos los que cambiaste
+ * 3D del dueño de VyMotion que traían las versiones de antes (la moneda incluida) se van, menos los que cambiaste
  * (`MODELOS_VIEJOS`). Lo que cambiaste en las skills se pisa, pero antes se copia a `data/skills-tuyas`
  * (`respaldarCambios`). Lo que la versión de antes traía y esta ya no se va, si no lo cambiaste (`quitarViejos`). Un
  * estilo que esta versión cambia a fondo (`cambio` en su card) se guarda antes como estaba (`guardarAnteriores`).
@@ -445,18 +489,17 @@ function arrancar() {
   s.stdout!.on('data', escribir)
   s.stderr!.on('data', escribir)
   s.on('error', (e) => {
-    if (NUBE) anotar(`No se pudo abrir Sloth: ${e.message}`)
-    else dialog.showErrorBox('Sloth', `No se pudo abrir Sloth: ${e.message}`)
+    dialog.showErrorBox('VyMotion', `No se pudo abrir VyMotion: ${e.message}`)
     salir()
   })
-  // Solo el que sigue siendo el de Sloth: el que se paró para mudarse ya no cuenta.
+  // Solo el que sigue siendo el de VyMotion: el que se paró para mudarse ya no cuenta.
   s.on('exit', (codigo) => s === servidor && termino(codigo))
 }
 
 function escribir(d: Buffer) {
   registro?.write(d)
   // Lo que escribe el servidor al quedar escuchando (server/index.ts).
-  if (!listo && String(d).includes('Sloth en ')) marcarListo()
+  if (!listo && String(d).includes('VyMotion en ')) marcarListo()
 }
 
 function marcarListo() {
@@ -466,7 +509,7 @@ function marcarListo() {
 }
 
 /**
- * start.mjs terminó solo. Con 0, Sloth ya corría (abierta de otra forma): queda su ventana, y al cerrarla se sale. Si no,
+ * start.mjs terminó solo. Con 0, VyMotion ya corría (abierta de otra forma): queda su ventana, y al cerrarla se sale. Si no,
  * el servidor se cayó tres veces seguidas.
  */
 function termino(codigo: number | null) {
@@ -477,8 +520,7 @@ function termino(codigo: number | null) {
     if (!ventana) app.quit()
     return
   }
-  if (NUBE) return (anotar('El servidor se cayó: Sloth sale y la nube la vuelve a abrir'), app.exit(1))
-  dialog.showMessageBoxSync({ type: 'warning', title: 'Sloth', message: 'Sloth se cerró.', detail: `Lo que pasó está en el registro:\n${REGISTRO}` })
+  dialog.showMessageBoxSync({ type: 'warning', title: 'VyMotion', message: 'VyMotion se cerró.', detail: `Lo que pasó está en el registro:\n${REGISTRO}` })
   salir()
 }
 
@@ -560,7 +602,7 @@ function guardarInstalador(cache: string) {
 const gb = (b: number) => `${(b / 1e9).toFixed(1).replace('.', ',')} GB`
 
 /**
- * Opciones → Espacio en disco, «Cambiar de disco…»: eliges dónde, Sloth para el servidor, lleva lo pesado allí
+ * Opciones → Espacio en disco, «Cambiar de disco…»: eliges dónde, VyMotion para el servidor, lleva lo pesado allí
  * (electron/mudanza.ts) enseñando cuánto va, y vuelve a arrancar. Solo si nada trabaja. Devuelve por qué no, o nada.
  */
 async function llevar(): Promise<{ error?: string }> {
@@ -585,19 +627,14 @@ async function llevar(): Promise<{ error?: string }> {
   if (!destino) return { error: porQueNo(opciones[0], lista, prohibidas) ?? undefined }
   const total = await porCopiar(destino, lista)
   if (total + 1e9 > libre(destino)) return { error: `En ese disco no cabe: hacen falta ${gb(total + 1e9)} y quedan ${gb(libre(destino))} libres.` }
-  const { response } = await dialog.showMessageBox(v, {
-    type: 'question',
-    title: 'Sloth',
-    message: total ? `¿Llevar ${gb(total)} a ${destino}?` : `¿Poner tus videos y la IA local en ${destino}?`,
-    detail:
-      'Van tus videos, la IA local (el Python de Sloth y sus modelos), los agentes y las dependencias de los videos; tus hilos se quedan. ' +
-      'Sloth se detiene mientras tanto y vuelve sola al acabar. No apagues la computadora ni desconectes el disco.',
-    buttons: ['Llevar', 'Cancelar'],
-    defaultId: 0,
-    cancelId: 1,
-    noLink: true
+  const { aceptar } = await pedirAviso(v, {
+    titulo: total ? `¿Llevar ${gb(total)} a ${destino}?` : `¿Poner tus videos y la IA local en ${destino}?`,
+    detalle:
+      'Van tus videos, la IA local (el Python de VyMotion y sus modelos), los agentes y las dependencias de los videos; tus hilos se quedan. ' +
+      'VyMotion se detiene mientras tanto y vuelve sola al acabar. No apagues la computadora ni desconectes el disco.',
+    accion: 'Llevar'
   })
-  if (response !== 0) return {}
+  if (!aceptar || v.isDestroyed()) return {}
   mudando = true
   listo = false
   detener()
@@ -622,20 +659,24 @@ async function llevar(): Promise<{ error?: string }> {
     mudando = false
     v.setProgressBar(-1)
   }
-  decir('Volviendo a abrir Sloth…')
+  decir('Volviendo a abrir VyMotion…')
+  if (error) avisoAlVolver = {
+    id: ++ultimoAviso, titulo: 'No se pudo mover todo',
+    detalle: `${error}\n\nLo que ya se movió funciona igual. El resto sigue en su ubicación anterior.`
+  }
   arrancar()
-  if (error) void dialog.showMessageBox(v, { type: 'warning', title: 'Sloth', message: 'No se pudo mover todo.', detail: `${error}\n\nLo que ya se movió funciona igual y lo demás sigue donde estaba: puedes volver a intentarlo.`, noLink: true })
   return {}
 }
 
 /** Lo que se ve mientras se mueve: el servidor está parado y la interfaz no carga. */
 function paginaMudanza(destino: string) {
   const esc = (t: string) => t.replace(/[&<>"]/g, (c) => `&#${c.charCodeAt(0)};`)
-  return `<!doctype html><meta charset="utf-8"><title>Sloth</title><style>
-body{margin:0;height:100vh;display:grid;place-content:center;gap:8px;text-align:center;background:${FONDO};color:#ede6d6;font:15px system-ui,sans-serif}
-p{margin:0}.m{color:#9a907f;font-size:13px}</style>
+  return `<!doctype html><meta charset="utf-8"><title>VyMotion</title><style>
+body{margin:0;height:100vh;display:grid;place-content:center;gap:8px;text-align:center;background:${FONDO};color:#f5f5f5;font:15px system-ui,sans-serif}
+p{margin:0}.m{color:#a3a3a3;font-size:13px}</style>
 <p>Llevando tus videos y la IA local a ${esc(destino)}</p><p class="m" id="t">Empezando…</p>
-<p class="m">No cierres Sloth ni apagues la computadora.</p>`
+<p class="m">No cierres VyMotion ni apagues la computadora.</p>
+<p class="m" id="aviso-mudanza" role="status" hidden>Espera a que termine la mudanza para cerrar VyMotion.</p>`
 }
 
 function anotar(texto: unknown) {
@@ -643,10 +684,10 @@ function anotar(texto: unknown) {
 }
 
 /**
- * Las versiones nuevas, del cobro de Sloth (`/actualizaciones`, lo que sube `npm run publicar`). Al abrir y cada 6 horas
+ * Las versiones nuevas, del cobro de VyMotion (`/actualizaciones`, lo que sube `npm run publicar`). Al abrir y cada 6 horas
  * pregunta, y antes si el vistazo de cada 5 minutos ve que cambió la última (la que el creador libera en un live llega
  * así); «Actualizar» (web/src/Actualizar.tsx) la baja, entera en Windows y por diferencias en Mac y Linux.
- * Luego cierra Sloth, el instalador la pone y la vuelve a abrir.
+ * Luego cierra VyMotion, el instalador la pone y la vuelve a abrir.
  */
 function actualizaciones() {
   // La versión que se bajó la última vez ya está puesta: su instalador sobra. El de esta versión se queda aparte
@@ -695,7 +736,7 @@ function actualizaciones() {
   let conClave: string | undefined
   const revisar = async () => {
     // Quien apoya recibe lo nuevo antes: el cobro lo reconoce por su clave y esta computadora, que da el servidor. Al
-    // abrir Sloth, se espera a que arranque: sin la clave, la versión de quien apoya le llegaba 6 horas después. Si no
+    // abrir VyMotion, se espera a que arranque: sin la clave, la versión de quien apoya le llegaba 6 horas después. Si no
     // arranca en 2 minutos, se pregunta igual: una versión nueva puede ser el arreglo.
     await Promise.race([servidorListo, new Promise((ok) => setTimeout(ok, 120_000))])
     const c = await credencial()
@@ -705,7 +746,7 @@ function actualizaciones() {
   }
   primera = revisar()
   setInterval(revisar, CADA)
-  // Quien escribe la clave de su apoyo con Sloth abierta ve la versión nueva en un minuto: sin esto se preguntaba con la
+  // Quien escribe la clave de su apoyo con VyMotion abierta ve la versión nueva en un minuto: sin esto se preguntaba con la
   // clave de antes (o sin ninguna) hasta la siguiente vuelta, y parecía que apoyar no la daba.
   setInterval(async () => {
     await primera

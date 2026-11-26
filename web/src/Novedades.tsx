@@ -8,11 +8,11 @@ import './Novedades.css'
  * La guía de lo nuevo de una versión (`web/public/novedades/<VERSION>.html`, una página animada con «Siguiente»): sale
  * una sola vez, a toda la pantalla, al abrir la app instalada (`window.sloth`) después de actualizar. Quien instala de
  * cero tiene la bienvenida y no la ve. La guía avisa que terminó con `postMessage`; también se cierra con la X, Escape o
- * un clic fuera. Lo que sale al abrir Sloth después (`EstiloCambio.tsx`) espera a `NOVEDADES_CERRADAS`.
+ * un clic fuera. Lo que sale al abrir VyMotion después (`EstiloCambio.tsx`) espera a `NOVEDADES_CERRADAS`.
  * «Ver novedades» en Opciones la abre de nuevo, también en el navegador de desarrollo.
  * Para la guía de otra versión: su página en `web/public/novedades/` y su número aquí.
  */
-const VERSION = '0.5.0'
+const VERSION = '0.4.3'
 const VISTA = 'sloth-novedades-vistas'
 const ABRIR = 'sloth-novedades-abrir'
 export const NOVEDADES_CERRADAS = 'sloth-novedades-cerradas'
@@ -33,7 +33,7 @@ const marcar = () => {
   }
 }
 
-/** Si la guía va a salir al abrir Sloth. */
+/** Si la guía va a salir al abrir VyMotion. */
 export const novedadesPendiente = () => !!window.sloth && !vista() && !bienvenidaPendiente()
 
 export function Novedades() {

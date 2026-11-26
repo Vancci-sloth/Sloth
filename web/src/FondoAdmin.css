@@ -2,7 +2,7 @@
 .admin-fondo-cabeza { display: flex; flex-wrap: wrap; align-items: center; gap: 16px 28px; }
 .admin-fondo-cabeza > div { flex: 1; min-width: 240px; }
 .admin-fondo-cabeza label { display: flex; flex-direction: column; gap: 4px; }
-.admin-fondo-cabeza .desplegable { font-size: 14px; }
+.admin-fondo-cabeza select { padding: 7px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--text); font-size: 14px; }
 .admin-fondo-cabeza h3 { margin: 4px 0; font-size: 22px; font-weight: 750; letter-spacing: -0.01em; font-variant-numeric: tabular-nums; }
 .admin-fondo-cabeza h3 .muted { font-size: 14px; font-weight: 500; letter-spacing: 0; }
 .admin-fondo-cabeza p { margin: 0; }

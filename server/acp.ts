@@ -8,12 +8,12 @@ import { RpcLineas } from './rpc-lineas.ts'
 
 /**
  * Los agentes que hablan ACP (Agent Client Protocol) por stdio: Grok (`grok agent stdio`), Antigravity (el servidor ACP
- * de Google), Gemini CLI (`gemini --acp`) y omp (`omp acp`). Como lo hace T3 Code (`packages/provider-acp`), pero solo lo que usa Sloth:
+ * de Google) y Gemini CLI (`gemini --acp`). Como lo hace T3 Code (`packages/provider-acp`), pero solo lo que usa VyMotion:
  * sin permisos (se acepta cada herramienta, como con los demás agentes), sin terminal ni escritura de archivos del lado
- * de Sloth (el agente las hace él mismo) y un proceso por hilo, salvo los `compartido`: uno para todos sus hilos, cada
+ * de VyMotion (el agente las hace él mismo) y un proceso por hilo, salvo los `compartido`: uno para todos sus hilos, cada
  * uno en su sesión.
  *
- * ACP no tiene instrucciones de sistema: las de Sloth van al principio del primer mensaje de cada proceso. El modelo y su
+ * ACP no tiene instrucciones de sistema: las de VyMotion van al principio del primer mensaje de cada proceso. El modelo y su
  * esfuerzo se eligen con las opciones de la sesión (`configOptions`), o con `session/set_model` si no las trae.
  */
 
@@ -29,23 +29,21 @@ export interface SaborAcp {
    * quedó sin cuota sigue con los hilos que ya llevaba.
    */
   cuenta?(opts: AgentOptions): string
-  /** Cómo se presenta Sloth: Antigravity solo ofrece los modelos que no son de Gemini a clientes que conoce (Zed). */
+  /** Cómo se presenta VyMotion: Antigravity solo ofrece los modelos que no son de Gemini a clientes que conoce (Zed). */
   clientInfo?: { name: string; version: string }
   /** Lee él mismo los archivos que le piden (Antigravity). */
   leeArchivos?: boolean
   /** Inicia sesión antes de abrirla, cada vez (Antigravity). */
   autenticar?: string
-  /** Lo que contestó ese inicio de sesión, con la cuenta del proceso (Antigravity dice ahí el plan de Google). */
-  alAutenticar?(resultado: any, cuenta?: string): void
   /** El modo que se elige al abrir la sesión, como opción o con `session/set_mode` (`yolo`: sin preguntar). */
   modo?: string
   /** No sabe compactar cuando se le pide (Gemini comprime solo). */
   sinCompactar?: boolean
   /** Lo que lleva `session/cancel` (Grok: `ctrl_c`, que no deja que las tareas de fondo lo despierten). */
   cancelarMeta?: Record<string, unknown>
-  /** Un error que dice que falta iniciar sesión, en palabras de Sloth. */
+  /** Un error que dice que falta iniciar sesión, en palabras de VyMotion. */
   sinCuenta: string
-  /** El error de un turno en palabras de Sloth, si lo reconoce. */
+  /** El error de un turno en palabras de VyMotion, si lo reconoce. */
   traducir?(mensaje: string): string | undefined
   /** Los modelos que dio la sesión, para guardarlos (Antigravity no tiene otra forma de listarlos). */
   alVerModelos?(opciones: OpcionAcp[]): void
@@ -142,10 +140,7 @@ export function conectar(sabor: SaborAcp, opts: AgentOptions, cuenta = sabor.cue
       clientCapabilities: { fs: { readTextFile: !!sabor.leeArchivos, writeTextFile: false }, terminal: false },
       clientInfo: sabor.clientInfo ?? { name: 'sloth', version: '1' }
     }, sabor.esperaInicio?.() ?? 180_000)
-    if (sabor.autenticar) {
-      const sesion = await c.rpc.request('authenticate', { methodId: sabor.autenticar }, 300_000)
-      sabor.alAutenticar?.(sesion, cuenta)
-    }
+    if (sabor.autenticar) await c.rpc.request('authenticate', { methodId: sabor.autenticar }, 300_000)
     c.lista = true
     return ini
   })()
@@ -164,7 +159,7 @@ export function soltar(sabor: SaborAcp, c: Conexion) {
   c.reloj.unref()
 }
 
-/** Lo que el agente le pide a Sloth, de cualquier sesión. */
+/** Lo que el agente le pide a VyMotion, de cualquier sesión. */
 async function pedir(sabor: SaborAcp, method: string, params: any) {
   if (method === 'session/request_permission') {
     // Sin permisos, como con Claude y Codex: una vez (las de «siempre» se guardan en el proyecto).
@@ -179,7 +174,7 @@ async function pedir(sabor: SaborAcp, method: string, params: any) {
   }
   // Las preguntas con formulario: la interfaz no sabe contestarlas, y el turno se quedaría esperando.
   if (/ask_user_question|exit_plan_mode/.test(method)) return { outcome: 'cancelled' }
-  throw new Error('Sloth no admite esta petición. Pregunta al usuario con un mensaje normal.')
+  throw new Error('VyMotion no admite esta petición. Pregunta al usuario con un mensaje normal.')
 }
 
 /** El nombre y la entrada de una herramienta de ACP, como las de Claude que ya dibuja la interfaz. */
@@ -236,21 +231,9 @@ export function startAcp(sabor: SaborAcp, opts: AgentOptions): AgentRun {
   /** El número del mensaje del turno: cada herramienta abre otro, para que el texto de después no se pegue al de antes. */
   let parte = 0
   let turno = 0
-  /**
-   * Va delante de `turno` en los ids: cada proceso cuenta desde 0, y sin esto lo primero que escribe un hilo retomado
-   * llevaba el id de lo primero del hilo y se pegaba a ese mensaje.
-   */
-  const vez = Date.now().toString(36)
   let pendiente: { text: string; images: string[] }[] = []
   let tokens = CERO
   let costo = 0
-  /**
-   * El costo que dice `usage_update` (omp) es el de toda la sesión: al turno va lo que creció (`costoSesion`). De una sesión
-   * retomada no se sabe lo de antes hasta su primer aviso (`undefined`), y ese turno va sin costo antes que con el de toda la
-   * sesión.
-   */
-  let gastado: number | undefined = 0
-  let costoSesion = 0
   /** Lo que escribió desde su última herramienta: un error de `errorDe` es todo su último mensaje. */
   let ultimo = ''
   let mudez: ReturnType<typeof setTimeout> | undefined
@@ -259,11 +242,9 @@ export function startAcp(sabor: SaborAcp, opts: AgentOptions): AgentRun {
     if (!busy) return
     busy = false
     clearTimeout(mudez)
-    const usd = costoSesion || costo
-    emit({ t: 'turn_end', at: Date.now(), ok, error, tokens, ...(usd ? { costUsd: usd } : {}), ...extra })
+    emit({ t: 'turn_end', at: Date.now(), ok, error, tokens, ...(costo ? { costUsd: costo } : {}), ...extra })
     tokens = CERO
     costo = 0
-    costoSesion = 0
   }
 
   /** Cierra el turno con lo que diga `errorDe`, si su último mensaje es un error. */
@@ -296,7 +277,7 @@ export function startAcp(sabor: SaborAcp, opts: AgentOptions): AgentRun {
     if (p?.sessionId !== sesion || cargando) return
     const u = p.update ?? {}
     if (u._meta?.isReplay) return
-    // Lo que manda solo, sin un mensaje de Sloth (termina algo de fondo y sigue): es un turno suyo.
+    // Lo que manda solo, sin un mensaje de VyMotion (termina algo de fondo y sigue): es un turno suyo.
     if (!busy && ['agent_message_chunk', 'agent_thought_chunk', 'tool_call'].includes(u.sessionUpdate)) {
       busy = true
       turno++
@@ -317,7 +298,7 @@ export function startAcp(sabor: SaborAcp, opts: AgentOptions): AgentRun {
       case 'agent_thought_chunk': {
         const texto = u.content?.type === 'text' ? u.content.text : ''
         if (texto && u.sessionUpdate === 'agent_message_chunk') ultimo += texto
-        if (texto) emit({ t: u.sessionUpdate === 'agent_message_chunk' ? 'text' : 'thinking', id: `${vez}:${turno}:${parte}${u.sessionUpdate === 'agent_thought_chunk' ? ':pensamiento' : ''}`, delta: texto })
+        if (texto) emit({ t: u.sessionUpdate === 'agent_message_chunk' ? 'text' : 'thinking', id: `${turno}:${parte}${u.sessionUpdate === 'agent_thought_chunk' ? ':pensamiento' : ''}`, delta: texto })
         return
       }
       case 'tool_call': {
@@ -334,23 +315,19 @@ export function startAcp(sabor: SaborAcp, opts: AgentOptions): AgentRun {
       case 'plan':
         // Como la lista de tareas de Claude (TodoWrite), que la interfaz ya dibuja.
         parte++
-        emit({ t: 'tool', id: `plan:${vez}:${turno}:${parte}`, name: 'TodoWrite', input: { todos: (u.entries ?? []).map((e: any) => ({ content: e.content, status: e.status === 'in_progress' ? 'in_progress' : e.status })) } })
-        emit({ t: 'tool_update', id: `plan:${vez}:${turno}:${parte}`, done: true, output: '' })
+        emit({ t: 'tool', id: `plan:${turno}:${parte}`, name: 'TodoWrite', input: { todos: (u.entries ?? []).map((e: any) => ({ content: e.content, status: e.status === 'in_progress' ? 'in_progress' : e.status })) } })
+        emit({ t: 'tool_update', id: `plan:${turno}:${parte}`, done: true, output: '' })
         return
       case 'usage_update':
         if (typeof u.used === 'number' && typeof u.size === 'number') {
           ventana = u.size
           if (!sabor.contextoOpaco) emit({ t: 'context', used: u.used, max: u.size })
         }
-        if (u.cost?.currency === 'USD' && typeof u.cost.amount === 'number') {
-          if (gastado !== undefined) costoSesion += Math.max(0, u.cost.amount - gastado)
-          gastado = u.cost.amount
-        }
         return
     }
   }
 
-  /** Los tokens y el costo de un turno, como los dan Grok, Gemini (que cuenta aparte lo que piensa) y omp. */
+  /** Los tokens y el costo de un turno, como los dan Grok y Gemini (que cuenta aparte lo que piensa). */
   function contar(u: any) {
     if (!u) return
     const cache = (u.cachedReadTokens ?? 0) + (u.cacheCreationTokens ?? 0)
@@ -403,7 +380,7 @@ export function startAcp(sabor: SaborAcp, opts: AgentOptions): AgentRun {
     c.cierres.add(alCerrar)
     const r = c.rpc
     const ini = await c.ini
-    // Los MCP de Sloth, como los pide ACP 1: `env` es una lista.
+    // Los MCP de VyMotion, como los pide ACP 1: `env` es una lista.
     const mcpServers = Object.entries(mcpSloth(opts.lote, opts.hilo)).map(([name, s]) => ({ name, command: s.command, args: s.args ?? [], env: Object.entries(s.env ?? {}).map(([n, value]) => ({ name: n, value })) }))
     let abierta: { sessionId?: string; configOptions?: OpcionAcp[]; modes?: { currentModeId?: string; availableModes?: { id: string }[] }; models?: { availableModels?: { modelId: string; _meta?: any }[] } } | undefined
     if (opts.resume) {
@@ -417,7 +394,6 @@ export function startAcp(sabor: SaborAcp, opts: AgentOptions): AgentRun {
           () => void c.sesiones.delete(opts.resume!)
         )
         cargando = false
-        if (abierta) gastado = undefined
       }
     }
     if (!abierta) {
@@ -519,7 +495,7 @@ export function startAcp(sabor: SaborAcp, opts: AgentOptions): AgentRun {
       }
       void mandar(texto, images)
     },
-    // ACP no mete mensajes en un turno en curso: va en cuanto acabe, dentro del mismo turno de Sloth.
+    // ACP no mete mensajes en un turno en curso: va en cuanto acabe, dentro del mismo turno de VyMotion.
     steer(text, images = []) {
       if (busy) pendiente.push({ text, images })
       else void mandar(text, images)

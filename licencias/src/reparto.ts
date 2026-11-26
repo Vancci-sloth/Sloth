@@ -7,7 +7,7 @@
  * depende de cuánta gente usa sus estilos. El pago lo manda el creador a mano desde Binance, al Binance ID de cada parte.
  *
  * Para que nadie se aproveche:
- * - Un Binance ID va en una sola cuenta de Sloth (Binance pide identificación: una persona, un ID), y nadie más lo ve:
+ * - Un Binance ID va en una sola cuenta de VyMotion (Binance pide identificación: una persona, un ID), y nadie más lo ve:
  *   su dueño, tapado; entero, solo el creador al pagar.
  * - Cada cambio queda anotado con su conexión cifrada (`binance_cambios`), avisa por correo al dueño de la cuenta (si
  *   alguien entró a ella para desviar el pago, se entera) y tiene su tope al día.
@@ -89,13 +89,13 @@ export async function mio(env: Env, yo: Miembro): Promise<MiFondo> {
 
 /** `POST /comunidad/fondo/participar` `{binance}`: `yo` participa, o cambia adónde se le paga. */
 export async function participar(req: Request, env: Env, yo: Miembro, c: Record<string, unknown>): Promise<MiFondo> {
-  if (esCreador(yo)) throw new Rechazo(400, 'Lo del creador de Sloth no se lleva del fondo.')
+  if (esCreador(yo)) throw new Rechazo(400, 'Lo del creador de VyMotion no se lleva del fondo.')
   if (!yo.nombre) throw new Rechazo(400, 'Antes, dinos cómo te llamas: así te ven los demás.')
   const binance = String(c.binance ?? '').replace(/[\s-]/g, '')
   if (!BINANCE.test(binance)) throw new Rechazo(400, 'Ese no parece un Binance ID: es el número de tu cuenta (en Binance, tu perfil), solo dígitos.')
   const antes = (await env.DB.prepare('SELECT binance FROM miembros WHERE id = ?').bind(yo.id).first<ConBinance>())?.binance ?? null
   if (antes === binance) return mio(env, yo)
-  const deOtro = 'Ese Binance ID ya está en otra cuenta de Sloth: cada persona participa con una sola.'
+  const deOtro = 'Ese Binance ID ya está en otra cuenta de VyMotion: cada persona participa con una sola.'
   if (await env.DB.prepare('SELECT 1 FROM miembros WHERE binance = ? AND id != ?').bind(binance, yo.id).first()) throw new Rechazo(409, deOtro)
   if (!(await conCupo(env, yo, 'binance'))) throw new Rechazo(429, 'Ya cambiaste tu Binance ID varias veces hoy. Mañana sigues.')
   const ahora = new Date().toISOString()
@@ -109,8 +109,8 @@ export async function participar(req: Request, env: Env, yo: Miembro, c: Record<
     if (e instanceof Error && /UNIQUE/i.test(e.message)) throw new Rechazo(409, deOtro)
     throw e
   }
-  await olvidarNumeros(env)
-  await avisarCambio(env, yo, antes ? `Se cambió el Binance ID de tu cuenta de Sloth: ahora termina en ${binance.slice(-4)}.` : `Ya participas en el fondo de la comunidad de Sloth. Tu parte se manda al Binance ID que termina en ${binance.slice(-4)}.`)
+  olvidarNumeros()
+  await avisarCambio(env, yo, antes ? `Se cambió el Binance ID de tu cuenta de VyMotion: ahora termina en ${binance.slice(-4)}.` : `Ya participas en el fondo de la comunidad de VyMotion. Tu parte se manda al Binance ID que termina en ${binance.slice(-4)}.`)
   return mio(env, yo)
 }
 
@@ -123,8 +123,8 @@ export async function salir(req: Request, env: Env, yo: Miembro): Promise<MiFond
     env.DB.prepare('UPDATE miembros SET binance = NULL, binance_desde = ? WHERE id = ?').bind(ahora, yo.id),
     env.DB.prepare("INSERT INTO binance_cambios (miembro, binance, red, cuando) VALUES (?, '', ?, ?)").bind(yo.id, await redDe(req, env), ahora)
   ])
-  await olvidarNumeros(env)
-  await avisarCambio(env, yo, 'Se quitó el Binance ID de tu cuenta de Sloth: tus estilos ya no se llevan del fondo de la comunidad.')
+  olvidarNumeros()
+  await avisarCambio(env, yo, 'Se quitó el Binance ID de tu cuenta de VyMotion: tus estilos ya no se llevan del fondo de la comunidad.')
   return mio(env, yo)
 }
 
@@ -132,7 +132,7 @@ export async function salir(req: Request, env: Env, yo: Miembro): Promise<MiFond
 async function avisarCambio(env: Env, yo: Miembro, que: string) {
   const email = await correoDe(env, yo)
   if (!email) return
-  await correo(env, email, 'Cambió adónde se te paga el fondo de Sloth', ['Hola:', que, 'Si no fuiste tú, responde a este correo antes del siguiente reparto y cambia la clave de tu cuenta.']).catch((e) =>
+  await correo(env, email, 'Cambió adónde se te paga el fondo de VyMotion', ['Hola:', que, 'Si no fuiste tú, responde a este correo antes del siguiente reparto y cambia la clave de tu cuenta.']).catch((e) =>
     console.error('Correo del Binance ID', e instanceof Error ? e.message : e)
   )
 }
@@ -209,7 +209,7 @@ async function enVivo(env: Env, periodo: string, f: FondoComunidad | null, ahora
 
 /** `GET /comunidad/fondo/reparto?periodo=`: solo el creador. Un periodo abierto, en vivo; uno cerrado, su foto. */
 export async function reparto(env: Env, yo: Miembro, url: URL, ahora = Date.now()): Promise<RepartoFondo> {
-  if (!esCreador(yo)) throw new Rechazo(403, 'Eso solo lo ve el creador de Sloth.')
+  if (!esCreador(yo)) throw new Rechazo(403, 'Eso solo lo ve el creador de VyMotion.')
   const periodos = periodosHasta(new Date(ahora))
   const periodo = url.searchParams.get('periodo') || periodos.at(-1)!
   if (!esPeriodo(periodo) || !periodos.includes(periodo)) throw new Rechazo(400, 'Ese periodo no existe.')
@@ -246,7 +246,7 @@ export async function reparto(env: Env, yo: Miembro, url: URL, ahora = Date.now(
 
 /** `POST /comunidad/fondo/cerrar` `{periodo}`: solo el creador, cuando el periodo ya terminó. Guarda su foto, una vez. */
 export async function cerrar(env: Env, yo: Miembro, c: Record<string, unknown>, ahora = Date.now()): Promise<RepartoFondo> {
-  if (!esCreador(yo)) throw new Rechazo(403, 'Eso solo lo hace el creador de Sloth.')
+  if (!esCreador(yo)) throw new Rechazo(403, 'Eso solo lo hace el creador de VyMotion.')
   const periodo = String(c.periodo ?? '')
   if (!esPeriodo(periodo)) throw new Rechazo(400, 'Ese periodo no existe.')
   if (tramoDe(periodo).hasta * 1000 > ahora) throw new Rechazo(400, `${nombreDe(periodo)} aún no termina: se cierra a partir del día 1.`)
@@ -281,7 +281,7 @@ export async function cerrar(env: Env, yo: Miembro, c: Record<string, unknown>, 
 
 /** `POST /comunidad/fondo/pagado` `{periodo, miembro, pagado, referencia?}`: solo el creador. Al marcarla, le avisa por correo. */
 export async function pagado(env: Env, yo: Miembro, c: Record<string, unknown>): Promise<{ ok: true }> {
-  if (!esCreador(yo)) throw new Rechazo(403, 'Eso solo lo hace el creador de Sloth.')
+  if (!esCreador(yo)) throw new Rechazo(403, 'Eso solo lo hace el creador de VyMotion.')
   const periodo = String(c.periodo ?? '')
   const miembro = String(c.miembro ?? '')
   if (!esPeriodo(periodo) || !ID.test(miembro)) throw new Rechazo(400, 'Falta el periodo o la persona.')
@@ -301,7 +301,7 @@ export async function pagado(env: Env, yo: Miembro, c: Record<string, unknown>):
       await correo(
         env,
         email,
-        'Ya te mandamos tu parte del fondo de Sloth',
+        'Ya te mandamos tu parte del fondo de VyMotion',
         ['Hola:', `Te mandamos ${dinero(montos)} del fondo de la comunidad de ${nombreDe(periodo)}, por lo que la gente hizo con tus estilos.`, `Llegó al Binance ID que termina en ${parte.binance.slice(-4)}.${referencia ? ` Referencia: ${referencia}.` : ''}`, 'Gracias por compartir tus estilos.'],
         `fondo-${periodo}-${miembro}`
       ).catch((e) => console.error('Correo del pago del fondo', e instanceof Error ? e.message : e))

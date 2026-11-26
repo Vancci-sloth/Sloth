@@ -1,5 +1,6 @@
 import { type ReactNode, useEffect, useState } from 'react'
 import type { Equipo } from '../../shared/types'
+import { usePoll } from './usePoll'
 import { api } from './api'
 import { Confirm } from './Confirm'
 import { Icono, type NombreIcono } from './Iconos'
@@ -27,11 +28,7 @@ function useEquipo() {
   useEffect(() => void leer(), [])
   // Mientras mide (unos 30 s) o baja la mejora.
   const trabajando = !!e?.midiendo || !!e?.mejora?.estado
-  useEffect(() => {
-    if (!trabajando) return
-    const id = setInterval(leer, 3000)
-    return () => clearInterval(id)
-  }, [trabajando])
+  usePoll(leer, 3000, trabajando)
   const mejorar = () => api<Equipo>('/api/equipo/mejorar', {}).then(setE)
   return { e, setE, error, setError, mejorar }
 }
@@ -48,10 +45,10 @@ export function AvisoEquipo() {
   return (
     <>
       <button className="aviso-version" title={e.mejora.error ? `La última vez falló: ${e.mejora.error}` : 'Transcribir tu voz unas cinco veces más rápido'} onClick={() => setPreguntar(true)}>
-        ↑ Acelerar Sloth en tu equipo
+        ↑ Acelerar VyMotion en tu equipo
       </button>
       {preguntar && (
-        <Confirm title="¿Acelerar Sloth en tu equipo?" action="Acelerar" onConfirm={mejorar} onClose={() => setPreguntar(false)}>
+        <Confirm title="¿Acelerar VyMotion en tu equipo?" action="Acelerar" onConfirm={mejorar} onClose={() => setPreguntar(false)}>
           {POR_QUE}
           {e.mejora.error && <span className="bad small fila-extra">La última vez falló: {e.mejora.error}</span>}
         </Confirm>
@@ -61,7 +58,7 @@ export function AvisoEquipo() {
 }
 
 /**
- * Opciones → Tu equipo (`server/equipo.ts`): qué tiene esta computadora, cómo trabaja Sloth en ella (lo elige solo) y
+ * Opciones → Tu equipo (`server/equipo.ts`): qué tiene esta computadora, cómo trabaja VyMotion en ella (lo elige solo) y
  * cuánto tarda cada cosa aquí, de lo que ya midió.
  */
 export function TuEquipo() {
@@ -73,7 +70,7 @@ export function TuEquipo() {
   }
 
   const voz = !e?.motor
-    ? <>Falta el Python de Sloth. Descárgalo en <a href="#/opciones/equipo/herramientas">Herramientas de video</a>.</>
+    ? <>Falta el Python de VyMotion. Descárgalo en <a href="#/opciones/equipo/herramientas">Herramientas de video</a>.</>
     : e.midiendo
       ? 'Midiendo cuánto tarda aquí… (unos 30 s)'
       : e.voz
@@ -123,7 +120,7 @@ export function TuEquipo() {
         )}
       </div>
       {e && error && <p className="bad small fila-extra">{error}</p>}
-      <p className="grupo-nota">Sloth elige solo cómo trabajar en esta computadora. Los tiempos salen de lo que ya hizo aquí, y los scripts los usan para decirte cuánto falta.</p>
+      <p className="grupo-nota">VyMotion elige solo cómo trabajar en esta computadora. Los tiempos salen de lo que ya hizo aquí, y los scripts los usan para decirte cuánto falta.</p>
     </section>
   )
 }

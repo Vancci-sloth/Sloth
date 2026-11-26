@@ -190,7 +190,7 @@ Sexta, con eso (el ahorrador de luz de enchufe): **13,1 min, 58 vueltas, un rend
 pequeñas: pidió la voz con `generar_voz` y después con `voz.py --studio` (18 s de más), y esperó con `sleep` lo que
 mandó de fondo con `nohup` (`voz.py`, `final.py`). Las dos vienen del texto: VOZ.md daba la herramienta y el script
 como iguales, y «en segundo plano» no decía cómo. Ahora VOZ.md dice que con script se usa solo el script, y SKILL.md
-que el segundo plano es el que avisa al terminar (`run_in_background` en Claude; Sloth le abre turno al acabar), no
+que el segundo plano es el que avisa al terminar (`run_in_background` en Claude; VyMotion le abre turno al acabar), no
 `nohup` con `sleep`.
 
 Séptima, con eso (el test del agua que sale marrón): **14,6 min, 69 vueltas, un render**, sin ✘ (40,7 s). Las dos
@@ -237,7 +237,7 @@ sobre el log de `final.py`.
 
 Los dos, arreglados. `revisar.py --movimiento` saca todos los cuadros en chico (juntos en un archivo: abrir 1.265 jpg
 recién escritos costaba 17 s en Windows) y les pasa el código de `medir.py`; en seis videos el movimiento quedó entre 0.92
-y 0.99 del final, nunca encima. Y Sloth frena en Claude (hook de `server/claude.ts`) un `sleep` de 5 s o más y, de fondo,
+y 0.99 del final, nunca encima. Y VyMotion frena en Claude (hook de `server/claude.ts`) un `sleep` de 5 s o más y, de fondo,
 cualquier bucle que espere: el de estafas lanzó un vigilante con `sleep 4` que nunca encontró lo que buscaba y dejó el
 hilo «trabajando» 15 min de más. Con eso: tamal 16,0 min, agua 8,8 y estafas 12,5 (65 vueltas), un render cada uno,
 sin ✘ y sin esperas; el estimado, siempre por debajo del final (3.96 → 4.24, 3.37 → 3.65, 4.65 → 4.81).

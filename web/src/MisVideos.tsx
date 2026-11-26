@@ -14,7 +14,6 @@ import { YoutubeLote } from './YoutubeProgramar'
 import { CalendarioYoutube } from './YoutubeCalendario'
 import { CalendarioRedes, type EstadoRedes, estadoEnRedes, Marcas, ResumenRedes } from './Redes' // redes
 import './MisVideos.css'
-import { abrirRuta, bajar as bajarAlDispositivo, enLaNube, enLaWeb } from './web'
 
 /**
  * «Mis videos»: los videos terminados de todos los estilos, del más nuevo al más viejo. Se buscan por título, archivo o
@@ -167,7 +166,7 @@ export function MisVideos({ cards, sessions, estilo, onEstilo, refDesplazamiento
   }, [estadoSobra, formaSobra])
   const claveVista = `${filtro ?? ''}|${formaVale ?? ''}|${busca}|${enEstado.length ? porEstado : ''}`
   useEffect(() => setElegidos(new Set()), [claveVista])
-  // redes: mientras Sloth sube a TikTok, su navegador se ve a la derecha (`ConNavegadorRedes`); al acabar la cola, se
+  // redes: mientras VyMotion sube a TikTok, su navegador se ve a la derecha (`ConNavegadorRedes`); al acabar la cola, se
   // esconde. Entre un video y el siguiente no se cierra. Si lo escondes tú, sigue escondido.
   const enNavegador = !!todos?.redes?.enNavegador
   const abrio = useRef(false)
@@ -196,14 +195,8 @@ export function MisVideos({ cards, sessions, estilo, onEstilo, refDesplazamiento
   }
   /** Copia los videos a Descargas y lo dice, con un enlace que los señala en su carpeta. */
   const bajando = useRef(false)
-  const v0 = (vs: VideoHecho[]) => vs[0].ruta.split(/[\\/]/).pop()
   async function bajar(vs: VideoHecho[]) {
     if (bajando.current) return
-    // En la nube no hay Descargas de una computadora: van directo a este dispositivo, uno tras otro.
-    if (enLaNube) {
-      vs.forEach((v, i) => setTimeout(() => bajarAlDispositivo(`/api/web/archivo?ruta=${encodeURIComponent(v.ruta)}`), i * 700))
-      return setAviso({ texto: vs.length === 1 ? `Bajando «${v0(vs)}» a este dispositivo.` : `Bajando ${vs.length} videos a este dispositivo.` })
-    }
     bajando.current = true
     setFallo('')
     setAviso({ texto: vs.length === 1 ? 'Copiando a Descargas…' : `Copiando ${vs.length} videos a Descargas…` })
@@ -211,11 +204,6 @@ export function MisVideos({ cards, sessions, estilo, onEstilo, refDesplazamiento
       const r = await api<{ carpeta: string; copias: string[] }>('/api/videos/descargar', { rutas: vs.map((v) => v.ruta) })
       const nombre = r.copias[0].split(/[\\/]/).pop()
       setAviso({ texto: r.copias.length === 1 ? `«${nombre}» está en Descargas.` : `${r.copias.length} videos están en Descargas.`, ruta: r.copias[0] })
-      // Desde la web, además, a este dispositivo: uno tras otro, que el navegador no corta varias descargas juntas.
-      if (enLaWeb) {
-        r.copias.forEach((c, i) => setTimeout(() => bajarAlDispositivo(`/api/web/archivo?ruta=${encodeURIComponent(c)}`), i * 700))
-        setAviso({ texto: `${r.copias.length === 1 ? `«${nombre}» está` : `${r.copias.length} videos están`} en Descargas de tu computadora, y se bajan también a este dispositivo.`, ruta: r.copias[0] })
-      }
     } catch (e) {
       setAviso(null)
       setFallo(e instanceof Error ? e.message : String(e))
@@ -307,27 +295,27 @@ export function MisVideos({ cards, sessions, estilo, onEstilo, refDesplazamiento
       {(conVideos.length > 1 || (verticales > 0 && horizontales > 0)) && (
         <nav className="mis-filtros" aria-label="Filtrar">
           {conVideos.length > 1 && (
-            <div className="mis-pestanas">
-              <button className={filtro ? '' : 'on'} aria-pressed={!filtro} onClick={() => onEstilo()}>
-                Todos <span className="cuantos">{videos.length}</span>
+            <div className="mis-pestanas" role="group" aria-label="Estilos de video">
+              <button className="mis-filtro" data-estilo="todos" aria-pressed={!filtro} onClick={() => onEstilo()}>
+                <Icono de="escena" /> <span>Todos</span> <span className="cuantos">{videos.length}</span>
               </button>
               {conVideos.map((c) => (
-                <button key={c.id} className={filtro === c.id ? 'on' : ''} aria-pressed={filtro === c.id} onClick={() => onEstilo(c.id)}>
-                  <Icon icon={c.icon ?? '✦'} /> {c.title} <span className="cuantos">{cuantos.get(c.id)}</span>
+                <button key={c.id} className="mis-filtro" data-estilo={c.id} aria-pressed={filtro === c.id} onClick={() => onEstilo(c.id)}>
+                  <Icon icon={c.icon ?? 'estrella'} /> <span>{c.title}</span> <span className="cuantos">{cuantos.get(c.id)}</span>
                 </button>
               ))}
             </div>
           )}
           {verticales > 0 && horizontales > 0 && (
-            <div className="mis-pestanas">
+            <div className="mis-pestanas mis-formatos" role="group" aria-label="Formato de video">
               {(
                 [
                   ['vertical', 'Verticales', verticales],
                   ['horizontal', 'Horizontales', horizontales]
                 ] as const
               ).map(([f, nombre, n]) => (
-                <button key={f} className={formaVale === f ? 'on' : ''} aria-pressed={formaVale === f} onClick={() => setForma(formaVale === f ? null : f)}>
-                  <span className={`mis-forma ${f}`} aria-hidden="true" /> {nombre} <span className="cuantos">{n}</span>
+                <button key={f} className="mis-filtro" data-forma={f} aria-pressed={formaVale === f} onClick={() => setForma(formaVale === f ? null : f)}>
+                  <span className={`mis-forma ${f}`} aria-hidden="true" /> <span>{nombre}</span> <span className="cuantos">{n}</span>
                 </button>
               ))}
             </div>
@@ -378,7 +366,7 @@ export function MisVideos({ cards, sessions, estilo, onEstilo, refDesplazamiento
             <div className="mis-aviso" role="status">
               <Icono de="descargar" /> {aviso.texto}
               {aviso.ruta && (
-                <button className="link" onClick={() => void abrirRuta(aviso.ruta!, undefined, { bajar: false }).catch(() => {})}>
+                <button className="link" onClick={() => api('/api/open', { path: aviso.ruta })}>
                   Mostrar
                 </button>
               )}
@@ -635,8 +623,8 @@ export function VideoDe(props: {
         <span className="video-titulo">{video.titulo}</span>
         <span className="video-meta">
           {estilo && (
-            <span className="video-estilo" title={estilo.title}>
-              <Icon icon={estilo.icon ?? '✦'} />
+            <span className="video-estilo" data-estilo={estilo.id} title={estilo.title}>
+              <Icon icon={estilo.icon ?? 'estrella'} />
             </span>
           )}
           {cuando(video.t)}

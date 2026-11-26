@@ -15,7 +15,7 @@ import { correr, Detenido, Pausa, ytdlp } from './youtube.ts'
 /**
  * Lo que se dice en los videos de la investigación, en `transcripciones/<id>.json` dentro de la carpeta del canal: así el
  * resumen cuenta ganchos dichos y Claude lee completas las de su evidencia al preparar un video. YouTube va por sus
- * subtítulos, sin bajar el video; TikTok e Instagram, por su audio y el Whisper de Sloth (`python/procesos/
+ * subtítulos, sin bajar el video; TikTok e Instagram, por su audio y el Whisper de VyMotion (`python/procesos/
  * transcribir-lote.py`), de 20 en 20 para cargar el modelo una vez por lote. Mientras Whisper transcribe un lote, se baja el
  * siguiente. Lo transcrito no se repite, y si una red frena, lo que falta queda para la vuelta siguiente.
  */
@@ -78,7 +78,7 @@ export async function transcribirVideos(carpeta: string, videos: VideoYT[], ctx:
   const avisos = [
     videos.length > faltan.length && `${videos.length - faltan.length} ya estaban transcritos.`,
     sinEnlace && `${sinEnlace} ${sinEnlace === 1 ? 'Reel no tiene' : 'Reels no tienen'} enlace para bajarlo: Meta no lo da de las cuentas ajenas, solo la búsqueda de Instagram y tu cuenta.`,
-    sinPython && `Sin el Python de Sloth no transcribo los ${sinPython} de TikTok e Instagram.`
+    sinPython && `Sin el Python de VyMotion no transcribo los ${sinPython} de TikTok e Instagram.`
   ]
   const detalle = avisos.filter(Boolean).join(' ') || undefined
   if (!cola.length) return void (detalle && ctx.paso('transcribir', 'No hay videos nuevos que transcribir.', detalle))
@@ -446,39 +446,10 @@ async function whisper(python: string, wavs: string[], ctx: CtxTranscribir, term
   }
 }
 
-/**
- * Lo que se dice en un video del disco, con el segundo de cada trozo en ese archivo: los capítulos de YouTube salen del
- * montaje final, no del guion. El mismo Whisper (o Parakeet) de la investigación; sin voz, la lista va vacía.
- */
-export async function transcribirArchivo(ruta: string, signal: AbortSignal): Promise<Segmento[]> {
-  const python = rutaPythonSloth()
-  if (!python) throw new Error('Falta el Python de Sloth para escuchar el video.')
-  const tmp = mkdtempSync(join(tmpdir(), 'sloth-capitulos-'))
-  try {
-    const wav = join(tmp, 'voz.wav')
-    await lanzar('ffmpeg', ['-nostdin', '-v', 'error', '-y', '-i', ruta, '-vn', '-ac', '1', '-ar', '16000', '-c:a', 'pcm_s16le', wav], signal, { plazo: 10 * 60_000 })
-    const salida = await lanzar(python, ['-E', '-s', '-B', '-X', 'utf8', 'transcribir-lote.py'], signal, {
-      cwd: PROCESOS,
-      entrada: JSON.stringify({ files: [wav], options: { modelos: MODELOS } }),
-      plazo: 60 * 60_000
-    })
-    let d: Dicho | undefined
-    try {
-      d = (JSON.parse(salida) as Record<string, Dicho>)[wav]
-    } catch {}
-    if (!d || 'error' in d) throw new Error(d && 'error' in d ? d.error : 'transcribir-lote.py no devolvió lo esperado.')
-    return d.segmentos.map((s) => ({ inicio: s.start, fin: s.end, texto: s.text.trim() })).filter((s) => s.texto)
-  } finally {
-    try {
-      rmSync(tmp, { recursive: true, force: true, maxRetries: 5, retryDelay: 500 })
-    } catch {}
-  }
-}
-
 /** yt-dlp sin `-J`, con el Python con que lo lanza `ytdlp()`. Devuelve lo que imprimió. */
 function conYtdlp(args: string[], signal: AbortSignal) {
   const l = ytdlp()
-  if (!l) return Promise.reject(new Error('Falta yt-dlp: instala el Python de Sloth, o corre «python -m pip install yt-dlp».'))
+  if (!l) return Promise.reject(new Error('Falta yt-dlp: instala el Python de VyMotion, o corre «python -m pip install yt-dlp».'))
   return lanzar(l.exe, [...l.args, '-m', 'yt_dlp', '--no-warnings', ...args], signal)
 }
 

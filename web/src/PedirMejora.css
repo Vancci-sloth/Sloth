@@ -1,7 +1,7 @@
 /*
  * «Pedir una mejora»: el botón con el símbolo del agente de cada hilo (en el encabezado, junto a «Citar» y en cada error),
  * la caja que abre, sobre un velo, y el aviso de que quedó anotada. El símbolo va en su color de marca; lo demás, con la
- * paleta de Sloth.
+ * paleta de VyMotion.
  */
 .marca-agente { width: 14px; height: 14px; flex: none; }
 

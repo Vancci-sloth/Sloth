@@ -7,9 +7,9 @@ import type { NavegadorDeFuera } from '../shared/types.ts'
 import { guardar } from './disco.ts'
 
 /**
- * Chrome, Edge u otro Chromium del sistema, con un perfil de Sloth y CDP, donde se entra con Google (la voz y Flow, `server/voz/`; las
+ * Chrome, Edge u otro Chromium del sistema, con un perfil de VyMotion y CDP, donde se entra con Google (la voz y Flow, `server/voz/`; las
  * redes, `server/redes/navegador.ts`): Google no deja entrar dentro de una app, y Safari no se deja manejar por CDP, así
- * que sin uno de los dos la sesión no tiene cómo pasar a Sloth. Sin ventana, se abre con `SIN_VENTANA` y sus páginas con
+ * que sin uno de los dos la sesión no tiene cómo pasar a VyMotion. Sin ventana, se abre con `SIN_VENTANA` y sus páginas con
  * `paginaNueva`, para que Google no lo vea como un robot. Cuál se usa lo eliges en Opciones → Navegador (`elegirNavegador`).
  */
 
@@ -47,7 +47,7 @@ const OPERA = WINDOWS
  * El que elegiste en Opciones → Navegador o, sin elegir (o si ya no está instalado), el primero que haya, Chrome antes
  * que Edge si `chromePrimero`. En Windows, Edge sigue primero (ahí está la sesión de quien ya entró) y, sin él, tu
  * navegador predeterminado si es un Chromium: hay quien quitó Edge (avisado en la comunidad el 8 de noviembre de 2026).
- * Firefox no sirve: ya no habla CDP, y sin eso la sesión no pasa a Sloth.
+ * Firefox no sirve: ya no habla CDP, y sin eso la sesión no pasa a VyMotion.
  */
 export function chromiumDelSistema(chromePrimero: boolean): string | undefined {
   return elegido() ?? automatico(chromePrimero)
@@ -90,9 +90,9 @@ export function navegadorDeFuera(): NavegadorDeFuera {
   return { elegido: elegido() ?? null, automatico: auto ? nombreDe(auto) : null, lista: instalados() }
 }
 
-/** Guarda el que eliges, o `null` para que Sloth vuelva a tomar el de siempre. Solo uno de los instalados. */
+/** Guarda el que eliges, o `null` para que VyMotion vuelva a tomar el de siempre. Solo uno de los instalados. */
 export function elegirNavegador(exe: string | null) {
-  if (!archivo) throw new Error('Sloth aún no sabe dónde guardar el navegador.')
+  if (!archivo) throw new Error('VyMotion aún no sabe dónde guardar el navegador.')
   if (exe && !instalados().some((n) => n.exe === exe)) throw new Error('Ese navegador ya no está instalado.')
   mkdirSync(dirname(archivo), { recursive: true })
   guardar(archivo, `${JSON.stringify({ exe }, null, 1)}\n`)
@@ -134,13 +134,13 @@ export function nombreDe(exe: string | undefined) {
 /** Lo que se dice si no hay ninguno: en Mac casi siempre es que solo hay Safari, y en Windows, Firefox. */
 export const SIN_CHROMIUM =
   process.platform === 'win32'
-    ? 'Para entrar con Google hace falta Chrome, Edge o Brave: Firefox no deja pasar la sesión a Sloth. Instala Chrome desde google.com/chrome y vuelve a intentarlo.'
+    ? 'Para entrar con Google hace falta Chrome, Edge o Brave: Firefox no deja pasar la sesión a VyMotion. Instala Chrome desde google.com/chrome y vuelve a intentarlo.'
     : process.platform === 'darwin'
-      ? 'Para entrar con Google hace falta Google Chrome (o Microsoft Edge): Safari no deja pasar la sesión a Sloth. Instálalo desde google.com/chrome y vuelve a intentarlo.'
+      ? 'Para entrar con Google hace falta Google Chrome (o Microsoft Edge): Safari no deja pasar la sesión a VyMotion. Instálalo desde google.com/chrome y vuelve a intentarlo.'
       : 'No encontré Google Chrome ni Microsoft Edge: instala uno para entrar con Google.'
 
 /**
- * Lo abre con `args`. Con `ventana`, en Mac va por `open`: lanzado directo desde Sloth, macOS no lo trae al frente y la
+ * Lo abre con `args`. Con `ventana`, en Mac va por `open`: lanzado directo desde VyMotion, macOS no lo trae al frente y la
  * ventana queda detrás, como si no se hubiera abierto. `-n` abre otro aunque ya tengas el tuyo abierto.
  */
 export function lanzarChromium(exe: string, args: string[], ventana: boolean) {

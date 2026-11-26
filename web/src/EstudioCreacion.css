@@ -1,0 +1,41 @@
+/* Portada y compositor de las bibliotecas de creación. */
+.creacion-portada {
+  position: relative; isolation: isolate; overflow: hidden; display: flex; align-items: end; gap: 12px;
+  min-height: clamp(142px, 22vw, 222px); padding: clamp(14px, 3vw, 26px);
+  border: 1px solid var(--line); border-radius: var(--radio-tarjeta);
+  background: linear-gradient(135deg, var(--bg), var(--panel-2));
+}
+.creacion-portada-fondo { position: absolute; z-index: -2; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 76% 44%; }
+.creacion-portada::before {
+  content: ''; position: absolute; z-index: -1; inset: 0; pointer-events: none;
+  background: linear-gradient(90deg, var(--bg), color-mix(in srgb, var(--bg) 82%, transparent) 24%, transparent 74%),
+    linear-gradient(0deg, var(--bg), transparent 62%);
+}
+.creacion-portada h1 { margin: 0 0 8px; font-size: clamp(26px, 4vw, 38px); line-height: 1.08; }
+.creacion-portada p { margin: 0; color: var(--muted); }
+.creacion-portada-icono {
+  display: grid; place-items: center; flex: none; width: 42px; height: 42px;
+  border: 1px solid var(--line); border-radius: 12px; background: var(--panel); color: var(--acento-imagen);
+}
+.creacion-portada-icono svg { width: 22px; height: 22px; }
+.creacion-flotante { position: sticky; top: clamp(8px, 2vw, 16px); z-index: 2; container: creacion / scroll-state; }
+.creacion-flotante > .composer {
+  background: var(--cristal-fondo-flotante); border-color: var(--cristal-borde);
+  box-shadow: var(--cristal-reflejo); backdrop-filter: blur(12px);
+}
+@container creacion scroll-state(stuck: top) {
+  body .creacion-flotante > .composer { box-shadow: var(--cristal-sombra-flotante); }
+  @media (prefers-reduced-motion: no-preference) {
+    body .creacion-flotante > .composer { translate: 0 3px; scale: .96; }
+  }
+}
+@media (prefers-reduced-transparency: no-preference) {
+  body .creacion-flotante > .composer { background: var(--cristal-fondo-flotante); }
+}
+@media (prefers-reduced-motion: no-preference) {
+  body .creacion-flotante > .composer {
+    transform-origin: center top;
+    transition: border-color 150ms, translate 360ms cubic-bezier(.22,1,.36,1),
+      scale 360ms cubic-bezier(.22,1,.36,1), box-shadow 360ms ease-out;
+  }
+}

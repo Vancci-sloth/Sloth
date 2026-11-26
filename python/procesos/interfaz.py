@@ -1,7 +1,7 @@
 """
 La interfaz de todos los procesos de `python/procesos`, estrecha y estable.
 
-Los lanza `proceso()` (de `video-base/scripts/sloth.py` o de `video-el-diff/scripts/comun.py`) con el Python de Sloth,
+Los lanza `proceso()` (de `video-base/scripts/sloth.py` o de `video-el-diff/scripts/comun.py`) con el Python de VyMotion,
 desde esta carpeta, y le pasa por la entrada un JSON con los archivos que tiene que mirar y sus opciones:
 `{"files": ["C:/...", ...], "options": {...}}`. El proceso contesta por la salida con un único JSON y sale con 0. Si
 falla, sale con 1 y la última línea de su salida de errores dice por qué. Todo lo demás que escriba (avisos de las

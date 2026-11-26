@@ -1,6 +1,7 @@
 import { Fragment, type ReactNode, useLayoutEffect, useRef, useState, useEffect } from 'react'
 import { esDeEstudio } from '../../shared/etapas'
 import { FASES, type AgentEvent, type Card, type Fase, type SessionMeta } from '../../shared/types'
+import { AyudaFase } from './AyudaVideo'
 import { Editor } from './Editor'
 import { useEscritos, useEventos } from './eventos'
 import { CarpetaDelHilo, EtapaCuerpo, useAvance, usePasos, type Pasos } from './Etapas'
@@ -14,7 +15,7 @@ import './Estudio.css'
  * fases (`FASES`), siempre las mismas y en su orden; al centro la elegida, que por defecto es la del agente y va
  * cambiando con él; abajo, en todas las fases, la línea de tiempo; a la derecha, siempre, el chat.
  * Un estilo nuevo no toca nada de aquí: su card dice en qué fase va cada etapa, y el resto sale de sus archivos. La fase
- * Video es la misma para todos (`Editor.tsx`): el video en vivo, sin renderizar, que arma el motor de Sloth, y la línea de
+ * Video es la misma para todos (`Editor.tsx`): el video en vivo, sin renderizar, que arma el motor de VyMotion, y la línea de
  * tiempo debajo, con sus escenas. El navegador del hilo, si lo abres, va en el centro.
  */
 
@@ -116,11 +117,14 @@ function BarraDeFases({ fases, p, vista, delAgente, error, onElegir }: { fases: 
         return (
           <Fragment key={f.id}>
             {k > 0 && <span className="fase-sep" aria-hidden="true" />}
-            <button className={`fase ${f.estado.replace(' ', '-')} ${f.id === vista ? 'vista' : ''} ${suya ? 'agente' : ''}`} disabled={!f.abierta} aria-current={f.id === vista ? 'step' : undefined} title={title} onClick={() => onElegir(f.id)}>
-              <span className="fase-punto" />
-              {f.nombre}
-              {va && va.toLowerCase() !== f.nombre.toLowerCase() && <span className="muted">· {va}</span>}
-            </button>
+            <div className="fase-con-ayuda">
+              <button className={`fase ${f.estado.replace(' ', '-')} ${f.id === vista ? 'vista' : ''} ${suya ? 'agente' : ''}`} disabled={!f.abierta} aria-current={f.id === vista ? 'step' : undefined} title={title} onClick={() => onElegir(f.id)}>
+                <span className="fase-punto" />
+                {f.nombre}
+                {va && va.toLowerCase() !== f.nombre.toLowerCase() && <span className="muted">· {va}</span>}
+              </button>
+              <AyudaFase fase={f.id} nombre={f.nombre} disponible={f.abierta} />
+            </div>
           </Fragment>
         )
       })}

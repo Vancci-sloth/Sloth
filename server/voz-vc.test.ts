@@ -10,10 +10,10 @@ test('las voces de Edge en Voices Cloning se nombran como persona y país, no co
   assert.equal(nombreVc('Elias - Spanish, Natural, Storyteller'), 'Elias - Spanish, Natural, Storyteller')
 })
 
-test('los errores del cobro le llegan al cliente como de las voces de Sloth', () => {
-  assert.equal(sinSocio('Se te acabaron los créditos de voz de Voices Cloning. Pídele más al creador de Sloth o usa otra voz.'), 'Se te acabaron los créditos de voz de Sloth. Pídele más al creador de Sloth o usa otra voz.')
-  assert.equal(sinSocio('Voices Cloning tiene mucha demanda ahora.'), 'Las voces de Sloth tiene mucha demanda ahora.')
-  assert.equal(sinSocio('Se llegó al tope del día de las voces de Voices Cloning en Sloth.'), 'Se llegó al tope del día de las voces de Sloth.')
-  assert.equal(sinSocio('Tu usuario de voces de Voices Cloning está suspendido.'), 'Tu usuario de las voces de Sloth está suspendido.')
+test('los errores del cobro le llegan al cliente como de las voces de VyMotion', () => {
+  assert.equal(sinSocio('Se te acabaron los créditos de voz de Voices Cloning. Pídele más al creador de VyMotion o usa otra voz.'), 'Se te acabaron los créditos de voz de VyMotion. Pídele más al creador de VyMotion o usa otra voz.')
+  assert.equal(sinSocio('Voices Cloning tiene mucha demanda ahora.'), 'Las voces de VyMotion tiene mucha demanda ahora.')
+  assert.equal(sinSocio('Se llegó al tope del día de las voces de Voices Cloning en VyMotion.'), 'Se llegó al tope del día de las voces de VyMotion.')
+  assert.equal(sinSocio('Tu usuario de voces de Voices Cloning está suspendido.'), 'Tu usuario de las voces de VyMotion está suspendido.')
   assert.equal(sinSocio('Sin créditos.'), 'Sin créditos.')
 })

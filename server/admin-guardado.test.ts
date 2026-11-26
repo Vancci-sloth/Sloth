@@ -7,7 +7,7 @@ import { Readable } from 'node:stream'
 import test from 'node:test'
 import { voicesCloning } from './voz/voices-cloning.ts'
 
-/** Pide `ruta` al `apiAdmin` de Sloth (con `json`, un POST) y da lo que respondió. */
+/** Pide `ruta` al `apiAdmin` de VyMotion (con `json`, un POST) y da lo que respondió. */
 async function pedir(vc: ReturnType<typeof voicesCloning>, ruta: string, json?: unknown) {
   let status = 0
   let cuerpo = ''

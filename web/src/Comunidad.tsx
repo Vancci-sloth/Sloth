@@ -1,41 +1,40 @@
-import { type CSSProperties, type DragEvent, type ReactNode, useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
+import { type CSSProperties, type DragEvent, memo, useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
 import type { AdjuntoComunidad, Autor, AvisoComunidad, CategoriaComunidad, ComentarioComunidad, FeedComunidad, OrdenComunidad, PublicacionComunidad, RoadmapComunidad } from '../../shared/types'
 import { api, ErrorApi } from './api'
 import { abiertaGuardada, BORRADA, buscarAqui, conocidas, consulta as consultaDe, guardado, guardar as guardarVista, guardarAbierta, indiceListo, olvidar, olvidarTodo, palabrasDe, pedir, pedirIndice, pedirPublicacion, precargarPublicacion, precargarVista, recordar, ultimoFeed } from './comunidadDatos'
+import { Cargando } from './Cargando'
+import { Elegir } from './Elegir'
 import { Confirm } from './Confirm'
+import { useContador } from './contador'
 import { Escribir, type Escrito, subirImagen } from './Escribir'
-import { TarjetasEnlaces } from './Enlaces'
-import { abrirBorrador, abrirHilo, CompartirTuyo, type Instalado, TrasInstalar } from './Estilos'
+import { abrirBorrador, CompartirTuyo, type Instalado, TrasInstalar } from './Estilos'
 import { LINK } from './etiquetas'
 import { Unirse } from './Licencia'
 import { Icono as IconoBase, type NombreIcono, trazosDe } from './Iconos'
 import { CampoAscii } from './CampoAscii'
 import { Liberar } from './Liberar'
 import { Fondo } from './Fondo'
-import { VerEvidencia } from './Evidencia'
 import { GuiaVista } from './Guia'
-import { ApoyarParaInstalar, Tienda } from './Tienda'
-import { Desplegable } from './Desplegable'
+import { Tienda } from './Tienda'
 import { Rifa } from './Rifa'
+import { RecortarFoto } from './RecortarFoto'
 import './Comunidad.css'
 
 /**
- * «Comunidad»: lo que la gente hace con Sloth y cómo lo hace, como la comunidad de Skool y en la paleta de Sloth. Arriba
+ * «Comunidad»: lo que la gente hace con VyMotion y cómo lo hace, como la comunidad de Skool y en la paleta de VyMotion. Arriba
  * se escribe; luego, las secciones y el feed: lo fijado y después lo que tuvo actividad más reciente (un comentario la
  * sube), o lo último publicado y, para el creador, lo que aún no contesta (`ORDENES`). Cada publicación se abre en grande, con sus comentarios. A la derecha, la comunidad con sus números y tu perfil.
  * Vive en el Worker del cobro (`licencias/src/comunidad.ts`), por `server/comunidad.ts`, y se vuelve a pedir cada minuto
  * mientras se ve. Quién comentó algo que aún no abres lo recuerda esta computadora (`comunidad:vistas`).
  *
- * Mejoras es lo que la gente quiere que Sloth haga mejor: el creador dice cómo va cada una, y todos lo ven. Arriba, solo
+ * Mejoras es lo que la gente quiere que VyMotion haga mejor: el creador dice cómo va cada una, y todos lo ven. Arriba, solo
  * él ve la versión que aún es de quien apoya y la libera para todos en un live (`Liberar.tsx`).
  * «Compartir» de un video de «Mis videos» abre el compositor en Lo que hice con ese video (`compartirVideo`).
  *
  * En Estilos, cada publicación trae un estilo que se instala con un clic. Se publica con «Compartir» de uno tuyo, en un
  * solo paso (`CompartirEstilo` en `Estilos.tsx`), que aquí abre «Compartir un estilo tuyo» o elegir Estilos al escribir.
  * Nadie más lo ve hasta que el creador lo aprueba («En revisión»); antes lo revisa: «Revisar» lo abre en una carpeta y le
- * pide a «Nuevo estilo» que lo lea. O lo pre-aprueba (ADR 0024): «Pre-aprobar» lo instala como card suya para hacerle la
- * prueba y arreglarlo, y al compartirlo desde ahí todos lo ven como «Pre-aprobado por Sloth»; su autor lo deja así
- * («Así está bien», en `ParaInstalar`) o manda su versión.
+ * pide a «Nuevo estilo» que lo lea.
  *
  * Todo sale al instante de lo que ya se pidió (`comunidadDatos.ts`) y se pone al día por detrás: la comunidad al abrirla,
  * cada sección (se adelanta al pasar por su pestaña), una publicación con sus comentarios (al detenerte en ella) y la
@@ -52,13 +51,22 @@ import './Comunidad.css'
 
 export const SECCIONES: { id: CategoriaComunidad; nombre: string; icono: NombreIcono; escribe: string }[] = [
   { id: 'general', nombre: 'General', icono: 'hilo', escribe: 'Preséntate, platica o comparte lo que quieras.' },
-  { id: 'hice', nombre: 'Lo que hice', icono: 'video', escribe: 'Cuenta cómo lo hiciste: el estilo, lo que le pediste a Sloth, lo que aprendiste.' },
+  { id: 'hice', nombre: 'Lo que hice', icono: 'video', escribe: 'Cuenta cómo lo hiciste: el estilo, lo que le pediste a VyMotion, lo que aprendiste.' },
   { id: 'ayuda', nombre: 'Ayuda', icono: 'pregunta', escribe: '¿Qué no te sale? Cuéntalo y, si puedes, pega una captura.' },
-  { id: 'mejoras', nombre: 'Mejoras', icono: 'flechaArriba', escribe: '¿Qué le falta a Sloth o qué debería hacer mejor?' },
+  { id: 'mejoras', nombre: 'Mejoras', icono: 'flechaArriba', escribe: '¿Qué le falta a VyMotion o qué debería hacer mejor?' },
   { id: 'estilos', nombre: 'Estilos', icono: 'claqueta', escribe: 'Qué hace tu estilo.' },
-  { id: 'anuncios', nombre: 'Anuncios', icono: 'megafono', escribe: '¿Qué hay de nuevo en Sloth?' },
+  { id: 'anuncios', nombre: 'Anuncios', icono: 'megafono', escribe: '¿Qué hay de nuevo en VyMotion?' },
 ]
 const seccionDe = (id: CategoriaComunidad) => SECCIONES.find((s) => s.id === id) ?? SECCIONES[0]
+/** El color de cada sección, de la paleta de VyMotion: lo llevan sus chips, su menú y su icono. */
+const TINTES: Record<CategoriaComunidad, string> = {
+  general: 'var(--acento-codex)',
+  hice: 'var(--acento-claude)',
+  ayuda: 'var(--acento-voz)',
+  mejoras: 'var(--ok)',
+  estilos: 'var(--acento-imagen)',
+  anuncios: 'var(--acento-instagram-final)'
+}
 /** Cómo se ordena el feed. «Sin contestar» es del creador: donde la última palabra no es suya. */
 const ORDENES: { id: OrdenComunidad; nombre: string; icono: NombreIcono }[] = [
   { id: 'actividad', nombre: 'Actividad reciente', icono: 'hilo' },
@@ -85,16 +93,16 @@ export function abrirPublicacion(id: string) {
   location.hash = '/comunidad'
   dispatchEvent(new Event(ABRIR))
 }
-/** Lleva a la sección Estilos, la tienda: desde un estilo que se cerró al acabarse el apoyo (`SinApoyo.tsx`). */
-export function abrirTienda() {
-  localStorage.setItem('comunidad:seccion', 'estilos')
-  location.hash = '/comunidad'
-}
+
+/** De «Mi perfil» de vuelta a la comunidad. */
+export const irAComunidad = () => void (location.hash = '/comunidad')
+/** A «Mi perfil» (`MiPerfil.tsx`), que es su propia página. */
+export const irAMiPerfil = () => void (location.hash = '/comunidad/perfil')
 
 const Icono = ({ de }: { de: NombreIcono }) => <IconoBase de={de} className="com-ico" />
 
 /** «hace 5 min», «hace 3 h», «hace 2 d» y luego la fecha. */
-export function hace(iso: string) {
+function hace(iso: string) {
   const ms = Date.parse(iso)
   const min = Math.floor((Date.now() - ms) / 60_000)
   if (min < 1) return 'ahora'
@@ -137,8 +145,6 @@ export function Comunidad() {
   const [abierta, setAbierta] = useState<string | null>(null)
   // La tienda de estilos se vuelve a pedir al cerrar una publicación: sus me gusta y su estado pudieron cambiar.
   const [tiendaVersion, setTiendaVersion] = useState(0)
-  // Donde la tienda pone su visor: a la derecha, en el sitio de la tarjeta de la comunidad.
-  const [sitioVisor, setSitioVisor] = useState<HTMLDivElement | null>(null)
   // El compositor abierto: en qué sección y, si llega de «Mis videos», con qué. `clave` lo vuelve a armar.
   const [escribiendo, setEscribiendo] = useState<{
     seccion: CategoriaComunidad
@@ -146,20 +152,19 @@ export function Comunidad() {
     video?: { subida: Promise<AdjuntoComunidad>; poster?: string }
     clave: number
   } | null>(null)
-  // Tu perfil: al tocarlo o, sin nombre, antes de publicar, comentar o dar me gusta (`luego`).
+  // Sin nombre, antes de publicar, comentar o dar me gusta: se pide aquí mismo y sigue con `luego`. Tu perfil entero
+  // está en su propia página (`MiPerfil.tsx`).
   const [perfil, setPerfil] = useState<{ luego?: () => void } | null>(null)
   const [nueva, setNueva] = useState<string | null>(null)
   // «Compartir un estilo tuyo» (`CompartirTuyo`).
   const [compartiendo, setCompartiendo] = useState(false)
-  // Desde la tienda: «Completarlo», de un estilo tuyo al que le falta algo.
-  useEffect(() => {
-    const abrir = () => setCompartiendo(true)
-    addEventListener('sloth-compartir-tuyo', abrir)
-    return () => removeEventListener('sloth-compartir-tuyo', abrir)
-  }, [])
   const [arrastrando, setArrastrando] = useState(false)
   const [vistas, setVistas] = useState(leerVistas)
-  const [, setReloj] = useState(0)
+  // Cada minuto: «hace 5 min» se pone al día en las tarjetas (que, si no, no se vuelven a dibujar).
+  const [minuto, setReloj] = useState(0)
+  // Los números de la comunidad suben al entrar, como la cifra del fondo.
+  const miembros = Math.round(useContador(feed?.miembros ?? 0, 1100))
+  const activos = Math.round(useContador(feed?.activos ?? 0, 1100))
   const subirAlCompositor = useRef<((archivos: File[]) => void) | null>(null)
   // La respuesta de una sección vieja que llega tarde no pisa la nueva.
   const pedido = useRef(0)
@@ -391,7 +396,7 @@ export function Comunidad() {
   const ocupada = !!(abierta || perfil || escribiendo || compartiendo)
   useEffect(() => {
     const tecla = (e: KeyboardEvent) => {
-      // Con cualquier diálogo abierto (de aquí o de Sloth: confirmar, la rifa, los avisos), las teclas son suyas.
+      // Con cualquier diálogo abierto (de aquí o de VyMotion: confirmar, la rifa, los avisos), las teclas son suyas.
       if (ocupada || e.ctrlKey || e.metaKey || e.altKey || escribeEn(e.target) || !lista?.length || hayDialogo()) return
       const botones = [...(raiz.current?.querySelectorAll<HTMLButtonElement>('.com-feed .com-post-abrir') ?? [])]
       if (e.key === 'j' || e.key === 'k') {
@@ -426,7 +431,18 @@ export function Comunidad() {
     return () => o.disconnect()
   }, [mas, falloMas, lista?.length, seccion, orden])
 
-  const caras = [...new Map((lista ?? []).flatMap((p) => [p.autor, ...p.comentaron]).filter((a) => a.nombre).map((a) => [a.id, a])).values()].slice(0, 8)
+  const delFeed = useRef({ abrir: (_id: string) => {}, foco: (_id: string) => {}, megusta: (_p: PublicacionComunidad) => {} })
+  delFeed.current = {
+    abrir: setAbierta,
+    foco: (id) => void (cursor.current = Math.max(0, lista?.findIndex((x) => x.id === id) ?? 0)),
+    megusta: (p) => conNombre(() => void megusta(p)),
+  }
+  const [alFeed] = useState(() => ({
+    abrir: (id: string) => delFeed.current.abrir(id),
+    foco: (id: string) => delFeed.current.foco(id),
+    megusta: (p: PublicacionComunidad) => delFeed.current.megusta(p),
+  }))
+
   const escribe = escribiendo && seccionDe(escribiendo.seccion)
 
   return (
@@ -436,7 +452,7 @@ export function Comunidad() {
         <main className="com-centro">
           <header className="com-cabeza">
             <div>
-              <div className="com-antetitulo">Sloth</div>
+              <div className="com-antetitulo">VyMotion</div>
               <h1>Comunidad</h1>
             </div>
             {feed && <Buscador onAbrir={setAbierta} />}
@@ -445,9 +461,10 @@ export function Comunidad() {
 
           {feed && <Rifa creador={!!yo?.creador} conNombre={conNombre} />}
 
+          {/* Arriba, nada más entrar: la cifra sola. Las cuentas y los pasos salen con «Ver más». */}
           {feed && <Fondo onEstilos={seccion === 'estilos' ? undefined : () => irA('estilos')} />}
 
-          {yo?.creador && <Liberar onAnunciar={(v) => abrirCompositor('anuncios', `Sloth ${v} ya es para todos`)} />}
+          {yo?.creador && <Liberar onAnunciar={(v) => abrirCompositor('anuncios', `VyMotion ${v} ya es para todos`)} />}
 
           {escribiendo && escribe ? (
             <div className="com-nueva">
@@ -495,33 +512,33 @@ export function Comunidad() {
           <div className="com-barra">
             <nav className="com-secciones" aria-label="Secciones">
               {/* Al apretar, no al soltar: como una pestaña del sistema, y lo de esa sección ya está guardado. */}
-              <button className={seccion === '' ? 'on' : ''} aria-pressed={seccion === ''} onPointerEnter={() => adelantarVista('')} onPointerLeave={soltarVista} onPointerDown={(e) => e.pointerType === 'mouse' && e.button === 0 && irA('')} onClick={() => irA('')}>
+              <button data-seccion="todo" className={seccion === '' ? 'on' : ''} aria-pressed={seccion === ''} onPointerEnter={() => adelantarVista('')} onPointerLeave={soltarVista} onPointerDown={(e) => e.pointerType === 'mouse' && e.button === 0 && irA('')} onClick={() => irA('')}>
                 Todo
               </button>
               {SECCIONES.map((s) => (
-                <button key={s.id} className={seccion === s.id ? 'on' : ''} aria-pressed={seccion === s.id} onPointerEnter={() => adelantarVista(s.id)} onPointerLeave={soltarVista} onFocus={() => adelantarVista(s.id)} onPointerDown={(e) => e.pointerType === 'mouse' && e.button === 0 && irA(s.id)} onClick={() => irA(s.id)}>
+                <button key={s.id} data-seccion={s.id} className={seccion === s.id ? 'on' : ''} aria-pressed={seccion === s.id} onPointerEnter={() => adelantarVista(s.id)} onPointerLeave={soltarVista} onFocus={() => adelantarVista(s.id)} onPointerDown={(e) => e.pointerType === 'mouse' && e.button === 0 && irA(s.id)} onClick={() => irA(s.id)}>
                   <Icono de={s.icono} />
                   {s.nombre}
                 </button>
               ))}
             </nav>
             {seccion !== 'estilos' && (
-            <Desplegable
-              className="com-orden"
-              nombre="Orden"
-              titulo="Cómo se ordena lo que ves"
-              icono={<Icono de={ORDENES.find((o) => o.id === orden)?.icono ?? 'hilo'} />}
-              valor={orden}
-              opciones={ORDENES.filter((o) => o.id !== 'sin-contestar' || yo?.creador || orden === o.id).map((o) => ({ value: o.id, label: o.nombre }))}
-              onCambio={(o) => irA(seccion, o as OrdenComunidad)}
-            />
+              <Elegir
+                clase="com-orden solo-icono"
+                etiqueta="Cómo se ordena"
+                soloIcono
+                alDerecho
+                valor={orden}
+                opciones={ORDENES.filter((o) => o.id !== 'sin-contestar' || yo?.creador || orden === o.id)}
+                onCambio={(id) => irA(seccion, id as OrdenComunidad)}
+              />
             )}
           </div>
 
           {yo && (
             <Bienvenida
               yo={yo}
-              onNombre={() => setPerfil({})}
+              onNombre={irAMiPerfil}
               onPresentarse={() => abrirCompositor('general', '¡Hola! Soy…')}
               onComentar={() => irA('hice')}
             />
@@ -535,10 +552,8 @@ export function Comunidad() {
               <button onClick={() => void cargar()}>Reintentar</button>
             </div>
           )}
-          {seccion === 'estilos' && feed && (
-            <Tienda version={tiendaVersion} creador={!!yo?.creador} yo={yo?.id} visorEn={sitioVisor} quieta={ocupada} onAbrir={setAbierta} conNombre={conNombre} />
-          )}
-          {seccion !== 'estilos' && lista === null && !error && <div className="com-cargando">Cargando…</div>}
+          {seccion === 'estilos' && feed && <Tienda version={tiendaVersion} creador={!!yo?.creador} onAbrir={setAbierta} conNombre={conNombre} />}
+          {seccion !== 'estilos' && lista === null && !error && <Cargando />}
           {seccion !== 'estilos' && lista?.length === 0 && (
             <div className="com-vacio">
               <div className="com-vacio-logo">
@@ -549,29 +564,31 @@ export function Comunidad() {
                 {orden === 'sin-contestar'
                   ? 'Aquí sale lo que alguien escribió y aún no le respondes.'
                   : seccion === 'anuncios'
-                  ? 'Lo nuevo de Sloth saldrá aquí.'
-                  : 'Sé el primero: preséntate o comparte un video que hiciste con Sloth.'}
+                  ? 'Lo nuevo de VyMotion saldrá aquí.'
+                  : 'Sé el primero: preséntate o comparte un video que hiciste con VyMotion.'}
               </p>
             </div>
           )}
 
           {seccion !== 'estilos' && !!lista?.length && (
             <div className="com-feed">
-              {lista.map((p) => (
+              {lista.map((p, i) => (
                 <Tarjeta
                   key={p.id}
+                  turno={i % 6}
                   p={p}
-                  yo={yo}
+                  yoId={yo?.id}
                   nueva={nueva === p.id}
                   visto={vistas[p.id]}
-                  onAbrir={() => setAbierta(p.id)}
-                  onFoco={() => (cursor.current = lista.indexOf(p))}
-                  onMegusta={() => conNombre(() => void megusta(p))}
+                  minuto={minuto}
+                  onAbrir={alFeed.abrir}
+                  onFoco={alFeed.foco}
+                  onMegusta={alFeed.megusta}
                 />
               ))}
               {/* Al acercarse aquí entra la página siguiente, que ya se pidió. */}
               <div ref={fin} className="com-fin" aria-hidden />
-              {mas && cargandoMas && <div className="com-cargando chico">Cargando más…</div>}
+              {mas && cargandoMas && <Cargando chico que="Cargando más" />}
               {/* Si falló la página siguiente, aquí abajo, donde estás: no se vuelve a pedir sola hasta que la pidas. */}
               {falloMas && (
                 <div className="com-error">
@@ -584,22 +601,20 @@ export function Comunidad() {
         </main>
 
         <aside className="com-lado">
-          {/* En Estilos, aquí va el visor de la tienda (`Tienda.tsx`); mientras enseña un estilo, lo demás de este lado no sale. */}
-          <div className="com-visor" ref={setSitioVisor} />
           <div className="com-comunidad">
             <div className="com-comunidad-portada">
               <img src="/icon.svg" alt="" />
             </div>
             <div className="com-comunidad-cuerpo">
-              <h2>Comunidad Sloth</h2>
-              <p>Lo que la gente hace con Sloth y cómo lo hace. Comparte tus videos, pregunta lo que no te sale y pide lo que le falta.</p>
+              <h2>Comunidad VyMotion</h2>
+              <p>Lo que la gente hace con VyMotion y cómo lo hace. Comparte tus videos, pregunta lo que no te sale y pide lo que le falta.</p>
               <div className="com-numeros">
                 <div>
-                  <strong>{feed ? feed.miembros.toLocaleString('es-MX') : '–'}</strong>
+                  <strong>{feed ? miembros.toLocaleString('es-MX') : '–'}</strong>
                   <span>Miembros</span>
                 </div>
                 <div>
-                  <strong>{feed ? feed.activos.toLocaleString('es-MX') : '–'}</strong>
+                  <strong>{feed ? activos.toLocaleString('es-MX') : '–'}</strong>
                   <span>Activos hoy</span>
                 </div>
                 <div>
@@ -607,14 +622,7 @@ export function Comunidad() {
                   <span>Creador</span>
                 </div>
               </div>
-              {caras.length > 0 && (
-                <div className="com-caras">
-                  {caras.map((a) => (
-                    <Cara key={a.id} autor={a} tam="chica" />
-                  ))}
-                </div>
-              )}
-              <button className="com-perfil" disabled={!yo} onClick={() => setPerfil({})}>
+              <button className="com-perfil" disabled={!yo} onClick={irAMiPerfil}>
                 <Cara autor={yo} tam="chica" />
                 {yo?.nombre ? 'Tu perfil' : 'Ponte tu nombre'}
               </button>
@@ -639,7 +647,7 @@ export function Comunidad() {
         />
       )}
       {perfil && yo && (
-        <Perfil
+        <PedirNombre
           yo={yo}
           onListo={(a) => {
             setFeed((f) => f && { ...f, yo: { ...f.yo, ...a } })
@@ -656,12 +664,12 @@ export function Comunidad() {
   )
 }
 
-/** La cara de alguien: su foto, el logo de Sloth si es el creador sin foto, o su inicial. */
-function Cara({ autor, tam = '' }: { autor?: Autor; tam?: '' | 'chica' | 'grande' }) {
+/** La cara de alguien: su foto, el logo de VyMotion si es el creador sin foto, o su inicial. */
+export function Cara({ autor, tam = '' }: { autor?: Autor; tam?: '' | 'chica' | 'grande' | 'enorme' }) {
   // La de un Fundador o un Donador PRO lleva su aro: se distingue también donde solo sale su cara.
   // (`aro-`, porque `grande` ya es un tamaño de cara.)
   const clase = `com-cara ${tam}${autor?.insignia === 'fundador' || autor?.insignia === 'grande' ? ` aro-${autor.insignia}` : ''}`
-  if (autor?.foto) return <img className={clase} src={autor.foto} alt="" />
+  if (autor?.foto) return <img className={clase} src={autor.foto} alt="" loading="lazy" decoding="async" />
   if (autor?.creador)
     return (
       <span className={`${clase} sloth`}>
@@ -672,10 +680,10 @@ function Cara({ autor, tam = '' }: { autor?: Autor; tam?: '' | 'chica' | 'grande
 }
 
 /**
- * Las insignias, de más a menos. Fundador: corona con joyas y los tres colores de Sloth (coral, ámbar y verde). Donador
+ * Las insignias, de más a menos. Fundador: corona con joyas y los tres colores de VyMotion (coral, ámbar y verde). Donador
  * PRO: lo mismo en oro y crema, con una estrella. Apoya: solo el texto.
  */
-const INSIGNIAS = {
+export const INSIGNIAS = {
   fundador: { texto: 'Fundador', icono: 'corona', colores: ['var(--bad)', 'var(--amber-2)', 'var(--ok)'] },
   grande: { texto: 'Donador PRO', icono: 'estrella', colores: ['var(--amber)', 'color-mix(in srgb, var(--amber-2) 20%, var(--text))', 'var(--amber)'] },
   apoya: { texto: 'Apoya', icono: null, colores: null }
@@ -735,14 +743,11 @@ function IconoInsignia({ de, colores }: { de: 'corona' | 'estrella'; colores: re
 /** La sección donde va una publicación: Anuncios, solo para el creador. */
 function ElegirSeccion({ valor, creador, onCambio }: { valor: CategoriaComunidad; creador: boolean; onCambio(s: CategoriaComunidad): void }) {
   return (
-    <Desplegable
-      className="com-elegir"
-      nombre="Sección"
-      titulo="La sección donde se publica"
-      icono={<Icono de={seccionDe(valor).icono} />}
+    <Elegir
+      etiqueta="Dónde se publica"
       valor={valor}
-      opciones={SECCIONES.filter((s) => creador || s.id !== 'anuncios').map((s) => ({ value: s.id, label: s.nombre }))}
-      onCambio={(s) => onCambio(s as CategoriaComunidad)}
+      opciones={SECCIONES.filter((s) => creador || s.id !== 'anuncios').map((s) => ({ id: s.id, nombre: s.nombre, icono: s.icono, tinte: TINTES[s.id] }))}
+      onCambio={(id) => onCambio(id as CategoriaComunidad)}
     />
   )
 }
@@ -765,7 +770,7 @@ function Bienvenida({ yo, onNombre, onPresentarse, onComentar }: { yo: Yo; onNom
   const [oculta, setOculta] = useState(() => localStorage.getItem('comunidad:bienvenida') === 'no')
   const pasos = [
     { hecho: !!yo.nombre, texto: 'Ponte tu nombre y tu foto', accion: onNombre },
-    { hecho: yo.publicaciones > 0, texto: 'Preséntate: quién eres y qué quieres hacer con Sloth', accion: onPresentarse },
+    { hecho: yo.publicaciones > 0, texto: 'Preséntate: quién eres y qué quieres hacer con VyMotion', accion: onPresentarse },
     { hecho: yo.comentarios > 0, texto: 'Comenta un video que hizo alguien', accion: onComentar },
   ]
   const hechos = pasos.filter((p) => p.hecho).length
@@ -795,16 +800,28 @@ function Bienvenida({ yo, onNombre, onPresentarse, onComentar }: { yo: Yo; onNom
 }
 
 /** Una publicación en el feed: quién, cuándo y dónde; su título y el principio del texto; su portada; y lo que generó. */
-function Tarjeta({ p, yo, nueva, visto, onAbrir, onFoco, onMegusta }: { p: PublicacionComunidad; yo?: Yo; nueva: boolean; visto?: string; onAbrir(): void; onFoco(): void; onMegusta(): void }) {
+/**
+ * Con `memo`: con cien publicaciones bajadas, escribir, abrir una o recibir un aviso no vuelve a dibujar todo el feed.
+ * Solo cambia la que cambió (y todas una vez por minuto, por `minuto`, para que «hace 5 min» siga al día).
+ */
+const Tarjeta = memo(function Tarjeta({ p, yoId, nueva, visto, turno, onAbrir, onFoco, onMegusta }: {
+  p: PublicacionComunidad
+  yoId?: string
+  nueva: boolean
+  visto?: string
+  /** Su lugar en la tanda, para entrar una tras otra. */
+  turno: number
+  minuto: number
+  onAbrir(id: string): void
+  onFoco(id: string): void
+  onMegusta(p: PublicacionComunidad): void
+}) {
   const portada = p.adjuntos.find((a) => a.tipo === 'video') ?? p.adjuntos.find((a) => a.tipo === 'imagen')
   const imagen = portada && (portada.tipo === 'imagen' ? portada.url : portada.posterUrl)
   const estilo = p.adjuntos.find((a) => a.tipo === 'estilo')
   const fotos = p.adjuntos.filter((a) => a.tipo !== 'estilo').length
-  // En el feed, la vista previa de los enlaces del texto (hasta 2, para no recargar). Van encima del botón que cubre la
-  // tarjeta (CSS `.com-post .enlaces`), para que se puedan abrir sin que el clic abra el post.
-  const enlacesFeed = enlacesDe(p.texto ?? '', 2)
   // Nuevo: llegó después de la última vez que la abriste, y no lo escribiste tú.
-  const nuevoComentario = !!p.ultimoComentario && (!visto || p.ultimoComentario > visto) && p.comentaron[0]?.id !== yo?.id
+  const nuevoComentario = !!p.ultimoComentario && (!visto || p.ultimoComentario > visto) && p.comentaron[0]?.id !== yoId
   // Se abre con su título, un botón que cubre toda la tarjeta (`.com-post-abrir::after`); me gusta va encima. Al pasar
   // por ella, sus comentarios se piden: al abrirla ya están.
   // Al detenerse en ella (no al pasar de largo con la rueda): 120 ms encima.
@@ -812,13 +829,13 @@ function Tarjeta({ p, yo, nueva, visto, onAbrir, onFoco, onMegusta }: { p: Publi
   const adelantar = () => precargarPublicacion(p.id)
   const detenerse = () => (clearTimeout(espera.current), (espera.current = setTimeout(adelantar, 120)))
   useEffect(() => () => clearTimeout(espera.current), [])
-  const botonAbrir = (contenido: ReactNode, etiqueta?: string) => (
-    <button className="com-post-abrir" aria-label={etiqueta} onClick={onAbrir} onFocus={() => (onFoco(), adelantar())} onPointerDown={(e) => e.button === 0 && adelantar()}>
-      {contenido}
+  const abrir = (
+    <button className="com-post-abrir" onClick={() => onAbrir(p.id)} onFocus={() => (onFoco(p.id), adelantar())} onPointerDown={(e) => e.button === 0 && adelantar()}>
+      {p.titulo || p.texto || (estilo ? estilo.nombre : 'Una imagen')}
     </button>
   )
   return (
-    <article className={`com-post${p.fijada ? ' fijada' : ''}${nueva ? ' nueva' : ''}`} onPointerEnter={detenerse} onPointerLeave={() => clearTimeout(espera.current)}>
+    <article className={`com-post${p.fijada ? ' fijada' : ''}${nueva ? ' nueva' : ''}`} style={{ '--turno': turno } as CSSProperties} onPointerEnter={detenerse} onPointerLeave={() => clearTimeout(espera.current)}>
       <header className="com-post-cabeza">
         <Cara autor={p.autor} />
         <div className="com-post-quien">
@@ -832,7 +849,7 @@ function Tarjeta({ p, yo, nueva, visto, onAbrir, onFoco, onMegusta }: { p: Publi
           </span>
         </div>
         <EstadoMejora p={p} />
-        <EstadoEstilo p={p} />
+        {p.porAprobar && <span className="com-estado" title="Solo lo ven quien lo compartió y el creador de VyMotion, hasta que lo apruebe">En revisión</span>}
         {!!p.reportes && <span className="com-reportada">Reportada · {p.reportes}</span>}
         {p.fijada && (
           <span className="com-fijada">
@@ -842,29 +859,18 @@ function Tarjeta({ p, yo, nueva, visto, onAbrir, onFoco, onMegusta }: { p: Publi
       </header>
       <div className="com-post-cuerpo">
         <div className="com-post-textos">
-          {p.titulo ? (
-            <h3>{botonAbrir(p.titulo)}</h3>
-          ) : p.texto ? (
-            // Sin título, el texto es el contenido: sus enlaces son clicables (encima del overlay) y el botón vacío,
-            // detrás, abre el post al tocar el resto.
-            <div className="com-post-solo">
-              <Texto texto={p.texto} className="com-post-texto" />
-              {botonAbrir(null, p.texto.slice(0, 120))}
-            </div>
-          ) : (
-            <div className="com-post-solo">{botonAbrir(estilo ? estilo.nombre : 'Una imagen')}</div>
-          )}
-          {p.titulo && p.texto && <Texto texto={p.texto} className="com-post-texto" />}
+          {p.titulo ? <h3>{abrir}</h3> : <div className="com-post-solo">{abrir}</div>}
+          {p.titulo && p.texto && <p>{p.texto}</p>}
           {estilo && (
             <span className="com-estilo-linea">
               <Icono de="claqueta" /> Estilo para instalar · {estilo.nombre}
             </span>
           )}
-          {!!enlacesFeed.length && <TarjetasEnlaces enlaces={enlacesFeed} />}
         </div>
         {portada && (
           <div className={`com-post-portada${portada.tipo === 'video' && portada.vertical ? ' vertical' : ''}`}>
-            {imagen ? <img src={imagen} alt="" loading="lazy" /> : <video src={portada.url} muted preload="metadata" />}
+            {/* Sin portada, el video no se baja hasta abrirla: cada <video> del feed ocupaba memoria aunque nadie lo viera. */}
+            {imagen ? <img src={imagen} alt="" loading="lazy" decoding="async" /> : <video src={portada.url} muted preload="none" />}
             {portada.tipo === 'video' && (
               <span className="com-play">
                 <Icono de="video" />
@@ -875,7 +881,7 @@ function Tarjeta({ p, yo, nueva, visto, onAbrir, onFoco, onMegusta }: { p: Publi
         )}
       </div>
       <footer className="com-post-pie">
-        <button className={`com-gusta${p.megusta ? ' on' : ''}`} title={p.megusta ? 'Ya no me gusta' : 'Me gusta'} aria-pressed={!!p.megusta} onClick={(e) => (e.stopPropagation(), onMegusta())}>
+        <button className={`com-gusta${p.megusta ? ' on' : ''}`} title={p.megusta ? 'Ya no me gusta' : 'Me gusta'} aria-pressed={!!p.megusta} onClick={(e) => (e.stopPropagation(), onMegusta(p))}>
           <Icono de="pulgar" /> {p.likes}
           <span className="com-oculto"> me gusta</span>
         </button>
@@ -897,22 +903,12 @@ function Tarjeta({ p, yo, nueva, visto, onAbrir, onFoco, onMegusta }: { p: Publi
       </footer>
     </article>
   )
-}
+})
 
-/** Las URLs únicas de un texto (las partes impares del split por `LINK`), hasta `max`, para su vista previa. */
-function enlacesDe(texto: string, max: number): string[] {
-  return [...new Set(texto.split(new RegExp(`(${LINK.source})`, 'g')).filter((_, i) => i % 2))].slice(0, max)
-}
-
-/**
- * El texto de una publicación o un comentario, con sus enlaces clicables. Con `conEnlaces`, además, debajo van las tarjetas
- * de vista previa de los enlaces (miniatura, sitio y título; YouTube, TikTok y Vimeo por oEmbed), reusando las del inicio
- * (`web/src/Enlaces.tsx`, `server/enlaces.ts`). Solo las primeras, para no recargar: un enlace sin título no enseña nada.
- */
-export function Texto({ texto, className, conEnlaces }: { texto: string; className: string; conEnlaces?: boolean }) {
+/** El texto de una publicación o un comentario, con sus enlaces. */
+function Texto({ texto, className }: { texto: string; className: string }) {
   const partes = texto.split(new RegExp(`(${LINK.source})`, 'g'))
-  const enlaces = conEnlaces ? enlacesDe(texto, 4) : []
-  const parrafo = (
+  return (
     <p className={className}>
       {partes.map((p, i) =>
         i % 2 ? (
@@ -924,13 +920,6 @@ export function Texto({ texto, className, conEnlaces }: { texto: string; classNa
         )
       )}
     </p>
-  )
-  if (!enlaces.length) return parrafo
-  return (
-    <>
-      {parrafo}
-      <TarjetasEnlaces enlaces={enlaces} />
-    </>
   )
 }
 
@@ -1027,38 +1016,21 @@ function Abierta(props: {
   const imagenes = p?.adjuntos.filter((a) => a.tipo === 'imagen') ?? []
   const estilo = p?.adjuntos.find((a) => a.tipo === 'estilo')
   const [revisando, setRevisando] = useState(false)
-  const [preaprobando, setPreaprobando] = useState(false)
-  // Lo que Sloth encontró en un estilo que se va a correr para pre-aprobarlo: se mira antes de seguir.
-  const [riesgo, setRiesgo] = useState('')
 
-  /**
-   * El creador lo instala como card suya para hacerle la prueba y arreglarlo (ADR 0024), con lo que se le pide a su agente
-   * ya escrito en un borrador. Al compartirlo desde esa card, sube a esta misma publicación como «Pre-aprobado por Sloth».
-   */
-  async function preaprobar(aunAsi = false) {
-    if (!p) return
-    setPreaprobando(true)
-    setError('')
-    setRiesgo('')
-    try {
-      const r = await api<{ cardId: string; texto: string }>('/api/comunidad/estilo/preaprobar', { publicacion: p.id, ...(aunAsi ? { aunAsi } : {}) })
-      abrirBorrador(r.cardId, r.texto)
-      props.onCerrar()
-    } catch (e) {
-      if (e instanceof ErrorApi && e.status === 409) setRiesgo(e.message)
-      else setError(e instanceof Error ? e.message : String(e))
-    } finally {
-      setPreaprobando(false)
-    }
-  }
-
-  /** El creador abre el hilo donde su Claude leyó el estilo al llegar (sin instalarlo); si aún no lo leyó, lo lee ahora. */
+  /** El creador lo abre en una carpeta (sin instalarlo) y le pide a «Nuevo estilo» que lo lea antes de aprobarlo. */
   async function revisar() {
     if (!p) return
     setRevisando(true)
     setError('')
     try {
-      abrirHilo((await api<{ hilo: string }>('/api/comunidad/estilo/revisar', { publicacion: p.id })).hilo)
+      const { carpeta } = await api<{ carpeta: string }>('/api/comunidad/estilo/revisar', { publicacion: p.id })
+      abrirBorrador(
+        'nuevo-estilo',
+        [
+          `Revisa el estilo «${estilo?.nombre ?? p.titulo}» que compartió ${p.autor.nombre || 'alguien'} en la comunidad, antes de que yo lo apruebe. Está abierto en "${carpeta}" (no está instalado).`,
+          'Sigue «Revisar un estilo de la comunidad» de tu skill.'
+        ].join('\n\n')
+      )
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
     } finally {
@@ -1072,7 +1044,7 @@ function Abierta(props: {
         <button className="com-icono com-cerrar" title="Cerrar (Esc)" onClick={props.onCerrar}>
           <Icono de="cerrar" />
         </button>
-        {!p && !error && <div className="com-cargando">Cargando…</div>}
+        {!p && !error && <Cargando />}
         {!p && error && <div className="com-error">{error}</div>}
         {p && (
           <>
@@ -1090,13 +1062,13 @@ function Abierta(props: {
                 </span>
               </div>
               <EstadoMejora p={p} />
-              <EstadoEstilo p={p} />
+              {p.porAprobar && <span className="com-estado" title="Solo lo ven quien lo compartió y el creador de VyMotion, hasta que lo apruebe">En revisión</span>}
               {!!p.reportes && <span className="com-reportada">Reportada · {p.reportes}</span>}
               {!editando && (
                 <div className="com-acciones">
                   {!suya && !yo.creador && (
                     <button
-                      className="com-icono"
+                      className="com-icono peligro"
                       disabled={reportada}
                       title={reportada ? 'Ya la reportaste' : 'Reportar la publicación'}
                       onClick={() => setReportando({ que: 'publicación', id: p.id })}
@@ -1144,18 +1116,17 @@ function Abierta(props: {
             ) : (
               <>
                 {p.titulo && <h2 className="com-abierta-titulo">{p.titulo}</h2>}
-                {p.texto && <Texto texto={p.texto} className="com-abierta-texto" conEnlaces />}
+                {p.texto && <Texto texto={p.texto} className="com-abierta-texto" />}
                 {video && (
                   <video className={`com-video${video.vertical ? ' vertical' : ''}`} src={video.url} poster={video.posterUrl} controls loop playsInline preload="metadata" />
                 )}
-                {estilo?.guia && <GuiaVista guia={estilo.guia} prueba={estilo.prueba} />}
-                {estilo?.prueba && <VerEvidencia prueba={estilo.prueba} />}
-                {estilo && <ParaInstalar p={p} nombre={estilo.nombre ?? p.titulo} suya={suya} onCambio={cambiar} />}
+                {estilo?.guia && <GuiaVista guia={estilo.guia} />}
+                {estilo && <ParaInstalar p={p} nombre={estilo.nombre ?? p.titulo} suya={suya} />}
                 {imagenes.length > 0 && (
                   <div className={`com-fotos n${Math.min(imagenes.length, 3)}`}>
                     {imagenes.map((a) => (
                       <button key={a.llave} title="Ampliar" onClick={() => setAmpliada(a.url)}>
-                        <img src={a.url} alt="" loading="lazy" />
+                        <img src={a.url} alt="" loading="lazy" decoding="async" />
                       </button>
                     ))}
                   </div>
@@ -1167,18 +1138,8 @@ function Abierta(props: {
             {yo.creador && (p.categoria === 'mejoras' || p.categoria === 'estilos' || !!p.reportes) && !editando && (
               <div className="com-creador-barra">
                 {estilo && (
-                  <button className="com-boton" disabled={revisando} title="Lo que tu Claude dijo de él al llegar: qué hace, qué le falta y por qué se aprobó o no. No lo instala" onClick={() => void revisar()}>
+                  <button className="com-boton" disabled={revisando} title="Lo abre en una carpeta, sin instalarlo, y «Nuevo estilo» lo lee y te dice qué hace" onClick={() => void revisar()}>
                     <Icono de="escudo" /> {revisando ? 'Abriendo…' : 'Revisar'}
-                  </button>
-                )}
-                {estilo && p.porAprobar && !p.autor.creador && (
-                  <button
-                    className="com-boton"
-                    disabled={preaprobando}
-                    title="Lo instalas como card tuya para hacerle la prueba, completarlo y arreglarlo. Al compartirlo desde esa card, lo ve toda la comunidad como «Pre-aprobado por Sloth»"
-                    onClick={() => void preaprobar()}
-                  >
-                    <Icono de="claqueta" /> {preaprobando ? 'Instalando…' : 'Pre-aprobar'}
                   </button>
                 )}
                 {estilo &&
@@ -1218,14 +1179,6 @@ function Abierta(props: {
               </div>
             )}
 
-            {riesgo && (
-              <div className="com-creador-barra">
-                <span className="com-falta">{riesgo}</span>
-                <button className="com-boton" disabled={preaprobando} onClick={() => void preaprobar(true)}>
-                  Ya lo revisé: pre-aprobar
-                </button>
-              </div>
-            )}
             {error && p && <div className="com-error">{error}</div>}
 
             <div className="com-abierta-pie">
@@ -1238,7 +1191,7 @@ function Abierta(props: {
             </div>
 
             <div className="com-comentarios">
-              {comentarios === null && !error && <div className="com-cargando chico">Cargando comentarios…</div>}
+              {comentarios === null && !error && <Cargando chico que="Cargando los comentarios" />}
               {comentarios
                 ?.filter((c) => !c.responde)
                 .map((c) => {
@@ -1378,12 +1331,12 @@ function Comentario(props: {
               )}
             </span>
           </div>
-          {c.texto && <Texto texto={c.texto} className="com-comentario-texto" conEnlaces />}
+          {c.texto && <Texto texto={c.texto} className="com-comentario-texto" />}
           {!!c.adjuntos?.length && (
             <div className={`com-comentario-fotos n${c.adjuntos.length}`}>
               {c.adjuntos.map((a) => (
                 <button key={a.llave} title="Ampliar" onClick={() => props.onAmpliar(a.url)}>
-                  <img src={a.url} alt="" loading="lazy" />
+                  <img src={a.url} alt="" loading="lazy" decoding="async" />
                 </button>
               ))}
             </div>
@@ -1567,7 +1520,7 @@ function Comentar(props: {
   )
 }
 
-const MOTIVOS = ['Es spam o publicidad', 'Es ofensivo o agresivo', 'No tiene que ver con Sloth', 'Otro']
+const MOTIVOS = ['Es spam o publicidad', 'Es ofensivo o agresivo', 'No tiene que ver con VyMotion', 'Otro']
 
 /** Reportar una publicación o un comentario: por qué, y le llega al creador. Con 3 reportes deja de verse hasta que lo revise. */
 function Reportar({ que, onListo, onCerrar }: { que: 'publicación' | 'comentario'; onListo(motivo: string): Promise<void>; onCerrar(): void }) {
@@ -1603,7 +1556,7 @@ function Reportar({ que, onListo, onCerrar }: { que: 'publicación' | 'comentari
         {listo ? (
           <>
             <h2 id="com-reportar-titulo">Gracias</h2>
-            <p>El creador de Sloth lo va a revisar. Si más personas lo reportan, deja de verse mientras tanto.</p>
+            <p>El creador de VyMotion lo va a revisar. Si más personas lo reportan, deja de verse mientras tanto.</p>
             <div className="com-caja-pie">
               <button className="esc-listo" autoFocus onClick={onCerrar}>
                 Listo
@@ -1613,7 +1566,7 @@ function Reportar({ que, onListo, onCerrar }: { que: 'publicación' | 'comentari
         ) : (
           <>
             <h2 id="com-reportar-titulo">Reportar {que === 'publicación' ? 'esta publicación' : 'este comentario'}</h2>
-            <p>¿Qué tiene? Solo lo ve el creador de Sloth.</p>
+            <p>¿Qué tiene? Solo lo ve el creador de VyMotion.</p>
             <div className="com-motivos" role="radiogroup">
               {MOTIVOS.map((m) => (
                 <button key={m} role="radio" aria-checked={motivo === m} className={motivo === m ? 'on' : ''} onClick={() => setMotivo(m)}>
@@ -1635,7 +1588,7 @@ function Reportar({ que, onListo, onCerrar }: { que: 'publicación' | 'comentari
               <button className="esc-cancelar" onClick={onCerrar}>
                 Cancelar
               </button>
-              <button className="esc-listo" disabled={falta || ocupado} onClick={() => void mandar()}>
+              <button className="esc-listo com-reportar-boton" disabled={falta || ocupado} onClick={() => void mandar()}>
                 Reportar
               </button>
             </div>
@@ -1646,7 +1599,7 @@ function Reportar({ que, onListo, onCerrar }: { que: 'publicación' | 'comentari
   )
 }
 
-/** Si hay un diálogo abierto en Sloth (confirmar, la rifa ganada, los avisos): los atajos de la comunidad no van. */
+/** Si hay un diálogo abierto en VyMotion (confirmar, la rifa ganada, los avisos): los atajos de la comunidad no van. */
 const hayDialogo = () => !!document.querySelector('[aria-modal="true"], .modal, .com-avisos-panel')
 
 /** Si la tecla va a algo donde se escribe (entonces no es un atajo). */
@@ -1664,7 +1617,8 @@ const RESULTADOS = 8
 type Resultado = { id: string; titulo: string; texto: string; categoria: CategoriaComunidad; creada: string; actividad: string; autor: string }
 const comoResultado = (p: PublicacionComunidad): Resultado => ({ ...p, autor: p.autor.nombre })
 
-function Buscador({ onAbrir }: { onAbrir(id: string): void }) {
+/** Con `memo`: lo que cambia en el feed no lo vuelve a calcular (busca entre miles de títulos). */
+const Buscador = memo(function Buscador({ onAbrir }: { onAbrir(id: string): void }) {
   const [q, setQ] = useState('')
   const [delWorker, setDelWorker] = useState<{ palabras: string; lista: Resultado[]; fallo?: boolean } | null>(null)
   const [activaId, setActivaId] = useState<string | null>(null)
@@ -1804,7 +1758,7 @@ function Buscador({ onAbrir }: { onAbrir(id: string): void }) {
       )}
     </div>
   )
-}
+})
 
 /** La campana: tus avisos, del más nuevo al más viejo. Al abrirla se marcan leídos; tocar uno abre su publicación. */
 function Avisos({ sinLeer, onAbrir, onLeidos }: { sinLeer: number; onAbrir(id: string): void; onLeidos(): void }) {
@@ -1871,13 +1825,9 @@ function Avisos({ sinLeer, onAbrir, onLeidos }: { sinLeer: number; onAbrir(id: s
 
 /**
  * El estilo de una publicación de Estilos: instalarlo, o ponerlo al día si ya lo tienes de aquí y su paquete cambió. Sin
- * aprobar, solo lo ven quien lo compartió y el creador. En el visor de la tienda (`enVisor`), solo el botón y cómo está:
- * el nombre ya va arriba. Instalar es de quien apoya: a quien no (`sinApoyo`, si ya se sabe; si no, lo dice el cobro con
- * un 402), «Instalar» le abre la invitación a apoyar, y al apoyar (`onApoyo`) ya lo puede instalar.
+ * aprobar, solo lo ven quien lo compartió y el creador.
  */
-export function ParaInstalar(props: { p: PublicacionComunidad; nombre: string; suya: boolean; enVisor?: boolean; sinApoyo?: number; onApoyo?(): void; onCambio?(p: PublicacionComunidad): void }) {
-  const { p, nombre, suya, enVisor } = props
-  const [invitar, setInvitar] = useState(false)
+function ParaInstalar({ p, nombre, suya }: { p: PublicacionComunidad; nombre: string; suya: boolean }) {
   const llave = p.adjuntos.find((a) => a.tipo === 'estilo')?.llave
   // Tu estilo de aquí, si ya lo instalaste: con qué paquete.
   const [mio, setMio] = useState<{ llave?: string } | null | undefined>(undefined)
@@ -1891,25 +1841,10 @@ export function ParaInstalar(props: { p: PublicacionComunidad; nombre: string; s
     )
   }, [p.id, instalado])
   async function instalar() {
-    if (props.sinApoyo !== undefined) return setInvitar(true)
     setOcupado(true)
     setError('')
     try {
       setInstalado(await api<Instalado>('/api/comunidad/estilo/instalar', { publicacion: p.id }))
-    } catch (e) {
-      // 402: instalar es de quien apoya.
-      if (e instanceof ErrorApi && e.status === 402) setInvitar(true)
-      else setError(e instanceof Error ? e.message : String(e))
-    } finally {
-      setOcupado(false)
-    }
-  }
-  /** Su autor deja como está el estilo que pre-aprobó Sloth: pasa a aprobado. */
-  async function conforme() {
-    setOcupado(true)
-    setError('')
-    try {
-      props.onCambio?.(await api<PublicacionComunidad>(`/api/comunidad/p/${p.id}/conforme`, {}))
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
     } finally {
@@ -1917,74 +1852,35 @@ export function ParaInstalar(props: { p: PublicacionComunidad; nombre: string; s
     }
   }
   const alDia = !!mio && mio.llave === llave
-  const como = p.incompleto
-    ? `Le falta completar: ${p.incompleto.join('; ')}. ${suya ? 'Mientras tanto no sale en la tienda: complétalo con «Compartir» en su card.' : 'Su autor lo tiene que completar.'}`
-    : p.porAprobar
-    ? p.publicaAun
-      ? suya
-        ? 'Tu versión nueva está en revisión. Mientras tanto la comunidad sigue viendo la de antes, y cuando se apruebe esta la reemplaza. Si le falta algo, te lo dice aquí abajo, en los comentarios.'
-        : 'Versión nueva sin aprobar: los demás siguen viendo la de antes.'
-      : suya
-        ? 'En revisión: solo lo ven tú y el creador de Sloth. Sloth lo lee solo: si cumple todo se aprueba, y si le falta algo te lo dice aquí abajo, en los comentarios; para mandar el arreglo, «Compartir» otra vez en su card. Cuando se apruebe, te llega un aviso a la campana.'
-        : 'Aún no lo apruebas: nadie más lo ve.'
-    : p.preaprobada && suya
-      ? 'Pre-aprobado por Sloth: le hizo la prueba, le completó lo que faltaba y le arregló sus errores, y ya lo ve toda la comunidad. Si te gusta así, «Así está bien». Si no, cámbialo y pulsa «Compartir» en su card: mientras se revisa tu versión, la comunidad sigue viendo esta.'
-    : alDia
-      ? 'Ya está en tus estilos.'
-      : mio
-        ? 'Hay una versión nueva.'
-        : props.sinApoyo !== undefined && !suya
-          ? 'Instalarlo es para quienes apoyan a Sloth.'
-          : 'Sale entre tus estilos, como uno tuyo.'
-  // El tuyo ya lo tienes: instalarlo chocaría con él.
-  const boton = mio !== undefined && !alDia && !suya && (
-    <button className={enVisor ? 'visor-boton' : 'com-boton ok'} disabled={ocupado} onClick={() => void instalar()}>
-      <Icono de="descargar" /> {ocupado ? 'Instalando…' : mio ? 'Actualizar' : 'Instalar'}
-    </button>
-  )
   return (
-    <div className={enVisor ? 'visor-instalar' : 'com-instalar'}>
-      {enVisor ? (
-        boton
-      ) : (
-        <span className="com-instalar-icono">
-          <Icono de="claqueta" />
-        </span>
-      )}
+    <div className="com-instalar">
+      <span className="com-instalar-icono">
+        <Icono de="claqueta" />
+      </span>
       <div className="com-instalar-texto">
-        {!enVisor && <strong>{nombre}</strong>}
-        <span className={p.incompleto ? 'com-falta' : undefined}>{como}</span>
+        <strong>{nombre}</strong>
+        <span>
+          {p.porAprobar
+            ? suya
+              ? 'En revisión: solo lo ven tú y el creador de VyMotion. Cuando lo apruebe, te llega un aviso a la campana.'
+              : 'Aún no lo apruebas: nadie más lo ve.'
+            : alDia
+              ? 'Ya está en tus estilos.'
+              : mio
+                ? 'Hay una versión nueva.'
+                : 'Sale entre tus estilos, como uno tuyo.'}
+        </span>
         {error && <span className="com-instalar-error">{error}</span>}
       </div>
-      {!enVisor && boton}
-      {p.preaprobada && suya && props.onCambio && (
-        <button className={enVisor ? 'visor-boton' : 'com-boton ok'} disabled={ocupado} title="Queda aprobado tal como lo dejó Sloth" onClick={() => void conforme()}>
-          <Icono de="palomita" /> Así está bien
+      {/* El tuyo ya lo tienes: instalarlo chocaría con él. */}
+      {mio !== undefined && !alDia && !suya && (
+        <button className="com-boton ok" disabled={ocupado} onClick={() => void instalar()}>
+          <Icono de="descargar" /> {ocupado ? 'Instalando…' : mio ? 'Actualizar' : 'Instalar'}
         </button>
       )}
       {instalado && <TrasInstalar r={instalado} onCerrar={() => setInstalado(null)} />}
-      {invitar && <ApoyarParaInstalar nombre={nombre} estilos={props.sinApoyo} onListo={() => (setInvitar(false), props.onApoyo?.())} onCerrar={() => setInvitar(false)} />}
     </div>
   )
-}
-
-/**
- * Cómo está un estilo: le falta algo de lo que lleva todo estilo (en rojo), está en revisión (y si la comunidad aún ve su
- * versión de antes), o lo pre-aprobó Sloth.
- */
-export function EstadoEstilo({ p }: { p: PublicacionComunidad }) {
-  if (p.incompleto) return <span className="com-estado com-falta" title={`Le falta: ${p.incompleto.join('; ')}. No sale en la tienda hasta que se complete`}>Le falta completar</span>
-  if (p.porAprobar)
-    return (
-      <span className="com-estado" title={p.publicaAun ? 'Su versión nueva espera su aprobación: mientras tanto la comunidad ve la de antes' : 'Solo lo ven quien lo compartió y el creador de Sloth, hasta que se apruebe'}>
-        En revisión
-      </span>
-    )
-  return p.preaprobada ? (
-    <span className="com-estado hecha" title="Sloth le hizo la prueba, lo completó y lo arregló; su autor aún no dice si así está bien">
-      <Icono de="escudo" /> Pre-aprobado por Sloth
-    </span>
-  ) : null
 }
 
 /** Lo que dice cada aviso. */
@@ -1999,8 +1895,6 @@ function fraseDe(a: AvisoComunidad) {
   if (a.tipo === 'reporte') return <>{quien} reportó {a.comentario ? 'un comentario en ' : ''}{sobre}: {a.texto}</>
   if (a.tipo === 'estilo') return <>{quien} compartió un estilo por aprobar: {sobre}</>
   if (a.tipo === 'aprobado') return <>{quien} aprobó tu estilo {sobre}: ya todos lo pueden instalar</>
-  if (a.tipo === 'preaprobado') return <>Sloth pre-aprobó tu estilo {sobre}: le hizo la prueba, lo arregló y ya lo ve toda la comunidad. Ábrelo para ver qué le cambió</>
-  if (a.tipo === 'incompleto') return <span className="com-falta">A tu estilo {sobre} le falta completar su guía, su video o su prueba: mientras tanto no sale en la tienda</span>
   return <>{quien} publicó un anuncio: {sobre}</>
 }
 
@@ -2046,15 +1940,14 @@ function Votar({ roadmap, fundador, onVoto }: { roadmap: RoadmapComunidad; funda
   )
 }
 
-function Perfil({ yo, onListo, onCerrar }: { yo: Yo; onListo(a: Autor): void; onCerrar(): void }) {
+/**
+ * Sin nombre no se publica ni se comenta: esta cajita lo pide ahí mismo, sin sacarte de lo que ibas a hacer, y luego
+ * sigue sola. Todo lo demás de tu perfil (tu foto, los créditos, tus números) vive en su propia página, `MiPerfil.tsx`.
+ */
+function PedirNombre({ yo, onListo, onCerrar }: { yo: Yo; onListo(a: Autor): void; onCerrar(): void }) {
   const [nombre, setNombre] = useState(yo.nombre)
-  const [creditos, setCreditos] = useState(!!yo.creditos)
-  // `undefined`: la foto que ya tenías; `null`: sin foto; o la nueva.
-  const [foto, setFoto] = useState<{ llave: string; url: string } | null | undefined>(undefined)
-  const [subiendo, setSubiendo] = useState(false)
   const [ocupado, setOcupado] = useState(false)
   const [error, setError] = useState('')
-  const elegir = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     const tecla = (e: KeyboardEvent) => e.key === 'Escape' && onCerrar()
@@ -2062,63 +1955,23 @@ function Perfil({ yo, onListo, onCerrar }: { yo: Yo; onListo(a: Autor): void; on
     return () => removeEventListener('keydown', tecla)
   })
 
-  async function subir(f?: File) {
-    if (!f) return
-    if (!f.type.startsWith('image/')) return setError('Tu foto debe ser una imagen.')
-    setSubiendo(true)
-    setError('')
-    try {
-      const r = await fetch(`/api/comunidad/archivo?tipo=${encodeURIComponent(f.type)}`, { method: 'POST', body: f })
-      const j = (await r.json().catch(() => ({}))) as { llave?: string; url?: string; error?: string }
-      if (!r.ok || !j.llave || !j.url) throw new Error(j.error ?? 'No se pudo subir tu foto.')
-      setFoto({ llave: j.llave, url: j.url })
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e))
-    } finally {
-      setSubiendo(false)
-    }
-  }
-
   async function guardar() {
-    if (!nombre.trim() || subiendo || ocupado) return
+    if (!nombre.trim() || ocupado) return
     setOcupado(true)
     setError('')
     try {
-      onListo(
-        await api<Autor>('/api/comunidad/perfil', {
-          nombre: nombre.trim(),
-          ...(foto !== undefined ? { foto: foto?.llave ?? null } : {}),
-          ...(yo.insignia === 'fundador' ? { creditos } : {})
-        })
-      )
+      onListo(await api<Autor>('/api/comunidad/perfil', { nombre: nombre.trim() }))
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
       setOcupado(false)
     }
   }
 
-  const vista: Autor = { ...yo, nombre: nombre || yo.nombre, foto: foto === undefined ? yo.foto : foto?.url }
   return (
     <div className="com-velo" onMouseDown={(e) => e.target === e.currentTarget && onCerrar()}>
-      <div className="com-caja" role="dialog" aria-modal="true" aria-labelledby="com-perfil-titulo">
-        <h2 id="com-perfil-titulo">{yo.nombre ? 'Tu perfil' : '¿Cómo te llamas?'}</h2>
-        <p>Así te ven en la comunidad: tu nombre y, si quieres, tu foto.</p>
-        <div className="com-perfil-foto">
-          <button className={subiendo ? 'subiendo' : ''} title="Elegir una foto" onClick={() => elegir.current?.click()}>
-            <Cara autor={vista} tam="grande" />
-          </button>
-          <div>
-            <button className="com-boton" disabled={subiendo} onClick={() => elegir.current?.click()}>
-              <Icono de="imagen" /> {subiendo ? 'Subiendo…' : vista.foto ? 'Cambiar la foto' : 'Poner una foto'}
-            </button>
-            {vista.foto && (
-              <button className="com-boton" onClick={() => setFoto(null)}>
-                Quitarla
-              </button>
-            )}
-          </div>
-          <input ref={elegir} type="file" accept="image/*" hidden onChange={(e) => (void subir(e.target.files?.[0]), (e.target.value = ''))} />
-        </div>
+      <div className="com-caja" role="dialog" aria-modal="true" aria-labelledby="com-nombre-titulo">
+        <h2 id="com-nombre-titulo">¿Cómo te llamas?</h2>
+        <p>Con ese nombre firmas lo que publicas. Tu foto y lo demás, en Mi perfil.</p>
         <input
           className="com-perfil-nombre"
           value={nombre}
@@ -2128,19 +1981,13 @@ function Perfil({ yo, onListo, onCerrar }: { yo: Yo; onListo(a: Autor): void; on
           onChange={(e) => setNombre(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && void guardar()}
         />
-        {yo.insignia === 'fundador' && (
-          <label className="com-creditos">
-            <input type="checkbox" checked={creditos} onChange={(e) => setCreditos(e.target.checked)} />
-            <span>Salir con este nombre en los créditos de los Fundadores, en sloth.vancci.org</span>
-          </label>
-        )}
         {error && <p className="bad small">{error}</p>}
         <div className="com-caja-pie">
           <button className="esc-cancelar" onClick={onCerrar}>
             Cancelar
           </button>
-          <button className="esc-listo" disabled={!nombre.trim() || subiendo || ocupado} onClick={() => void guardar()}>
-            Guardar
+          <button className="esc-listo" disabled={!nombre.trim() || ocupado} onClick={() => void guardar()}>
+            {ocupado ? 'Guardando…' : 'Seguir'}
           </button>
         </div>
       </div>

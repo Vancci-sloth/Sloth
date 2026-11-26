@@ -3,7 +3,7 @@
 Las series son formatos fijos del canal que sirven para cualquier nicho y cualquier estilo, cada una en su archivo: qué
 es, dónde buscar el tema y cómo elegirlo, qué tiene que pasar en el video y temas de ejemplo. Las de todos los estilos
 están en [`series/`](series/) de la base; un estilo puede tener además las suyas en `<skill>/series/` (con el mismo
-nombre, la suya manda). Sloth las enseña al crear un video y, si el usuario elige una, el mensaje trae la línea
+nombre, la suya manda). VyMotion las enseña al crear un video y, si el usuario elige una, el mensaje trae la línea
 `Serie: <nombre> (<archivo>)`, con la ruta desde la carpeta de las skills.
 
 - Lee ese archivo antes de investigar. Manda sobre lo general del estilo en el tema y en lo que tiene que pasar; la
@@ -30,4 +30,4 @@ nombre, la suya manda). Sloth las enseña al crear un video y, si el usuario eli
   ningún proyecto». Así el siguiente video no empieza a buscar de cero.
 
 Una serie nueva es un archivo más en `series/` (de la base si sirve a cualquier estilo, de la skill si es solo suya),
-con la misma forma: el título en la primera línea `# `, que es el nombre que enseña Sloth.
+con la misma forma: el título en la primera línea `# `, que es el nombre que enseña VyMotion.

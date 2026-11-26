@@ -9,11 +9,6 @@
 // STRIPE_WEBHOOK_SECRET (la tarjeta, con Stripe: `npm run stripe` pone las dos con la llave secreta; sin ellas no se ofrece),
 // VOICES_PK_LIVE, VOICES_PK_LIVE_2, VOICES_PK_LIVE_3… (las llaves de socio `pk_live_…` de Voices Cloning, una por secreto,
 // para las voces de src/voz.ts; una nueva va en el siguiente número libre y nunca encima de otra, que tiene sus usuarios),
-// DEEPGRAM_API_KEY, DEEPGRAM_API_KEY_2, DEEPGRAM_API_KEY_3… (las llaves de Deepgram del dictado de quien apoya,
-// src/dictado.ts, con rol Admin u Owner para que se lea su saldo: se usan en orden y se salta la que se acaba; una
-// nueva va en el siguiente número libre),
-// YOUTUBE_CLIENT_ID y YOUTUBE_CLIENT_SECRET (el cliente OAuth «App de escritorio» del proyecto de Google de Sloth: con
-// ellos, quien apoya conecta su canal de YouTube con la app de Sloth, src/youtube.ts; sin ellos, no se ofrece),
 // FIRMA (la llave privada Ed25519 en PKCS8 y base64; la pública va en server/licencia.ts), PUBLICAR (la llave de
 // `npm run publicar`, solo en los secretos de GitHub: sube versiones) y ADMIN (la del creador, en
 // %APPDATA%\sloth\licencias\admin.txt: administra la comunidad, las voces y los apoyos a mano, no publica). La base de datos se crea con
@@ -24,11 +19,7 @@
   "compatibility_date": "2026-10-01",
   // workers.dev sigue para las apps de antes, que llaman ahí; las nuevas, a api.sloth.vancci.org (zona vancci.org de esta cuenta).
   "workers_dev": true,
-  // web.sloth.vancci.org: la entrada de Sloth en la web (src/web.ts), sola en su dominio.
-  "routes": [
-    { "pattern": "api.sloth.vancci.org", "custom_domain": true },
-    { "pattern": "web.sloth.vancci.org", "custom_domain": true }
-  ],
+  "routes": [{ "pattern": "api.sloth.vancci.org", "custom_domain": true }],
   "observability": { "enabled": true },
   // Cada mañana (9:00 de la Ciudad de México): el aviso de los cobros que vienen. Cada 10 minutos: las claves que no
   // salieron por correo al confirmarse el pago (`reenviarClaves`) y los premios de la rifa que quedaron a medias.
@@ -56,13 +47,6 @@
     "FUNDADORES": 25,
     "PRECIO_MENSUAL": 10,
     "PRECIO_ANUAL": 100,
-    // La escalera (src/escalera.ts), desde el 18 de noviembre de 2026: por cada PRECIO_CADA personas que apoyan hoy, el
-    // apoyo de cada mes cuesta PRECIO_SUBE más que PRECIO_MENSUAL ($10 hasta 49, $15 de 50 a 99, $20 de 100 a 149…; en
-    // pesos, PRECIO_SUBE_MXN más que PRECIO_MENSUAL_MXN). A quien entra con ese precio le baja PRECIO_SUBE cada mes
-    // hasta PRECIO_MENSUAL. Para quitarla, quita PRECIO_CADA: las que ya bajan siguen bajando con PRECIO_SUBE.
-    "PRECIO_CADA": 50,
-    "PRECIO_SUBE": 5,
-    "PRECIO_SUBE_MXN": 100,
     // El mensual y el de una vez también van con el monto que elija cada quien, desde APOYO_MINIMO; desde APOYO_GRANDE al
     // mes, con la insignia de apoyo grande (Donador PRO) en la comunidad, aunque la página ya no lo ofrece aparte.
     "APOYO_MINIMO": 1,
@@ -86,9 +70,6 @@
     // "1": Voices Cloning es solo del creador, aunque alguien más tenga créditos (desde el 6 de noviembre de 2026, mientras
     // se prueba). La actualización que trae las voces lo abre al terminar de publicarse (`voz-mensual.json` en R2).
     "VOZ_SOLO_CREADOR": "1",
-    // "1": la app del celular solo abre a quien apoya hoy, con su clave de Sloth (src/celular.ts); "0", para todos.
-    // Cambia sin sacar otra versión de la app: basta con desplegar. Desde el 21 de noviembre de 2026, "0" (versión GAMMA).
-    "CELULAR_SOLO_APOYO": "0",
     "CORREO_DE": "Sloth <avisos@vancci.org>",
     "CORREO_RESPUESTA": "soporte@vancci.org"
   }

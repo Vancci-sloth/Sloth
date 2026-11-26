@@ -8,7 +8,7 @@ import {guardar} from './disco.ts'
 import type {AgentOptions} from './agent.ts'
 
 test('el mismo turno genera el título y nunca pisa un renombrado manual', t => {
-  const dir = mkdtempSync(join(tmpdir(), 'sloth-titulos-'))
+  const dir = mkdtempSync(join(tmpdir(), 'vymotion-titulos-'))
   let emitir!: AgentOptions['onEvent']
   let enviado = ''
   const sesiones = new Sessions(dir, ()=>{}, ()=>{}, ()=>{}, ()=>{}, opts => {
@@ -18,7 +18,7 @@ test('el mismo turno genera el título y nunca pisa un renombrado manual', t => 
   t.after(()=>{sesiones.closeAll(); rmSync(dir, {recursive:true, force:true})})
   const meta = sesiones.create({cardId:'prueba', title:'Crea un anuncio', model:'codex:prueba', cwd:dir, generarTitulo:true})
   sesiones.send(meta.id, 'Un anuncio de Deezer sin voz')
-  const archivo = join(dir, `.sloth-titulo-${meta.id}.txt`)
+  const archivo = join(dir, `.vymotion-titulo-${meta.id}.txt`)
   assert.ok(enviado.includes(meta.id+'.txt'))
   guardar(archivo, 'Deezer: tu próximo ritmo')
   emitir({t:'turn_end', at:Date.now(), ok:true})

@@ -1,9 +1,8 @@
 import assert from 'node:assert/strict'
-import { readdirSync, readFileSync } from 'node:fs'
+import { readFileSync } from 'node:fs'
 import test from 'node:test'
 import { DatabaseSync } from 'node:sqlite'
-import { AVISO_BINANCE, COMO_PONER_BINANCE } from '../../shared/fondo.ts'
-import { adjuntosDe, consultaBuscar, consultaFeed, consultaIndice, estiloEnSuSitio, FALTA_BINANCE, fotosDeComentario, palabrasDe } from './comunidad.ts'
+import { adjuntosDe, consultaBuscar, consultaFeed, consultaIndice, estiloEnSuSitio, fotosDeComentario, palabrasDe } from './comunidad.ts'
 
 const imagen = (n: number) => ({ tipo: 'imagen', llave: `${String(n).padStart(20, 'a')}.png` })
 const video = { tipo: 'video', llave: 'bbbbbbbbbbbbbbbbbbbb.mp4', poster: 'cccccccccccccccccccc.webp', vertical: true }
@@ -28,11 +27,6 @@ test('un solo video, a lo más diez adjuntos, y la portada solo si es una imagen
   assert.deepEqual(adjuntosDe([video, otro]), [video])
   assert.equal(adjuntosDe(Array.from({ length: 14 }, (_, i) => imagen(i))).length, 10)
   assert.deepEqual(adjuntosDe([{ ...video, poster: 'eeeeeeeeeeeeeeeeeeee.mp4' }]), [{ tipo: 'video', llave: video.llave, vertical: true }])
-  // El adelanto del video de un estilo es otro MP4 de la comunidad; lo que no lo sea, no se guarda.
-  assert.deepEqual(adjuntosDe([{ ...video, previa: 'dddddddddddddddddddd.mp4' }]), [{ ...video, previa: 'dddddddddddddddddddd.mp4' }])
-  assert.deepEqual(adjuntosDe([{ ...video, previa: 'dddddddddddddddddddd.webp' }]), [video])
-  assert.deepEqual(adjuntosDe([{ ...video, previa: 'https://otro.com/x.mp4' }]), [video])
-  assert.deepEqual(adjuntosDe([{ ...imagen(1), previa: 'dddddddddddddddddddd.mp4' }]), [imagen(1)])
 })
 
 test('un estilo es un paquete de la comunidad, uno solo, con su nombre, y va en Estilos', () => {
@@ -46,38 +40,20 @@ test('un estilo es un paquete de la comunidad, uno solo, con su nombre, y va en 
   assert.doesNotThrow(() => estiloEnSuSitio('general', adjuntosDe([imagen(1)]), ''))
 })
 
-test('un estilo no se publica sin lo que lleva todo estilo: qué hace, su guía completa, un video entero y su prueba', () => {
-  const guia = { das: 'Solo el tema del video.', entrega: 'Un vertical de 30 segundos.', ejemplo: 'Hazme un video del ciclo del agua.', herramientas: ['codigo', 'tu-voz'], agentes: ['claude'] }
-  const prueba = { agente: 'claude', modelo: 'claude-opus-5-5', costo: 0.49, segundos: 222, evidencia: 'hhhhhhhhhhhhhhhhhhhh.hilo' }
-  const video = { tipo: 'video', llave: 'eeeeeeeeeeeeeeeeeeee.mp4' }
+test('un estilo no se publica sin decir qué hace y cómo se usa: su plantilla completa', () => {
+  const guia = { das: 'Solo el tema del video.', entrega: 'Un vertical de 30 segundos.', ejemplo: 'Hazme un video del ciclo del agua.' }
   const estilo = { tipo: 'estilo', llave: 'ffffffffffffffffffff.estilo', nombre: 'Receta rápida' }
   const con = (g: unknown) => adjuntosDe([{ ...estilo, guia: g }])
-  /** Como lo manda «Compartir»: el estilo con su guía y su prueba, y su video. */
-  const completo = (g: unknown = guia, p: unknown = prueba) => adjuntosDe([{ ...estilo, guia: g, prueba: p }, video])
   // La guía se guarda limpia: recortada, sin lo que no es suyo ni los campos vacíos.
   assert.deepEqual(con({ ...guia, das: `  Solo el
  tema del video.  `, necesita: ' ', otro: 'x', ejemplo: 'e'.repeat(900) }), [{ ...estilo, guia: { ...guia, ejemplo: 'e'.repeat(400) } }])
   assert.deepEqual(con('nada'), [estilo])
-  // La prueba también se guarda limpia, y una que no dice con qué se hizo no se guarda.
-  assert.deepEqual(adjuntosDe([{ ...estilo, prueba: { ...prueba, costo: 0.487, otro: 'x' } }]), [{ ...estilo, prueba }])
-  assert.deepEqual(adjuntosDe([{ ...estilo, prueba: { costo: 1, segundos: 60 } }]), [estilo])
-  assert.doesNotThrow(() => estiloEnSuSitio('estilos', completo({ ...guia, necesita: 'Google Flow con créditos.' }), 'Recetas en 30 segundos.'))
-  assert.doesNotThrow(() => estiloEnSuSitio('estilos', completo(), 'Recetas en 30 segundos.'))
-  // Una Sloth de antes no manda todo: dice qué falta, todo de una vez, y que se actualice.
-  assert.throws(() => estiloEnSuSitio('estilos', adjuntosDe([estilo]), 'Recetas.'), /falta: Qué le das; Un video entero hecho con él; La prueba de con qué agente.*actualízala/)
-  assert.throws(() => estiloEnSuSitio('estilos', completo({ ...guia, ejemplo: 'x' }), 'Recetas.'), /falta: Ejemplo de lo que le escribes\./)
-  assert.throws(() => estiloEnSuSitio('estilos', completo({ ...guia, herramientas: [] }), 'Recetas.'), /falta: Con qué lo hace\./)
-  // El agente de su prueba y lo que su hilo usó van en su guía sin que los marque; y lo que llega con los acentos rotos se guarda bien.
-  assert.deepEqual(completo({ ...guia, agentes: ['uno-inventado'] })[0].guia?.agentes, ['claude'])
-  const usada = { ...prueba, agente: 'antigravity', hilo: { pedido: 'Hazme uno.', turnos: [{ segundos: 60, costo: 0, herramientas: 2 }], usa: ['flow-imagenes'] } }
-  assert.deepEqual(completo({ ...guia, necesita: 'Google Flow con crÃ©ditos.' }, usada)[0].guia, { ...guia, necesita: 'Google Flow con créditos.', herramientas: ['codigo', 'tu-voz', 'flow-imagenes'], agentes: ['claude', 'antigravity'] })
-  assert.throws(() => estiloEnSuSitio('estilos', adjuntosDe([{ ...estilo, guia: { ...guia, agentes: [] } }, video]), 'Recetas.'), /falta: Con qué agentes funciona bien; La prueba/)
-  // El hilo de una prueba no se adjunta suelto, ni como video: va dentro de la prueba.
-  assert.deepEqual(adjuntosDe([{ tipo: 'video', llave: prueba.evidencia }]), [])
-  assert.throws(() => estiloEnSuSitio('estilos', completo(guia, { ...prueba, evidencia: undefined }), 'Recetas.'), /falta: La prueba de con qué agente/)
-  assert.throws(() => estiloEnSuSitio('estilos', completo(guia, null), 'Recetas.'), /falta: La prueba de con qué agente se hizo, cuánto costó y cuánto tardó\./)
-  assert.throws(() => estiloEnSuSitio('estilos', adjuntosDe([{ ...estilo, guia, prueba }]), 'Recetas.'), /falta: Un video entero hecho con él\./)
-  assert.throws(() => estiloEnSuSitio('estilos', completo(), ''), /falta: Qué hace\./)
+  assert.doesNotThrow(() => estiloEnSuSitio('estilos', con({ ...guia, necesita: 'Google Flow con créditos.' }), 'Recetas en 30 segundos.'))
+  assert.doesNotThrow(() => estiloEnSuSitio('estilos', con(guia), 'Recetas en 30 segundos.'))
+  // Una VyMotion de antes no la manda: dice qué falta y que se actualice.
+  assert.throws(() => estiloEnSuSitio('estilos', adjuntosDe([estilo]), 'Recetas.'), /falta «Qué le das».*actualízala/)
+  assert.throws(() => estiloEnSuSitio('estilos', con({ ...guia, ejemplo: 'x' }), 'Recetas.'), /falta «Ejemplo de lo que le escribes»/)
+  assert.throws(() => estiloEnSuSitio('estilos', con(guia), ''), /falta «Qué hace»/)
   assert.deepEqual(fotosDeComentario([estilo]), [])
 })
 
@@ -90,7 +66,7 @@ test('un comentario lleva solo imágenes de la comunidad, a lo más cuatro', () 
 
 test('el feed por actividad, por lo más reciente y, para el creador, lo que no ha contestado', () => {
   const db = new DatabaseSync(':memory:', COMO_D1)
-  for (const m of ['0004_comunidad', '0009_comentarios_adjuntos', '0019_estilos', '0026_comunidad_recientes', '0035_preaprobados']) db.exec(readFileSync(new URL(`../migrations/${m}.sql`, import.meta.url), 'utf8'))
+  for (const m of ['0004_comunidad', '0009_comentarios_adjuntos', '0019_estilos', '0026_comunidad_recientes']) db.exec(readFileSync(new URL(`../migrations/${m}.sql`, import.meta.url), 'utf8'))
   const pub = db.prepare("INSERT INTO publicaciones (id, autor, categoria, titulo, texto, creada, actividad, fijada) VALUES (?, ?, 'general', '', '', ?, ?, ?)")
   const com = db.prepare("INSERT INTO comentarios (id, publicacion, autor, texto, creada) VALUES (?, ?, ?, '', ?)")
   // a: de Ana, sin comentarios. b: de Beto, ya le contestó el creador. c: de Ana, le contestó y luego Beto volvió a
@@ -122,7 +98,7 @@ test('el feed por actividad, por lo más reciente y, para el creador, lo que no 
 
 test('el buscador encuentra cada palabra sin importar acentos ni mayúsculas, en el título, el texto o un comentario', () => {
   const db = new DatabaseSync(':memory:', COMO_D1)
-  for (const m of ['0004_comunidad', '0009_comentarios_adjuntos', '0019_estilos', '0026_comunidad_recientes', '0035_preaprobados']) db.exec(readFileSync(new URL(`../migrations/${m}.sql`, import.meta.url), 'utf8'))
+  for (const m of ['0004_comunidad', '0009_comentarios_adjuntos', '0019_estilos', '0026_comunidad_recientes']) db.exec(readFileSync(new URL(`../migrations/${m}.sql`, import.meta.url), 'utf8'))
   const pub = db.prepare("INSERT INTO publicaciones (id, autor, categoria, titulo, texto, creada, actividad, reportes, aprobada) VALUES (?, ?, 'ayuda', ?, ?, ?, ?, ?, ?)")
   pub.run('a', 'ana', 'La voz clonada suena ROBÓTICA', 'Grabé 30 segundos.', '2026-11-01', '2026-11-01', 0, 1)
   pub.run('b', 'beto', 'Música que no se oye', 'En el mp4 no suena; parece robótica la mezcla', '2026-11-02', '2026-11-09', 0, 1)
@@ -157,7 +133,7 @@ test('el buscador encuentra cada palabra sin importar acentos ni mayúsculas, en
 
 test('el índice del buscador trae lo que cada quien ve, sin lo oculto ni lo que no se aprobó', () => {
   const db = new DatabaseSync(':memory:', COMO_D1)
-  for (const m of ['0004_comunidad', '0009_comentarios_adjuntos', '0019_estilos', '0026_comunidad_recientes', '0035_preaprobados']) db.exec(readFileSync(new URL(`../migrations/${m}.sql`, import.meta.url), 'utf8'))
+  for (const m of ['0004_comunidad', '0009_comentarios_adjuntos', '0019_estilos', '0026_comunidad_recientes']) db.exec(readFileSync(new URL(`../migrations/${m}.sql`, import.meta.url), 'utf8'))
   db.prepare("INSERT INTO miembros (id, clave, nombre, creado, visto) VALUES ('ana', 'k1', 'Ana', '2026-11-01', '2026-11-01')").run()
   const pub = db.prepare("INSERT INTO publicaciones (id, autor, categoria, titulo, texto, creada, actividad, reportes, aprobada) VALUES (?, ?, 'general', ?, ?, ?, ?, ?, ?)")
   pub.run('a', 'ana', 'Visible', 'x'.repeat(500), '2026-11-01', '2026-11-03', 0, 1)
@@ -175,47 +151,25 @@ test('el índice del buscador trae lo que cada quien ve, sin lo oculto ni lo que
   assert.deepEqual(filas({ id: 'yo', creador: true }).map((f) => f.id), ['a', 'b', 'c'])
 })
 
-test('los estilos de otros le salen a cualquiera, apoye o no: en el feed, en el buscador y en su índice', () => {
+test('los estilos de otros no le salen a quien no apoya: ni en el feed, ni en el buscador, ni en su índice', () => {
   const db = new DatabaseSync(':memory:', COMO_D1)
-  for (const m of ['0004_comunidad', '0009_comentarios_adjuntos', '0019_estilos', '0026_comunidad_recientes', '0035_preaprobados']) db.exec(readFileSync(new URL(`../migrations/${m}.sql`, import.meta.url), 'utf8'))
+  for (const m of ['0004_comunidad', '0009_comentarios_adjuntos', '0019_estilos', '0026_comunidad_recientes']) db.exec(readFileSync(new URL(`../migrations/${m}.sql`, import.meta.url), 'utf8'))
   const pub = db.prepare("INSERT INTO publicaciones (id, autor, categoria, titulo, texto, creada, actividad) VALUES (?, ?, ?, ?, '', ?, ?)")
   pub.run('g', 'ana', 'general', 'Hola receta', '2026-11-01', '2026-11-01')
   pub.run('e1', 'ana', 'estilos', 'Receta rápida', '2026-11-02', '2026-11-02')
   pub.run('e2', 'beto', 'estilos', 'Receta lenta', '2026-11-03', '2026-11-03')
-  const ver = (yo: { id: string; creador: boolean }) => {
+  const ver = (yo: { id: string; creador: boolean; apoya?: boolean }) => {
     const feed = consultaFeed(yo, { categoria: '', antes: '', orden: 'recientes' })
     const buscar = consultaBuscar(yo, 'receta')
     const indice = consultaIndice(yo)
     return [feed, buscar, indice].map((c) => (db.prepare(c.sql).all(...c.valores) as { id: string }[]).map((f) => f.id).sort().join())
   }
-  // Las consultas ya no preguntan si apoyas: lo que es de quien apoya es instalarlos (el paquete, `servirArchivo`).
-  assert.deepEqual(ver({ id: 'caro', creador: false }), ['e1,e2,g', 'e1,e2,g', 'e1,e2,g'])
+  // Quien apoya y el creador, todo. Quien no, lo demás y sus propios estilos (compartir es de cualquiera).
+  assert.deepEqual(ver({ id: 'caro', creador: false, apoya: true }), ['e1,e2,g', 'e1,e2,g', 'e1,e2,g'])
   assert.deepEqual(ver({ id: 'yo', creador: true }), ['e1,e2,g', 'e1,e2,g', 'e1,e2,g'])
-  assert.deepEqual(ver({ id: 'ana', creador: false }), ['e1,e2,g', 'e1,e2,g', 'e1,e2,g'])
-  // Y la sección Estilos, con los de todos.
+  assert.deepEqual(ver({ id: 'caro', creador: false, apoya: false }), ['g', 'g', 'g'])
+  assert.deepEqual(ver({ id: 'ana', creador: false }), ['e1,g', 'e1,g', 'e1,g'])
+  // Y la sección Estilos, vacía de lo ajeno.
   const estilos = consultaFeed({ id: 'caro', creador: false }, { categoria: 'estilos', antes: '', orden: '' })
-  assert.deepEqual((db.prepare(estilos.sql).all(...estilos.valores) as { id: string }[]).map((f) => f.id).sort(), ['e1', 'e2'])
-})
-
-test('a quien le aprueban un estilo y no ha puesto su Binance ID se le dice cómo, una vez por autor; al creador y a quien ya lo puso, no', () => {
-  const db = new DatabaseSync(':memory:')
-  const carpeta = new URL('../migrations/', import.meta.url)
-  for (const m of readdirSync(carpeta).sort()) db.exec(readFileSync(new URL(m, carpeta), 'utf8'))
-  for (const [id, clave, binance] of [['creador', 'admin', null], ['ana', 'SLOTH-ana', null], ['beto', 'SLOTH-beto', '123456789']])
-    db.prepare("INSERT INTO miembros (id, clave, nombre, creado, visto, binance) VALUES (?, ?, ?, '2026-11-01', '2026-11-01', ?)").run(id, clave, id, binance)
-  for (const [id, autor] of [['e1', 'ana'], ['e2', 'ana'], ['e3', 'beto']])
-    db.prepare("INSERT INTO publicaciones (id, autor, categoria, titulo, texto, adjuntos, creada, actividad, aprobada) VALUES (?, ?, 'estilos', ?, 'Qué hace', '[]', '2026-11-10', '2026-11-10', 1)").run(id, autor, id)
-  const falta = (autor: string) => !!db.prepare(FALTA_BINANCE).get(autor, AVISO_BINANCE)
-  assert.deepEqual(['ana', 'beto', 'creador'].map(falta), [true, false, false])
-  // Ya se le dijo en uno de sus estilos: en el otro no se repite. Un comentario cualquiera no cuenta.
-  db.prepare("INSERT INTO comentarios (id, publicacion, autor, texto, creada, adjuntos) VALUES ('c0', 'e2', 'creador', 'Qué buen estilo.', '2026-11-20', '[]')").run()
-  assert.equal(falta('ana'), true)
-  db.prepare("INSERT INTO comentarios (id, publicacion, autor, texto, creada, adjuntos) VALUES ('c1', 'e1', 'creador', ?, '2026-11-20', '[]')").run(COMO_PONER_BINANCE)
-  assert.equal(falta('ana'), false)
-  // Lo que se le dice: dónde se pone, paso a paso, y qué es.
-  assert.match(COMO_PONER_BINANCE, /^Aviso automático de Sloth: tu estilo ya está en la tienda\. /)
-  // D1 no acepta un patrón de LIKE de más de 50 bytes, y este aviso empieza con más: la consulta no lo usa.
-  assert.doesNotMatch(FALTA_BINANCE, /LIKE|GLOB/i)
-  assert.match(COMO_PONER_BINANCE, /1\. En Sloth, abre Comunidad y dale clic al renglón «Fondo», arriba\.\n2\. Pulsa «¿Quieres participar\?» y baja a «Pon tu Binance ID y cobra»\.\n3\. Escribe tu Binance ID y pulsa «Participar»\./)
-  db.close()
+  assert.deepEqual(db.prepare(estilos.sql).all(...estilos.valores), [])
 })

@@ -5,7 +5,7 @@ Prepara la voz que grabó el usuario y escribe src/datos/voz.json, lo que lee el
     python -I -B scripts/alinear.py --frases     (subtitulos.txt cambió: vuelve a emparejar sin transcribir)
 
 1. Nivela la voz a -14 LUFS (masterizar.mjs de video-base) en public/voz.wav.
-2. La transcribe con tiempos por palabra (transcribir.py de Sloth, con las cifras en letra: el alineador no sabe situar
+2. La transcribe con tiempos por palabra (transcribir.py de VyMotion, con las cifras en letra: el alineador no sabe situar
    dígitos).
 3. Si Whisper se saltó un tramo con voz o escribió otra frase en lugar de la dicha (pasa: en un video dejó fuera los
    primeros 17 s y apretó lo que seguía al principio), vuelve a transcribir esas zonas en trozos cortos cortados en

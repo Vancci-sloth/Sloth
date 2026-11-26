@@ -6,7 +6,7 @@ import './Rifa.css'
 
 /**
  * «Participa en la rifa», hasta arriba de la comunidad mientras el creador tiene una abierta (`licencias/src/rifa.ts`):
- * «Llévate créditos de Sloth» (qué y para cuántos lo decide el creador en cada sorteo), cuántos participan, quién ya
+ * «Llévate créditos de VyMotion» (qué y para cuántos lo decide el creador en cada sorteo), cuántos participan, quién ya
  * ganó y un solo botón. La rifa sigue abierta entre sorteos: quien participa entra en todos hasta que gana una vez. Al pulsarlo queda claro que ya estás dentro y adónde llega el aviso
  * si ganas. Quien paga $10 USD o más o es Fundador la ve, con por qué no participa.
  * Cerrada, durante unos días, quién ganó qué. Al creador le lleva a Administrador, donde se sortea (`RifaAdmin.tsx`).
@@ -68,10 +68,10 @@ export function Rifa({ creador, conNombre }: { creador: boolean; conNombre(accio
       <Boletos />
       <div className="rifa-cuerpo">
         <p className="rifa-antetitulo">
-          <Icono de="boleto" /> Rifa de Sloth · gratis
+          <Icono de="boleto" /> Rifa de VyMotion · gratis
         </p>
         <h2 id="rifa-titulo">Participa en la rifa</h2>
-        <p className="rifa-premio">Llévate créditos de Sloth</p>
+        <p className="rifa-premio">Llévate créditos de VyMotion</p>
         <p className="rifa-texto">Completamente gratis: solo pulsa el botón y ya estás participando.</p>
 
         {rifa.ganaste ? (
@@ -95,7 +95,7 @@ export function Rifa({ creador, conNombre }: { creador: boolean; conNombre(accio
             <div>
               <strong>¡Ya estás participando!</strong>
               <p>
-                Tu boleto ya está adentro y no tienes que hacer nada más: entras en todos los sorteos de esta rifa. Si ganas, te sale el aviso aquí en tu Sloth y te llega un correo
+                Tu boleto ya está adentro y no tienes que hacer nada más: entras en todos los sorteos de esta rifa. Si ganas, te sale el aviso aquí en tu VyMotion y te llega un correo
                 {rifa.correo ? (
                   <>
                     {' '}

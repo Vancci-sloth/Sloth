@@ -6,48 +6,48 @@ import { NOMBRE_AGENTE, proveedorDe } from '../shared/providers.ts'
 import { llaveGuardada } from './acceso.ts'
 import { asegurarAgente, conAgente, programaClaude, rutaAgente } from './agentes.ts'
 import { codexModels } from './codex.ts'
+import { CodexRpc } from './codex-rpc.ts'
+import { entornoDeepSeek, SIN_LLAVE } from './deepseek.ts'
 import { redactarOpenCode } from './opencode.ts'
-import { otraApi } from './otra-api.ts'
+import { entornoPerfilClaude, llaveDelPerfil, perfilActivo } from './perfiles-agentes.ts'
 import { OTROS } from './proveedores.ts'
 import { redactarCodexYoutube } from './youtube-redactor.ts'
 
 /**
  * Una respuesta suelta de un agente, sin herramientas ni sesión que se guarde: la ayuda de «Pedir una mejora»
  * (`server/comunidad.ts`) o el texto de un video para redes (`server/redes/`). Va con el agente de `model`, el de un hilo:
- * con Claude, Sonnet; con DeepSeek, Flash; con OpenRouter y FreeLLMAPI, el del hilo; con Codex, ese modelo con poco
- * esfuerzo y la forma de `esquema`; con OpenCode, el suyo. Grok, Antigravity, Cursor, Muse y Pi no tienen respuesta suelta: se abre uno de un momento, en una carpeta
+ * con Claude, Sonnet; con DeepSeek, Flash; con Codex, ese modelo con poco esfuerzo y la forma de `esquema`; con OpenCode,
+ * el suyo. Grok, Antigravity, Cursor, Muse y Pi no tienen respuesta suelta: se abre uno de un momento, en una carpeta
  * vacía, y se toma lo que escribe en su turno. Sin `model`, el primero que esté bajado: Claude, OpenCode o Codex.
  * Devuelve lo que contestó; el JSON se lee de ahí.
  */
-export async function redactar(model: string | undefined, cwd: string, prompt: string, instruccion: string, esquema: Record<string, unknown>): Promise<string> {
+export async function redactar(model: string | undefined, cwd: string, prompt: string, instruccion: string, esquema: Record<string, unknown>, { modeloExacto = false } = {}): Promise<string> {
   const p = model ? proveedorDe(model) : rutaAgente('claude') ? 'claude' : rutaAgente('opencode') ? 'opencode' : 'codex'
   const nombre = NOMBRE_AGENTE[p]
   const conEsquema = `${prompt}\n\nResponde solo con un JSON que cumpla este esquema:\n${JSON.stringify(esquema)}`
-  if (p === 'claude' || (model && otraApi(model))) return conClaude(prompt, instruccion, p === 'claude' ? undefined : model)
+  if (p === 'claude' || p === 'deepseek') return conClaude(modeloExacto ? conEsquema : prompt, instruccion, p === 'deepseek', modeloExacto ? model : undefined, modeloExacto ? cwd : undefined)
   if (p === 'opencode') return redactarOpenCode(model, cwd, conEsquema, [], instruccion)
   if (p === 'codex') model ??= (await codexModels())[0]?.id
   if (!model) throw new Error('No tienes ningún agente bajado: elige uno en Opciones → Agentes.')
-  if (p === 'codex') return conCodex(model, cwd, prompt, instruccion, esquema, nombre)
+  if (p === 'codex') return conCodex(model, cwd, prompt, instruccion, esquema, nombre, modeloExacto)
   return conOtro(model, `<instrucciones>\n${instruccion}\n</instrucciones>\n\n${conEsquema}\n\nNo uses herramientas ni abras archivos: contesta con lo que ya tienes aquí.`, nombre)
 }
 
-/**
- * Claude Code sin herramientas; con el `model` de otra API (`server/otra-api.ts`), contra ella: con su modelo rápido si
- * la marca tiene uno (DeepSeek Flash) y, si no, con el del hilo.
- */
-async function conClaude(prompt: string, instruccion: string, model?: string): Promise<string> {
-  const otra = model ? otraApi(model) : undefined
-  const suyo = otra && (otra.rapido ?? model!)
-  const nombre = NOMBRE_AGENTE[proveedorDe(model ?? '')]
-  if (otra && !llaveGuardada(proveedorDe(model!))) throw new Error(otra.sinLlave)
+/** Claude Code sin herramientas; con `deepseek`, contra la API de DeepSeek y su modelo rápido (`server/deepseek.ts`). */
+async function conClaude(prompt: string, instruccion: string, deepseek: boolean, elegido?: string, cwd?: string): Promise<string> {
+  const nombre = deepseek ? 'DeepSeek' : 'Claude'
+  if (deepseek && !(elegido ? llaveDelPerfil('deepseek') : llaveGuardada('deepseek'))) throw new Error(SIN_LLAVE)
   // Quien trabaja con otro agente puede no tener aún el programa de Claude: sin él, el SDK solo dice «Native CLI binary
   // for darwin-arm64 not found».
   await asegurarAgente('claude')
+  const model = elegido ?? (deepseek ? 'deepseek:deepseek-flash' : 'sonnet')
+  const perfil = elegido && !deepseek ? perfilActivo('claude') : undefined
   const q = query({
     prompt,
     options: {
       ...programaClaude(),
-      ...(otra && suyo ? { model: otra.modelo(suyo), env: otra.entorno(suyo) } : { model: 'sonnet' }),
+      ...(cwd ? { cwd } : {}),
+      ...(deepseek ? { model: model.replace(/^deepseek:/, ''), env: entornoDeepSeek(model) } : { model, ...(perfil ? { env: entornoPerfilClaude(perfil) } : {}) }),
       systemPrompt: instruccion,
       tools: [],
       maxTurns: 1,
@@ -102,9 +102,10 @@ function conOtro(model: string, prompt: string, nombre: string): Promise<string>
   })
 }
 
-async function conCodex(model: string, cwd: string, prompt: string, instruccion: string, esquema: Record<string, unknown>, nombre: string): Promise<string> {
+async function conCodex(model: string, cwd: string, prompt: string, instruccion: string, esquema: Record<string, unknown>, nombre: string, modeloExacto: boolean): Promise<string> {
   try {
-    return await redactarCodexYoutube(model, cwd, prompt, [], esquema, undefined, 'low', instruccion)
+    const conectar = modeloExacto ? ((notificar, salir, config) => new CodexRpc(notificar, salir, config, undefined, perfilActivo('codex'))) satisfies NonNullable<Parameters<typeof redactarCodexYoutube>[5]> : undefined
+    return await redactarCodexYoutube(model, cwd, prompt, [], esquema, conectar, 'low', instruccion)
   } catch (error) {
     const detalle = error instanceof Error ? error.message : ''
     if (/límite/.test(detalle)) throw new Error(`Llegaste al límite de tu plan de ${nombre}. Escríbelo tú, o vuelve a intentarlo cuando se reinicie.`)

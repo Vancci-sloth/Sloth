@@ -11,7 +11,7 @@ test('buscar: sin acentos ni mayúsculas, cada palabra en cualquier parte y orde
   assert.ok(!coincide(buscable, 'maria anual'))
 })
 
-test('los planes de Sloth, en español y en pocas palabras', () => {
+test('los planes de VyMotion, en español y en pocas palabras', () => {
   assert.equal(planLargo({ plan: 'mensual', estado: 'authorized', monto: 15, moneda: 'USD', fundador: 1 }), 'Apoyo mensual · 15 USD · activo · Fundador')
   assert.equal(planLargo({ plan: 'cuenta', estado: 'gratis' }), 'Cuenta gratis')
   assert.equal(planLargo({ plan: 'unico', estado: 'pending', monto: 299, moneda: 'MXN' }), 'Pago único · 299 MXN · pendiente')

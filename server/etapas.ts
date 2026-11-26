@@ -70,7 +70,7 @@ export function carpetaValida(cwd: string, nombre: string): string | undefined {
   return subcarpetas(cwd).get(nombre.toLowerCase())?.name
 }
 
-/** La carpeta de un hilo: la que le nombró Sloth al crearlo o eligió el usuario, o la de su lote. */
+/** La carpeta de un hilo: la que le nombró VyMotion al crearlo o eligió el usuario, o la de su lote. */
 const suyaDe = (s: SessionMeta) => s.carpeta ?? s.lote?.carpeta
 
 /**
@@ -86,7 +86,7 @@ function carpetasDeVideo(cwd: string, sessions: Sessions): CarpetaDeVideo[] {
 
 /**
  * La carpeta de un hilo dentro de `cwd` (`''` si es el propio `cwd`). La card trabaja en `cwd`, pero cada video va en su
- * carpeta: la nombra Sloth al crear el hilo (la de un lote va en `lote`), o la elige el usuario. Un hilo de antes de que
+ * carpeta: la nombra VyMotion al crear el hilo (la de un lote va en `lote`), o la elige el usuario. Un hilo de antes de que
  * se nombrara no tiene, y los de Ideas trabajan en la carpeta de su canal.
  */
 const carpetaDe = (meta: SessionMeta) => suyaDe(meta) ?? ''
@@ -262,7 +262,7 @@ function otraVersion(meta: SessionMeta, sessions: Sessions): { antes: string; nu
   while (usadas.has(`${base}-v${k}`.toLowerCase())) k++
   const nueva = `${base}-v${k}`
   mkdirSync(join(meta.cwd, nueva), { recursive: true })
-  sessions.setCarpeta(meta.id, nueva)
+  sessions.setCarpeta(meta.id, nueva, true)
   return { antes, nueva }
 }
 
@@ -278,11 +278,6 @@ export async function videosApi(req: IncomingMessage, res: ServerResponse, url: 
     const porRuta = new Map<string, VideoHecho>()
     for (const c of cards) if (c.etapas?.length) for (const v of videosDe(c, sessions)) if (!porRuta.has(v.ruta)) porRuta.set(v.ruta, v)
     const videos = [...porRuta.values()].sort((a, b) => b.t - a.t)
-    // Las portadas de los más nuevos se hacen ya, de fondo y en orden: cuando la rejilla las pida, están en el disco.
-    for (const v of videos.slice(0, PORTADAS_DE_ANTEMANO)) void cuadro?.(v.ruta).catch(() => {})
-    // Y, si la pide «Mis videos» abierta (`?previas`, no la precarga al arrancar), sus vistas previas: van a la cola de
-    // FFmpeg detrás de las portadas.
-    if (url.searchParams.has('previas')) for (const v of videos.slice(0, PREVIAS_DE_ANTEMANO)) void previa?.hacer(v.ruta).catch(() => {})
     return json(res, 200, { videos, redes: await marcas?.(videos) } satisfies VideosDeTodos)
   }
   // El ✕ de un video terminado: su archivo va a la Papelera; lo demás de su carpeta se queda. No si un agente trabaja en
@@ -390,11 +385,6 @@ async function copiarSinPisar(origen: string, carpeta: string, nombre: string): 
     }
   }
 }
-
-/** Cuántas portadas de «Mis videos» se hacen al pedir la lista: las de las primeras pantallas. */
-const PORTADAS_DE_ANTEMANO = 40
-/** Y de cuántos su vista previa chica (`server/miniaturas.ts`): las de la primera tanda de la rejilla. */
-const PREVIAS_DE_ANTEMANO = 30
 
 /** Los videos terminados de un estilo, del más nuevo al más viejo. También los usan las redes (`server/redes/`). */
 export function videosDe(card: Card, sessions: Sessions): VideoHecho[] {
@@ -531,7 +521,7 @@ export function avanceCorto(meta: SessionMeta, card: Card): { avance: AvanceCort
 
 /**
  * Lo que le falta al video de un hilo para estar terminado, los nombres de sus etapas, con lo mismo que lee el estudio.
- * Nada si ya está o si lo que sigue lo tiene que dar el usuario (una etapa con `espera`, como su voz). Para que Sloth le
+ * Nada si ya está o si lo que sigue lo tiene que dar el usuario (una etapa con `espera`, como su voz). Para que VyMotion le
  * pida al agente que siga si cerró su turno a medias (`Sessions`).
  */
 export function queFalta(meta: SessionMeta, card: Card): string[] {
@@ -695,7 +685,7 @@ export async function etapasApi(
   }
 
   // La carpeta del hilo, y cambiarla por otra que ya existe en `cwd`: un hilo que sigue el video de otro, uno que trabajó
-  // en otra, o uno de antes de que Sloth nombrara la suya.
+  // en otra, o uno de antes de que VyMotion nombrara la suya.
   if (m[2] === 'carpeta') {
     if (!card?.etapas?.length) return json(res, 400, { error: 'Este hilo no tiene carpeta de video' })
     if (req.method === 'GET') return json(res, 200, { actual: carpetaDe(meta), carpetas: carpetasDeVideo(meta.cwd, sessions) })

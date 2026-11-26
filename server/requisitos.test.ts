@@ -48,7 +48,7 @@ test('reconoce una descarga dañada de pip, aunque el error venga recortado', ()
   assert.ok(!descargaDanada('ERROR: Could not install packages due to an OSError: [Errno 28] No space left on device'))
 })
 
-test('pasa al Python de Sloth si no hay rueda para el tuyo, no por cualquier fallo de pip', () => {
+test('pasa al Python de VyMotion si no hay rueda para el tuyo, no por cualquier fallo de pip', () => {
   assert.ok(sinRueda('ERROR: Could not find a version that satisfies the requirement onnxruntime (from versions: none)'))
   assert.ok(sinRueda('ERROR: No matching distribution found for onnxruntime'))
   assert.ok(sinRueda('ERROR: ResolutionImpossible: for help visit https://pip.pypa.io/en/latest/topics/dependency-resolution/')) // el de Python 3.15
@@ -66,14 +66,14 @@ test('el torch de CUDA solo con una NVIDIA, un controlador y una memoria que lo 
   assert.ok(!aguantaCuda(''))
 })
 
-test('el motor de la voz sale de la carpeta del Python de Sloth', () => {
+test('el motor de la voz sale de la carpeta del Python de VyMotion', () => {
   assert.equal(motorDe('3.12.15-cu128-sloth'), 'whisper')
   assert.equal(motorDe('3.12.14-cu128-2e23ffa6'), 'whisper') // el de la app de YouTube archivada
   assert.equal(motorDe('3.12.15-cpu-sloth'), 'parakeet')
   assert.equal(motorDe('3.12.15-onnx-sloth'), 'parakeet-solo')
 })
 
-test('de varios Python de Sloth se usa el suyo y, entre iguales, el más nuevo', () => {
+test('de varios Python de VyMotion se usa el suyo y, entre iguales, el más nuevo', () => {
   const fechas: Record<string, number> = { '3.12.14-cu128-2e23ffa6': 3, '3.12.15-cpu-sloth': 1, '3.12.15-cu128-sloth': 2 }
   assert.equal(elegirPython(Object.keys(fechas), (id) => fechas[id]), '3.12.15-cu128-sloth')
   assert.equal(elegirPython(['3.12.14-cu128-2e23ffa6'], () => 0), '3.12.14-cu128-2e23ffa6')

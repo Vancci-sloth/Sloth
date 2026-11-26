@@ -1,7 +1,7 @@
 """
 El disco de los estilos de video: un solo node_modules por plantilla, los temporales que deja Remotion y el espacio
 antes de renderizar. Lo usan `video-explicativo`, `video-documental` y `reel-collage` (El Diff tiene lo suyo en su
-`comun.py`, igual que esto). Sloth hace lo mismo desde Opciones → Espacio en disco (`server/espacio.ts`): si cambias
+`comun.py`, igual que esto). VyMotion hace lo mismo desde Opciones → Espacio en disco (`server/espacio.ts`): si cambias
 dónde vive algo aquí, cámbialo allí.
 
     from espacio import comprobar_disco, enlazar_modulos, limpiar_temporales
@@ -19,7 +19,7 @@ from pathlib import Path
 from sloth import turno
 
 TEMP = Path(tempfile.gettempdir())
-# Un render deja varios GB de temporales; con el disco lleno se cae todo (el render, los agentes y Sloth).
+# Un render deja varios GB de temporales; con el disco lleno se cae todo (el render, los agentes y VyMotion).
 DISCO_MINIMO_GB = 8
 # Las carpetas node_modules compartidas, una por plantilla y versión de su package-lock.
 MODULOS = Path(os.environ.get("LOCALAPPDATA") or Path.home() / ".cache") / "sloth-modulos"
@@ -49,7 +49,7 @@ def comprobar_disco(raiz: Path, minimo_gb: float = DISCO_MINIMO_GB) -> None:
     libre = shutil.disk_usage(raiz).free / 1e9
     if libre < minimo_gb:
         raise SystemExit(f"Quedan {libre:.1f} GB libres en el disco y un render deja varios GB de temporales. Con el disco "
-                         "lleno se cae todo (el render, los agentes y Sloth). Pide al usuario que libere espacio (en Sloth: "
+                         "lleno se cae todo (el render, los agentes y VyMotion). Pide al usuario que libere espacio (en VyMotion: "
                          "Opciones → Espacio en disco) antes de seguir.")
 
 
@@ -88,7 +88,7 @@ def _arbol(lock: bytes) -> dict:
 
 
 def casa_de(estilo: str, plantilla: Path) -> Path:
-    """La carpeta compartida de una plantilla: `<estilo>-<huella de su package-lock>`. Sloth la calcula igual."""
+    """La carpeta compartida de una plantilla: `<estilo>-<huella de su package-lock>`. VyMotion la calcula igual."""
     huella = hashlib.sha1((plantilla / "package-lock.json").read_bytes()).hexdigest()[:10]
     return MODULOS / f"{estilo}-{huella}"
 
@@ -125,7 +125,7 @@ def enlazar_modulos(raiz: Path, estilo: str, plantilla: Path, vecinos: list[Path
     Que el proyecto tenga su `node_modules`: una unión (junction) a la carpeta que comparten todos los videos de la
     plantilla, en %LOCALAPPDATA%/sloth-modulos/<estilo>-<huella>. Antes cada video copiaba el suyo (~1 GB): 14 videos
     explicativos eran 17 GB. Si alguien lo borró para hacer espacio, se vuelve a enlazar. Un video con su propia carpeta
-    completa se queda como está (Sloth la cambia por el enlace al liberar espacio, si su package-lock es el mismo).
+    completa se queda como está (VyMotion la cambia por el enlace al liberar espacio, si su package-lock es el mismo).
     `vecinos`: node_modules de otros videos de donde copiarlo la primera vez, en vez de bajarlo.
     """
     propio = raiz / "node_modules"

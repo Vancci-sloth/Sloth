@@ -4,7 +4,6 @@ import { version } from '../../package.json'
 import type { Licencia } from '../../shared/types'
 import { api } from './api'
 import { Confirm } from './Confirm'
-import { claveEscrita } from './Respaldo'
 import './Licencia.css'
 
 const dinero = (n: number) => `$${n.toLocaleString('es-MX')}`
@@ -37,17 +36,17 @@ function finApoyo(l: Licencia | undefined, corta: boolean): string {
   return !l.activa ? `tu apoyo terminó el ${dia}` : l.estado === 'authorized' ? `tu apoyo se renueva el ${dia}` : `tu apoyo termina el ${dia}`
 }
 
-/** La versión de Sloth que tienes y hasta cuándo vale tu apoyo: bajo el título de Opciones y abajo de la barra lateral (`corta`). */
+/** La versión de VyMotion que tienes y hasta cuándo vale tu apoyo: bajo el título de Opciones y abajo de la barra lateral (`corta`). */
 export function VersionYApoyo({ corta = false, className }: { corta?: boolean; className: string }) {
   const fin = finApoyo(useLicencia().l, corta)
   return (
     <span className={className}>
-      Sloth {version}
+      VyMotion {version}
       {fin && ` · ${fin}`}
     </span>
   )
 }
-/** La página de Sloth: ahí se apoya, y tiene los términos y el aviso de privacidad. */
+/** La página de VyMotion: ahí se apoya, y tiene los términos y el aviso de privacidad. */
 const PAGINA = 'https://sloth.vancci.org'
 /** La versión de los términos que acepta quien crea su cuenta: la de `TERMINOS` en la página. */
 const TERMINOS = '2026-10-30'
@@ -55,13 +54,13 @@ const TERMINOS = '2026-10-30'
 const CADA = 10
 const INICIOS = 'sloth:inicios'
 
-/** Si la clave quita el recordatorio: un apoyo vigente o un lugar gratis de por vida (de cuando Sloth se vendía). */
+/** Si la clave quita el recordatorio: un apoyo vigente o un lugar gratis de por vida (de cuando VyMotion se vendía). */
 const apoya = (l?: Licencia) => !!l?.activa && l.plan !== 'cuenta'
 /** Abre la página ya en el formulario del pago (`#pago`), no en la tabla de lo que trae el apoyo. */
 const apoyar = () => window.open(`${PAGINA}/#pago`, '_blank')
 
 /**
- * Sloth es gratis (`server/licencia.ts`). Cada `CADA` inicios, a quien no apoya le recuerda que puede hacerlo, sin
+ * VyMotion es gratis (`server/licencia.ts`). Cada `CADA` inicios, a quien no apoya le recuerda que puede hacerlo, sin
  * bloquear nada: «Recordarme más tarde» vuelve a contar desde cero. Un inicio es una ventana nueva (`sessionStorage`).
  */
 export function Recordatorio() {
@@ -87,12 +86,12 @@ export function Recordatorio() {
   if (!abierto || !licencia) return null
   return createPortal(
     <div className="modal-backdrop" onClick={luego}>
-      <div className="modal licencia-caja" role="dialog" aria-modal aria-label="Apoya a Sloth" onClick={(e) => e.stopPropagation()}>
+      <div className="modal licencia-caja" role="dialog" aria-modal aria-label="Apoya a VyMotion" onClick={(e) => e.stopPropagation()}>
         {clave ? (
           <Clave licencia={licencia} onCambio={(l) => (setLicencia(l), apoya(l) && setAbierto(false))} onVolver={() => setClave(false)} />
         ) : (
           <>
-            <Cabeza titulo="Sloth es gratis">
+            <Cabeza titulo="VyMotion es gratis">
               La hace una sola persona. Si te sirve, <b>apóyala al mes</b>: quien apoya recibe lo nuevo antes y decide qué sale
               primero. Mira lo que viene en sloth.vancci.org.
             </Cabeza>
@@ -128,8 +127,6 @@ function Clave({ licencia, aviso, onCambio, onVolver }: { licencia: Licencia; av
     setError('')
     try {
       const l = saber(await api<Licencia>('/api/licencia/clave', { clave }))
-      // Si esa clave ya se usa en otra computadora, Sloth ofrece traer lo de allá.
-      if (l.activa) claveEscrita()
       if (!l.activa) setError(l.estado === 'pending' ? 'Todavía no se confirma el pago de esa clave.' : 'Ese apoyo ya terminó. Puedes renovarlo en sloth.vancci.org.')
       onCambio(l)
     } catch (e) {
@@ -144,7 +141,7 @@ function Clave({ licencia, aviso, onCambio, onVolver }: { licencia: Licencia; av
       <Cabeza titulo="Escribe tu clave">
         {aviso ?? (
           <>
-            <b>Te llegó a tu correo</b> al apoyar en sloth.vancci.org, en «Tu clave de Sloth» (si no lo ves, revisa spam o promociones).
+            <b>Te llegó a tu correo</b> al apoyar en sloth.vancci.org, en «Tu clave de VyMotion» (si no lo ves, revisa spam o promociones).
             {licencia.plan === 'cuenta' && ' Tu cuenta de la comunidad se queda: es la misma con tu correo.'}
           </>
         )}
@@ -176,8 +173,8 @@ export function Unirse({ onListo }: { onListo(): void }) {
   const [acepto, setAcepto] = useState(false)
   const [ocupado, setOcupado] = useState(false)
   const [error, setError] = useState('')
-  // La clave va al correo: se escribe aquí para entrar. Quien ya apoya entra con la de su apoyo (`yaTiene`: dónde está).
-  const [enviada, setEnviada] = useState<Licencia & { yaTiene?: string }>()
+  // La clave va al correo: se escribe aquí para entrar.
+  const [enviada, setEnviada] = useState<Licencia>()
 
   async function unirse(e: FormEvent) {
     e.preventDefault()
@@ -185,8 +182,8 @@ export function Unirse({ onListo }: { onListo(): void }) {
     setOcupado(true)
     setError('')
     try {
-      const l = await api<Licencia & { enviada?: boolean; yaTiene?: string }>('/api/licencia/unirse', { email, terminos: TERMINOS })
-      if (!l.enviada && !l.yaTiene) return onListo()
+      const l = await api<Licencia & { enviada?: boolean }>('/api/licencia/unirse', { email, terminos: TERMINOS })
+      if (!l.enviada) return onListo()
       setEnviada(l)
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
@@ -200,11 +197,9 @@ export function Unirse({ onListo }: { onListo(): void }) {
         <Clave
           licencia={enviada}
           aviso={
-            enviada.yaTiene ?? (
-              <>
-                <b>Te la mandamos a {email.trim()}</b>, en «Tu cuenta de Sloth» (si no lo ves, revisa spam o promociones).
-              </>
-            )
+            <>
+              <b>Te la mandamos a {email.trim()}</b>, en «Tu cuenta de VyMotion» (si no lo ves, revisa spam o promociones).
+            </>
           }
           onCambio={(l) => l.activa && onListo()}
           onVolver={() => setEnviada(undefined)}
@@ -215,7 +210,7 @@ export function Unirse({ onListo }: { onListo(): void }) {
   return (
     <div className="licencia-caja licencia-unirse">
       <Cabeza titulo="Entra a la comunidad">
-        Mira qué hace la gente con Sloth y cómo, y enseña lo tuyo. Crea tu cuenta gratis con tu correo: ahí te llega tu clave.
+        Mira qué hace la gente con VyMotion y cómo, y enseña lo tuyo. Crea tu cuenta gratis con tu correo: ahí te llega tu clave.
       </Cabeza>
       <form onSubmit={unirse}>
         <label>
@@ -279,11 +274,6 @@ export function SuscripcionOpciones() {
   const [cancelando, setCancelando] = useState(false)
   const [copiada, setCopiada] = useState(false)
   const [clave, setClave] = useState(false)
-  // Lo que paga hoy quien entra (el apoyo sube con la gente): al cancelar se dice, porque quien vuelve entra con ese.
-  const [hoy, setHoy] = useState<{ mensual: number; paso: number }>()
-  useEffect(() => {
-    if (cancelando) api<{ mensual: number; paso: number }>('/api/licencia/precio').then(setHoy, () => {})
-  }, [cancelando])
 
   if (!l) return <div className="fila"><span className="muted small">{error || 'Mirando…'}</span></div>
   // Un año pagado de una vez: el pago del siguiente.
@@ -299,14 +289,11 @@ export function SuscripcionOpciones() {
       : !pagado
         ? l.plan === 'cuenta'
           ? 'Tienes tu cuenta gratis de la comunidad'
-          : 'Sloth es gratis: si te sirve, apóyala'
+          : 'VyMotion es gratis: si te sirve, apóyala'
         : l.estado === 'authorized'
           ? `${l.monto ? `${dinero(l.monto)} ${cada}` : 'Activo'}${l.pagadaHasta ? ` · próximo cobro el ${fecha(l.pagadaHasta)}` : ''}`
           : l.estado === 'pagado' && l.activa
             ? `Pagado hasta el ${fecha(l.pagadaHasta)} · no se renueva solo`
-            : // Lo de PayPal lo canceló Sloth, no quien apoya: no se le dice «Cancelado» (`AvisoPaypal`).
-              l.cancelarPaypal && l.activa
-              ? `Apoyas a Sloth hasta el ${fecha(l.pagadaHasta)} · cancela tu suscripción en PayPal: Sloth ya no cobra por ahí`
             : l.activa
             ? `Cancelado: vale hasta el ${fecha(l.pagadaHasta)}${l.folio ? ` · folio ${l.folio}` : ''}`
             : 'Terminó'
@@ -382,9 +369,8 @@ export function SuscripcionOpciones() {
           onConfirm={() => api<Licencia>('/api/licencia/cancelar', {}).then(saber)}
           onClose={() => setCancelando(false)}
         >
-          Dejamos de cobrarte desde ahora, sin penalización. Sloth sigue siendo gratis; lo que ya pagaste vale hasta el{' '}
+          Dejamos de cobrarte desde ahora, sin penalización. VyMotion sigue siendo gratis; lo que ya pagaste vale hasta el{' '}
           {fecha(l.pagadaHasta)}. Te damos un folio de la cancelación.
-          {!!hoy?.paso && ` Tu precio se queda contigo solo mientras sigas: si después vuelves, entras con el precio de ese día (hoy, ${dinero(hoy.mensual)} USD el primer mes).`}
         </Confirm>
       )}
     </div>

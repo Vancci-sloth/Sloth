@@ -1,7 +1,7 @@
 /**
  * Entrar con Google en el navegador integrado. Google no deja iniciar sesión dentro de una app («este navegador o app
  * puede no ser seguro»), pero sí acepta la sesión ya iniciada: como la voz (`server/voz/`) y las redes
- * (`server/redes/navegador.ts`), ese paso se da en Edge (Chrome en Mac), con un perfil de Sloth, y sus cookies de Google
+ * (`server/redes/navegador.ts`), ese paso se da en Edge (Chrome en Mac), con un perfil de VyMotion, y sus cookies de Google
  * pasan al perfil de las páginas. Luego la página vuelve a la dirección de Google que pedía, ya con la sesión: el «Entrar
  * con Google» de cualquier sitio sigue ahí.
  *

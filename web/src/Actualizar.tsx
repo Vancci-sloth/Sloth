@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react'
 import type { ActualizacionSloth, AgentesAlDia } from '../../shared/types'
 import { api } from './api'
 import { Confirm } from './Confirm'
-import { enLaNube } from './web'
 import { Icono } from './Iconos'
 
 /**
@@ -13,19 +12,11 @@ const BAJANDO = 1000
 const CADA = 60_000
 
 /**
- * Abajo de la barra lateral de la app que se vende: si hay una versión nueva de Sloth, el botón que la pone. Lo sabe la
- * ventana de Sloth (electron/main.ts): al confirmar baja solo lo que cambió, cierra Sloth y la vuelve a abrir actualizada.
- * En la nube (ADR 0026) esa ventana no la ve nadie: se le pregunta por el servidor (`/api/ventana/…`).
+ * Abajo de la barra lateral de la app que se vende: si hay una versión nueva de VyMotion, el botón que la pone. Lo sabe la
+ * ventana de VyMotion (electron/main.ts): al confirmar baja solo lo que cambió, cierra VyMotion y la vuelve a abrir actualizada.
  */
-const ventanaDeLaNube = enLaNube
-  ? {
-      actualizacion: () => api<ActualizacionSloth>('/api/ventana/actualizacion'),
-      actualizar: () => api<ActualizacionSloth>('/api/ventana/actualizar', {})
-    }
-  : undefined
-
 export function ActualizarSloth() {
-  const sloth = window.sloth ?? ventanaDeLaNube
+  const sloth = window.sloth
   const [a, setA] = useState<ActualizacionSloth>()
   const [preguntar, setPreguntar] = useState(false)
   const bajando = a?.avance !== undefined
@@ -42,23 +33,23 @@ export function ActualizarSloth() {
   if (bajando)
     return (
       <span className="muted small pie-nota">
-        {a.avance === 1 ? 'Poniendo la versión nueva…' : a.sinRed ? `Sin internet: Sloth ${a.nueva} sigue bajando cuando vuelva` : `Bajando Sloth ${a.nueva}… ${Math.round(a.avance! * 100)} %`}
+        {a.avance === 1 ? 'Poniendo la versión nueva…' : a.sinRed ? `Sin internet: VyMotion ${a.nueva} sigue bajando cuando vuelva` : `Bajando VyMotion ${a.nueva}… ${Math.round(a.avance! * 100)} %`}
       </span>
     )
   return (
     <>
-      <button className="aviso-sloth" title={a.novedad ?? `Actualizar a Sloth ${a.nueva}`} onClick={() => setPreguntar(true)}>
+      <button className="aviso-sloth" title={a.novedad ?? `Actualizar a VyMotion ${a.nueva}`} onClick={() => setPreguntar(true)}>
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <path d="M12 19V5M6 11l6-6 6 6" />
         </svg>
-        Actualizar a Sloth {a.nueva}
+        Actualizar a VyMotion {a.nueva}
       </button>
       {a.error && <span className="bad small">{a.error}</span>}
       {preguntar && (
-        <Confirm title={`¿Actualizar a Sloth ${a.nueva}?`} action={a.aMano ? 'Descargar' : 'Actualizar'} onConfirm={() => sloth.actualizar().then(setA)} onClose={() => setPreguntar(false)}>
+        <Confirm title={`¿Actualizar a VyMotion ${a.nueva}?`} action={a.aMano ? 'Descargar' : 'Actualizar'} onConfirm={() => sloth.actualizar().then(setA)} onClose={() => setPreguntar(false)}>
           {a.aMano
-            ? 'Se baja en tu navegador. Cierra Sloth y arrastra la nueva a Aplicaciones, encima de esta: tus videos y tus hilos se quedan.'
-            : 'Se baja solo lo que cambió desde tu versión. Después Sloth se cierra y se vuelve a abrir ya actualizada: se detiene lo que esté haciendo, y tus videos y tus hilos se quedan.'}
+            ? 'Se baja en tu navegador. Cierra VyMotion y arrastra la nueva a Aplicaciones, encima de esta: tus videos y tus hilos se quedan.'
+            : 'Se baja solo lo que cambió desde tu versión. Después VyMotion se cierra y se vuelve a abrir ya actualizada: se detiene lo que esté haciendo, y tus videos y tus hilos se quedan.'}
         </Confirm>
       )}
     </>

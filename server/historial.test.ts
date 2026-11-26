@@ -1,8 +1,10 @@
 import assert from 'node:assert/strict'
-import { appendFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, truncateSync } from 'node:fs'
+import { appendFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, truncateSync } from 'node:fs'
+import { gunzipSync } from 'node:zlib'
+import { setTimeout as esperar } from 'node:timers/promises'
 import { join, resolve } from 'node:path'
 import test from 'node:test'
-import { leerHistorial, primerUsuario } from './historial.ts'
+import { leerHistorial, leerVistaSync, primerUsuario } from './historial.ts'
 import { guardar } from './disco.ts'
 import { buildTimeline } from '../web/src/items.ts'
 
@@ -60,4 +62,24 @@ test('el primer mensaje se lee del principio, aunque el registro sea enorme o te
   appendFileSync(file, '\n' + JSON.stringify(usuario))
   assert.deepEqual(primerUsuario(file), usuario, 'la última línea, sin salto al final, también cuenta')
   assert.equal(primerUsuario(join(dir, 'no-existe.jsonl')), undefined)
+})
+
+test('una vista grande se comprime al abrir el chat y se puede volver a leer', async (t) => {
+  const base = resolve('data')
+  mkdirSync(base, { recursive: true })
+  const dir = mkdtempSync(join(base, 'prueba-vista-comprimida-'))
+  t.after(() => rmSync(dir, { recursive: true, force: true }))
+  const file = join(dir, 'hilo.jsonl'), vista = join(dir, 'hilo.json')
+  const evento = { t: 'text', id: 'respuesta', delta: 'Un párrafo del historial. '.repeat(5000) }
+  guardar(file, JSON.stringify(evento) + '\n')
+  const fuente = statSync(file)
+  guardar(vista, JSON.stringify({ version: 1, bytes: fuente.size, mtime: fuente.mtimeMs, events: [evento] }))
+  assert.deepEqual(await leerHistorial(file, vista), [evento])
+  for (let n = 0; n < 200 && !existsSync(vista + '.gz'); n++) await esperar(10)
+  assert.equal(existsSync(vista), false)
+  const comprimida = readFileSync(vista + '.gz')
+  assert.ok(comprimida.length < fuente.size / 10)
+  assert.deepEqual(JSON.parse(gunzipSync(comprimida).toString()).events, [evento])
+  assert.deepEqual(leerVistaSync(vista, fuente)?.events, [evento])
+  assert.deepEqual(await leerHistorial(file, vista), [evento])
 })

@@ -327,7 +327,7 @@ def pedir(ruta: str, datos: dict | None = None) -> dict:
     except urllib.error.HTTPError as e:
         raise RuntimeError(f"la voz: {json.load(e).get('error', e)} (VOZ.md de video-base: «Si falla»)")
     except urllib.error.URLError as e:
-        raise RuntimeError(f"Sloth no contesta en {url}: {e.reason}")
+        raise RuntimeError(f"VyMotion no contesta en {url}: {e.reason}")
 
 
 def terminos(g: director.Guion) -> str:

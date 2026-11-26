@@ -4,7 +4,6 @@ import { api } from './api'
 import { SubtitulosEntrega } from './Subtitulos'
 import { YoutubeBoton } from './Youtube'
 import './Final.css'
-import { abrirRuta } from './web'
 
 /**
  * Lo que se hace con un video terminado, arriba de la fase Entrega del estudio: bajarlo, verlo en su carpeta y pedirle
@@ -53,7 +52,7 @@ export function Final({ session, card, carpeta, finales }: { session: SessionMet
   const mandar = (c: (typeof CAMBIOS)[number]) =>
     pedir(c.texto, () => api(`/api/sessions/${session.id}/send`, { text: `${c.pide}${narrado ? ' La voz no se toca.' : ''} Cuando acabes, vuelve a renderizar el video final.` }))
   const src = (f: VideoFinal) => `/api/sessions/${session.id}/archivo?ruta=${encodeURIComponent(f.ruta)}&t=${Math.round(f.t)}&descarga=${encodeURIComponent(f.nombre)}`
-  const abrir = (ruta: string) => abrirRuta(ruta).catch((e: Error) => setError(e.message))
+  const abrir = (ruta: string) => api('/api/open', { path: ruta }).catch((e) => setError(e.message))
   if (!finales.length) return null
 
   return (

@@ -4,7 +4,7 @@ Las palabras de la toma con su tiempo, para cortar sobre ellas: work/tx/words.js
     python -I -B -X utf8 <skill>/scripts/transcribir.py <video>
     python -I -B -X utf8 <skill>/scripts/transcribir.py <video> --comparar out/final.mp4
 
-Transcribe public/assets/media/vo.wav con el transcriptor de Sloth (WhisperX large-v3-turbo y el alineador del español,
+Transcribe public/assets/media/vo.wav con el transcriptor de VyMotion (WhisperX large-v3-turbo y el alineador del español,
 `python/procesos/transcribir.py`), con los nombres de `terminos.txt` (uno por línea, si existe) como pistas, y sigue
 con snap-onsets.py. Avisa de los tramos con voz y sin palabras: Whisper a veces se salta uno entero; léelos antes de
 construir. Los nombres mal oídos se corrigen a mano en words.json, sin tocar los tiempos.

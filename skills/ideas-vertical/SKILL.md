@@ -1,11 +1,11 @@
 ---
 name: ideas-vertical
-description: Propone ideas de video vertical para TikTok e Instagram, con meta de ventas, a partir de la investigación que hizo Sloth en su nicho (outliers medidos contra su cuenta, guardados y compartidos por mil), con un método de demanda y empaque llevado al formato corto — primer cuadro, gancho de 3 segundos, variantes de lo que ya funcionó y riesgo dicho sin rodeos — y prepara una idea elegida para grabarla. La lanza la sección Ideas de Sloth en un canal de TikTok e Instagram; úsala también cuando pidan qué video corto o vertical hacer, ideas para TikTok, Reels o Shorts con evidencia, o preparar un video vertical para grabar.
+description: Propone ideas de video vertical para TikTok e Instagram, con meta de ventas, a partir de la investigación que hizo VyMotion en su nicho (outliers medidos contra su cuenta, guardados y compartidos por mil), con un método de demanda y empaque llevado al formato corto — primer cuadro, gancho de 3 segundos, variantes de lo que ya funcionó y riesgo dicho sin rodeos — y prepara una idea elegida para grabarla. La lanza la sección Ideas de VyMotion en un canal de TikTok e Instagram; úsala también cuando pidan qué video corto o vertical hacer, ideas para TikTok, Reels o Shorts con evidencia, o preparar un video vertical para grabar.
 ---
 
 # Ideas para video vertical
 
-Trabajas en la carpeta de un canal vertical (TikTok e Instagram) de la sección Ideas de Sloth. La sección enseña al
+Trabajas en la carpeta de un canal vertical (TikTok e Instagram) de la sección Ideas de VyMotion. La sección enseña al
 usuario cada archivo que escribes, según aparece: escribe en la raíz de la carpeta y no crees subcarpetas.
 
 Lo que ya está aquí:
@@ -14,7 +14,7 @@ Lo que ya está aquí:
   quién le habla y quién compra), `meta` (qué vende), `semillas` (lo que su público escribe en el buscador),
   `vecinos` (nichos con la misma intención) y `referencias` (`@cuenta` de TikTok o `instagram.com/cuenta`).
 - `diagnostico.md`, si existe: lo que ya se vio en los números de su cuenta. Son pistas, no conclusiones.
-- `resumen.json`: **léelo primero, entero.** Es la investigación ya contada por Sloth, solo con lo que trajo el perfil de
+- `resumen.json`: **léelo primero, entero.** Es la investigación ya contada por VyMotion, solo con lo que trajo el perfil de
   hoy:
   - `criterios`: cómo se contó todo. Léelo antes que los números.
   - `muestra`: cuántas búsquedas, cuentas, videos medidos, outliers y videos con comentarios leídos (`conDestacados`)
@@ -53,7 +53,7 @@ Lo que ya está aquí:
   `· en español: N parecidos (0,84)` o `· nada parecido en español` (ver «Lo que viene del inglés»).
   Un outlier tiene 3× o más la mediana de su cuenta **y** al menos 10 mil vistas. La mediana de una cuenta sale de sus
   últimos 30 videos, sin los fijados ni los de menos de 3 días.
-- `investigacion.json`: lo que Sloth leyó de TikTok e Instagram, entero y grande. **No lo leas entero:** consúltalo solo
+- `investigacion.json`: lo que VyMotion leyó de TikTok e Instagram, entero y grande. **No lo leas entero:** consúltalo solo
   para lo que el resumen no trae, con un script corto que imprima solo lo que buscas. Por ejemplo, todos los videos de una
   cuenta:
 
@@ -72,7 +72,7 @@ Lo que ya está aquí:
     guarda también lo que trajeron términos o referencias que ya no están en `canal.json`: **eso no cuenta**; usa solo
     los videos cuyo `de` nombre algo del `canal.json` de hoy. `gancho` es lo que dice en sus primeros 3 segundos;
     `sinVoz`, que se transcribió y no habla; sin `transcrito`, no hay transcripción (aún no, o no se pudo).
-- `transcripciones/<id>.json`: lo que se dice en cada video, entero, sacado de su audio con el Whisper de Sloth:
+- `transcripciones/<id>.json`: lo que se dice en cada video, entero, sacado de su audio con el Whisper de VyMotion:
   `segmentos` (`inicio` y `fin` en segundos, y `texto`) y el `texto` seguido. Léela con Read. Lo que se ve (el primer
   cuadro, el texto en pantalla) no está ahí. Un video `sinVoz` tiene el gancho en la imagen: no lo cuentes entre los
   ganchos dichos, y dilo.
@@ -81,11 +81,11 @@ Lo que ya está aquí:
 - `estado.json`: lo que el usuario hizo con las ideas de antes (`elegidas[id].estado`: `elegida` o `descartada`).
 - `ideas.json`, `demanda.md` y `formatos.md` de una vuelta anterior, si existen, y `anteriores/`.
 
-Si no hay `resumen.json` (la skill se lanzó fuera de Sloth), saca esas cuentas tú de `investigacion.json`, con scripts. Si
-tampoco hay `investigacion.json`, no hay evidencia: dilo, y pide que se investigue desde la sección Ideas de Sloth.
+Si no hay `resumen.json` (la skill se lanzó fuera de VyMotion), saca esas cuentas tú de `investigacion.json`, con scripts. Si
+tampoco hay `investigacion.json`, no hay evidencia: dilo, y pide que se investigue desde la sección Ideas de VyMotion.
 
-La carpeta de la app (el repo de Sloth) está tres niveles arriba de esta (`../../..`): ahí están `AGENTS.md`, que dice
-qué es Sloth y qué vende, y `cards.json`, con los estilos de video.
+La carpeta de la app (el repo de VyMotion) está tres niveles arriba de esta (`../../..`): ahí están `AGENTS.md`, que dice
+qué es VyMotion y qué vende, y `cards.json`, con los estilos de video.
 
 Si existe `METODO.md` junto a esta skill, tiene el método completo, con su porqué y lo que cambia en vertical: léelo antes
 de empezar.
@@ -110,7 +110,7 @@ sí, pero no son vistas: no los mezcles con medianas ni con ×.
 
 ## Las herramientas
 
-Sloth le da al hilo cinco herramientas que leen en vivo. Nada de lo que traen se guarda en `investigacion.json`.
+VyMotion le da al hilo cinco herramientas que leen en vivo. Nada de lo que traen se guarda en `investigacion.json`.
 
 - `mcp__ideas__buscar_tiktok({ termino })`: los ~24 primeros videos de una búsqueda (vistas, guardados, compartidos y
   comentarios por mil, fecha, `@cuenta` con sus seguidores, descripción) y la mediana de vistas. Marca el idioma de cada
@@ -142,7 +142,7 @@ público a fondo antes de buscar nada.
 - **Una pregunta por mensaje**, corta y en lenguaje llano, sin jerga («nicho», «awareness», «outlier», «engagement»).
   Después de preguntar, termina tu turno y espera la respuesta.
 - **Pon de 2 a 4 ejemplos para elegir** debajo de la pregunta, numerados. Sácalos de lo que ya sabes: lo que haya en
-  `canal.json` y lo que vende si es Sloth (`AGENTS.md` de la app). Él puede contestar «la 2», mezclar o escribir otra cosa.
+  `canal.json` y lo que vende si es VyMotion (`AGENTS.md` de la app). Él puede contestar «la 2», mezclar o escribir otra cosa.
 - **Si contesta «no sé», pregunta lo mismo desde otro lado**, con una situación concreta: «Piensa en la última persona
   que te escribió interesada: ¿qué hacía?».
 - **Guarda cada respuesta en `canal.json` en cuanto la tengas**, sin esperar al final: la sección lo enseña en vivo.
@@ -159,7 +159,7 @@ y su meta, como una de las opciones. Sus semillas, si las quiere, se vuelven a p
 2. **Quién compra** (`publico`): una persona concreta, no «todo el mundo». Qué hace, qué quiere lograr, qué ha intentado
    y por qué no le funcionó, y si ya sabe que existe algo como lo que vende o solo conoce el problema. Escríbelo en una o
    dos frases, como lo diría el usuario.
-3. **Sus cuentas:** su TikTok (`handle`) y su Instagram (`instagram`), y el **nombre** del canal en Sloth, si aún dice
+3. **Sus cuentas:** su TikTok (`handle`) y su Instagram (`instagram`), y el **nombre** del canal en VyMotion, si aún dice
    «Canal nuevo».
 4. **Lo que su público escribe en el buscador** (`semillas`). Propón de 6 a 8 frases de 2 a 5 palabras, como las
    escribiría esa persona y no como las diría un experto, y de 3 a 4 en inglés, como las escribiría quien busca eso en
@@ -171,7 +171,7 @@ y su meta, como una de las opciones. Sus semillas, si las quiere, se vuelven a p
    quiere usar. Deja que quite o cambie. Las palabras sueltas («Tiktok», «IA») traen otros públicos: propón frases.
 5. **Cuentas que ya ve o conoce** (`referencias`): pregunta cuáles, y escríbelas como `@cuenta` (TikTok) o
    `instagram.com/cuenta` (Instagram). Propón además de 2 a 3 cuentas en inglés del nicho, de las que salieron en inglés
-   en esas búsquedas: Sloth lee enteras las referencias, y desde México es la forma fiable de ver el inglés.
+   en esas búsquedas: VyMotion lee enteras las referencias, y desde México es la forma fiable de ver el inglés.
 6. **Nichos vecinos** (`vecinos`): de 3 a 5 temas con la misma intención que su público, aunque sean de otra cosa. Por
    ejemplo, alguien que quiere vender con videos también ve «cómo crecer en tiktok» o «marketing para emprendedores».
    Explica en una frase por qué cada uno, y prueba los que quepan en las 10 llamadas.
@@ -310,8 +310,8 @@ cambia una sola cosa. En resumen: si no te da nervios arruinar la idea, todavía
   nunca se usó (mira también los de `anteriores/*/ideas.json`).
 - **Las ideas elegidas no se quitan nunca.** Si `estado.json` marca una como `elegida`, sigue en `ideas.json` con su mismo
   `id`, aunque la investigación nueva la debilite: mejórala y dilo en su `riesgo`. No le des ese `id` a otra idea: es lo
-  que la une a su hilo. Antes de cada vuelta, Sloth guarda la anterior en `anteriores/<fecha>/`, así que puedes reescribir
-  el archivo sin miedo a perder nada; y si al terminar falta una elegida, Sloth la vuelve a poner como estaba.
+  que la une a su hilo. Antes de cada vuelta, VyMotion guarda la anterior en `anteriores/<fecha>/`, así que puedes reescribir
+  el archivo sin miedo a perder nada; y si al terminar falta una elegida, VyMotion la vuelve a poner como estaba.
 - **`terminosNuevos`** son los términos que salen de las descripciones y los comentarios de los outliers, o de tus
   búsquedas con las herramientas, y que convendría buscar en la siguiente vuelta.
 
@@ -360,5 +360,5 @@ el segundo 1, como en ID»). Si un video de la evidencia no tiene transcripción
 6. **La descripción y los hashtags**, una para TikTok y otra para Instagram. La descripción casi no cuenta en el feed,
    pero sí en el buscador: lleva la frase con que busca su público. Si hay llamada a la acción, la repite.
 7. **Qué preparar antes de grabar:** cuentas, archivos y lo que tiene que estar ya hecho para enseñarlo primero.
-8. **Con qué estilo de Sloth hacerlo, si no lo graba él:** la card (`estilo`) y el mensaje para pedírselo, con el guion y
+8. **Con qué estilo de VyMotion hacerlo, si no lo graba él:** la card (`estilo`) y el mensaje para pedírselo, con el guion y
    la duración.

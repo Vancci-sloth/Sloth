@@ -1,12 +1,12 @@
 """
-Crea el proyecto de un video documental desde la grabación, en `<nombre>` (el de la línea `Carpeta:` de Sloth):
+Crea el proyecto de un video documental desde la grabación, en `<nombre>` (el de la línea `Carpeta:` de VyMotion):
 
     python -I -B -X utf8 <skill>/scripts/nuevo.py <grabación> [<otra toma>…] <nombre> [--vertical]
 
 Con varias tomas, las junta en el orden en que vienen. Al acabar transcribe la voz (work/tx/words.json) y enseña lo
 dicho frase por frase con su segundo: con eso se escribe momentos.json.
 
-Va en el directorio actual (Sloth lanza la card en `trabajo/video-documental`, y su panel de etapas busca ahí la
+Va en el directorio actual (VyMotion lanza la card en `trabajo/video-documental`, y su panel de etapas busca ahí la
 carpeta); dentro de un proyecto, junto a él. Deja:
 
   package.json, src/                      la plantilla: Remotion dibuja src/edicion.json, que escribe el director (hacer.py)

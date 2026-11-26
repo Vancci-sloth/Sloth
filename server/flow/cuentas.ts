@@ -13,10 +13,10 @@ import { URL_FLOW } from './pagina.ts'
 /**
  * Las cuentas de Google que se agregan a Flow además de la de la voz, para tener más créditos: cada una con su perfil de
  * Edge (Chrome en Mac), `data/flow/cuentas/<id>/`, donde se entró una vez, y su Edge sin ventana para generar. Cada Edge
- * abre su CDP en un puerto libre (`puertoLibre`), que Sloth deja escrito en su perfil: así varios generan a la vez sin
+ * abre su CDP en un puerto libre (`puertoLibre`), que VyMotion deja escrito en su perfil: así varios generan a la vez sin
  * pisarse.
  *
- * Para entrar se abre ese Edge con ventana en el inicio de sesión de Google, y Sloth solo mira por CDP qué página tiene y
+ * Para entrar se abre ese Edge con ventana en el inicio de sesión de Google, y VyMotion solo mira por CDP qué página tiene y
  * si ya hay sesión, sin Playwright (que toca cada pestaña y Google lo nota), como al conectar la voz. Al llegar a Flow,
  * cada quien acepta su aviso y cierra la ventana; entonces se lee el correo y la cuenta queda. Agregar una que ya estaba
  * es volver a conectarla: se queda el perfil nuevo.
@@ -49,8 +49,8 @@ const puertoLibre = () =>
 const navegador = () => chromiumDelSistema(process.platform === 'darwin')
 export const nombreNavegador = () => nombreDe(navegador() ?? (process.platform === 'win32' ? 'msedge' : undefined))
 
-/** El Edge de un perfil: lo abre, lo usa con Playwright y lo cierra. `inicio`, donde abre su ventana. También el de Meta Muse. */
-export function edgeDe(perfil: string, inicio = URL_FLOW) {
+/** El Edge de un perfil: lo abre, lo usa con Playwright y lo cierra. */
+function edgeDe(perfil: string) {
   // Edge solo escribe `DevToolsActivePort` con el puerto `0`: el elegido se guarda aquí, para hallar su Edge tras reiniciar.
   const archivoPuerto = join(perfil, 'puerto-sloth')
   const puerto = () => {
@@ -92,7 +92,7 @@ export function edgeDe(perfil: string, inicio = URL_FLOW) {
   }
 
   /** Lo abre, si no lo estaba. Con `ventana`, en `url` y como un Edge cualquiera; si no, sin ventana ni sonido. */
-  async function lanzar(ventana: boolean, url = inicio) {
+  async function lanzar(ventana: boolean, url = URL_FLOW) {
     if (await responde()) {
       if (!ventana) return
       await cerrar()
@@ -117,27 +117,23 @@ export function edgeDe(perfil: string, inicio = URL_FLOW) {
     return r
   }
 
-  /** Si tiene la cookie `nombre` de `dominio` (o de un subdominio), sin tocar sus pestañas. */
-  const tiene = (dominio: RegExp, nombre: RegExp) =>
-    alNavegador<{ cookies: { name: string; domain: string }[] }>('Storage.getCookies').then(
-      ({ cookies }) => cookies.some((c) => nombre.test(c.name) && dominio.test(c.domain.replace(/^\./, ''))),
-      () => false
-    )
-
   return {
     lanzar,
     cerrar,
     paginas,
-    tiene,
     /**
      * Si ya tiene la sesión de Google y la de Flow. La de Flow (`OSID` en su dominio) la pone Google un momento después de
      * llegar: sin ella, el Edge sin ventana tenía que pedirla otra vez y Google no se la daba, así que Flow abría sin
      * cuenta («Entraste, pero Flow no dijo con qué cuenta»), a quien cerraba la ventana en cuanto veía Flow.
      */
-    sesiones: async () => {
-      const google = await tiene(/(^|\.)google\.com$/, /^SAPISID$/)
-      return { google, flow: google && (await tiene(new RegExp(`^${new URL(URL_FLOW).hostname.replaceAll('.', '\\.')}$`), /^(__Secure-)?OSID$/)) }
-    },
+    sesiones: () =>
+      alNavegador<{ cookies: { name: string; domain: string }[] }>('Storage.getCookies').then(
+        ({ cookies }) => {
+          const de = (dominio: RegExp, nombre: RegExp) => cookies.some((c) => nombre.test(c.name) && dominio.test(c.domain.replace(/^\./, '')))
+          return { google: de(/(^|\.)google\.com$/, /^SAPISID$/), flow: de(new RegExp(`^${new URL(URL_FLOW).hostname.replaceAll('.', '\\.')}$`), /^(__Secure-)?OSID$/) }
+        },
+        () => ({ google: false, flow: false })
+      ),
     enEdge: <T>(fn: (b: Browser) => Promise<T>) =>
       enTurno(async () => {
         await lanzar(false)

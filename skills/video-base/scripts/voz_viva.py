@@ -4,9 +4,9 @@ python/procesos) no lo cargue otra vez. Con el proceso de siempre, importar torc
 36 s con la máquina tranquila y de 3 a 10 min con varios videos a la vez (torch/lib son 4 GB que, con la memoria llena,
 se vuelven a leer cada vez); transcribir y alinear 6 min de voz ya cargado, 20 s. Aquí se carga una vez (ADR 0008).
 
-Lo arranca Sloth cuando un video empieza a trabajar (`calentar_voz()` de sloth.py, ADR 0011) o, si no estaba, `proceso()`
-la primera vez que hace falta, ya con el turno de la GPU, y lo espera. Corre con el Python de Sloth, escucha en un puerto
-local que anota en %TEMP%/sloth-voz.json y se cierra solo tras 10 min sin pedidos; Sloth le manda un ping cada minuto
+Lo arranca VyMotion cuando un video empieza a trabajar (`calentar_voz()` de sloth.py, ADR 0011) o, si no estaba, `proceso()`
+la primera vez que hace falta, ya con el turno de la GPU, y lo espera. Corre con el Python de VyMotion, escucha en un puerto
+local que anota en %TEMP%/sloth-voz.json y se cierra solo tras 10 min sin pedidos; VyMotion le manda un ping cada minuto
 mientras trabaja un video (ocupa unos 2,6 GB de la tarjeta). Cada pedido es una línea JSON, `{"proceso": "transcribir.py", "files", "options"}`;
 contesta con las líneas de avance (`@progreso 0.42`) y al final una línea con `{"ok": respuesta}` o `{"error": "..."}`.
 `{"salir": true}` lo cierra: lo manda `transcribir-lote.py`, que carga su propio Whisper y con los dos no caben en 6 GB.

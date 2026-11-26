@@ -11,8 +11,72 @@ import { flow } from './flow/index.ts'
 import { registroDeImagen } from './flow/hilo-imagen.ts'
 import { Sessions } from './sessions.ts'
 
+test('preparar texto en segundo plano usa el modelo elegido sin publicar un chat técnico', async () => {
+  const app = await mkdtemp(join(tmpdir(), 'vymotion-prompt-'))
+  let cerrado = false
+  const sesiones = new Sessions(app, () => assert.fail('Publicó eventos internos'), () => assert.fail('Creó un chat visible'), () => {}, () => {}, (opts) => {
+    assert.equal(opts.model, 'codex:gpt-prueba')
+    assert.equal(opts.effort, 'low')
+    return {
+      send() {
+        opts.onProviderSession('temporal')
+        opts.onEvent({ t: 'text', id: 'avance', delta: 'Voy a redactarlo.' })
+        opts.onEvent({ t: 'text', id: 'final', delta: 'Un árbol ' })
+        opts.onEvent({ t: 'text', id: 'final', delta: 'a contraluz.' })
+        opts.onEvent({ t: 'turn_end', at: Date.now(), ok: true })
+      },
+      steer() {},
+      async interrupt() {},
+      close() { cerrado = true }
+    }
+  })
+  try {
+    const salida = await sesiones.textoInterno({ model: 'codex:gpt-prueba', effort: 'low', cwd: app }, 'Prepara el prompt')
+    assert.equal(salida.texto, 'Un árbol a contraluz.')
+    assert.deepEqual(sesiones.list(), [])
+    assert.equal(cerrado, true)
+  } finally {
+    sesiones.closeAll()
+    await rm(app, { recursive: true, force: true })
+  }
+})
+
+test('la siguiente edición aprovecha el antiguo chat técnico de la imagen', async () => {
+  const app = await mkdtemp(join(tmpdir(), 'vymotion-historial-imagen-'))
+  const sesiones = new Sessions(join(app, 'hilos'), () => {}, () => {}, () => {}, () => {}, (opts) => ({
+    send() {
+      opts.onEvent({ t: 'text', id: 'viejo', delta: 'Listo.' })
+      opts.onEvent({ t: 'turn_end', at: Date.now(), ok: true })
+    },
+    steer() {},
+    async interrupt() {},
+    close() {}
+  }))
+  try {
+    const original = { id: '1795276800000-abc123abc123', prompt: 'Un paisaje', estilo: 'acuarela' as const,
+      modelo: 'chatgpt', orquestador: 'codex:gpt-prueba', formato: '1:1', creada: 1795276800000 }
+    const carpeta = join(app, 'pedidos', original.id)
+    await mkdir(carpeta, { recursive: true })
+    await writeFile(join(carpeta, 'prompt.txt'), 'Un paisaje con luz cálida.')
+    const anterior = sesiones.create({ cardId: 'estudio-imagenes', title: 'Preparar prompt de imagen', cwd: carpeta, model: original.orquestador })
+    sesiones.send(anterior.id, 'Escribe prompt.txt en la carpeta del pedido.')
+    const editar = registroDeImagen(sesiones, app)(original, { ...original, id: '1795276800001-abc123abc123', origen: original.id, prompt: 'Añade niebla.' })
+    editar?.terminar()
+    assert.deepEqual(sesiones.list().map((h) => h.id), [anterior.id])
+    assert.equal(sesiones.meta(anterior.id)?.title, original.prompt)
+    const historial = sesiones.get(anterior.id)!
+    const visibles = historial.events.slice(historial.meta.desdeImagen)
+    assert.deepEqual(visibles.filter((e) => e.t === 'user').map((e) => e.text), ['Un paisaje', 'Añade niebla.'])
+    assert.match(JSON.stringify(visibles), /Un paisaje con luz cálida\./)
+    assert.ok(historial.events.some((e) => e.t === 'user' && e.text.includes('prompt.txt')))
+  } finally {
+    sesiones.closeAll()
+    await rm(app, { recursive: true, force: true })
+  }
+})
+
 test('el estudio lista solo imágenes terminadas y conserva su tipo al descargarlas', async () => {
-  const app = await mkdtemp(join(tmpdir(), 'sloth-imagenes-'))
+  const app = await mkdtemp(join(tmpdir(), 'vymotion-imagenes-'))
   const sesiones = new Sessions(join(app, 'hilos'), () => {}, () => {}, () => {}, () => {})
   try {
     const servicio = flow(app, {
@@ -90,6 +154,7 @@ test('el estudio lista solo imágenes terminadas y conserva su tipo al descargar
     const pedido = JSON.parse(crear.cuerpo.toString())
     assert.equal(pedido.estado, 'preparando')
     assert.equal((await pedir(`${base}/${pedido.id}/borrar`, {}, motor)).status, 409)
+    assert.throws(() => motor.moverImagenesDelHilo(motor.archivosDelHilo(pedido.id)), /Espera a que terminen/)
     const siguiente = await pedir(base, { ...imagen, prompt: 'Una montaña', formato: '9:16', modelo: 'chatgpt' }, motor)
     assert.equal(siguiente.status, 200)
     const enCola = JSON.parse(siguiente.cuerpo.toString())
@@ -118,16 +183,21 @@ test('el estudio lista solo imágenes terminadas y conserva su tipo al descargar
     assert.equal((await pedir(base, { ...cambio, marcas: [{ x: 99, y: 10, ancho: 20, alto: 10 }] }, motor)).status, 400)
     assert.equal((await pedir(base, { ...cambio, marcas: [{ ...zona, herramienta: '__proto__' }] }, motor)).status, 400)
     assert.equal((await pedir(base, { ...cambio, marcas: [{ ...protegida, contorno: [{ x: 0, y: 0 }, ...contorno] }] }, motor)).status, 400)
-    const respuestaEdicion = await pedir(base, { ...cambio, marcas: [zona, protegida, { ...zona, herramienta: 'quitar' }] }, motor)
+    assert.equal((await pedir(base, { ...cambio, ajustesEdicion: ['__proto__'] }, motor)).status, 400)
+    const respuestaEdicion = await pedir(base, { ...cambio, ajustesEdicion: ['objeto'], marcas: [zona, protegida, { ...zona, herramienta: 'quitar' }] }, motor)
     assert.equal(respuestaEdicion.status, 200)
     const idEdicion = JSON.parse(respuestaEdicion.cuerpo.toString()).id
-    let version: { origen?: string } | undefined
+    let version: { origen?: string; prompt?: string; ajustesEdicion?: string[] } | undefined
     for (let i = 0; i < 20 && !version; i++) {
       const estado = JSON.parse((await pedir(base, undefined, motor)).cuerpo.toString())
       version = estado.imagenes.find((imagen: { id: string }) => imagen.id === idEdicion)
       if (!version) await esperar(20)
     }
     assert.equal(version?.origen, pedido.id)
+    assert.equal(version?.prompt, cambio.prompt)
+    assert.deepEqual(version?.ajustesEdicion, ['objeto'])
+    assert.match(prompts[2], /Respeta la escala, la perspectiva y las sombras de la escena/)
+    assert.match(prompts[2], /Instrucción original del usuario: Cambia la zona 1 a naranja/)
     assert.match(prompts[2], /Zona 1:.*x=10%/)
     assert.match(prompts[2], /Zona 2: Contorno cerrado.*\(10,10\) \(30,13\) \(16,25\).*Mantén intacta/)
     assert.match(prompts[2], /Zona 3:.*Borra el objeto/)
@@ -156,11 +226,21 @@ test('el estudio lista solo imágenes terminadas y conserva su tipo al descargar
     const eventos = sesiones.get(hilo.id)?.events ?? []
     assert.deepEqual(eventos.filter((e) => e.t === 'user').map((e) => e.text), ['Un árbol', cambio.prompt, 'Quitar el fondo'])
     const respuestas = eventos.filter((e) => e.t === 'text').map((e) => e.delta)
-    assert.match(respuestas[0], /El prompt/)
+    assert.match(respuestas[0], /Prompt listo/)
     assert.ok(respuestas[0].includes(preparado))
     assert.match(respuestas[1], /Imagen lista.*#\/imagenes\/editar\//)
     assert.ok(respuestas[2].includes(`#/imagenes/editar/${idEdicion}`))
     assert.ok(respuestas[3].includes(`#/imagenes/editar/${recortada.id}`))
+    await assert.rejects(readFile(join(ruta, 'pedidos', idEdicion, 'original.png')), { code: 'ENOENT' })
+
+    const plan = motor.archivosDelHilo(pedido.id)
+    assert.deepEqual([...plan.ids], [pedido.id, idEdicion, recortada.id])
+    let archivos: ReturnType<typeof motor.moverImagenesDelHilo> | undefined
+    sesiones.remove(hilo.id, () => { archivos = motor.moverImagenesDelHilo(plan) })
+    await archivos?.limpiar()
+    assert.equal(sesiones.meta(hilo.id), undefined)
+    for (const id of plan.ids) assert.equal((await pedir(`${base}/${id}`, undefined, motor)).status, 404)
+    assert.equal((await pedir(`${base}/${enCola.id}`, undefined, motor)).status, 200)
 
     await mkdir(join(app, 'data', 'flow'), { recursive: true })
     await writeFile(join(app, 'data', 'flow', 'ajustes.json'), JSON.stringify({ calmaHasta: Date.now() + 60_000 }))
@@ -172,6 +252,41 @@ test('el estudio lista solo imágenes terminadas y conserva su tipo al descargar
     assert.equal((await pedir(base, imagen, enPausa)).status, 429)
   } finally {
     sesiones.closeAll()
+    await rm(app, { recursive: true, force: true })
+  }
+})
+
+test('una imagen subida entra a la galería lista para editarla, con su formato y sin salir de data/attachments', async () => {
+  const app = await mkdtemp(join(tmpdir(), 'vymotion-subida-'))
+  try {
+    const servicio = flow(app, { cuenta: () => null, enEdge: async () => { throw new Error('No debe abrir Google Flow') }, abrirEnEdge: async () => {} })
+    const pedir = async (ruta: string, cuerpo?: object) => {
+      const req = Object.assign(Readable.from(cuerpo ? [Buffer.from(JSON.stringify(cuerpo))] : []), { method: cuerpo ? 'POST' : 'GET', url: ruta })
+      const partes: Buffer[] = []
+      let status = 0
+      const res = Object.assign(new Writable({ write(trozo: Buffer, _encoding, done) { partes.push(trozo); done() } }), {
+        writeHead(codigo: number) { status = codigo }
+      })
+      assert.equal(await servicio.api(req as unknown as IncomingMessage, res as unknown as ServerResponse, ruta.split('?')[0]), true)
+      return { status, cuerpo: JSON.parse(Buffer.concat(partes).toString() || 'null') }
+    }
+    // Un PNG de 2×1: formato apaisado 2:1 no existe, así que se queda el más cercano (16:9).
+    const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAIAAAABCAYAAAD0In+7AAAADElEQVR4nGNgYGAAAAAEAAH2FzhVAAAAAElFTkSuQmCC', 'base64')
+    const carpeta = join(app, 'data', 'attachments')
+    await mkdir(carpeta, { recursive: true })
+    await writeFile(join(carpeta, '1795276800000-foto.png'), png)
+    const subida = await pedir('/api/flow/estudio/subir', { ruta: join(carpeta, '1795276800000-foto.png') })
+    assert.equal(subida.status, 200)
+    assert.equal(subida.cuerpo.modelo, 'subida')
+    assert.equal(subida.cuerpo.formato, '16:9')
+    const galeria = await pedir('/api/flow/estudio')
+    assert.deepEqual(galeria.cuerpo.imagenes.map((i: { id: string }) => i.id), [subida.cuerpo.id])
+    assert.deepEqual(await readFile(join(app, 'data', 'imagenes', `${subida.cuerpo.id}.jpg`)), png)
+    // Fuera de la carpeta de adjuntos no se sube nada.
+    await writeFile(join(app, 'secreto.png'), png)
+    assert.equal((await pedir('/api/flow/estudio/subir', { ruta: join(app, 'secreto.png') })).status, 400)
+    assert.equal((await pedir('/api/flow/estudio/subir', { ruta: join(carpeta, '..', '..', '..', 'secreto.png') })).status, 400)
+  } finally {
     await rm(app, { recursive: true, force: true })
   }
 })

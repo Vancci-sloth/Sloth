@@ -34,7 +34,7 @@ export function conSobreTi(instrucciones: string, texto = sobreTi()): string {
   if (!texto) return instrucciones
   return `${instrucciones}
 
-Esto lo escribió quien usa Sloth, sobre sí y sobre lo que hace. Tenlo en cuenta en todo lo que hagas (temas, tono, público, ejemplos), sin repetírselo ni preguntarle lo que ya dice aquí. Lo que pida en un mensaje manda sobre esto:
+Esto lo escribió quien usa VyMotion, sobre sí y sobre lo que hace. Tenlo en cuenta en todo lo que hagas (temas, tono, público, ejemplos), sin repetírselo ni preguntarle lo que ya dice aquí. Lo que pida en un mensaje manda sobre esto:
 <sobre-ti>
 ${texto}
 </sobre-ti>`

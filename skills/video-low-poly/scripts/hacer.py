@@ -15,7 +15,7 @@ efectos) a −15 LUFS, como pedía la referencia.
 
 Desde la raíz del proyecto. En orden, y para en el primer ✗ diciendo qué arreglar:
 1. Comprueba momentos.json contra guion.md (cada palabra, cada lugar y cada cosa) antes de pagar la voz.
-2. La voz (solo si el guion cambió) y sus palabras con su segundo (el transcriptor de Sloth).
+2. La voz (solo si el guion cambió) y sus palabras con su segundo (el transcriptor de VyMotion).
 3. Ancla cada momento a la palabra que dijo la voz y escribe revision/plan.json: lo que dibuja el director (kit/low-poly.js).
 4. Dibuja cada cuadro en Chrome con la tarjeta (render.mjs, 64 sub-render por cuadro, como la referencia) y su sonido,
    salido del mismo plan; si el plan y el kit no cambiaron, no lo dibuja otra vez.
@@ -33,14 +33,13 @@ import shutil
 import subprocess
 import sys
 import time
-import urllib.error
-import urllib.request
 from pathlib import Path
 
 SKILL = Path(__file__).resolve().parent.parent
 BASE = (Path(os.environ["SLOTH_SKILLS"]) if os.environ.get("SLOTH_SKILLS") else SKILL.parent) / "video-base" / "scripts"
 sys.path.insert(0, str(BASE))
 from momentos import Reloj, anclar, con_imagenes, esperar_portada, guardar, hoja, leer, normal, opcion, palabras_de, parar, pedir_portada  # noqa: E402
+from voz import conseguir as conseguir_voz, palabras as palabras_de_la_voz  # noqa: E402
 
 RAIZ = Path.cwd()
 VOZ = RAIZ / "fuentes" / "voz"
@@ -255,82 +254,14 @@ def huella(*partes) -> str:
     return h.hexdigest()[:16]
 
 
-def pedir(ruta: str, datos: dict | None = None) -> dict:
-    url = os.environ.get("SLOTH_URL", "http://127.0.0.1:4848") + ruta
-    pedido = urllib.request.Request(url, data=json.dumps(datos).encode() if datos else None, headers={"content-type": "application/json"})
-    try:
-        with urllib.request.urlopen(pedido, timeout=120) as r:
-            return json.load(r)
-    except urllib.error.HTTPError as e:
-        sys.exit(f"✗ AI Studio: {json.load(e).get('error', e)} (si es la cuenta o la cuota, VOZ.md de video-base: «Si falla»)")
-    except urllib.error.URLError as e:
-        sys.exit(f"✗ Sloth no contesta en {url}: {e.reason}")
-
-
 def voz(args: list[str], guion_txt: str, reloj: Reloj) -> None:
-    """fuentes/voz/original.wav (48 kHz, sin el silencio de las puntas), solo si el guion o el audio cambiaron."""
-    VOZ.mkdir(parents=True, exist_ok=True)
-    marca = VOZ / "hecha.json"
-    antes = json.loads(marca.read_text(encoding="utf-8")) if marca.exists() else {}
-    if "--studio" in args:
-        nombre = args[args.index("--studio") + 1]
-        clave = huella("studio", nombre, guion_txt)
-        if antes.get("clave") == clave and (VOZ / "original.wav").exists():
-            reloj.paso("voz: la de antes (el guion no cambió)")
-            return
-        reloj.paso(f"voz de AI Studio ({nombre})…")
-        salida = VOZ / "ai-studio.wav"
-        t = pedir("/api/voz/generar", {"voz": nombre, "archivo": str((RAIZ / "guion.md").resolve()), "salida": str(salida.resolve())})
-        while t["estado"] in ("en-fila", "generando"):
-            t = pedir(f"/api/voz/trabajos/{t['id']}?esperar=40")
-        if t["estado"] == "error":
-            sys.exit(f"✗ AI Studio: {t['error']} (VOZ.md de video-base: «Si falla»)")
-        audio = salida
-    elif "--audio" in args:
-        audio = Path(args[args.index("--audio") + 1]).expanduser()
-        if not audio.exists():
-            sys.exit(f"✗ No encuentro el audio {audio}.")
-        clave = huella("audio", audio.stat().st_size, audio.stat().st_mtime_ns, audio.name)
-        if antes.get("clave") == clave and (VOZ / "original.wav").exists():
-            reloj.paso("voz: la de antes")
-            return
-        reloj.paso("tu voz…")
-    else:
-        if not (VOZ / "original.wav").exists():
-            sys.exit("✗ Aún no hay voz: corre hacer.py con --studio <Voz> (la línea `Voz:`) o con --audio <archivo> (la del usuario).")
-        return
-    # Sin el silencio largo de las puntas: deja 0,15 s antes de la primera palabra y 0,4 después de la última.
-    puntas = ("silenceremove=start_periods=1:start_threshold=-45dB:start_silence=0.15,areverse,"
-              "silenceremove=start_periods=1:start_threshold=-45dB:start_silence=0.4,areverse")
-    subprocess.run(["ffmpeg", "-nostdin", "-v", "error", "-y", "-i", str(audio), "-vn", "-af", puntas, "-ac", "2", "-c:a", "pcm_s16le",
-                    "-ar", "48000", str(VOZ / "original.wav")], check=True)
-    (VOZ / "palabras.json").unlink(missing_ok=True)
-    guardar(marca, {"clave": clave})
+    """fuentes/voz/original.wav, de AI Studio o del usuario. Lo común está en video-base/scripts/voz.py."""
+    conseguir_voz(RAIZ, args, guion_txt, reloj)
 
 
 def palabras(reloj: Reloj) -> list[dict]:
-    """Las palabras de la voz con su segundo (WhisperX de Sloth), guardadas mientras la voz no cambie."""
-    archivo, original = VOZ / "palabras.json", VOZ / "original.wav"
-    clave = huella(original.read_bytes())
-    if archivo.exists():
-        d = json.loads(archivo.read_text(encoding="utf-8"))
-        if d.get("clave") == clave:
-            return d["palabras"]
-    reloj.paso("transcribo la voz…")
-    from sloth import MODELOS, proceso, wav16k  # el Python de Sloth y su WhisperX: solo hace falta aquí
-    v16 = VOZ / "voz.16k.wav"
-    wav16k(original, v16)
-    t = RAIZ / "terminos.txt"
-    terminos = [x.strip() for x in t.read_text(encoding="utf-8").splitlines() if x.strip()] if t.exists() else []
-    try:
-        d = proceso("transcribir.py", [str(v16)], {"modelos": str(MODELOS), "alineador": "voxpopuli-es", "terminos": terminos, "cifras_en_letra": True})
-    finally:
-        v16.unlink(missing_ok=True)
-    ps = [{"w": p["text"], "s": round(p["start"], 3), "e": round(p["end"], 3)} for p in d["words"]]
-    if not ps:
-        sys.exit("✗ La voz no trae palabras: ¿se oye?")
-    guardar(archivo, {"clave": clave, "palabras": ps})
-    return ps
+    """Las palabras de la voz con su segundo (WhisperX de VyMotion)."""
+    return palabras_de_la_voz(RAIZ, reloj)
 
 
 def plan(m: dict, ps: list[dict], guion: list[str], indices: list[int]) -> tuple[dict, list[str]]:
@@ -424,7 +355,7 @@ def main() -> None:
         reloj.paso("render: el de antes (ni el plan ni el kit cambiaron)")
     else:
         reloj.paso(f"render de {p['duracion']:.1f} s ({round(p['duracion'] * 30)} cuadros, {muestras or 64} sub-render cada uno)…")
-        from sloth import turno  # uno a la vez en la tarjeta, como los demás renders de Sloth
+        from sloth import turno  # uno a la vez en la tarjeta, como los demás renders de VyMotion
         with turno("render-gpu", "Esperando: otro video está usando la tarjeta."):
             r = subprocess.run(["node", str(SKILL / "scripts" / "render.mjs"), ".", "--plan", "revision/plan.json", "--salida", str(imagen.relative_to(RAIZ)),
                                 "--sonido", str(efectos.relative_to(RAIZ)), *([] if sin_voz else ["--voz"]), *(["--muestras", muestras] if muestras else [])],

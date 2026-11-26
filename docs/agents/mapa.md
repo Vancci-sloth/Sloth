@@ -1,4 +1,4 @@
-# Mapa de Sloth
+# Mapa de VyMotion
 
 Cada módulo explica lo suyo en su comentario de cabecera, y los campos de una card están en `Card` (`shared/types.ts`).
 Este es el mapa:
@@ -13,47 +13,38 @@ Este es el mapa:
 - `server/opencode.ts`: adaptador de OpenCode 2, la versión gratis (con la cuenta de OpenCode de cada quien, que se crea
   gratis y se conecta en `server/cuenta-opencode.ts`; primero sus modelos gratis de Zen y luego los de pago), hecho
   como el de T3 Code: un solo `opencode serve` para todos los hilos, con sus datos en `data/opencode`; cada hilo es una
-  sesión en su carpeta, con las instrucciones de Sloth y su navegador (un MCP que solo él puede usar). Se prueba con un
+  sesión en su carpeta, con las instrucciones de VyMotion y su navegador (un MCP que solo él puede usar). Se prueba con un
   turno grabado (`opencode.grabacion.json`). Cada `conexion` se devuelve con `soltarConexion`: un minuto sin hilos ni
   consultas cierra el servidor, y un inicio de sesión lo conserva hasta autorizarse, cancelarse o vencer. ADR 0009 y 0010.
 - `server/agentes.ts`: el programa de cada agente no viene en el instalador: se baja al elegirlo (bienvenida, Opciones o
   el primer mensaje de un hilo suyo, `conAgente`) a `%APPDATA%\sloth\piezas\agentes`. En el repo, Claude Code, Codex y
   OpenCode ya están en node_modules. Un proveedor nuevo es una entrada más en `AGENTES` y en `PROVEEDORES`
-  (`shared/providers.ts`). «Actualizar los agentes», arriba a la derecha del hilo nuevo (`AvisoAgentes`), baja la versión
+  (`shared/providers.ts`). «Actualizar los agentes» en Opciones → Agentes de IA (`AvisoAgentes`) baja la versión
   más nueva de npm de Claude Code, Codex y OpenCode a `<agente>/versiones/<versión>` (`AL_DIA`); se usa siempre la más
   nueva, la de la app o la bajada.
 - Los demás agentes, como en T3 Code (ADR 0012), cada uno con su cuenta y su catálogo en `server/proveedores.ts` y su fila
-  en Opciones (`CuentaAgente`): DeepSeek es Claude Code con la API de DeepSeek (`server/deepseek.ts`), y lo mismo
-  OpenRouter (`openrouter.ts`, su catálogo filtrado y con buscador) y FreeLLMAPI (`freellmapi.ts`, el programa gratis que
-  cada quien instala; Sloth lo busca en esta computadora): los tres, en `server/otra-api.ts` (ADR 0021); Grok,
-  Antigravity, Gemini CLI y omp hablan ACP (`server/acp.ts`, `grok.ts`, `antigravity.ts`, `gemini.ts`, `omp.ts`; Antigravity, con las cuentas de Google que conectes y un proceso por cuenta para todos sus hilos: al acabarse la cuota de una, el hilo sigue con la siguiente; la cuota es la del plan de Google de cada cuenta, gratis o Google AI Pro/Ultra, que Antigravity dice al iniciar sesión y sale en Opciones; Gemini, con llave de API, ADR 0013; omp, con lo que se conecte en su `~/.omp`, y si ya hay un omp instalado se usa ese, sin bajar el de GitHub); Cursor corre su SDK en un puente aparte
+  en Opciones (`CuentaAgente`): DeepSeek es Claude Code con la API de DeepSeek (`server/deepseek.ts`); Grok,
+  Antigravity y Gemini CLI hablan ACP (`server/acp.ts`, `grok.ts`, `antigravity.ts`, `gemini.ts`; Antigravity, con las cuentas de Google que conectes y un proceso por cuenta para todos sus hilos: al acabarse la cuota de una, el hilo sigue con la siguiente; Gemini, con llave de API, ADR 0013); Cursor corre su SDK en un puente aparte
   (`cursor.ts`, `cursor-puente.mjs`); Muse Code, su MSP (`muse.ts`); Pi, su RPC con una extensión que le pasa los MCP de
-  Sloth (`pi.ts`). Lo que comparten (las instrucciones, la skill por su ruta, los MCP del hilo) está en
+  VyMotion (`pi.ts`). Lo que comparten (las instrucciones, la skill por su ruta, los MCP del hilo) está en
   `server/instrucciones.ts`; el JSON-RPC por líneas, en `server/rpc-lineas.ts`.
+- `server/perfiles-agentes.ts` guarda perfiles de Claude, ChatGPT, Grok, Muse y Pi y llaves adicionales de Gemini, DeepSeek
+  y Cursor en `data/cuentas-<proveedor>`. Cada hilo conserva su perfil; OpenCode y Antigravity usan su gestión de cuentas.
+  Cambiar de cuenta desde el aviso de límite de Claude abre una sesión nueva con un resumen del hilo.
+  La llave de OpenRouter se guarda en Opciones → Agentes de IA → Pi y amplía el catálogo de ese agente.
 - «Sobre ti» (`server/sobre-ti.ts`, `web/src/SobreTi.tsx`): lo que cada quien cuenta de sí en la bienvenida o en
-  Opciones, en `data/sobre-ti.json`. Va con las instrucciones de Sloth a todos los agentes (`conSobreTi`: el `append`
+  Opciones, en `data/sobre-ti.json`. Va con las instrucciones de VyMotion a todos los agentes (`conSobreTi`: el `append`
   de Claude, las `developerInstructions` de Codex e `instrucciones()` de los demás), leído al empezar cada hilo.
-- Sloth en la web (`server/web.ts`, `web/src/web.ts`, `web/src/SlothWeb.tsx`, ADR 0025): la misma interfaz desde el
-  navegador de otro dispositivo, por un túnel rápido de Cloudflare (cloudflared se baja al encenderla). El cobro
-  (`licencias/src/web.ts`) solo dice dónde está el túnel de cada computadora; la entrada es `web.sloth.vancci.org`, que
-  crea en cada navegador una llave que no se puede sacar y firma un reto del túnel. Entra solo un dispositivo conectado
-  desde Opciones; `confianza` decide qué se atiende por el túnel. Lo que en la web no
-  aplica (abrir en el Explorador, `127.0.0.1`) usa `abrirRuta` y `enLaWeb`; lo grande sube por trozos (`subir`). El
-  navegador del hilo se ve en capturas y se usa a distancia (`server/navegador-remoto.ts`, `web/src/NavegadorWeb.tsx`,
-  `remoto` en `electron/navegador.ts`). Las cuentas se conectan desde la web con `server/ventanas-remotas.ts`
-  (terminales sin ventana, los Edge de Google a distancia, la vuelta a `localhost`) y `web/src/VentanasRemotas.tsx`. Para
-  probarla con el cobro local: `SLOTH_COBRO_WEB`.
-- Sloth en la nube (`.devcontainer/`, `server/nube.ts`, ADR 0026): sin computadora, la Sloth de Linux corre en un
-  Codespace de GitHub de cada quien, con su ventana en una pantalla virtual. `sloth-nube.sh` la baja, guarda lo tuyo en
-  `/workspaces/.sloth-nube` y la vigila; se entra por la dirección privada del puerto 4848 (`SLOTH_NUBE`), que el
-  servidor atiende como a su ventana. La interfaz va como desde la web (`enLaNube`): todo se baja al dispositivo y
-  «Actualizar» va por `/api/ventana/…`. La entrada (`licencias/src/web.ts`) ofrece «Abrir Sloth en la nube».
-- `server/sessions.ts`: cada hilo es `data/sessions/<id>.json` (qué es) y `<id>.jsonl` (lo que pasó). Retoma la sesión
-  del proveedor tras reiniciar, reparte los lotes según la máquina y cierra el proceso de un video del lote al acabar.
+- `server/sessions.ts`: cada hilo es `data/sessions/<id>.json` (qué es) y `<id>.jsonl` (lo que pasó).
+  «Eliminar» ofrece conservar los archivos o borrar también las imágenes vinculadas y los proyectos de video propios
+  (`server/borrar-hilo.ts`). Los proyectos compartidos se conservan y la cola de publicación protege sus archivos.
+  El título inicial descarta rutas y configuración (`server/titulos.ts`); el mismo agente propone uno corto
+  mediante `.vymotion-titulo-<id>.txt` en su cwd. Se recoge al cerrar el turno y nunca pisa un nombre manual.
+  Retoma la sesión del proveedor tras reiniciar, reparte los lotes según la máquina y cierra el proceso de un video del lote al acabar.
   Un chat de Claude, DeepSeek, Codex u OpenCode con su sesión guardada suelta el proceso a la media hora; los demás
   agentes lo conservan hasta comprobar que retoman. `npm run hilo -- <id>` (`scripts/hilo.mjs`) resume un hilo desde esos archivos.
   Una sesión de Antigravity que se desborda o se calla no se recupera, ni retomándola: el turno acaba con `relevo` y el hilo
-  sigue en otra, con el resumen que Sloth saca de su historial (`relevar`, `server/relevo.ts`). `/compact` hace lo mismo.
+  sigue en otra, con el resumen que VyMotion saca de su historial (`relevar`, `server/relevo.ts`). `/compact` hace lo mismo.
   Elegir un modelo de otro agente en un hilo (`setModel`) lo pasa a ese agente con el mismo resumen, la skill y la ruta
   del historial, como el traspaso de T3 Code (`vieneDe`); el aviso de un límite de uso lo ofrece con «Seguir con…»; el de Claude dice además cuánto queda y deja entrar con otra cuenta (`LimiteClaude.tsx`).
 - Lo que aguanta la máquina (ADR 0011): el aviso antes de pasar de dos videos a la vez (`shared/limites.ts`,
@@ -62,8 +53,8 @@ Este es el mapa:
 - `cards.json`: las cards. `skill` es la carpeta en `SKILLS` (`server/skills.ts`): en la app que se vende,
   `~/.claude/skills`, enlazada también en `~/.codex/skills` y `~/.agents/skills` (`enlazarSkillsCodex`), para que Claude y
   Codex lean los mismos archivos; en el repo, `skills/` (su Claude usa su propia configuración, `data/claude`, y no toca la
-  de la Sloth instalada). Los scripts de las skills la reciben en `SLOTH_SKILLS`. `cwd`, donde trabaja (`{app}` es la
-  carpeta de Sloth; sin él, `<trabajo>/<id>`, de `carpetaTrabajo` en `server/trabajo.ts`: fuera del repo en desarrollo). `etapas` es el avance, leído de los archivos del hilo (`server/etapas.ts`) con los
+  de la VyMotion instalada). Los scripts de las skills la reciben en `SLOTH_SKILLS`. `cwd`, donde trabaja (`{app}` es la
+  carpeta de VyMotion; sin él, `<trabajo>/<id>`, de `carpetaTrabajo` en `server/trabajo.ts`: fuera del repo en desarrollo). `etapas` es el avance, leído de los archivos del hilo (`server/etapas.ts`) con los
   globs `listo`. Los videos terminados son los de la etapa «Video» (los `_*` son a medias); `server/reglas-repo.test.ts`
   comprueba que ningún glob cuente un borrador. Los estilos que cada quien hace con la card «Nuevo estilo» (skill
   `crear-estilo`) van en `data/tus-cards.json` y `skills/<id>`, que ninguna actualización toca. Si su card se pierde
@@ -72,48 +63,35 @@ Este es el mapa:
   (`server/estilos-perdidos.ts`). Son las únicas que la
   venta deja borrar (`tuya`); la skill sale a `data/skills-tuyas` (`guardarSkillTuya`). «Compartir» (en su card, junto a
   su nombre o en Comunidad → Estilos) abre `CompartirEstilo` (`web/src/Estilos.tsx`): una pantalla ya llena que lo
-  empaqueta en un `.sloth-estilo` (`server/estilos.ts`, ADR 0017) y lo publica en Estilos, donde sale al aprobarse, o lo
-  guarda como archivo; «Importar» o «Instalar» lo pone entre los tuyos, con su `origen`. Todo estilo de la comunidad
-  lleva lo mismo (`shared/guia.ts`): su guía (con qué de Sloth lo hace y con qué agentes funciona, de listas fijas), un
-  video entero y su prueba (agente, costo y tiempo, sacados del hilo donde se hizo: `server/prueba-estilo.ts`); sin eso
-  el cobro no lo publica, y al que ya estaba su autor lo ve en rojo, con lo que le falta (`incompleto`,
-  `marcarIncompletos`), hasta completarlo. La vara de todo estilo es
-  `skills/video-base/ESTILO.md`, 30 requisitos; los que Sloth comprueba solo están en `server/estilos-requisitos.ts`
-  (un test los empareja y pasa por ella los estilos de Sloth). Antes de mandarlo le dice a su autor los que no cumple, y
-  el que ya compartió pone al día su misma publicación (`data/estilos-compartidos.json`). En la computadora del creador,
-  su Claude lee cada estilo que llega, sin instalarlo y sin poder más que leer (`soloLeer`), y la revisión se cierra
-  sola (`server/estilos-revision.ts`, ADR 0022): se aprueba el que no falla en lo que frena (ADR 0023: lo demás son
-  sugerencias, y los acentos rotos y lo que su prueba demuestra los arregla Sloth, `shared/acentos.ts`) y no añade nada
-  de riesgo, a su autor se le contesta en su publicación lo que le falta, y el hilo queda como «Aprobado», «Le falta», «Decide tú» (añade algo
-  que tiene que ver una persona) o «No lo aprobaría»; «Revisar», en la publicación, abre ese hilo. El creador también lo
-  pre-aprueba (ADR 0024): «Pre-aprobar» lo instala como card suya con un borrador para su agente (la prueba y los
-  arreglos), y su «Compartir» lo sube a la publicación del autor como «Pre-aprobado por Sloth» (`aprobada = 2`), que ya
-  ve toda la comunidad; su autor lo deja así o manda otro. Mientras se revisa el paquete nuevo de uno que ya estaba a la
-  vista, la comunidad sigue viendo el de antes (`publica`, `aLaVista`). Todo estilo
+  empaqueta en un `.sloth-estilo` (`server/estilos.ts`, ADR 0017) y lo publica en Estilos, donde sale cuando el creador
+  lo aprueba, o lo guarda como archivo; «Importar» o «Instalar» lo pone entre los tuyos, con su `origen`. Todo estilo
   compartido lleva su guía de uso, una plantilla igual para todos (`shared/guia.ts`, `web/src/Guia.tsx`): qué le das, qué
   te entrega, un ejemplo y qué necesita. El Worker no lo publica sin ella y queda en la card de quien lo instala (`guia`).
-- Tu Sloth en otra computadora (`server/respaldo.ts`, `web/src/Respaldo.tsx`, ADR 0020): con su clave, cada Sloth guarda
-  sola en el cobro (`licencias/src/respaldo.ts`, R2 y D1) una copia de sus estilos enteros, sus chats, «Sobre ti» y sus
-  marcas; los videos y las cuentas conectadas no. Al escribir esa clave en otra computadora, o al abrir una que ya la
-  tenía y a la que le faltan estilos, `TraerSloth` ofrece traerla, sin pisar lo que ya hay; un chat traído sigue con un
-  resumen (`Sessions.traer`). En Opciones se apaga la copia y se trae la de las otras. Los topes que la mantienen gratis
-  están en la cabecera del módulo del cobro.
+- `#/estilos` (`CatalogoEstilos`) muestra los estilos de video, permite importarlos y abre la card «Nuevo estilo» en
+  un chat nuevo para invocar `crear-estilo`. La misma card está disponible en el inicio y en el menú de «/».
 - Lo que el estudio ve en vivo: `server/claude.ts` saca los borradores de lo que escribe el agente (Write y los heredocs
   de Bash), el WebSocket los lleva a `web/src/App.tsx` y `Etapas.tsx` los dibuja.
 - El estudio de video (`web/src/Estudio.tsx`): toda card cuyas etapas tengan `fase` se ve igual, con las cinco fases
   arriba, la elegida al centro, la línea de tiempo abajo y el chat a la derecha. En la fase Video (`Editor.tsx`), el motor
   en vivo (`server/motor.ts`, ADR 0005) reproduce sin renderizar cualquier proyecto de Remotion y se rehace solo con cada
   cambio; un clic en el cuadro, una escena o un tramo va al chat como referencia (`Referencia.tsx`).
+  Los iconos de información de cada fase y del formato al crear un video muestran ejemplos sin salir del estudio (`AyudaVideo.tsx`).
   Los motores y los vigilantes de carpetas se liberan tras cinco minutos sin uso; los hilos a la vista conservan ambos, y
   los que trabajan, sus vigilantes. Las ondas de audio se calculan de una en una y se guardan en bytes, 32 archivos como máximo.
+  Al reproducir un MP4, `web/src/pistas-render.ts` aporta la pieza completa y su mezcla de audio a la línea de tiempo.
+- `skills/motion-graphics` (card Motion Graphics) sigue el motor desde la 2.0: el agente solo escribe
+  `momentos.json` (qué plano va en cada compás) y el director (`kit/motion.js`, canvas 2D) pone duraciones, curvas,
+  colores, transiciones y HUD sobre una rejilla de 128 BPM. Los números del estilo, medidos sobre las referencias,
+  están en `skills/motion-graphics/ESTILO.md`; `scripts/render.mjs` lo dibuja en Chrome y `scripts/hacer.py` hace
+  música, render, portada y comprobación.
 - El motor de los estilos (`skills/video-base/MOTOR.md`): el agente escribe `momentos.json` (qué se ve en cada
   palabra) y el `hacer.py` del estilo hace lo demás; lo que comparten está en `video-base/scripts/momentos.py` y
   `render.cjs`. El Documental (`skills/video-documental`) lo sigue desde la 2.0: `components/director.py` arma la edición
   con los dispositivos medidos, `scripts/material.py` baja y trata lo que pide cada momento y `buscar.py` lo busca. Low-Poly
   (`skills/video-low-poly`) también: su director (`kit/low-poly.js`) arma un mundo de three.js desde `revision/plan.json`
   con los kits de render y de sonido de su referencia (`kit/stage.js`, `kit/sound.js`, sin tocar), y `scripts/render.mjs` lo
-  dibuja cuadro por cuadro en Chrome con la tarjeta.
-- La carpeta del video: un hilo de video nace con su carpeta nombrada por Sloth, y el mensaje lleva la línea
+  dibuja cuadro por cuadro en Chrome con la tarjeta. Motion Graphics (arriba) es el cuarto.
+- La carpeta del video: un hilo de video nace con su carpeta nombrada por VyMotion, y el mensaje lleva la línea
   `Carpeta: <nombre>`, que leen las skills. Con `lote`, varios enlaces pueden ser un video cada uno
   (`lote-MMDD-HHMM-NN`, ver `skills/video-base/LOTE.md`). Cambiar la carpeta desde el estudio usa una que ya existe.
   Todo estilo de video hace vertical y horizontal: el compositor manda la línea `Formato:` (`skills/video-base/FORMATO.md`).
@@ -127,30 +105,32 @@ Este es el mapa:
 - `modelos` (`web/src/Modelos.tsx`): en «Optimizado», el modelo y el esfuerzo medidos para el hilo. Una card sin medir
   usa lo último que eligió el usuario a mano. En «Avanzado» se eligen; junto a cada modelo medido sale lo que cuesta y
   tarda un minuto de video (`porMinuto` de la card: al medir otro modelo, se añade ahí). Los subagentes van siempre en el modelo y el
-  esfuerzo del hilo: en Claude, Sloth los manda en la línea `Subagentes: todos = <alias> <esfuerzo>.` (las `tareas`
+  esfuerzo del hilo: en Claude, VyMotion los manda en la línea `Subagentes: todos = <alias> <esfuerzo>.` (las `tareas`
   medidas de la card ya no se usan). La excepción es el `guionista` del explicativo (`server/claude.ts`), que va en Opus.
-- La galería: al elegir un estilo, sus videos terminados ocupan el sitio de las cards (`videosApi` en `etapas.ts`);
+- La galería: «Ver videos de este estilo» abre sus videos terminados en el sitio de las cards (`videosApi` en `etapas.ts`);
   «Mis videos» (`MisVideos.tsx`) los junta todos, con buscador, filtros, teclado y acciones con varios. Cada card enseña de
   fondo el más nuevo (`server/previas.ts`).
 - `server/redes/` y `web/src/Redes.tsx`: los verticales terminados se programan al ritmo que eliges en «Mis videos» (`web/src/Ritmos.tsx`, las cuentas en `shared/ritmo.ts`; YouTube lleva el suyo).
+  La entrada Redes de la barra lateral abre `web/src/CentroRedes.tsx` en `#/redes`: reúne producción con estilos,
+  Ideas en `#/redes/ideas[/<canal>]`, publicaciones mediante MisVideos, ritmos y conexiones. Usa las mismas cuentas y colas que Opciones.
+    En la revisión de YouTube (`YoutubeProgramar.tsx`), «Organizar en chat» guarda los borradores y crea un hilo
+    `organizar-publicaciones` (`shared/publicaciones.ts`), sin etapas de video, con el modelo y la selección actuales.
+    La revisión separa Videos, Calendario y Asistente IA; muestra un video por página con apartados de contenido,
+    fecha y sugerencias. Los borradores y la selección se mantienen al navegar.
+    Se abre como página en `#/youtube` desde Entrega y las galerías, con filtros en la URL y regreso al origen.
+    Los cambios sin guardar se recuperan de sessionStorage al volver durante la misma sesión de la app.
   TikTok va por su página (ADR 0002), en la página `redes` del navegador integrado, con su propio perfil (sin la ventana
-  de Sloth, en un Edge con `data/redes/perfil`);
+  de VyMotion, en un Edge con `data/redes/perfil`);
   Instagram, por la nube (`nube/`, un Worker de Cloudflare con R2 y un cron, ADR 0003), que publica con la computadora
   apagada. La nube se despliega con `npm run nube -- deploy`, no con «Reiniciar backend». Cuando todo un video quedó
   programado, se borra lo regenerable de su carpeta (`out/partes`, `_bundle_rev`). Para mirar o mover la cola:
   `docs/agents/redes.md`.
-- El piloto (`server/piloto.ts`, `shared/piloto.ts`, `web/src/Piloto.tsx`, Redes → Piloto; idea de tazkore, #36): videos
-  verticales de una marca con su brief (`data/piloto/piloto.json`), un hilo por video (`crearLote`). Dos modos aparte:
-  el manual los hace al pulsar y quedan por revisar (se programan en Publicaciones, como cualquiera); el automático,
-  apagado por defecto y encendido solo tras aceptar que gasta y publica solo (`acepto`), pide cada 10 minutos los del
-  día, hasta su tope y en las horas que quedan del ritmo de redes, y al terminar los mete a la cola
-  (`programarVideo`, el siguiente hueco). Encendido, la barra lateral lo dice (`AvisoPiloto`).
 - `server/voz/` y `web/src/Voz.tsx`: la voz de los videos con Google AI Studio (Gemini 3.8 Flash TTS), en la cuenta de
   Google de cada quien (Opciones → Voz). La genera el servidor en la página `voz` del navegador integrado, con su propio
   perfil; los agentes la piden con el MCP `voz` (`mcp.mjs`), y el menú «Voz» del compositor manda la línea `Voz:` que
   siguen las skills (`skills/video-base/VOZ.md`). ADR 0011. Fish Audio y ElevenLabs van por su API con la llave de cada
   quien (`server/voz/apis.ts`, voces `fish:<id>` y `elevenlabs:<id>`), también clonando la voz del usuario. Voices
-  Cloning, el proveedor de Sloth (voces `vc:<id>`, `server/voz/voices-cloning.ts`, ADR 0018), va por el cobro
+  Cloning, el proveedor de VyMotion (voces `vc:<id>`, `server/voz/voices-cloning.ts`, ADR 0018), va por el cobro
   (`licencias/src/voz.ts`), que guarda la llave del socio y los créditos de cada quien; su catálogo sale en el menú «Voz» con el pase del cobro. El menú
   «Voz» es `web/src/ElegirVoz.tsx`: buscar en español, oír la muestra (`server/voz/muestras.ts` la guarda) o tu frase
   (`/api/voz/probar`) y clonar grabando ahí. En los estilos con `musica` en su card (el explicativo), su pie enciende la
@@ -166,23 +146,19 @@ Este es el mapa:
   referencias («Ingredientes») o fotogramas. Los agentes piden con el MCP `flow` (`mcp.mjs`, `skills/video-base/FLOW.md`).
   Lee el costo antes de generar y no pasa del tope. «Ayudar a mejorar Flow» se apaga para todos y se cambia en Opciones →
   Google Flow. El menú «Imágenes» del compositor manda la línea `Imágenes:` (ChatGPT o un modelo de Flow). ADR 0014, 0015 y 0016.
-  Google Vids es un modelo más de video (`vids.ts`, «Google Vids · Omni»): misma fila y cuentas, su propio cupo y descanso
-  (`descansosVids`). ADR 0027.
-- `server/meta/` y `web/src/Meta.tsx`: imágenes y videos de 10 s de Meta Muse (muse.ai), con las cuentas de Meta que se
-  agregan en Opciones → Meta Muse, cada una en su Edge (`edgeDe` de `flow/cuentas.ts`). El reparto (a la de menos uso de
-  la semana) está en `shared/meta.ts`. `pagina.ts` le pide en un chat nuevo y saca el archivo de la página; lee el uso
-  de la semana antes y después. Los agentes piden con el MCP `meta`
-  (`mcp.mjs`, `skills/video-base/FLOW.md`). ADR 0028.
-- Imágenes (`web/src/EstudioImagenes.tsx`, `EditorImagen.tsx`, `/api/flow/estudio` en `server/flow/index.ts`): pedir una
-  imagen sin chat, con un estilo (`shared/estilos-imagen.ts`), un modelo de Flow (la misma fila y cuentas), ChatGPT
-  (`server/imagen-codex.ts`) o «Quitar fondo» en tu computadora (`server/flow/recorte.ts`, `video-base/scripts/recorte.py`).
-  El editor marca zonas a mano alzada (cambiar, quitar, conservar). Con «Prompt» y un modelo, `redactar` escribe el pedido
-  y queda un chat de solo lectura de la imagen (`server/flow/hilo-imagen.ts`, `SessionMeta.imagenEstudio`). En `data/imagenes`.
+- El estudio `#/imagenes` (`EstudioImagenes`) combina estilos de `shared/estilos-imagen.ts` con Nano Banana o ChatGPT.
+  Opcionalmente prepara el prompt con el modelo elegido sin abrir un chat técnico. `server/flow/hilo-imagen.ts` registra
+  el prompt y los enlaces al editor en un solo chat por imagen de partida. `server/imagen-codex.ts` toma la imagen del hilo exacto
+  de Codex. Los resultados y sus datos quedan en `data/imagenes` y se sirven por ID en `/api/flow/estudio`.
+  El editor abre en `#/imagenes/editar/<id>` y envía los contornos dibujados a mano como instrucciones con coordenadas.
+  Quitar fondo usa Python y rembg a demanda, mantiene el lienzo y conserva el interior de los contornos protegidos en el PNG.
 - El navegador de cada hilo (`electron/navegador.ts`, el globo de `web/src/Navegador.tsx`): el Playwright MCP del agente
   (`server/navegador-agente.ts`, lanzado a demanda por `server/navegador-mcp.mjs`) entra en él por CDP. Sin ventana, un Chrome con `data/navegador`; en lotes, uno limpio.
+  Solo suena la pestaña visible. Al ocultar el panel o cambiar de hilo se silencia; el botón de sonido conserva
+  el silencio manual mientras vive la pestaña (`electron/audio-navegador.ts`). Redes y voz siempre están silenciadas.
   Sus capturas y los logs de consola quedan en `data/navegador-capturas/`. Copia lo mejor del de T3 Code (`C:\dev\t3code`):
   pestañas (el agente solo usa la primera), tamaños fijos (`navegador-medidas.ts`) y bordes que se arrastran. T3 usa
-  `<webview>` y Sloth una vista nativa: el tamaño fijo es `enableDeviceEmulation`, y por eso el relevo reescala los clics.
+  `<webview>` y VyMotion una vista nativa: el tamaño fijo es `enableDeviceEmulation`, y por eso el relevo reescala los clics.
   Google no deja iniciar sesión dentro de la app: ese paso se da en Edge (Chrome en Mac; en Windows sin Edge, tu predeterminado si es Chrome, Brave o Vivaldi, o el que haya; o el que elijas en Opciones → Navegador, también Opera: `server/chromium.ts`) y la sesión pasa a sus páginas (`electron/google.ts`).
 - `server/ideas/` y `web/src/Ideas.tsx`: Ideas, qué video hacer: largo en YouTube o vertical en TikTok e Instagram
   (`formato: 'vertical'`), en `trabajo/ideas/<id>/`. Investigar mide cada video contra su canal (outlier: 3× o más),
@@ -198,27 +174,25 @@ Este es el mapa:
   buscador, en `/comunidad/buscar` (`consultaBuscar`).
   Publicar una mejora (la ven todos): `POST /api/mejoras {texto}`. Un anuncio a nombre del creador, en su tono:
   `docs/agents/anuncios.md`. La rifa (`licencias/src/rifa.ts`): arriba de la comunidad «Participa en la rifa» (`Rifa.tsx`,
-  solo quien usa Sloth gratis), en Administrador se arma y se sortea con la ruleta (`RifaAdmin.tsx`); el ganador recibe
+  solo quien usa VyMotion gratis), en Administrador se arma y se sortea con la ruleta (`RifaAdmin.tsx`); el ganador recibe
   sus créditos de voz, un correo y el aviso a pantalla completa (`GanasteRifa.tsx`). Debajo, el fondo de la comunidad
-  (`licencias/src/fondo.ts`, `Fondo.tsx`, ADR 0019): la mitad de los apoyos que cobra Stripe en el mes, sin IVA, en vivo (casi siempre un
-  renglón con la raya del reparto; en grande solo cuando trae noticia, `web/src/fondoNoticia.ts`), y el
+  (`licencias/src/fondo.ts`, `Fondo.tsx`, ADR 0019): la mitad de lo que cae por Stripe en el mes, sin IVA, en vivo, y el
   paso a paso para llevarse una parte con un estilo compartido. La sección Estilos es la tienda (`licencias/src/tienda.ts`,
-  `Tienda.tsx`): llega entera y se filtra en la app, al instante (`web/src/tiendaFiltros.ts`: buscador, temas que salen
-  del título y el texto de cada estilo, su forma, los nuevos para ti y el orden), un muro de portadas con la forma de cada video y, a la derecha (en el
-  sitio de la tarjeta de la comunidad), un visor fijo con el video entero del estilo elegido, Instalar y sus números
-  públicos con sus puntos del mes, que mide la app (`server/estilos-usos.ts`). El video de un estilo sube entero
-  (`calidadEntero` en `server/comunidad.ts`); los demás de la comunidad, sus primeros 5 segundos. La tienda la ve cualquiera; instalar es de quien apoya: a los demás,
-  «Instalar» les abre la invitación a apoyar (`ApoyarParaInstalar`) y el cobro no les entrega el paquete. Los ya instalados se cierran al acabarse el apoyo: la licencia firmada
-  dice si su correo apoya hoy (`apoyaHoy`), `server/licencia.ts` lo mira (`sinApoyo`) y el servidor marca esas cards
-  (`Card.bloqueada`: candado, sin videos nuevos, `SinApoyo.tsx`) hasta que vuelve a apoyar. El reparto (`licencias/src/reparto.ts`): participa quien pone su
+  `Tienda.tsx`): buscar, favoritos, más usados, y los números públicos de cada estilo con sus puntos del mes, que mide
+  la app (`server/estilos-usos.ts`). Los estilos son de quien apoya: a los demás, la tienda les enseña la invitación
+  a apoyar y el cobro no les entrega el paquete. El reparto (`licencias/src/reparto.ts`): participa quien pone su
   Binance ID (en el recuadro del fondo), el primero es el 1 de enero de 2027 y el creador cierra cada periodo y marca
   lo pagado en Administrador → Fondo (`FondoAdmin.tsx`); el envío es a mano, desde Binance.
 - `server/modelos3d.ts` y `web/src/Modelos3D.tsx`: «Modelos 3D» enseña la biblioteca `skills/modelos-3d` que usan los
   agentes (la de `SKILLS`), que llenan los videos. Empieza vacía; la moneda de la plantilla
   va en `modelos-3d/plantilla`, sin enseñarse. Sus botones (`server/modelos3d-acciones.ts`, `web/src/Modelos3DAcciones.tsx`):
   «Importar .glb» corre `modelos.py importar` sin agente, en una carpeta temporal que se borra (Draco y Meshopt se
-  abren; el decodificador de Draco va con el modelo); «Nuevo modelo» abre un hilo de `MODELO3D_CARD` (`shared/modelos3d.ts`,
-  no sale en el inicio) en su propia carpeta, `<trabajo>/modelos-3d/<nombre>` (skill `modelos-3d`, §6).
+  abren; el decodificador de Draco va con el modelo). `BorradorModelo3D.tsx` reúne dictado, Afinar y hasta cuatro referencias.
+  Generar abre un hilo de `MODELO3D_CARD` en `<trabajo>/modelos-3d/<nombre>` (skill `modelos-3d`, §6).
+  Editar retoma el hilo y guarda sobre la ficha abierta. El visor muestra su chat en vivo y reúne los mensajes de variantes anteriores enlazadas por origen y resultado.
+  `#/modelos-3d/editar/<id>` muestra la ficha que se corrige. La herramienta puede ser Texto → modelo, Imagen → modelo,
+  Mejorar modelo, Remesh y topología, Separar partes, Materiales y UV, Rig y pose u Optimizar y exportar.
+  La operación se incluye en el mensaje de forma breve para ahorrar contexto y tokens.
 - Los subtítulos (`server/subtitulos.ts`, `web/src/Subtitulos.tsx`): en la Entrega de un hilo (`Final.tsx`), gratis y sin
   agente. `video-base/scripts/subtitulos.py` transcribe el video terminado con el transcriptor local; el servidor arma los
   renglones, el .srt y un .ass, y FFmpeg graba una copia en `<carpeta del video>/subtitulos/<video>/`, fuera de `out/`
@@ -226,62 +200,52 @@ Este es el mapa:
 - `server/originales.ts` y `web/src/TusCambios.tsx`: en la app que se vende, «Con tus cambios (N)» bajo la card dice qué
   archivos de su skill (y de video-base) ya no son como los trae la versión, y vuelve a la original, entera o uno a uno.
   Lo que se pisa, también al actualizar (`prepararSkills`), se copia antes a `data/skills-tuyas`.
-- `server/anteriores.ts` y `web/src/EstiloCambio.tsx`: cuando una versión cambia a fondo un estilo de Sloth, su card en
+- `server/anteriores.ts` y `web/src/EstiloCambio.tsx`: cuando una versión cambia a fondo un estilo de VyMotion, su card en
   `cards.json` lleva `cambio` (la fecha, qué cambió para quien hace videos, el enlace a los dos lado a lado y lo de la
-  card de antes que ya no es igual). Al actualizar se guarda el de antes. Al abrir Sloth, todos ven un aviso a pantalla
-  completa hasta pulsar «Leí toda la especificación»; quien tenía el de antes elige luego «Guardar también el de antes»,
-  que lo pone entre sus estilos como `<skill>-<fecha>`, o «Usar solo el nuevo». El de Sloth se actualiza siempre.
+  card de antes que ya no es igual). Al actualizar se guarda el de antes. Al abrir VyMotion, todos ven un aviso a pantalla
+  completa salvo si desactivaron «Cambios de estilos» en Perfil y avisos. Al pulsar «Leí toda la especificación»,
+  quien tenía el de antes elige luego «Guardar también el de antes»,
+  que lo pone entre sus estilos como `<skill>-<fecha>`, o «Usar solo el nuevo». El de VyMotion se actualiza siempre.
   Cada estilo lleva su `version`, a la vista en su card: el segundo número sube con un cambio que se nota, el primero
   con uno a fondo (el del `cambio`, que dice en `antes.version` la de antes; lo comprueba `reglas-repo.test.ts`).
   El aviso enseña el mismo video con los dos (`cambio.comparacion`), con los archivos en `web/public/cambios/<card>/`. Al rehacer un estilo, pon el
   `cambio` y deja la comparación lista antes de publicar.
-- `server/requisitos.ts`: lo que las skills necesitan fuera de Sloth. Cada card pide solo los paquetes de su skill
-  (`PAQUETES` dice cuáles), siempre ya compilados; si tu Python de Windows no los tiene (uno recién salido), baja el suyo. Instala automáticamente el Python de Sloth en `%APPDATA%\youtube\piezas\python`,
+- `server/requisitos.ts`: lo que las skills necesitan fuera de VyMotion. Cada card pide solo los paquetes de su skill
+  (`PAQUETES` dice cuáles), siempre ya compilados; si tu Python de Windows no los tiene (uno recién salido), baja el suyo. Instala automáticamente el Python de VyMotion en `%APPDATA%\youtube\piezas\python`,
   sus paquetes y los modelos; elige CUDA y Whisper si hay una NVIDIA que lo aguante (`aguantaCuda`) y, si no, CPU y
-  Parakeet (`MotorVoz`, ADR 0007). Una instalación interrumpida se puede reanudar. Si hay varios, Sloth y `sloth.py`
+  Parakeet (`MotorVoz`, ADR 0007). Una instalación interrumpida se puede reanudar. Si hay varios, VyMotion y `sloth.py`
   usan el mismo (`elegirPython`).
-- `server/equipo.ts` y `web/src/Equipo.tsx`: Opciones → Tu equipo. Qué eligió Sloth para esta computadora y cuánto
+- `server/equipo.ts` y `web/src/Equipo.tsx`: Opciones → Tu equipo. Qué eligió VyMotion para esta computadora y cuánto
   tarda aquí la voz y el render, de lo que midió (`equipo.json`, junto a los modelos). Si puede ir más rápido (Parakeet
   sin NVIDIA), el hilo nuevo lo ofrece arriba.
-- `server/actividad-agentes.ts` y `web/src/ActividadAgente.tsx`: Opciones → Actividad de los agentes. Turnos y tokens de
-  cada agente y modelo por día, de los últimos 91 días, leídos de los cierres de turno de cada hilo (`turn_end.model`).
 - `server/espacio.ts` y `web/src/Espacio.tsx`: Opciones → Espacio en disco. Lo que dejan los videos y no hace falta
   (temporales de Remotion, pedazos de render, `node_modules` repetidos, cachés viejas); lo seguro lo borra solo cada
   6 horas si nada trabaja. Las skills evitan dejarlo con `espacio.py` y `remotion.cjs` de video-base. «Cambiar de disco…»
   (`electron/mudanza.ts`) lleva los videos, la IA local, los agentes y `sloth-modulos` a otra carpeta y deja enlaces en
   su sitio, con las mismas rutas; el instalador de Windows deja elegir la carpeta (`scripts/instalador.nsh`).
-- `python/procesos/`: lo que las skills corren con el Python de Sloth (transcribir la voz o un video ajeno), lanzado por
+- `python/procesos/`: lo que las skills corren con el Python de VyMotion (transcribir la voz o un video ajeno), lanzado por
   `proceso()` de `sloth.py` o `comun.py`. Con NVIDIA transcribe Whisper, ya cargado en `video-base/scripts/voz_viva.py`
   (ADR 0008); sin ella, Parakeet y `alineador.py` (`parakeet.py` dice cuál y por qué).
 - `server/cuenta.ts`, `server/version.ts` y `server/opciones.ts`: la cuenta de Claude, la versión de Claude y de Codex
-  (la que trae Sloth: se ponen al día al subirlas en package.json y publicar) y las credenciales de YouTube e Instagram (en las variables de entorno del usuario).
+  (la que trae VyMotion: se ponen al día al subirlas en package.json y publicar) y las credenciales de YouTube e Instagram (en las variables de entorno del usuario).
   `server/acceso.ts`: si Claude y Codex pagan con la suscripción o con una llave de API (Opciones → Agentes), guardada en
   `data/agentes.json`.
-  Varias cuentas de Claude y de ChatGPT (`server/perfiles-agentes.ts`): la original sigue donde estaba y las agregadas viven en
-  `data/cuentas-<agente>/<id>`; la activa es la de los hilos nuevos y cada hilo se queda con la suya (`perfilClaude`,
-  `perfilCodex`). Al llegar al límite, el hilo sigue con otra con el resumen (`cambiarCuentaClaude`, `LimiteClaude.tsx`).
-- Sloth en el celular (`movil/`, ADR 0025): una app de Expo para iOS y Android con dos modos (`modo.ts`). «En este
-  celular» corre el agente en el teléfono (`src/local/`: Claude por la API con la llave de quien la usa, los estilos con
-  su skill en `estilos.json`, hilos y archivos en el teléfono, y «Seguir en la computadora» para el video final).
-  «Con mi computadora» le pide el trabajo a ella: entra por la puerta de `server/celular.ts` (el puerto de Sloth más uno, en la red y con la llave del QR de Opciones →
-  Tu celular, `web/src/Celular.tsx`), que reenvía `/api` y `/ws`. Usa los tipos de `shared/`, `buildTimeline` de
-  `web/src/items.ts`, la elección de modelo de `shared/modelos.ts` y los trazos de `web/src/trazos.ts`: nada de eso
-  puede importar paquetes. Pestañas: Inicio (estilos y hilo nuevo con las líneas del compositor), Hilos (el chat en vivo
-  y «Cómo va el video»), Mis videos (ver, guardar en la galería, compartir), Comunidad y Más. Compilar: `publicacion.md`.
-- Los temas (`web/src/temas.ts`, Opciones → Apariencia): «Sloth», el de siempre, y «Cristal», grises y cristal. Cada
-  uno es `data-tema` en la raíz y su archivo `web/src/temas/<id>.css`, que cambia variables y estilos solo bajo su atributo;
-  los colores de los demás .css van en variables. Un tema puede encender los fondos de signos (`CampoAscii.tsx`) y el
-  movimiento (`Movimiento.tsx`), quietos con «reducir movimiento». Se guarda en el navegador.
 - `web/src`: React. `api.ts` habla con el servidor; `eventos.ts` guarda los eventos fuera de `App`, `items.ts` los junta
-  en bloques y `Timeline.tsx` los dibuja; `Composer.tsx` es el campo de texto. Un desplegable es siempre `Desplegable`
-  (`Desplegable.tsx`, sobre el `Picker` del compositor), nunca un `<select>`: un test lo para.
-- «Nuevo chat» (`NewSession` en `App.tsx`): los carteles de los estilos caben enteros en cualquier ventana
-  (`encajar.ts`), `/` en el campo cambia de estilo (`menu-estilos.ts`), Alt+N (Cmd+N en Mac) o Ctrl+Mayús+O abren uno
+  en bloques y `Timeline.tsx` los dibuja; `Composer.tsx` es el campo de texto.
+  «Afinar» (`AfinarPrompt.tsx`) pide a `/api/afinar-prompt` una propuesta y preguntas opcionales para el borrador de video,
+  imagen o edición. Inserta el borrador editable en el compositor, con las referencias protegidas y las opciones de las
+  preguntas junto al texto. El selector compartido (`Picker.tsx`) agrupa los modelos y permite buscarlos en Afinar.
+  Su micrófono (`Dictado.tsx`) manda audio a `server/dictado.ts`; Deepgram transcribe desde el backend.
+  Configuración y futura migración central: `docs/DEEPGRAM-SERVICIO.md`.
+  `Movimiento.tsx` coordina el pulso de controles, la selección entre opciones y `useTransicionApartado`:
+  entradas finitas al navegar, cancelables y desactivadas con movimiento reducido.
+- La campana de la barra lateral (`Notificaciones` en `web/src/Opciones.tsx`) reúne las herramientas de video pendientes
+  del estilo elegido y muestra un aviso breve al detectarlas por primera vez en la sesión de la ventana.
+- Opciones usa secciones en `#/opciones/<sección>`. Agentes abre la conexión, las tendencias y el calendario de cada proveedor
+  (`ActividadAgente.tsx`): `server/actividad-agentes.ts` resume los cierres guardados de los últimos 91 días. Los cierres
+  nuevos guardan el modelo del hilo; los antiguos pueden aportar tokens al agente sin identificar el modelo.
+- Voz e imágenes y Equipo tienen navegación propia en `#/opciones/<sección>/<apartado>` para abrir directamente una cuenta,
+  las preferencias de Flow o las herramientas de video.
+- «Nuevo chat» (`NewSession` en `App.tsx`): los estilos van en un carrusel con perspectiva, selección central, flechas y arrastre.
+  `/` en el campo cambia de estilo (`menu-estilos.ts`), Alt+N (Cmd+N en Mac) o Ctrl+Mayús+O abren uno
   desde cualquier parte, y lo que llega del servidor arranca con lo último sabido (`recordado.ts`) para que nada salte.
-  «Afinar», junto a enviar (`server/afinar.ts`, `POST /api/afinar`): el agente elegido reescribe el pedido con la card, su
-  SKILL.md, la marca y «Sobre ti»; lo que solo decide el usuario queda como hueco en el campo (`huecoChip` en
-  `Composer.tsx`), con sus opciones. Un hueco sin llenar le llega al agente como «Decídelo tú».
-- El dictado (`web/src/Dictado.tsx`, `server/dictado.ts`, `server/dictado-vivo.ts`): el micrófono del compositor manda tu
-  voz a Deepgram y lo dicho entra al campo sin mandarse. Solo para quien apoya: va por el cobro
-  (`licencias/src/dictado.ts`), que tiene las llaves de Sloth y salta a la siguiente cuando una se acaba, con tope al
-  día. Sin apoyo no sale. `docs/DEEPGRAM-SERVICIO.md`.

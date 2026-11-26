@@ -37,7 +37,7 @@ test(`hasta ${VIDEOS_SIN_AVISO} videos no hay aviso; con mÃ¡s, lo hay y dice cuÃ
   assert.equal(avisoDeVideos(0, 2), undefined)
 })
 
-test('Sloth no frena videos: un tercero confirmado arranca enseguida, sin cola', (t) => {
+test('VyMotion no frena videos: un tercero confirmado arranca enseguida, sin cola', (t) => {
   const h = preparar(t)
   const [a, b, c] = [h.hilo(), h.hilo(), h.hilo()]
   for (const [m, texto] of [[a, 'uno'], [b, 'dos'], [c, 'tres']] as const) h.sessions.send(m.id, texto)

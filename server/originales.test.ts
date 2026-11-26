@@ -119,6 +119,6 @@ test('al estrenar una versión se va lo que ya no trae, pero no lo que cambiaste
   assert.equal(readFileSync(join(actual, 'video-el-diff', 'scripts', 'voz.py'), 'utf8'), 'print(3)\n')
   assert.ok(existsSync(join(actual, 'video-el-diff', 'huellas', 'registro.jsonl')))
   assert.ok(existsSync(join(actual, 'video-el-diff', 'SKILL.md')))
-  // Sin la lista de la versión de antes, no se sabe qué era de Sloth: no se quita nada.
+  // Sin la lista de la versión de antes, no se sabe qué era de VyMotion: no se quita nada.
   assert.deepEqual(quitarViejos({}, nueva, actual), [])
 })

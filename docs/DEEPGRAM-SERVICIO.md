@@ -1,59 +1,34 @@
-# Dictado con Deepgram
+# Dictado y futura migración a un servicio central
 
-## Cómo va
+## Implementación local
 
-El micrófono del compositor (`web/src/Dictado.tsx`) graba hasta 60 segundos con MediaRecorder y manda trozos de
-250 ms por WebSocket a `/api/dictado/vivo` (`server/dictado-vivo.ts`). El servidor los pasa al cobro
-(`licencias/src/dictado.ts`, `/dictado/vivo`), que los pasa a Deepgram `/v1/listen` con Nova-3 multilingüe,
-preferencia por español, resultados provisionales y formato inteligente, y devuelve sus mensajes tal cual. Los parciales
-entran al campo en un solo trozo provisional que se reemplaza hasta confirmarse, sin duplicar frases ni tocar el resto
-del borrador. Al terminar se manda el último trozo y «fin» (el cobro lo vuelve `CloseStream`), para que lleguen las
-últimas palabras. No manda el mensaje solo. El audio pasa por memoria y no se guarda ni en disco ni en el cobro.
+El micrófono del compositor graba hasta 60 segundos con MediaRecorder. Envía fragmentos de 250 ms
+por WebSocket a `/api/dictado/vivo`. El backend conecta con Deepgram `/v1/listen` con Nova-3
+multilingüe, preferencia por español, resultados provisionales y formato inteligente. Los parciales
+aparecen directamente en el campo del mensaje; se reemplaza el fragmento provisional hasta
+confirmarlo, sin duplicar frases ni reemplazar todo el borrador.
+Al terminar se envía el último fragmento antes de CloseStream para recibir las últimas palabras.
+La ruta anterior `POST /api/dictado` sigue disponible para audio completo.
+No envía el mensaje automáticamente. El audio se procesa en memoria y no se guarda en disco.
 
-## Quién dicta
+La clave se obtiene de `DEEPGRAM_API_KEY` o de `data/deepgram.key`, ignorado por Git. No incluir
+claves en este documento, el frontend, mensajes de error, instaladores ni registros. La ruta usa
+la protección de origen del servidor local, limita el cuerpo a 12 MB, una transcripción concurrente
+y 60 segundos de espera al proveedor. Requiere reiniciar el backend tras instalar esta versión.
 
-Solo quien apoya a Sloth hoy (`apoya`; también los lugares gratis de por vida de cuando se vendía) y el creador. Una
-cuenta gratis no: `GET /api/dictado` le pregunta al cobro y, si dice que no, el botón no sale. El cobro reconoce a quien
-pide como las voces de Sloth (`quien` de `voz.ts`: la clave y el equipo de la app, o la llave del creador).
+## Próxima actualización: servicio de VyMotion
 
-Cada quien: un dictado a la vez, 80 s, 12 MB y `DICTADO_MINUTOS` al día (30 si no se pone; el creador no tiene tope).
-Lo único que se anota es cuánto dictó cada quien por día (`dictado_uso`, migración 0038); el cron borra lo de más de 35
-días.
+Sustituir la llamada local a Deepgram por un servicio HTTPS autenticado de VyMotion. La clave
+del proveedor debe vivir exclusivamente en los secretos de ese servicio. El cliente local enviará
+el audio y recibirá `{texto}` con el mismo contrato que usa hoy el compositor.
 
-## Las llaves y su rotación
+Antes de publicarlo: autenticación por usuario, límites de duración y tamaño, cuota y concurrencia
+por cuenta, protección contra abuso, cancelación, timeout y errores claros de saldo o disponibilidad.
+El servicio debe aceptar WebSocket y conservar el orden de fragmentos y confirmaciones. Mantener
+resultados provisionales separados de los finales para no duplicar frases ni sobrescribir ediciones.
+No desplegar un proxy público sin autenticación ni distribuir una clave compartida en la app.
+Definir retención y tratamiento del audio con el proveedor; evitar registrar audio, transcripciones
+y credenciales. Medir latencia y coste sin conservar contenido. Probar pérdida de red, micrófono
+denegado, silencio, cierre de vista, audios largos y recuperación tras un fallo.
 
-Son de Sloth y viven solo en los secretos del cobro: `DEEPGRAM_API_KEY` y, si hay más, `DEEPGRAM_API_KEY_2`, `_3`…
-Una nueva va en el siguiente número libre. Se crean en la consola de Deepgram con rol **Admin** u **Owner**: la de
-rol Member (la de siempre) dicta, pero no deja leer el saldo.
-
-Se usan en orden. Antes de cada dictado, el cobro mira el saldo de la llave (`saldoDe`: `GET /v1/projects` una vez
-por Worker para su proyecto, y `GET /v1/projects/{id}/balances`, la suma de sus `amount` en USD). Si tiene menos de
-`DICTADO_SALDO_MINIMO` (0.05 dólares si no se pone, mucho más de lo que cuesta un dictado de 80 s), se anota agotada
-(`dictado_llaves`, por su id, no la llave) y se pasa a la siguiente antes de abrir, para que ningún dictado se corte a
-medias. Si el saldo no se pudo leer (llave Member, Deepgram lento), se intenta igual, y si Deepgram la rechaza al
-abrir (402 sin saldo, 401 o 403 revocada), también se anota y se prueba la siguiente en el mismo dictado. Si ninguna
-tenía saldo, se prueban todas de todos modos (una cuenta con pago por uso puede marcar 0 y dictar). Las agotadas van al
-final; si una vuelve a servir (la recargaron), se le quita la marca. Si Deepgram está lleno (429), se prueba la
-siguiente sin marcar nada. Un dictado ya abierto no cambia de llave: el mínimo cuida que alcance.
-
-Para ver cómo van: `GET /dictado` con la llave del creador dice cada llave (`llaves`: su secreto, sus últimas cuatro
-letras, su saldo en dólares si se pudo leer y desde cuándo está agotada).
-
-Nunca van en la app, en el navegador, en los errores, en los registros ni en este documento.
-
-## Encenderlo o poner otra llave
-
-```
-npm run licencias -- d1 migrations apply sloth-licencias --remote   # una vez
-npm run licencias -- secret put DEEPGRAM_API_KEY                    # la siguiente: DEEPGRAM_API_KEY_2, _3…
-npm run licencias -- deploy                                         # solo la primera vez: un secreto nuevo no lo pide
-```
-
-La app tiene que ser de una versión con este dictado: las de antes no saben ir al cobro. Para probar contra otro cobro:
-`SLOTH_COBRO`.
-
-Pendiente: apagar en cada proyecto de Deepgram el Model Improvement Program, para que no guarde el audio; medir latencia
-y costo sin guardar contenido; probar sin red, con el micrófono negado, en silencio, al cerrar la vista y al volver tras
-un fallo.
-
-Documentación: https://developers.deepgram.com/docs/live-streaming-audio
+Documentación: https://developers.deepgram.com/docs/pre-recorded-audio

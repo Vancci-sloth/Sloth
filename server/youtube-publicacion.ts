@@ -24,7 +24,7 @@ export async function programarYoutube(subida: SubidaYoutube, token: () => Promi
     guardar()
     return
   }
-  if (actual.privacyStatus !== 'private') throw new Error('El video ya es público o no listado. Revisa su publicación en YouTube Studio; Sloth no cambió su privacidad.')
+  if (actual.privacyStatus !== 'private') throw new Error('El video ya es público o no listado. Revisa su publicación en YouTube Studio; VyMotion no cambió su privacidad.')
   if (Date.parse(subida.datos.cuando) < Date.now() + 120_000) throw new Error('La fecha de publicación ya pasó o está demasiado cerca. El video sigue privado: elige otra fecha y reintenta.')
   if (!subida.miniaturaPuesta) {
     const imagen = await readFile(subida.datos.miniatura)

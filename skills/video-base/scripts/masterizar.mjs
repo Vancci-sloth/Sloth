@@ -14,7 +14,7 @@ import { resolve } from 'node:path'
 import { ffmpeg, opciones, sonoridad, uso } from './ffmpeg.mjs'
 
 /**
- * Pone el temporal en su sitio. Si el estudio de Sloth está reproduciendo la salida, Windows no deja renombrar encima
+ * Pone el temporal en su sitio. Si el estudio de VyMotion está reproduciendo la salida, Windows no deja renombrar encima
  * (EPERM o EBUSY): se reintenta un momento y, si sigue abierta, se copia encima, que sí se puede, y se borra el temporal.
  */
 function reemplazar(tmp, salida) {

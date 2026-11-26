@@ -5,10 +5,6 @@
 .ideas-head p { margin: 0; max-width: 720px; font-size: 13.5px; }
 
 .ideas-canales { display: flex; flex-wrap: wrap; gap: 6px; }
-.ideas-canal { display: inline-flex; align-items: center; gap: 7px; padding: 6px 14px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); font-size: 13px; font-weight: 600; transition: color 0.15s, border-color 0.15s, background 0.15s; }
-.ideas-canal:hover { color: var(--text); border-color: var(--line-hover); }
-.ideas-canal.on { color: var(--amber); border-color: var(--amber); background: var(--amber-tinte); }
-.ideas-canal.mas { border-style: dashed; }
 body .ideas .ideas-canal.boton {
   display: inline-flex; align-items: center; gap: 7px; padding: 6px 12px; --acento-apartado: var(--gris-300);
 }
@@ -61,7 +57,7 @@ body .ideas .ideas-canal.boton[aria-pressed="true"] { --acento-apartado: var(--a
 .entrevista-barra { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; padding: 10px 14px; border-radius: var(--radio); border: 1px solid var(--line); background: var(--panel); font-size: 13px; }
 .entrevista-barra.espera { border-color: var(--amber); }
 .entrevista-barra.trabajando { border-color: var(--amber); }
-.entrevista-barra.lista { border-color: color-mix(in srgb, var(--ok) 45%, transparent); }
+.entrevista-barra.lista { border-color: rgba(143, 193, 119, 0.45); }
 
 /* El perfil */
 .perfil dl { display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; margin: 2px 0 0; font-size: 13px; }
@@ -126,7 +122,7 @@ body .ideas .ideas-canal.boton[aria-pressed="true"] { --acento-apartado: var(--a
 .enlace:hover { color: var(--amber-2); }
 .tabla-wrap { display: flex; flex-direction: column; gap: 8px; }
 .filtros { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
-.filtros .desplegable.campo > .picker-trigger { min-height: 28px; padding: 3px 8px; border-radius: 7px; background: var(--panel-2); }
+.filtros select { padding: 3px 6px; border-radius: 7px; background: var(--panel-2); border: 1px solid var(--line); }
 .filtros label { display: inline-flex; align-items: center; gap: 5px; color: var(--muted); cursor: pointer; }
 .tabla { width: 100%; border-collapse: collapse; font-size: 13px; }
 .tabla th { text-align: left; font-size: 11px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); padding: 4px 8px; border-bottom: 1px solid var(--line); }
@@ -162,7 +158,7 @@ body .ideas .ideas-canal.boton[aria-pressed="true"] { --acento-apartado: var(--a
 .celda-barra { width: 30%; }
 .barra-h { display: block; height: 8px; border-radius: 99px; background: var(--amber); opacity: 0.75; min-width: 2px; }
 .idea-marca { display: inline-block; margin-left: 4px; padding: 0 6px; border-radius: 999px; border: 1px solid var(--line); font-size: 10.5px; color: var(--muted); }
-.idea-marca.mal { color: var(--bad); border-color: color-mix(in srgb, var(--bad) 45%, transparent); }
+.idea-marca.mal { color: var(--bad); border-color: rgba(224, 108, 85, 0.45); }
 /* Lo que funciona en otro idioma y aún no existe en español: lo que está por traerse. */
 .idea-marca.hueco { color: var(--amber); border-color: var(--amber); }
 /* Temas: una fila por tema; al abrirlo, sus videos debajo, sin el realce de la fila. */
@@ -178,7 +174,7 @@ body .ideas .ideas-canal.boton[aria-pressed="true"] { --acento-apartado: var(--a
 .proponer input:focus { border-color: var(--amber); }
 .mini-etapas { list-style: none; display: flex; gap: 6px; margin: 0; padding: 0; }
 .mini-etapas li { padding: 2px 10px; border-radius: 999px; border: 1px solid var(--line); font-size: 12px; color: var(--muted); }
-.mini-etapas li.ok { color: var(--ok); border-color: color-mix(in srgb, var(--ok) 40%, transparent); }
+.mini-etapas li.ok { color: var(--ok); border-color: rgba(143, 193, 119, 0.4); }
 .mini-etapas li.on { color: var(--amber); border-color: var(--amber); }
 .idea-vivo { display: flex; align-items: baseline; gap: 12px; }
 .vivo-ahora { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; color: var(--amber-2); }

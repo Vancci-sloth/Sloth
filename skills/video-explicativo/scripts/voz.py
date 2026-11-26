@@ -2,11 +2,11 @@
 La voz del video de principio a fin, en un comando que va en segundo plano: mientras corre (~1.5 min) se escribe el
 mundo, que no la necesita (los tiempos `en("…")` se leen de src/datos/voz.json al dibujar).
 
-    python -B -X utf8 <skill>/scripts/voz.py --studio <Voz>     la genera Sloth en AI Studio con guion.md (VOZ.md de video-base)
+    python -B -X utf8 <skill>/scripts/voz.py --studio <Voz>     la genera VyMotion en AI Studio con guion.md (VOZ.md de video-base)
     python -B -X utf8 <skill>/scripts/voz.py <audio>            la que mandó el usuario (m4a, mp3, ogg, un video…)
     python -B -X utf8 <skill>/scripts/voz.py --frases           subtitulos.txt cambió: empareja otra vez y acelera (segundos)
 
-Desde la raíz del proyecto. Hace en orden: (con --studio) pide la voz a Sloth y la espera; la pasa a
+Desde la raíz del proyecto. Hace en orden: (con --studio) pide la voz a VyMotion y la espera; la pasa a
 fuentes/voz/original.wav sin el silencio de las puntas; alinear.py (la nivela, la transcribe y empareja los subtítulos)
 y acelerar.py (al ritmo del estilo). Deja public/voz.wav y src/datos/voz.json. Antes eran cuatro o cinco llamadas del
 agente y una espera a ciegas (en el de estafas, `sleep 60`); ahora avisa al terminar.
@@ -36,11 +36,11 @@ def pedir(ruta: str, datos: dict | None = None) -> dict:
     except urllib.error.HTTPError as e:
         sys.exit(f"✗ AI Studio: {json.load(e).get('error', e)} (si es la cuenta o la cuota, VOZ.md de video-base: «Si falla»)")
     except urllib.error.URLError as e:
-        sys.exit(f"✗ Sloth no contesta en {url}: {e.reason}")
+        sys.exit(f"✗ VyMotion no contesta en {url}: {e.reason}")
 
 
 def studio(voz: str) -> Path:
-    """La pide a Sloth, que la genera en AI Studio con la cuenta de Google del usuario, y la espera."""
+    """La pide a VyMotion, que la genera en AI Studio con la cuenta de Google del usuario, y la espera."""
     salida = VOZ / "ai-studio.wav"
     t = pedir("/api/voz/generar", {"voz": voz, "archivo": str((RAIZ / "guion.md").resolve()), "salida": str(salida.resolve())})
     while t["estado"] in ("en-fila", "generando"):

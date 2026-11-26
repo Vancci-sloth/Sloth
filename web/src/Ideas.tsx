@@ -43,8 +43,8 @@ import type {
   TerminoYT,
   VideoYT
 } from '../../shared/types'
+import { usePoll } from './usePoll'
 import { api } from './api'
-import { Desplegable } from './Desplegable'
 import { Icon, type Choice } from './Composer'
 import { Confirm } from './Confirm'
 import { Icono } from './Iconos'
@@ -339,7 +339,7 @@ function CanalForm({
         <input value={c.instagram ?? ''} onChange={campo('instagram')} placeholder="@tu.instagram" />
       </label>}
       </div>
-      <small className="muted">Si añades tus cuentas, Sloth compara las ideas con el rendimiento de tus videos.</small>
+      <small className="muted">Si añades tus cuentas, VyMotion compara las ideas con el rendimiento de tus videos.</small>
       </fieldset>
       <fieldset className="canal-grupo">
         <legend><Icono de="personas" /> Público y objetivo</legend>
@@ -793,7 +793,7 @@ function TusVideos({ d, elegir, sessions, onHilo, onCambio }: { d: CanalCompleto
       {error && <p className="bad small">{error}</p>}
       {!r && (
         <p className="muted small">
-          Sloth lee de YouTube, con el canal que conectaste para subir, cómo le fue a cada video largo: cuántos lo vieron, qué parte vieron, cuántos seguían a los 30
+          VyMotion lee de YouTube, con el canal que conectaste para subir, cómo le fue a cada video largo: cuántos lo vieron, qué parte vieron, cuántos seguían a los 30
           segundos y de dónde llegaron. Luego Claude suma lo que solo dice Studio (cuántos vieron la miniatura y cuántos hicieron clic) y te dice qué cambiar.
         </p>
       )}
@@ -967,11 +967,7 @@ function CuentasInvestigacion({ canal, trabajando }: { canal: Canal; trabajando:
   // Al investigar también se abre: al acabar, la sesión pudo cambiar.
   useEffect(() => void leer(), [canal.id, trabajando])
   const falta = !!c && (!c.cuenta || !c.instagram)
-  useEffect(() => {
-    if (!c?.abierto || !falta) return
-    const i = setInterval(leer, 4000)
-    return () => clearInterval(i)
-  }, [c?.abierto, falta])
+  usePoll(leer, 4000, !!c?.abierto && falta)
   const abrir = (red: RedVertical) => (setError(''), setAbierta(red), api(`/api/ideas/${canal.id}/navegador`, { red }).then(leer, (e) => setError(e.message)))
   if (!c) return error ? <p className="bad small">{error}</p> : null
   // Con su Edge cerrado no se puede preguntar por la sesión: se abre solo al investigar, con las sesiones de su perfil.
@@ -994,7 +990,7 @@ function CuentasInvestigacion({ canal, trabajando }: { canal: Canal; trabajando:
     {
       red: 'tiktok' as const,
       usuario: c.cuenta,
-      pista: c.abierto && abierta !== 'instagram' ? 'Inicia sesión con el QR en la ventana de Edge.' : 'Con ella busca Sloth y lee los comentarios.'
+      pista: c.abierto && abierta !== 'instagram' ? 'Inicia sesión con el QR en la ventana de Edge.' : 'Con ella busca VyMotion y lee los comentarios.'
     },
     {
       red: 'instagram' as const,
@@ -1120,7 +1116,7 @@ function Investigacion({
       </div>
       {!d.ytdlp && (
         <p className="bad small">
-          Falta yt-dlp para leer {vertical ? 'TikTok e Instagram' : 'YouTube'}: instala el Python de Sloth, o corre «python -m pip install yt-dlp».
+          Falta yt-dlp para leer {vertical ? 'TikTok e Instagram' : 'YouTube'}: instala el Python de VyMotion, o corre «python -m pip install yt-dlp».
         </p>
       )}
       {vertical && <CuentasInvestigacion canal={d.canal} trabajando={trabajando} />}
@@ -1138,7 +1134,7 @@ function Investigacion({
       )}
       {!toda && !t && vertical && (
         <p className="muted small">
-          Sloth busca cada término en TikTok y en Instagram, cada red con su cuenta de investigación; la de Instagram es una cuenta desechable aparte, nunca{' '}
+          VyMotion busca cada término en TikTok y en Instagram, cada red con su cuenta de investigación; la de Instagram es una cuenta desechable aparte, nunca{' '}
           {d.canal.instagram ? `@${usuarioDe(d.canal.instagram)}` : 'la tuya'}. Abre las cuentas de los videos más vistos y mide cada video contra la mediana de su
           cuenta: los que sacan {OUTLIER} veces o más, con al menos {mil(MIN_VISTAS_VERTICAL)} vistas, son outliers. De los mejores lee los comentarios con más
           likes, para saber qué pide la gente. También transcribe lo que se dice en cada video y lo agrupa en temas por lo que dicen, aunque estén en otro
@@ -1147,7 +1143,7 @@ function Investigacion({
       )}
       {!toda && !t && !vertical && (
         <p className="muted small">
-          Sloth busca cada término en YouTube y se queda con los videos de 4 minutos o más. Abre los canales de los más vistos y mide cada video contra la mediana
+          VyMotion busca cada término en YouTube y se queda con los videos de 4 minutos o más. Abre los canales de los más vistos y mide cada video contra la mediana
           de sus videos largos: los que sacan {OUTLIER} veces o más, con al menos {mil(MIN_VISTAS)} vistas, son outliers, una señal de que ese tema tiene demanda. También transcribe lo que se dice en cada video y lo agrupa en temas por lo que dicen. Tarda unos minutos y no gasta nada.
         </p>
       )}
@@ -1380,17 +1376,11 @@ function Outliers({
           />
         )}
         <span className="muted">Ordenar por</span>
-        <Desplegable
-          campo
-          nombre="Ordenar por"
-          valor={orden}
-          opciones={[
-            { value: 'x', label: vertical ? '× su cuenta' : '× su canal' },
-            { value: 'vistas', label: 'vistas' },
-            { value: 'fecha', label: 'más recientes' }
-          ]}
-          onCambio={(o) => setOrden(o as typeof orden)}
-        />
+        <select value={orden} onChange={(e) => setOrden(e.target.value as typeof orden)}>
+          <option value="x">{vertical ? '× su cuenta' : '× su canal'}</option>
+          <option value="vistas">vistas</option>
+          <option value="fecha">más recientes</option>
+        </select>
         <label title="Muchas vistas y casi ningún comentario (menos de 0,15 por mil). Puede ser publicidad pagada, o no">
           <input type="checkbox" checked={ocultarRaros} onChange={(e) => setOcultarRaros(e.target.checked)} /> Ocultar los de comentarios inusualmente bajos
         </label>
@@ -1778,13 +1768,12 @@ function Propuestas(props: {
   const [vivo, setVivo] = useState<EnVivo | null>(null)
   const [, tic] = useState(0)
   // Mientras Claude trabaja, qué hace ahora y cuánto lleva: sin abrir el hilo.
+  const leerVivo = () => api<EnVivo | null>(`/api/ideas/${d.canal.id}/hilo`).then(setVivo, () => {})
   useEffect(() => {
     if (!corriendo) return setVivo(null)
-    const leer = () => api<EnVivo | null>(`/api/ideas/${d.canal.id}/hilo`).then(setVivo, () => {})
-    leer()
-    const i = setInterval(() => (leer(), tic((n) => n + 1)), 3000)
-    return () => clearInterval(i)
+    void leerVivo()
   }, [corriendo, d.canal.id])
+  usePoll(() => (leerVivo(), tic((n) => n + 1)), 3000, corriendo)
   const [nota, setNota] = useState('')
   const [razon, setRazon] = useState<'demanda' | 'formatos' | null>(null)
   const [error, setError] = useState('')
@@ -1850,7 +1839,7 @@ function Propuestas(props: {
           )}
           <p className="muted small">
             Primero el mapa de demanda, luego las fórmulas con su tasa de éxito y al final las ideas. Cada archivo aparece aquí en cuanto lo escribe. Parte del
-            resumen de la investigación que Sloth ya contó; con Opus, una vuelta tarda varios minutos.
+            resumen de la investigación que VyMotion ya contó; con Opus, una vuelta tarda varios minutos.
           </p>
         </div>
       ) : (
@@ -1870,13 +1859,13 @@ function Propuestas(props: {
           ]
             .filter(Boolean)
             .join(' y ')}
-          . Antes de proponer, Sloth investiga solo eso (unos minutos, sin gastar) y luego Claude propone con todo.
+          . Antes de proponer, VyMotion investiga solo eso (unos minutos, sin gastar) y luego Claude propone con todo.
         </p>
       )}
       {props.investigando && !corriendo && (
         <p className="muted small">
           {d.trabajo?.proponer
-            ? 'Sloth investiga lo que faltaba de tu perfil; al terminar, Claude propone las ideas.'
+            ? 'VyMotion investiga lo que faltaba de tu perfil; al terminar, Claude propone las ideas.'
             : 'Espera a que termine la investigación: las ideas salen de ella.'}
         </p>
       )}
@@ -1940,7 +1929,7 @@ function Propuestas(props: {
 }
 
 /**
- * Las vueltas anteriores de «Proponer ideas», que Sloth guarda antes de cada vuelta nueva. Una idea que ya no está entre
+ * Las vueltas anteriores de «Proponer ideas», que VyMotion guarda antes de cada vuelta nueva. Una idea que ya no está entre
  * las de ahora se puede recuperar: vuelve a la lista con todo lo suyo.
  */
 function Anteriores({ d, corriendo, onCambio }: { d: CanalCompleto; corriendo: boolean; onCambio(): void }) {
@@ -1997,8 +1986,8 @@ function brief(d: CanalCompleto, idea: Idea): string {
   const x = (v: VideoYT) => (v.x !== undefined ? veces(v.x) : sinVistas(v) ? 'sin vistas (cuenta no medible)' : 'sin medir')
   return [
     vertical
-      ? `Un video vertical (9:16) para ${redesDe(idea.red)}, del canal «${d.canal.nombre}». Sale de la sección Ideas de Sloth.`
-      : `Un video largo para YouTube (horizontal), del canal «${d.canal.nombre}». Sale de la sección Ideas de Sloth.`,
+      ? `Un video vertical (9:16) para ${redesDe(idea.red)}, del canal «${d.canal.nombre}». Sale de la sección Ideas de VyMotion.`
+      : `Un video largo para YouTube (horizontal), del canal «${d.canal.nombre}». Sale de la sección Ideas de VyMotion.`,
     `${vertical ? 'Texto del primer cuadro' : 'Título'}: ${idea.titulo}`,
     `Tema: ${idea.tema}`,
     `Por qué: ${idea.porque}`,

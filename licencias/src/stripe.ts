@@ -57,7 +57,7 @@ export interface PagoStripe {
 }
 
 /**
- * Una suscripción de Stripe en los estados de Mercado Pago, que son los que entiende Sloth. `past_due` (Stripe reintenta
+ * Una suscripción de Stripe en los estados de Mercado Pago, que son los que entiende VyMotion. `past_due` (Stripe reintenta
  * el cobro) sigue abierta, como `authorized` en Mercado Pago, pero no alarga lo pagado, y solo `GRACIA_STRIPE` desde que
  * empezó el periodo sin pagar: si el panel de Stripe la deja en `past_due` al acabar los reintentos, se pausa. Si se
  * pidió cancelar al final del periodo, ya cuenta como cancelada: no se avisa del cobro y abre hasta ese día.
@@ -97,12 +97,11 @@ export function pagoDeSesion(s: SesionStripe): PagoStripe {
 
 /**
  * La sesión de pago de una fila: el mensual, una suscripción; el año o el apoyo de una vez, un pago suelto. Su `url` es
- * adonde va el cliente; al pagar, vuelve a `/gracias`, y si sale, a la página de Sloth. `nota` sale bajo el nombre de lo
- * que se paga: cómo baja el apoyo que baja cada mes (`escalera.ts`), porque Stripe solo enseña el monto del primero.
+ * adonde va el cliente; al pagar, vuelve a `/gracias`, y si sale, a la página de VyMotion.
  */
-export function sesionStripe(env: Env, f: Pick<Fila, 'id' | 'email' | 'plan' | 'monto' | 'moneda'>, nota?: string): Promise<SesionStripe> {
+export function sesionStripe(env: Env, f: Pick<Fila, 'id' | 'email' | 'plan' | 'monto' | 'moneda'>): Promise<SesionStripe> {
   const mensual = f.plan === 'mensual'
-  const nombre = { mensual: 'Sloth - apoyo mensual', anual: 'Sloth - plan anual', unico: 'Sloth - apoyo de una vez' }[f.plan as 'mensual' | 'anual' | 'unico']
+  const nombre = { mensual: 'VyMotion - apoyo mensual', anual: 'VyMotion - plan anual', unico: 'VyMotion - apoyo de una vez' }[f.plan as 'mensual' | 'anual' | 'unico']
   return stripe(env, 'POST', '/v1/checkout/sessions', {
     mode: mensual ? 'subscription' : 'payment',
     customer_email: f.email,
@@ -113,13 +112,12 @@ export function sesionStripe(env: Env, f: Pick<Fila, 'id' | 'email' | 'plan' | '
     'line_items[0][price_data][unit_amount]': String(Math.round(f.monto * 100)),
     ...(mensual ? { 'line_items[0][price_data][recurring][interval]': 'month' } : {}),
     'line_items[0][price_data][product_data][name]': nombre,
-    ...(nota ? { 'line_items[0][price_data][product_data][description]': nota } : {}),
     // El precio ya trae el IVA, como dice la página: con Stripe Tax (encendido en la cuenta) se desglosa, no se suma.
     'line_items[0][price_data][tax_behavior]': 'inclusive',
     // Quien paga desde otro país lo ve y lo paga en su moneda.
     'adaptive_pricing[enabled]': 'true',
-    // Que se vea Sloth y no el nombre de la cuenta: su nombre y su paleta.
-    'branding_settings[display_name]': 'Sloth',
+    // Que se vea VyMotion y no el nombre de la cuenta: su nombre y su paleta.
+    'branding_settings[display_name]': 'VyMotion',
     'branding_settings[background_color]': '#0f0e0c',
     'branding_settings[button_color]': '#e8a33d',
     'branding_settings[border_style]': 'rounded',
@@ -145,19 +143,18 @@ export function cancelarStripe(env: Env, id: string): Promise<SuscripcionStripe>
 /** El modo de la llave: con `sk_live_` (o `rk_live_`) cobra de verdad. */
 export const modoStripe = (env: Pick<Env, 'STRIPE_SECRET_KEY'>) => (/^[sr]k_live_/.test(env.STRIPE_SECRET_KEY ?? '') ? 'produccion' : 'prueba')
 
-/** Con `version`, la respuesta llega con la forma de esa versión de su API; sin ella, con la de la cuenta. */
-export async function stripe<T>(env: Env, metodo: string, ruta: string, formulario?: Record<string, string>, version?: string): Promise<T> {
+export async function stripe<T>(env: Env, metodo: string, ruta: string, formulario?: Record<string, string>): Promise<T> {
   if (!env.STRIPE_SECRET_KEY) throw new Error('Falta STRIPE_SECRET_KEY.')
   const r = await fetch(`${API}${ruta}`, {
     method: metodo,
-    headers: { authorization: `Bearer ${env.STRIPE_SECRET_KEY}`, 'content-type': 'application/x-www-form-urlencoded', ...(version ? { 'stripe-version': version } : {}) },
+    headers: { authorization: `Bearer ${env.STRIPE_SECRET_KEY}`, 'content-type': 'application/x-www-form-urlencoded' },
     body: formulario && new URLSearchParams(formulario)
   })
   const datos = (await r.json().catch(() => ({}))) as { error?: { message?: string } }
   if (!r.ok) {
     // Solo el estado y el mensaje: nada del cliente.
     console.error('Stripe', metodo, ruta.replace(/\?.*$/, '').replace(/\/\w+_\w{8,}/, '/…'), r.status, datos.error?.message ?? '')
-    throw new Rechazo(r.status, 'Stripe no respondió bien. Intenta otra vez en un momento.', datos.error?.message)
+    throw new Rechazo(r.status, datos.error?.message ?? `Stripe respondió ${r.status}`)
   }
   return datos as T
 }

@@ -8,11 +8,12 @@ import { conRutas, IMAGE_TYPES, type AgentOptions, type AgentRun, type SkillRef 
 import { asegurarAgente, rutaAgente } from './agentes.ts'
 import { conSkill, instrucciones, mcpSloth } from './instrucciones.ts'
 import { matarArbol } from './rpc-lineas.ts'
+import { llavePerfil, perfilActivo } from './perfiles-agentes.ts'
 
 /**
  * Cursor con su SDK (`@cursor/sdk`), como en T3 Code: el agente de Cursor corre en la computadora, con la cuenta de Cursor
  * de cada quien (pide un plan de pago). El SDK no va dentro del servidor: corre en un puente (`cursor-puente.mjs`) con
- * el Node de Sloth, uno por hilo, desde la carpeta donde se bajó.
+ * el Node de VyMotion, uno por hilo, desde la carpeta donde se bajó.
  *
  * La cuenta se conecta en el navegador: el SDK da un enlace, se autoriza, y guarda una llave de 90 días en
  * `~/.cursor/sdk/auth.json` (la misma del SDK en la terminal).
@@ -27,8 +28,8 @@ function puente(): string {
   return destino
 }
 
-function lanzar(modo: string, cwd: string) {
-  return spawn(process.execPath, [puente(), modo], { cwd, windowsHide: true, stdio: 'pipe', env: { ...entornoSinLlaves(), CURSOR_HOST_APP_NAME: 'Sloth' } })
+function lanzar(modo: string, cwd: string, dir?: string | null) {
+  return spawn(process.execPath, [puente(), modo], { cwd, windowsHide: true, stdio: 'pipe', env: { ...entornoSinLlaves(), CURSOR_HOST_APP_NAME: 'VyMotion', ...(dir ? { SLOTH_CURSOR_API_KEY: llavePerfil(dir) } : { SLOTH_CURSOR_API_KEY: '' }) } })
 }
 
 /** Lee lo que escribe el puente, una línea JSON a la vez. */
@@ -116,8 +117,6 @@ export function startCursor(opts: AgentOptions): AgentRun {
   let detenido = false
   let primero = true
   let turno = 0
-  /** Delante de `turno` en los ids: cada proceso cuenta desde 0, y lo de un hilo retomado se pegaba a lo primero del hilo. */
-  const vez = Date.now().toString(36)
   let parte = 0
   let pendiente: string[] = []
   const herramientas = new Set<string>()
@@ -126,7 +125,7 @@ export function startCursor(opts: AgentOptions): AgentRun {
   const abierto = new Promise<void>((ok, mal) => ((alAbrir = ok), (alFallar = mal)))
   void abierto.catch(() => {})
 
-  const proc = lanzar('agente', opts.cwd)
+  const proc = lanzar('agente', opts.cwd, opts.configAgente === undefined ? perfilActivo('cursor') : opts.configAgente)
   let errores = ''
   proc.stderr.setEncoding('utf8')
   proc.stderr.on('data', (d: string) => (errores = (errores + d).slice(-2000)))
@@ -173,7 +172,7 @@ export function startCursor(opts: AgentOptions): AgentRun {
     switch (u.type) {
       case 'text-delta':
       case 'thinking-delta':
-        if (u.text) emit({ t: u.type === 'text-delta' ? 'text' : 'thinking', id: `${vez}:${turno}:${parte}${u.type === 'thinking-delta' ? ':pensamiento' : ''}`, delta: u.text })
+        if (u.text) emit({ t: u.type === 'text-delta' ? 'text' : 'thinking', id: `${turno}:${parte}${u.type === 'thinking-delta' ? ':pensamiento' : ''}`, delta: u.text })
         return
       case 'tool-call-started':
       case 'tool-call-completed': {
@@ -195,14 +194,14 @@ export function startCursor(opts: AgentOptions): AgentRun {
     }
   }
 
-  // Los MCP de Sloth, como los pide el SDK, y la configuración del proyecto y del usuario (sus reglas, skills y MCP).
+  // Los MCP de VyMotion, como los pide el SDK, y la configuración del proyecto y del usuario (sus reglas, skills y MCP).
   const mcpServers = Object.fromEntries(Object.entries(mcpSloth(opts.lote, opts.hilo)).map(([n, s]) => [n, { type: 'stdio', ...s }]))
   orden({
     type: 'abrir',
     resume: opts.resume,
     opciones: {
       model: seleccion(opts.model, opts.effort),
-      name: `Sloth ${opts.hilo ?? ''}`.trim(),
+      name: `VyMotion ${opts.hilo ?? ''}`.trim(),
       mode: 'agent',
       mcpServers,
       local: { cwd: opts.cwd, settingSources: ['project', 'user', 'team', 'mdm', 'plugins'], sandboxOptions: { enabled: false }, enableAgentRetries: true, autoReview: false }
@@ -265,7 +264,7 @@ export function startCursor(opts: AgentOptions): AgentRun {
   }
 }
 
-/** Los errores de Cursor, en palabras de Sloth. */
+/** Los errores de Cursor, en palabras de VyMotion. */
 function errorDe(error = ''): string {
   if (/plan_required|paid plan/i.test(error)) return 'Cursor pide un plan de pago para usar su agente.'
   if (/unauthenticated|not logged in|AuthenticationError|api key/i.test(error)) return 'Conecta tu cuenta de Cursor en Opciones.'
@@ -284,7 +283,11 @@ interface ModeloCursor {
 export async function modelosCursor(): Promise<Model[]> {
   if (!rutaAgente('cursor')) return []
   try {
-    const { modelos } = await consultar<{ modelos: ModeloCursor[] }>('modelos')
+    const dir = perfilActivo('cursor')
+    const { modelos } = dir
+      ? await fetch('https://api.cursor.com/v1/models', { headers: { authorization: `Bearer ${llavePerfil(dir)}` }, signal: AbortSignal.timeout(15_000) })
+          .then(async r => ({ modelos: r.ok ? ((await r.json()) as { items: ModeloCursor[] }).items : [] }))
+      : await consultar<{ modelos: ModeloCursor[] }>('modelos')
     return modelos.map((m) => {
       const esfuerzos = m.parameters?.find((p) => p.id === 'effort' || p.id === 'reasoning')?.values.map((v) => v.value) ?? []
       const porDefecto = m.variants?.find((v) => v.isDefault)?.params.find((p) => p.id === 'effort')?.value
@@ -301,6 +304,8 @@ let fallo = ''
 
 export async function cuentaCursor(): Promise<CuentaClaude> {
   if (login) return { conectada: false, conectando: { url: login.url } }
+  const dir = perfilActivo('cursor')
+  if (dir) return { conectada: true, quien: `Llave de API …${llavePerfil(dir).slice(-4)}`, uso: 'https://cursor.com/dashboard', perfilAdicional: true }
   if (!rutaAgente('cursor')) return { conectada: false, error: fallo || undefined }
   const s = await consultar<{ conectada: boolean; quien?: string }>('estado').catch(() => ({ conectada: false, quien: undefined }))
   return { ...s, error: fallo || undefined, uso: 'https://cursor.com/dashboard' }

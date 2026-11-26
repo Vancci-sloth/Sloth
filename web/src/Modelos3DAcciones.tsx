@@ -1,7 +1,5 @@
 import { type ReactNode, useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { api } from './api'
-import { Desplegable } from './Desplegable'
 import { Icono } from './Iconos'
 import './Modelos3DAcciones.css'
 
@@ -13,33 +11,18 @@ import './Modelos3DAcciones.css'
 
 const TOPE_MB = 300
 
-/** Lo último que elegiste a mano (modelo y esfuerzo); si ya no está, el servidor usa el primero de Claude. */
-function eleccion(): { model?: string; effort?: string } {
-  try {
-    const c = JSON.parse(localStorage.getItem('choice') ?? 'null') as { model?: string; effort?: string } | null
-    return c?.model ? { model: c.model.replace('[1m]', ''), effort: c.effort } : {}
-  } catch {
-    return {}
-  }
-}
-
 const mensaje = (e: unknown) => (e instanceof Error ? e.message : String(e))
 
 export function Acciones3D({ tipos, onImportado }: { tipos: string[]; onImportado(id: string): void }) {
-  const [abierta, setAbierta] = useState<'importar' | 'nuevo' | null>(null)
-  const cerrar = () => setAbierta(null)
+  const [abierta, setAbierta] = useState(false)
+  const cerrar = () => setAbierta(false)
   return (
     <div className="m3d-acciones">
-      <button className="m3d-accion" onClick={() => setAbierta('nuevo')}>
-        <Icono de="mas" />
-        Nuevo modelo
-      </button>
-      <button className="m3d-accion principal" onClick={() => setAbierta('importar')}>
+      <button className="m3d-accion" onClick={() => setAbierta(true)}>
         <Icono de="importar" />
         Importar .glb
       </button>
-      {abierta === 'nuevo' && <Nuevo onCerrar={cerrar} />}
-      {abierta === 'importar' && <Importar tipos={tipos} onCerrar={cerrar} onHecho={(id) => (cerrar(), onImportado(id))} />}
+      {abierta && <Importar tipos={tipos} onCerrar={cerrar} onHecho={(id) => (cerrar(), onImportado(id))} />}
     </div>
   )
 }
@@ -80,7 +63,7 @@ function Importar({ tipos, onCerrar, onHecho }: { tipos: string[]; onCerrar(): v
       if (licencia.trim()) q.set('licencia', licencia.trim())
       const res = await fetch(`/api/modelos3d/importar?${q}`, { method: 'POST', body: archivo })
       const datos = (await res.json().catch(() => ({}))) as { id?: string; error?: string }
-      if (!res.ok || !datos.id) throw new Error(datos.error ?? `Sloth respondió ${res.status}.`)
+      if (!res.ok || !datos.id) throw new Error(datos.error ?? `VyMotion respondió ${res.status}.`)
       onHecho(datos.id)
     } catch (e) {
       setError(mensaje(e))
@@ -88,7 +71,7 @@ function Importar({ tipos, onCerrar, onHecho }: { tipos: string[]; onCerrar(): v
     }
   }
   return (
-    <Ventana titulo="Importar un modelo .glb" texto="Un modelo hecho fuera de Sloth (Sketchfab, Blender…). Se guarda en la biblioteca con su vista; tarda un minuto." onCerrar={trabajando ? undefined : onCerrar}>
+    <Ventana titulo="Importar un modelo .glb" texto="Un modelo hecho fuera de VyMotion (Sketchfab, Blender…). Se guarda en la biblioteca con su vista; tarda un minuto." onCerrar={trabajando ? undefined : onCerrar}>
       <label className="m3d-campo">
         <span>Archivo .glb</span>
         <input
@@ -109,7 +92,11 @@ function Importar({ tipos, onCerrar, onHecho }: { tipos: string[]; onCerrar(): v
       </label>
       <label className="m3d-campo">
         <span>Tipo</span>
-        <Desplegable campo nombre="Tipo" valor={tipo} disabled={trabajando} opciones={(tipos.length ? tipos : ['Objetos']).map((t) => ({ value: t, label: t }))} onCambio={setTipo} />
+        <select value={tipo} disabled={trabajando} onChange={(e) => setTipo(e.target.value)}>
+          {(tipos.length ? tipos : ['Objetos']).map((t) => (
+            <option key={t}>{t}</option>
+          ))}
+        </select>
       </label>
       <label className="m3d-campo">
         <span>Licencia (opcional)</span>
@@ -129,54 +116,3 @@ function Importar({ tipos, onCerrar, onHecho }: { tipos: string[]; onCerrar(): v
   )
 }
 
-function Nuevo({ onCerrar }: { onCerrar(): void }) {
-  const [descripcion, setDescripcion] = useState('')
-  const [imagen, setImagen] = useState<File | null>(null)
-  const [error, setError] = useState('')
-  const [enviando, setEnviando] = useState(false)
-  async function crear() {
-    setEnviando(true)
-    setError('')
-    try {
-      let referencia: string | undefined
-      if (imagen) {
-        const subida = await fetch(`/api/upload?name=${encodeURIComponent(imagen.name || 'referencia.png')}`, { method: 'POST', body: imagen })
-        if (!subida.ok) throw new Error('No se pudo subir la imagen.')
-        referencia = ((await subida.json()) as { path: string }).path
-      }
-      const meta = await api<{ id: string }>('/api/modelos3d/nuevo', { descripcion, referencia, ...eleccion() })
-      location.hash = `/s/${meta.id}`
-    } catch (e) {
-      setError(mensaje(e))
-      setEnviando(false)
-    }
-  }
-  return (
-    <Ventana titulo="Nuevo modelo 3D" texto="Describe el objeto. Se abre un hilo donde el agente lo modela, le saca su vista y lo guarda aquí." onCerrar={enviando ? undefined : onCerrar}>
-      <label className="m3d-campo">
-        <span>Qué objeto</span>
-        <textarea
-          autoFocus
-          value={descripcion}
-          rows={5}
-          placeholder="Una caja fuerte de acero con rueda de combinación, que se pueda abrir"
-          onChange={(e) => setDescripcion(e.target.value)}
-        />
-      </label>
-      <label className="m3d-campo">
-        <span>Imagen de referencia (opcional)</span>
-        <input type="file" accept="image/png,image/jpeg,image/webp,image/gif" onChange={(e) => setImagen(e.target.files?.[0] ?? null)} />
-      </label>
-      {error && <p className="bad small">{error}</p>}
-      <div className="m3d-modal-pie">
-        <button className="m3d-accion" disabled={enviando} onClick={onCerrar}>
-          Cancelar
-        </button>
-        <button className="m3d-accion principal" disabled={enviando || !descripcion.trim()} onClick={crear}>
-          <Icono de="hilo" />
-          {enviando ? 'Abriendo…' : 'Abrir hilo'}
-        </button>
-      </div>
-    </Ventana>
-  )
-}

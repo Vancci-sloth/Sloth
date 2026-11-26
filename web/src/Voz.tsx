@@ -1,20 +1,20 @@
 import { useEffect, useRef, useState } from 'react'
 import type { Card, EstadoVoz, ProveedorVoz, VozApi } from '../../shared/types'
 import { lineaVoz, MOTORES, motorDe } from '../../shared/voz'
+import { usePoll } from './usePoll'
 import { api } from './api'
 import { Picker } from './Composer'
 import { ElegirVoz, itemsDeVoz, type Musica } from './ElegirVoz'
 import { Logo } from './Logos'
-import { claveEscrita } from './Respaldo'
 
 /**
  * La voz en la interfaz (`server/voz/`): conectar la cuenta de Google para AI Studio y poner las llaves de Fish Audio y
  * ElevenLabs (Opciones → Voz) y, en el compositor de un video, elegir entre mandar tu voz o que el agente la genere con
  * una de ellas. Lo elegido va en la línea `Voz:` del primer mensaje (`lineaVoz`, `shared/voz.ts`).
  *
- * Las voces de Sloth (Voices Cloning, el proveedor socio) usan la clave personal de la cuenta de Sloth: sus voces se
+ * Las voces de VyMotion (Voices Cloning, el proveedor socio) usan la clave personal de la cuenta de VyMotion: sus voces se
  * eligen en el menú «Voz» (`ElegirVoz.tsx`), y en Opciones «Abrir sus funciones…» abre su ventana para lo demás
- * (`embed.js`, un iframe suyo encima de Sloth) con el pase que pide el servidor; la voz que eliges o clonas ahí queda
+ * (`embed.js`, un iframe suyo encima de VyMotion) con el pase que pide el servidor; la voz que eliges o clonas ahí queda
  * en el menú (`vc:<id>`).
  */
 
@@ -48,11 +48,11 @@ function widget(): Promise<VoiceWidget> {
     const s = document.createElement('script')
     s.src = EMBED
     s.async = true
-    s.onload = () => (window.VoiceWidget ? ok(window.VoiceWidget) : mal(new Error('La ventana de voces de Sloth no cargó.')))
+    s.onload = () => (window.VoiceWidget ? ok(window.VoiceWidget) : mal(new Error('La ventana de voces de VyMotion no cargó.')))
     s.onerror = () => {
       cargandoWidget = undefined
       s.remove()
-      mal(new Error('No se pudo abrir la ventana de voces de Sloth: revisa tu internet.'))
+      mal(new Error('No se pudo abrir la ventana de voces de VyMotion: revisa tu internet.'))
     }
     document.head.append(s)
   })
@@ -68,11 +68,7 @@ export function useVoz() {
   const [error, setError] = useState<string>()
   const recibir = (p: Promise<EstadoVoz>) => p.then((e) => (setEstado(e), setError(undefined)), (e: Error) => setError(e.message))
   useEffect(() => void recibir(api('/api/voz')), [])
-  useEffect(() => {
-    if (!estado?.conectando) return
-    const t = setInterval(() => void recibir(api('/api/voz')), 2000)
-    return () => clearInterval(t)
-  }, [estado?.conectando])
+  usePoll(() => recibir(api('/api/voz')), 2000, !!estado?.conectando)
   /** Lo de Fish Audio y ElevenLabs: devuelve la promesa y falla si falla, para que su fila diga por qué. */
   const aProveedor = (p: Promise<EstadoVoz>) => p.then((e) => void setEstado(e))
   const [errorVc, setErrorVc] = useState('')
@@ -94,7 +90,7 @@ export function useVoz() {
           token,
           view,
           language: 'es',
-          title: 'Voces de Sloth',
+          title: 'Voces de VyMotion',
           onSelectVoice: (v) => void guardarla(v, false),
           onResult: (r) => void (r.kind === 'clone' && r.voice_id ? guardarla({ voice_id: r.voice_id, name: r.name }, true) : undefined),
           onClose: () => ok(undefined)
@@ -114,7 +110,6 @@ export function useVoz() {
     releerVc: () => aProveedor(api('/api/voz/vc', {})),
     claveSloth: async (clave: string) => {
       await api('/api/licencia/clave', { clave })
-      claveEscrita()
       await aProveedor(api('/api/voz/vc', {}))
     },
     conectar: () => void recibir(api('/api/voz/conectar', {})),
@@ -162,7 +157,7 @@ const PROVEEDORES: ProveedorVoz[] = ['fish', 'elevenlabs', 'vibi', 'groq']
 
 /**
  * ¿Se puede generar con esta voz? La de AI Studio, con la cuenta; la de Fish Audio o ElevenLabs, con su llave; la de
- * Voices Cloning, si Sloth la ofrece aquí.
+ * Voices Cloning, si VyMotion la ofrece aquí.
  */
 export function vozPosible(e: EstadoVoz | undefined, voz: string): boolean {
   if (!voz || !e || voz === ABRIR_VC) return false
@@ -249,7 +244,7 @@ export function GenerarVoz({ onGenerar }: { onGenerar(texto: string): Promise<vo
 }
 
 /**
- * Opciones → Voz: la cuenta de Google con que Sloth genera las voces en AI Studio y las llaves de Fish Audio y
+ * Opciones → Voz: la cuenta de Google con que VyMotion genera las voces en AI Studio y las llaves de Fish Audio y
  * ElevenLabs. `voz` es el de Opciones, que comparte con Google Flow.
  */
 export function VozOpciones({ voz, vista }: { voz: UsoVoz; vista: 'google' | 'sloth' | 'externos' }) {
@@ -286,14 +281,14 @@ export function VozOpciones({ voz, vista }: { voz: UsoVoz; vista: 'google' | 'sl
             )
           )}
         </div>
-        {e?.conectando && <p className="muted small fila-extra">Google no deja entrar desde una app. Al entrar en {e.navegador} (la primera vez, AI Studio te pide aceptar sus términos), la ventana se cierra y la sesión pasa sola a Sloth.</p>}
+        {e?.conectando && <p className="muted small fila-extra">Google no deja entrar desde una app. Al entrar en {e.navegador} (la primera vez, AI Studio te pide aceptar sus términos), la ventana se cierra y la sesión pasa sola a VyMotion.</p>}
         {voz.error && !e?.conectando && <p className="bad small fila-extra">{voz.error}</p>}
       </div>
   )
 }
 
 /**
- * Voices Cloning en Opciones → Voz, si Sloth te la ofrece: tus créditos, abrir su ventana entera (voces, clonar tu voz,
+ * Voices Cloning en Opciones → Voz, si VyMotion te la ofrece: tus créditos, abrir su ventana entera (voces, clonar tu voz,
  * diálogo, texto largo, transcribir) y quitar del menú una voz que ya no usas.
  */
 function VoicesCloningOpciones({ voz }: { voz: UsoVoz }) {
@@ -314,22 +309,22 @@ function VoicesCloningOpciones({ voz }: { voz: UsoVoz }) {
   return (
     <div className="item" id="voces-de-sloth">
       <div className="fila">
-        <Logo de="sloth" nombre="Sloth" />
+        <Logo de="sloth" nombre="VyMotion" />
         <div className="fila-nombre">
-          <strong>Voces de Sloth</strong>
+          <strong>Voces de VyMotion</strong>
           <span>
             {vc?.estado === 'suspended' ? 'Tu usuario está suspendido. ' : ''}
-            {vc?.disponible ? `${vc.voces.length} ${vc.voces.length === 1 ? 'voz' : 'voces'} en el menú Voz` : 'Voces listas y la tuya clonada, con créditos de Sloth.'}
+            {vc?.disponible ? `${vc.voces.length} ${vc.voces.length === 1 ? 'voz' : 'voces'} en el menú Voz` : 'Voces listas y la tuya clonada, con créditos de VyMotion.'}
           </span>
         </div>
         {vc?.disponible ? (
           <Picker
             className="acciones"
-            label={<span className="estado">{ocupado || 'Sloth'}</span>}
+            label={<span className="estado">{ocupado || 'VyMotion'}</span>}
             value=""
             disabled={!!ocupado}
             groups={[
-              { label: 'Voces de Sloth', options: [{ value: 'abrir', label: 'Abrir sus funciones (diálogo, texto largo, transcribir)…' }, { value: 'releer', label: 'Volver a leer tus créditos' }, { value: 'clave', label: 'Cambiar clave de Sloth' }] },
+              { label: 'Voces de VyMotion', options: [{ value: 'abrir', label: 'Abrir sus funciones (diálogo, texto largo, transcribir)…' }, { value: 'releer', label: 'Volver a leer tus créditos' }, { value: 'clave', label: 'Cambiar clave de VyMotion' }] },
               ...(vc.voces.length ? [{ label: 'Quitar del menú', options: vc.voces.map((v) => ({ value: `quitar:${v.id}`, label: v.nombre })) }] : [])
             ]}
             onChange={(q) => {
@@ -339,7 +334,7 @@ function VoicesCloningOpciones({ voz }: { voz: UsoVoz }) {
               if (q.startsWith('quitar:')) hacer('Quitando…', voz.quitarVc(q.slice(7)))
             }}
           />
-        ) : <button className="primary" disabled={!voz.estado || !!ocupado} onClick={() => setPegando(true)}>Añadir clave de Sloth</button>}
+        ) : <button className="primary" disabled={!voz.estado || !!ocupado} onClick={() => setPegando(true)}>Añadir clave de VyMotion</button>}
       </div>
       {disponibles !== undefined && (
         <div className="fila-extra creditos-sloth">
@@ -349,7 +344,7 @@ function VoicesCloningOpciones({ voz }: { voz: UsoVoz }) {
           </div>
           {total !== undefined && (
             <>
-              <div className={`limite-barra${consumo >= 90 || total === 0 ? ' lleno' : consumo >= 70 ? ' alto' : ''}`} role="meter" aria-label="Créditos de Sloth usados" aria-valuenow={usados} aria-valuemin={0} aria-valuemax={total || 1} aria-valuetext={`${usados!.toLocaleString('es-MX')} usados; ${disponibles.toLocaleString('es-MX')} disponibles`}>
+              <div className={`limite-barra${consumo >= 90 || total === 0 ? ' lleno' : consumo >= 70 ? ' alto' : ''}`} role="meter" aria-label="Créditos de VyMotion usados" aria-valuenow={usados} aria-valuemin={0} aria-valuemax={total || 1} aria-valuetext={`${usados!.toLocaleString('es-MX')} usados; ${disponibles.toLocaleString('es-MX')} disponibles`}>
                 <span style={{ width: `${consumo}%` }} />
               </div>
               <div className="limite-nombre muted">
@@ -360,18 +355,18 @@ function VoicesCloningOpciones({ voz }: { voz: UsoVoz }) {
           )}
           {typeof vc?.hoy === 'number' && vc.hoy > 0 && <span className="muted">{vc.hoy.toLocaleString('es-MX')} usados hoy</span>}        </div>
       )}
-      <p className="muted small fila-extra">Las eliges en el menú Voz, en su pestaña, o clonas la tuya grabándola ahí. Usa tu clave personal de Sloth, la que te llegó por correo. Si ya la pusiste en Apoyo, se conecta sola. Los créditos se ganan en la rifa de la comunidad o te los da el creador de Sloth; ya no se dan cada mes.</p>
+      <p className="muted small fila-extra">Las eliges en el menú Voz, en su pestaña, o clonas la tuya grabándola ahí. Usa tu clave personal de VyMotion, la que te llegó por correo. Si ya la pusiste en Apoyo, se conecta sola. Los créditos se ganan en la rifa de la comunidad o te los da el creador de VyMotion; ya no se dan cada mes.</p>
       {pegando && (
         <form className="fila-extra" onSubmit={(ev) => {
           ev.preventDefault()
           if (clave.trim()) void hacer('Conectando…', voz.claveSloth(clave)).then((ok) => ok && (setPegando(false), setClave('')))
         }}>
           <div className="opcion-fila">
-            <input type="password" autoFocus aria-label="Clave personal de Sloth" placeholder="SLOTH-…" value={clave} onChange={(ev) => setClave(ev.target.value)} autoComplete="off" />
-            <button className="primary" disabled={!!ocupado || !clave.trim()}>{ocupado || 'Conectar Sloth'}</button>
+            <input type="password" autoFocus aria-label="Clave personal de VyMotion" placeholder="SLOTH-…" value={clave} onChange={(ev) => setClave(ev.target.value)} autoComplete="off" />
+            <button className="primary" disabled={!!ocupado || !clave.trim()}>{ocupado || 'Conectar VyMotion'}</button>
             <button type="button" className="ghost" disabled={!!ocupado} onClick={() => (setPegando(false), setClave(''))}>Cancelar</button>
           </div>
-          <p className="muted small">Es la misma clave de tu cuenta y apoyo en Sloth. Al conectarla, también se usará en Apoyo y Comunidad.</p>
+          <p className="muted small">Es la misma clave de tu cuenta y apoyo en VyMotion. Al conectarla, también se usará en Apoyo y Comunidad.</p>
         </form>
       )}
       {!vc?.disponible && !pegando && <button className="ghost small fila-extra" disabled={!!ocupado} onClick={() => void hacer('Leyendo…', voz.releerVc())}>{ocupado || 'Volver a leer tus créditos'}</button>}
@@ -387,24 +382,24 @@ const DE: Record<ProveedorVoz, { para: string; llaves: string; ayuda: string }> 
     llaves: 'https://fish.audio/app/api-keys/',
     ayuda: 'Crea una cuenta gratis en fish.audio (sin tarjeta) y una llave en «API Keys». Mientras sea gratis, Fish puede usar lo que generes para mejorar su modelo.'
   },
+  vibi: {
+    para: 'Voces de ElevenLabs, MiniMax y CapCut con los créditos de tu cuenta de Vibi.',
+    llaves: 'https://vibi.pro/docs/api-keys/get-api-key',
+    ayuda: 'Inicia sesión en Vibi y copia la clave de API que aparece en su documentación.'
+  },
+  groq: {
+    para: 'Voces Orpheus en inglés con cuota gratuita de API.',
+    llaves: 'https://console.groq.com/keys',
+    ayuda: 'Crea una llave en Groq Console. El modelo Orpheus de esta tarjeta está diseñado para inglés.'
+  },
   elevenlabs: {
     para: 'Voces muy expresivas y la tuya clonada (clonar pide su plan de pago). Gasta los créditos de tu plan: el gratis da 10.000 letras al mes.',
     llaves: 'https://elevenlabs.io/app/settings/api-keys',
     ayuda: 'En elevenlabs.io, crea una llave en «API Keys» con permiso para Text to Speech y Voices.'
-  },
-  vibi: {
-    para: 'Voces de ElevenLabs, MiniMax y CapCut con los créditos de tu cuenta de Vibi. No clona voces desde Sloth.',
-    llaves: 'https://vibi.pro/docs/api-keys/get-api-key',
-    ayuda: 'Entra a tu cuenta de Vibi y copia la llave de API que sale en su documentación.'
-  },
-  groq: {
-    para: 'Voces Orpheus en inglés, con la cuota gratis de la API de Groq. No clona voces.',
-    llaves: 'https://console.groq.com/keys',
-    ayuda: 'Crea una llave en Groq Console. Orpheus, el modelo de esta voz, está hecho para inglés.'
   }
 }
 
-/** Fish Audio, ElevenLabs, Vibi o Groq en Opciones → Voz: poner la llave (se prueba antes de guardarla), clonar tu voz y releer sus voces. */
+/** Fish Audio o ElevenLabs en Opciones → Voz: poner la llave (se prueba antes de guardarla), clonar tu voz y releer sus voces. */
 function ProveedorOpciones({ p, voz }: { p: ProveedorVoz; voz: UsoVoz }) {
   const m = voz.estado?.motores?.[p]
   const de = DE[p]

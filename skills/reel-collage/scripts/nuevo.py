@@ -8,7 +8,7 @@ reels (espacio.py de video-base).
 El formato es el de la línea `Formato:` del mensaje (sin ella, vertical): queda en `FORMATO` de src/datos.ts, del que
 leen la composición (1080x1920 o 1920x1080) y los scripts.
 
-Va en el directorio actual (Sloth lanza la card en `trabajo/reel-collage`, y su panel de etapas busca ahí la carpeta
+Va en el directorio actual (VyMotion lanza la card en `trabajo/reel-collage`, y su panel de etapas busca ahí la carpeta
 del reel); dentro de otro proyecto, junto a él.
 """
 

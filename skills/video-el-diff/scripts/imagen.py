@@ -21,7 +21,7 @@ from pathlib import Path
 
 from PIL import Image, ImageDraw
 
-AGENTE = "ElDiff/1.0 (Sloth; uso local)"
+AGENTE = "ElDiff/1.0 (VyMotion; uso local)"
 API = "https://commons.wikimedia.org/w/api.php"
 
 

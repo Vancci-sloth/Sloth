@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { Modelo3D } from '../../shared/types'
-import { enLaWeb } from './web'
+import type { Ediciones, HerramientaEdicion } from './modelos3d-ediciones'
 
 /**
  * El visor 3D de «Modelos 3D» (`skills/modelos-3d/visor.tsx`): uno solo mientras la sección está abierta, en un iframe
@@ -10,7 +10,7 @@ import { enLaWeb } from './web'
  *
  * Si se vuelve a armar (cambia su dirección), carga otra vez y se le pide de nuevo lo último.
  *
- * Va en la otra dirección de esta computadora (`127.0.0.1` si Sloth es `localhost`, y al revés), como la vista en vivo
+ * Va en la otra dirección de esta computadora (`127.0.0.1` si VyMotion es `localhost`, y al revés), como la vista en vivo
  * del estudio (`Monitor.tsx`): para el navegador es otro sitio y lo carga en su propio proceso, sin trabar la página.
  * Vive fijo en la raíz de la sección y se coloca encima del lugar del modelo en la ficha (`colocar`), sin tapar las
  * botones de la ficha que caen encima (las flechas y, en angosto, cerrar), que quedan fuera de su recorte.
@@ -18,23 +18,49 @@ import { enLaWeb } from './web'
 
 /** En angosto la ficha se desplaza: ahí la rueda la desplaza, y acerca solo con Ctrl (o pellizcando el panel táctil). */
 export const ANGOSTO = '(max-width: 860px)'
-// Desde la web no hay otra dirección: `127.0.0.1` sería la del dispositivo. Va en la misma, en un marco del túnel.
-const aparte = (ruta: string) => (enLaWeb ? ruta : `${location.protocol}//${location.hostname === '127.0.0.1' ? 'localhost' : '127.0.0.1'}:${location.port}${ruta}`)
+const aparte = (ruta: string) => `${location.protocol}//${location.hostname === '127.0.0.1' ? 'localhost' : '127.0.0.1'}:${location.port}${ruta}`
 
 /** Lo que dice el visor. */
-export type AvisoVisor = { que: 'hola' | 'listo' | 'falta' | 'toca' | 'tecla' | 'rueda'; id?: string; key?: string; dy?: number }
+export type AvisoVisor = {
+  que: 'hola' | 'listo' | 'falta' | 'toca' | 'tecla' | 'rueda' | 'estadisticas' | 'pieza' | 'ediciones' | 'historial' | 'herramienta'
+  id?: string
+  key?: string
+  dy?: number
+  /** Con `estadisticas`: lo que tiene el modelo que se ve. */
+  triangulos?: number
+  piezas?: number
+  materiales?: number
+  /** Con `pieza`: el nombre de la pieza elegida (vacío, ninguna). */
+  nombre?: string
+  /** Con `ediciones`: el mapa completo de piezas movidas del modelo. */
+  ediciones?: Ediciones
+  /** Con `historial`: si hay algo que deshacer o rehacer. */
+  deshacer?: boolean
+  rehacer?: boolean
+  /** Con `herramienta`: la que el visor acaba de usar (al elegir una pieza con «Ver»). */
+  herramienta?: HerramientaEdicion
+}
+
+/** La vista de la ficha: la malla (alambre) y la cuadrícula del suelo. */
+export type VistaVisor = { malla: boolean; cuadricula: boolean }
 
 export interface Visor3D {
   /** Si la biblioteca tiene visor. */
   hay: boolean
   /** Que enseñe un modelo; con `azimut` (grados), desde ese ángulo. */
-  mostrar(id: string, azimut?: number): void
+  mostrar(id: string, azimut?: number, ediciones?: Ediciones): void
   /** Que compile de fondo los materiales de estos modelos (los que se ven en la rejilla): su primera vez ya no tarda. */
   precalentar(ids: string[]): void
   /** Que no haga nada de fondo (mientras se desplaza la rejilla): preparar un modelo ocupa la tarjeta gráfica. */
   pausar(si: boolean): void
   /** Girarlo con el teclado: [de lado, de arriba abajo], en pasos de 10°. */
   girar(paso: [number, number]): void
+  /** Cómo se ve: en malla y con la cuadrícula del suelo. */
+  vista(opciones: VistaVisor): void
+  /** Vuelve a encuadrar el modelo, como cuando se abrió. */
+  encuadrar(): void
+  /** La barra de edición: la herramienta, o deshacer, rehacer o restablecer. */
+  edicion(orden: { herramienta?: HerramientaEdicion; accion?: 'deshacer' | 'rehacer' | 'restablecer' }): void
   /** Dónde va (el lugar del modelo en la ficha) y si se ve; `null`, escondido. */
   colocar(lugar: HTMLElement | null, visible?: boolean): void
   /** Quién oye sus avisos (la ficha abierta). */
@@ -163,8 +189,11 @@ export function useVisor3D(modelos: Modelo3D[]): { visor: Visor3D; listo: ListoV
   const visor = useMemo<Visor3D>(
     () => ({
       hay: !!base,
-      mostrar: (id, azimut) => enviar({ mostrar: id, ...(azimut === undefined ? {} : { azimut }) }),
+      mostrar: (id, azimut, ediciones) => enviar({ mostrar: id, ...(azimut === undefined ? {} : { azimut }), ...(ediciones ? { ediciones } : {}) }),
       girar: (paso) => enviar({ girar: paso }),
+      vista: (opciones) => enviar({ vista: opciones }),
+      encuadrar: () => enviar({ encuadrar: true }),
+      edicion: (orden) => enviar({ edicion: orden }),
       precalentar: (ids) => ids.length && enviar({ precalentar: ids }),
       pausar: (si) => cargado.current && marco.current?.contentWindow?.postMessage({ pausa: si }, '*'),
       colocar,

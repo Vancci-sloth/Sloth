@@ -1,22 +1,22 @@
 import { createHash, randomBytes } from 'node:crypto'
-import { copyFileSync, existsSync, mkdirSync, readFileSync, rmSync } from 'node:fs'
-import { open, readFile, readdir } from 'node:fs/promises'
+import { copyFileSync, existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, rmSync } from 'node:fs'
+import { open, readFile, readdir, rm } from 'node:fs/promises'
 import { pipeline } from 'node:stream/promises'
+import { moverProyectos } from '../borrar-hilo.ts'
 import type { IncomingMessage, ServerResponse } from 'node:http'
-import { dirname, isAbsolute, join, resolve } from 'node:path'
+import { dirname, isAbsolute, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type { McpStdioServerConfig } from '@anthropic-ai/claude-agent-sdk'
 import type { Browser } from 'playwright-core'
-import { A_LA_VEZ, AVISO_FRENADA, CALMA, type Descanso, descansoNuevo, descansoVids, elegirCuenta, espacioEntrePedidos, esVids, FORMATOS_IMAGEN, FORMATOS_VIDEO, INGREDIENTES_VIDS, type Motivo, MODELOS_IMAGEN, MODELOS_VIDEO, motivoDeAviso, motivoDeVids, esOmni, PAUSA_CUENTA, puede, RESOLUCIONES_OMNI, type Saldo, SEGUNDOS_VIDS, tipoDeArchivo, TOPE_CREDITOS, VIDEO_MAS_BARATO } from '../../shared/flow.ts'
+import { A_LA_VEZ, AVISO_FRENADA, CALMA, type Descanso, descansoNuevo, elegirCuenta, espacioEntrePedidos, FORMATOS_IMAGEN, FORMATOS_VIDEO, type Motivo, MODELOS_IMAGEN, MODELOS_VIDEO, motivoDeAviso, esOmni, PAUSA_CUENTA, puede, RESOLUCIONES_OMNI, type Saldo, tipoDeArchivo, TOPE_CREDITOS, VIDEO_MAS_BARATO } from '../../shared/flow.ts'
 import type { EstadoFlow, GastoFlow, SaldoFlow, TrabajoFlow } from '../../shared/types.ts'
 import { VENTA } from '../../shared/venta.ts'
-import { areaDeContorno, ESTILOS_IMAGEN, HERRAMIENTAS_IMAGEN, LIMITE_MARCAS, LIMITE_PUNTOS_MARCA, MODELO_RECORTE, PEDIDO_RECORTE, type EstiloImagen, type ImagenEstudio, type MarcaImagen, type PasoImagen } from '../../shared/estilos-imagen.ts'
+import { AJUSTES_EDICION_IMAGEN, areaDeContorno, ESTILOS_IMAGEN, HERRAMIENTAS_IMAGEN, LIMITE_MARCAS, LIMITE_PUNTOS_MARCA, MODELO_RECORTE, MODELO_SUBIDA, PEDIDO_RECORTE, type EstiloImagen, type ImagenEstudio, type MarcaImagen, type PasoImagen } from '../../shared/estilos-imagen.ts'
 import { guardar } from '../disco.ts'
 import { cuerpo, json } from '../http.ts'
 import { type CuentaFlow, cuentasFlow, nombreNavegador } from './cuentas.ts'
-import { generarEnFlow, leerSaldo, paginaFlow, ponerAportar, Rechazado, saldoEnFlow, SinConexion, SinEmpezar, URL_FLOW } from './pagina.ts'
+import { generarEnFlow, leerSaldo, paginaFlow, ponerAportar, Rechazado, saldoEnFlow, SinEmpezar, URL_FLOW } from './pagina.ts'
 import type { PromptPreparado, registroDeImagen } from './hilo-imagen.ts'
-import { generarEnVids, paginaVids } from './vids.ts'
 
 /**
  * Las imágenes (Nano Banana) y los videos (Veo) de Google Flow, en las cuentas de Google del usuario, como los generaría
@@ -26,19 +26,13 @@ import { generarEnVids, paginaVids } from './vids.ts'
  * (`cuentas.ts`, cada una en su Edge), hasta `A_LA_VEZ` a la vez. Cada pedido va a la cuenta libre que lleva más sin
  * generar (`elegirCuenta`), para gastar parejo. Si Flow no lo empieza (sin créditos, frenada, sin sesión) no gastó: la
  * cuenta descansa (`descansos`) y el pedido pasa a otra que no lo haya probado. Si ninguna puede, falla diciendo cuándo
- * vuelven. La sesión de Google no la tiene ningún agente. Lo generado queda en un proyecto de Flow para Sloth
+ * vuelven. La sesión de Google no la tiene ningún agente. Lo generado queda en un proyecto de Flow para VyMotion
  * (`proyectos`, uno por cuenta), y lo que dura cada pedido está en `pagina.ts`.
  *
  * Si Flow lo empieza y lo rechaza en su tarjeta por «actividad inusual», la cuenta descansa igual. El pedido pasa a otra
  * solo si se comprobó que no gastó (`Rechazado`); si gastó o no se supo, falla diciéndolo. Los pedidos van con ritmo
  * (`espacioEntrePedidos`, `PAUSA_CUENTA`), y tras una frenada, de uno en uno durante `CALMA`: todas las cuentas salen de
  * la misma conexión, y Google las ve juntas.
- *
- * Si la conexión no da antes de pedir nada (una subida que no entra, una página que no carga: `SinConexion`), no gastó y
- * la cuenta no tiene la culpa: el pedido vuelve al frente de la fila y se reintenta solo, cada vez más espaciado
- * (`ESPERAS_RED`). Con dos fallos de red seguidos la fila va de uno en uno —hasta que uno salga bien o pase un rato sin más
- * fallos (`CALMA_RED`)—, para no saturar la conexión. El agente solo espera; se le avisa cuándo será el siguiente intento
- * (`TrabajoFlow.aviso`).
  *
  * Gasta los créditos del usuario, y por eso: cada pedido lee el costo antes de generar y no pasa de `tope`; si no cambió
  * nada desde el último archivo de esa ruta (`.huella`), no pide nada, y uno igual que ya está en fila no se repite.
@@ -51,20 +45,9 @@ import { generarEnVids, paginaVids } from './vids.ts'
  * encendido, y cada quien lo cambia en Opciones. Se pone en cada cuenta antes de su primer pedido; si no se puede, no se
  * genera.
  *
- * Google Vids (`vids.ts`, `MODELO_VIDS`) es un modelo más de video, en la misma fila y con las mismas cuentas: no gasta
- * créditos de Flow sino el cupo de Vids de cada cuenta, que va aparte. Por eso su descanso también (`descansosVids`): una
- * cuenta sin cupo de Vids sigue haciendo videos en Flow, y al revés. Vids no dice cuánto le queda a una cuenta.
- *
  * `derechos` es la fecha en que el usuario confirmó que tiene los derechos de las imágenes que manda (referencias y
  * fotogramas) y que cumple la política de Google. Al subir una imagen, Flow pide aceptar eso mismo, y solo con esta
- * confirmación Sloth acepta por él (`subir` en `pagina.ts`): sin ella, un pedido con imágenes no se hace.
- *
- * El estudio de Imágenes (`/api/flow/estudio`, `web/src/EstudioImagenes.tsx`): cada quien pide una imagen sin agente, con un
- * estilo (`shared/estilos-imagen.ts`), un modelo de Flow (por la misma fila y las mismas cuentas de aquí), ChatGPT
- * (`imagen-codex.ts`) o el recorte local que quita el fondo (`recorte.ts`). Editar una de la galería la manda como
- * referencia, con las zonas que marcaste (cambiar, quitar, conservar) dichas en el pedido. Con un modelo de «Prompt», un
- * agente escribe antes el pedido (`preparar`) y el estudio lo guarda como un chat de la imagen (`hilo-imagen.ts`). Todo
- * queda en `data/imagenes`: la imagen, su `.huella` y sus datos en un `.json`. Hasta `LIMITE_ESTUDIO` pedidos a la vez.
+ * confirmación VyMotion acepta por él (`subir` en `pagina.ts`): sin ella, un pedido con imágenes no se hace.
  */
 
 type Trabajo = TrabajoFlow & {
@@ -79,9 +62,6 @@ type Trabajo = TrabajoFlow & {
   /** Las cuentas donde Flow no lo empezó, y lo último que dijo. */
   probadas: string[]
   ultimo?: string
-  /** Las veces que no salió por la conexión, y desde cuándo puede volver a probar. */
-  fallosDeRed?: number
-  desde?: number
 }
 interface Ajustes {
   calmaHasta?: number
@@ -89,9 +69,6 @@ interface Ajustes {
   derechos?: string
   proyectos?: Record<string, string>
   descansos?: Record<string, Descanso>
-  /** Los de Google Vids, que tiene su propio cupo, y su archivo para Sloth en cada cuenta. */
-  descansosVids?: Record<string, Descanso>
-  proyectosVids?: Record<string, string>
   saldos?: Record<string, SaldoFlow>
   /** Por día (AAAA-MM-DD, del equipo) y por cuenta, los videos hechos y sus créditos. */
   uso?: Record<string, Record<string, GastoFlow>>
@@ -104,10 +81,6 @@ export interface Google {
 }
 
 const ESPERA_MAXIMA = 50_000
-/** Lo que espera un pedido antes de reintentar tras cada fallo de la conexión. Tras el último, falla. */
-const ESPERAS_RED = [30_000, 60_000, 120_000, 240_000]
-/** Tras 2 fallos de red seguidos la fila va de uno en uno; vuelve a la normalidad si pasa este rato sin más fallos. */
-const CALMA_RED = 120_000
 const SIN_CUENTA = 'No hay cuenta de Google conectada: que el usuario conecte una en Opciones → Voz o agregue una en Opciones → Google Flow.'
 const SIN_DERECHOS = 'Para mandar imágenes a Flow (referencias o fotogramas), el usuario debe confirmar que tiene sus derechos, en Opciones → Google Flow. No se generó nada.'
 const IMAGEN = /\.(png|jpe?g|webp)$/i
@@ -128,6 +101,36 @@ interface MotoresEstudio {
 type EncargoImagen = ImagenEstudio & { estado: 'en-fila' | 'preparando' | 'generando' | 'error'; error?: string; paso?: PasoImagen }
 const LIMITE_ESTUDIO = 6
 const ID_IMAGEN = /^\d{13}-[a-f0-9]{12}$/
+const MAX_SUBIDA = 25 * 1024 * 1024
+
+/** El ancho y el alto de un PNG o de un JPEG, leídos de sus cabeceras (sin decodificarlo). */
+function tamanoDeImagen(b: Uint8Array): { ancho: number; alto: number } | null {
+  const v = new DataView(b.buffer, b.byteOffset, b.byteLength)
+  if (b[0] === 0x89) return b.length >= 24 ? { ancho: v.getUint32(16), alto: v.getUint32(20) } : null
+  let i = 2
+  while (i + 9 < b.length) {
+    if (b[i] !== 0xff) return null
+    const marca = b[i + 1]!
+    if (marca === 0xff) { i++; continue }
+    // Marcas sin longitud: SOI, EOI, RSTn y TEM.
+    if (marca === 0x01 || marca === 0xd8 || marca === 0xd9 || (marca >= 0xd0 && marca <= 0xd7)) { i += 2; continue }
+    // SOF0 a SOF15, sin DHT (c4), JPG (c8) ni DAC (cc): ahí van el alto y el ancho.
+    if (marca >= 0xc0 && marca <= 0xcf && marca !== 0xc4 && marca !== 0xc8 && marca !== 0xcc)
+      return { alto: v.getUint16(i + 5), ancho: v.getUint16(i + 7) }
+    i += 2 + v.getUint16(i + 2)
+  }
+  return null
+}
+
+/** El formato de la galería (`FORMATOS_IMAGEN`) cuya proporción se parece más a la de la imagen subida. */
+function formatoMasCercano({ ancho, alto }: { ancho: number; alto: number }): string {
+  const proporcion = Math.log(ancho / alto)
+  return Object.keys(FORMATOS_IMAGEN).reduce((mejor, f) => {
+      const [w, h] = f.split(':').map(Number) as [number, number]
+      const distancia = Math.abs(proporcion - Math.log(w / h))
+      return distancia < mejor.distancia ? { f, distancia } : mejor
+    }, { f: '1:1', distancia: Infinity }).f
+}
 function marcaValida(m: MarcaImagen | null) {
   return !!m && [m.x, m.y, m.ancho, m.alto].every((n) => Number.isFinite(n) && n >= 0 && n <= 100)
     && m.ancho > 0 && m.alto > 0 && m.x + m.ancho <= 100.001 && m.y + m.alto <= 100.001
@@ -147,13 +150,7 @@ function describirMarca(m: MarcaImagen, i: number): string {
   return `Zona ${i + 1}: ${zona} ${instruccion}`.trimEnd()
 }
 
-/** Lo de fuera que usa la fila: la página de Flow y las cuentas agregadas. Las pruebas ponen lo suyo (`flow-red.test.ts`). */
-const EN_FLOW = { cuentasFlow, generarEnFlow, leerSaldo, paginaFlow, ponerAportar, saldoEnFlow }
-export type EnFlow = typeof EN_FLOW
-
-export function flow(app: string, google: Google, motores?: MotoresEstudio, deFuera: Partial<EnFlow> = {}) {
-  // Con los nombres de lo importado, para que lo demás no cambie.
-  const { cuentasFlow, generarEnFlow, leerSaldo, paginaFlow, ponerAportar, saldoEnFlow } = { ...EN_FLOW, ...deFuera }
+export function flow(app: string, google: Google, motores?: MotoresEstudio) {
   const carpeta = join(app, 'data', 'flow')
   const estudio = join(app, 'data', 'imagenes')
   const metadatosEstudio = new Map<string, ImagenEstudio>()
@@ -218,18 +215,12 @@ export function flow(app: string, google: Google, motores?: MotoresEstudio, deFu
   /** Cuándo puede empezar el siguiente pedido, y hasta cuándo se va con calma tras una frenada. */
   let siguiente = 0
   let calmaHasta = ajustes.calmaHasta ?? 0
-  /** Los fallos de red seguidos (de cualquier pedido) y cuándo fue el último: con dos recientes, la fila va de uno en uno. */
-  let fallosDeRed = 0
-  let ultimoFalloRed = 0
   let despertar: NodeJS.Timeout | undefined
 
-  // Una cuenta que acaba de generar cuenta como ocupada durante su pausa. Para Vids cuenta su propio descanso, y de los
-  // de Flow, el de la sesión y el de una frenada (Google ve las dos páginas juntas), no el de sus créditos.
-  const usos = (ahora: number, vids = false) =>
+  // Una cuenta que acaba de generar cuenta como ocupada durante su pausa.
+  const usos = (ahora: number) =>
     cuentas().map((c) => {
-      const flow = ajustes.descansos?.[c.correo]
-      const deFlow = vids && flow?.motivo === 'creditos' ? undefined : flow
-      const d = [deFlow, vids ? ajustes.descansosVids?.[c.correo] : undefined].filter((x): x is Descanso => !!x && x.hasta > ahora).sort((a, b) => b.hasta - a.hasta)[0]
+      const d = ajustes.descansos?.[c.correo]
       const ocupada = ocupadas.has(c.correo) || (acabo.get(c.correo) ?? 0) + PAUSA_CUENTA > ahora
       return { correo: c.correo, ocupada, usada: usada.get(c.correo) ?? 0, descansa: d && d.hasta > ahora ? d : undefined }
     })
@@ -239,13 +230,6 @@ export function flow(app: string, google: Google, motores?: MotoresEstudio, deFu
     const ahora = Date.now()
     ajustes.descansos = { ...ajustes.descansos, [correo]: descansoNuevo(motivo, ahora, ajustes.descansos?.[correo], ajustes.saldos?.[correo]?.renueva) }
     if (motivo === 'frenada') ajustes.calmaHasta = calmaHasta = ahora + CALMA
-    guardarAjustes()
-  }
-
-  /** Descansa solo de Vids. Su frenada no calma a Flow: es un límite de un minuto, no «actividad inusual». */
-  function descansarVids(correo: string, motivo: Motivo) {
-    if (motivo === 'sesion') return descansar(correo, motivo)
-    ajustes.descansosVids = { ...ajustes.descansosVids, [correo]: descansoVids(motivo, Date.now()) }
     guardarAjustes()
   }
 
@@ -287,43 +271,22 @@ export function flow(app: string, google: Google, motores?: MotoresEstudio, deFu
   /** Por qué ninguna cuenta puede con `t` ahora, dicho para el agente. */
   function porQueNinguna(t: Trabajo): string {
     const ahora = Date.now()
-    const vids = esVids(t.modelo)
-    const descansan = usos(ahora, vids).filter((c) => !puede(c, t.tipo, ahora) && c.descansa)
+    const descansan = usos(ahora).filter((c) => !puede(c, t.tipo, ahora) && c.descansa)
     const vuelve = Math.min(...descansan.map((c) => c.descansa!.hasta))
-    const motivo = (m: Motivo) => (vids && m === 'creditos' ? 'sin cupo de Google Vids este mes' : vids && m === 'frenada' ? 'Google Vids pidió esperar' : POR_QUE[m])
-    const cuales = descansan.map((c) => `${c.correo} (${motivo(c.descansa!.motivo)})`).join(', ')
+    const cuales = descansan.map((c) => `${c.correo} (${POR_QUE[c.descansa!.motivo]})`).join(', ')
     const antes = t.ultimo ? `${t.ultimo} ` : ''
-    // El cupo de Vids vuelve el día 1: más allá de hoy, con su fecha.
-    const cuando = vuelve - ahora > 20 * 60 * 60_000 ? `el ${new Date(vuelve).toLocaleString('es-MX', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })}` : `las ${hora(vuelve)}`
-    return `${antes}Ninguna cuenta de Google puede generarlo ahora${cuales ? `: ${cuales}` : ''}.${descansan.length ? ` Vuelven a probar desde ${cuando}.` : ''} No se gastó nada. Para tener más, el usuario puede agregar cuentas en Opciones → Google Flow.`
+    return `${antes}Ninguna cuenta de Google puede generarlo ahora${cuales ? `: ${cuales}` : ''}.${descansan.length ? ` Vuelven a probar desde las ${hora(vuelve)}.` : ''} No se gastó nada. Para tener más, el usuario puede agregar cuentas en Opciones → Google Flow.`
   }
 
   async function generar(t: Trabajo, c: CuentaFlow) {
     t.estado = 'generando'
     t.cuenta = c.correo
     const bajada = join(descargas, t.id)
-    const vids = esVids(t.modelo)
     try {
       await c.enEdge(async (b) => {
-        const page = await (vids ? paginaVids(b) : paginaFlow(b))
+        const page = await paginaFlow(b)
         try {
           if ((t.referencias.length || t.cuadros.length) && !ajustes.derechos) throw new Error(SIN_DERECHOS)
-          if (vids) {
-            const pedido = { prompt: t.prompt, formato: t.formato, segundos: t.segundos ?? SEGUNDOS_VIDS.porDefecto, referencias: t.referencias }
-            const hecho = await generarEnVids(page, ajustes.proyectosVids?.[c.correo], pedido, bajada, (archivo) => {
-              if (ajustes.proyectosVids?.[c.correo] === archivo) return
-              ajustes.proyectosVids = { ...ajustes.proyectosVids, [c.correo]: archivo }
-              guardarAjustes()
-            })
-            mkdirSync(dirname(t.salida), { recursive: true })
-            copyFileSync(hecho.archivo, t.salida)
-            guardar(`${t.salida}.huella`, t.huella)
-            t.creditos = 0
-            apuntarUso(c.correo, 0)
-            t.archivo = t.salida
-            t.estado = 'lista'
-            return
-          }
           const aportar = ajustes.aportar === true
           if (aplicado.get(c.correo) !== aportar) {
             await ponerAportar(page, aportar)
@@ -350,9 +313,7 @@ export function flow(app: string, google: Google, motores?: MotoresEstudio, deFu
             t.quedan = quedan(Date.now())
           }
           t.archivo = t.salida
-          t.aviso = undefined
           t.estado = 'lista'
-          fallosDeRed = 0
         } catch (e) {
           await page.screenshot({ path: join(carpeta, 'error.png') }).catch(() => {})
           throw e
@@ -361,8 +322,6 @@ export function flow(app: string, google: Google, motores?: MotoresEstudio, deFu
         }
       })
     } catch (e) {
-      if (e instanceof SinConexion) return reintentarPorRed(t, e)
-      if (vids) return fallaVids(t, c, e)
       const frenada = e instanceof Rechazado && AVISO_FRENADA.test(e.aviso)
       if (e instanceof Rechazado) {
         if (e.saldo) apuntarSaldo(c.correo, e.saldo)
@@ -390,50 +349,6 @@ export function flow(app: string, google: Google, motores?: MotoresEstudio, deFu
       acabo.set(c.correo, Date.now())
       rmSync(bajada, { recursive: true, force: true })
     }
-  }
-
-  /**
-   * La conexión no dio y no se gastó nada: el pedido vuelve al frente de la fila para dentro de un rato (`ESPERAS_RED`, cada
-   * vez más), en la cuenta que esté libre entonces: la que falló no descansa, porque la culpa fue de la red. Tras los
-   * intentos de la lista, se rinde. No se pide de nuevo: se le avisa al agente.
-   */
-  function reintentarPorRed(t: Trabajo, e: SinConexion) {
-    const ahora = Date.now()
-    // Decaimiento: un fallo de hace rato no suma, para no dejar la fila frenada después de que la conexión se recuperó.
-    if (ahora - ultimoFalloRed > CALMA_RED) fallosDeRed = 0
-    fallosDeRed++
-    ultimoFalloRed = ahora
-    const n = (t.fallosDeRed = (t.fallosDeRed ?? 0) + 1)
-    t.cuenta = undefined
-    if (n > ESPERAS_RED.length) {
-      t.estado = 'error'
-      t.aviso = undefined
-      t.error = `${mensaje(e)} Lo intenté ${n} veces y la conexión con Flow no dio. Espera a que mejore y pídelo otra vez.`
-      return
-    }
-    t.desde = ahora + ESPERAS_RED[n - 1]
-    t.aviso = `${mensaje(e)} Sloth lo reintenta solo a las ${hora(t.desde)} (intento ${n + 1} de ${ESPERAS_RED.length + 1}), sin gastar créditos: no lo pidas otra vez.`
-    t.estado = 'en-fila'
-    if (t.estudio) t.estudio.paso = 'turno'
-    fila.unshift(t)
-  }
-
-  /**
-   * Un pedido de Vids que no salió. Sin empezar (sin cupo, un límite corto o sin sesión) no gastó: la cuenta descansa de
-   * Vids y el pedido pasa a otra. Lo demás falla diciéndolo: Vids no dice si lo cobró.
-   */
-  function fallaVids(t: Trabajo, c: CuentaFlow, e: unknown) {
-    if (e instanceof SinEmpezar) {
-      descansarVids(c.correo, e.sesion ? 'sesion' : (motivoDeVids(e.aviso) ?? 'creditos'))
-      t.probadas.push(c.correo)
-      t.ultimo = `${c.correo}: ${mensaje(e)}`
-      t.estado = 'en-fila'
-      t.cuenta = undefined
-      fila.unshift(t)
-      return
-    }
-    t.estado = 'error'
-    t.error = e instanceof Rechazado ? `${mensaje(e)} No se sabe si gastó el cupo de Vids de la cuenta: no lo pidas otra vez sin decírselo al usuario.` : mensaje(e)
   }
 
   /** Lo que se le dice al agente de un pedido rechazado: si gastó y si puede pedirlo otra vez. */
@@ -490,12 +405,10 @@ export function flow(app: string, google: Google, motores?: MotoresEstudio, deFu
   function repartir() {
     const ahora = Date.now()
     if (ahora < siguiente) return repartirEn(siguiente - ahora)
-    const calma = calmaHasta > ahora || (fallosDeRed >= 2 && ahora - ultimoFalloRed < CALMA_RED)
+    const calma = calmaHasta > ahora
     for (const t of [...fila]) {
       if (ocupadas.size >= (calma ? 1 : A_LA_VEZ)) return
-      // Un pedido que espera su reintento por la red: aún no.
-      if (t.desde && t.desde > ahora) continue
-      const elegida = elegirCuenta(usos(ahora, esVids(t.modelo)), t.tipo, ahora, t.probadas)
+      const elegida = elegirCuenta(usos(ahora), t.tipo, ahora, t.probadas)
       if (elegida === 'esperar') continue
       fila.splice(fila.indexOf(t), 1)
       if (elegida === 'ninguna') {
@@ -517,9 +430,9 @@ export function flow(app: string, google: Google, motores?: MotoresEstudio, deFu
     repartirEn(5000)
   }
 
-  function pedir(d: Pick<Trabajo, 'tipo' | 'prompt' | 'formato' | 'modelo' | 'resolucion' | 'segundos' | 'salida' | 'tope' | 'referencias' | 'cuadros' | 'estudio'>): Trabajo {
-    // Sin resolución (Veo) ni segundos (Flow), la huella de siempre: lo ya hecho no se repite.
-    const suma = createHash('sha1').update(`${d.tipo}\n${d.modelo}${d.resolucion ? ` ${d.resolucion}` : ''}${d.segundos ? ` ${d.segundos} s` : ''}\n${d.formato}\n${d.prompt}`)
+  function pedir(d: Pick<Trabajo, 'tipo' | 'prompt' | 'formato' | 'modelo' | 'resolucion' | 'salida' | 'tope' | 'referencias' | 'cuadros' | 'estudio'>): Trabajo {
+    // Sin resolución (Veo), la huella de siempre: lo ya hecho no se repite.
+    const suma = createHash('sha1').update(`${d.tipo}\n${d.modelo}${d.resolucion ? ` ${d.resolucion}` : ''}\n${d.formato}\n${d.prompt}`)
     // Lo que importa de una imagen es lo que tiene, no dónde está. Los fotogramas, aparte: no son referencias.
     for (const r of d.referencias) suma.update(readFileSync(r))
     if (d.cuadros.length) suma.update('\nfotogramas\n')
@@ -537,7 +450,7 @@ export function flow(app: string, google: Google, motores?: MotoresEstudio, deFu
     return t
   }
 
-  const publico = ({ prompt: _p, salida: _s, huella: _h, tope: _t, formato: _f, referencias: _r, cuadros: _c, probadas: _pr, ultimo: _u, estudio: _e, fallosDeRed: _fr, desde: _d, ...t }: Trabajo): TrabajoFlow => t
+  const publico = ({ prompt: _p, salida: _s, huella: _h, tope: _t, formato: _f, referencias: _r, cuadros: _c, probadas: _pr, ultimo: _u, estudio: _e, ...t }: Trabajo): TrabajoFlow => t
   const estado = (): EstadoFlow => {
     const ahora = Date.now()
     const hoy = dia(ahora)
@@ -546,14 +459,12 @@ export function flow(app: string, google: Google, motores?: MotoresEstudio, deFu
     return {
       cuentas: cuentas().map((c) => {
         const d = ajustes.descansos?.[c.correo]
-        const dv = ajustes.descansosVids?.[c.correo]
         const saldo = ajustes.saldos?.[c.correo]
         return {
           correo: c.correo,
           deLaVoz: c.deLaVoz,
           generando: ocupadas.has(c.correo),
           ...(d && d.hasta > ahora ? { descansa: d } : {}),
-          ...(dv && dv.hasta > ahora ? { descansaVids: dv } : {}),
           ...(saldo ? { saldo } : {}),
           hoy: deHoy[c.correo] ?? NADA
         }
@@ -578,16 +489,58 @@ export function flow(app: string, google: Google, motores?: MotoresEstudio, deFu
     return `Google Flow limitó temporalmente la generación. Prueba después de las ${hora(calmaHasta)} o elige ChatGPT.`
   }
 
+  function archivosDelHilo(raiz: string) {
+    const ids = new Set([raiz])
+    if (!ID_IMAGEN.test(raiz) || !existsSync(estudio)) return { ids, archivos: [], ocupado: false }
+    const imagenes = readdirSync(estudio).flatMap((nombre) => {
+      if (!nombre.endsWith('.json') || !ID_IMAGEN.test(nombre.slice(0, -5))) return []
+      const archivo = join(estudio, nombre)
+      if (!lstatSync(archivo, { throwIfNoEntry: false })?.isFile()) return []
+      try {
+        const imagen = JSON.parse(readFileSync(archivo, 'utf8')) as ImagenEstudio
+        return imagen.id === nombre.slice(0, -5) ? [imagen] : []
+      } catch { return [] }
+    })
+    for (const imagen of imagenes.sort((a, b) => a.creada - b.creada)) {
+      if (imagen.raiz === raiz || (imagen.origen && ids.has(imagen.origen))) ids.add(imagen.id)
+    }
+    const pedidos = join(estudio, 'pedidos')
+    const directorioPedidos = lstatSync(pedidos, { throwIfNoEntry: false })?.isDirectory()
+    const archivos = [...ids].flatMap((id) => [
+      ...['.jpg', '.jpg.huella', '.json'].map((ext) => join(estudio, id + ext)),
+      ...(directorioPedidos ? [join(pedidos, id)] : [])
+    ]).filter((ruta) => lstatSync(ruta, { throwIfNoEntry: false }))
+    const ocupado = [...encargos.values()].some((p) => p.estado !== 'error'
+      && (ids.has(p.id) || (p.origen && ids.has(p.origen)) || p.raiz === raiz))
+    return { ids, archivos, ocupado }
+  }
+
+  function moverImagenesDelHilo(plan: ReturnType<typeof archivosDelHilo>) {
+    if (plan.ocupado) throw new Error('Espera a que terminen las imágenes de este chat antes de eliminarlas.')
+    const movidas = moverProyectos(plan.archivos)
+    return {
+      restaurar: movidas.restaurar,
+      limpiar() {
+        for (const id of plan.ids) {
+          metadatosEstudio.delete(id + '.json')
+          encargos.delete(id)
+        }
+        return movidas.limpiar()
+      }
+    }
+  }
+
   async function procesarEstudio() {
     if (procesandoEstudio) return
     procesandoEstudio = true
     try {
       for (const actual of encargos.values()) {
         if (actual.estado !== 'en-fila') continue
-        const { id, prompt, estilo, modelo, formato, orquestador, origen, marcas } = actual
+        const { id, prompt, estilo, modelo, formato, orquestador, origen, marcas, ajustesEdicion } = actual
         const chatgpt = modelo === 'chatgpt'
         const recorte = modelo === MODELO_RECORTE
         let registro: ReturnType<NonNullable<MotoresEstudio['registrar']>>
+        let referencia: string | undefined
         try {
           if (origen) {
             actual.estado = 'preparando'
@@ -617,7 +570,6 @@ export function flow(app: string, google: Google, motores?: MotoresEstudio, deFu
           }
           const carpetaPedido = join(estudio, 'pedidos', id)
           if (chatgpt || orquestador || origen) mkdirSync(carpetaPedido, { recursive: true })
-          let referencia: string | undefined
           if (origen) {
             actual.estado = 'preparando'
             actual.paso = 'referencia'
@@ -630,6 +582,7 @@ export function flow(app: string, google: Google, motores?: MotoresEstudio, deFu
           const descripcion = [
             origen ? 'Edita la imagen original adjunta. Conserva el contenido, la identidad y el encuadre fuera de los cambios pedidos. No dibujes marcas ni números en el resultado.' : '',
             `Instrucción original del usuario: ${prompt}`,
+            ...(ajustesEdicion ?? []).map((id) => AJUSTES_EDICION_IMAGEN[id]),
             guia && !origen ? `Dirección visual: ${guia}` : '',
             ...(marcas ?? []).map(describirMarca)
           ].filter(Boolean).join('\n\n')
@@ -668,6 +621,8 @@ export function flow(app: string, google: Google, motores?: MotoresEstudio, deFu
           registro?.terminar(actual.error)
           const errores = [...encargos.values()].filter((p) => p.estado === 'error')
           for (const anterior of errores.slice(0, -12)) encargos.delete(anterior.id)
+        } finally {
+          if (referencia) await rm(referencia, { force: true }).catch(() => {})
         }
       }
     } finally { procesandoEstudio = false }
@@ -696,7 +651,7 @@ export function flow(app: string, google: Google, motores?: MotoresEstudio, deFu
     }
     if (path === '/api/flow/estudio' && metodo === 'POST') {
       const d = await cuerpo<Partial<ImagenEstudio> | null>(req) ?? {}
-      const { estilo, modelo, formato, orquestador, origen, marcas } = d
+      const { estilo, modelo, formato, orquestador, origen, marcas, ajustesEdicion } = d
       const chatgpt = modelo === 'chatgpt'
       const recorte = modelo === MODELO_RECORTE
       const prompt = recorte ? PEDIDO_RECORTE : typeof d.prompt === 'string' ? d.prompt.trim() : ''
@@ -711,6 +666,10 @@ export function flow(app: string, google: Google, motores?: MotoresEstudio, deFu
         return json(res, 400, { error: 'Elige una imagen de la galería para editar.' })
       if (marcas !== undefined && (!origen || !Array.isArray(marcas) || marcas.length > LIMITE_MARCAS || !marcas.every(marcaValida)))
         return json(res, 400, { error: 'Las zonas marcadas no son válidas.' })
+      if (ajustesEdicion !== undefined && (!origen || recorte || !Array.isArray(ajustesEdicion)
+        || ajustesEdicion.length > Object.keys(AJUSTES_EDICION_IMAGEN).length
+        || !ajustesEdicion.every((id) => typeof id === 'string' && Object.hasOwn(AJUSTES_EDICION_IMAGEN, id))))
+        return json(res, 400, { error: 'Los ajustes de edición no son válidos.' })
       if (recorte && (!origen || orquestador || marcas?.some((m) => m.herramienta !== 'conservar')))
         return json(res, 400, { error: 'Elige una imagen y usa solo marcas de conservación para el recorte local.' })
       if (recorte && !motores?.quitarFondo) return json(res, 409, { error: 'El recorte local no está disponible.' })
@@ -723,13 +682,35 @@ export function flow(app: string, google: Google, motores?: MotoresEstudio, deFu
       const creada = Date.now()
       const id = `${creada}-${randomBytes(6).toString('hex')}`
       const imagen = { id, prompt, estilo: estilo as EstiloImagen, modelo, formato, creada,
-        ...(orquestador ? { orquestador } : {}), ...(origen ? { origen, marcas } : {}) }
+        ...(orquestador ? { orquestador } : {}), ...(origen ? { origen, marcas } : {}), ...(ajustesEdicion?.length ? { ajustesEdicion: [...new Set(ajustesEdicion)] } : {}) }
       mkdirSync(estudio, { recursive: true })
       guardar(join(estudio, `${id}.json`), JSON.stringify(imagen))
       const actual: EncargoImagen = { ...imagen, estado: 'en-fila' }
       encargos.set(id, actual)
       void procesarEstudio()
       return json(res, 200, actual)
+      return json(res, 200, actual)
+    }
+    // Una imagen que el usuario sube (ya en `data/attachments` por `/api/upload`): entra a la galería como una más, lista
+    // para editarla. Los archivos son los mismos que los de un pedido (`.jpg`, su `.huella` y su `.json`).
+    if (path === '/api/flow/estudio/subir' && metodo === 'POST') {
+      const { ruta } = await cuerpo<{ ruta?: unknown }>(req)
+      const carpeta = join(app, 'data', 'attachments')
+      const archivo = typeof ruta === 'string' ? resolve(ruta) : ''
+      const relativo = archivo ? relative(carpeta, archivo) : '..'
+      if (!archivo || relativo.startsWith('..') || isAbsolute(relativo)) return json(res, 400, { error: 'Esa imagen no está subida a VyMotion.' })
+      const bytes = await readFile(archivo).catch(() => null)
+      if (!bytes || bytes.length > MAX_SUBIDA) return json(res, 400, { error: 'La imagen no se pudo leer o pesa más de 25 MB.' })
+      const tamano = tamanoDeImagen(bytes)
+      if (tipoDeArchivo(bytes) !== 'imagen' || !tamano) return json(res, 400, { error: 'Sube una imagen PNG o JPG.' })
+      const creada = Date.now()
+      const id = `${creada}-${randomBytes(6).toString('hex')}`
+      const imagen: ImagenEstudio = { id, prompt: 'Imagen subida', estilo: 'libre', modelo: MODELO_SUBIDA, formato: formatoMasCercano(tamano), creada }
+      mkdirSync(estudio, { recursive: true })
+      guardar(join(estudio, `${id}.jpg`), bytes)
+      guardar(join(estudio, `${id}.jpg.huella`), MODELO_SUBIDA)
+      guardar(join(estudio, `${id}.json`), JSON.stringify(imagen))
+      return json(res, 200, imagen)
     }
     const borrarImagen = /^\/api\/flow\/estudio\/(\d{13}-[a-f0-9]{12})\/borrar$/.exec(path)
     if (borrarImagen && metodo === 'POST') {
@@ -765,7 +746,7 @@ export function flow(app: string, google: Google, motores?: MotoresEstudio, deFu
         res.writeHead(200, {
           'Content-Type': png ? 'image/png' : 'image/jpeg',
           'Content-Length': size,
-          'Content-Disposition': `inline; filename="sloth-${foto[1]}.${png ? 'png' : 'jpg'}"`,
+          'Content-Disposition': `inline; filename="vymotion-${foto[1]}.${png ? 'png' : 'jpg'}"`,
           'Cache-Control': 'private, max-age=86400'
         })
         await pipeline(archivo.createReadStream({ start: 0, autoClose: false }), res).catch(() => {})
@@ -814,7 +795,7 @@ export function flow(app: string, google: Google, motores?: MotoresEstudio, deFu
       return json(res, 200, estado())
     }
     if (path === '/api/flow/generar' && metodo === 'POST') {
-      const d = await cuerpo<{ tipo?: string; prompt?: string; formato?: string; modelo?: string; resolucion?: string; segundos?: number; salida?: string; tope?: number; referencias?: string[]; primerCuadro?: string; ultimoCuadro?: string }>(req)
+      const d = await cuerpo<{ tipo?: string; prompt?: string; formato?: string; modelo?: string; resolucion?: string; salida?: string; tope?: number; referencias?: string[]; primerCuadro?: string; ultimoCuadro?: string }>(req)
       if (d.tipo !== 'imagen' && d.tipo !== 'video') return json(res, 400, { error: 'El tipo es imagen o video.' })
       const video = d.tipo === 'video'
       const modelos = video ? MODELOS_VIDEO : MODELOS_IMAGEN
@@ -837,23 +818,13 @@ export function flow(app: string, google: Google, motores?: MotoresEstudio, deFu
         return json(res, 400, { error: 'Flow hace un video desde fotogramas o con referencias, no las dos: pon a los personajes en el primer cuadro (generar_imagen con sus referencias) y anímalo.' })
       const mala = imagenMala([...referencias, ...cuadros])
       if (mala) return json(res, 400, { error: `No encuentro la imagen ${mala}: pasa la ruta absoluta de un .png, .jpg o .webp.` })
-      const vids = esVids(modelo)
-      const { min, max, porDefecto } = SEGUNDOS_VIDS
-      if (!vids && d.segundos !== undefined && d.segundos !== 8) return json(res, 400, { error: 'Los videos de Flow duran 8 s: elegir la duración es solo de Google Vids.' })
-      const segundos = vids ? (d.segundos ?? porDefecto) : undefined
-      if (segundos !== undefined && (!Number.isInteger(segundos) || segundos < min || segundos > max)) return json(res, 400, { error: `Un video de Google Vids dura de ${min} a ${max} s.` })
-      if (vids && cuadros.length)
-        return json(res, 400, { error: 'Google Vids no parte de un primer cuadro: pasa la imagen en referencias y di en el prompt que el video empieza en «Imagen 1».' })
-      if (vids && referencias.length > INGREDIENTES_VIDS) return json(res, 400, { error: `Google Vids toma hasta ${INGREDIENTES_VIDS} referencias.` })
-      const webp = vids && referencias.find((r) => /\.webp$/i.test(r))
-      if (webp) return json(res, 400, { error: `Google Vids solo toma PNG y JPEG: convierte ${webp}.` })
       if ((referencias.length || cuadros.length) && !ajustes.derechos) return json(res, 409, { error: SIN_DERECHOS })
-      return json(res, 200, publico(pedir({ tipo: d.tipo, prompt: d.prompt.trim(), formato, modelo, resolucion, segundos, salida: resolve(d.salida), tope: d.tope ?? TOPE_CREDITOS, referencias, cuadros })))
+      return json(res, 200, publico(pedir({ tipo: d.tipo, prompt: d.prompt.trim(), formato, modelo, resolucion, salida: resolve(d.salida), tope: d.tope ?? TOPE_CREDITOS, referencias, cuadros })))
     }
     const t = /^\/api\/flow\/trabajos\/(\w+)$/.exec(path)
     if (t && metodo === 'GET') {
       const trabajo = trabajos.get(t[1])
-      if (!trabajo) return json(res, 404, { error: 'No conozco ese pedido: Sloth se reinició. Vuelve a pedirlo (si ya estaba hecho, sale al momento y sin gastar).' })
+      if (!trabajo) return json(res, 404, { error: 'No conozco ese pedido: VyMotion se reinició. Vuelve a pedirlo (si ya estaba hecho, sale al momento y sin gastar).' })
       const hasta = Date.now() + Math.min(ESPERA_MAXIMA, Number(new URL(req.url ?? '', 'http://x').searchParams.get('esperar') ?? 0) * 1000)
       while ((trabajo.estado === 'en-fila' || trabajo.estado === 'generando') && Date.now() < hasta) await new Promise((r) => setTimeout(r, 500))
       return json(res, 200, publico(trabajo))
@@ -862,13 +833,13 @@ export function flow(app: string, google: Google, motores?: MotoresEstudio, deFu
   }
 
   return {
-    api,
+    api, archivosDelHilo, moverImagenesDelHilo,
     /** Por qué no se puede reiniciar el servidor: cortaría un pedido ya pagado o en fila, o la ventana donde entras con Google. */
-    ocupado: () => (estudioOcupado() ? 'Hay un pedido en curso en Imágenes.' : ocupadas.size || fila.length ? 'Sloth está generando en Google Flow. Espera a que termine.' : otras.agregando() ? 'Hay una ventana abierta para entrar con Google en Flow: termina o ciérrala.' : null)
+    ocupado: () => (estudioOcupado() ? 'Hay un pedido en curso en Imágenes.' : ocupadas.size || fila.length ? 'VyMotion está generando en Google Flow. Espera a que termine.' : otras.agregando() ? 'Hay una ventana abierta para entrar con Google en Flow: termina o ciérrala.' : null)
   }
 }
 
-/** El MCP `flow` para los agentes (`mcp.mjs`): lo corre el Node de Sloth y habla con la API de este servidor. */
+/** El MCP `flow` para los agentes (`mcp.mjs`): lo corre el Node de VyMotion y habla con la API de este servidor. */
 export function mcpFlow(): Record<string, McpStdioServerConfig> {
   const aqui = dirname(fileURLToPath(import.meta.url))
   // Compilada (`scripts/compilar.mjs`), el servidor va en un solo archivo, server/index.mjs, y el MCP a su lado.

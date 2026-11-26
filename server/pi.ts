@@ -11,14 +11,15 @@ import { cuentaConVentana } from './cuenta-ventana.ts'
 import { guardar } from './disco.ts'
 import { conSkill, instrucciones, mcpSloth } from './instrucciones.ts'
 import { matarArbol } from './rpc-lineas.ts'
+import { entornoPerfilAgente, perfilActivo } from './perfiles-agentes.ts'
 
 /**
  * Pi (`@earendil-works/pi-coding-agent`), en modo RPC (`pi --mode rpc`), como en T3 Code: un proceso por hilo que habla
  * JSON por líneas. Pi trabaja con el proveedor que cada quien conecte en él (`/login`: Claude, ChatGPT, Gemini, Copilot…,
  * o una llave de API como la de DeepSeek), y guarda las cuentas en `~/.pi/agent`, el mismo Pi de la terminal. Las llaves que
- * guardaste en Sloth las usa solo si se lo eliges en Opciones (`entornoAgente`).
+ * guardaste en VyMotion las usa solo si se lo eliges en Opciones (`entornoAgente`).
  *
- * Los MCP de Sloth (el navegador y la voz) y sus instrucciones entran con una extensión que Sloth escribe en
+ * Los MCP de VyMotion (el navegador y la voz) y sus instrucciones entran con una extensión que VyMotion escribe en
  * `data/pi` (`pi.registerMcpServer`): Pi conecta solo sus MCP, como los de `mcp.json`.
  */
 
@@ -29,7 +30,7 @@ const LOGIN = join(APP, 'data', 'pi', 'sloth-login.ts')
 const ARGS_LOGIN = ['--no-session', '--no-skills', '--no-context-files', '--no-prompt-templates', '--no-extensions', '--extension']
 
 /** La extensión: registra los MCP del hilo, que le llegan en `SLOTH_MCP`, con sus herramientas a la vista del modelo. */
-const FUENTE = `// La escribe Sloth (server/pi.ts) cada vez que abre Pi: no la edites.
+const FUENTE = `// La escribe VyMotion (server/pi.ts) cada vez que abre Pi: no la edites.
 export default function (pi: any) {
   const servidores = JSON.parse(process.env.SLOTH_MCP || '{}')
   for (const [nombre, s] of Object.entries(servidores)) pi.registerMcpServer(nombre, { ...(s as object), exposure: 'direct' })
@@ -41,7 +42,7 @@ export default function (pi: any) {
  * da Enter, y cierra la ventana en cuanto se guarda una cuenta. El Enter usa `focusedComponent`, que no es API pública:
  * si un Pi nuevo lo cambia, queda `/login` escrito y basta con pulsar Enter.
  */
-const FUENTE_LOGIN = `// La escribe Sloth (server/pi.ts) cada vez que abre Pi para conectar una cuenta: no la edites.
+const FUENTE_LOGIN = `// La escribe VyMotion (server/pi.ts) cada vez que abre Pi para conectar una cuenta: no la edites.
 import { statSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
@@ -188,8 +189,6 @@ export function startPi(opts: AgentOptions): AgentRun {
   let costo = 0
   let ventana = 0
   let turno = 0
-  /** Delante de `turno` en los ids: cada proceso cuenta desde 0, y lo de un hilo retomado se pegaba a lo primero del hilo. */
-  const vez = Date.now().toString(36)
   let mensaje = 0
   let usado = 0
 
@@ -216,7 +215,7 @@ export function startPi(opts: AgentOptions): AgentRun {
         return
       case 'message_update': {
         const a = e.assistantMessageEvent
-        if (a?.delta && (a.type === 'text_delta' || a.type === 'thinking_delta')) emit({ t: a.type === 'text_delta' ? 'text' : 'thinking', id: `${vez}:${turno}:${mensaje}:${a.contentIndex ?? 0}${a.type === 'thinking_delta' ? ':pensamiento' : ''}`, delta: a.delta })
+        if (a?.delta && (a.type === 'text_delta' || a.type === 'thinking_delta')) emit({ t: a.type === 'text_delta' ? 'text' : 'thinking', id: `${turno}:${mensaje}:${a.contentIndex ?? 0}${a.type === 'thinking_delta' ? ':pensamiento' : ''}`, delta: a.delta })
         const total = e.usage?.totalTokens
         // Solo cuando cambia: cada trozo de texto lo repite.
         if (typeof total === 'number' && ventana && total !== usado) emit({ t: 'context', used: (usado = total), max: ventana })
@@ -264,7 +263,7 @@ export function startPi(opts: AgentOptions): AgentRun {
 
   const { provider, modelId } = modeloDe(opts.model)
   const args = ['--extension', extension(), '--append-system-prompt', instrucciones(), ...(opts.resume ? ['--session', opts.resume] : [])]
-  const env = { ...entornoAgente('pi'), SLOTH_MCP: JSON.stringify(mcpSloth(opts.lote, opts.hilo)) }
+  const env = { ...entornoPi(opts.configAgente === undefined ? perfilActivo('pi') : opts.configAgente), SLOTH_MCP: JSON.stringify(mcpSloth(opts.lote, opts.hilo)) }
   rpc = new Rpc(args, opts.cwd, env, oir, (code) => {
     const habia = busy
     if (busy) {
@@ -349,10 +348,16 @@ export function startPi(opts: AgentOptions): AgentRun {
 }
 
 /** Un Pi de un momento, sin sesión ni extensiones, para preguntarle algo. */
-async function consultar<T>(fn: (rpc: Rpc) => Promise<T>): Promise<T> {
+function entornoPi(dir?: string | null) {
+  const env = entornoAgente('pi')
+  if (dir) for (const k of Object.keys(env)) if (/(?:_API_KEY|_AUTH_TOKEN|_OAUTH_TOKEN|_TOKEN_PLAN_API_KEY)$/i.test(k)) delete env[k]
+  return { ...env, ...entornoPerfilAgente('pi', dir) }
+}
+
+async function consultar<T>(fn: (rpc: Rpc) => Promise<T>, dir?: string | null): Promise<T> {
   let rpc: Rpc | undefined
   try {
-    rpc = new Rpc(['--no-session', '--no-extensions'], APP, entornoAgente('pi'), () => {}, () => {})
+    rpc = new Rpc(['--no-session', '--no-extensions'], APP, entornoPi(dir), () => {}, () => {})
     return await fn(rpc)
   } finally {
     rpc?.close()
@@ -384,10 +389,10 @@ const NIVELES = ['off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max']
 const niveles = (m: ModeloPi) => (m.reasoning ? NIVELES.filter((n) => (n === 'xhigh' || n === 'max' ? !!m.thinkingLevelMap?.[n] : m.thinkingLevelMap?.[n] !== null)) : [])
 
 /** Los modelos de los proveedores que conectaste en Pi. Vacío si Pi no se ha bajado o no tiene ninguno. */
-export async function modelosPi(): Promise<Model[]> {
+export async function modelosPi(dir: string | null | undefined = perfilActivo('pi')): Promise<Model[]> {
   if (!comandoAgente('pi')) return []
   try {
-    const { models } = (await consultar((r) => r.orden('get_available_models', {}, 30_000))) as { models: ModeloPi[] }
+    const { models } = (await consultar((r) => r.orden('get_available_models', {}, 30_000), dir)) as { models: ModeloPi[] }
     return models.map((m) => ({ id: `pi:${m.provider}/${m.id}`, label: `Pi · ${m.name ?? m.id} (${m.provider})`, efforts: niveles(m), defaultEffort: niveles(m).includes('high') ? 'high' : undefined, precio: precioPi(m) }))
   } catch {
     return []
@@ -403,14 +408,14 @@ export const cuentaPi = cuentaConVentana('pi', {
     const c = comandoAgente('pi')!
     return { command: [c.command, ...c.args, ...ARGS_LOGIN, extension(LOGIN, FUENTE_LOGIN)], env: llavesPrestadas('pi') }
   },
-  async estado() {
+  async estado(dir) {
     // Quién: los proveedores que tiene conectados («deepseek, anthropic»).
-    const proveedores = [...new Set((await modelosPi()).map((m) => modeloDe(m.id).provider))]
-    return { conectada: proveedores.length > 0, quien: proveedores.join(', ') || undefined, llavesSloth: llavesPrestables('pi') }
+    const proveedores = [...new Set((await modelosPi(dir ?? null)).map((m) => modeloDe(m.id).provider))]
+    return { conectada: proveedores.length > 0, quien: proveedores.join(', ') || undefined, llavesSloth: dir ? undefined : llavesPrestables('pi') }
   }
 })
 
-/** Darle a Pi las llaves de Sloth, o dejar de dárselas: cambia los modelos que tiene. Los hilos abiertos siguen como estaban. */
+/** Darle a Pi las llaves de VyMotion, o dejar de dárselas: cambia los modelos que tiene. Los hilos abiertos siguen como estaban. */
 export function llavesPi(usar: boolean) {
   prestarLlaves('pi', usar)
   return cuentaPi.cuenta(true)
@@ -418,10 +423,10 @@ export function llavesPi(usar: boolean) {
 
 /**
  * Cierra todas las cuentas de Pi, como su `/logout` con cada proveedor: vacía `auth.json`, donde las guarda, y deja de
- * darle las llaves de Sloth. Las llaves de API de tus variables las sigue usando: con ellas, sigue conectado.
+ * darle las llaves de VyMotion. Las llaves de API de tus variables las sigue usando: con ellas, sigue conectado.
  */
 export function salirPi() {
-  const cuentas = join(process.env.PI_CODING_AGENT_DIR || join(homedir(), '.pi', 'agent'), 'auth.json')
+  const cuentas = join(perfilActivo('pi') || process.env.PI_CODING_AGENT_DIR || join(homedir(), '.pi', 'agent'), 'auth.json')
   if (existsSync(cuentas)) guardar(cuentas, '{}\n')
   prestarLlaves('pi', false)
   return cuentaPi.cuenta(true)

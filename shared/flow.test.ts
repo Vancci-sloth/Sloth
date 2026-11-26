@@ -5,26 +5,20 @@ import {
   creditosDe,
   DESCANSO,
   descansoNuevo,
-  descansoVids,
   elegirCuenta,
   ENTRE_PEDIDOS,
   espacioEntrePedidos,
   gastoDeRechazo,
-  hechoDeFlow,
   IMAGEN_CHATGPT,
   imagenPosible,
   lineaClips,
   lineaImagenes,
-  MODELO_VIDS,
   MODELOS_VIDEO,
   motivoDeAviso,
-  motivoDeVids,
   esOmni,
   OPCIONES_CLIPS,
-  precioClip,
   RESOLUCIONES_OMNI,
   saldoDe,
-  sinSesion,
   tipoDeArchivo,
   type UsoCuenta
 } from './flow.ts'
@@ -135,41 +129,9 @@ test('la línea Clips lleva el modelo, la resolución de Omni y su costo de tope
   for (const o of Object.values(OPCIONES_CLIPS)) assert.ok(o.resolucion === undefined || (esOmni(o.modelo) && RESOLUCIONES_OMNI.includes(o.resolucion)))
 })
 
-test('Google Vids va en el menú Clips sin créditos ni tope, y su pedido hecho se lee igual que uno de Flow', () => {
-  assert.match(lineaClips(MODELO_VIDS), /^Clips: genéralos en Google Vids .*modelo "Google Vids · Omni"/)
-  assert.doesNotMatch(lineaClips(MODELO_VIDS), /tope/)
-  assert.equal(precioClip(OPCIONES_CLIPS[MODELO_VIDS]), 'cupo de Vids, sin créditos')
-  assert.equal(precioClip(OPCIONES_CLIPS['Veo 3.1 - Lite']), '10 créditos')
-  assert.deepEqual(hechoDeFlow('Lista: C:\\v\\clip.mp4 (Google Vids · Omni, 0 créditos gastados, con una@gmail.com, pedido z).'), {
-    archivo: 'C:\\v\\clip.mp4',
-    modelo: 'Google Vids · Omni',
-    creditos: 0,
-    cuenta: 'una@gmail.com',
-    pedido: 'z'
-  })
-})
-
-test('el aviso de Vids dice si se acabó su cupo del mes o si pide esperar un minuto', () => {
-  // Los textos de su página (23 de noviembre de 2026), en español y en inglés.
-  assert.equal(motivoDeVids('Has alcanzado el límite de vídeos que puedes generar en Vids.'), 'creditos')
-  assert.equal(motivoDeVids("You've reached your limit for videos you can generate in Vids."), 'creditos')
-  assert.equal(motivoDeVids('Has alcanzado un límite provisional de generación de vídeos. Espera un minuto y vuelve a intentarlo.'), 'frenada')
-  assert.equal(motivoDeVids('You reached a temporary video generation limit. Wait a minute and try again.'), 'frenada')
-  assert.equal(motivoDeVids('No se ha podido generar el vídeo. Inténtalo de nuevo.'), null)
-})
-
-test('sin cupo de Vids la cuenta descansa de Vids hasta el día 1; su frenada, dos minutos', () => {
-  const ahora = Date.UTC(2026, 10, 23, 18)
-  assert.deepEqual(descansoVids('creditos', ahora), { hasta: Date.UTC(2026, 11, 1, 8), motivo: 'creditos' })
-  // En diciembre pasa al año siguiente.
-  assert.equal(descansoVids('creditos', Date.UTC(2026, 11, 31)).hasta, Date.UTC(2027, 0, 1, 8))
-  assert.deepEqual(descansoVids('frenada', ahora), { hasta: ahora + 2 * 60_000, motivo: 'frenada' })
-})
-
 test('lo que baja se reconoce por sus bytes, no por el nombre', () => {
   assert.equal(tipoDeArchivo(Uint8Array.from([0xff, 0xd8, 0xff, 0xe0, 0, 0, 0, 0])), 'imagen')
   assert.equal(tipoDeArchivo(Uint8Array.from([0, 0, 0, 0x20, 0x66, 0x74, 0x79, 0x70])), 'video')
-  assert.equal(tipoDeArchivo(new TextEncoder().encode('RIFF\0\0\0\0WEBPVP8 ')), 'imagen')
   assert.equal(tipoDeArchivo(new TextEncoder().encode('<!doctype html>')), null)
 })
 
@@ -184,13 +146,4 @@ test('lo que le queda a una cuenta se lee de su menú, con la hora en que se ren
   // Sin gastar aún, Flow dice la hora de ahora: no es cuándo se renuevan.
   assert.deepEqual(saldoDe('50 puntos de Google Flow\nLos puntos se actualizan a diario a las 15:00', ahora), { creditos: 50 })
   assert.equal(saldoDe('Créditos de Google Flow', ahora), null)
-})
-
-test('sin la sesión de Flow, Google manda a entrar o a la página pública; el inicio y los proyectos sí la tienen', () => {
-  assert.ok(sinSesion('https://accounts.google.com/ServiceLogin?continue=https://flow.google.com/'))
-  assert.ok(sinSesion('https://flow.google.com/about'))
-  assert.ok(sinSesion('https://flow.google.com/about#pricing'))
-  assert.ok(!sinSesion('https://flow.google.com/'))
-  assert.ok(!sinSesion('https://flow.google.com/project/bdbc9543-a6ed-46e5-b7f4-595116cd8590'))
-  assert.ok(!sinSesion('https://flow.google.com/aboutness'))
 })

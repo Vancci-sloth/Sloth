@@ -6,13 +6,14 @@ import { proveedorDe } from '../../shared/providers'
 import type { BorradorYoutube, CatalogoYoutube, MiniaturaYoutube, VideoParaYoutube } from '../../shared/youtube'
 import { resumenRitmo } from '../../shared/ritmo'
 import { fechaLocalYoutube, fechasYoutube, type RitmoYoutube } from '../../shared/youtube-fechas'
+import { usePoll } from './usePoll'
 import { api } from './api'
-import { subir } from './web'
 import './Youtube.css'
 import { YoutubeRecomendaciones } from './YoutubeRecomendaciones'
 import { YoutubeEliminar } from './YoutubeEliminar'
 import { Picker } from './Composer'
 import { Icono } from './Iconos'
+import { Logo } from './Logos'
 import { PUBLICACIONES_CARD } from '../../shared/publicaciones'
 
 /** La revisión por lote de YouTube: guarda borradores, exige revisar título y miniatura y confirma las fechas juntas. */
@@ -31,31 +32,23 @@ export function YoutubeLote({ videos, cardId }: { videos: VideoHecho[]; cardId?:
   const leer = () => api<CatalogoYoutube>(consulta(cardId)).then((r) => { setDatos(r); setError('') }, (e) => setError(e.message))
   useEffect(() => {
     let vivo = true
-    api<CatalogoYoutube>(consulta(cardId)).then((r) => { if (vivo) setDatos(r) }, (e) => { if (vivo) setError(e.message) })
+    api<CatalogoYoutube>(consulta(cardId)).then((r) => { if (vivo) { setDatos(r); setError('') } }, (e) => { if (vivo) setError(e.message) })
     return () => { vivo = false }
   }, [clave, cardId])
   const trabajando = datos?.videos.some(enCurso)
-  useEffect(() => {
-    if (!trabajando) return
-    const t = setInterval(leer, 5000)
-    return () => clearInterval(t)
-  }, [trabajando, cardId])
+  usePoll(leer, 5000, !!trabajando)
   if (!videos.length) return null
   const pendientes = datos?.videos.filter((v) => !bloqueado(v)) ?? []
   const programados = datos?.videos.filter((v) => v.subida?.estado === 'programado') ?? []
   return <>
     <section className="youtube-lote-barra" data-red="youtube">
-      <div><strong>YouTube</strong><span className="muted small">{datos ? `Horizontales · ${pendientes.length} por revisar · ${programados.length} programados${trabajando ? ' · Subiendo el lote…' : ''}` : error || 'Buscando videos largos…'}</span></div>
-      <div className="youtube-lote-acciones"><YoutubeEliminar videos={datos?.videos ?? []} onEliminar={async (r) => { await leer(); setAviso(r.quedan ? `${r.quedan} no se pudieron eliminar: siguen pendientes, en uso o no se pudieron mover a la Papelera.` : '') }} /><button className="primary" onClick={() => abrirRevisionYoutube(cardId)}>Revisar y programar{pendientes.length ? ` (${pendientes.length})` : ''}</button></div>
+      <div><strong className="youtube-lote-titulo"><Logo de="youtube" chico />YouTube</strong><span className="muted small">{datos ? `Horizontales · ${pendientes.length} por revisar · ${programados.length} programados${trabajando ? ' · Subiendo el lote…' : ''}` : error ? 'No se pudo cargar el catálogo.' : 'Buscando videos largos…'}</span></div>
+      <div className="youtube-lote-acciones">{!datos && error && <button className="boton" type="button" onClick={() => { setError(''); void leer() }}><Icono de="recargar" />Reintentar</button>}<YoutubeEliminar videos={datos?.videos ?? []} onEliminar={async (r) => { await leer(); setAviso(r.quedan ? `${r.quedan} no se pudieron eliminar: siguen pendientes, en uso o no se pudieron mover a la Papelera.` : '') }} /><button className="primary" onClick={() => abrirRevisionYoutube(cardId)}><Icono de="calendario" />Revisar y programar{pendientes.length ? ` (${pendientes.length})` : ''}</button></div>
     </section>
     {aviso && <p className="bad small" role="status">{aviso}</p>}
   </>
 }
 
-/**
- * La revisión, como página (`#/youtube`, `youtube-ruta.ts`). Lo que cambiaste sin guardar se queda en la pestaña
- * (`sessionStorage`) si te vas a otra parte, y vuelve al regresar.
- */
 export function RevisionYoutube({ cardId, ruta, cerrar, onCambio }: { cardId?: string; ruta?: string; cerrar(): void; onCambio?(): void }) {
   const [modelos, setModelos] = useState<Model[]>([])
   const [errorModelos, setErrorModelos] = useState('')
@@ -138,11 +131,7 @@ export function RevisionYoutube({ cardId, ruta, cerrar, onCambio }: { cardId?: s
   }
   useEffect(() => { let vivo = true; leer(true).catch((e) => { if (vivo) setError(e.message) }); return () => { vivo = false } }, [cardId, ruta])
   const trabajando = catalogo?.videos.some(enCurso)
-  useEffect(() => {
-    if (!trabajando) return
-    const t = setInterval(() => leer().catch((e) => setError(e.message)), 2000)
-    return () => clearInterval(t)
-  }, [trabajando, cardId, ruta])
+  usePoll(() => leer().catch((e) => setError(e.message)), 2000, !!trabajando)
   function cambiar(v: VideoParaYoutube, cambios: Partial<BorradorYoutube>, editorial = true) {
     setBorradores((bs) => ({ ...bs, [v.huella]: { ...bs[v.huella], ...cambios, ...(editorial ? { revisado: false } : {}) } }))
     setSucio(true)
@@ -221,7 +210,7 @@ export function RevisionYoutube({ cardId, ruta, cerrar, onCambio }: { cardId?: s
       await guardar()
       const r = await api<{ encolados: number }>('/api/youtube/programar', { borradores: listos.map((v) => borradores[v.huella]) })
       dispatchEvent(new Event('sloth-youtube'))
-      setAviso(`${r.encolados} ${r.encolados === 1 ? 'video en cola' : 'videos en cola'}. Sloth los sube de uno en uno y YouTube los publica a su hora.`)
+      setAviso(`${r.encolados} ${r.encolados === 1 ? 'video en cola' : 'videos en cola'}. VyMotion los sube de uno en uno y YouTube los publica a su hora.`)
       setElegidos(new Set())
       await leer()
       onCambio?.()
@@ -242,7 +231,7 @@ export function RevisionYoutube({ cardId, ruta, cerrar, onCambio }: { cardId?: s
     setError('')
     try {
       if (file.size > 50 * 1024 * 1024 || !/\.(png|jpe?g)$/i.test(file.name)) throw new Error('Elige una miniatura PNG o JPEG de hasta 50 MB.')
-      const res = await subir(`/api/upload?name=${encodeURIComponent(file.name)}`, file)
+      const res = await fetch(`/api/upload?name=${encodeURIComponent(file.name)}`, { method: 'POST', body: file })
       const j = await res.json()
       if (!res.ok) throw new Error(j.error ?? 'No se pudo importar la miniatura.')
       const m = await api<MiniaturaYoutube>('/api/youtube/elegir-miniatura', { cardId: v.cardId, ruta: v.ruta, imagen: j.path })

@@ -25,7 +25,7 @@ después confunde nombres parecidos.
 - **`video-base/scripts/voz_viva.py`** importa todo y carga Whisper, su detector de voz y el alineador una sola vez, y
   atiende `transcribir.py` y `transcribir-ajeno.py` por un puerto local, como `vectores_vivo.py` los vectores. Se cierra
   tras 10 min sin pedidos; ocupa unos 2,6 GB de la tarjeta.
-- **`proceso()` de sloth.py** lo usa solo donde transcribe Whisper en una NVIDIA (el Python de Sloth es el de CUDA). Lo
+- **`proceso()` de sloth.py** lo usa solo donde transcribe Whisper en una NVIDIA (el Python de VyMotion es el de CUDA). Lo
   arranca con el turno de la GPU ya tomado, lo espera y le pasa el avance al agente igual que antes. Si no arranca o un
   pedido falla, lo cierra y corre el proceso de siempre, que dice el error.
 - **Los procesos no cambian para quien los lanza**: `transcribir.kept` guarda lo cargado solo dentro de la voz viva, e

@@ -1,0 +1,33 @@
+/* El recortador de la foto de perfil (RecortarFoto.tsx): el círculo con el que sale en la comunidad. */
+.recortar { display: flex; flex-direction: column; gap: 12px; }
+.recortar-marco {
+  position: relative; overflow: hidden; width: 100%; max-width: 280px; aspect-ratio: 1; margin: 0 auto; border-radius: 20px;
+  background: color-mix(in srgb, var(--bg) 80%, transparent); cursor: grab; touch-action: none; user-select: none;
+}
+.recortar-marco:active { cursor: grabbing; }
+/* La foto se mueve desde el centro del marco: mover, girar y agrandar, en ese orden, igual que al guardarla. */
+.recortar-foto { position: absolute; left: 50%; top: 50%; transform-origin: 0 0; max-width: none; pointer-events: none; }
+/* Lo de fuera del círculo, apagado: es lo que no se guarda. */
+.recortar-mascara {
+  position: absolute; inset: 0; pointer-events: none;
+  background: color-mix(in srgb, var(--bg) 72%, transparent);
+  mask: radial-gradient(circle at 50% 50%, transparent 49.5%, #000 50%);
+  -webkit-mask: radial-gradient(circle at 50% 50%, transparent 49.5%, #000 50%);
+}
+/* El aro del círculo, encima de lo apagado: dice hasta dónde llega la foto que se guarda. */
+.recortar-aro { position: absolute; inset: 0; pointer-events: none; border-radius: 50%; box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--text) 45%, transparent); }
+.recortar-ayuda { margin: 0; color: var(--com-suave); font-size: 13.5px; text-align: center; }
+.recortar-mandos { display: flex; align-items: center; gap: 8px; }
+.recortar-barra { flex: 1; min-width: 0; height: 4px; appearance: none; -webkit-appearance: none; border-radius: 99px; background: color-mix(in srgb, var(--text) 14%, transparent); }
+.recortar-barra::-webkit-slider-thumb {
+  appearance: none; -webkit-appearance: none; width: 16px; height: 16px; border-radius: 50%; border: 1px solid color-mix(in srgb, var(--ok) 60%, var(--bg));
+  background: linear-gradient(180deg, color-mix(in srgb, var(--ok) 55%, var(--text)), var(--ok) 60%);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--text) 55%, transparent), 0 2px 8px color-mix(in srgb, var(--ok) 35%, transparent);
+}
+.recortar-barra::-moz-range-thumb {
+  width: 15px; height: 15px; border-radius: 50%; border: 1px solid color-mix(in srgb, var(--ok) 60%, var(--bg));
+  background: linear-gradient(180deg, color-mix(in srgb, var(--ok) 55%, var(--text)), var(--ok) 60%);
+}
+/* Los iconos de `Iconos.tsx` llevan la clase `ico`, que `.com-boton` no mide: aquí se les da su tamaño. */
+.recortar-mandos .com-boton { padding: 0 8px; }
+.recortar-mandos .com-boton .ico { width: 16px; height: 16px; }

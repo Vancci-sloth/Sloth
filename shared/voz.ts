@@ -9,8 +9,8 @@ import type { Card, FuenteVoz, VozStudio } from './types.ts'
 /** La guía que siguen las skills con la línea `Voz:` (en `SLOTH_SKILLS`). */
 const GUIA = 'video-base/VOZ.md'
 
-/** El nombre de cada motor que no es AI Studio, como se ve en Sloth. */
-export const MOTORES: Record<FuenteVoz, string> = { fish: 'Fish Audio', elevenlabs: 'ElevenLabs', vibi: 'Vibi', groq: 'Groq Orpheus', vc: 'Sloth' }
+/** El nombre de cada motor que no es AI Studio, como se ve en VyMotion. */
+export const MOTORES: Record<FuenteVoz, string> = { fish: 'Fish Audio', elevenlabs: 'ElevenLabs', vibi: 'Vibi', groq: 'Groq Orpheus', vc: 'VyMotion' }
 
 /**
  * De qué motor es una voz: las de Fish Audio, ElevenLabs y Voices Cloning van con su prefijo (`fish:<id>`,
@@ -290,7 +290,7 @@ export function segundosWav(b: Uint8Array): number | null {
 }
 
 /**
- * Lo que se narra de un guion en Markdown, lo mismo que copia «Copiar» de Sloth: sin títulos, encabezados, comentarios
+ * Lo que se narra de un guion en Markdown, lo mismo que copia «Copiar» de VyMotion: sin títulos, encabezados, comentarios
  * ni la línea del corte de datos del video explicativo (la que se salta su `subtitulos.py`), y cada párrafo en un
  * renglón. La voz la leía en alto cuando no se quitaba aquí (el de estafas del 3 de noviembre).
  */

@@ -1,5 +1,5 @@
 /**
- * La voz de Voices Cloning (https://www.voicescloning.art), el proveedor de voz de Sloth. Sloth es su socio: tiene un
+ * La voz de Voices Cloning (https://www.voicescloning.art), el proveedor de voz de VyMotion. VyMotion es su socio: tiene un
  * saldo general, que el creador recarga pagándoles, y cada quien es un usuario suyo con sus propios créditos. Asignar
  * créditos no gasta el saldo; solo lo gasta generar.
  *
@@ -27,15 +27,15 @@
  *   gastó y te quedan. Si tarda de más responde 504 con un `task_id`, sin cobrar.
  * - `GET /voz/tareas/<id>`: esa tarea (en la llave donde se pidió); 202 mientras sigue.
  *
- * Para el creador (Administrador, en su Sloth):
+ * Para el creador (Administrador, en su VyMotion):
  * - `GET /voz/admin?pagina=&consumo=`: `reparto`, cuánto saldo queda libre para repartir (`cuentaDeReparto`); de cada llave (`llaves`), su saldo, sus usuarios y el consumo que da Voices
  *   Cloning (recargas y gastos, `items`); `nuevos`, la llave donde entran los nuevos ahora; los correos y planes de
- *   Sloth de cada usuario, el registro de aquí y su resumen de 30 días. Cada lista va por páginas de 100 (`pagina` la de
+ *   VyMotion de cada usuario, el registro de aquí y su resumen de 30 días. Cada lista va por páginas de 100 (`pagina` la de
  *   usuarios, `consumo` la del consumo). Lo de Voices Cloning va tal cual lo responde.
  * - `GET /voz/admin/usuario?externo=`: uno, con su registro y su llave.
  * - `POST /voz/admin/creditos` `{externo, amount}`: suma (o, negativo, quita) créditos, en su llave.
  * - `POST /voz/admin/estado` `{externo, status}`: `active` o `suspended`.
- * - `POST /voz/admin/alta` `{email, creditos}`: da de alta a una cuenta de Sloth por su correo, con créditos.
+ * - `POST /voz/admin/alta` `{email, creditos}`: da de alta a una cuenta de VyMotion por su correo, con créditos.
  * - `POST /voz/admin/regalo` `{email, creditos, motivo, asunto, parrafos}`: créditos de una sola vez por `motivo` y un
  *   correo con su clave (`{clave}` en los párrafos); sin cuenta, se le hace una gratis.
  *
@@ -60,8 +60,8 @@ export const MAX_LETRAS = 5000
 export const GUARDAR_DIAS = 180
 /** El nombre del secreto de una llave de socio: `VOICES_PK_LIVE`, `VOICES_PK_LIVE_2`… */
 export const NOMBRE_LLAVE = /^VOICES_PK_LIVE(?:_(\d+))?$/
-const SIN_LLAVE = 'Las voces de Sloth aún no están listas.'
-const CERRADA = 'Las voces de Sloth aún no están abiertas.'
+const SIN_LLAVE = 'Las voces de VyMotion aún no están listas.'
+const CERRADA = 'Las voces de VyMotion aún no están abiertas.'
 const SIN_CUENTA = 'Ese usuario no está en ninguna cuenta de Voices Cloning.'
 const soloCreador = async (env: Env) => env.VOZ_SOLO_CREADOR === '1' && !(await vocesPublicadas(env))
 const EXTERNO = /^[\w-]{1,100}$/
@@ -106,7 +106,7 @@ export async function voz(req: Request, env: Env, ctx: ExecutionContext, url: UR
   const q = await quien(req, env)
   const llaves = await llavesDe(env)
   if (ruta.startsWith('/voz/admin')) {
-    if (!q.creador) throw new Rechazo(403, 'Esto solo lo ve el creador de Sloth.')
+    if (!q.creador) throw new Rechazo(403, 'Esto solo lo ve el creador de VyMotion.')
     return admin(req, env, ctx, url, llaves)
   }
   if (!q.creador && await soloCreador(env)) {
@@ -137,7 +137,7 @@ export async function voz(req: Request, env: Env, ctx: ExecutionContext, url: UR
     const { r, en } = await conMudanza(env, ctx, llaves, q, llave, (l) => vc(l, 'POST', '/api/v1/tts', { usuario: q.externo, cuerpo: pedido }))
     anotar(env, ctx, { externo: q.externo, accion: 'tts', llave: en, voz: pedido.voice_id, letras: pedido.text.length, creditos: numero(r.datos.credits_used), ms: Date.now() - t, r })
     // Lo clonado no se muda con la persona: esa voz se quedó en la cuenta de antes.
-    if (en.id !== llave.id && r.status === 404) throw new Rechazo(409, 'Tus voces de Sloth pasaron a otra cuenta y esta se quedó en la anterior. Elige o clona otra en el menú «Voz».')
+    if (en.id !== llave.id && r.status === 404) throw new Rechazo(409, 'Tus voces de VyMotion pasaron a otra cuenta y esta se quedó en la anterior. Elige o clona otra en el menú «Voz».')
     return responder(r)
   }
   const tarea = /^\/voz\/tareas\/([^/]+)$/.exec(ruta)?.[1]
@@ -339,11 +339,11 @@ async function admin(req: Request, env: Env, ctx: ExecutionContext, url: URL, ll
     return responder(r)
   }
   if (ruta === '/voz/admin/alta') {
-    if (await soloCreador(env)) throw new Rechazo(409, 'Las voces de Sloth se abrirán cuando se publique la actualización que las trae.')
+    if (await soloCreador(env)) throw new Rechazo(409, 'Las voces de VyMotion se abrirán cuando se publique la actualización que las trae.')
     const email = String(c.email ?? '').trim().toLowerCase()
     const creditos = Math.max(0, Math.floor(Number(c.creditos) || 0))
     const fila = await env.DB.prepare('SELECT id FROM licencias WHERE email = ? ORDER BY creada LIMIT 1').bind(email).first<{ id: string }>()
-    if (!fila) throw new Rechazo(404, 'No hay ninguna cuenta de Sloth con ese correo.')
+    if (!fila) throw new Rechazo(404, 'No hay ninguna cuenta de VyMotion con ese correo.')
     const donde = await cuentaDe(env, ctx, llaves, fila.id, creditos)
     // Ya existía: el alta no cambia sus créditos, así que se le suman.
     if (!donde.creado && creditos > 0) {
@@ -359,12 +359,12 @@ async function admin(req: Request, env: Env, ctx: ExecutionContext, url: URL, ll
 }
 
 /**
- * Un regalo de créditos de una sola vez, con su correo (`/voz/admin/regalo`). A quien no tiene cuenta de Sloth se le hace
+ * Un regalo de créditos de una sola vez, con su correo (`/voz/admin/regalo`). A quien no tiene cuenta de VyMotion se le hace
  * una gratis (no Fundador), para que tenga clave. La marca `regalos/<motivo>/<externo>.json` en R2 se toma antes de sumar:
  * con el mismo motivo no se suma dos veces, y esa lista dice a quién quitarle lo que le quede cuando se acabe.
  */
 async function regalo(env: Env, ctx: ExecutionContext, llaves: Llave[], c: Record<string, unknown>): Promise<Response> {
-  if (await soloCreador(env)) throw new Rechazo(409, 'Las voces de Sloth aún son solo del creador.')
+  if (await soloCreador(env)) throw new Rechazo(409, 'Las voces de VyMotion aún son solo del creador.')
   const email = String(c.email ?? '').trim().toLowerCase()
   const creditos = Math.floor(Number(c.creditos) || 0)
   const motivo = String(c.motivo ?? '')
@@ -463,11 +463,8 @@ async function cuentasDe(env: Env, externos: string[]): Promise<Record<string, {
 
 // ── Lo de todos ─────────────────────────────────────────────────────────────────────────────────────────────────
 
-/**
- * Quién pide: el creador, con su llave (`delCreador`), o una cuenta o un apoyo activos en una computadora que lo usa.
- * `pidio` es lo que se anota al vigilar a quien no viene de la app. También lo usa el dictado (`dictado.ts`).
- */
-export async function quien(req: Request, env: Env, pidio = 'pidió voces de Voices Cloning'): Promise<Quien> {
+/** Quién pide: el creador, con su llave (`delCreador`), o una cuenta o un apoyo activos en una computadora que lo usa. */
+async function quien(req: Request, env: Env): Promise<Quien> {
   if (delCreador(req, env)) return { externo: CREADOR_VOZ, creador: true }
   const clave = (req.headers.get('x-sloth-clave') ?? '').replace(/\s+/g, '').toUpperCase()
   const equipo = req.headers.get('x-sloth-equipo') ?? ''
@@ -480,10 +477,10 @@ export async function quien(req: Request, env: Env, pidio = 'pidió voces de Voi
           .first<{ estado: string; pagado_hasta: string | null; email: string; externo: string; vetada: number }>()
       : null
   if (fila?.vetada) throw new Rechazo(403, BLOQUEADA)
-  if (!fila || !vigencia(fila as Parameters<typeof vigencia>[0], Date.now()).activa) throw new Rechazo(401, 'Para usar las voces de Sloth, crea tu cuenta gratis de Sloth.')
+  if (!fila || !vigencia(fila as Parameters<typeof vigencia>[0], Date.now()).activa) throw new Rechazo(401, 'Para usar las voces de VyMotion, crea tu cuenta gratis de VyMotion.')
   if (!DE_LA_APP.test(equipo)) {
-    await vigilar(env, fila.email, `${pidio} sin la app de Sloth, con un identificador de computadora inventado`)
-    throw new Rechazo(403, 'Detectamos actividad sospechosa: esto no viene de la app de Sloth. Tu cuenta queda vigilada.')
+    await vigilar(env, fila.email, 'pidió voces de Voices Cloning sin la app de VyMotion, con un identificador de computadora inventado')
+    throw new Rechazo(403, 'Detectamos actividad sospechosa: esto no viene de la app de VyMotion. Tu cuenta queda vigilada.')
   }
   return { externo: fila.externo, creador: false, email: fila.email }
 }
@@ -510,10 +507,10 @@ export async function repartidorVoz(env: Env, ctx: ExecutionContext): Promise<Re
   return llaves.length ? repartidor(env, ctx, llaves) : undefined
 }
 
-/** Si las voces de Sloth ya son de todos (no solo del creador). */
+/** Si las voces de VyMotion ya son de todos (no solo del creador). */
 export const vozAbierta = async (env: Env) => !(await soloCreador(env))
 
-const nombreDe = (externo: string) => (externo === CREADOR_VOZ ? 'Vancci (creador de Sloth)' : 'Usuario de Sloth')
+const nombreDe = (externo: string) => (externo === CREADOR_VOZ ? 'Vancci (creador de VyMotion)' : 'Usuario de VyMotion')
 
 /** Da de alta a alguien en una llave (Voices Cloning no lo duplica: responde 200 si ya existía). */
 async function alta(env: Env, ctx: ExecutionContext, llave: Llave, externo: string, creditos: number): Promise<Respuesta> {
@@ -532,7 +529,7 @@ export function pedidoTts(c: Record<string, unknown>): { text: string; voice_id:
   const text = typeof c.text === 'string' ? c.text.trim() : ''
   const voice_id = typeof c.voice_id === 'string' ? c.voice_id.trim() : ''
   if (!text) throw new Rechazo(400, 'Falta el texto.')
-  if (text.length > MAX_LETRAS) throw new Rechazo(400, `Son ${text.length} letras: las voces de Sloth aceptan ${MAX_LETRAS} por llamada.`)
+  if (text.length > MAX_LETRAS) throw new Rechazo(400, `Son ${text.length} letras: las voces de VyMotion aceptan ${MAX_LETRAS} por llamada.`)
   if (!voice_id || voice_id.length > 200) throw new Rechazo(400, 'Falta la voz.')
   if (c.speed === undefined) return { text, voice_id }
   const speed = Number(c.speed)
@@ -557,7 +554,7 @@ async function vc(llave: Llave, metodo: string, ruta: string, o: { usuario?: str
       signal: AbortSignal.timeout(ruta === '/api/v1/tts' ? 6 * 60_000 : 30_000)
     })
   } catch {
-    return { status: 502, datos: { error: 'No hubo conexión con las voces de Sloth.', code: 'sin_conexion' } }
+    return { status: 502, datos: { error: 'No hubo conexión con las voces de VyMotion.', code: 'sin_conexion' } }
   }
   const datos = (await r.json().catch(() => null)) as unknown
   return { status: r.status, datos: datos && typeof datos === 'object' && !Array.isArray(datos) ? (datos as Record<string, unknown>) : { valor: datos }, espera: r.headers.get('retry-after') ?? undefined }
@@ -570,21 +567,21 @@ function responder(r: Respuesta): Response {
   return json(datos, r.status === 401 ? 502 : r.status, r.espera ? { 'retry-after': r.espera } : {})
 }
 
-/** Por qué no salió, dicho para quien usa Sloth (y su agente). */
+/** Por qué no salió, dicho para quien usa VyMotion (y su agente). */
 export function mensajeDe(r: Pick<Respuesta, 'status' | 'datos' | 'espera'>): string {
   const codigo = String(r.datos.code ?? '')
   const suyo = typeof r.datos.error === 'string' ? r.datos.error : ''
-  if (codigo === 'insufficient_credits') return 'Se te acabaron los créditos de voz de Sloth. Pídele más al creador de Sloth o usa otra voz.'
-  if (codigo === 'partner_balance_empty') return 'Las voces de Sloth no están disponibles ahora: se acabó su saldo. El creador ya puede verlo; mientras, usa otra voz.'
-  if (codigo === 'partner_daily_limit') return 'Se llegó al tope del día de las voces de Sloth. Se libera a medianoche, hora de Lima (las 23:00 en la Ciudad de México).'
-  if (codigo === 'queue_full' || r.status === 429) return `Las voces de Sloth tienen mucha demanda ahora. Intenta otra vez en ${r.espera ?? 'unos'} segundos.`
+  if (codigo === 'insufficient_credits') return 'Se te acabaron los créditos de voz de VyMotion. Pídele más al creador de VyMotion o usa otra voz.'
+  if (codigo === 'partner_balance_empty') return 'Las voces de VyMotion no están disponibles ahora: se acabó su saldo. El creador ya puede verlo; mientras, usa otra voz.'
+  if (codigo === 'partner_daily_limit') return 'Se llegó al tope del día de las voces de VyMotion. Se libera a medianoche, hora de Lima (las 23:00 en la Ciudad de México).'
+  if (codigo === 'queue_full' || r.status === 429) return `Las voces de VyMotion tienen mucha demanda ahora. Intenta otra vez en ${r.espera ?? 'unos'} segundos.`
   if (r.status === 504) return 'La voz tardó más de lo normal (no se cobró): sigue con su tarea o vuelve a pedirla.'
-  if (r.status === 401) return 'Las voces de Sloth no aceptaron su llave. Avísale al creador.'
-  if (r.status === 403) return 'Tu usuario de las voces de Sloth está suspendido. Pregúntale al creador de Sloth.'
-  if (r.status === 404) return suyo ? `Las voces de Sloth no lo encontraron: ${suyo}` : 'Las voces de Sloth no tienen eso (¿la voz existe?).'
-  if (codigo === 'invalid_body' || r.status === 400) return `Las voces de Sloth no aceptaron el pedido${suyo ? `: ${suyo}` : '.'}`
-  if (codigo === 'sin_conexion') return 'No hubo conexión con las voces de Sloth. Intenta otra vez en un momento.'
-  return `Las voces de Sloth respondieron ${r.status}${suyo ? `: ${suyo}` : '.'}`
+  if (r.status === 401) return 'Las voces de VyMotion no aceptaron su llave. Avísale al creador.'
+  if (r.status === 403) return 'Tu usuario de las voces de VyMotion está suspendido. Pregúntale al creador de VyMotion.'
+  if (r.status === 404) return suyo ? `Las voces de VyMotion no lo encontraron: ${suyo}` : 'Las voces de VyMotion no tienen eso (¿la voz existe?).'
+  if (codigo === 'invalid_body' || r.status === 400) return `Las voces de VyMotion no aceptaron el pedido${suyo ? `: ${suyo}` : '.'}`
+  if (codigo === 'sin_conexion') return 'No hubo conexión con las voces de VyMotion. Intenta otra vez en un momento.'
+  return `Las voces de VyMotion respondieron ${r.status}${suyo ? `: ${suyo}` : '.'}`
 }
 
 /** Anota la llamada en `voz_registro` sin detener la respuesta. */

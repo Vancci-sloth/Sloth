@@ -1,17 +1,18 @@
-import { lazy, memo, Suspense, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Component, lazy, memo, Suspense, type ErrorInfo, type ReactNode, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { CANAL_CARD, IDEAS_CARD } from '../../shared/ideas' // ideas
-import { MODELO3D_CARD } from '../../shared/modelos3d' // modelos 3D
-import { PUBLICACIONES_CARD } from '../../shared/publicaciones' // «Organizar en chat» de YouTube
-import { REVISION_CARD } from '../../shared/revision' // revisión de estilos
-import type { Afinado, AvanceCorto, AvisoComunidad, Card, Marcas, RifaGanada, Model, Previa, Serie, ServerPush, SessionMeta, VideoHecho } from '../../shared/types'
+import { chatsPorModelo3D, MODELO3D_CARD, rutaEditor3D } from '../../shared/modelos3d' // modelos 3D
+import { PUBLICACIONES_CARD } from '../../shared/publicaciones'
 import { NUEVO_ESTILO } from '../../shared/crear-estilo'
+import { rutaEditorImagen } from '../../shared/estilos-imagen'
+import type { AvanceCorto, AvisoComunidad, Card, Marcas, RifaGanada, Model, Previa, Serie, ServerPush, SessionMeta, VideoHecho } from '../../shared/types'
 import { NOMBRE_AGENTE, PROVEEDORES, proveedorDe } from '../../shared/providers'
 import { AvisoVideos } from './AvisoVideos'
 import { VENTA } from '../../shared/venta'
 import { textoAHtml } from './markdown'
 import { CuentaClaude, Notificaciones, Opciones, useSinClaude } from './Opciones'
 import { CampoAscii } from './CampoAscii'
-import { useEntradaEstilo, useTransicionApartado } from './Movimiento'
+import { useEntradaEstilo } from './Movimiento'
+import { AyudaCrearVideo } from './AyudaVideo'
 import { api } from './api'
 import { eventos, useFallo, useResumen } from './eventos'
 import { useDesplazando } from './desplazando'
@@ -36,19 +37,17 @@ import { CON_CHATGPT, conOpenCode, conPrimero, elegirModelos, lineaSubagentes, M
 import { AvisoEquipo } from './Equipo' // tu equipo
 import { MisVideos, Rejilla, VideoDe } from './MisVideos'
 import { abrirPublicacion, Comunidad } from './Comunidad' // comunidad
-import { abrirBorrador, CompartirEstilo, ImportarEstilo, incompletosGuardados, marcarIncompletos } from './Estilos' // estilos compartidos
+import { MiPerfil } from './MiPerfil' // comunidad: «Mi perfil», su propia página
+import { abrirBorrador, CompartirEstilo, ImportarEstilo } from './Estilos' // estilos compartidos
 import { GuiaVista } from './Guia'
 import { PedirMejora } from './PedirMejora' // comunidad
 import { Icono } from './Iconos'
-import { SinApoyo } from './SinApoyo' // estilos de la comunidad, sin apoyo
 import { Bienvenida } from './Bienvenida'
 import { AvisoMacViejo } from './AvisoMacViejo'
 import { MarcaAgente } from './Logos'
-import { RevisionYoutube, YoutubeLote } from './YoutubeProgramar'
-import { rutaEditorImagen } from '../../shared/estilos-imagen'
+import { YoutubeLote } from './YoutubeProgramar'
 import { CalendarioYoutube } from './YoutubeCalendario'
 import { avisarTanda, AvisoRedes, ConNavegadorRedes, usePublicar } from './Redes' // redes
-import { AvisoPiloto } from './Piloto' // piloto
 import { NombreDelHilo, Renombrar } from './Renombrar'
 import { Segmento } from './Segmento'
 import { nombreDeVoz, SelectorVoz, useVoz, vozPosible } from './Voz' // voz de AI Studio, Fish Audio o ElevenLabs
@@ -59,13 +58,67 @@ import { Timeline } from './Timeline'
 import { Admin, esPestanaAdmin, type PestanaAdmin, useEsCreador } from './Admin' // Administrador, solo en la computadora del creador
 import { compact, duration } from './items'
 import './Barra.css'
+import './Cristal.css'
+import { RevisionYoutube } from './YoutubeProgramar'
+import { useTransicionApartado } from './Movimiento'
 import { apartadoRedes, rutaRedes, type ApartadoRedes } from './redes-ruta'
 
-const EstudioImagenes = lazy(() => import('./EstudioImagenes').then((m) => ({ default: m.EstudioImagenes })))
-const CatalogoEstilos = lazy(() => import('./CatalogoEstilos').then((m) => ({ default: m.CatalogoEstilos })))
-const Ideas = lazy(() => import('./Ideas').then((m) => ({ default: m.Ideas })))
-const Modelos3D = lazy(() => import('./Modelos3D').then((m) => ({ default: m.Modelos3D })))
-const CentroRedes = lazy(() => import('./CentroRedes').then((m) => ({ default: m.CentroRedes })))
+const cargarEstudioImagenes = () => import('./EstudioImagenes').then((m) => ({ default: m.EstudioImagenes }))
+const cargarCatalogoEstilos = () => import('./CatalogoEstilos').then((m) => ({ default: m.CatalogoEstilos }))
+const cargarIdeas = () => import('./Ideas').then((m) => ({ default: m.Ideas }))
+const cargarModelos3D = () => import('./Modelos3D').then((m) => ({ default: m.Modelos3D }))
+const cargarCentroRedes = () => import('./CentroRedes').then((m) => ({ default: m.CentroRedes }))
+const EstudioImagenes = lazy(cargarEstudioImagenes)
+const CatalogoEstilos = lazy(cargarCatalogoEstilos)
+const Ideas = lazy(cargarIdeas)
+const Modelos3D = lazy(cargarModelos3D)
+const CentroRedes = lazy(cargarCentroRedes)
+
+type ApartadoCarga = 'redes' | 'imagenes' | 'estilos' | 'modelos3d'
+const cargadoresApartados: Record<ApartadoCarga, () => Promise<unknown>> = {
+  redes: cargarCentroRedes,
+  imagenes: cargarEstudioImagenes,
+  estilos: cargarCatalogoEstilos,
+  modelos3d: cargarModelos3D,
+}
+
+function precargarApartado(apartado: ApartadoCarga) {
+  void cargadoresApartados[apartado]().catch(() => {})
+}
+
+function nombreApartado(apartado: ApartadoCarga) {
+  return { redes: 'Redes', imagenes: 'Imágenes', estilos: 'Estilos', modelos3d: 'Modelos 3D' }[apartado]
+}
+
+function CargandoApartado({ apartado }: { apartado: ApartadoCarga }) {
+  return <section className={`vista-cargando vista-cargando-${apartado}`} role="status" aria-live="polite" aria-busy="true">
+    <div className="vista-cargando-cabecera">
+      <span className="vista-cargando-icono" aria-hidden="true" />
+      <div>
+        <p className="vista-cargando-kicker">Cargando espacio de trabajo</p>
+        <h1>{nombreApartado(apartado)}</h1>
+        <p>Preparando herramientas, navegación y contenido…</p>
+      </div>
+    </div>
+    <div className="vista-cargando-nav" aria-hidden="true"><i /><i /><i /><i /></div>
+    <div className="vista-cargando-grid" aria-hidden="true"><i /><i /><i /></div>
+  </section>
+}
+
+class ErrorApartado extends Component<{ children: ReactNode }, { error: Error | null }> {
+  state = { error: null as Error | null }
+  static getDerivedStateFromError(error: Error) { return { error } }
+  componentDidCatch(error: Error, info: ErrorInfo) { console.error('No se pudo abrir el apartado', error, info) }
+  render() {
+    if (!this.state.error) return this.props.children
+    return <section className="vista-error" role="alert">
+      <div className="vista-error-icono" aria-hidden="true"><Icono de="alerta" /></div>
+      <h1>No se pudo abrir este apartado</h1>
+      <p>La interfaz encontró un problema al preparar sus herramientas. Puedes intentarlo de nuevo sin perder tus chats.</p>
+      <button className="boton" onClick={() => location.reload()}>Recargar apartado</button>
+    </section>
+  }
+}
 
 /** El inicio es siempre un hilo nuevo; sin card en el hash, toma la última que se usó. Un borrador es un inicio a medias. */
 type View =
@@ -74,15 +127,13 @@ type View =
   | { kind: 'session'; id: string }
   | { kind: 'opciones'; seccion?: string; apartado?: string }
   | { kind: 'videos'; estilo?: string }
-  | { kind: 'estilos' } // el catálogo de estilos
-  | { kind: 'modelos3d' } // modelos 3D
-  | { kind: 'imagenes'; imagenId?: string } // estudio de Imágenes, o el editor de una
-  /** Redes: la producción, Ideas, las publicaciones, el calendario y las cuentas (`CentroRedes.tsx`). */
+  | { kind: 'estilos' }
+  | { kind: 'modelos3d'; modeloId?: string }
+  | { kind: 'imagenes'; imagenId?: string }
   | { kind: 'redes'; apartado?: ApartadoRedes; canalId?: string }
-  | { kind: 'comunidad' } // comunidad
-  | { kind: 'admin'; pestana?: PestanaAdmin } // Administrador, solo en la computadora del creador
-  /** La revisión de YouTube (`youtube-ruta.ts`): `volver` es la vista de donde se abrió. */
   | { kind: 'youtube'; cardId?: string; ruta?: string; volver: string }
+  | { kind: 'comunidad'; perfil?: boolean } // comunidad; `perfil`, «Mi perfil» (su propia página)
+  | { kind: 'admin'; pestana?: PestanaAdmin } // Administrador, solo en la computadora del creador
 
 /** Lo que se escribió en un hilo nuevo sin mandarlo. Vive en localStorage hasta que se manda o se borra. */
 type Saved = Draft & { cardId: string; at: number }
@@ -111,9 +162,9 @@ function readHash(): View {
     return VENTA && seccion === 'ideas' ? { kind: 'redes' }
       : { kind: 'redes', apartado: seccion, canalId: seccion === 'ideas' ? apartado || undefined : undefined }
   }
-  if (kind === 'modelos-3d') return { kind: 'modelos3d' } // modelos 3D
+  if (kind === 'modelos-3d') return { kind: 'modelos3d', modeloId: id === 'editar' && apartado && /^[\w-]+$/.test(apartado) ? apartado : undefined }
   if (kind === 'imagenes') return { kind: 'imagenes', imagenId: id === 'editar' ? apartado : undefined }
-  if (kind === 'comunidad' || kind === 'mejoras') return { kind: 'comunidad' } // comunidad (antes, Mejoras)
+  if (kind === 'comunidad' || kind === 'mejoras') return { kind: 'comunidad', ...(id === 'perfil' ? { perfil: true } : {}) } // comunidad (antes, Mejoras)
   if (kind === 'admin') return { kind: 'admin', pestana: esPestanaAdmin(id) ? id : undefined }
   return { kind: 'new', cardId: kind === 'new' ? id : undefined }
 }
@@ -148,9 +199,9 @@ function go(view: View) {
           : view.kind === 'videos'
             ? `/mis-videos${view.estilo ? `/${view.estilo}` : ''}`
             : view.kind === 'modelos3d' // modelos 3D
-              ? '/modelos-3d'
+              ? view.modeloId ? rutaEditor3D(view.modeloId) : '/modelos-3d'
               : view.kind === 'comunidad' // comunidad
-              ? '/comunidad'
+              ? `/comunidad${view.perfil ? '/perfil' : ''}`
               : view.kind === 'admin'
               ? `/admin${view.pestana ? `/${view.pestana}` : ''}`
               : view.cardId
@@ -174,8 +225,8 @@ function guardarRespuesta(id: string, d: Draft) {
 
 export function App() {
   const [view, setView] = useState<View>(readHash)
-  const pagina = useRef<HTMLElement>(null)
-  useTransicionApartado(pagina, view.kind === 'session' ? 'hilo' : JSON.stringify(view))
+  const paginaRef = useRef<HTMLElement>(null)
+  useTransicionApartado(paginaRef, view.kind === 'redes' || view.kind === 'new' ? view.kind : JSON.stringify(view))
   const [cards, setCards] = useState<Card[]>([])
   const [models, setModels] = useState<Model[]>([])
   const [sessions, setSessions] = useState<SessionMeta[]>([])
@@ -209,14 +260,13 @@ export function App() {
   })
   useEffect(() => localStorage.setItem('drafts', JSON.stringify(drafts)), [drafts])
   // El hilo nuevo en blanco también escribe en un borrador, que solo sale en la lista cuando lo dejas a medias. Se
-  // recuerda también al cerrar Sloth: al volver, lo que escribías sigue en el campo, no en «Borradores».
+  // recuerda también al cerrar VyMotion: al volver, lo que escribías sigue en el campo, no en «Borradores».
   const [freshId, setFreshId] = useState(() => sessionStorage.getItem('fresh') || localStorage.getItem('fresh') || newId())
   useEffect(() => (sessionStorage.setItem('fresh', freshId), localStorage.setItem('fresh', freshId)), [freshId])
   const draftId = view.kind === 'draft' ? view.id : view.kind === 'new' ? freshId : null
 
   useEffect(() => {
-    // En el celular la barra desplegada va encima de todo: al elegir algo se pliega sola, como en una app de teléfono.
-    const onHash = () => (setView(readHash()), matchMedia('(max-width: 760px)').matches && plegar(true))
+    const onHash = () => setView(readHash())
     addEventListener('hashchange', onHash)
     return () => removeEventListener('hashchange', onHash)
   }, [])
@@ -231,7 +281,6 @@ export function App() {
         const socket = ws
         socket.send(JSON.stringify({ type: 'subscribe', sessionId: abierto.current }))
         setConnected(true)
-        dispatchEvent(new CustomEvent('sloth-conexion', { detail: true }))
         try {
           const state = await api('/api/state')
           setCards(state.cards)
@@ -246,14 +295,12 @@ export function App() {
           dispatchEvent(new CustomEvent('sloth-etapas')) // panel de etapas
         } catch (e) {
           // Sin el estado la app se queda vacía: se dice abajo en la barra y se vuelve a intentar al reconectar.
-          setFalloEstado(`No se pudo leer el estado de Sloth: ${e instanceof Error ? e.message : String(e)}`)
+          setFalloEstado(`No se pudo leer el estado de VyMotion: ${e instanceof Error ? e.message : String(e)}`)
           socket.close()
         }
       }
-      ws.onclose = (e) => {
+      ws.onclose = () => {
         setConnected(false)
-        // Desde la web, `ConexionWeb` lo dice si tarda (4001: este dispositivo se quitó en Opciones).
-        dispatchEvent(new CustomEvent('sloth-conexion', { detail: e.code === 4001 ? 'quitado' : false }))
         eventos.conexion(false)
         retry = setTimeout(connect, 800)
       }
@@ -293,7 +340,13 @@ export function App() {
     }
   }, [])
 
-  const openId = view.kind === 'session' ? view.id : null
+  const chats3D = useMemo(() => chatsPorModelo3D(sessions), [sessions])
+  const destino3D = view.kind === 'session' ? sessions.find(s => s.id === view.id)?.modelo3d : undefined
+  useEffect(() => {
+    if (destino3D) location.replace(rutaEditor3D(destino3D.editando ?? destino3D.resultado))
+  }, [destino3D])
+  const grupo3D = view.kind === 'modelos3d' && view.modeloId ? chats3D.get(view.modeloId) : undefined
+  const openId = view.kind === 'session' ? view.id : grupo3D?.[0]?.id ?? null
   abierto.current = openId
   // El servidor manda los eventos del hilo abierto. El que se deja se guarda para volver, si no trabaja (`eventos.ts`).
   const deSesiones = useRef(sessions)
@@ -318,7 +371,7 @@ export function App() {
   useAvisos({ sessions, cards, openId, sinVer: sessions.filter((s) => !s.archived && finished(s)).length, abrir: (id) => go({ kind: 'session', id }) })
 
   // Archivado automático: lo que hacías a mano con casi todos los hilos. Vive aquí y no en el servidor porque «ya lo
-  // viste» es de este navegador (`seen`). Un hilo se archiva solo si cumple todo: su card no tiene estudio (Sloth, Ideas:
+  // viste» es de este navegador (`seen`). Un hilo se archiva solo si cumple todo: su card no tiene estudio (VyMotion, Ideas:
   // los videos se siguen en su estudio), ya lo viste (sin el punto verde), no trabaja ni espera nada, su último turno
   // acabó bien (`acaboBien`, del servidor) y lleva 12 h quieto. Tampoco el que miras ni uno con una respuesta a medio
   // escribir. Se desarchiva como siempre y entonces se queda: `archivadosSolos` guarda el `updatedAt` con el que se
@@ -373,11 +426,8 @@ export function App() {
       setDrafts((all) => ({ ...all, [id]: { text: texto, html: textoAHtml(texto), images: [], cardId, at: Date.now() } }))
       go({ kind: 'draft', id })
     }
-    // El hilo donde tu agente revisó un estilo de la comunidad (`abrirHilo`).
-    const hilo = (e: Event) => go({ kind: 'session', id: (e as CustomEvent<string>).detail })
     addEventListener('sloth-borrador', abrir)
-    addEventListener('sloth-hilo', hilo)
-    return () => (removeEventListener('sloth-borrador', abrir), removeEventListener('sloth-hilo', hilo))
+    return () => removeEventListener('sloth-borrador', abrir)
   }, []) // estilos compartidos
 
   function dropDraft(id: string) {
@@ -385,8 +435,8 @@ export function App() {
     if (view.kind === 'draft' && view.id === id) go({ kind: 'new' })
   }
 
-  // Los hilos de Ideas, los de «Nuevo modelo» y los que revisan un estilo son de una card que no sale en el inicio: les da su icono.
-  const cardOf = (id: string) => cards.find((c) => c.id === id) ?? [IDEAS_CARD, CANAL_CARD, MODELO3D_CARD, REVISION_CARD, PUBLICACIONES_CARD].find((c) => c.id === id)
+  // Los hilos de Ideas y los de «Nuevo modelo» son de una card que no sale en el inicio: les da su icono.
+  const cardOf = (id: string) => cards.find((c) => c.id === id) ?? [IDEAS_CARD, CANAL_CARD, MODELO3D_CARD, PUBLICACIONES_CARD].find((c) => c.id === id)
   // Antes de dibujar: las etiquetas de hilo del compositor y de las burbujas lo leen al pintarse.
   threadIcons.clear()
   for (const s of sessions) {
@@ -398,6 +448,7 @@ export function App() {
   const lista: (SessionMeta | SessionMeta[])[] = []
   const lotes = new Map<string, SessionMeta[]>()
   for (const s of sessions.filter((s) => !s.archived)) {
+    if (s.modelo3d && chats3D.get(s.modelo3d.resultado)?.[0]?.id !== s.id) continue
     if (!s.lote) {
       lista.push(s)
       continue
@@ -426,17 +477,10 @@ export function App() {
   // se filtra: no se ve qué se busca.
   const [busca, setBusca] = useState('')
   const campoBusca = useRef<HTMLInputElement>(null)
-  // comunidad: tus avisos sin leer, junto a «Comunidad». Se piden cada 2 minutos mientras se ve Sloth, cada 10 con la
+  // comunidad: tus avisos sin leer, junto a «Comunidad». Se piden cada 2 minutos mientras se ve VyMotion, cada 10 con la
   // ventana oculta (un anuncio avisa aunque no la estés mirando), y al leerlos. Si subieron, se mira si hay un anuncio.
   // Con ellos llega lo que ganaste en la rifa, que sale a toda la pantalla (`GanasteRifa`).
   const [avisosComunidad, setAvisosComunidad] = useState(0)
-  // Los estilos tuyos de la comunidad a los que les falta algo para estar en la tienda (`marcarIncompletos`).
-  const [incompletos, setIncompletos] = useState(incompletosGuardados)
-  useEffect(() => {
-    const oir = (e: Event) => setIncompletos((e as CustomEvent<number>).detail)
-    addEventListener('sloth-estilos-incompletos', oir)
-    return () => removeEventListener('sloth-estilos-incompletos', oir)
-  }, [])
   const esCreador = useEsCreador()
   useEffect(() => {
     let sabidos = 0
@@ -448,13 +492,7 @@ export function App() {
         const { sinLeer, rifa } = await api<{ sinLeer: number; rifa?: RifaGanada }>('/api/comunidad/avisos?cuenta')
         setAvisosComunidad(sinLeer)
         if (rifa) avisarGanasteRifa(rifa)
-        if (sinLeer > sabidos) {
-          const { avisos } = await api<{ avisos: AvisoComunidad[] }>('/api/comunidad/avisos')
-          avisarAnuncio(avisos, abrirPublicacion)
-          // A un estilo tuyo le falta algo para estar en la tienda: «Comunidad» va en rojo hasta que lo completes.
-          const faltan = avisos.filter((a) => a.tipo === 'incompleto' && !a.leido).length
-          if (faltan) marcarIncompletos(faltan)
-        }
+        if (sinLeer > sabidos) avisarAnuncio((await api<{ avisos: AvisoComunidad[] }>('/api/comunidad/avisos')).avisos, abrirPublicacion)
         sabidos = sinLeer
       } catch {
         // Sin conexión o sin cuenta: se vuelve a pedir.
@@ -467,8 +505,8 @@ export function App() {
   }, [])
   const buscar = () => (plegar(false), setTimeout(() => campoBusca.current?.focus()))
   // Un chat nuevo desde cualquier parte, con el cursor ya en su campo: Alt+N en Windows y Linux (también en un navegador,
-  // que no lo usa); en Mac, Cmd+N (en la ventana de Sloth: Opción+N escribe la ñ). Y Ctrl+Mayús+O, el de ChatGPT y
-  // Gemini. Ctrl+N también, en la ventana de Sloth (un navegador lo guarda para abrir otra ventana).
+  // que no lo usa); en Mac, Cmd+N (en la ventana de VyMotion: Opción+N escribe la ñ). Y Ctrl+Mayús+O, el de ChatGPT y
+  // Gemini. Ctrl+N también, en la ventana de VyMotion (un navegador lo guarda para abrir otra ventana).
   const alNuevo = useRef(newChat)
   alNuevo.current = newChat
   /** «Nuevo chat» ya se abrió al apretar el ratón: el clic de cuando suelta no abre otro. */
@@ -524,7 +562,9 @@ export function App() {
   const alFila = useRef<AccionesFila>(null as never)
   alFila.current = {
     clic(s, e) {
-      if (!selected && !e.ctrlKey && !e.metaKey) return go({ kind: 'session', id: s.id })
+      if (!selected && !e.ctrlKey && !e.metaKey) return go(s.modelo3d
+        ? { kind: 'modelos3d', modeloId: s.modelo3d.editando ?? s.modelo3d.resultado }
+        : { kind: 'session', id: s.id })
       if (!selected) setPickY(e.clientY)
       pick(s.id, e.shiftKey)
     },
@@ -547,7 +587,7 @@ export function App() {
     <FilaHilo
       key={s.id}
       s={s}
-      icono={s.imagenEstudio ? 'imagen' : (cardOf(s.cardId)?.icon ?? '•')}
+      icono={s.imagenEstudio ? 'imagen' : cardOf(s.cardId)?.icon ?? '•'}
       activa={openId === s.id && !selected}
       marcada={selected ? selected.has(s.id) : undefined}
       plegada={plegada}
@@ -574,7 +614,7 @@ export function App() {
         {/* Plegada, cada botón es su icono y dice qué es al pasar el ratón; los textos se esconden en Barra.css. */}
         <div className="brand-fila">
           <button className="brand" onClick={newChat} title={plegada ? 'Nuevo chat' : undefined}>
-            <img src="/icon.svg" alt="" /> Sloth
+            <img src="/icon.svg" alt="" /><span className="barra-etiqueta">VyMotion</span>
           </button>
           <Notificaciones key={skillNotificaciones ?? ''} skill={skillNotificaciones} />
           <button className="plegar" title={plegada ? 'Desplegar la barra (Ctrl+B)' : 'Plegar la barra (Ctrl+B)'} aria-expanded={!plegada} onClick={() => plegar(!plegada)}>
@@ -602,48 +642,42 @@ export function App() {
         >
           <span className="new-chat-icon">
             <Icono de="mas" />
-          </span>{' '}
-          Nuevo chat
+          </span>
+          <span className="barra-etiqueta">Nuevo chat</span>
         </button>
         <nav className="barra-destinos" aria-label="Navegación principal">
-        <button data-destino="redes" className={`new-chat${view.kind === 'redes' || view.kind === 'youtube' ? ' active' : ''}`} aria-current={view.kind === 'redes' || view.kind === 'youtube' ? 'page' : undefined} onClick={() => go({ kind: 'redes' })} title={plegada ? 'Redes' : undefined}>
-          <span className="new-chat-icon"><Icono de="compartir" /></span> Redes
+        <button data-destino="redes" className={`new-chat${view.kind === 'redes' || view.kind === 'youtube' ? ' active' : ''}`} aria-current={view.kind === 'redes' || view.kind === 'youtube' ? 'page' : undefined} onPointerEnter={() => precargarApartado('redes')} onFocus={() => precargarApartado('redes')} onClick={() => go({ kind: 'redes' })} title={plegada ? 'Redes' : undefined}>
+          <span className="new-chat-icon"><Icono de="compartir" /></span><span className="barra-etiqueta">Redes</span>
         </button>
         <button data-destino="videos" className={`new-chat${view.kind === 'videos' ? ' active' : ''}`} aria-current={view.kind === 'videos' ? 'page' : undefined} onClick={() => go({ kind: 'videos' })} title={plegada ? 'Mis videos' : undefined}>
           <span className="new-chat-icon">
             <Icono de="video" />
-          </span>{' '}
-          Mis videos
+          </span>
+          <span className="barra-etiqueta">Mis videos</span>
         </button>
-        <button data-destino="estilos" className={`new-chat${view.kind === 'estilos' ? ' active' : ''}`} aria-current={view.kind === 'estilos' ? 'page' : undefined} onClick={() => go({ kind: 'estilos' })} title={plegada ? 'Estilos' : undefined}>
-          <span className="new-chat-icon"><Icono de="claqueta" /></span> Estilos
+        <button data-destino="estilos" className={`new-chat${view.kind === 'estilos' ? ' active' : ''}`} aria-current={view.kind === 'estilos' ? 'page' : undefined} onPointerEnter={() => precargarApartado('estilos')} onFocus={() => precargarApartado('estilos')} onClick={() => go({ kind: 'estilos' })} title={plegada ? 'Estilos' : undefined}>
+          <span className="new-chat-icon"><Icono de="claqueta" /></span><span className="barra-etiqueta">Estilos</span>
         </button>
-        <button data-destino="imagenes" className={`new-chat${view.kind === 'imagenes' ? ' active' : ''}`} aria-current={view.kind === 'imagenes' ? 'page' : undefined} onClick={() => go({ kind: 'imagenes' })} title={plegada ? 'Imágenes' : undefined}>
-          <span className="new-chat-icon"><Icono de="imagen" /></span>{' '}
-          Imágenes
+        <button data-destino="imagenes" className={`new-chat${view.kind === 'imagenes' ? ' active' : ''}`} aria-current={view.kind === 'imagenes' ? 'page' : undefined} onPointerEnter={() => precargarApartado('imagenes')} onFocus={() => precargarApartado('imagenes')} onClick={() => go({ kind: 'imagenes' })} title={plegada ? 'Imágenes' : undefined}>
+          <span className="new-chat-icon"><Icono de="imagen" /></span>
+          <span className="barra-etiqueta">Imágenes</span>
         </button>
         {/* modelos 3D */}
-        <button data-destino="modelos3d" className={`new-chat${view.kind === 'modelos3d' ? ' active' : ''}`} aria-current={view.kind === 'modelos3d' ? 'page' : undefined} onClick={() => go({ kind: 'modelos3d' })} title={plegada ? 'Modelos 3D' : undefined}>
+        <button data-destino="modelos3d" className={`new-chat${view.kind === 'modelos3d' ? ' active' : ''}`} aria-current={view.kind === 'modelos3d' ? 'page' : undefined} onPointerEnter={() => precargarApartado('modelos3d')} onFocus={() => precargarApartado('modelos3d')} onClick={() => go({ kind: 'modelos3d' })} title={plegada ? 'Modelos 3D' : undefined}>
           <span className="new-chat-icon">
             <Icono de="cubo" />
-          </span>{' '}
-          Modelos 3D
+          </span>
+          <span className="barra-etiqueta">Modelos 3D</span>
         </button>
         {/* comunidad */}
-        <button
-          data-destino="comunidad"
-          className={`new-chat${view.kind === 'comunidad' ? ' active' : ''}${incompletos ? ' falta' : ''}`}
-          aria-current={view.kind === 'comunidad' ? 'page' : undefined}
-          onClick={() => go({ kind: 'comunidad' })}
-          title={incompletos ? 'A un estilo tuyo le falta algo para estar en la tienda: entra a Estilos y complétalo' : plegada ? 'Comunidad' : undefined}
-        >
+        <button data-destino="comunidad" className={`new-chat${view.kind === 'comunidad' ? ' active' : ''}`} aria-current={view.kind === 'comunidad' ? 'page' : undefined} onClick={() => go({ kind: 'comunidad' })} title={plegada ? 'Comunidad' : undefined}>
           <span className="new-chat-icon">
             <Icono de="personas" />
-          </span>{' '}
-          Comunidad
-          {(avisosComunidad > 0 || incompletos > 0) && (
-            <span className="nav-cuenta" title={avisosComunidad ? `${avisosComunidad} ${avisosComunidad === 1 ? 'aviso' : 'avisos'} sin leer` : undefined}>
-              {avisosComunidad > 99 ? '99+' : avisosComunidad || '!'}
+          </span>
+          <span className="barra-etiqueta">Comunidad</span>
+          {avisosComunidad > 0 && (
+            <span className="nav-cuenta" title={`${avisosComunidad} ${avisosComunidad === 1 ? 'aviso' : 'avisos'} sin leer`}>
+              {avisosComunidad > 99 ? '99+' : avisosComunidad}
             </span>
           )}
         </button>
@@ -660,8 +694,8 @@ export function App() {
           >
             <span className="new-chat-icon">
               <Icono de="escudo" />
-            </span>{' '}
-            Administrador
+            </span>
+            <span className="barra-etiqueta">Administrador</span>
           </button>
         )}
         </nav>
@@ -769,19 +803,20 @@ export function App() {
         <Pie running={sessions.some((s) => s.running || !!s.background?.length)} connected={connected} enOpciones={view.kind === 'opciones'} fallo={falloEstado} plegada={plegada} />
       </aside>
 
-      <main className="main" ref={pagina}>
+      <main className="main" ref={paginaRef}>
         <Bienvenida models={models} />
         <AvisoMacViejo />
         <AvisoVideos />
         {view.kind === 'opciones' && (
           <Opciones seccion={view.seccion} apartado={view.apartado} avisosEstilos={avisosEstilos} onAvisosEstilos={setAvisosEstilos} onDone={() => go({ kind: 'new' })} />
         )}
-        <Suspense fallback={<p className="vista-cargando" role="status">Abriendo apartado…</p>}>
+        <ErrorApartado key={JSON.stringify(view)}>
+        <Suspense fallback={<CargandoApartado apartado={view.kind === 'redes' ? 'redes' : view.kind === 'imagenes' ? 'imagenes' : view.kind === 'estilos' ? 'estilos' : 'modelos3d'} />}>
         {view.kind === 'redes' && (
           <CentroRedes cards={cards} sessions={sessions} apartado={view.apartado}
             onCrear={(id) => go({ kind: 'new', cardId: id })}>
             {!VENTA && view.apartado === 'ideas' && (
-              <Suspense fallback={<p className="muted" role="status">Abriendo Ideas…</p>}>
+              <Suspense fallback={<CargandoApartado apartado="redes" />}>
                 <Ideas
                   canalId={view.canalId}
                   cards={cards}
@@ -802,10 +837,11 @@ export function App() {
         )}
         {view.kind === 'imagenes' && <EstudioImagenes models={models} imagenId={view.imagenId} abrir={(imagenId) => go({ kind: 'imagenes', imagenId })} />}
         {view.kind === 'estilos' && <CatalogoEstilos cards={cards} puedeCrear={!!creador} abrir={abrirChatDeEstilo} />}
-        {view.kind === 'modelos3d' && <Modelos3D />} {/* modelos 3D */}
+        {view.kind === 'modelos3d' && <Modelos3D modelosIA={models} modeloId={view.modeloId} chats={chats3D} />} {/* modelos 3D */}
         </Suspense>
+        </ErrorApartado>
         {view.kind === 'youtube' && <RevisionYoutube key={`${view.cardId ?? ''}:${view.ruta ?? ''}`} cardId={view.cardId} ruta={view.ruta} cerrar={() => { location.hash = view.volver }} />}
-        {view.kind === 'comunidad' && <Comunidad />}
+        {view.kind === 'comunidad' && (view.perfil ? <MiPerfil /> : <Comunidad />)}
         {esCreador && view.kind === 'admin' && (
           <Admin activa pestana={view.pestana} onPestana={irAPestanaAdmin} />
         )}
@@ -860,11 +896,11 @@ export function App() {
           />
         )}
       </main>
-      {/* En el celular, con la barra desplegada encima: tocar fuera la pliega (Barra.css). */}
-      {!plegada && <div className="barra-velo" aria-hidden onClick={() => plegar(true)} />}
       <Novedades />
       <GanasteRifa />
-      {avisosEstilos && <EstiloCambio cards={cards} activa={newCard?.id} onDesactivar={() => setAvisosEstilos(false)} />}
+      {avisosEstilos && <EstiloCambio cards={cards} activa={newCard?.id}
+        pausado={view.kind === 'modelos3d' || (view.kind === 'session' && !!sessions.find((s) => s.id === view.id)?.modelo3d)}
+        onDesactivar={() => setAvisosEstilos(false)} />}
     </div>
   )
 }
@@ -953,9 +989,8 @@ function NewSession(props: {
   onCreated(id: string): void
 }) {
   const { card, models } = props
-  // El nombre y la descripción del estilo elegido entran al cambiarlo, en los temas con movimiento.
-  const cabecera = useRef<HTMLDivElement>(null)
-  useEntradaEstilo(cabecera, card.id)
+  const cabeceraEstilo = useRef<HTMLDivElement>(null)
+  useEntradaEstilo(cabeceraEstilo, card.id)
   // El modelo: «Optimizado» usa lo medido para esta card (el hilo y cada subagente) o, sin medir, lo último que elegiste
   // a mano; «Avanzado», lo que elegiste para ella.
   const [avanzados, setAvanzados] = useStored<Record<string, Avanzado>>('modelos', {})
@@ -1066,14 +1101,19 @@ function NewSession(props: {
         onDraft={props.onDraft}
         bloqueo={sinCuenta ? 'Primero conecta tu cuenta (arriba)' : undefined}
         placeholder={card.id === NUEVO_ESTILO ? 'Describe el estilo de video que quieres crear o adjunta referencias…'
-          : card.skill ? `Qué quieres de ${card.title}… o escribe / para cambiar de estilo` : 'Qué cambio quieres en Sloth…'}
+          : card.skill ? `Qué quieres de ${card.title}… o escribe / para cambiar de estilo` : 'Qué cambio quieres en VyMotion…'}
         estilos={opcionesBarra}
         onEstilo={(id) => {
           const c = props.cards.find((x) => x.id === id)
           if (c) props.onPick(c)
         }}
-        afinar={card.skill ? { para: card.title, pedir: (texto, c) => api<Afinado>('/api/afinar', { card: card.id, texto, model: c.model, marca: laMarca || undefined }) } : undefined}
         modelos={<Modelos conf={card.modelos} models={models} avanzado={avanzado} choice={choice} tareas={tareas} sinClaude={sinClaude} onAvanzado={cambiarModelos} />}
+        afinar={esDeEstudio(card) ? [
+          `Estilo de video: ${card.title}. ${card.description ?? ''}`,
+          `Formato: ${formato}.`,
+          laSerie && `Serie: ${laSerie.nombre}.`,
+          laMarca && `Marca: ${laMarca}.`
+        ].filter(Boolean).join('\n').slice(0, 1800) : undefined}
         extra={
           <>
             {series.length > 0 && (
@@ -1104,16 +1144,19 @@ function NewSession(props: {
               />
             )}
             {conFormato && (
-              <Segmento
-                dispositivo
-                label="Formato"
-                valor={formato}
-                opciones={[
-                  { id: 'vertical', texto: 'Vertical', title: formatoEscrito ? 'Lo trae la idea' : '1080x1920, para TikTok', disabled: !!formatoEscrito },
-                  { id: 'horizontal', texto: 'Horizontal', title: formatoEscrito ? 'Lo trae la idea' : '1920x1080, para YouTube', disabled: !!formatoEscrito }
-                ]}
-                onCambio={(f) => setFormatos({ ...formatos, [card.id]: f })}
-              />
+              <div className="formato-con-ayuda">
+                <Segmento
+                  dispositivo
+                  label="Formato"
+                  valor={formato}
+                  opciones={[
+                    { id: 'vertical', texto: 'Vertical', title: formatoEscrito ? 'Lo trae la idea' : '1080x1920, para TikTok', disabled: !!formatoEscrito },
+                    { id: 'horizontal', texto: 'Horizontal', title: formatoEscrito ? 'Lo trae la idea' : '1920x1080, para YouTube', disabled: !!formatoEscrito }
+                  ]}
+                  onCambio={(f) => setFormatos({ ...formatos, [card.id]: f })}
+                />
+                <AyudaCrearVideo clips={!!card.clips} />
+              </div>
             )}
             {conFormato && (
               <SelectorVoz
@@ -1174,7 +1217,7 @@ function NewSession(props: {
   )
 
   return (
-    <div className={`new-session fondo-ramas${enEstilo && card.etapas ? ' viendo-estilo' : ''}`} {...soltar.props}>
+    <div className={`new-session fondo-ramas${conFormato ? ' new-session-video' : ''}${enEstilo && conFormato ? ' viendo-estilo' : ''}`} {...soltar.props}>
       <CampoAscii variante="ramas" />
       {soltar.aviso}
       {/* Arriba las skills (o, con un estilo elegido, sus videos), que hacen scroll solas; abajo la skill elegida y el
@@ -1225,7 +1268,7 @@ function NewSession(props: {
       </div>
       <div className="new-bottom">
         {/* En una línea el icono, el nombre y la versión: le deja el alto a los carteles. */}
-        <div ref={cabecera} className="new-head superficie-ascii">
+        <div ref={cabeceraEstilo} className="new-head superficie-ascii">
           <CampoAscii variante="orbita" />
           <div className="new-head-fila">
           <h1>
@@ -1283,6 +1326,12 @@ function NewSession(props: {
   )
 }
 
+function distanciaCircular(distancia: number, total: number) {
+  if (!total) return 0
+  const positiva = (distancia % total + total) % total
+  return positiva > total / 2 ? positiva - total : positiva
+}
+
 type AccionesCartel = { elegir(c: Card): void; duplicar(c: Card): void; borrar(c: Card): void; compartir(c: Card): void }
 
 /**
@@ -1306,9 +1355,46 @@ const Carteles = memo(function Carteles({ cards, activa, sessions, acciones }: {
     return () => { vivo = false }
   }, [mirando, previas])
   const indice = Math.max(0, cards.findIndex((c) => c.id === activa))
+  const anterior = useRef(indice)
+  const indiceAnterior = anterior.current
+  const paso = distanciaCircular(indice - indiceAnterior, cards.length)
+  useLayoutEffect(() => { anterior.current = indice }, [indice])
+  useLayoutEffect(() => {
+    clearTimeout(espera.current)
+    setMirando('')
+  }, [activa])
   const desplazar = (direccion: number) => {
     if (cards.length > 1) acciones.elegir(cards[(indice + direccion + cards.length) % cards.length])
   }
+  const estante = useRef<HTMLDivElement>(null)
+  const alDesplazar = useRef(desplazar)
+  alDesplazar.current = desplazar
+  useEffect(() => {
+    const zona = estante.current
+    if (!zona || cards.length < 2) return
+    let acumulado = 0
+    let ultimaRueda = -Infinity
+    let ultimoCambio = -Infinity
+
+    function rueda(e: WheelEvent) {
+      if (e.ctrlKey || e.metaKey || !e.cancelable) return
+      const delta = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY
+      if (!delta) return
+      e.preventDefault()
+      const ahora = performance.now()
+      if (ahora - ultimaRueda > 160 || Math.sign(delta) !== Math.sign(acumulado)) acumulado = 0
+      ultimaRueda = ahora
+      const unidad = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? 80 : 1
+      acumulado += delta * unidad
+      if (Math.abs(acumulado) < 48 || ahora - ultimoCambio < 210) return
+      alDesplazar.current(Math.sign(acumulado))
+      acumulado = 0
+      ultimoCambio = ahora
+    }
+
+    zona.addEventListener('wheel', rueda, { passive: false })
+    return () => zona.removeEventListener('wheel', rueda)
+  }, [cards.length])
   return (
     <div className="estilos-carrusel" role="region" aria-label="Carrusel de estilos" aria-roledescription="carrusel">
       <div className="estilos-carrusel-controles">
@@ -1316,7 +1402,7 @@ const Carteles = memo(function Carteles({ cards, activa, sessions, acciones }: {
         <button className="boton" aria-label="Estilo anterior" disabled={cards.length < 2} onClick={() => desplazar(-1)}><Icono de="izquierda" /></button>
         <button className="boton" aria-label="Estilo siguiente" disabled={cards.length < 2} onClick={() => desplazar(1)}><span className="carrusel-siguiente"><Icono de="izquierda" /></span></button>
       </div>
-    <div className="cards cards-carrusel"
+    <div className="cards cards-carrusel" ref={estante}
       onKeyDown={(e) => {
         if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
           e.preventDefault()
@@ -1348,17 +1434,20 @@ const Carteles = memo(function Carteles({ cards, activa, sessions, acciones }: {
       }}
     >
       {cards.map((c, i) => {
-        let distancia = (i - indice + cards.length) % cards.length
-        if (distancia > cards.length / 2) distancia -= cards.length
+        const distancia = distanciaCircular(i - indice, cards.length)
         const profundidad = Math.abs(distancia)
+        const lado = Math.sign(distancia)
+        const salto = distancia !== distanciaCircular(i - indiceAnterior, cards.length) - paso
         const muestra = c.cambio?.comparacion?.ahora
         const previa = previas[c.id] ?? (muestra?.video && muestra.portada ? { video: muestra.video, cuadro: muestra.portada } : undefined)
         return (
         <button
           key={c.id}
           className={`card ${c.id === activa ? 'active' : ''}`}
+          data-salto={salto || undefined}
+          data-visible={profundidad <= 2 || undefined}
           style={{
-            transform: `translateX(calc(-50% + ${distancia} * var(--paso-carrusel))) translateY(${Math.min(profundidad, 3) * 13}px) translateZ(${-Math.min(profundidad, 3) * 90}px) rotateY(${-Math.sign(distancia) * 23}deg) scale(${1 - Math.min(profundidad, 3) * .09})`,
+            transform: `translateX(calc(-50% + ${lado * Math.min(profundidad, 3)} * var(--paso-carrusel))) translateY(${Math.min(profundidad, 3) * 13}px) translateZ(${-Math.min(profundidad, 3) * 90}px) rotateY(${-Math.sign(distancia) * 23}deg) scale(${1 - Math.min(profundidad, 3) * .09})`,
             zIndex: cards.length - profundidad,
             opacity: profundidad > 2 ? 0 : 1 - profundidad * .22,
             visibility: profundidad > 2 ? 'hidden' : 'visible',
@@ -1375,21 +1464,22 @@ const Carteles = memo(function Carteles({ cards, activa, sessions, acciones }: {
           }}
           onPointerLeave={dejar}
         >
-          {profundidad <= 2 && (previa ? (
-            mirando === c.id
-              ? <video className="card-previa" src={previa.video} poster={previa.cuadro} muted loop playsInline autoPlay />
-              : <img className="card-previa" src={previa.cuadro} alt="" decoding="async" />
-          ) : (
+          {previa ? (
             <>
-              <CampoAscii variante={c.icon === 'cubo' || c.icon === 'claqueta' ? 'malla' : c.icon === 'globo' || c.icon === 'risa' ? 'orbita' : 'onda'} />
-              <span className="card-fondo">
-                <span className="card-icon"><Icon icon={c.icon ?? '✦'} /></span>
-                <span className="card-desc">{c.description}</span>
-              </span>
+              <img className="card-previa" src={previa.cuadro} alt="" loading={profundidad <= 2 ? 'eager' : 'lazy'} decoding="async" />
+              {mirando === c.id && profundidad <= 2 && (
+                <video className="card-previa card-previa-video" src={previa.video}
+                  muted loop playsInline autoPlay onPlaying={(e) => { e.currentTarget.dataset.reproduciendo = '' }} />
+              )}
             </>
-          ))}
+          ) : (
+            <span className="card-fondo">
+              <span className="card-icon"><Icon icon={c.icon ?? '✦'} /></span>
+              <span className="card-desc">{c.description}</span>
+            </span>
+          )}
           {c.version && <span className="card-version" title={`Versión ${c.version} de este estilo`}>v{c.version}</span>}
-          {/* En la app que se vende, las cards de Sloth ni se duplican ni se borran; las de tus estilos se borran. */}
+          {/* En la app que se vende, las cards de VyMotion ni se duplican ni se borran; las de tus estilos se borran. */}
           {c.id !== NUEVO_ESTILO && (!VENTA || c.tuya) && (
             <span className="card-actions">
               {!VENTA && (
@@ -1413,10 +1503,7 @@ const Carteles = memo(function Carteles({ cards, activa, sessions, acciones }: {
             </span>
           )}
           <span className="card-pie">
-            <span className="card-title">
-              {c.bloqueada && <Icono de="candadoCerrado" className="icon-trazo card-candado" />}
-              {c.title}
-            </span>
+            <span className="card-title">{c.title}</span>
             <Uso hilos={sessions.filter((s) => s.cardId === c.id && !s.archived)} />
           </span>
         </button>
@@ -1499,9 +1586,11 @@ const SessionView = memo(function SessionView({ id, session, card, models }: { i
   const totals = useResumen(id)
   // Un video del lote que espera su turno arranca con su propio mensaje: un clic no le manda otro.
   const pendiente = !!session?.pendiente
-  // El chat de una imagen del estudio solo se lee: se edita desde su editor.
-  const deImagen = !!session?.imagenEstudio
-  const onResponder = useMemo(() => (pendiente || deImagen ? undefined : (text: string, images?: string[]) => api(`/api/sessions/${id}/send`, { text, images })), [id, pendiente, deImagen])
+  const historialImagen = !!session?.imagenEstudio
+  // Los hilos de Modelos 3D tienen su propio editor. El navegador embebido añade una segunda interfaz y sus avisos de venta,
+  // así que el trabajo se sigue desde el chat y el botón «Editor 3D» del encabezado.
+  const esModelo3d = card?.id === MODELO3D_CARD.id || !!session?.modelo3d
+  const onResponder = useMemo(() => (pendiente || historialImagen ? undefined : (text: string, images?: string[]) => api(`/api/sessions/${id}/send`, { text, images })), [id, pendiente, historialImagen])
   // Con quién puede seguir el hilo si su agente llega al límite: el primer modelo de cada otro agente conectado.
   const actual = proveedorDe(session?.model ?? '')
   const relevos = useMemo(() => PROVEEDORES.filter((p) => p !== actual).flatMap((p) => (p === 'opencode' ? conOpenCode(models) : conPrimero(models, p))?.principal ?? []), [models, actual])
@@ -1511,7 +1600,7 @@ const SessionView = memo(function SessionView({ id, session, card, models }: { i
   const trabaja = session.running || !!session.background?.length
   const head = (extra?: ReactNode) => (
     <header className="session-head">
-      <span className="session-icon"><Icon icon={deImagen ? 'imagen' : (card?.icon ?? '•')} /></span>
+      <span className="session-icon"><Icon icon={historialImagen ? 'imagen' : card?.icon ?? '•'} /></span>
       <NombreDelHilo key={session.id} session={session} />
       <span className="spacer" />
       {totals.ms > 0 && <span className="muted small">{duration(totals.ms)}</span>}
@@ -1532,7 +1621,8 @@ const SessionView = memo(function SessionView({ id, session, card, models }: { i
         <MarcaAgente de={proveedorDe(session.model)} />
       </button>
       {extra}
-      {!deImagen && <BotonNavegador hilo={session.id} trabajando={trabaja} />}
+      {session.modelo3d && <a className="boton small" href={rutaEditor3D(session.modelo3d.editando ?? session.modelo3d.resultado)}>Editor 3D</a>}
+      {!historialImagen && !esModelo3d && <BotonNavegador hilo={session.id} trabajando={trabaja} />}
     </header>
   )
   const chat = () => (
@@ -1542,6 +1632,7 @@ const SessionView = memo(function SessionView({ id, session, card, models }: { i
         running={session.running}
         background={session.background ?? SIN_TAREAS}
         sessionId={session.id}
+        desdeEvento={session.desdeImagen}
         proveedor={proveedorDe(session.model)}
         subagente={subagente}
         onSubagente={onSubagente}
@@ -1549,12 +1640,7 @@ const SessionView = memo(function SessionView({ id, session, card, models }: { i
         relevos={relevos}
       />
       {/* Oculto y no quitado: guarda lo que escribías, y una cita del subagente le llega. */}
-      <div className="session-composer" hidden={!!subagente}>
-        {deImagen && session.imagenEstudio && (
-          <p className="muted small historial-imagen-aviso">
-            Este chat es de una imagen: <a href={rutaEditorImagen(session.imagenEstudio)}>ábrela en el editor</a> para pedirle otro cambio.
-          </p>
-        )}
+      {!historialImagen && <div className="session-composer" hidden={!!subagente}>
         {session.pendiente && (
           <div className="queue">
             <div className="queued">
@@ -1575,8 +1661,7 @@ const SessionView = memo(function SessionView({ id, session, card, models }: { i
         )}
         {/* Lo elegido en el video (un elemento, una escena, un tramo): el mensaje lo lleva delante. */}
         {esDeEstudio(card) && <ReferenciaVideo sessionId={session.id} />}
-        {/* El hilo de un estilo de la comunidad que se cerró se sigue viendo, pero no sigue trabajando. */}
-        {deImagen ? null : card?.bloqueada ? <SinApoyo titulo={card.title} /> : <Composer
+        <Composer
           key={`composer:${session.id}`}
           models={models}
           initial={{ model: session.model, effort: session.effort }}
@@ -1588,13 +1673,14 @@ const SessionView = memo(function SessionView({ id, session, card, models }: { i
           gasto={totals}
           onCompactar={() => api(`/api/sessions/${session.id}/compactar`, {})}
           placeholder="Responde, pide un cambio, pega una imagen o suelta un archivo…"
+          afinar={esDeEstudio(card) ? `Petición de cambio en un video en curso. Estilo: ${card?.title}.` : undefined}
           draft={leerRespuesta(session.id)}
           onDraft={(d) => guardarRespuesta(session.id, d)}
           onChoice={(c) => api(`/api/sessions/${session.id}/model`, c).then(() => elegidoAMano(c))}
           onStop={() => api(`/api/sessions/${session.id}/stop`, {})}
           onSend={(text, _choice, images) => api(`/api/sessions/${session.id}/send`, { text: conReferencia(session.id, text), images })}
-        />}
-      </div>
+        />
+      </div>}
     </>
   )
   // Un estilo de video se ve en el estudio, siempre con el mismo marco.
@@ -1602,7 +1688,7 @@ const SessionView = memo(function SessionView({ id, session, card, models }: { i
   // Lo que deja un hilo de Ideas se ve en la sección, en la carpeta de su canal (su `cwd`).
   const canal = card?.id === IDEAS_CARD.id || card?.id === CANAL_CARD.id ? session.cwd.split(/[\\/]/).filter(Boolean).pop() : undefined // ideas
   return (
-    <div className={deImagen ? 'session historial-imagen' : 'session'}>
+    <div className={historialImagen ? 'session historial-imagen' : 'session'}>
       {head(
         canal && (
           <button className="ghost small" onClick={() => go({ kind: 'redes', apartado: 'ideas', canalId: canal })}>
@@ -1613,7 +1699,7 @@ const SessionView = memo(function SessionView({ id, session, card, models }: { i
       {/* El chat no cambia de sitio al abrir el navegador: no se vuelve a montar. */}
       <div className="session-cuerpo">
         <div className="session-chat">{chat()}</div>
-        {navegador && !deImagen && <PanelNavegador hilo={session.id} trabajando={trabaja} />}
+        {navegador && !historialImagen && !esModelo3d && <PanelNavegador hilo={session.id} trabajando={trabaja} />}
       </div>
     </div>
   )
@@ -1653,18 +1739,7 @@ function SessionMenu({ session, x, y, app, onClose, onSelect, onDeleted, onRenam
   // Eliminar pregunta con el mismo modal que eliminar varios; el menú se va mientras tanto.
   if (borrar)
     return (
-      <Confirm
-        title={`¿Eliminar «${session.title}»?`}
-        action="Eliminar"
-        danger
-        onClose={onClose}
-        onConfirm={async () => {
-          await api(`/api/sessions/${session.id}/delete`, {})
-          onDeleted(session.id)
-        }}
-      >
-        Se borra su historial y no se puede deshacer.
-      </Confirm>
+      <BorrarChats hilos={[session]} ocupados={0} onClose={onClose} onDeleted={(ids) => ids.forEach(onDeleted)} />
     )
 
   return (
@@ -1753,21 +1828,65 @@ function SelectBar({ picked, y, app, onClose, onDeleted }: { picked: SessionMeta
         </button>
       </div>
       {asking && (
-        <Confirm
-          title={free.length === 1 ? `¿Eliminar «${free[0].title}»?` : `¿Eliminar ${free.length} hilos?`}
-          action="Eliminar"
-          danger
-          onClose={() => setAsking(false)}
-          onConfirm={async () => {
-            await Promise.all(free.map((s) => api(`/api/sessions/${s.id}/delete`, {})))
-            onDeleted(free.map((s) => s.id))
-            onClose()
-          }}
-        >
-          Se borra su historial y no se puede deshacer.{busy > 0 && ` ${busy === 1 ? 'Uno sigue trabajando y se queda' : `${busy} siguen trabajando y se quedan`}.`}
-        </Confirm>
+        <BorrarChats hilos={free} ocupados={busy} onClose={() => setAsking(false)} onDeleted={onDeleted} />
       )}
     </div>
+  )
+}
+
+/** La misma confirmación para un chat y para la selección de la barra lateral. */
+function BorrarChats({ hilos, ocupados, onClose, onDeleted }: { hilos: SessionMeta[]; ocupados: number; onClose(): void; onDeleted(ids: string[]): void }) {
+  const clave = hilos.map((hilo) => hilo.imagenEstudio || hilo.carpeta || hilo.lote || hilo.carpetasGeneradas?.length ? hilo.id : '').join(',')
+  const [plan, setPlan] = useState<{ clave: string; tipos: ('video' | 'imagen' | null)[]; error?: string }>()
+  useEffect(() => {
+    let vigente = true
+    if (clave) Promise.all(clave.split(',').map((id) => id ? api<{ tipo: 'video' | 'imagen' | null }>(`/api/sessions/${id}/borrado`) : { tipo: null }))
+      .then((resultados) => {
+        if (vigente) setPlan({ clave, tipos: resultados.map((r) => r.tipo) })
+      }, (error: Error) => {
+        if (vigente) setPlan({ clave, tipos: [], error: error.message })
+      })
+    return () => { vigente = false }
+  }, [clave])
+
+  const actual = plan?.clave === clave ? plan : undefined
+  const videos = !!actual?.tipos.includes('video')
+  const imagenes = !!actual?.tipos.includes('imagen')
+  const archivos = videos && imagenes ? 'videos e imágenes' : videos ? 'videos' : 'imágenes'
+  const varios = hilos.length > 1
+  async function borrar(conArchivos: boolean) {
+    const ids: string[] = []
+    const errores: string[] = []
+    for (const [i, hilo] of hilos.entries()) {
+      const accion = conArchivos && actual?.tipos[i] ? 'borrado' : 'delete'
+      try {
+        const { aviso } = await api<{ aviso?: string }>(`/api/sessions/${hilo.id}/${accion}`, {})
+        ids.push(hilo.id)
+        if (aviso) errores.push(aviso)
+      } catch (error) {
+        errores.push(error instanceof Error ? error.message : String(error))
+      }
+    }
+    if (ids.length) onDeleted(ids)
+    if (errores.length) throw new Error([...new Set(errores)].join(' '))
+  }
+
+  return (
+    <Confirm
+      title={varios ? `¿Eliminar ${hilos.length} chats?` : hilos[0] ? `¿Eliminar «${hilos[0].title}»?` : 'Eliminar chats'}
+      action={varios ? 'Eliminar solo los chats' : 'Eliminar solo el chat'}
+      danger
+      enfocarCancelar
+      onClose={onClose}
+      onConfirm={() => borrar(false)}
+      otraAccion={videos || imagenes ? { etiqueta: `Eliminar también ${archivos}`, ejecutar: () => borrar(true) } : undefined}
+    >
+      El historial se elimina de forma permanente.
+      {clave && !actual && <p>Buscando archivos vinculados…</p>}
+      {actual?.error && <p className="bad">{actual.error}</p>}
+      {(videos || imagenes) && <p>También puedes eliminar {archivos === 'imágenes' ? 'las' : 'los'} {archivos} vinculados y sus archivos de trabajo. Se conservan los proyectos compartidos con otros chats.</p>}
+      {ocupados > 0 && <p>{ocupados === 1 ? 'Un chat sigue trabajando y se conserva.' : `${ocupados} chats siguen trabajando y se conservan.`}</p>}
+    </Confirm>
   )
 }
 
@@ -1843,7 +1962,6 @@ function Pie({ running, connected, enOpciones, fallo, plegada }: { running: bool
   return (
     <div className="pie">
       <AvisoRedes connected={connected} /> {/* redes */}
-      <AvisoPiloto connected={connected} /> {/* piloto */}
       <button className={enOpciones ? 'on' : ''} aria-current={enOpciones ? 'page' : undefined} title={plegada ? 'Opciones' : undefined} onClick={() => go({ kind: 'opciones' })}>
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
           <path d="M4 7h9M17 7h3M4 17h3M11 17h9" />

@@ -24,7 +24,7 @@ dibujos: profundidad de campo, desenfoque de movimiento y sombras suaves de verd
 
 ## Formato
 
-Sloth manda `Formato: vertical` o `Formato: horizontal` y va en `momentos.json` como `"formato"` (sin él, vertical).
+VyMotion manda `Formato: vertical` o `Formato: horizontal` y va en `momentos.json` como `"formato"` (sin él, vertical).
 En **vertical** (1080×1920) la cámara, el lente y el acabado son los mismos que en horizontal (se aleja para que quepa), la bandera de un lugar
 con cosas va encima de ellas, y lo de abajo (donde la red pone el texto) queda libre; la portada es su primer cuadro.
 Con **`Formato: horizontal`** (1920×1080, para YouTube) los encuadres son los de la referencia y la portada es la

@@ -6,7 +6,7 @@ import { dirname, join, relative } from 'node:path'
 import type { CambioSkill } from '../shared/types.ts'
 
 /**
- * Las skills tal como las trae esta versión de Sloth y lo que el usuario les cambió: lo que su agente editó cuando le
+ * Las skills tal como las trae esta versión de VyMotion y lo que el usuario les cambió: lo que su agente editó cuando le
  * pidió «guarda este cambio». La app que se vende las trae en `resources/skills` (Electron se lo dice al servidor en
  * `SLOTH_SKILLS_ORIGINALES`). La card enseña «Con tus cambios» y vuelve a la original. Antes de pisar algo cambiado, se
  * guarda una copia en `data/skills-tuyas/<fecha> <motivo>/`, al volver a la original y al estrenar una versión

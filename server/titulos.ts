@@ -1,11 +1,4 @@
-/**
- * El nombre de un hilo nuevo. Al crearlo, su primer mensaje sin lo que añade la app (las líneas `Formato:`, `Voz:`,
- * `Carpeta:`…), sin rutas de archivos adjuntos ni enlaces, y recortado en una palabra entera (`tituloInicial`). Luego, uno
- * corto: el de Claude lo pone Haiku aparte (`tituloCorto` en `claude.ts`); los demás agentes lo escriben en su mismo
- * primer turno en `.sloth-titulo-<id>.txt` (`Sessions`), que `tituloGenerado` revisa. Renombrarlo a mano gana siempre.
- */
-
-/** El pedido sin lo que añade la app ni rutas ni enlaces, en una línea. */
+/** Título provisional limpio; el agente lo afina en el mismo turno del trabajo. */
 export function pedidoParaTitulo(texto: string): string {
   return texto
     .replace(/^(?:Formato|Voz|Imágenes|Imagenes|Carpeta|Subagentes|Marca):.*$/gmi, '')

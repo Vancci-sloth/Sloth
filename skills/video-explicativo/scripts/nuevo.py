@@ -1,6 +1,6 @@
 """
-Crea el proyecto de un video en la carpeta `<nombre>`, tal cual (la de la línea `Carpeta:` de Sloth, o
-`explicado-<tema>` fuera de Sloth): copia la plantilla de Remotion, la marca (el personaje con sus poses en
+Crea el proyecto de un video en la carpeta `<nombre>`, tal cual (la de la línea `Carpeta:` de VyMotion, o
+`explicado-<tema>` fuera de VyMotion): copia la plantilla de Remotion, la marca (el personaje con sus poses en
 public/perro, la foto y la red del cierre: `marca.py aplicar`), enlaza node_modules al que comparten todos los videos
 explicativos (espacio.py de video-base: antes cada uno copiaba el suyo, ~1 GB) y,
 de skills/modelos-3d/plantilla, el ícono 3D (`Icono3D`, con `comun.tsx`): el protagonista lo elige cada video. Al final empaqueta
@@ -9,7 +9,7 @@ así el render de hacer.py no los paga. Al terminar deja `.listo`, que hacer.py 
 
     python -B nuevo.py <nombre> [--formato vertical|horizontal] [--marca <nombre>] [--musica] [--imagenes <con>] [--adjunta <imagen>]…
 
-Va en el directorio actual (Sloth lanza la card en `trabajo/video-explicativo`, y su panel de etapas busca ahí la
+Va en el directorio actual (VyMotion lanza la card en `trabajo/video-explicativo`, y su panel de etapas busca ahí la
 carpeta del video); dentro de un proyecto, junto a él. Deja también una voz muda, para que la plantilla se vea en Remotion Studio antes de que llegue la del
 usuario.
 

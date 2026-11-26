@@ -1,8 +1,9 @@
 import type { CuentaClaude, Model } from '../shared/types.ts'
-import { entornoClaudeCon, llaveDe, llaveGuardada } from './acceso.ts'
+import { llaveDe } from './acceso.ts'
+import { llaveDelPerfil, perfilActivo, variablesPerfilClaude } from './perfiles-agentes.ts'
 
 /**
- * DeepSeek con el mismo Claude Code de Sloth: DeepSeek tiene una API compatible con la de Anthropic
+ * DeepSeek con el mismo Claude Code de VyMotion: DeepSeek tiene una API compatible con la de Anthropic
  * (`https://api.deepseek.com/anthropic`), y Claude Code trabaja con ella si se le cambia la dirección y la llave. Así un
  * hilo de DeepSeek tiene todo lo de uno de Claude (las skills con `/`, los subagentes, el navegador, la voz) sin otro
  * programa que bajar. Es lo que DeepSeek recomienda en su guía de Claude Code.
@@ -20,12 +21,26 @@ export const modeloDeepSeek = (model: string) => model.replace(/^deepseek:/, '')
 /**
  * Lo que necesita Claude Code para hablar con DeepSeek. Los alias que piden las skills y sus subagentes (`opus`, `sonnet`)
  * van al modelo del hilo, y `haiku` (los títulos, lo rápido) a Flash. `[1m]` le dice a Claude Code que la ventana es de un
- * millón, como la de los dos modelos de DeepSeek: si no, compactaría a los 200 000.
+ * millón, como la de los dos modelos de DeepSeek: si no, compactaría a los 200 000. Sin la llave de Anthropic ni el token
+ * de la cuenta de Claude, que irían a DeepSeek.
  */
-export function entornoDeepSeek(model: string, effort?: string): Record<string, string> {
-  const llave = llaveGuardada('deepseek')
+export function entornoDeepSeek(model: string, effort?: string, dir: string | null | undefined = perfilActivo('deepseek')): Record<string, string> {
+  const llave = llaveDelPerfil('deepseek', dir)
   if (!llave) throw new Error(SIN_LLAVE)
-  return entornoClaudeCon({ direccion: `${API}/anthropic`, llave, modelo: `${modeloDeepSeek(model)}[1m]`, rapido: 'deepseek-flash', ventana: 786_432, effort })
+  const { ANTHROPIC_API_KEY: _, CLAUDE_CODE_OAUTH_TOKEN: __, ...env } = process.env as Record<string, string>
+  const elegido = `${modeloDeepSeek(model)}[1m]`
+  return {
+    ...env,
+    ...(dir ? variablesPerfilClaude(dir) : {}),
+    ANTHROPIC_BASE_URL: `${API}/anthropic`,
+    ANTHROPIC_AUTH_TOKEN: llave,
+    ANTHROPIC_MODEL: elegido,
+    ANTHROPIC_DEFAULT_OPUS_MODEL: elegido,
+    ANTHROPIC_DEFAULT_SONNET_MODEL: elegido,
+    ANTHROPIC_DEFAULT_HAIKU_MODEL: 'deepseek-flash',
+    CLAUDE_CODE_AUTO_COMPACT_WINDOW: '786432',
+    ...(effort ? { CLAUDE_CODE_EFFORT_LEVEL: effort } : {})
+  }
 }
 
 export const SIN_LLAVE = 'Pega tu llave de API de DeepSeek en Opciones.'
@@ -47,7 +62,7 @@ export function tarifaDeepSeek(cuando = new Date()) {
 }
 
 /**
- * Lo que cuesta en hora valle lo que Claude Code cuenta por modelo (`modelUsage`, con el `[1m]` que le pone Sloth). La
+ * Lo que cuesta en hora valle lo que Claude Code cuenta por modelo (`modelUsage`, con el `[1m]` que le pone VyMotion). La
  * escritura en caché DeepSeek la cobra como entrada sin caché. Un modelo sin precio conocido no suma.
  */
 export function dolaresDeepSeek(modelos: Record<string, { inputTokens: number; outputTokens: number; cacheReadInputTokens: number; cacheCreationInputTokens: number }>): number {
@@ -68,7 +83,7 @@ interface ModeloDeepSeek {
 
 /** Los modelos de la cuenta, como los da DeepSeek (`GET /models`), con sus esfuerzos. Vacío sin llave. */
 export async function deepseekModels(): Promise<Model[]> {
-  const llave = llaveGuardada('deepseek')
+  const llave = llaveDelPerfil('deepseek')
   if (!llave) return []
   try {
     const res = await fetch(`${API}/models`, { headers: { authorization: `Bearer ${llave}` } })
@@ -87,10 +102,10 @@ export async function deepseekModels(): Promise<Model[]> {
 
 /** La cuenta es la llave: conectada si hay una, con el saldo que le queda. */
 export async function cuentaDeepSeek(): Promise<CuentaClaude> {
-  const llave = llaveGuardada('deepseek')
+  const llave = llaveDelPerfil('deepseek')
   if (!llave) return { conectada: false }
   const saldo = await saldoDeepSeek(llave).catch(() => undefined)
-  return { conectada: true, quien: `Llave de API …${llave.slice(-4)}${saldo ? ` · saldo ${saldo}` : ''}`, llave: llaveDe('deepseek'), uso: SALDO_DEEPSEEK }
+  return { conectada: true, quien: `Llave de API …${llave.slice(-4)}${saldo ? ` · saldo ${saldo}` : ''}`, llave: llaveDe('deepseek'), uso: SALDO_DEEPSEEK, perfilAdicional: !!perfilActivo('deepseek') }
 }
 
 /** «12.40 USD», o el de la primera moneda si hay varias. Sin saldo, DeepSeek responde 402 a cada mensaje. */

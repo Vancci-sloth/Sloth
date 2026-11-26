@@ -3,7 +3,7 @@ Une los clips de una frutinovela en el video final. Se corre desde la raíz del 
 
     python <skill>/scripts/unir.py <nombre> [--formato vertical|horizontal] [--sin-subtitulos] [--sin-recortar] [--hasta NN=s ...]
 
-Toma `clips/esc-*.mp4` en orden y transcribe cada uno con el Whisper de Sloth. Corta el final muerto de cada clip, el
+Toma `clips/esc-*.mp4` en orden y transcribe cada uno con el Whisper de VyMotion. Corta el final muerto de cada clip, el
 segundo o dos en que nadie habla ni se mueve, a 0,35 s de su última palabra, salvo `--sin-recortar`. `--hasta 03=7.6`
 acaba el clip `esc-03` en ese segundo: para lo que pasa tras la última palabra (los golpes en la puerta del cliffhanger). Los lleva al
 tamaño del formato (Veo da 720p) a 30 fps, une su audio y lo masteriza (`masterizar.mjs` de video-base, −14 LUFS y
@@ -139,7 +139,7 @@ def main() -> None:
     revision = PROYECTO / "revision"
     revision.mkdir(exist_ok=True)
     (PROYECTO / "out").mkdir(exist_ok=True)
-    from sloth import transcribir  # el Python de Sloth y Whisper, de video-base
+    from sloth import transcribir  # el Python de VyMotion y Whisper, de video-base
 
     # Clip por clip: de todo junto, Whisper puede dar un solo segmento largo y los subtítulos caerían donde no se habla.
     # Con lo que oye en cada uno se corta su final muerto (`corte`), salvo `--sin-recortar`.

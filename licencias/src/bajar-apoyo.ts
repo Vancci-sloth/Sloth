@@ -78,12 +78,11 @@ export async function bajarApoyo(req: Request, env: Env): Promise<Response> {
   const antes = String(c.antes ?? '')
   if (!/^\d{4}-\d{2}-\d{2}T/.test(antes) || Number.isNaN(Date.parse(antes))) throw new Rechazo(400, 'Falta `antes`: la fecha del cambio, en ISO.')
   const limite = Math.min(10, Math.max(1, Number(c.limite) || 3))
-  // Las rifas dan apoyos con un correo de Sloth: no son de nadie que haya pagado. Las que bajan cada mes (`piso`,
-  // `escalera.ts`) no pagaron de más: su primer mes cuesta eso.
+  // Las rifas dan apoyos con un correo de VyMotion: no son de nadie que haya pagado.
   const { results } = await env.DB.prepare(
     `SELECT * FROM licencias WHERE modo = 'produccion' AND plan IN ('mensual', 'unico') AND autorizada IS NOT NULL AND autorizada < ?
        AND estado IN ('authorized', 'paused', 'cancelled', 'pagado') AND julianday(pagado_hasta) > julianday('now')
-       AND extra_avisado IS NULL AND piso IS NULL AND email NOT LIKE '%@sloth.vancci.org' ORDER BY autorizada`
+       AND extra_avisado IS NULL AND email NOT LIKE '%@sloth.vancci.org' ORDER BY autorizada`
   )
     .bind(antes)
     .all<Fila>()
@@ -126,7 +125,7 @@ async function unaFila(env: Env, f: Fila, precio: number, cancelarPaypal: boolea
         .bind(dias, hasta, hasta, accion === 'paypal' || accion === 'mp' ? hasta : null, monto, f.id)
         .run()
       f = { ...f, extra_dias: dias, extra_hasta: hasta, pagado_hasta: hasta, monto }
-      // Cancelada por Sloth: su folio, como cuando la cancela quien apoya.
+      // Cancelada por VyMotion: su folio, como cuando la cancela quien apoya.
       if (accion === 'paypal-cancelada') {
         f = { ...f, estado: 'cancelled', folio: f.folio ?? `C-${letras(8)}`, cancelada: f.cancelada ?? new Date().toISOString() }
         await env.DB.prepare("UPDATE licencias SET estado = 'cancelled', folio = ?, cancelada = ? WHERE id = ?").bind(f.folio, f.cancelada, f.id).run()
@@ -143,18 +142,14 @@ async function unaFila(env: Env, f: Fila, precio: number, cancelarPaypal: boolea
 
 const PRODUCTO_STRIPE = 'sloth-apoyo-mensual'
 
-/**
- * Deja la suscripción cobrando `precio` desde su siguiente cobro, sin cobrar ni abonar la diferencia. `deStripe`: lo
- * demás que se le cambia a la de Stripe en la misma llamada. Pedirlo dos veces da lo mismo. También lo usa el apoyo que
- * baja cada mes (`escalera.ts`).
- */
-export async function cambiarMonto(env: Env, f: Pick<Fila, 'stripe' | 'paypal' | 'preapproval' | 'moneda'>, accion: Accion, precio: number, deStripe: Record<string, string> = {}) {
+/** Baja el cobro de la suscripción a `precio` y lo aplaza a `hasta`. Cada paso se puede repetir si el anterior falló a medias. */
+async function aplazarCobro(env: Env, f: Fila, accion: Accion, precio: number, hasta: string) {
   if (accion === 'stripe') {
     const s = await stripe<{ items: { data: { id: string }[] } }>(env, 'GET', `/v1/subscriptions/${encodeURIComponent(f.stripe!)}`)
     const item = s.items.data[0]
     // El producto que crea Checkout queda archivado y no acepta precios nuevos: va a uno propio, activo, que se crea una vez.
-    await stripe(env, 'POST', '/v1/products', { id: PRODUCTO_STRIPE, name: 'Sloth - apoyo mensual' }).catch((e) => {
-      if (!(e instanceof Rechazo) || e.status !== 400 || !/already exists/i.test(e.detalle ?? '')) throw e
+    await stripe(env, 'POST', '/v1/products', { id: PRODUCTO_STRIPE, name: 'VyMotion - apoyo mensual' }).catch((e) => {
+      if (!(e instanceof Rechazo) || e.status !== 400 || !/already exists/i.test(e.message)) throw e
     })
     await stripe(env, 'POST', `/v1/subscriptions/${encodeURIComponent(f.stripe!)}`, {
       'items[0][id]': item.id,
@@ -163,26 +158,18 @@ export async function cambiarMonto(env: Env, f: Pick<Fila, 'stripe' | 'paypal' |
       'items[0][price_data][unit_amount]': String(Math.round(precio * 100)),
       'items[0][price_data][recurring][interval]': 'month',
       'items[0][price_data][tax_behavior]': 'inclusive',
+      // Sin cobrar ni abonar la diferencia: lo pagado de más ya vale como estos días.
       proration_behavior: 'none',
-      ...deStripe
+      trial_end: String(Math.floor(Date.parse(hasta) / 1000))
     })
   } else if (accion === 'paypal') {
-    await paypal(env, 'PATCH', `/v1/billing/subscriptions/${encodeURIComponent(f.paypal!)}`, [
+    const ruta = `/v1/billing/subscriptions/${encodeURIComponent(f.paypal!)}`
+    await paypal(env, 'PATCH', ruta, [
       { op: 'replace', path: '/plan/billing_cycles/@sequence==1/pricing_scheme/fixed_price', value: { currency_code: f.moneda, value: precio.toFixed(2) } }
     ])
-  } else if (accion === 'mp') {
-    await mp(env, 'PUT', `/preapproval/${encodeURIComponent(f.preapproval!)}`, { auto_recurring: { transaction_amount: precio, currency_id: f.moneda } })
-  }
-}
-
-/** Baja el cobro de la suscripción a `precio` y lo aplaza a `hasta`. Cada paso se puede repetir si el anterior falló a medias. */
-async function aplazarCobro(env: Env, f: Fila, accion: Accion, precio: number, hasta: string) {
-  // Lo pagado de más ya vale como los días hasta `hasta`: la de Stripe no cobra antes (`trial_end`).
-  await cambiarMonto(env, f, accion, precio, { trial_end: String(Math.floor(Date.parse(hasta) / 1000)) })
-  if (accion === 'paypal') {
     // Ya suspendida (una vuelta anterior que no llegó a guardarse), PayPal contesta 422.
     if (f.estado === 'authorized')
-      await paypal(env, 'POST', `/v1/billing/subscriptions/${encodeURIComponent(f.paypal!)}/suspend`, { reason: 'El apoyo bajo a 10 USD: lo pagado de mas vale hasta que se reanude' }).catch((e) => {
+      await paypal(env, 'POST', `${ruta}/suspend`, { reason: 'El apoyo bajo a 10 USD: lo pagado de mas vale hasta que se reanude' }).catch((e) => {
         if (!(e instanceof Rechazo) || e.status !== 422) throw e
       })
   } else if (accion === 'paypal-cancelada') {
@@ -191,7 +178,9 @@ async function aplazarCobro(env: Env, f: Fila, accion: Accion, precio: number, h
       if (!(e instanceof Rechazo) || e.status !== 422 || (await refrescar(env, f)).estado !== 'cancelled') throw e
     })
   } else if (accion === 'mp') {
-    if (f.estado === 'authorized') await mp(env, 'PUT', `/preapproval/${encodeURIComponent(f.preapproval!)}`, { status: 'paused' })
+    const ruta = `/preapproval/${encodeURIComponent(f.preapproval!)}`
+    await mp(env, 'PUT', ruta, { auto_recurring: { transaction_amount: precio, currency_id: f.moneda } })
+    if (f.estado === 'authorized') await mp(env, 'PUT', ruta, { status: 'paused' })
   }
 }
 
@@ -201,7 +190,7 @@ function avisar(env: Env, f: Fila, accion: Accion, h: Hecho): Promise<boolean> {
   const quien = pasarela(f)
   const parrafos = [
     'Hola:',
-    `El apoyo de Sloth ahora es uno solo, de $10 USD al mes ($199 MXN con Mercado Pago). Tú pagaste ${h.monto}, más que eso, y lo que pagaste de más no se pierde: te da ${tiempo(h.dias)} más de apoyo.`
+    `El apoyo de VyMotion ahora es uno solo, de $10 USD al mes ($199 MXN con Mercado Pago). Tú pagaste ${h.monto}, más que eso, y lo que pagaste de más no se pierde: te da ${tiempo(h.dias)} más de apoyo.`
   ]
   const hasta = `Tu apoyo ahora vale hasta el ${fecha(h.hasta)} (antes, hasta el ${fecha(h.antes)}).${f.fundador ? ' Sigues siendo Fundador.' : ''}`
   if (accion === 'paypal-cancelada') {
@@ -215,7 +204,7 @@ function avisar(env: Env, f: Fila, accion: Accion, h: Hecho): Promise<boolean> {
     )
     if (accion !== 'stripe')
       parrafos.push(`Mientras tanto, en tu cuenta de ${quien} tu suscripción aparece en pausa: así no se te cobra antes. Se reanuda sola el ${fecha(h.hasta)}, no tienes que hacer nada.`)
-    parrafos.push(`Si no quieres seguir, cancélala antes en Sloth: Opciones, Apoyo, «Cancelar apoyo», o responde a este correo. Lo pagado vale hasta el ${fecha(h.hasta)}.`)
+    parrafos.push(`Si no quieres seguir, cancélala antes en VyMotion: Opciones, Apoyo, «Cancelar apoyo», o responde a este correo. Lo pagado vale hasta el ${fecha(h.hasta)}.`)
   } else {
     const porque = f.cripto && f.plan === 'mensual'
       ? `Con cripto no hay cobro automático: antes de que se acabe te avisamos para pagar el mes siguiente, ya de ${dinero(precio, f.moneda)}.`
@@ -224,8 +213,8 @@ function avisar(env: Env, f: Fila, accion: Accion, h: Hecho): Promise<boolean> {
         : `Tu suscripción ya está cancelada: no te cobramos nada. Si después quieres volver, el apoyo ya es de ${dinero(precio, f.moneda)} al mes, en sloth.vancci.org.`
     parrafos.push(`${hasta} ${porque}`)
   }
-  parrafos.push('Gracias por apoyar a Sloth. Si tienes dudas, responde a este correo.')
-  return correo(env, f.email, `Sloth baja a $10 al mes: tienes ${tiempo(h.dias)} más de apoyo`, parrafos, `bajar-apoyo-${f.id}`)
+  parrafos.push('Gracias por apoyar a VyMotion. Si tienes dudas, responde a este correo.')
+  return correo(env, f.email, `VyMotion baja a $10 al mes: tienes ${tiempo(h.dias)} más de apoyo`, parrafos, `bajar-apoyo-${f.id}`)
 }
 
 /**

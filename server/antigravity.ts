@@ -22,10 +22,8 @@ import { guardar } from './disco.ts'
  * Code. En una computadora lenta, o con el antivirus revisando cada archivo, pasa de los 3 min: se le esperan 10 (`DESEMPACAR`).
  *
  * Se conectan las cuentas que quieras (`cuentas.json`, y la sesión de cada una en `cuentas/<id>.json`): cada hilo
- * trabaja con la que esté en uso, y su proceso arranca con esa sesión copiada en `acp_token.json`. La cuota es la del
- * plan de Google de cada cuenta (la gratis, semanal; con Google AI Pro o Ultra, la de ese plan, sin conectar nada más):
- * Antigravity dice cuál es al iniciar sesión, y se guarda con la cuenta para enseñarlo en Opciones (`planDe`). Va por
- * grupo de modelos (`grupoDe`): cuando a una cuenta se le acaba, se anota hasta cuándo y el hilo sigue solo con la
+ * trabaja con la que esté en uso, y su proceso arranca con esa sesión copiada en `acp_token.json`. La cuota es semanal y
+ * por grupo de modelos (`grupoDe`): cuando a una cuenta se le acaba, se anota hasta cuándo y el hilo sigue solo con la
  * siguiente que tenga (`agotar`). Una cuenta nueva inicia sesión en su propia carpeta (`ENTRANDO`), para no tocar la
  * sesión de los procesos que ya trabajan.
  *
@@ -62,7 +60,7 @@ const ENLACE = /Open the following link to authenticate the ACP server:\s*(\S+)/
 /** Las llaves de Google del entorno mandarían sobre la cuenta: se quitan, como en T3 Code. */
 const FUERA = /^(GEMINI_API_KEY|GOOGLE_API_KEY|GOOGLE_APPLICATION_CREDENTIALS|GOOGLE_CLOUD_.*|GOOGLE_GENAI_USE_VERTEXAI|GCLOUD_PROJECT|CLOUDSDK_CORE_PROJECT|AGY_ACP_.*|GEMINI_HOME|ANTIGRAVITY_HARNESS_PATH|ELECTRON_RUN_AS_NODE)$/i
 
-/** Las carpetas temporales en uso. Al salir Sloth no llega el reloj que las borra (y el proceso ya se cerró: `server/acp.ts`). */
+/** Las carpetas temporales en uso. Al salir VyMotion no llega el reloj que las borra (y el proceso ya se cerró: `server/acp.ts`). */
 const temporales = new Set<string>()
 process.once('exit', () => {
   for (const t of temporales) {
@@ -146,26 +144,10 @@ export function errorAntigravity(texto: string): { error: string; relevo?: boole
   }
 }
 
-/** El plan de Google de una cuenta, con el nombre que le da Google («Antigravity Starter Quota» es el gratis, `free-tier`). */
-export interface PlanAgy {
-  id: string
-  nombre: string
-}
-
-/** El plan que dice la respuesta de `authenticate` (`_meta.antigravity.tier`). Otra versión podría no decirlo. */
-export function planDe(resultado: any): PlanAgy | undefined {
-  const t = resultado?._meta?.antigravity?.tier
-  return typeof t?.id === 'string' && t.id ? { id: t.id, nombre: typeof t.name === 'string' && t.name ? t.name : t.id } : undefined
-}
-
-/** Como se enseña: `gratis`, o el nombre que le da Google al plan de pago. */
-const planLlano = (p?: PlanAgy) => p && (p.id === 'free-tier' ? 'gratis' : p.nombre)
-
-/** Una cuenta conectada: su correo (si Google lo dio), su plan (si ya lo dijo) y hasta cuándo no le queda cuota de cada grupo. */
+/** Una cuenta conectada: su correo (si Google lo dio) y hasta cuándo no le queda cuota de cada grupo. */
 export interface CuentaAgy {
   id: string
   correo?: string
-  plan?: PlanAgy
   agotada?: Partial<Record<Grupo, number>>
 }
 export interface ListaAgy {
@@ -230,13 +212,13 @@ function agotar(texto: string, modelo: string, cuenta?: string): { error: string
   c.agotada = { ...c.agotada, [grupo]: Date.now() + (renuevaEn(texto) ?? 86_400_000) }
   const sigue = elegirCuenta(l, grupo)
   guardarLista(sigue ? { ...l, activa: sigue } : l)
-  if (sigue) return { error: `Se acabó la cuota de ${NOMBRE_GRUPO[grupo]} en ${nombre(l, cuenta)}. Sloth sigue con ${nombre(l, sigue)}.`, relevo: true }
+  if (sigue) return { error: `Se acabó la cuota de ${NOMBRE_GRUPO[grupo]} en ${nombre(l, cuenta)}. VyMotion sigue con ${nombre(l, sigue)}.`, relevo: true }
   if (l.cuentas.length < 2) return
   const pronto = Math.min(...l.cuentas.map((x) => x.agotada?.[grupo] ?? Infinity))
   return { error: `Se acabó la cuota de ${NOMBRE_GRUPO[grupo]} en tus ${l.cuentas.length} cuentas de Google. La primera vuelve el ${fecha(pronto)}. Mientras, elige abajo un modelo del otro grupo y pulsa «Reintentar», o conecta otra cuenta en Opciones → Antigravity.` }
 }
 
-/** Lo que la sesión dice de los modelos, como los guarda Sloth para el catálogo. */
+/** Lo que la sesión dice de los modelos, como los guarda VyMotion para el catálogo. */
 function guardarModelos(opciones: OpcionAcp[]) {
   const modelo = opciones.find((o) => o.category === 'model' || o.id === 'model')
   const nivel = opciones.find((o) => o.category === 'thought_level')
@@ -294,19 +276,6 @@ const SABOR: SaborAcp = {
   clientInfo: { name: 'zed', version: '0.0.0' },
   leeArchivos: true,
   autenticar: METODO,
-  alAutenticar(resultado, cuenta) {
-    const plan = planDe(resultado)
-    if (!plan) return
-    // La que inicia sesión aún no está en la lista: se guarda con ella al terminar.
-    if (cuenta === NUEVA) return void (login && (login.plan = plan))
-    try {
-      const l = leerLista()
-      const c = l.cuentas.find((x) => x.id === cuenta)
-      if (c && (c.plan?.id !== plan.id || c.plan.nombre !== plan.nombre)) guardarLista({ ...l, cuentas: l.cuentas.map((x) => (x === c ? { ...x, plan } : x)) })
-    } catch {
-      // Sin apuntarlo: el hilo trabaja igual.
-    }
-  },
   modo: 'yolo',
   sinCuenta: 'Conecta tu cuenta de Google en Opciones → Antigravity.',
   alVerModelos: guardarModelos,
@@ -353,7 +322,7 @@ async function correoDe(s: Sesion): Promise<string | undefined> {
   }
 }
 
-/** Las cuentas sin correo (la de antes de las cuentas) lo buscan una vez por arranque de Sloth. */
+/** Las cuentas sin correo (la de antes de las cuentas) lo buscan una vez por arranque de VyMotion. */
 const buscados = new Set<string>()
 function buscarCorreos(l: ListaAgy) {
   for (const c of l.cuentas) {
@@ -369,8 +338,8 @@ function buscarCorreos(l: ListaAgy) {
   }
 }
 
-/** Mientras se inicia sesión: el enlace de Google, si ya lo dio, el proceso que espera, lo que va escribiendo y el plan de la cuenta. */
-type Login = { url?: string; c?: Conexion; lineas: string[]; plan?: PlanAgy }
+/** Mientras se inicia sesión: el enlace de Google, si ya lo dio, el proceso que espera y lo que va escribiendo. */
+type Login = { url?: string; c?: Conexion; lineas: string[] }
 let login: Login | undefined
 let fallo = ''
 
@@ -387,12 +356,10 @@ export function cuentaAntigravity(): CuentaClaude {
       .filter((g) => !libre(c, g, ahora))
       .map((g) => ` · sin ${NOMBRE_GRUPO[g]} hasta el ${fecha(c.agotada![g]!)}`)
       .join('')
-  const conPlan = (c: CuentaAgy) => (c.plan ? ` · ${planLlano(c.plan)}` : '')
   return {
     conectada,
     quien: conectada ? `${nombre(l, activa?.id).replace(/^tu c/, 'C')}${l.cuentas.length > 1 ? ` (y ${l.cuentas.length - 1} más)` : ''}` : undefined,
-    plan: planLlano(activa?.plan),
-    cuentas: conectada ? l.cuentas.map((c) => ({ id: c.id, quien: `${nombre(l, c.id).replace(/^tu c/, 'C')}${conPlan(c)}${estado(c)}`, activa: c.id === activa?.id })) : undefined,
+    cuentas: conectada ? l.cuentas.map((c) => ({ id: c.id, quien: `${nombre(l, c.id).replace(/^tu c/, 'C')}${estado(c)}`, activa: c.id === activa?.id })) : undefined,
     conectando: login && { url: login.url, arranque },
     error: fallo || undefined
   }
@@ -426,8 +393,7 @@ export async function conectarAntigravity(): Promise<CuentaClaude> {
       const id = l.cuentas.find((x) => correo && x.correo === correo)?.id ?? randomBytes(4).toString('hex')
       mkdirSync(SESIONES, { recursive: true })
       guardar(join(SESIONES, `${id}.json`), sesion)
-      const esta = { id, correo, plan: este.plan }
-      const cuentas = l.cuentas.some((x) => x.id === id) ? l.cuentas.map((x) => (x.id === id ? esta : x)) : [...l.cuentas, esta]
+      const cuentas = l.cuentas.some((x) => x.id === id) ? l.cuentas.map((x) => (x.id === id ? { id, correo } : x)) : [...l.cuentas, { id, correo }]
       guardarLista({ activa: id, cuentas })
     } finally {
       c.rpc.close()
@@ -469,7 +435,7 @@ export function cancelarAntigravity(): CuentaClaude {
 export function usarAntigravity(id: string): CuentaClaude {
   const l = leerLista()
   if (!l.cuentas.some((c) => c.id === id)) throw new Error('Esa cuenta ya no está conectada.')
-  guardarLista({ activa: id, cuentas: l.cuentas.map((c) => (c.id === id ? { id: c.id, correo: c.correo, plan: c.plan } : c)) })
+  guardarLista({ activa: id, cuentas: l.cuentas.map((c) => (c.id === id ? { id: c.id, correo: c.correo } : c)) })
   return cuentaAntigravity()
 }
 

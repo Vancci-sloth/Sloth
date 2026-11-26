@@ -2,13 +2,11 @@ import { type ReactNode, useCallback, useEffect, useRef, useState, useSyncExtern
 import type { Avance, Card } from '../../shared/types'
 import type { Pasos } from './Etapas'
 import { Icono } from './Iconos'
-import { Desplegable } from './Desplegable'
 import { Segmento } from './Segmento'
-import { enLaWeb } from './web'
 
 /**
  * El monitor del estudio, uno solo para todos los estilos en la fase Video (`useMonitor` y `Monitor`). Enseña el video
- * en vivo, sin renderizar: lo arma el motor de Sloth (`server/motor.ts`) para cualquier proyecto de Remotion, y cada vez
+ * en vivo, sin renderizar: lo arma el motor de VyMotion (`server/motor.ts`) para cualquier proyecto de Remotion, y cada vez
  * que el agente cambia algo llega una versión nueva, que se carga detrás de la que se ve y la reemplaza en el mismo
  * segundo, sin parpadeo. Si no hay motor, la vista en vivo de la skill o el render. Con el video en pausa, un clic en el
  * cuadro elige lo que hay debajo para pedir un cambio. Debajo, la barra de transporte; la línea de tiempo va en
@@ -66,13 +64,12 @@ export type Elemento = { tipo: string; texto: string; componentes: string[]; caj
 type Marco = { url: string; n: number }
 
 /**
- * La vista en vivo va en la otra dirección de esta computadora (`127.0.0.1` si Sloth es `localhost`, y al revés): para el
+ * La vista en vivo va en la otra dirección de esta computadora (`127.0.0.1` si VyMotion es `localhost`, y al revés): para el
  * navegador es otro sitio y la carga en su propio proceso. Armar su primer cuadro (el video, Three.js, sus texturas) tarda
  * segundos, y en el mismo proceso congelaba la interfaz entera cada vez que el agente cambiaba algo. Se habla con ella por
  * `postMessage`, que no necesita el mismo sitio (`server/origen.ts` la deja abrir así).
  */
-// Desde la web no hay otra dirección: `127.0.0.1` sería la del dispositivo. Va en la misma, en un marco del túnel.
-const aparte = (ruta: string) => (enLaWeb ? ruta : `${location.protocol}//${location.hostname === '127.0.0.1' ? 'localhost' : '127.0.0.1'}:${location.port}${ruta}`)
+const aparte = (ruta: string) => `${location.protocol}//${location.hostname === '127.0.0.1' ? 'localhost' : '127.0.0.1'}:${location.port}${ruta}`
 
 /**
  * Todo lo que suena en el monitor, sea el motor en vivo, la vista en vivo de la skill o el render: qué se ve, el segundo,
@@ -403,14 +400,14 @@ export function Monitor({ m, escena, antes, despues, vertical, label, children }
           />
         )}
         {modo === 'render' && m.renders.length > 1 && (
-          <Desplegable
-            campo
-            className="monitor-cual"
-            nombre="Qué video se ve"
-            valor={render?.ruta ?? ''}
-            opciones={m.renders.map((v) => ({ value: v.ruta, label: v.ruta.split('/').pop()!.replace(/\.\w+$/, ''), ...(v.vertical === undefined ? {} : { detalle: v.vertical ? 'vertical' : 'horizontal' }) }))}
-            onCambio={m.elegirRender}
-          />
+          <select className="monitor-cual" aria-label="Qué video se ve" value={render?.ruta} onChange={(e) => m.elegirRender(e.target.value)}>
+            {m.renders.map((v) => (
+              <option key={v.ruta} value={v.ruta}>
+                {v.ruta.split('/').pop()!.replace(/\.\w+$/, '')}
+                {v.vertical === undefined ? '' : v.vertical ? ' · vertical' : ' · horizontal'}
+              </option>
+            ))}
+          </select>
         )}
         {modo === 'render' && render?.viejo && <span className="small render-viejo">Desactualizado: cambió {render.viejo.ruta}</span>}
         <button className={`transporte-boton ${m.silencio ? 'on' : ''}`} title={m.silencio ? 'Con sonido' : 'Sin sonido'} onClick={() => m.setSilencio(!m.silencio)}>

@@ -1,0 +1,67 @@
+.afinar-boton, .afinar-deshacer, .afinar-cerrar {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  padding: 4px 10px; min-height: 28px; border-radius: 12px; font-size: 12px;
+}
+.afinar-boton, .afinar-cerrar {
+  --borde-afinar: color-mix(in srgb, var(--acento-modelo, var(--acento-imagen)) 40%, var(--line));
+  border: 1px solid var(--borde-afinar); color: var(--text);
+  background: linear-gradient(140deg, color-mix(in srgb, var(--acento-modelo, var(--acento-imagen)) 18%, transparent), transparent 88%), var(--cristal-fondo);
+  box-shadow: var(--cristal-reflejo);
+}
+.afinar-boton .ico, .afinar-cerrar .ico { width: 14px; height: 14px; flex: none; }
+.afinar-boton:hover:not(:disabled), .afinar-cerrar:hover { border-color: var(--acento-modelo, var(--acento-imagen)); }
+.afinar-boton:disabled { opacity: .48; }
+.afinar-deshacer { color: var(--muted); }
+.afinar-deshacer:hover { color: var(--text); }
+.afinar-panel {
+  width: min(455px, calc(100% - 28px)); max-height: calc(100% - 28px); padding: 0;
+  border: 1px solid var(--line-hover); border-radius: 20px; color: var(--text);
+  background: var(--panel); box-shadow: 0 22px 70px color-mix(in srgb, var(--bg) 65%, transparent);
+}
+.afinar-panel[open] { display: flex; flex-direction: column; }
+.afinar-panel::backdrop { background: color-mix(in srgb, var(--bg) 70%, transparent); }
+.afinar-cabecera, .afinar-pie { display: flex; align-items: center; gap: 12px; justify-content: space-between; flex-wrap: wrap; padding: 12px 16px; }
+.afinar-cabecera { border-bottom: 1px solid var(--linea-tarjeta); }
+.afinar-cabecera > span { display: inline-flex; gap: 9px; align-items: center; }
+.afinar-cabecera > span .ico { width: 16px; height: 16px; color: var(--acento-modelo, var(--acento-imagen)); }
+.afinar-cabecera h2 { margin: 0; font-size: 17px; }
+.afinar-cerrar { width: 30px; min-height: 30px; padding: 0; }
+.afinar-contenido { overflow: auto; min-height: 0; padding: 16px; overflow-wrap: anywhere; }
+.afinar-contenido > p { margin: 0; }
+.afinar-espera { display: flex; align-items: center; gap: 10px; min-height: 28px; color: var(--muted); }
+.afinar-espera .spinner { flex: none; border-top-color: var(--acento-modelo, var(--acento-imagen)); }
+.afinar-decisiones { flex: 0 0 100%; order: -1; min-width: 0; border-top: 1px solid var(--linea-tarjeta); padding: 8px 0 3px; }
+.afinar-decisiones p { margin: 6px 0 0; overflow-wrap: anywhere; }
+.afinar-preguntas { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
+.afinar-pregunta { min-width: 0; max-width: 100%; }
+body .composer .afinar-pregunta > .picker-trigger { --tinte-control: var(--acento-modelo, var(--acento-imagen)); max-width: 100%; color: var(--tinte-control); }
+.afinar-modelo .picker-trigger > span, .afinar-pregunta .picker-trigger > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.afinar-modelo .picker-trigger > svg, .afinar-pregunta .picker-trigger > svg { flex: none; }
+.afinar-lista-pregunta .picker-label, .afinar-lista-pregunta .picker-option { white-space: normal; overflow-wrap: anywhere; }
+.afinar-personal { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.afinar-personal input {
+  min-width: 0; max-width: 100%; min-height: 34px; padding: 4px 8px; color: var(--text);
+  background: var(--bg); border: 1px solid var(--line); border-radius: 8px; color-scheme: dark;
+}
+.afinar-personal input { flex: 1 1 180px; }
+.afinar-pie { align-items: end; color: var(--muted); }
+.afinar-contenido + .afinar-pie { border-top: 1px solid var(--linea-tarjeta); }
+.afinar-modelo { display: grid; gap: 4px; flex: 1 1 170px; min-width: 0; }
+.afinar-pie .afinar-boton { min-height: 36px; margin-left: auto; }
+body .composer .afinar-modelo .picker-trigger {
+  --tinte-control: var(--acento-modelo, var(--acento-imagen)); width: 100%; min-width: 0; height: 36px;
+  justify-content: space-between; padding-inline: 10px; border: 1px solid color-mix(in srgb, var(--tinte-control) 40%, var(--line));
+}
+.afinar-pie .destacado { font-weight: 650; border-color: var(--acento-modelo, var(--acento-imagen)); }
+.afinar-panel :is(button, input, a):focus-visible, .afinar-boton:focus-visible, .afinar-deshacer:focus-visible {
+  outline: 2px solid var(--acento-modelo, var(--acento-imagen)); outline-offset: 2px;
+}
+.afinar-lista-modelos, .afinar-lista-pregunta { overscroll-behavior: contain; }
+.afinar-lista-modelos .picker-option > svg { flex: none; }
+.afinar-lista-modelos .picker-option:focus-visible, .afinar-lista-pregunta .picker-option:focus-visible { outline-offset: -1px; }
+@media (prefers-reduced-motion: no-preference) {
+  .afinar-panel[open], .afinar-decisiones { animation: afinar-entrada 170ms ease-out both; }
+  .afinar-boton { transition: border-color 140ms ease; }
+  @keyframes afinar-entrada { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+}
+@media (prefers-reduced-motion: reduce) { .afinar-espera .spinner { animation: none; } }

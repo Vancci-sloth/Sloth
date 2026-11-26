@@ -52,7 +52,7 @@ export const destinoDe = (elegida: string) => (basename(elegida).toLowerCase() =
  * Sloth.exe, la app).
  */
 export function porQueNo(elegido: string, lista: Pesada[], prohibidas: string[]): string | null {
-  if (prohibidas.some((p) => dentro(elegido, p))) return 'Esa carpeta es de la instalación de Sloth, que se cambia en cada versión. Elige otra.'
+  if (prohibidas.some((p) => dentro(elegido, p))) return 'Esa carpeta es de la instalación de VyMotion, que se cambia en cada versión. Elige otra.'
   // Con sus enlaces resueltos, como lo que se mueve: en Mac, /var es /private/var.
   const destino = realHastaDonde(elegido)
   for (const p of lista) {

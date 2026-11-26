@@ -44,7 +44,7 @@ export function radar(app: string) {
       if (salida.trim()) writeFileSync(join(carpeta, 'ultima-pasada.log'), `${salida.trim()}\n(salió con ${codigo})\n`)
     })
   }
-  // El primero, un minuto después de arrancar: no compite con lo que hace Sloth al abrir.
+  // El primero, un minuto después de arrancar: no compite con lo que hace VyMotion al abrir.
   setTimeout(rastrear, 60_000).unref()
   setInterval(rastrear, 5 * 60_000).unref()
 

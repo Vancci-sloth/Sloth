@@ -144,10 +144,9 @@ const faltan = new Set(
 if (faltan.size) throw new Error(`El servidor importa paquetes que no van en la app: ${[...faltan].join(', ')}. Añádelos a PAQUETES.`)
 // La página del motor en vivo no va dentro del servidor: la arma cada proyecto de video con sus propios paquetes.
 cpSync(join(REPO, 'server', 'motor-pagina.jsx'), join(APP, 'server', 'motor-pagina.jsx'))
-// Los MCP de la voz, de Flow y de Meta los lanza cada agente con el Node de Sloth: van tal cual, sin paquetes.
+// Los MCP de la voz y de Flow los lanza cada agente con el Node de Sloth: van tal cual, sin paquetes.
 cpSync(join(REPO, 'server', 'voz', 'mcp.mjs'), join(APP, 'server', 'voz', 'mcp.mjs'))
 cpSync(join(REPO, 'server', 'flow', 'mcp.mjs'), join(APP, 'server', 'flow', 'mcp.mjs'))
-cpSync(join(REPO, 'server', 'meta', 'mcp.mjs'), join(APP, 'server', 'meta', 'mcp.mjs'))
 // El que lanza Playwright MCP a demanda, igual.
 cpSync(join(REPO, 'server', 'navegador-mcp.mjs'), join(APP, 'server', 'navegador-mcp.mjs'))
 // El puente con el SDK de Cursor: server/cursor.ts lo copia junto al SDK que se baja y lo corre con el Node de Sloth.
@@ -198,54 +197,12 @@ if (WINDOWS) {
   cpSync(join(NODE, 'node_modules', 'npm'), join(SALIDA, 'node', 'node_modules', 'npm'), { recursive: true })
 } else {
   // Como lo instala nodejs.org: bin/node y lib/node_modules/npm. Allí npm y npx son enlaces; aquí, dos guiones, que un
-  // enlace no llega igual al empaquetado. El Node de Homebrew enlaza libnode.dylib y otras libs del Cellar: no viaja
-  // solo. Si es ese, bajamos el tarball oficial de la misma versión (un solo binario portable).
-  const destino = join(SALIDA, 'node')
+  // enlace no llega igual al empaquetado.
   const NODE = dirname(dirname(process.execPath))
-  const npmJunto = join(NODE, 'lib', 'node_modules', 'npm')
-  const brew =
-    !existsSync(npmJunto) ||
-    (() => {
-      try {
-        const libs = execFileSync('otool', ['-L', process.execPath], { encoding: 'utf8' })
-        return libs.includes('@rpath/libnode') || /\/opt\/homebrew\/|\/usr\/local\/opt\//.test(libs)
-      } catch {
-        return true
-      }
-    })()
-  if (brew) {
-    const ver = process.version.slice(1)
-    const arch = process.arch === 'arm64' ? 'arm64' : 'x64'
-    const nombre = `node-v${ver}-darwin-${arch}`
-    const cache = join(DIST, 'cache-node')
-    const tar = join(cache, `${nombre}.tar.gz`)
-    const extr = join(cache, nombre)
-    mkdirSync(cache, { recursive: true })
-    if (!existsSync(tar)) {
-      const url = `https://nodejs.org/dist/v${ver}/${nombre}.tar.gz`
-      console.log(`  Bajando Node oficial ${ver} (${arch})…`)
-      execFileSync('curl', ['-fsSL', '-o', tar, url], { stdio: 'inherit' })
-    }
-    rmSync(extr, { recursive: true, force: true })
-    execFileSync('tar', ['-xzf', tar, '-C', cache], { stdio: 'inherit' })
-    mkdirSync(join(destino, 'bin'), { recursive: true })
-    mkdirSync(join(destino, 'lib', 'node_modules'), { recursive: true })
-    cpSync(join(extr, 'bin', 'node'), join(destino, 'bin', 'node'))
-    cpSync(join(extr, 'lib', 'node_modules', 'npm'), join(destino, 'lib', 'node_modules', 'npm'), { recursive: true })
-    rmSync(extr, { recursive: true, force: true })
-  } else {
-    const npmGlobal = join(execFileSync('npm', ['prefix', '-g'], { encoding: 'utf8' }).trim(), 'lib', 'node_modules', 'npm')
-    const npm = existsSync(npmJunto) ? npmJunto : npmGlobal
-    if (!existsSync(npm)) throw new Error(`No encontré npm para empaquetar (ni en ${npmJunto} ni en ${npmGlobal}).`)
-    mkdirSync(join(destino, 'bin'), { recursive: true })
-    mkdirSync(join(destino, 'lib', 'node_modules'), { recursive: true })
-    cpSync(process.execPath, join(destino, 'bin', 'node'))
-    cpSync(npm, join(destino, 'lib', 'node_modules', 'npm'), { recursive: true })
-  }
-  // `.bin` con enlaces absolutos (Homebrew) hace fallar a electron-builder con EEXIST; la app solo usa npm-cli.js.
-  rmSync(join(destino, 'lib', 'node_modules', 'npm', 'node_modules', '.bin'), { recursive: true, force: true })
+  cpSync(process.execPath, join(SALIDA, 'node', 'bin', 'node'))
+  cpSync(join(NODE, 'lib', 'node_modules', 'npm'), join(SALIDA, 'node', 'lib', 'node_modules', 'npm'), { recursive: true })
   for (const [f, cli] of [['npm', 'npm-cli.js'], ['npx', 'npx-cli.js']])
-    writeFileSync(join(destino, 'bin', f), `#!/bin/sh\nd="$(dirname "$0")"\nexec "$d/node" "$d/../lib/node_modules/npm/bin/${cli}" "$@"\n`, { mode: 0o755 })
+    writeFileSync(join(SALIDA, 'node', 'bin', f), `#!/bin/sh\nd="$(dirname "$0")"\nexec "$d/node" "$d/../lib/node_modules/npm/bin/${cli}" "$@"\n`, { mode: 0o755 })
 }
 
 paso('Armando la ventana')
@@ -266,10 +223,10 @@ if (WINDOWS) {
 // Linux pide además una página de la app.
 const ventana = {
   name: 'sloth',
-  productName: 'Sloth',
+  productName: 'VyMotion',
   version: VERSION,
-  description: 'Sloth',
-  author: 'Sloth',
+  description: 'VyMotion',
+  author: 'VyMotion',
   homepage: 'https://sloth.vancci.org',
   // En Linux, el nombre con que el escritorio junta la ventana con su icono.
   desktopName: 'sloth.desktop',
@@ -339,17 +296,18 @@ const hechos = await empaquetar({
     // El mismo nombre ante Windows que la 0.2: lo ya anclado y los avisos siguen siendo de Sloth.
     appId: 'Sloth.App',
     electronVersion: MAC12 ? ELECTRON_MAC12 : JSON.parse(readFileSync(join(REPO, 'node_modules', 'electron', 'package.json'), 'utf8')).version,
-    productName: 'Sloth',
-    copyright: 'Sloth',
+    productName: 'VyMotion',
+    copyright: 'VyMotion',
     directories: { app: VENTANA, output: join(DIST, 'instalador') },
     files: ['**/*', '!ayudante.exe'],
     extraFiles: WINDOWS ? fuera : [],
     extraResources: [
       ...(WINDOWS ? [] : fuera),
       { from: join(SALIDA, 'skills'), to: 'skills' },
-      ...(WINDOWS ? [{ from: join(VENTANA, 'ayudante.exe'), to: 'ayudante.exe' }] : [{ from: ICONO_PNG, to: 'icon.png' }])
+      { from: ICONO_PNG, to: 'icon.png' },
+      ...(WINDOWS ? [{ from: join(VENTANA, 'ayudante.exe'), to: 'ayudante.exe' }] : [])
     ],
-    win: { icon: ICONO },
+    win: { icon: ICONO, executableName: 'Sloth' },
     nsis: {
       ...compresionInstalador,
       // Con sus pasos, para elegir en qué disco va (scripts/instalador.nsh). Las actualizaciones siguen sin preguntar nada.
@@ -358,8 +316,8 @@ const hechos = await empaquetar({
       perMachine: false,
       runAfterFinish: true,
       createDesktopShortcut: true,
-      shortcutName: 'Sloth',
-      uninstallDisplayName: 'Sloth',
+      shortcutName: 'VyMotion',
+      uninstallDisplayName: 'VyMotion',
       artifactName: 'Sloth-Setup-${version}.${ext}',
       installerIcon: ICONO,
       uninstallerIcon: ICONO,
@@ -368,6 +326,7 @@ const hechos = await empaquetar({
       language: '3082'
     },
     mac: {
+      executableName: 'Sloth',
       icon: ICONO_PNG,
       category: 'public.app-category.video',
       artifactName: NOMBRE_MAC,
@@ -381,7 +340,7 @@ const hechos = await empaquetar({
       entitlements: join(REPO, 'scripts', 'mac.entitlements'),
       entitlementsInherit: join(REPO, 'scripts', 'mac.entitlements'),
       // La voz se graba en la interfaz: sin esto, macOS ni siquiera pregunta por el micrófono.
-      extendInfo: { NSMicrophoneUsageDescription: 'Sloth graba tu voz para los videos.' }
+      extendInfo: { NSMicrophoneUsageDescription: 'VyMotion graba tu voz para los videos.' }
     },
     dmg: { artifactName: NOMBRE_MAC },
     linux: {

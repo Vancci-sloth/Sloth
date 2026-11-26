@@ -12,11 +12,11 @@
 .rifa-premio { margin: 2px 0 0; font-size: 22px; font-weight: 750; line-height: 1.25; letter-spacing: -0.01em; }
 .rifa-texto { margin: 0; font-size: 15px; line-height: 1.5; font-weight: 500; }
 .rifa-acciones { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 6px; }
-.rifa-boton { display: inline-flex; align-items: center; gap: 10px; padding: 14px 26px; border-radius: 12px; background: var(--sobre-ambar); color: var(--amber-2); font-size: 17px; font-weight: 800; letter-spacing: 0.02em; text-transform: uppercase; box-shadow: 0 8px 22px color-mix(in srgb, var(--sobre-ambar) 35%, transparent); transition: transform 0.12s ease; }
+.rifa-boton { display: inline-flex; align-items: center; gap: 10px; padding: 14px 26px; border-radius: 12px; background: var(--sobre-ambar); color: var(--amber-2); font-size: 17px; font-weight: 800; letter-spacing: 0.02em; text-transform: uppercase; box-shadow: 0 8px 22px rgba(27, 20, 8, 0.35); transition: transform 0.12s ease; }
 .rifa-boton:hover:not(:disabled) { transform: translateY(-2px); }
 .rifa-boton:active:not(:disabled) { transform: translateY(0); }
 .rifa-boton .ico { width: 20px; height: 20px; }
-.rifa-fuera { margin: 4px 0 0; padding: 10px 14px; border-radius: 12px; background: color-mix(in srgb, var(--sobre-ambar) 14%, transparent); font-size: 14px; font-weight: 600; }
+.rifa-fuera { margin: 4px 0 0; padding: 10px 14px; border-radius: 12px; background: rgba(27, 20, 8, 0.14); font-size: 14px; font-weight: 600; }
 .rifa-error { margin: 0; padding: 8px 12px; border-radius: 10px; background: var(--sobre-ambar); color: var(--bad); font-size: 13.5px; }
 .rifa-cuenta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 2px 0 0; font-size: 13px; font-weight: 650; opacity: 0.8; }
 .rifa-cuenta .ico { width: 15px; height: 15px; }
@@ -35,7 +35,7 @@
 
 .rifa-boletos { position: absolute; right: -4px; top: 50%; width: 220px; height: 176px; transform: translateY(-50%); pointer-events: none; }
 .rifa-boleto path { fill: color-mix(in srgb, var(--text) 20%, transparent); stroke: var(--sobre-ambar); stroke-width: 3; stroke-linejoin: round; }
-.rifa-boleto.atras path { fill: color-mix(in srgb, var(--sobre-ambar) 8%, transparent); opacity: 0.55; }
+.rifa-boleto.atras path { fill: rgba(27, 20, 8, 0.08); opacity: 0.55; }
 .rifa-boleto .rifa-estrella { fill: var(--sobre-ambar); stroke: none; }
 .rifa.dentro .rifa-boleto:not(.atras) .rifa-estrella { fill: var(--ok); stroke: var(--sobre-ambar); stroke-width: 2; }
 @media (max-width: 760px) {
@@ -130,3 +130,28 @@
 .admin-rifa-numero { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 8px; background: var(--amber-tinte); color: var(--amber-2); font-weight: 750; }
 .admin-rifa-agregar { display: inline-flex; align-items: center; gap: 6px; align-self: flex-start; }
 .admin-rifa-agregar .ico { width: 14px; height: 14px; }
+
+/* La rifa, en vidrio negro como el fondo: el verde es para el dinero y el premio, no la tarjeta entera. */
+.rifa {
+  color: var(--text);
+  background: linear-gradient(135deg, color-mix(in srgb, var(--ok) 12%, transparent), transparent 60%), linear-gradient(160deg, color-mix(in srgb, var(--text) 8%, transparent), transparent 42%), color-mix(in srgb, var(--bg) 62%, transparent);
+  border: 1px solid color-mix(in srgb, var(--text) 12%, transparent);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--text) 16%, transparent), 0 24px 60px color-mix(in srgb, var(--bg) 60%, transparent);
+  backdrop-filter: blur(22px) saturate(160%); -webkit-backdrop-filter: blur(22px) saturate(160%);
+}
+.rifa::after { background: linear-gradient(105deg, transparent 40%, color-mix(in srgb, var(--text) 7%, transparent) 50%, transparent 60%); }
+.rifa-boton {
+  position: relative; overflow: hidden; border: 1px solid color-mix(in srgb, var(--ok) 60%, var(--bg)); border-radius: 999px;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--ok) 55%, var(--text)) 0%, var(--ok) 52%, color-mix(in srgb, var(--ok) 72%, var(--bg)) 100%);
+  color: var(--sobre-ambar);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--text) 55%, transparent), inset 0 -3px 6px color-mix(in srgb, var(--ok) 35%, var(--bg)), 0 8px 24px color-mix(in srgb, var(--ok) 26%, transparent);
+}
+.rifa-dentro, .rifa-fuera, .rifa-error { border: 1px solid color-mix(in srgb, var(--text) 10%, transparent); }
+.rifa-dentro { background: color-mix(in srgb, var(--bg) 62%, transparent); }
+.rifa-fuera { background: color-mix(in srgb, var(--text) 8%, transparent); }
+.rifa-error { background: color-mix(in srgb, var(--bg) 70%, transparent); }
+.rifa-dentro b, .rifa-tu { color: var(--ok); }
+.rifa-boleto path { stroke: color-mix(in srgb, var(--text) 30%, transparent); }
+.rifa-boleto .rifa-estrella { fill: color-mix(in srgb, var(--text) 45%, transparent); }
+.rifa.dentro .rifa-boleto:not(.atras) .rifa-estrella { stroke: color-mix(in srgb, var(--text) 30%, transparent); }
+@media (prefers-reduced-motion: reduce) { .rifa::after { animation: none; } }

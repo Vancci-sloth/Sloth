@@ -5,7 +5,7 @@ Fecha: 2026-10-29
 ## Contexto
 
 Hasta ahora la voz la grababa el usuario, salvo El Diff, que tenía un script propio (`voz_studio.mjs`) que manejaba
-Google AI Studio en un Edge aparte. Ningún otro estilo podía generarla, ni se podía elegir la voz desde Sloth.
+Google AI Studio en un Edge aparte. Ningún otro estilo podía generarla, ni se podía elegir la voz desde VyMotion.
 
 AI Studio genera la voz con Gemini 3.8 Flash TTS («Generate speech»), en español, con más de 2.000 voces. Por la API,
 la llave gratis da unos 10 pedidos al día; por la página, con la cuenta de Google del usuario, no hay tope publicado. Se
@@ -19,10 +19,10 @@ probó el 29 de octubre de 2026:
 
 ## Decisión
 
-- **La voz la genera el servidor de Sloth, no el agente** (`server/voz/`), en una página propia del navegador integrado
+- **La voz la genera el servidor de VyMotion, no el agente** (`server/voz/`), en una página propia del navegador integrado
   (`NAVEGADOR_VOZ`, perfil `persist:voz`): la sesión de Google no la tiene ningún agente. Se entra una vez en Edge
   (Chrome en Mac y Linux) y las cookies pasan a la página; si la página las pierde, se vuelven a pasar de Edge sin
-  preguntar. Sin la ventana de Sloth, se genera en ese Edge, sin ventana.
+  preguntar. Sin la ventana de VyMotion, se genera en ese Edge, sin ventana.
 - **Los agentes la piden con un MCP propio** (`server/voz/mcp.mjs`, JavaScript sin paquetes), igual para Claude, Codex
   y OpenCode. Cada herramienta espera como mucho 40 s (Codex corta a los 60) y da un id para seguir esperando.
 - **Una voz a la vez, en fila**, y sin volver a pedir lo que no cambió (`.huella`).

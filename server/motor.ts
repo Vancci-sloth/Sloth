@@ -7,7 +7,7 @@ import { largo } from './disco.ts'
 
 /**
  * El motor en vivo: el video de un hilo reproducido en el navegador tal cual saldrá, sin renderizarlo, sea cual sea su
- * estilo, mientras esté hecho con Remotion. Sloth arma la página él solo, con el esbuild y el Player que ya trae el
+ * estilo, mientras esté hecho con Remotion. VyMotion arma la página él solo, con el esbuild y el Player que ya trae el
  * proyecto, y la vuelve a armar en cuanto cambia algo de lo que entra en el video: el agente escribe una escena y en un
  * segundo se puede ver y recorrer. Las skills no hacen nada para tenerlo. La página es `motor-pagina.jsx`; el monitor la
  * cambia por la nueva sin parpadear ni perder el segundo (`web/src/Monitor.tsx`). Los motores que ya no se ven se
@@ -227,7 +227,7 @@ export function servirMotor(res: ServerResponse, folder: string, sub: string | u
   const html = `<!doctype html>
 <html lang="es">
 <meta charset="utf-8" />
-<title>Sloth · en vivo</title>
+<title>VyMotion · en vivo</title>
 <style>html, body, #raiz { margin: 0; height: 100%; background: #000; overflow: hidden; }</style>
 <div id="raiz"></div>
 <script>

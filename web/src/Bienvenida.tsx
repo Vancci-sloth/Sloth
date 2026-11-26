@@ -5,7 +5,6 @@ import { SobreTi } from './SobreTi'
 import { AvisoPrimerAgente, Requisitos, useConAgente } from './Opciones'
 import type { Model } from '../../shared/types'
 import './Bienvenida.css'
-import { enLaNube, enLaWeb } from './web'
 
 const VISTA = 'bienvenida'
 const EVENTO = 'sloth-bienvenida'
@@ -18,12 +17,10 @@ const OPCIONES = [
       ['claude', 'Claude'],
       ['codex', 'ChatGPT'],
       ['deepseek', 'DeepSeek'],
-      ['openrouter', 'OpenRouter'],
       ['gemini', 'Gemini'],
       ['cursor', 'Cursor'],
       ['muse', 'Muse Code'],
-      ['pi', 'Pi'],
-      ['omp', 'omp']
+      ['pi', 'Pi']
     ]
   },
   {
@@ -32,19 +29,15 @@ const OPCIONES = [
     agentes: [
       ['opencode', 'OpenCode'],
       ['antigravity', 'Antigravity'],
-      ['grok', 'Grok'],
-      ['freellmapi', 'FreeLLMAPI']
+      ['grok', 'Grok']
     ]
   }
 ]
 
 /** Opciones la vuelve a abrir. */
 export const abrirBienvenida = () => dispatchEvent(new Event(EVENTO))
-/** Si la primera bienvenida aún no se cerró: lo que quiera salir al abrir Sloth (`EstiloCambio.tsx`) espera a `BIENVENIDA_CERRADA`. */
+/** Si la primera bienvenida aún no se cerró: lo que quiera salir al abrir VyMotion (`EstiloCambio.tsx`) espera a `BIENVENIDA_CERRADA`. */
 export const bienvenidaPendiente = () => {
-  // Desde la web, la computadora ya se preparó: la bienvenida no sale sola en cada dispositivo nuevo. En la nube no hay
-  // otra computadora que la haya visto (ADR 0026).
-  if (enLaWeb && !enLaNube) return false
   try {
     return !localStorage.getItem(VISTA)
   } catch {
@@ -54,15 +47,15 @@ export const bienvenidaPendiente = () => {
 export const BIENVENIDA_CERRADA = 'sloth-bienvenida-cerrada'
 
 /**
- * La bienvenida: sale la primera vez que se abre Sloth y luego desde Opciones. Dice qué hace, qué hace falta (con lo
+ * La bienvenida: sale la primera vez que se abre VyMotion y luego desde Opciones. Dice qué hace, qué hace falta (con lo
  * que falta a la vista, para hacerlo ahí mismo), deja contar de ti para todos los agentes, cómo va un video, cuánto tarda
  * y qué cuesta.
  */
 export function Bienvenida({ models }: { models: Model[] }) {
-  const [abierta, setAbierta] = useState(bienvenidaPendiente)
+  const [abierta, setAbierta] = useState(() => !localStorage.getItem(VISTA))
   const conAgente = useConAgente(models, abierta)
   const [listo, setListo] = useState<boolean>()
-  // En la app instalada en Windows: si Sloth está anclada a la barra de tareas. `null`, aquí no se ofrece.
+  // En la app instalada en Windows: si VyMotion está anclada a la barra de tareas. `null`, aquí no se ofrece.
   const [anclada, setAnclada] = useState<boolean | null>(null)
   const [anclando, setAnclando] = useState(false)
   const [sinPermiso, setSinPermiso] = useState(false)
@@ -104,9 +97,9 @@ export function Bienvenida({ models }: { models: Model[] }) {
         <header>
           <img src="/icon.svg" alt="" />
           <div>
-            <h2>Te damos la bienvenida a Sloth</h2>
+            <h2>Te damos la bienvenida a VyMotion</h2>
             <p>
-              Elige un estilo y dale un tema o un enlace. Sloth investiga, escribe el guion y arma el video con tu agente.
+              Elige un estilo y dale un tema o un enlace. VyMotion investiga, escribe el guion y arma el video con tu agente.
             </p>
           </div>
         </header>
@@ -114,7 +107,7 @@ export function Bienvenida({ models }: { models: Model[] }) {
         <div className="bienvenida-pasos">
           {/* Con uno basta. Sin ninguno, el aviso lleva a Opciones → Agentes, como el del compositor. */}
           <Paso n={1} titulo="Elige con qué trabaja" hecho={conAgente}>
-            Con uno basta, y Sloth no te cobra aparte. Todos se conectan en Opciones → Agentes; Pi usa el plan o la llave que le
+            Con uno basta, y VyMotion no te cobra aparte. Todos se conectan en Opciones → Agentes; Pi usa el plan o la llave que le
             conectes.
             {OPCIONES.map(({ titulo, nota, agentes }) => (
               <div className="opcion" key={titulo}>
@@ -143,8 +136,8 @@ export function Bienvenida({ models }: { models: Model[] }) {
             <Requisitos onListo={setListo} />
           </Paso>
           {anclada !== null && (
-            <Paso n={4} titulo="Ten Sloth a mano (opcional)" hecho={anclada}>
-              {anclada ? 'Sloth está anclada a la barra de tareas.' : 'Ánclala a la barra de tareas para abrirla con un clic.'}
+            <Paso n={4} titulo="Ten VyMotion a mano (opcional)" hecho={anclada}>
+              {anclada ? 'VyMotion está anclada a la barra de tareas.' : 'Ánclala a la barra de tareas para abrirla con un clic.'}
               {!anclada && (
                 <div className="anclar">
                   <button className="boton" disabled={anclando} onClick={() => void anclar()}>
@@ -152,7 +145,7 @@ export function Bienvenida({ models }: { models: Model[] }) {
                   </button>
                   {sinPermiso && (
                     <p className="small">
-                      Windows no dejó anclarla desde aquí. Haz clic derecho en el icono de Sloth en la barra de tareas y elige
+                      Windows no dejó anclarla desde aquí. Haz clic derecho en el icono de VyMotion en la barra de tareas y elige
                       «Anclar a la barra de tareas».
                     </p>
                   )}
@@ -161,7 +154,7 @@ export function Bienvenida({ models }: { models: Model[] }) {
             </Paso>
           )}
           <Paso n={anclada === null ? 4 : 5} titulo="Haz tu primer video">
-            Elige un estilo, escribe el tema o pega un enlace y pulsa <b>↑</b>. Cuando el guion está listo, Sloth te pide tu voz:
+            Elige un estilo, escribe el tema o pega un enlace y pulsa <b>↑</b>. Cuando el guion está listo, VyMotion te pide tu voz:
             grábalo con el celular y súbelo en la etapa «Tu voz». Luego arma el video y lo revisa. El Diff tarda de una a dos
             horas; el Video explicativo, unos 40 minutos. Cuando acaba, lo descargas desde el video o en «Mis videos».
           </Paso>

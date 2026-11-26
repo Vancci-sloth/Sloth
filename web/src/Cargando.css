@@ -1,0 +1,17 @@
+/* Los puntos de «algo viene en camino» (Cargando.tsx): monoespacio, como el campo ASCII del fondo de la app. */
+.cargando { display: flex; justify-content: center; margin-top: 40px; }
+.cargando.chico { justify-content: flex-start; margin: 8px 0; }
+
+.cargando-puntos { display: inline-flex; align-items: center; gap: 9px; font-family: var(--mono); font-size: 34px; line-height: 1; color: var(--muted); }
+.cargando.chico .cargando-puntos { font-size: 24px; gap: 6px; }
+/* Cada punto se enciende un poco después que el anterior, y el encendido crece: así se ve la onda de izquierda a
+   derecha. Con pasos, que es lo que menos gasta de lo que se mueve sin parar. */
+.cargando-puntos i { font-style: normal; display: block; opacity: 0.25; transform: scale(1); animation: cargando-punto 1.15s steps(3, end) infinite; }
+@keyframes cargando-punto {
+  0%, 60%, 100% { opacity: 0.25; transform: scale(1); color: var(--muted); }
+  25% { opacity: 1; transform: scale(1.75); color: var(--ok); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cargando-puntos i { animation: none; opacity: 0.6; }
+}

@@ -7,18 +7,10 @@
 .compartir-paquete > .icon-trazo { flex: none; margin-top: 2px; }
 .compartir-paquete.bien { color: var(--text); }
 .compartir-paquete.bien > .icon-trazo { color: var(--ok); }
-.compartir-paquete.mal { border-color: var(--bad); background: color-mix(in srgb, var(--bad) 10%, transparent); color: var(--text); }
+.compartir-paquete.mal { border-color: var(--bad); background: rgba(224, 108, 85, 0.1); color: var(--text); }
 .compartir-paquete.mal strong { color: var(--bad); }
-.compartir-arreglar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 10px; }
+.compartir-arreglar { margin-top: 10px; }
 .compartir-arreglar .primary { padding: 7px 14px; font-size: 13px; }
-.compartir-arreglar span { color: var(--muted); font-size: 12.5px; }
-/* Lo que conviene arreglar antes de mandarlo: no lo impide. */
-.compartir-paquete.ojo { border-color: var(--amber); background: var(--amber-tinte); color: var(--text); }
-.compartir-avisos { margin: 8px 0 0; padding-left: 18px; display: flex; flex-direction: column; gap: 5px; }
-/* Uno que ya compartiste: se pone al día su publicación. */
-.compartir-anterior { display: flex; align-items: center; gap: 12px; margin: 6px 0 10px; color: var(--muted); font-size: 13px; line-height: 1.45; }
-.compartir-anterior span { flex: 1; }
-.compartir-anterior button { flex: none; }
 
 .compartir-campos { display: flex; flex-direction: column; gap: 12px; }
 .compartir-campos label, .compartir-video { display: flex; flex-direction: column; gap: 5px; }
@@ -31,16 +23,6 @@
 .compartir-guia strong { font-size: 14px; }
 .compartir-guia span { color: var(--muted); font-size: 12.5px; }
 .compartir-falta { margin: 12px 0 0; color: var(--suave); font-size: 13px; }
-
-/* La prueba del video elegido: con qué agente se hizo, cuánto costó y cuánto tardó. */
-.compartir-prueba { display: flex; flex-direction: column; gap: 3px; margin-top: 4px; padding: 9px 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel-2); }
-.compartir-prueba strong { color: var(--text); font-size: 13px; }
-.compartir-prueba span { color: var(--muted); font-size: 12.5px; font-weight: 400; line-height: 1.45; }
-/* Lo que su autor acepta al mandarlo: compartir el hilo completo de ese video. */
-.compartir-campos .compartir-acepto { flex-direction: row; align-items: flex-start; gap: 8px; margin-top: 6px; cursor: pointer; }
-.compartir-campos .compartir-acepto input { width: auto; flex: none; margin: 2px 0 0; padding: 0; accent-color: var(--amber); }
-.compartir-campos .compartir-acepto > span { color: var(--muted); font-size: 12.5px; font-weight: 400; }
-.compartir-acepto strong { color: var(--text); font-size: 12.5px; }
 
 /* Sus últimos videos: el elegido, con borde ámbar y palomita. */
 .compartir-videos { display: flex; gap: 8px; flex-wrap: wrap; }
@@ -58,7 +40,6 @@
 .compartir-pasos { list-style: none; margin: 4px 0 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
 .compartir-pasos li { display: flex; gap: 9px; line-height: 1.45; }
 .compartir-pasos .icon-trazo { flex: none; margin-top: 3px; color: var(--muted); }
-.compartir-pasos li strong { color: var(--text); }
 .compartir-pasos li.hecho { color: var(--text); }
 .compartir-pasos li.hecho .icon-trazo { color: var(--ok); }
 

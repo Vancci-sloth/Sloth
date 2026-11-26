@@ -98,7 +98,7 @@ print(json.dumps({"con": con, "args": args, "recordada": con_imagenes(raiz, None
     assert.ok(d.sin && d.hecha)
     assert.equal(d.estado.estado, 'fallo')
     assert.match(d.dichos[0], /^portada con IA \(Flow, Nano Banana 2\.1\), de fondo/)
-    assert.match(d.dichos[1], /^la portada con IA no salió \(no contesta Sloth en .*\): va la del cuadro del video$/)
+    assert.match(d.dichos[1], /^la portada con IA no salió \(no contesta VyMotion en .*\): va la del cuadro del video$/)
   } finally {
     rmSync(dir, { recursive: true, force: true })
   }

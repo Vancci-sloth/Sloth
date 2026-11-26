@@ -1,9 +1,6 @@
-/**
- * La revisión de YouTube es una página de la app (`#/youtube?…`, `RevisionYoutube`), no una ventana encima: se puede ir a
- * otro lado y volver. `volver` es de dónde se abrió, para regresar ahí al cerrarla.
- */
+/** La revisión es una página de la app y conserva el origen al abrir un video concreto. */
 export function abrirRevisionYoutube(cardId?: string, ruta?: string) {
-  const params = new URLSearchParams({ volver: location.hash.startsWith('#/youtube') || !location.hash ? '#/mis-videos' : location.hash })
+  const params = new URLSearchParams({ volver: location.hash.startsWith('#/youtube') ? '#/redes' : location.hash || '#/mis-videos' })
   if (cardId) params.set('cardId', cardId)
   if (ruta) params.set('ruta', ruta)
   location.hash = `/youtube?${params}`

@@ -10,11 +10,21 @@
    esté al 100 o al 125 %; sin él, a esas escalas, la volvía a pintar en cada cuadro. */
 .m3d { --suave: color-mix(in srgb, var(--muted) 55%, var(--text)); height: 100%; width: 100%; overflow-y: auto; background: var(--bg); font-size: 14.5px; }
 .m3d > :not(.m3d-velo, .m3d-visor, .m3d-visor-borde, .campo-ascii) { width: 100%; max-width: 1400px; margin-left: auto; margin-right: auto; padding-left: 48px; padding-right: 48px; }
-.m3d-cabeza { display: grid; gap: 16px; padding-top: 22px; }
+.m3d-biblioteca { --m3d-margen: clamp(16px, 4vw, 44px); --opacidad-ramas: .48; }
+.m3d-biblioteca > :not(.m3d-velo, .m3d-visor, .m3d-visor-borde, .campo-ascii) {
+  width: min(860px, calc(100% - 2 * var(--m3d-margen))); padding-inline: 0;
+}
+.m3d-biblioteca > .creacion-portada { margin-top: var(--m3d-margen); padding: clamp(14px, 3vw, 26px); }
+.m3d-biblioteca > .creacion-flotante { margin-block: 24px 28px; }
+.m3d-biblioteca > .m3d-rejilla { padding-block-end: 24px; }
+.m3d-cabeza { display: grid; gap: 14px; margin-top: 28px; }
 .m3d-herramientas { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding-bottom: 16px; border-bottom: 1px solid var(--linea-tarjeta); }
 .m3d-herramientas .m3d-acciones { flex-wrap: wrap; margin-left: auto; }
-.m3d-cabeza h1 { margin: 0 0 6px; font-size: 28px; font-weight: 700; letter-spacing: -0.02em; }
-.m3d-cabeza p { margin: 0; max-width: 560px; color: var(--suave); font-size: 14.5px; line-height: 1.5; }
+.m3d-cabeza-titulo { display: flex; align-items: end; justify-content: space-between; gap: 16px; }
+.m3d-cabeza-titulo > div { display: grid; gap: 4px; min-width: 0; }
+.m3d-cabeza h2 { margin: 0; font-size: 24px; letter-spacing: -.03em; }
+.m3d-cabeza-titulo p { margin: 0; color: var(--suave); font-size: 13px; }
+.m3d-cabeza-conteo { flex: none; padding-bottom: 3px; color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
 .m3d-cuenta { margin-top: -4px; padding-bottom: 16px; font-size: 14.5px; color: var(--suave); }
 .m3d-cuenta strong { color: var(--text); font-weight: 600; }
 .m3d-suave { color: var(--suave); }
@@ -27,9 +37,11 @@
 .m3d-tipos button.on { color: var(--amber-2); border-bottom-color: var(--amber); }
 .m3d-tipos button:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; border-radius: 4px; }
 .m3d-tipos button span { font-size: 14.5px; font-weight: 500; font-variant-numeric: tabular-nums; color: var(--suave); }
-.m3d-orden { flex-shrink: 0; margin-bottom: 5px; color: var(--suave); font-size: 14.5px; font-weight: 600; }
-.m3d-orden > .picker-trigger { padding: 4px 8px; border-radius: 10px; }
+.m3d-orden { flex-shrink: 0; display: inline-flex; align-items: center; gap: 6px; margin-bottom: 5px; padding: 4px 8px; border-radius: 10px; color: var(--suave); font-size: 14.5px; font-weight: 600; cursor: pointer; transition: color 0.15s, background 0.15s; }
+.m3d-orden:hover { color: var(--text); background: var(--panel); }
 .m3d-orden svg { width: 15px; height: 15px; }
+.m3d-orden select { appearance: none; padding: 0; border: 0; outline: none; background: none; color: inherit; font: inherit; cursor: pointer; }
+.m3d-orden select option { background: var(--panel); color: var(--text); }
 .m3d-pista { color: var(--suave); }
 /* Los atajos, a la vista en la cabeza (en angosto, sin teclado, no se dicen). */
 .m3d-teclas { color: var(--suave); }
@@ -64,6 +76,11 @@
 .m3d-cartel.girando .m3d-foto { opacity: 0; }
 .m3d-cartel:hover .m3d-foto { transform: scale(1.03); }
 .m3d-sin { position: absolute; inset: 0 0 25%; display: grid; place-items: center; color: var(--suave); font-size: 14.5px; }
+.m3d-sin-preparando { align-content: center; justify-items: center; gap: 7px; padding: 28px; text-align: center; background: radial-gradient(circle at 50% 40%, color-mix(in srgb, var(--acento-modelo) 10%, transparent), transparent 58%); }
+.m3d-sin-preparando svg { width: 34px; height: 34px; color: var(--acento-modelo, var(--amber)); opacity: .8; }
+.m3d-sin-preparando strong { color: var(--text); font-size: 14px; }
+.m3d-sin-preparando small { max-width: 190px; color: var(--suave); font-size: 11px; line-height: 1.35; }
+.m3d-foto-video { object-fit: contain; }
 .m3d-cartel::after { content: ''; position: absolute; inset: 0; z-index: -1; pointer-events: none; background: linear-gradient(to top, color-mix(in srgb, var(--bg) 96%, transparent), color-mix(in srgb, var(--bg) 70%, transparent) 26%, transparent 48%); }
 .m3d-pie { position: absolute; left: 0; right: 0; bottom: 0; display: flex; flex-direction: column; gap: 2px; padding: 12px 15px 14px; }
 .m3d-pie strong { font-size: 15.5px; font-weight: 650; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -75,6 +92,23 @@
 /* Su tipo, cuando no van agrupados: texto, sin caja. Y su nombre para copiar, al pasar el ratón. */
 .m3d-tipo { position: absolute; top: 11px; left: 13px; color: var(--suave); font-size: 14.5px; font-weight: 600; text-shadow: 0 1px 6px var(--bg); transition: opacity 0.15s; }
 .m3d-cartel:hover .m3d-tipo, .m3d-cartel:focus-visible .m3d-tipo { opacity: 0; }
+/* De dónde sale el modelo: en la esquina de arriba a la derecha de la tarjeta, con un color por origen. */
+.m3d-procedencia { position: absolute; top: 11px; right: 13px; padding: 2px 8px; border: 1px solid var(--line); border-radius: 999px; background: color-mix(in srgb, var(--bg) 80%, transparent); color: var(--suave); font-size: 11.5px; font-weight: 600; line-height: 1.5; white-space: nowrap; }
+.m3d-procedencia.creado { color: var(--ok); border-color: color-mix(in srgb, var(--ok) 55%, var(--line)); }
+.m3d-procedencia.importado { color: var(--acento-codex); border-color: color-mix(in srgb, var(--acento-codex) 55%, var(--line)); }
+.m3d-procedencia.video { color: var(--suave); }
+.m3d-procedencia.editado { top: 36px; color: var(--amber-2); border-color: color-mix(in srgb, var(--amber) 55%, var(--line)); }
+/* El chat vacío: un título corto y centrado que invita a escribir arriba del compositor. */
+.m3d-editor-vacio { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; min-height: 180px; text-align: center; color: var(--muted); }
+.m3d-editor-vacio-icono { display: grid; place-items: center; width: 44px; height: 44px; margin-bottom: 6px; border-radius: 14px; background: color-mix(in srgb, var(--acento-imagen) 14%, transparent); }
+.m3d-editor-vacio-icono svg { width: 22px; height: 22px; color: var(--acento-imagen); }
+.m3d-editor-vacio strong { color: var(--text); font-size: 17px; font-weight: 650; }
+.m3d-editor-vacio p { margin: 0; font-size: 13px; line-height: 1.45; }
+.m3d-editor-vacio-pista { max-width: 260px; color: var(--muted); font-size: 12px; }
+.m3d-chat-modelo { display: inline-grid; place-items: center; width: 28px; height: 28px; padding: 0; box-sizing: border-box; border-radius: 50%; border: 1px solid var(--line); background: var(--panel-2); }
+.m3d-editor-chat-titulo .m3d-chat-modelo { min-height: 0; max-width: none; margin: 0; padding: 0; border: 1px solid var(--line); border-radius: 50%; box-shadow: none; }
+.m3d-chat-modelo .logo.chico { width: 16px; height: 16px; min-height: 0; max-width: none; padding: 0; margin: 0; border: 0; border-radius: 0; background: none; box-shadow: none; }
+.m3d-chat-modelo .logo.chico svg { width: 100%; height: 100%; display: block; }
 .m3d-copiar { position: absolute; top: 8px; right: 8px; max-width: calc(100% - 16px); display: inline-flex; align-items: center; gap: 6px; padding: 4px 9px 4px 8px; border-radius: 8px; background: color-mix(in srgb, var(--bg) 88%, transparent); border: 1px solid var(--line); color: var(--text); font-family: var(--mono); font-size: 14.5px; opacity: 0; transform: translateY(-3px); transition: opacity 0.15s, transform 0.15s, border-color 0.15s, color 0.15s; }
 .m3d-copiar span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .m3d-copiar svg { width: 13px; height: 13px; flex: none; }
@@ -93,6 +127,8 @@
 .m3d-boton { flex-shrink: 0; display: inline-flex; align-items: center; gap: 7px; padding: 7px 14px; border-radius: 10px; border: 1px solid var(--line); color: var(--text); font-size: 14.5px; font-weight: 600; transition: border-color 0.15s, color 0.15s, background 0.15s; }
 .m3d-boton svg { width: 15px; height: 15px; }
 .m3d-boton:hover { border-color: var(--amber); color: var(--amber); background: var(--amber-tinte); }
+.m3d-boton-peligro { color: var(--bad); border-color: color-mix(in srgb, var(--bad) 38%, var(--line)); }
+.m3d-boton-peligro:hover { border-color: var(--bad); color: var(--bad); background: color-mix(in srgb, var(--bad) 12%, transparent); }
 
 /* La ficha. */
 .m3d-velo { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; padding: 32px; background: color-mix(in srgb, var(--bg) 78%, transparent); backdrop-filter: blur(6px); animation: m3d-aparece 0.18s ease-out; }
@@ -114,6 +150,10 @@
 .m3d-ficha-escena.se-gira { cursor: grab; }
 .m3d-ficha-escena.se-gira:active { cursor: grabbing; }
 .m3d-ficha-escena video, .m3d-ficha-escena img { position: absolute; inset: 4%; width: 92%; height: 92%; object-fit: contain; pointer-events: none; transition: transform 0.12s; }
+.m3d-escena-preparando { position: absolute; inset: 0; display: grid; align-content: center; justify-items: center; gap: 9px; padding: 32px; color: var(--suave); text-align: center; background: radial-gradient(circle at 50% 40%, color-mix(in srgb, var(--acento-modelo) 12%, transparent), transparent 62%); }
+.m3d-escena-preparando svg { width: 44px; height: 44px; color: var(--acento-modelo, var(--amber)); opacity: .9; }
+.m3d-escena-preparando strong { color: var(--text); font-size: 16px; }
+.m3d-escena-preparando p { max-width: 290px; margin: 0; line-height: 1.45; }
 .m3d-arrastra { position: absolute; left: 50%; bottom: 16px; translate: -50% 0; display: inline-flex; align-items: center; gap: 7px; color: var(--suave); font-size: 14.5px; white-space: nowrap; pointer-events: none; }
 .m3d-arrastra svg { width: 16px; height: 16px; }
 .m3d-paso { position: absolute; top: 50%; translate: 0 -50%; width: 36px; height: 36px; display: grid; place-items: center; border-radius: 10px; border: 1px solid var(--line); background: color-mix(in srgb, var(--bg) 70%, transparent); color: var(--suave); transition: color 0.15s, border-color 0.15s; }
@@ -146,17 +186,17 @@
 .m3d-enlace { color: var(--amber); text-decoration: underline; text-decoration-color: color-mix(in srgb, var(--amber) 40%, transparent); text-underline-offset: 3px; }
 .m3d-enlace:hover { text-decoration-color: var(--amber); }
 /* Cómo usarlo: siempre a la vista, al pie de la columna aunque los datos sigan debajo. */
-.m3d-usar { position: sticky; bottom: 0; margin: auto -32px 0; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 32px 16px; background: var(--panel); border-top: 1px solid var(--line); font-size: 14.5px; color: var(--suave); }
+.m3d-usar { position: sticky; bottom: 0; margin: auto -32px 0; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px 12px; padding: 14px 32px 16px; background: var(--panel); border-top: 1px solid var(--line); font-size: 14.5px; color: var(--suave); }
 
 @media (max-width: 860px) {
   .m3d > :not(.m3d-velo, .m3d-visor, .m3d-visor-borde, .campo-ascii) { padding-left: 20px; padding-right: 20px; }
+  .m3d-cabeza-titulo { align-items: start; }
   .m3d-busca { flex-basis: 100%; }
   .m3d-herramientas .m3d-acciones { margin-left: 0; }
   .m3d-barra { flex-direction: column; align-items: stretch; gap: 4px; }
   .m3d-tipos { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
   .m3d-tipos button { flex: none; }
   .m3d-orden { align-self: flex-start; }
-  .m3d-teclas { display: none; }
   .m3d-velo { padding: 12px; }
   .m3d-ficha { display: block; overflow-y: auto; }
   /* En angosto la ficha se desplaza: con el dedo, de arriba abajo la desplaza y de lado gira el modelo. */
@@ -164,3 +204,449 @@
   .m3d-ficha-texto { overflow: visible; }
   .m3d-cerrar { position: fixed; top: 22px; right: 22px; z-index: 1; border: 1px solid var(--line); background: color-mix(in srgb, var(--bg) 85%, transparent); }
 }
+@media (max-width: 520px) {
+  .m3d-cabeza-titulo { display: grid; gap: 4px; }
+  .m3d-cabeza-conteo { padding-bottom: 0; }
+  .m3d-proyectos ul { grid-template-columns: 1fr; }
+}
+body .m3d-borrador.composer { display: grid; gap: 10px; padding: 16px; }
+body .m3d-compositor.composer { --acento-modelo: var(--acento-imagen); margin: 0; padding: 14px 16px; }
+.m3d-borrador-titulo { display: flex; align-items: center; gap: 8px; }
+.m3d-borrador-titulo svg { width: 18px; height: 18px; color: var(--acento-imagen); }
+.m3d-borrador-titulo h2, .m3d-proyectos h2 { margin: 0; font-size: 16px; }
+.m3d-borrador textarea {
+  width: 100%; min-height: 86px; max-height: 240px; padding: 10px; resize: vertical;
+  color: var(--text); background: var(--bg); border: 1px solid var(--line); border-radius: 9px;
+}
+.m3d-borrador textarea:focus-visible { outline: 1px solid var(--acento-imagen); outline-offset: 1px; }
+.m3d-compositor textarea {
+  display: block; min-height: 54px; max-height: min(220px, 30dvh); padding: 0; resize: none;
+  field-sizing: content; overflow-y: auto; border: 0; border-radius: 0; background: transparent;
+}
+.m3d-compositor textarea:focus-visible { outline: 0; }
+.m3d-compositor textarea::placeholder { color: var(--muted); }
+.m3d-borrador p { margin: 0; }
+.m3d-ayuda-operacion { color: var(--acento-imagen) !important; font-size: 12px; }
+.m3d-borrador .m3d-borrador-controles {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 8px; margin: 0;
+}
+.m3d-borrador-enviar:has(.dictado > span) { grid-column: 1 / -1; }
+.m3d-compositor .m3d-borrador-selectores { align-self: center; }
+.m3d-borrador-controles .picker { max-width: 100%; }
+.m3d-borrador-controles .picker-trigger { white-space: normal; text-align: left; }
+.m3d-borrador .m3d-generar { margin-inline-start: auto; }
+.m3d-generar.send svg { width: 16px; height: 16px; }
+.m3d-compositor .m3d-adjuntar {
+  min-height: 28px; padding: 3px 8px; border: 1px solid var(--cristal-borde); border-radius: 12px;
+  color: var(--suave);
+}
+.m3d-adjuntar, .m3d-ejemplos { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
+.m3d-adjuntar svg { width: 15px; height: 15px; }
+.m3d-ejemplos button { padding: 3px 8px; border: 1px solid var(--line); border-radius: 8px; }
+.m3d-ejemplos button.activa { color: var(--text); border-color: var(--acento-imagen); background: var(--amber-tinte); }
+.m3d-referencias, .m3d-proyectos ul { display: flex; flex-wrap: wrap; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.m3d-referencias li { position: relative; }
+.m3d-referencias img { display: block; width: 64px; height: 64px; border: 1px solid var(--line); border-radius: 8px; object-fit: cover; }
+.m3d-referencias button {
+  position: absolute; inset: 3px 3px auto auto; display: grid; place-items: center; width: 22px; height: 22px;
+  border-radius: 6px; color: var(--text); background: var(--bg);
+}
+.m3d-referencias button svg { width: 13px; height: 13px; }
+.m3d > .m3d-proyectos { margin-block: 30px 18px; padding-top: 17px; border-top: 1px solid var(--line); }
+.m3d-proyectos h2 { color: var(--muted); font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+.m3d-proyectos ul { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); margin-block-start: 10px; }
+.m3d-proyectos li { min-width: 0; max-width: 100%; }
+.m3d-proyectos a { display: flex; align-items: center; gap: 9px; min-height: 42px; padding: 7px 10px; border: 1px solid var(--line); border-radius: 10px; background: color-mix(in srgb, var(--panel) 70%, transparent); color: var(--text); text-decoration: none; transition: border-color .15s, background .15s; }
+.m3d-proyectos a:hover { border-color: var(--acento-imagen); background: var(--panel); }
+.m3d-proyectos a > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.m3d-proyectos a > small { flex: none; margin-left: auto; color: var(--muted); font-size: 11px; }
+.m3d-proyectos svg, .m3d-editor-cabecera svg, .m3d-usar a svg { width: 16px; height: 16px; flex: none; }
+.m3d-editor { display: flex; flex-direction: column; width: min(100%, 1180px); height: 100%; min-height: 0; box-sizing: border-box; margin-inline: auto; padding: 0 20px; overflow: hidden; }
+.m3d-editor > :not(.m3d-velo, .m3d-visor, .m3d-visor-borde, .campo-ascii) { width: 100%; max-width: none; padding-inline: 0; }
+.m3d-editor-cabecera { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; padding-block: 14px 9px; }
+.m3d-editor-cabecera h1 { flex: 1; min-width: 100px; margin: 0; font-size: clamp(20px, 2vw, 26px); line-height: 1.2; overflow-wrap: anywhere; }
+.m3d-editor-cabecera > .boton:first-child { min-height: 34px; padding: 5px 12px 5px 9px; border: 1px solid color-mix(in srgb, var(--acento-imagen) 45%, var(--line)); border-radius: 999px; background: color-mix(in srgb, var(--acento-imagen) 9%, transparent); color: var(--text); font-size: 13px; font-weight: 650; }
+.m3d-editor-cabecera > .boton:first-child:hover { border-color: var(--acento-imagen); background: color-mix(in srgb, var(--acento-imagen) 16%, transparent); }
+.m3d-editor-herramientas {
+  display: flex; flex-wrap: wrap; gap: 7px; overflow: visible; padding: 2px 0 10px; border-bottom: 1px solid var(--line);
+}
+.m3d-herramienta { display: inline-flex; align-items: center; gap: 2px; flex: none; }
+.m3d-herramienta > button {
+  display: inline-flex; align-items: center; gap: 6px; flex: none; min-height: 32px;
+  padding: 5px 10px; border: 1px solid var(--line); border-radius: 9px;
+  color: var(--suave); background: var(--panel-2); font-size: 12px;
+}
+.m3d-herramienta > button:hover, .m3d-herramienta > button:focus-visible {
+  color: var(--text); border-color: var(--acento-imagen); background: var(--amber-tinte);
+}
+.m3d-editor-herramientas svg { width: 15px; height: 15px; color: var(--acento-imagen); }
+.m3d-herramienta .boton-ayuda { width: 23px; height: 30px; border-radius: 7px; }
+.m3d-herramienta .boton-ayuda svg { width: 14px; height: 14px; color: var(--muted); }
+.m3d-herramienta .boton-ayuda:hover { color: var(--text); background: var(--panel-2); }
+.m3d-ayuda-herramienta { min-width: 250px; }
+.m3d-ayuda-antes-despues {
+  display: grid; grid-template-columns: 1fr auto 1fr; gap: 5px; align-items: center;
+  margin-top: 9px; padding: 16px 8px; border-radius: 9px;
+  background: linear-gradient(135deg, var(--panel-2), var(--bg));
+  color: var(--muted); font-size: 11px; text-align: center;
+}
+.m3d-ayuda-antes-despues span { padding: 10px 3px; border: 1px solid var(--line); border-radius: 6px; }
+.m3d-ayuda-antes-despues span:last-child { color: var(--acento-imagen); border-color: var(--acento-imagen); }
+.m3d-operacion-resumen { display: inline-flex; align-items: center; justify-self: start; gap: 4px; max-width: 100%; padding-inline-start: 9px; border: 1px solid var(--cristal-borde); border-radius: 8px; background: var(--panel-2); color: var(--suave); font-size: 12px; }
+.m3d-operacion-resumen span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.m3d-operacion-resumen button { flex: none; display: grid; place-items: center; width: 26px; height: 26px; border-radius: 7px; }
+.m3d-operacion-resumen button:hover { background: var(--line); color: var(--text); }
+.m3d-operacion-resumen button svg { width: 14px; height: 14px; }
+.m3d-editor .m3d-editor-cuerpo { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) minmax(320px, 440px); gap: 16px; padding-block-end: 24px; }
+.m3d-editor-visor { display: flex; min-height: 420px; border: 1px solid var(--line); border-radius: 14px; overflow: hidden; background: var(--panel); }
+.m3d-editor-visor > * { flex: 1; min-height: 0; border-right: 0; }
+.m3d-editor-visor .m3d-vacio { align-self: center; }
+.m3d-editor-panel {
+  display: flex; flex-direction: column; align-items: stretch; gap: 14px; min-width: 0; min-height: 0;
+  overflow-y: auto; padding: 0 0 8px; color: var(--text);
+}
+.m3d-editor-chat-titulo {
+  display: flex; align-items: center; gap: 7px; min-height: 38px; padding: 0 2px 9px;
+  border-bottom: 1px solid var(--line); color: var(--text); font-size: 14px;
+}
+.m3d-editor-chat-titulo svg { width: 17px; height: 17px; color: var(--acento-imagen); }
+.m3d-editor-chat-titulo span { margin-inline-start: auto; color: var(--muted); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.m3d-editor-panel > p { margin: 0; }
+.m3d-editor-panel .m3d-borrador {
+  width: 100%; margin: 0; border-radius: 16px; background: var(--cristal-fondo);
+  box-shadow: var(--cristal-reflejo); backdrop-filter: blur(12px);
+}
+.m3d-usar a.boton, .m3d-editor-cabecera a.boton { display: inline-flex; align-items: center; gap: 6px; text-decoration: none; }
+@media (max-width: 1040px) {
+  .m3d-editor { padding-inline: 14px; }
+  .m3d-editor-herramientas { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+  .m3d-editor .m3d-editor-cuerpo { grid-template-columns: minmax(0, 1fr); }
+  .m3d-editor-visor { min-height: min(55vh, 400px); }
+}
+
+/* El editor comparte la lectura del editor de imágenes: herramientas sobre la vista, chat independiente y compositor fijo. */
+.m3d-editor-cabecera {
+  align-items: flex-start; padding-block: 16px 12px; border-bottom: 1px solid var(--line);
+}
+.m3d-editor-titulo { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.m3d-editor-volver {
+  display: grid; place-items: center; width: 36px; height: 36px; flex: none;
+  border-radius: 10px; color: var(--acento-modelo); text-decoration: none;
+}
+.m3d-editor-volver:hover { color: var(--text); background: var(--panel); }
+.m3d-editor-volver svg { width: 16px; height: 16px; }
+.m3d-editor-cabecera h1 { font-size: clamp(20px, 2.2vw, 27px); }
+.m3d-editor-datos { display: flex; align-items: baseline; flex-wrap: wrap; gap: 5px 14px; margin-top: 4px; }
+.m3d-editor-datos small { color: var(--muted); font-size: 11px; }
+.m3d-editor-cuerpo { align-items: stretch; }
+.m3d-editor-visual { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+.m3d-editor-visual .m3d-editor-herramientas {
+  flex: none; min-height: 50px; padding: 7px 4px; border: 0; border-bottom: 1px solid var(--line); flex-wrap: wrap; overflow: visible;
+  container: m3d-editor-barra / inline-size;
+}
+.m3d-editor-herramientas { gap: 4px; }
+.m3d-selector-herramientas { min-width: 0; --tinte-editor: var(--acento-modelo); }
+.m3d-selector-crear { --tinte-editor: var(--acento-modelo); }
+.m3d-selector-geometria { --tinte-editor: var(--acento-imagen); }
+.m3d-selector-seleccion { --tinte-editor: var(--bad); }
+.m3d-selector-materiales { --tinte-editor: var(--acento-voz); }
+.m3d-selector-optimizar { --tinte-editor: var(--amber); }
+.m3d-selector-herramientas .picker-trigger {
+  display: inline-flex; align-items: center; gap: 7px; min-height: 36px; max-width: 100%; padding: 5px 9px;
+  border: 1px solid var(--cristal-borde); border-radius: 10px; color: var(--text);
+  background: var(--cristal-fondo); box-shadow: var(--cristal-reflejo); backdrop-filter: blur(10px);
+}
+.m3d-selector-herramientas .picker-trigger:hover:not(:disabled), .m3d-selector-herramientas.open .picker-trigger {
+  border-color: color-mix(in srgb, var(--tinte-editor) 62%, var(--line));
+  background: linear-gradient(155deg, color-mix(in srgb, var(--tinte-editor) 17%, transparent), transparent 78%), var(--panel);
+}
+.m3d-etiqueta-herramienta { display: inline-flex; align-items: center; min-width: 0; gap: 7px; }
+.m3d-etiqueta-herramienta > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.m3d-etiqueta-herramienta > svg { width: 15px; height: 15px; flex: none; color: var(--tinte-editor, var(--acento-imagen)); }
+.m3d-menu-herramientas { min-width: 260px; }
+.m3d-menu-herramientas .picker-fila-info { display: grid; grid-template-columns: minmax(0, 1fr) 30px; align-items: center; gap: 3px; }
+.m3d-menu-herramientas .picker-info { width: 30px; height: 32px; display: grid; place-items: center; border-radius: 7px; color: var(--muted); }
+.m3d-menu-herramientas .picker-info:hover { background: var(--panel-2); color: var(--text); }
+.m3d-menu-herramientas .picker-info:focus-visible { outline: 1px solid var(--text); outline-offset: -2px; }
+.m3d-menu-herramientas .picker-info svg { width: 15px; height: 15px; }
+.m3d-menu-herramientas .picker-option { min-height: 36px; }
+.m3d-menu-herramientas .picker-label { white-space: normal; }
+.m3d-herramienta { gap: 2px; }
+.m3d-herramienta > button {
+  min-height: 36px; padding: 5px 9px; border: 1px solid var(--cristal-borde); border-radius: 10px;
+  background: var(--cristal-fondo); box-shadow: var(--cristal-reflejo); backdrop-filter: blur(10px);
+}
+.m3d-herramienta > button:hover, .m3d-herramienta > button:focus-visible {
+  border-color: color-mix(in srgb, var(--acento-imagen) 58%, var(--line));
+  background: linear-gradient(155deg, color-mix(in srgb, var(--acento-imagen) 17%, transparent), transparent 78%), var(--panel);
+}
+.m3d-herramienta .boton-ayuda { width: 30px; height: 36px; border: 1px solid var(--cristal-borde); border-radius: 10px; background: var(--cristal-fondo); box-shadow: var(--cristal-reflejo); }
+.m3d-herramienta .boton-ayuda:hover { border-color: var(--line); background: var(--panel-2); }
+.m3d-editor-visor { flex: 1; min-height: 0; margin-top: 12px; border-color: var(--cristal-borde); border-radius: 16px; background: radial-gradient(circle at 50% 42%, color-mix(in srgb, var(--panel-2) 70%, transparent), transparent 62%), var(--panel); box-shadow: inset 0 1px 0 color-mix(in srgb, var(--text) 8%, transparent); }
+.m3d-editor-visor { position: relative; }
+.m3d-editor-visor-fijado > iframe { pointer-events: none; }
+.m3d-marcador-capa { position: absolute; inset: 0; z-index: 65; pointer-events: none; }
+.m3d-marcador-capa.activo.fijada { pointer-events: auto; }
+.m3d-marcador { position: absolute; inset: 0; width: 100%; height: 100%; cursor: crosshair; touch-action: none; }
+.m3d-marcador-capa:not(.fijada) .m3d-marcador { pointer-events: none; }
+.m3d-marcador :is(polygon, polyline, circle) { stroke: var(--bad); stroke-width: 2px; stroke-linecap: round; stroke-linejoin: round; pointer-events: none; vector-effect: non-scaling-stroke; }
+.m3d-marcador polyline { fill: none; }
+.m3d-marcador :is(polygon, circle) { fill: color-mix(in srgb, var(--bad) 17%, transparent); fill-rule: evenodd; }
+.m3d-marcador-ayuda { position: absolute; left: 50%; top: 14px; z-index: 70; translate: -50% 0; display: inline-flex; align-items: center; gap: 8px; max-width: calc(100% - 24px); padding: 6px 8px 6px 10px; border: 1px solid color-mix(in srgb, var(--bad) 55%, var(--line)); border-radius: 999px; background: color-mix(in srgb, var(--bg) 84%, transparent); color: var(--text); font-size: 11px; text-align: center; pointer-events: auto; white-space: nowrap; }
+.m3d-marcador-ayuda button { display: inline-flex; align-items: center; gap: 4px; padding: 3px 7px; border: 1px solid color-mix(in srgb, var(--bad) 55%, var(--line)); border-radius: 7px; background: color-mix(in srgb, var(--bad) 12%, transparent); color: var(--text); font-size: 11px; }
+.m3d-marcador-ayuda button:hover { background: color-mix(in srgb, var(--bad) 24%, transparent); }
+.m3d-marcador-ayuda button svg { width: 12px; height: 12px; }
+.m3d-marcador-limpiar { position: absolute; right: 14px; bottom: 14px; z-index: 70; display: inline-flex; align-items: center; gap: 5px; padding: 5px 9px; border: 1px solid color-mix(in srgb, var(--bad) 50%, var(--line)); border-radius: 9px; background: color-mix(in srgb, var(--bg) 86%, transparent); color: var(--text); font-size: 11px; }
+.m3d-marcador-limpiar:hover { background: color-mix(in srgb, var(--bad) 18%, var(--panel)); }
+.m3d-marcador-limpiar svg { width: 13px; height: 13px; }
+/* La barra del visor (encuadrar, malla, cuadrícula y cifras), sobre el modelo, abajo a la izquierda. */
+.m3d-vista-barra {
+  --acento-modelo: var(--acento-imagen);
+  position: absolute; left: 12px; top: 12px; z-index: 70; display: inline-flex; align-items: center; flex-wrap: wrap; gap: 4px;
+  max-width: calc(100% - 24px); padding: 4px; border: 1px solid var(--cristal-borde); border-radius: 12px;
+  background: var(--cristal-fondo); box-shadow: var(--cristal-reflejo); backdrop-filter: blur(10px);
+}
+.m3d-vista-barra button {
+  display: inline-flex; align-items: center; gap: 5px; min-height: 28px; padding: 3px 8px; border: 1px solid transparent; border-radius: 8px;
+  background: transparent; color: var(--suave); font-size: 12px; white-space: nowrap;
+}
+.m3d-vista-barra button:hover { color: var(--text); background: var(--panel-2); }
+.m3d-vista-barra button[aria-pressed='true'] { color: var(--text); border-color: color-mix(in srgb, var(--acento-modelo) 60%, var(--line)); background: color-mix(in srgb, var(--acento-modelo) 16%, transparent); }
+.m3d-vista-barra button:focus-visible { outline: 2px solid var(--acento-modelo); outline-offset: 1px; }
+.m3d-vista-barra svg { width: 14px; height: 14px; flex: none; color: var(--acento-modelo); }
+.m3d-vista-cifras { padding: 0 8px 0 6px; color: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+/* Las barras del visor van en la fila de herramientas: la vista a la derecha de los selectores, y la edición en una fila
+   completa debajo. Si la columna es angosta, la vista deja sus nombres (los iconos y los títulos siguen). */
+/* Ocupa lo que sobra de la primera fila (junto a los selectores); baja de línea solo si su contenido ya no cabe. */
+.m3d-editor-visual .m3d-editor-herramientas > .m3d-vista-barra { position: static; max-width: none; flex: 1 1 0; min-width: 0; flex-wrap: nowrap; justify-content: flex-end; }
+.m3d-editor-visual .m3d-editor-herramientas > .m3d-vista-barra .m3d-vista-cifras { white-space: nowrap; }
+.m3d-editor-visual .m3d-editor-herramientas > .m3d-vista-barra .m3d-vista-cifras { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+/* Va siempre después de la vista (primera fila: selectores y vista; segunda: edición, completa). */
+.m3d-editor-visual .m3d-editor-herramientas > .m3d-edicion-barra { position: static; max-width: none; order: 1; flex: 1 1 100%; flex-wrap: wrap; justify-content: space-between; }
+@container m3d-editor-barra (max-width: 620px) {
+  .m3d-editor-visual .m3d-editor-herramientas > .m3d-vista-barra:not(.m3d-edicion-barra) button > span { display: none; }
+}
+@container m3d-editor-barra (max-width: 480px) {
+  .m3d-editor-visual .m3d-editor-herramientas > .m3d-vista-barra .m3d-vista-cifras { display: none; }
+}
+/* La barra de edición, en una segunda fila bajo la de vista: mover, girar y escalar la pieza elegida; deshacer y rehacer. */
+.m3d-edicion-barra { top: 60px; flex-wrap: nowrap; max-width: calc(100% - 24px); }
+.m3d-edicion-barra button:disabled { opacity: 0.4; cursor: default; }
+.m3d-edicion-barra button:disabled:hover { color: var(--suave); background: transparent; }
+.m3d-edicion-separa { width: 1px; height: 20px; margin-inline: 2px; background: var(--line); }
+/* El botón de guardar: en reposo, discreto; con cambios sin guardar, resaltado; si falla, en rojo. */
+.m3d-editor-cabecera > .m3d-edicion-guardar { margin-inline-start: auto; align-self: center; }
+.m3d-edicion-guardar { display: inline-flex; align-items: center; justify-content: center; gap: 5px; width: 156px; min-width: 156px; min-height: 28px; padding: 3px 9px; border: 1px solid color-mix(in srgb, var(--ok) 45%, var(--line)); border-radius: 8px; background: color-mix(in srgb, var(--ok) 8%, transparent); color: var(--ok); font-size: 12px; white-space: nowrap; flex: none; }
+.m3d-edicion-guardar:hover:not(:disabled) { color: var(--text); background: var(--panel-2); }
+.m3d-edicion-guardar.pendiente { color: var(--text); border-color: color-mix(in srgb, var(--ok) 65%, var(--line)); background: color-mix(in srgb, var(--ok) 18%, transparent); }
+.m3d-edicion-guardar.fallo { color: var(--bad); border-color: color-mix(in srgb, var(--bad) 60%, var(--line)); }
+.m3d-edicion-guardar svg { width: 14px; height: 14px; color: var(--ok); }
+.m3d-edicion-guardar.fallo svg { color: var(--bad); }
+/* Cada herramienta de edición con su color (como los selectores de arriba): ver, mover, girar, escalar; deshacer, rehacer, restablecer. */
+.m3d-edicion-barra > button:nth-of-type(1) svg { color: var(--acento-codex); }
+.m3d-edicion-barra > button:nth-of-type(2) svg { color: var(--acento-pi); }
+.m3d-edicion-barra > button:nth-of-type(3) svg { color: var(--acento-claude); }
+.m3d-edicion-barra > button:nth-of-type(4) svg { color: var(--acento-gemini); }
+.m3d-edicion-barra > button:nth-of-type(-n+7):nth-of-type(n+5) svg { color: var(--acento-voz); }
+.m3d-edicion-guardar:disabled { opacity: 0.8; cursor: default; }
+.m3d-edicion-pieza { box-sizing: border-box; width: 150px; min-width: 150px; max-width: 150px; overflow: hidden; padding: 0 6px; color: var(--muted); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+/* Con la barra angosta, las herramientas quedan en iconos (su nombre sigue en el título y en la lectura de pantalla). */
+@container m3d-editor-barra (max-width: 640px) {
+  .m3d-selector-herramientas .picker-trigger .m3d-etiqueta-herramienta > span { display: none; }
+}
+.m3d-editor-panel {
+  gap: 0; overflow: hidden; border-inline-start: 1px solid var(--line); padding: 0 0 0 14px;
+}
+.m3d-editor-chat-titulo { flex: none; min-height: 51px; padding: 8px 4px 9px 0; }
+.m3d-editor-chat-historial { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 16px 14px 20px 0; scrollbar-gutter: stable; }
+.m3d-editor-chat-historial > * + * { margin-top: 14px; }
+.m3d-editor-chat-historial .m3d-proyectos { margin: 0; }
+.m3d-editor-chat-historial .m3d-proyectos h2 { margin-bottom: 8px; }
+.m3d-editor-mensaje { display: flex; justify-content: flex-end; }
+.m3d-editor-mensaje span { max-width: 92%; padding: 10px 12px; border-radius: 14px 14px 4px 14px; background: var(--panel); color: var(--text); line-height: 1.45; white-space: pre-wrap; overflow-wrap: anywhere; }
+.m3d-generacion { display: grid; align-content: center; justify-items: center; gap: 10px; color: var(--suave); font-size: 14px; }
+.m3d-generacion svg { width: 32px; height: 32px; color: var(--acento-imagen); }
+.m3d-generacion img { width: min(70%, 320px); max-height: 35vh; object-fit: contain; }
+.m3d-pedidos { list-style: none; padding: 0; margin-block: 0 14px; }
+.m3d-pedidos li { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); }
+.m3d-pedidos li + li { margin-top: 6px; }
+.m3d-pedidos li > div { flex: 1; min-width: 0; display: grid; gap: 2px; }
+.m3d-pedidos strong, .m3d-pedidos small { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.m3d-pedidos small { color: var(--suave); }
+.m3d-pedidos a { flex: none; }
+body .m3d-editor-panel .m3d-borrador { flex: none; width: 100%; box-sizing: border-box; padding: 12px; border: 1px solid var(--cristal-borde); border-radius: 16px; background: var(--cristal-fondo); box-shadow: var(--cristal-reflejo); backdrop-filter: blur(12px); }
+.m3d-ayuda-herramienta { min-width: 260px; }
+.m3d-ayuda-cabecera { display: grid; grid-template-columns: 30px minmax(0, 1fr); gap: 9px; align-items: start; }
+.m3d-ayuda-cabecera > div { display: grid; gap: 4px; }
+.m3d-ayuda-cabecera > div > span { color: var(--suave); line-height: 1.4; }
+.m3d-ayuda-icono { display: grid; place-items: center; width: 30px; height: 30px; border: 1px solid color-mix(in srgb, var(--acento-imagen) 48%, var(--line)); border-radius: 8px; background: color-mix(in srgb, var(--acento-imagen) 12%, var(--panel-2)); color: var(--acento-imagen); }
+.m3d-ayuda-icono svg { width: 17px; height: 17px; }
+.m3d-ayuda-imagen { display: block; width: 100%; aspect-ratio: 1.8; margin: 11px 0 10px; border: 1px solid var(--line); border-radius: 9px; object-fit: cover; background: var(--panel-2); }
+.m3d-ayuda-detalle { margin: 0 0 10px; color: var(--text); line-height: 1.45; }
+.m3d-ayuda-datos { display: grid; gap: 7px; margin: 0; padding: 9px 10px; border: 1px solid var(--line); border-radius: 9px; background: color-mix(in srgb, var(--panel-2) 80%, transparent); }
+.m3d-ayuda-datos div { display: grid; gap: 2px; }
+.m3d-ayuda-datos dt { color: var(--acento-imagen); font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
+.m3d-ayuda-datos dd { margin: 0; color: var(--suave); line-height: 1.35; }
+.m3d-ayuda-ejemplo { margin: 10px 0 0; color: var(--suave); line-height: 1.4; }
+.m3d-ayuda-ejemplo strong { color: var(--text); }
+.m3d-ayuda-antes-despues { grid-template-columns: 1fr auto 1fr; gap: 8px; margin-top: 10px; padding: 10px; background: var(--panel-2); }
+.m3d-ayuda-antes-despues > svg { width: 16px; height: 16px; color: var(--acento-imagen); }
+.m3d-ayuda-antes-despues > div { display: grid; justify-items: center; gap: 4px; }
+.m3d-ayuda-antes-despues small { color: var(--muted); font-size: 10px; }
+.m3d-ayuda-preview { display: grid; place-items: center; width: 76px; height: 48px; border: 1px solid var(--line); border-radius: 7px; background: linear-gradient(145deg, #26343b, #12171c); color: var(--muted); }
+.m3d-ayuda-preview svg { width: 24px; height: 24px; }
+.m3d-ayuda-preview-despues { border-color: color-mix(in srgb, var(--acento-imagen) 65%, var(--line)); background: linear-gradient(145deg, color-mix(in srgb, var(--acento-imagen) 30%, #182228), #12171c); color: var(--acento-imagen); }
+@container m3d-editor-barra (max-width: 700px) {
+  .m3d-selector-herramientas .picker-trigger { padding-inline: 7px; }
+  .m3d-selector-herramientas .picker-trigger > .m3d-etiqueta-herramienta > span { max-width: 120px; overflow: hidden; text-overflow: ellipsis; }
+}
+@container m3d-editor-barra (max-width: 540px) {
+  .m3d-selector-herramientas .picker-trigger > .m3d-etiqueta-herramienta > span { display: none; }
+}
+@media (max-width: 1040px) {
+  .m3d-editor-visual .m3d-editor-herramientas { flex-wrap: wrap; overflow: visible; }
+  .m3d-editor-visor { min-height: min(55vh, 400px); }
+  .m3d-editor-panel { border-inline-start: 0; border-block-start: 1px solid var(--line); padding: 0; }
+  .m3d-editor-chat-titulo, .m3d-editor-chat-historial { padding-inline: 0; }
+  .m3d-editor-chat-historial { max-height: 42dvh; }
+  body .m3d-editor-panel .m3d-borrador { border-inline: 0; border-radius: 0; }
+}
+
+/* El chat de edición mantiene el mismo ritmo visual que el editor de imágenes. */
+.m3d-editor-panel {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--panel) 22%, transparent), transparent 28%), var(--bg);
+}
+.m3d-editor-chat-titulo {
+  gap: 9px;
+  padding: 9px 10px;
+  background: color-mix(in srgb, var(--bg) 88%, transparent);
+}
+.m3d-editor-chat-titulo > svg { width: 18px; height: 18px; }
+.m3d-editor-panel > .timeline .timeline-inner { padding: 14px 10px 20px; }
+.m3d-editor-chat-titulo span {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  max-width: 48%;
+  padding: 3px 8px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--panel);
+}
+.m3d-editor-chat-historial {
+  padding: 0;
+  overflow-y: auto;
+  background: var(--bg);
+  scrollbar-gutter: stable;
+}
+.m3d-editor-chat-inner {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  /* Activa el mismo carril interactivo del editor de Imágenes incluso cuando el historial aún es corto. */
+  min-height: calc(100% + 4px);
+  padding: 18px 14px 22px 10px;
+}
+.m3d-editor-chat-inner > * { flex: none; }
+.m3d-editor-chat-inner .m3d-editor-mensaje { margin: 4px 0 0; }
+.m3d-editor-mensaje span {
+  max-width: min(92%, 330px);
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 14px 14px 4px 14px;
+  background: var(--panel-2);
+}
+.m3d-editor-ayuda { margin: auto 0 0; color: var(--muted); font-size: 12px; }
+.m3d-editor-panel > .m3d-borrador {
+  position: relative;
+  z-index: 1;
+  gap: 7px;
+  margin: 0;
+  padding: 10px 12px 11px;
+  border: 1px solid var(--cristal-borde);
+  border-radius: 24px;
+  background: linear-gradient(155deg, color-mix(in srgb, var(--acento-modelo) 7%, transparent), transparent 58%), var(--cristal-fondo);
+  box-shadow: var(--cristal-reflejo);
+  backdrop-filter: blur(12px);
+}
+.m3d-editor-panel > .m3d-borrador .m3d-borrador-titulo { display: none; }
+.m3d-borrador[data-proveedor="claude"] { --acento-modelo: var(--acento-claude); }
+.m3d-borrador[data-proveedor="codex"] { --acento-modelo: var(--acento-codex); }
+.m3d-borrador[data-proveedor="opencode"] { --acento-modelo: var(--acento-opencode); }
+.m3d-borrador[data-proveedor="deepseek"] { --acento-modelo: var(--acento-deepseek); }
+.m3d-borrador[data-proveedor="grok"] { --acento-modelo: var(--acento-grok); }
+.m3d-borrador[data-proveedor="antigravity"] { --acento-modelo: var(--acento-antigravity); }
+.m3d-borrador[data-proveedor="gemini"] { --acento-modelo: var(--acento-gemini); }
+.m3d-borrador[data-proveedor="cursor"] { --acento-modelo: var(--acento-cursor); }
+.m3d-borrador[data-proveedor="muse"] { --acento-modelo: var(--acento-muse); }
+.m3d-borrador[data-proveedor="pi"] { --acento-modelo: var(--acento-pi); }
+.m3d-editor-panel > .m3d-borrador textarea {
+  field-sizing: content;
+  min-height: 26px;
+  max-height: clamp(78px, 20dvh, 150px);
+  padding: 2px 0;
+  border: 0;
+  border-radius: 0;
+  resize: none;
+  background: transparent;
+  line-height: 1.45;
+}
+.m3d-editor-panel > .m3d-borrador textarea:focus { outline: 0; }
+.m3d-editor-panel > .m3d-borrador .m3d-borrador-controles {
+  gap: 6px;
+  min-height: 34px;
+  padding-top: 4px;
+}
+.m3d-borrador-selectores { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; min-width: 0; }
+.m3d-borrador-enviar { display: flex; align-items: center; justify-content: flex-end; gap: 8px; min-width: 0; }
+.m3d-borrador-selectores .m3d-adjuntar,
+.m3d-borrador-selectores .picker-trigger,
+.m3d-borrador-selectores .afinar-boton {
+  min-height: 28px;
+  max-width: 100%;
+  padding: 3px 8px;
+  border: 1px solid var(--cristal-borde);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--panel) 70%, transparent);
+}
+.m3d-borrador-selectores .afinar-boton { display: inline-flex; align-items: center; gap: 5px; color: var(--muted); }
+.m3d-borrador-selectores .afinar-boton svg { width: 14px; height: 14px; }
+.m3d-editor-panel .m3d-borrador-selectores .m3d-adjuntar { width: 30px; justify-content: center; padding-inline: 0; }
+.m3d-borrador-selectores .picker-trigger { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.m3d-editor-panel > .m3d-borrador[data-proveedor] .m3d-borrador-selectores .picker-trigger,
+.m3d-editor-panel > .m3d-borrador[data-proveedor] .m3d-borrador-selectores .afinar-boton {
+  border-color: color-mix(in srgb, var(--acento-modelo) 48%, var(--line));
+}
+.m3d-borrador-enviar .m3d-generar { display: grid; place-items: center; flex: 0 0 34px; }
+.m3d-borrador-enviar .m3d-generar .spinner { width: 15px; height: 15px; }
+.m3d-editor-panel > .m3d-borrador[data-proveedor] .m3d-borrador-enviar .m3d-generar {
+  background: var(--acento-modelo);
+  color: var(--sobre-ambar);
+}
+.m3d-editor-panel > .m3d-borrador[data-proveedor] .m3d-borrador-enviar .m3d-generar:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--acento-modelo) 82%, var(--text));
+}
+@media (max-width: 420px) {
+  .m3d-editor-panel > .m3d-borrador .m3d-borrador-controles { grid-template-columns: 1fr; }
+  .m3d-borrador-enviar { justify-content: flex-end; }
+}
+
+/* En la versión de venta el editor ocupa todo el lienzo, como el editor de Imágenes. */
+.m3d > .m3d-editor { width: 100%; max-width: none; padding-inline: clamp(14px, 3vw, 48px); }
+@media (max-width: 1040px) {
+  .m3d > .m3d-editor { padding-inline: 14px; }
+}
+
+/* La cabecera del chat: solo el icono del modelo de IA, sin círculo, alineado a la derecha del título. */
+.m3d-editor-chat-titulo .m3d-chat-modelo { display: inline-flex; width: auto; height: auto; min-width: 0; margin-inline-start: auto; padding: 0; border: 0; border-radius: 0; background: none; box-shadow: none; }
+.m3d-editor-chat-titulo .m3d-chat-modelo .logo.chico { width: 18px; height: 18px; min-height: 0; padding: 0; margin: 0; border: 0; background: none; box-shadow: none; }
+
+/* El icono del modelo de IA en la cabecera del chat: el logo de la marca dentro de su cuadro oscuro, pequeño. */
+.m3d-editor-chat-titulo .m3d-chat-modelo { width: 24px; height: 24px; }
+.m3d-editor-chat-titulo .m3d-chat-modelo .logo.chico { width: 24px; height: 24px; border-radius: 6px; background: var(--bg); box-shadow: inset 0 0 0 1px var(--line); display: grid; place-items: center; }
+.m3d-editor-chat-titulo .m3d-chat-modelo .logo.chico svg { width: 14px; height: 14px; }
+
+/* Igual que los iconos de la lista de proveedores: cuadro oscuro sin borde, con el logo blanco al centro. */
+.m3d-editor-chat-titulo .m3d-chat-modelo { width: 26px; height: 26px; align-self: center; }
+.m3d-editor-chat-titulo .m3d-chat-modelo .logo.chico { width: 26px; height: 26px; border-radius: 7px; background: var(--bg); box-shadow: none; }
+.m3d-editor-chat-titulo .m3d-chat-modelo .logo.chico svg { width: 16px; height: 16px; }

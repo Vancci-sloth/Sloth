@@ -15,11 +15,11 @@
  *   conexión son una, y la misma computadora en otra red sigue siendo una. La conexión se guarda cifrada (`redDe`).
  * - Una cuenta de menos de `ANTIGUEDAD` no suma videos: así no sirve abrir cuentas para inflar un estilo.
  * - El creador ve las pruebas de cada estilo y descarta lo que no es de verdad (`/pruebas`, `/descartar`) antes de pagar.
- * - Solo cuentan los estilos aprobados, y los del creador de Sloth no se llevan del fondo. Tampoco los de quien no
+ * - Solo cuentan los estilos aprobados, y los del creador de VyMotion no se llevan del fondo. Tampoco los de quien no
  *   quiso participar (sin Binance ID, `reparto.ts`): sus puntos se ven, pero el fondo se reparte entre los demás.
- * - La tienda la ve cualquiera, pero instalar un estilo y sumarle videos es de quien apoya (`apoya` en
- *   `comunidad.ts`): así cada persona falsa cuesta un apoyo de verdad. A quien no apoya la tienda se lo dice
- *   (`sinApoyo`, con cuántos estilos hay), para que la app le enseñe la invitación a apoyar al querer instalar uno.
+ * - Los estilos son de quien apoya (`apoya` en `comunidad.ts`): solo quien apoya los ve, los instala y suma videos.
+ *   Para que cada persona falsa cueste un apoyo de verdad. A los demás la tienda les dice cuántos hay (`cerrada`) y les
+ *   enseña solo los suyos, que cualquiera puede compartir.
  *
  * Los puntos del periodo (`puntosDelMes`; un mes, y el primero junta dos: `periodoFondo`) son públicos: `PUNTOS.persona` por persona que terminó un video con él,
  * `PUNTOS.video` por video (hasta `PUNTOS.tope` por persona al mes) y `PUNTOS.variante` por variante aprobada ese mes.
@@ -32,9 +32,8 @@
  *   `{publicacion, periodo?, videos?: [{equipo, huella}], miembro?, descartado}`.
  */
 import type { Autor, EstiloTienda, FondoComunidad, OrdenTienda, PruebasEstilo, TiendaEstilos } from '../../shared/types.ts'
-import { aLaVista, apoya, armar, conCupo, esCreador, esDe, type Guardada, type Miembro, miembros, OCULTAR, palabrasDe, sinAcentos, urlDe } from './comunidad.ts'
+import { apoya, armar, conCupo, esCreador, esDe, type Guardada, type Miembro, miembros, OCULTAR, palabrasDe, sinAcentos, urlDe } from './comunidad.ts'
 import { esPeriodo, fondo, periodoFondo } from './fondo.ts'
-import { guardado, olvidar } from './guardado.ts'
 import { cuerpo, type Env, Rechazo } from './index.ts'
 
 export const PUNTOS = { persona: 3, video: 1, tope: 10, variante: 10 }
@@ -46,8 +45,7 @@ const POR_ENVIO = 50
 const HUELLA = /^[0-9a-f]{16,64}$/
 const ID = /^[a-z0-9]+$/
 const PRUEBA = /^[a-z0-9]{20}\.(png|jpg|webp)$/
-/** Cada cuánto se recuentan los números de la tienda, para todas las copias del Worker. */
-const NUMEROS = 60_000
+const GUARDADO = 60_000
 
 export interface VideosDeEquipo {
   publicacion: string
@@ -147,7 +145,7 @@ export async function redDe(req: Request, env: Env): Promise<string> {
   return [...firma.slice(0, 8)].map((b) => b.toString(16).padStart(2, '0')).join('')
 }
 
-/** Un estilo aprobado, con de quién es y si se lleva del fondo: ni los del creador de Sloth ni los de quien no participa. */
+/** Un estilo aprobado, con de quién es y si se lleva del fondo: ni los del creador de VyMotion ni los de quien no participa. */
 export interface EstiloDelFondo {
   id: string
   titulo: string
@@ -167,36 +165,28 @@ export interface Numeros {
   /** De qué estilo salió cada uno. */
   origen: Map<string, string>
 }
-/** Los números como van en la tabla `guardado`: cada `Map`, como su lista. */
-type NumerosGuardados = { [K in keyof Numeros]: Numeros[K] extends Map<infer L, infer V> ? [L, V][] : Numeros[K] }
+let guardados: (Numeros & { hasta: number }) | undefined
 
-/**
- * Los números del periodo en curso, guardados para todas las copias del Worker (`guardado.ts`): recorren `estilo_usos`
- * entera, y en la memoria de cada copia se recorrían una vez por copia.
- */
+/** Los números del periodo en curso: se recorren a lo más cada minuto (D1 cobra por fila leída). */
 export async function numerosActuales(env: Env): Promise<Numeros> {
-  const periodo = periodoFondo(new Date())
-  const g = await guardado<NumerosGuardados>(env, `numeros:${periodo}`, async () => {
-    const n = await numerosDe(env, periodo)
-    return { ...n, estilos: [...n.estilos], siempre: [...n.siempre], mes: [...n.mes], origen: [...n.origen] }
-  }, false, NUMEROS)
-  return { ...g, estilos: new Map(g.estilos), siempre: new Map(g.siempre), mes: new Map(g.mes), origen: new Map(g.origen) }
+  const ahora = Date.now()
+  const periodo = periodoFondo(new Date(ahora))
+  if (guardados && guardados.periodo === periodo && guardados.hasta > ahora) return guardados
+  guardados = { ...(await numerosDe(env, periodo)), hasta: ahora + GUARDADO }
+  return guardados
 }
 
-/**
- * Los números de todos los estilos que ve la comunidad (aprobados, pre-aprobados o con una versión a la vista mientras se
- * revisa otra: `aLaVista`), con los puntos de un periodo (el reparto los pide del que cerró).
- */
+/** Los números de todos los estilos aprobados, con los puntos de un periodo (el reparto los pide del que cerró). */
 export async function numerosDe(env: Env, periodo: string): Promise<Numeros> {
   const [estilos, descargas, videos, variantes] = await env.DB.batch([
-    // Los que están a la vista, con su autor. Del fondo se llevan los de quien participa (dio su Binance ID) y no es el creador.
+    // Los aprobados, con su autor. Del fondo se llevan los de quien participa (dio su Binance ID) y no es el creador.
     env.DB.prepare(
-      `SELECT p.id, p.titulo, p.autor, (m.clave != 'admin' AND m.binance IS NOT NULL) AS participa FROM publicaciones p LEFT JOIN miembros m ON m.id = p.autor WHERE p.categoria = 'estilos' AND ${aLaVista('p.')}`
+      "SELECT p.id, p.titulo, p.autor, (m.clave != 'admin' AND m.binance IS NOT NULL) AS participa FROM publicaciones p LEFT JOIN miembros m ON m.id = p.autor WHERE p.categoria = 'estilos' AND p.aprobada = 1"
     ),
     env.DB.prepare("SELECT publicacion, COUNT(*) AS n FROM estilo_usos WHERE tipo = 'descarga' GROUP BY publicacion"),
     env.DB.prepare("SELECT publicacion, equipo, red, periodo, COUNT(*) AS videos FROM estilo_usos WHERE tipo = 'video' AND descartado = 0 GROUP BY publicacion, equipo, red, periodo"),
     env.DB.prepare(
-      `SELECT p.id, json_extract(j.value, '$.de') AS de, p.autor, p.creada FROM publicaciones p, json_each(p.adjuntos) j WHERE p.categoria = 'estilos' AND ${aLaVista('p.')} AND json_extract(j.value, '$.tipo') = 'estilo' AND json_extract(j.value, '$.de') IS NOT NULL`
+      "SELECT p.id, json_extract(j.value, '$.de') AS de, p.autor, p.creada FROM publicaciones p, json_each(p.adjuntos) j WHERE p.categoria = 'estilos' AND p.aprobada = 1 AND json_extract(j.value, '$.tipo') = 'estilo' AND json_extract(j.value, '$.de') IS NOT NULL"
     )
   ])
   const filas = (estilos.results as { id: string; titulo: string; autor: string; participa: number | null }[]).map((f) => ({ ...f, participa: !!f.participa }))
@@ -233,18 +223,20 @@ export async function numerosDe(env: Env, periodo: string): Promise<Numeros> {
 }
 
 /** Que los números se vuelvan a leer: cambió quién participa o qué cuenta. */
-export const olvidarNumeros = (env: Pick<Env, 'DB'>) => olvidar(env, 'numeros:')
+export const olvidarNumeros = () => void (guardados = undefined)
 
 /**
  * `GET /comunidad/estilos`: los que `yo` puede ver (lo suyo por aprobar también), con sus números, buscados y ordenados.
- * A quien no apoya, los mismos, y que no los puede instalar (`sinApoyo`).
+ * A quien no apoya, solo los suyos, y cuántos hay (`cerrada`).
  */
 export async function tienda(env: Env, yo: Miembro, url: URL): Promise<TiendaEstilos> {
   const orden = (url.searchParams.get('orden') || 'favoritos') as OrdenTienda
   if (!ORDENES_TIENDA.includes(orden)) throw new Rechazo(400, 'Ese orden no existe.')
   const donde = ["categoria = 'estilos'"]
   const valores: (string | number)[] = []
-  if (!esCreador(yo)) donde.push(`((reportes < ? AND ${aLaVista()}) OR autor = ?)`), valores.push(OCULTAR, yo.id)
+  const abierta = apoya(yo)
+  if (!abierta) donde.push('autor = ?'), valores.push(yo.id)
+  else if (!esCreador(yo)) donde.push('((reportes < ? AND aprobada = 1) OR autor = ?)'), valores.push(OCULTAR, yo.id)
   // Las palabras solo llevan letras y números (`palabrasDe`): ni `%` ni `_` llegan al LIKE.
   for (const p of palabrasDe(url.searchParams.get('q') ?? '')) {
     donde.push(`(${sinAcentos('titulo')} LIKE ? OR ${sinAcentos('texto')} LIKE ? OR ${sinAcentos('adjuntos')} LIKE ?)`)
@@ -260,12 +252,9 @@ export async function tienda(env: Env, yo: Miembro, url: URL): Promise<TiendaEst
   const pubs = await armar(env, yo, filas.results)
   const titulos = new Map<string, string>()
   const faltan = [...new Set(pubs.map((p) => n.origen.get(p.id)).filter((d): d is string => !!d))]
-  // D1 acepta hasta 100 valores por consulta.
-  for (let i = 0; i < faltan.length; i += 90) {
-    const parte = faltan.slice(i, i + 90)
-    for (const r of (await env.DB.prepare(`SELECT id, titulo FROM publicaciones WHERE ${aLaVista()} AND id IN (${parte.map(() => '?').join(', ')})`).bind(...parte).all<{ id: string; titulo: string }>()).results)
+  if (faltan.length)
+    for (const r of (await env.DB.prepare(`SELECT id, titulo FROM publicaciones WHERE aprobada = 1 AND id IN (${faltan.map(() => '?').join(', ')})`).bind(...faltan).all<{ id: string; titulo: string }>()).results)
       titulos.set(r.id, r.titulo)
-  }
   const estilos: EstiloTienda[] = pubs.map((p) => {
     const s = n.siempre.get(p.id) ?? { descargas: 0, videos: 0, personas: 0, variantes: 0 }
     const mes = n.mes.get(p.id) ?? { personas: 0, videos: 0, variantes: 0, puntos: 0 }
@@ -292,7 +281,7 @@ export async function tienda(env: Env, yo: Miembro, url: URL): Promise<TiendaEst
     const y = clave(b)
     return x === y ? b.publicacion.creada.localeCompare(a.publicacion.creada) : x < y ? 1 : -1
   })
-  return { estilos, fondo: f, puntos: n.total, reglas: { ...PUNTOS, dias: ANTIGUEDAD / 86_400_000 }, ...(apoya(yo) ? {} : { sinApoyo: { estilos: n.estilos.size } }) }
+  return { estilos, fondo: f, puntos: n.total, reglas: { ...PUNTOS, dias: ANTIGUEDAD / 86_400_000 }, ...(abierta ? {} : { cerrada: { estilos: n.estilos.size } }) }
 }
 
 /** `POST /comunidad/estilos/uso`: lo que se hizo con estilos de la comunidad en la computadora de `yo`. */
@@ -320,13 +309,13 @@ export async function usos(req: Request, env: Env, yo: Miembro): Promise<{ ok: t
   if (!(await conCupo(env, yo, 'usos'))) throw new Rechazo(429, 'Ya se mandó mucho hoy desde esta computadora. Mañana sigue.')
   const periodo = periodoFondo(ahora)
   const red = await redDe(req, env)
-  // Solo de un estilo a la vista y de alguien más: ni el autor, ni una computadora de las cuentas de su correo.
+  // Solo de un estilo aprobado y de alguien más: ni el autor, ni una computadora de las cuentas de su correo.
   const resultado = await env.DB.batch(
     lista.map((u) =>
       env.DB.prepare(
         `INSERT OR IGNORE INTO estilo_usos (publicacion, tipo, equipo, huella, miembro, red, prueba, periodo, creado)
         SELECT ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9 FROM publicaciones p
-        WHERE p.id = ?1 AND p.categoria = 'estilos' AND ${aLaVista('p.')} AND p.autor != ?5
+        WHERE p.id = ?1 AND p.categoria = 'estilos' AND p.aprobada = 1 AND p.autor != ?5
           AND NOT EXISTS (
             SELECT 1 FROM equipos e JOIN licencias l ON l.clave = e.clave
             WHERE e.equipo = ?3 AND l.email IN (SELECT la.email FROM miembros ma JOIN licencias la ON la.clave = ma.clave WHERE ma.id = p.autor)
@@ -335,13 +324,13 @@ export async function usos(req: Request, env: Env, yo: Miembro): Promise<{ ok: t
     )
   )
   const contados = resultado.reduce((s, r) => s + (r.meta.changes ?? 0), 0)
-  // Lo contado sale en la tienda al recontar (`NUMEROS`): olvidarlo en cada uso haría recontar a todas las copias sin parar.
+  if (contados) guardados = undefined
   return { ok: true, contados }
 }
 
 /** Solo el creador: las pruebas de los videos de un estilo en un mes, con quién y de qué persona es cada una. */
 export async function pruebas(env: Env, yo: Miembro, url: URL): Promise<PruebasEstilo> {
-  if (!esCreador(yo)) throw new Rechazo(403, 'Eso solo lo ve el creador de Sloth.')
+  if (!esCreador(yo)) throw new Rechazo(403, 'Eso solo lo ve el creador de VyMotion.')
   const publicacion = url.searchParams.get('publicacion') ?? ''
   const periodo = url.searchParams.get('periodo') || periodoFondo()
   if (!ID.test(publicacion) || !esPeriodo(periodo)) throw new Rechazo(400, 'Falta el estilo o el mes.')
@@ -374,7 +363,7 @@ export async function pruebas(env: Env, yo: Miembro, url: URL): Promise<PruebasE
 
 /** Solo el creador: que unos videos (o todos los de un miembro en ese mes) cuenten o no. */
 export async function descartar(req: Request, env: Env, yo: Miembro): Promise<{ ok: true; cambiados: number }> {
-  if (!esCreador(yo)) throw new Rechazo(403, 'Eso solo lo hace el creador de Sloth.')
+  if (!esCreador(yo)) throw new Rechazo(403, 'Eso solo lo hace el creador de VyMotion.')
   const c = await cuerpo(req)
   const publicacion = String(c.publicacion ?? '')
   const periodo = String(c.periodo || periodoFondo())
@@ -390,6 +379,6 @@ export async function descartar(req: Request, env: Env, yo: Miembro): Promise<{ 
   }
   if (!consultas.length) return { ok: true, cambiados: 0 }
   const r = await env.DB.batch(consultas)
-  await olvidarNumeros(env)
+  guardados = undefined
   return { ok: true, cambiados: r.reduce((s, x) => s + (x.meta.changes ?? 0), 0) }
 }

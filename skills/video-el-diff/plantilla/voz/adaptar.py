@@ -2,7 +2,7 @@
 Adapta el video a una narración grabada por fuera, en lugar de la de edge-tts.
 
 Toma la transcripción con tiempos por palabra de fuentes/voz/palabras.json (WhisperX, con los procesos de
-Sloth) y la empareja con las palabras del guion. Las que coinciden fijan el tiempo; las que no (cifras, nombres que
+VyMotion) y la empareja con las palabras del guion. Las que coinciden fijan el tiempo; las que no (cifras, nombres que
 el guion escribe como se pronuncian) se reparten el hueco entre sus vecinas según su largo. Un beat sin palabras
 (`say` vacío, "…") ocupa la pausa tras la última palabra del anterior.
 

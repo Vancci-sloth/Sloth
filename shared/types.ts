@@ -13,7 +13,7 @@ export interface Card {
    * segundo número si se nota en los videos (2.0 → 2.1), y el primero si cambia a fondo, con su `cambio` (2.1 → 3.0).
    */
   version?: string
-  /** Carpeta donde trabaja el agente. `{app}` es la carpeta de Sloth. Si falta, es `<trabajo>/<id>` (`carpetaTrabajo`). */
+  /** Carpeta donde trabaja el agente. `{app}` es la carpeta de VyMotion. Si falta, es `<trabajo>/<id>` (`carpetaTrabajo`). */
   cwd: string
   icon?: string
   /** Con varios enlaces, un video por enlace, cada uno en su hilo. */
@@ -41,17 +41,12 @@ export interface Card {
    */
   musica?: true
   /**
-   * El estilo de Sloth del que partió uno tuyo (lo copió «Nuevo estilo»): pide los paquetes de Python de ese
+   * El estilo de VyMotion del que partió uno tuyo (lo copió «Nuevo estilo»): pide los paquetes de Python de ese
    * (`server/requisitos.ts`) y es con el que se compara al compartirlo (`server/estilos.ts`).
    */
   basadoEn?: string
   /** Un estilo que instalaste de otro: de dónde vino. Al volver a instalarlo de ahí, se pone al día. */
   origen?: OrigenEstilo
-  /**
-   * Un estilo instalado de la comunidad (`origen.publicacion`) en una computadora que ya no apoya a Sloth: lo pone el
-   * servidor. Lleva su candado y no hace videos hasta volver a apoyar (`web/src/SinApoyo.tsx`); los ya hechos se quedan.
-   */
-  bloqueada?: true
   /**
    * Un estilo tuyo que salió de uno de la comunidad (lo copió «Nuevo estilo» de uno instalado): la publicación de aquel.
    * Al compartirlo, cuenta como su variante (`licencias/src/tienda.ts`).
@@ -69,13 +64,13 @@ export interface Card {
    */
   sinHerramientas?: string[]
   /**
-   * Una versión de Sloth cambió este estilo a fondo: quien ya lo usaba puede quedarse también con el de antes
+   * Una versión de VyMotion cambió este estilo a fondo: quien ya lo usaba puede quedarse también con el de antes
    * (`server/anteriores.ts`).
    */
   cambio?: CambioEstilo
 }
 
-/** Lo que dice la card de un estilo de Sloth que cambió a fondo (`Card.cambio`). */
+/** Lo que dice la card de un estilo de VyMotion que cambió a fondo (`Card.cambio`). */
 export interface CambioEstilo {
   /** El día del cambio, `AAAA-MM-DD`: lo distingue de otro y nombra el de antes («hasta el 7 nov 2026»). */
   fecha: string
@@ -83,7 +78,7 @@ export interface CambioEstilo {
   texto: string
   /** El titular del aviso, en una línea («Sale en 5 minutos y gasta 46 veces menos»). Si falta, «Pasó a la versión N». */
   titulo?: string
-  /** Dónde ver los dos lado a lado, fuera de Sloth. */
+  /** Dónde ver los dos lado a lado, fuera de VyMotion. */
   compara?: string
   /** El mismo video hecho con el de antes y con el nuevo, que el aviso enseña lado a lado. */
   comparacion?: Comparacion
@@ -133,61 +128,18 @@ export interface GuiaEstilo {
   entrega: string
   /** Un mensaje de ejemplo, listo para mandar. */
   ejemplo: string
-  /** Lo que hace falta aparte de Sloth (cuentas, material propio), si algo. */
+  /** Lo que hace falta aparte de VyMotion (cuentas, material propio), si algo. */
   necesita?: string
-  /** Con qué de Sloth hace el video (`HERRAMIENTAS` en `shared/guia.ts`): solo código, Google Flow, voz generada… */
-  herramientas?: string[]
-  /** Los agentes con que se probó y da buen resultado. */
-  agentes?: Proveedor[]
 }
 
-/**
- * La prueba de un estilo compartido: lo que costó hacer el video con que se enseña, medido en el hilo donde se hizo
- * (`server/prueba-estilo.ts`). Los números se ven en la tienda; `hilo`, su evidencia, solo su autor y el creador.
- */
-export interface PruebaEstilo {
-  /** El agente que hizo el video y su modelo, como lo llama su proveedor. */
-  agente: Proveedor
-  modelo: string
-  /** Lo que costó el hilo hasta ese video, en dólares a precio de la API (con una suscripción no se cobra aparte). */
-  costo: number
-  /** Los segundos que trabajó el agente hasta dejarlo terminado, sin lo que esperó a quien lo usa. */
-  segundos: number
-  /** Cuánto dura el video. */
-  video?: number
-  /** El hilo, resumido: lo que se le pidió, cada turno con lo que tardó y costó, y lo que usó de Sloth. Sin sus archivos. */
-  hilo?: { pedido: string; turnos: { segundos: number; costo: number; herramientas: number }[]; usa: string[] }
-  /** La llave del hilo completo (`EvidenciaEstilo`), un archivo de la comunidad que solo bajan su autor y el creador. */
-  evidencia?: string
-}
-
-/**
- * El hilo completo donde se hizo el video de una prueba, como lo guardó Sloth: lo que se le pidió al agente, lo que
- * contestó y lo que hizo en cada turno, hasta el video terminado. Es la evidencia de la prueba: «Ver la evidencia», en
- * la publicación del estilo, la enseña a su autor y al creador (`web/src/Evidencia.tsx`).
- */
-export interface EvidenciaEstilo {
-  version: 1
-  titulo: string
-  modelo: string
-  pasos: PasoEvidencia[]
-}
-
-export type PasoEvidencia =
-  | { t: 'usuario'; texto: string }
-  | { t: 'agente'; texto: string }
-  /** `entrada` y `salida`, recortadas: lo que se le pasó a la herramienta y lo que devolvió. */
-  | { t: 'herramienta'; nombre: string; entrada: string; salida?: string; error?: true }
-  | { t: 'turno'; segundos: number; costo: number; ok: boolean; error?: string }
-
-/** De dónde vino un estilo instalado: de un archivo (sin `publicacion`) o de la comunidad, y de qué versión de Sloth. */
+/** De dónde vino un estilo instalado: de un archivo (sin `publicacion`) o de la comunidad, y de qué versión de VyMotion. */
 export interface OrigenEstilo {
   /** La publicación de la sección Estilos y la llave de su paquete. */
   publicacion?: string
   llave?: string
   /** Quién lo compartió, como se llama en la comunidad. */
   autor?: string
-  /** La versión de Sloth donde se hizo. */
+  /** La versión de VyMotion donde se hizo. */
   sloth: string
 }
 
@@ -200,7 +152,7 @@ export interface ModeloTarea {
 
 /**
  * `principal` es el del hilo (un id del catálogo, como `claude-opus-5-5`). `tareas` son sus subagentes, con el nombre
- * con que la skill los conoce y el modelo como lo pide la herramienta Agent (`opus`, `sonnet`, `haiku`): Sloth se los
+ * con que la skill los conoce y el modelo como lo pide la herramienta Agent (`opus`, `sonnet`, `haiku`): VyMotion se los
  * pasa en la línea `Subagentes:` del primer mensaje.
  */
 export interface ModelosConf {
@@ -312,7 +264,7 @@ export interface Marcas {
   otras: string[]
 }
 
-/** Un archivo de una skill que ya no es como lo trae Sloth (`server/originales.ts`): cambiado o, con `borrado`, quitado. */
+/** Un archivo de una skill que ya no es como lo trae VyMotion (`server/originales.ts`): cambiado o, con `borrado`, quitado. */
 export interface CambioSkill {
   skill: string
   archivo: string
@@ -376,7 +328,7 @@ export interface Avance {
   /** Los archivos de la línea de tiempo del editor de escenas que ya existen; `cuadros` va por id de escena. */
   editor?: { guion?: Archivo; linea?: Archivo; cuadros: Record<string, Archivo> }
   /**
-   * El monitor de la fase Video, el mismo para todos los estilos. `motor`: el motor en vivo de Sloth (`server/motor.ts`),
+   * El monitor de la fase Video, el mismo para todos los estilos. `motor`: el motor en vivo de VyMotion (`server/motor.ts`),
    * el video sin renderizar de cualquier proyecto de Remotion; `v` sube con cada versión y `armando` dice que viene otra.
    * `vivo`: la página en vivo que arma la propia skill (la de El Diff), para cuando el motor no puede (sin `node_modules`);
    * `t` es el de su entrada más nueva. Las dos hablan con el monitor por `postMessage` (`listo`, `tiempo`, `ir`, `play`,
@@ -458,7 +410,7 @@ export interface Tokens {
 }
 
 export interface SessionMeta {
-  /** El nombre de partida, mientras su agente no le ponga uno corto (`server/titulos.ts`). Renombrarlo lo quita. */
+  /** Nombre provisional que puede sustituir el agente; un renombrado manual lo cancela. */
   tituloPendiente?: string
   id: string
   cardId: string
@@ -470,9 +422,10 @@ export interface SessionMeta {
   updatedAt: number
   /** El id del hilo en su proveedor, para retomarlo tras reiniciar. */
   providerSessionId?: string
-  /** Con qué cuenta de Claude o de ChatGPT trabaja (`server/perfiles-agentes.ts`); sin ella, la original. */
+  /** Configuración de Claude en la que vive la sesión de este hilo. */
   perfilClaude?: string
-  perfilCodex?: string
+  /** Perfil de autenticación del proveedor con el que se abrió esta sesión. */
+  perfilAgente?: string
   /**
    * Codex: el hilo empezó con la llave de API, no con la cuenta de ChatGPT, y sigue con ella (`server/acceso.ts`). Codex le
    * reenvía al modelo su razonamiento, cifrado para lo que lo hizo.
@@ -481,19 +434,25 @@ export interface SessionMeta {
   running: boolean
   /** Fuera de la lista de la barra lateral, sin borrarse. */
   archived?: boolean
-  /** El chat de una imagen del estudio (`server/flow/hilo-imagen.ts`), por su imagen de partida: no se le escribe. */
+  /** Imagen de partida del historial que registra el estudio de imágenes. */
   imagenEstudio?: string
+  /** Modelo de salida del estudio 3D y, para una variante, el modelo de partida. */
+  modelo3d?: import('./modelos3d.ts').TrabajoModelo3D
+  /** Punto del historial desde el que se ve un chat técnico que pasó a ser el de la imagen. */
+  desdeImagen?: number
   /** Las tareas en segundo plano que siguen vivas, por su descripción. */
   background?: string[]
   /** Si es un video de un lote: cuál es, de cuántos, y la carpeta que le tocó dentro de `cwd`. */
   lote?: Lote
   /**
-   * Panel de etapas: la carpeta de un hilo suelto dentro de `cwd`. La de un video nuevo la nombra Sloth al crearlo, y la
+   * Panel de etapas: la carpeta de un hilo suelto dentro de `cwd`. La de un video nuevo la nombra VyMotion al crearlo, y la
    * skill la lee en la línea `Carpeta:` del primer mensaje; la de un video que sigue, la elige el usuario. La de un video
-   * de un lote va en `lote`. Si el usuario la cambia desde el panel, manda sobre las dos. Los hilos de antes de que Sloth
+   * de un lote va en `lote`. Si el usuario la cambia desde el panel, manda sobre las dos. Los hilos de antes de que VyMotion
    * la nombrara no tienen.
    */
   carpeta?: string
+  /** Carpetas nuevas que VyMotion asignó al hilo, incluidas sus versiones. */
+  carpetasGeneradas?: string[]
   /** Cuántas caídas seguidas se retomaron solas (ver `retomar` en sessions.ts). Vuelve a cero cuando un turno acaba bien. */
   retomas?: number
   /** Si su último turno acabó bien: `false` si falló o se cortó. Falta si aún no acabó ninguno. Lo mira el archivado automático. */
@@ -521,26 +480,6 @@ export interface Lote {
 }
 
 
-/** Una dirección de esta computadora a la que puede llegar el celular: la red de la casa, Tailscale u otra. */
-export interface DireccionCelular {
-  ip: string
-  /** El nombre de su red en el sistema («Wi-Fi», «Ethernet», «Tailscale»). */
-  red: string
-  tipo: 'casa' | 'tailscale' | 'otra'
-  url: string
-}
-
-/** `GET /api/celular`: la puerta del celular (`server/celular.ts`, ADR 0025). `enlace` es lo que lleva el QR. */
-export interface Celular {
-  activo: boolean
-  escuchando: boolean
-  puerto: number
-  llave: string
-  direcciones: DireccionCelular[]
-  enlace: string
-  error?: string
-}
-
 /** Lo que enseña la pantalla de Opciones. De una llave solo viaja el final, para reconocerla. */
 export interface Opciones {
   /** La de la API de YouTube (Data API v3), opcional: la sección Ideas saca con ella fechas y comentarios. */
@@ -554,7 +493,7 @@ export interface Opciones {
 
 /**
  * El navegador de tu computadora donde se entra con Google, que no deja hacerlo dentro de la app (`server/chromium.ts`).
- * `elegido`: el programa del que elegiste en Opciones, o `null` si lo toma Sloth; `automatico`: el nombre del que toma
+ * `elegido`: el programa del que elegiste en Opciones, o `null` si lo toma VyMotion; `automatico`: el nombre del que toma
  * entonces, o `null` si no hay ninguno; `lista`: los instalados que sirven.
  */
 export interface NavegadorDeFuera {
@@ -572,7 +511,7 @@ export interface Enlace {
   autor?: string
 }
 
-/** Las redes donde Sloth programa los videos verticales terminados (`server/redes/`). Cada una es un módulo. */
+/** Las redes donde VyMotion programa los videos verticales terminados (`server/redes/`). Cada una es un módulo. */
 export type RedId = 'tiktok' | 'instagram' | 'youtube'
 
 /**
@@ -643,8 +582,8 @@ export interface Borrador {
 /**
  * Un video en una red: en `cola` espera su turno; `programado` sale solo a la hora `cuando` (`'2026-10-12 16:00'`), y
  * `publicado` es que la red dijo que ya salió. `descartado` es que lo quitaste (de la cola, o tras fallar): «Programar los
- * que faltan» no lo vuelve a poner hasta que lo deshagas. `ref` es el nombre que le da Sloth antes del primer intento (en
- * Instagram, el del video en la nube de Sloth), para reintentarlo sin subirlo otra vez. `huella` identifica el contenido
+ * que faltan» no lo vuelve a poner hasta que lo deshagas. `ref` es el nombre que le da VyMotion antes del primer intento (en
+ * Instagram, el del video en la nube de VyMotion), para reintentarlo sin subirlo otra vez. `huella` identifica el contenido
  * del video (ver `huella()` en `server/disco.ts`). `captura` es lo que se veía en la página de la red cuando falló
  * (`data/redes/fallos/<captura>`).
  */
@@ -673,7 +612,7 @@ export interface MarcasDeRedes {
   otraVersion: string[]
   programados: string[]
   calendario: CalendarioRed[]
-  /** Sloth sube algo ahora por el navegador de las redes (TikTok): Mis videos lo enseña mientras tanto. */
+  /** VyMotion sube algo ahora por el navegador de las redes (TikTok): Mis videos lo enseña mientras tanto. */
   enNavegador?: boolean
 }
 
@@ -717,7 +656,7 @@ export interface TandaRedes {
   redes: RedId[]
 }
 
-/** `GET /api/claude/version` (y la de Codex y OpenCode): la versión que trae Sloth. `null` si no está instalado. */
+/** `GET /api/claude/version` (y la de Codex y OpenCode): la versión que trae VyMotion. `null` si no está instalado. */
 export interface VersionClaude {
   instalada: string | null
 }
@@ -745,8 +684,8 @@ export interface EstadoAgente {
 }
 
 /**
- * `GET /api/requisitos`: algo que las skills necesitan fuera de Sloth (FFmpeg, Python…). `detalle` es la versión que se
- * encontró o lo que falta; `aMano`, cómo conseguirlo cuando Sloth no lo puede instalar.
+ * `GET /api/requisitos`: algo que las skills necesitan fuera de VyMotion (FFmpeg, Python…). `detalle` es la versión que se
+ * encontró o lo que falta; `aMano`, cómo conseguirlo cuando VyMotion no lo puede instalar.
  */
 export interface Requisito {
   id: string
@@ -794,6 +733,10 @@ export interface Modelo3D {
   vuelta?: string
   /** Su visor 3D (`visor/`, `modelos.py visor`), si ya está armado con él: la ficha lo gira de verdad. */
   visor?: string
+  /** De dónde sale: un video (lo hizo una skill), lo creó el usuario en «Nuevo modelo», o lo trajo de un archivo .glb. */
+  procedencia?: 'video' | 'creado' | 'importado'
+  /** Si el usuario movió piezas a mano en el visor (y guardó). */
+  editado?: boolean
 }
 
 /**
@@ -801,6 +744,8 @@ export interface Modelo3D {
  * curso, con el enlace de respaldo por si el navegador no se abrió; `error`, por qué falló el último.
  */
 export interface CuentaClaude {
+  /** La cuenta activa usa una llave adicional guardada en su propio perfil. */
+  perfilAdicional?: boolean
   conectada: boolean
   /** El correo de la cuenta, o de dónde sale la llave de API. */
   quien?: string
@@ -816,7 +761,7 @@ export interface CuentaClaude {
   /** Dónde se ven el saldo y el uso de la cuenta, en su página (OpenCode). */
   uso?: string
   /**
-   * Pi: las llaves de API guardadas en Sloth (de Claude, ChatGPT, DeepSeek) que puede usar, y si se las da. Sin dárselas no
+   * Pi: las llaves de API guardadas en VyMotion (de Claude, ChatGPT, DeepSeek) que puede usar, y si se las da. Sin dárselas no
    * las ve (`server/acceso.ts`).
    */
   llavesSloth?: { usar: boolean; de: string[] }
@@ -1039,7 +984,7 @@ export interface TrabajoYT {
 
 /**
  * `transcripciones/<id>.json` en la carpeta de un canal: lo que se dice en un video. En YouTube sale de sus subtítulos
- * (`fuente: 'subtitulos'`); en TikTok e Instagram, de su audio con el Whisper de Sloth. Se guarda entera: al preparar un
+ * (`fuente: 'subtitulos'`); en TikTok e Instagram, de su audio con el Whisper de VyMotion. Se guarda entera: al preparar un
  * video, Claude lee completas las de su evidencia. Sin voz, `segmentos` va vacío.
  */
 export interface Transcripcion {
@@ -1097,7 +1042,7 @@ export interface Idea {
   techo: number
   cta?: string
   /**
-   * Solo en un canal vertical (skill `ideas-vertical`): el id de la card de Sloth con que conviene hacerlo (`cards.json`).
+   * Solo en un canal vertical (skill `ideas-vertical`): el id de la card de VyMotion con que conviene hacerlo (`cards.json`).
    * Ahí `titulo` es el texto del primer cuadro, y `miniatura`, lo que se ve en él.
    */
   estilo?: string
@@ -1136,7 +1081,7 @@ export interface HiloIdeas {
 }
 
 /**
- * Una vuelta anterior de «Proponer ideas»: antes de cada vuelta nueva, Sloth guarda la que había en
+ * Una vuelta anterior de «Proponer ideas»: antes de cada vuelta nueva, VyMotion guarda la que había en
  * `anteriores/<vuelta>/`, para que ninguna idea se pierda.
  */
 export interface VueltaAnterior {
@@ -1175,7 +1120,7 @@ export interface CanalCompleto {
   esquemas: Record<string, string>
   /** Si está puesta la llave de la API de YouTube. */
   api: boolean
-  /** Si se puede leer YouTube: hace falta yt-dlp (el Python de Sloth, o uno con yt-dlp instalado). */
+  /** Si se puede leer YouTube: hace falta yt-dlp (el Python de VyMotion, o uno con yt-dlp instalado). */
   ytdlp: boolean
   /** Solo en un canal vertical: si está puesto el token de Meta, sin el que Instagram no se investiga. */
   meta?: boolean
@@ -1259,24 +1204,6 @@ export interface AyudaMejora {
   preguntas: string[]
 }
 
-/**
- * Lo que propone «Afinar» en el hilo nuevo (`POST /api/afinar`, `server/afinar.ts`): el pedido reescrito para el estilo,
- * con `{{1}}`, `{{2}}`… donde va lo que solo decide quien lo pide. Cada uno es el hueco de ese número (empieza en 1).
- */
-export interface Afinado {
-  texto: string
-  huecos: Hueco[]
-}
-
-/** Un hueco del pedido afinado: se ve como `etiqueta` en el campo y, al pulsarlo, pregunta y ofrece sus opciones. */
-export interface Hueco {
-  /** Lo que se ve en el campo, corto y en forma de pregunta: «¿qué ciudad?». */
-  etiqueta: string
-  /** La pregunta entera, arriba de las opciones. */
-  pregunta: string
-  opciones: string[]
-}
-
 /** Las secciones de la comunidad (`licencias/src/comunidad.ts`). En Anuncios solo publica el creador. */
 export type CategoriaComunidad = 'general' | 'hice' | 'ayuda' | 'mejoras' | 'estilos' | 'anuncios'
 /** Cómo se ordena el feed: por actividad, lo último publicado o, solo el creador, lo que no ha contestado. */
@@ -1288,7 +1215,7 @@ export interface Autor {
   nombre: string
   /** La URL de su foto. */
   foto?: string
-  /** El creador de Sloth. */
+  /** El creador de VyMotion. */
   creador?: boolean
   /** Fundador (mientras tenga pagado el precio de Fundador), Donador PRO (`grande`) o Apoya, mientras apoya. */
   insignia?: 'fundador' | 'grande' | 'apoya'
@@ -1308,17 +1235,9 @@ export interface AdjuntoComunidad {
   de?: string
   /** Cómo se usa el estilo: en Estilos no se publica sin ella (`shared/guia.ts`). */
   guia?: GuiaEstilo
-  /** Lo que costó hacer el video con que se enseña: en Estilos no se publica sin ella (`shared/guia.ts`). */
-  prueba?: PruebaEstilo
   /** La portada de un video: su llave y su URL. */
   poster?: string
   posterUrl?: string
-  /**
-   * El adelanto del video de un estilo: mudo, chico y de unos segundos, con tramos de todo el video. Es lo que se mueve
-   * en el muro de la tienda (`web/src/Tienda.tsx`); sin él, se mueve el principio del video.
-   */
-  previa?: string
-  previaUrl?: string
   vertical?: boolean
 }
 
@@ -1346,23 +1265,8 @@ export interface PublicacionComunidad {
   comentaron: Autor[]
   /** Cuántos la reportaron. Solo lo ve el creador; con 3 o más, los demás ya no la ven hasta que la revise. */
   reportes?: number
-  /** Un estilo que aún no se aprueba: solo lo ven quien lo compartió y el creador. */
+  /** Un estilo que el creador aún no aprueba: solo lo ven quien lo compartió y él. */
   porAprobar?: true
-  /**
-   * Un estilo pre-aprobado por Sloth (ADR 0024): el creador le hizo la prueba, le completó lo que faltaba y le arregló sus
-   * errores. Ya lo ve toda la comunidad; su autor lo deja así («Así está bien») o manda otra versión.
-   */
-  preaprobada?: true
-  /**
-   * Solo a su autor y al creador, de un estilo en revisión: la comunidad sigue viendo la versión de antes, que ya estaba a
-   * la vista, hasta que se apruebe esta.
-   */
-  publicaAun?: true
-  /**
-   * Un estilo al que le falta algo de lo que lleva todo estilo de la comunidad (`faltaEnEstilo` en `shared/guia.ts`): no
-   * sale en la tienda hasta que su autor lo complete. Solo lo ven él, en rojo, y el creador.
-   */
-  incompleto?: string[]
 }
 
 export interface ComentarioComunidad {
@@ -1383,11 +1287,7 @@ export interface ComentarioComunidad {
 /** Lo que le pasó a lo tuyo en la comunidad: te comentaron, te respondieron, te dieron me gusta… */
 export interface AvisoComunidad {
   id: string
-  /**
-   * `incompleto`: a un estilo tuyo le falta algo de lo que lleva todo estilo, y no sale en la tienda hasta que lo completes.
-   * `preaprobado`: Sloth lo probó, lo completó y lo arregló, y ya lo ve toda la comunidad.
-   */
-  tipo: 'comento' | 'respondio' | 'gusta' | 'gustaComentario' | 'estado' | 'reporte' | 'anuncio' | 'estilo' | 'aprobado' | 'preaprobado' | 'incompleto'
+  tipo: 'comento' | 'respondio' | 'gusta' | 'gustaComentario' | 'estado' | 'reporte' | 'anuncio' | 'estilo' | 'aprobado'
   de: Autor
   publicacion: string
   /** El título de la publicación, o el principio de su texto. */
@@ -1408,10 +1308,10 @@ export interface RoadmapComunidad {
 
 export interface FeedComunidad {
   /** Con lo que llevas hecho, para «Comienza aquí». */
-  yo: Autor & { publicaciones: number; comentarios: number; /** Apoya a Sloth ahora: entra a los estilos de la comunidad. */ apoya?: boolean }
+  yo: Autor & { publicaciones: number; comentarios: number; /** Apoya a VyMotion ahora: entra a los estilos de la comunidad. */ apoya?: boolean }
   /** Las licencias activas. */
   miembros: number
-  /** Las que abrieron Sloth en las últimas 24 horas. */
+  /** Las que abrieron VyMotion en las últimas 24 horas. */
   activos: number
   /** Tus avisos sin leer. */
   avisos: number
@@ -1421,7 +1321,7 @@ export interface FeedComunidad {
   mas: boolean
 }
 
-/** Un premio de la rifa que ganaste y aún no ves en tu Sloth (`GET /api/comunidad/avisos?cuenta` y `/rifa`). */
+/** Un premio de la rifa que ganaste y aún no ves en tu VyMotion (`GET /api/comunidad/avisos?cuenta` y `/rifa`). */
 export interface RifaGanada {
   rifa: string
   premio: string
@@ -1515,7 +1415,7 @@ export interface EstiloTienda {
   variantes: number
   /** Este mes, lo que cuenta para el fondo: los videos, con su tope por persona. */
   mes: { personas: number; videos: number; variantes: number; puntos: number }
-  /** Si se lleva del fondo: su autor quiso participar (dio su Binance ID) y no es el creador de Sloth. */
+  /** Si se lleva del fondo: su autor quiso participar (dio su Binance ID) y no es el creador de VyMotion. */
   participa: boolean
   /** Lo que se llevaría del fondo si el periodo cerrara ahora; vacío si no participa. */
   estimado: FondoComunidad['montos']
@@ -1530,8 +1430,8 @@ export interface TiendaEstilos {
   fondo: FondoComunidad | null
   /** Los puntos de los estilos que se llevan del fondo en este periodo. */
   puntos: number
-  /** A quien no apoya: ve la tienda entera, pero no instala; y cuántos estilos hay, para la invitación a apoyar. */
-  sinApoyo?: { estilos: number }
+  /** A quien no apoya: la tienda está cerrada (solo ve sus estilos), y cuántos estilos hay dentro. */
+  cerrada?: { estilos: number }
   /** Cuánto vale cada cosa, y los días que tiene que llevar una cuenta para que sus videos sumen. */
   reglas: { persona: number; video: number; tope: number; variante: number; dias: number }
 }
@@ -1590,7 +1490,7 @@ export interface GanadorRifa {
 
 /** `GET /api/comunidad/rifa/admin`, solo el creador. */
 export interface RifaAdmin {
-  /** Si las voces de Sloth ya se abrieron a todos: sin eso no se rifan créditos. */
+  /** Si las voces de VyMotion ya se abrieron a todos: sin eso no se rifan créditos. */
   vozAbierta: boolean
   /** La abierta, con quién participa y, de quien ya ganó en ella, qué (`gano`). */
   abierta?: RifaComunidad['abierta'] & { lista: { externo: string; nombre: string; email: string; desde: string; fuera?: string; gano?: string }[] }
@@ -1670,7 +1570,7 @@ export interface Licencia {
   email?: string
   /**
    * `mensual`, `anual` o `unico` (de una vez, vale un mes): un apoyo; `gratis`: uno de los lugares gratis de por vida
-   * (de cuando Sloth se vendía); `cuenta`: una cuenta gratis.
+   * (de cuando VyMotion se vendía); `cuenta`: una cuenta gratis.
    */
   plan?: 'mensual' | 'anual' | 'unico' | 'gratis' | 'cuenta'
   /** Lo que se cobra cada mes o cada año, en la moneda con que empezó el apoyo. */
@@ -1686,11 +1586,6 @@ export interface Licencia {
   folio?: string
   /** De las primeras personas que apoyaron: fundadora para siempre, aunque cancele. */
   fundador?: boolean
-  /**
-   * Su correo apoyó con una suscripción de PayPal, que Sloth ya no cobra: la app le pide en grande que la cancele allá
-   * (`web/src/AvisoPaypal.tsx`). `hasta`: cuándo se acaba lo que pagó por PayPal.
-   */
-  cancelarPaypal?: { hasta?: string }
   error?: string
 }
 
@@ -1700,7 +1595,7 @@ export interface ActualizacionSloth {
   nueva?: string
   /** Lo que trae la nueva, en un renglón: se ve al pasar el cursor sobre «Actualizar». */
   novedad?: string
-  /** De 0 a 1 mientras baja; 1, ya bajó y Sloth se cierra para ponerla. */
+  /** De 0 a 1 mientras baja; 1, ya bajó y VyMotion se cierra para ponerla. */
   avance?: number
   /** Bajando, se fue el internet: sigue sola cuando vuelva. */
   sinRed?: boolean
@@ -1709,38 +1604,44 @@ export interface ActualizacionSloth {
   aMano?: boolean
 }
 
-/** Lo que la ventana de Sloth (electron/preload.ts) le da a la interfaz como `window.sloth`. En un navegador no está. */
+export type AvisoVentana = { id: number; titulo: string; detalle: string; accion?: string; recordar?: boolean }
+
+/** Lo que la ventana de VyMotion (electron/preload.ts) le da a la interfaz como `window.sloth`. En un navegador no está. */
 export interface PuenteSloth {
   /** La de Mac con macOS 12 (Electron 43): al abrirla, el aviso de lo que puede no andar ahí (`AvisoMacViejo`). */
   macViejo?: boolean
   actualizacion(): Promise<ActualizacionSloth>
-  /** Baja la versión nueva y la pone: Sloth se cierra y se vuelve a abrir. */
+  /** Baja la versión nueva y la pone: VyMotion se cierra y se vuelve a abrir. */
   actualizar(): Promise<ActualizacionSloth>
   /** La ventana al frente (al pulsar un aviso). */
   traer(): void
-  /** Si Sloth está anclada a la barra de tareas; `null` donde no se puede ofrecer (fuera de la app instalada en Windows). */
+  /** Si VyMotion está anclada a la barra de tareas; `null` donde no se puede ofrecer (fuera de la app instalada en Windows). */
   anclada(): Promise<boolean | null>
   /** Pide a Windows anclarla, que pregunta en su ventana. `windows`: Windows no dejó pedirlo. */
   anclar(): Promise<'anclada' | 'no' | 'windows'>
+  avisos?: {
+    escuchar(recibir: (aviso: AvisoVentana) => void): () => void
+    responder(id: number, aceptar: boolean, recordar: boolean): void
+  }
   /** El navegador integrado de cada hilo. No está en una ventana de antes de que existiera. */
   navegador?: PuenteNavegador
   /** Dónde está lo pesado y llevarlo a otro disco (electron/mudanza.ts). No está en una ventana de antes. */
   disco?: {
     /** La carpeta de tus videos; `null` fuera de la app instalada. */
     donde(): Promise<string | null>
-    /** Pregunta dónde, lo lleva y vuelve a abrir Sloth. Devuelve por qué no se pudo, si fue antes de empezar. */
+    /** Pregunta dónde, lo lleva y vuelve a abrir VyMotion. Devuelve por qué no se pudo, si fue antes de empezar. */
     llevar(): Promise<{ error?: string }>
   }
 }
 
 /**
- * La página del navegador integrado donde Sloth publica en TikTok (`server/redes/navegador.ts`), como si fuera otro
+ * La página del navegador integrado donde VyMotion publica en TikTok (`server/redes/navegador.ts`), como si fuera otro
  * hilo. Tiene su propio perfil: la sesión de las redes no la tienen los agentes.
  */
 export const NAVEGADOR_REDES = 'redes'
 
 /**
- * La página del navegador integrado donde Sloth genera las voces en Google AI Studio (`server/voz/`), con la sesión de
+ * La página del navegador integrado donde VyMotion genera las voces en Google AI Studio (`server/voz/`), con la sesión de
  * Google del usuario en su propio perfil: tampoco la tienen los agentes.
  */
 export const NAVEGADOR_VOZ = 'voz'
@@ -1757,7 +1658,7 @@ export interface VozStudio {
 }
 
 /**
- * `GET /api/voz`: la cuenta de Google con que Sloth genera las voces (`null`: sin conectar), si está esperando a que
+ * `GET /api/voz`: la cuenta de Google con que VyMotion genera las voces (`null`: sin conectar), si está esperando a que
  * entres en Edge, las voces que ofrece la página y cuántas esperan su turno. `error`: lo último que falló al conectar.
  */
 export interface EstadoVoz {
@@ -1770,7 +1671,7 @@ export interface EstadoVoz {
   error?: string
   /** Los proveedores que van con una llave de API (`server/voz/apis.ts`). */
   motores: Record<ProveedorVoz, EstadoProveedorVoz>
-  /** Voices Cloning, el proveedor de Sloth (`server/voz/voices-cloning.ts`). */
+  /** Voices Cloning, el proveedor de VyMotion (`server/voz/voices-cloning.ts`). */
   vc: EstadoVoicesCloning
 }
 
@@ -1781,8 +1682,8 @@ export type ProveedorVoz = 'fish' | 'elevenlabs' | 'vibi' | 'groq'
 export type FuenteVoz = ProveedorVoz | 'vc'
 
 /**
- * Voices Cloning, el proveedor de voz de Sloth: sin llave propia, con los créditos que da Sloth (su cobro guarda la del
- * socio, `licencias/src/voz.ts`). `disponible`: si se puede usar aquí (con cuenta de Sloth, la llave puesta y créditos, o
+ * Voices Cloning, el proveedor de voz de VyMotion: sin llave propia, con los créditos que da VyMotion (su cobro guarda la del
+ * socio, `licencias/src/voz.ts`). `disponible`: si se puede usar aquí (con cuenta de VyMotion, la llave puesta y créditos, o
  * siendo el creador). `voces`: las que elegiste o clonaste en su ventana, para el menú. `error`: lo último que falló.
  */
 export interface EstadoVoicesCloning {
@@ -1799,7 +1700,7 @@ export interface EstadoVoicesCloning {
 }
 
 /**
- * Una voz de Fish Audio o ElevenLabs. `id`: el suyo allí (en Sloth va como `fish:<id>`, `shared/voz.ts`). `propia`: una
+ * Una voz de Fish Audio o ElevenLabs. `id`: el suyo allí (en VyMotion va como `fish:<id>`, `shared/voz.ts`). `propia`: una
  * que clonaste o creaste tú; las demás son de su biblioteca.
  */
 export interface VozApi {
@@ -1851,7 +1752,7 @@ export interface TrabajoVoz {
 }
 
 /**
- * `GET /api/flow`: la cuenta de Google con que Sloth genera en Google Flow (la de la voz), cuántos pedidos esperan y si
+ * `GET /api/flow`: la cuenta de Google con que VyMotion genera en Google Flow (la de la voz), cuántos pedidos esperan y si
  * deja que Google use lo generado («Ayudar a mejorar Flow», apagado salvo que lo enciendas). `derechos`: si confirmó que
  * tiene los derechos de lo que manda de referencia; sin eso, Flow solo recibe texto.
  */
@@ -1884,8 +1785,6 @@ export interface CuentaEnFlow {
   deLaVoz: boolean
   generando: boolean
   descansa?: { hasta: number; motivo: 'creditos' | 'frenada' | 'sesion' }
-  /** Lo mismo en Google Vids, que tiene su propio cupo: sin él, la cuenta sigue haciendo videos en Flow. */
-  descansaVids?: { hasta: number; motivo: 'creditos' | 'frenada' | 'sesion' }
   saldo?: SaldoFlow
   hoy: GastoFlow
 }
@@ -1918,8 +1817,6 @@ export interface TrabajoFlow {
   modelo: string
   /** La de Omni; Veo, siempre 720p. */
   resolucion?: string
-  /** Lo que dura un video de Google Vids (de 3 a 15 s); los de Flow duran 8. */
-  segundos?: number
   /** La cuenta de Google con que se genera o se generó. */
   cuenta?: string
   archivo?: string
@@ -1927,8 +1824,6 @@ export interface TrabajoFlow {
   /** En un video ya hecho: lo que les queda a las cuentas con su saldo al día (`EstadoFlow.quedan`). */
   quedan?: number
   error?: string
-  /** En fila tras un fallo de la conexión: cuándo lo reintenta Sloth solo, sin gastar. */
-  aviso?: string
 }
 
 /**
@@ -1945,7 +1840,7 @@ export interface EstadoNavegador {
   adelante: boolean
   agente: boolean
   zoom: number
-  /** La silenciaste a mano; además, una página que no se ve nunca suena (`electron/audio-navegador.ts`). */
+  /** Preferencia manual; al ocultar la página también se corta su audio. */
   silenciado?: boolean
   icono?: string
   /** Estás entrando con Google en este navegador (Edge o Chrome): Google no deja hacerlo dentro de la app. */
@@ -1976,20 +1871,6 @@ export interface PuenteNavegador {
   estados(): Promise<EstadoNavegador[]>
 }
 
-/**
- * Lo que la web le hace a la página de un hilo (ADR 0025, `server/navegador-remoto.ts`): ahí no hay vista nativa, así
- * que se ve en capturas y se usa con esto. `x` e `y`, en píxeles CSS de la página.
- */
-export type EntradaNavegador =
-  | { tipo: 'clic'; x: number; y: number }
-  | { tipo: 'rueda'; x: number; y: number; dx: number; dy: number }
-  | { tipo: 'texto'; texto: string }
-  | { tipo: 'tecla'; tecla: TeclaNavegador }
-
-/** Las teclas que no son texto y que la web manda una a una. */
-export const TECLAS_NAVEGADOR = ['Enter', 'Backspace', 'Tab', 'Escape', 'Delete', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End', 'PageUp', 'PageDown'] as const
-export type TeclaNavegador = (typeof TECLAS_NAVEGADOR)[number]
-
 /** Lo que se puede borrar sin perder nada tuyo, en Opciones → Espacio en disco (`server/espacio.ts`). */
 export type IdEspacio = 'temporales' | 'renders' | 'modulos' | 'caches' | 'perfiles' | 'fuentes' | 'python' | 'adjuntos'
 
@@ -2000,7 +1881,7 @@ export interface GrupoEspacio {
   detalle: string
   bytes: number
   cuantos: number
-  /** Si Sloth lo borra solo (cada 6 horas) y entra en «Liberar»: lo demás se borra uno por uno, con su botón. */
+  /** Si VyMotion lo borra solo (cada 6 horas) y entra en «Liberar»: lo demás se borra uno por uno, con su botón. */
   seguro: boolean
 }
 
@@ -2027,9 +1908,9 @@ export interface Equipo {
   memoria: number
   /** La tarjeta de video, si se supo cuál. */
   tarjeta?: string
-  /** Con qué transcribe hoy la voz; null si aún no está el Python de Sloth. */
+  /** Con qué transcribe hoy la voz; null si aún no está el Python de VyMotion. */
   motor: MotorVoz | null
-  /** Si su Python de Sloth es el de CUDA: Whisper va en la tarjeta (si no, en el procesador, hasta bajar Parakeet). */
+  /** Si su Python de VyMotion es el de CUDA: Whisper va en la tarjeta (si no, en el procesador, hasta bajar Parakeet). */
   nvidia: boolean
   /** Lo medido de la voz: segundos de trabajo por segundo de voz (`veces`) y de cargar el motor (`carga`). */
   voz?: { motor: MotorVoz; veces: number; carga: number; fecha: string }

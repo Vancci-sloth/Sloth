@@ -80,7 +80,7 @@ Mírala (paso 4) y sigue en el paso 5. **Con ella:**
 
 YouTube no enseña el primer fotograma: enseña la miniatura que se sube aparte. Así que en un vídeo horizontal
 `portada.png` es esa miniatura, de 1280×720, y **no entra en el vídeo**: no se corre `portada.mjs` y el `final.py` del
-estilo no la pega. Sloth la ofrece al programar el vídeo en YouTube. Se hace como la de arriba, con estos cambios:
+estilo no la pega. VyMotion la ofrece al programar el vídeo en YouTube. Se hace como la de arriba, con estos cambios:
 
 - **Cómo se ve.** Del estilo del vídeo y legible en chico, igual que la vertical: en las listas de YouTube mide unos
   170 px de ancho. El título a un lado (de 2 a 5 palabras, no más de 45 % del ancho) y el protagonista al otro. Nada

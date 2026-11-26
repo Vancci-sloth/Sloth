@@ -10,7 +10,7 @@ using System.Text;
 static class Accesos
 {
     /** El acceso del menú Inicio (`shortcutName` en scripts/compilar.mjs). */
-    public static string Inicio { get { return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Programs), "Sloth.lnk"); } }
+    public static string Inicio { get { return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Programs), "VyMotion.lnk"); } }
 
     /** Lo anclado a la barra de tareas es un acceso en esta carpeta (Windows la crea con el primero). */
     static string Anclados { get { return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), @"Microsoft\Internet Explorer\Quick Launch\User Pinned\TaskBar"); } }

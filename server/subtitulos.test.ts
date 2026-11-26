@@ -51,7 +51,7 @@ test('el .ass resalta en Ã¡mbar la palabra que se dice y limpia lo que ASS leerÃ
   assert.match(eventos[0], /\{\\c&H3DA3E8&\}HOLA\{\\c&HFFFFFF&\} MUNDO$/)
   assert.match(eventos[1], /HOLA \{\\c&H3DA3E8&\}MUNDO\{\\c&HFFFFFF&\}$/)
   // Abajo en un vertical: por encima de los botones de TikTok.
-  assert.match(texto, /Style: Sloth,Arial Black,86,.*,2,86,86,384,1$/m)
+  assert.match(texto, /Style: VyMotion,Arial Black,86,.*,2,86,86,384,1$/m)
   const clasicos = ass([{ palabras: dichas('hola mundo') }], { estilo: 'clasicos', tamano: 'mediano', posicion: 'arriba' }, { ancho: 1920, alto: 1080 })
   assert.equal(clasicos.split('\n').filter((l) => l.startsWith('Dialogue:')).length, 1)
   assert.match(clasicos, /,8,154,154,86,1$/m)

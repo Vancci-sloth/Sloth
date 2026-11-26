@@ -8,7 +8,7 @@ Una frutinovela (personajes de fruta en una telenovela, con sus voces) son de 8 
 personajes. Con Lite (10 créditos) son unos 130 créditos por episodio, y una cuenta gratis da 50 al día. useapi.net
 vende lo mismo como servicio: hasta 50 cuentas por persona, con las cookies de cada una en sus servidores, captchas
 pagados aparte y su MCP solo para el chat del agente de Flow. Se miró el 3 de noviembre de 2026 y se decidió hacerlo en
-Sloth, en la compu de cada quien.
+VyMotion, en la compu de cada quien.
 
 Ese mismo día, en la página de Flow:
 
@@ -20,8 +20,8 @@ Ese mismo día, en la página de Flow:
 ## Decisión
 
 - **Las cuentas se agregan en Opciones → Google Flow**, hasta 50 contando la de la voz. Cada una tiene su perfil de
-  Edge (`data/flow/cuentas/<id>/`) y se entra con Google en una ventana normal, como en la voz: Sloth solo mira por CDP si
-  ya hay sesión. La cuenta queda al cerrar esa ventana, y antes cada quien acepta el aviso de Flow, que Sloth no acepta
+  Edge (`data/flow/cuentas/<id>/`) y se entra con Google en una ventana normal, como en la voz: VyMotion solo mira por CDP si
+  ya hay sesión. La cuenta queda al cerrar esa ventana, y antes cada quien acepta el aviso de Flow, que VyMotion no acepta
   por nadie. La sesión no sale de la compu.
 - **Cada cuenta abre su propio Edge**, con un puerto libre elegido antes, nunca `--remote-debugging-port=0`. Con `0`,
   Edge marca la página como automatizada (`navigator.webdriver`) y Google no deja entrar: «Es posible que el navegador no

@@ -1,5 +1,5 @@
 /**
- * Cómo dice el Administrador (`Admin.tsx`) cada cosa: los planes de Sloth, los errores del proveedor y del cobro, las
+ * Cómo dice el Administrador (`Admin.tsx`) cada cosa: los planes de VyMotion, los errores del proveedor y del cobro, las
  * cifras y las fechas, todo en español; y cómo se busca a alguien (sin acentos, cada palabra en cualquier parte).
  */
 
@@ -35,7 +35,7 @@ const ESTADOS_PLAN: Record<string, string> = { authorized: 'activo', pagado: 'pa
 /** El porqué de una llamada fallida, en español. */
 export const explicar = (r: { status: number; codigo: string | null; error: string | null }) => (r.codigo && CODIGOS[r.codigo]) || STATUS[r.status] || r.error || `Respondió ${r.status}`
 
-/** El plan de Sloth de un correo en pocas palabras: el que sigue en pie (o el más nuevo), y «+1» si hay más. */
+/** El plan de VyMotion de un correo en pocas palabras: el que sigue en pie (o el más nuevo), y «+1» si hay más. */
 export function planCorto(c?: Cuenta): string {
   if (!c?.licencias.length) return '—'
   const vivas = c.licencias.filter((l) => l.estado === 'authorized' || l.estado === 'pagado' || l.estado === 'gratis')

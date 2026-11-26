@@ -1,7 +1,9 @@
-import { closeSync, createReadStream, mkdirSync, openSync, readSync } from 'node:fs'
+import { closeSync, createReadStream, mkdirSync, openSync, readFileSync, readSync, rmSync, statSync } from 'node:fs'
 import { dirname } from 'node:path'
 import { readFile, stat } from 'node:fs/promises'
 import { createInterface } from 'node:readline'
+import { promisify } from 'node:util'
+import { gzip, gunzip, gunzipSync } from 'node:zlib'
 import type { AgentEvent } from '../shared/types.ts'
 import { guardar } from './disco.ts'
 
@@ -43,6 +45,47 @@ export function primerUsuario(file: string): Usuario | undefined {
   }
 }
 
+const comprimir = promisify(gzip)
+const descomprimir = promisify(gunzip)
+const MINIMO_PARA_COMPRIMIR = 64 * 1024
+let comprimiendo = false
+
+function vistaValida(texto: string, fuente: { size: number; mtimeMs: number }) {
+  const vista = JSON.parse(texto)
+  if (vista.version === 1 && vista.bytes === fuente.size && vista.mtime === fuente.mtimeMs && Array.isArray(vista.events))
+    return vista as { events: AgentEvent[]; terminado?: boolean }
+}
+
+export function leerVistaSync(vista: string, fuente: { size: number; mtimeMs: number }) {
+  try { return vistaValida(readFileSync(vista, 'utf8'), fuente) }
+  catch { /* Puede estar comprimida. */ }
+  try { return vistaValida(gunzipSync(readFileSync(vista + '.gz')).toString(), fuente) }
+  catch { return undefined }
+}
+
+async function guardarVista(file: string, vista: string, fuente: { size: number; mtimeMs: number }, texto: string, soloComprimida = false) {
+  try {
+    const bytes = Buffer.byteLength(texto)
+    let comprimida: Buffer | undefined
+    if (bytes >= MINIMO_PARA_COMPRIMIR && !comprimiendo) {
+      comprimiendo = true
+      try { comprimida = await comprimir(texto, { level: 1 }) }
+      finally { comprimiendo = false }
+    }
+    // El hilo puede haber cambiado o desaparecido mientras se comprimía.
+    const actual = statSync(file, { throwIfNoEntry: false })
+    if (actual?.size !== fuente.size || actual.mtimeMs !== fuente.mtimeMs) return
+    mkdirSync(dirname(vista), { recursive: true })
+    if (comprimida && comprimida.length < bytes) {
+      guardar(vista + '.gz', comprimida)
+      rmSync(vista, { force: true })
+    } else if (!soloComprimida) {
+      guardar(vista, texto)
+      rmSync(vista + '.gz', { force: true })
+    }
+  } catch { /* El historial sigue disponible aunque no se pueda guardar su caché. */ }
+}
+
 /** Vista regenerable del JSONL: solo la última salida de cada herramienta, con los mismos índices que el original. */
 const lecturas = new Map<string, Promise<AgentEvent[]>>()
 export function leerHistorial(file: string, vista: string): Promise<AgentEvent[]> {
@@ -57,8 +100,17 @@ async function construir(file: string, vista: string): Promise<AgentEvent[]> {
   const fuente = await stat(file).catch((e) => { if (e.code === 'ENOENT') return undefined; throw e })
   if (!fuente) return []
   try {
-    const guardada = JSON.parse(await readFile(vista, 'utf8'))
-    if (guardada.version === 1 && guardada.bytes === fuente.size && guardada.mtime === fuente.mtimeMs && Array.isArray(guardada.events)) return guardada.events
+    const texto = await readFile(vista, 'utf8')
+    const guardada = vistaValida(texto, fuente)
+    if (guardada) {
+      if (texto.length >= MINIMO_PARA_COMPRIMIR) void guardarVista(file, vista, fuente, texto, true)
+      return guardada.events
+    }
+  } catch { /* Puede estar comprimida. */ }
+  try {
+    const texto = (await descomprimir(await readFile(vista + '.gz'))).toString()
+    const guardada = vistaValida(texto, fuente)
+    if (guardada) return guardada.events
   } catch { /* Sin vista válida se reconstruye del registro original. */ }
   const events: AgentEvent[] = []
   const salidas = new Map<string, number[]>()
@@ -84,13 +136,6 @@ async function construir(file: string, vista: string): Promise<AgentEvent[]> {
     }
     events.push(e)
   }
-  const despues = await stat(file).catch(() => undefined)
-  if (despues?.size === fuente.size && despues.mtimeMs === fuente.mtimeMs) {
-    try {
-      mkdirSync(dirname(vista), { recursive: true })
-      guardar(vista, JSON.stringify({ version: 1, bytes: fuente.size, mtime: fuente.mtimeMs, terminado, events }))
-    }
-    catch { /* El historial sigue disponible aunque no se pueda guardar su caché. */ }
-  }
+  void guardarVista(file, vista, fuente, JSON.stringify({ version: 1, bytes: fuente.size, mtime: fuente.mtimeMs, terminado, events }))
   return events
 }

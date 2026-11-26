@@ -8,7 +8,7 @@ El ADR 0009 usaba OpenCode sin cuenta: sus modelos gratis se listan y responden 
 usuario nuevo, el segundo paso del primer hilo ya falló con «Free usage limit reached. Free models work in OpenCode;
 subscribe to OpenCode Go to keep going». Sin cuenta, el uso gratis lo cuenta OpenCode por computadora o red, no publica
 de cuánto es ni cuándo vuelve, y hay reportes de que a veces no se repone en días (issues #58814, #58205 y #58284 de
-`anomalyco/opencode`). No sirve como la puerta gratis de Sloth.
+`anomalyco/opencode`). No sirve como la puerta gratis de VyMotion.
 
 OpenCode 2 (2.2.1) trae lo necesario para conectar la cuenta de opencode.ai, verificado en vivo: la integración
 `opencode` («OpenCode Console») con el método `device` (`integration.oauth.connect` da una URL y un código; la persona lo
@@ -22,13 +22,13 @@ catálogo solo trae los modelos gratis; con ella, también los de pago de Zen, q
   como las de Claude y ChatGPT (`server/cuenta-opencode.ts`). Sin ella, el catálogo de OpenCode llega vacío y un turno
   acaba pidiendo conectarla, sin mandar nada.
 - **Primero los modelos gratis y luego todos los de pago**, con su precio por millón de tokens (`Model.precio`). Los de
-  pago los decide la persona: si le pone saldo a su cuenta, los usa; Sloth no cobra nada. Los de otros proveedores
+  pago los decide la persona: si le pone saldo a su cuenta, los usa; VyMotion no cobra nada. Los de otros proveedores
   (Google, si el entorno trae su llave) siguen fuera: no se cobrarían en la cuenta de OpenCode.
 - **Varias cuentas, una activa, como OpenCode.** Conectar otra la agrega y la deja activa; el menú de la cuenta cambia a
   otra, la quita o lleva al saldo en opencode.ai. Cada cambio vuelve a pedir el catálogo.
 - **Los límites de Go van con los demás** (Opciones y el contexto del hilo). Sin Go no hay plan: se dice que el uso
   gratis tiene un tope que OpenCode no enseña.
-- Todo sigue en el `opencode serve` de Sloth, con sus datos en `data/opencode`: no toca la cuenta del OpenCode que tenga
+- Todo sigue en el `opencode serve` de VyMotion, con sus datos en `data/opencode`: no toca la cuenta del OpenCode que tenga
   el usuario.
 
 ## Consecuencias
@@ -38,7 +38,7 @@ catálogo solo trae los modelos gratis; con ella, también los de pago de Zen, q
   el suyo: las dos chocaron con el mismo «Free usage limit reached» en el primer paso, sin gastar nada. OpenCode cuenta
   lo gratis por computadora o red, no por cuenta. Lo que da la cuenta son los modelos de pago con su saldo (30 de 38 en
   el catálogo, verificado) y Go.
-- La etiqueta de cada cuenta en OpenCode es el nombre de su organización («Personal» en todas): Sloth enseña el correo.
+- La etiqueta de cada cuenta en OpenCode es el nombre de su organización («Personal» en todas): VyMotion enseña el correo.
 - Cuando se acaba el uso gratis, el hilo lo dice así y ofrece los modelos de pago, Claude o ChatGPT; no lo confunde con
   un modelo saturado.
 - Los datos de la cuenta (el token que renueva OpenCode) viven en la base de `data/opencode`, en esta computadora.

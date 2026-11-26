@@ -54,6 +54,11 @@ const teEspera = (s: SessionMeta, a: AvanceCorto) => !!a.espera && !s.running &&
 
 /** Un video: en qué fase va (o que terminó) y cuántas etapas lleva. Los que esperan su turno en un lote, nada: ya lo dicen. */
 export function vistaDeVideo(s: SessionMeta, a?: AvanceCorto): Vista | undefined {
+  if (s.modelo3d && !s.pendiente) {
+    const trabajando = s.running || !!s.background?.length
+    const texto = trabajando ? 'Generando modelo 3D' : s.acaboBien === false ? 'Revisar intento' : 'Turno terminado'
+    return { texto, title: s.background?.[0] ?? texto, parte: 1, clase: trabajando ? undefined : s.acaboBien === false ? 'espera' : 'hecho' }
+  }
   if (!a?.total || s.pendiente) return undefined
   if (!a.fase) return { texto: 'Terminado', title: `Terminado: sus ${a.total} etapas están hechas`, parte: 1, clase: 'hecho' }
   const fase = nombreDe(a.fase)

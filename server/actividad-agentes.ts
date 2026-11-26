@@ -1,10 +1,3 @@
-/**
- * La actividad de cada agente en Opciones (`web/src/ActividadAgente.tsx`, `GET /api/actividad-agentes?agente=`): por día y
- * por modelo, los turnos (los que fallaron aparte) y los tokens que dijo el agente, de los últimos 91 días. Sale del
- * historial de cada hilo (`data/sessions/<id>.jsonl`), leyendo solo sus cierres de turno y los traspasos a otro agente:
- * un hilo que pasó de Claude a ChatGPT cuenta lo de antes para Claude. El modelo va en cada `turn_end` desde que Sloth lo
- * apunta (`Sessions.emit`); lo de antes cuenta para el agente, sin modelo. Se lee de nuevo cada 30 segundos como mucho.
- */
 import { createReadStream } from 'node:fs'
 import { join } from 'node:path'
 import { createInterface } from 'node:readline'

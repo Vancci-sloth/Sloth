@@ -39,7 +39,7 @@ function preparar(t: { after(fn: () => void): void }) {
     MONEDA: 'USD',
     PRECIO_MENSUAL: 15,
     PRECIO_MENSUAL_MXN: 299,
-    CORREO_DE: 'Sloth <avisos@example.com>',
+    CORREO_DE: 'VyMotion <avisos@example.com>',
     CORREO_RESPUESTA: 'soporte@example.com',
     RESEND_API_KEY: 're_prueba'
   } as unknown as Env
@@ -82,7 +82,7 @@ function preparar(t: { after(fn: () => void): void }) {
   return { db, env, ctx, esperas, correos, persona, creador, pedir }
 }
 
-test('entra quien usa Sloth gratis o apoya con menos del sugerido; quien apoya con el sugerido o es Fundador ve por qué no', async (t) => {
+test('entra quien usa VyMotion gratis o apoya con menos del sugerido; quien apoya con el sugerido o es Fundador ve por qué no', async (t) => {
   const { persona, creador, pedir } = preparar(t)
   const gratis = persona('gratis@example.com')
   const vencido = persona('vencido@example.com', 'mensual', 'cancelled', '2026-01-01')
@@ -120,7 +120,7 @@ test('la rifa sigue abierta entre sorteos, nadie gana dos veces y al cerrarla la
   await pedir(creador, '/comunidad/rifa/crear', {})
   await assert.rejects(pedir(creador, '/comunidad/rifa/crear', {}), /Ya hay una rifa abierta/)
   const id = (await pedir<RifaAdmin>(creador, '/comunidad/rifa/admin')).abierta!.id
-  const clave = { premio: 'Una clave de Sloth', creditos: 0, ganadores: 1 }
+  const clave = { premio: 'Una clave de VyMotion', creditos: 0, ganadores: 1 }
   await assert.rejects(pedir(creador, '/comunidad/rifa/sortear', { rifa: id, ...clave }), /no hay participantes/)
   await assert.rejects(pedir(creador, '/comunidad/rifa/sortear', { rifa: id, creditos: 0, ganadores: 1 }), /Di qué se rifa/)
   await pedir(a, '/comunidad/rifa/participar', {})
@@ -135,11 +135,11 @@ test('la rifa sigue abierta entre sorteos, nadie gana dos veces y al cerrarla la
   await Promise.all(esperas)
   assert.equal(correos.length, 1)
   assert.deepEqual(correos[0].to, ['a@example.com'])
-  assert.match(correos[0].text, /ganaste la rifa de Sloth: Una clave de Sloth/)
-  assert.deepEqual(await ganada(env, a.id), { rifa: id, premio: 'Una clave de Sloth', creditos: 0, entregados: false })
+  assert.match(correos[0].text, /ganaste la rifa de VyMotion: Una clave de VyMotion/)
+  assert.deepEqual(await ganada(env, a.id), { rifa: id, premio: 'Una clave de VyMotion', creditos: 0, entregados: false })
   // La rifa sigue abierta: a ve que ya ganó y la comunidad, quién.
   const va = await pedir<RifaComunidad>(a, '/comunidad/rifa')
-  assert.equal(va.ganaste, 'Una clave de Sloth')
+  assert.equal(va.ganaste, 'Una clave de VyMotion')
   assert.deepEqual(va.abierta?.ganadores, ['Persona 1'])
   // Nadie más puede ganar todavía: a ya ganó y b quedó fuera.
   await assert.rejects(pedir(creador, '/comunidad/rifa/sortear', { rifa: id, ...clave }), /no hay participantes que no hayan ganado/)
@@ -150,15 +150,15 @@ test('la rifa sigue abierta entre sorteos, nadie gana dos veces y al cerrarla la
   assert.deepEqual(s2.ganadores.map((g) => g.nombre), ['Persona 3'])
   assert.deepEqual(s2.participantes.map((p) => p.nombre), ['Persona 3'])
   const panel = await pedir<RifaAdmin>(creador, '/comunidad/rifa/admin')
-  assert.deepEqual(panel.ganadores.map((g) => [g.email, g.premio]), [['c@example.com', 'Una playera'], ['a@example.com', 'Una clave de Sloth']])
-  assert.equal(panel.abierta?.lista.find((p) => p.email === 'a@example.com')?.gano, 'Una clave de Sloth')
+  assert.deepEqual(panel.ganadores.map((g) => [g.email, g.premio]), [['c@example.com', 'Una playera'], ['a@example.com', 'Una clave de VyMotion']])
+  assert.equal(panel.abierta?.lista.find((p) => p.email === 'a@example.com')?.gano, 'Una clave de VyMotion')
 
   // Al cerrarla ya no se sortea, y la comunidad ve quién ganó qué.
   await pedir(creador, '/comunidad/rifa/cerrar', { rifa: id })
   await assert.rejects(pedir(creador, '/comunidad/rifa/sortear', { rifa: id, ...clave }), /cerrada/)
   const vb = await pedir<RifaComunidad>(b, '/comunidad/rifa')
   assert.equal(vb.abierta, undefined)
-  assert.deepEqual(vb.ultima?.ganadores, [{ nombre: 'Persona 1', premio: 'Una clave de Sloth' }, { nombre: 'Persona 3', premio: 'Una playera' }])
+  assert.deepEqual(vb.ultima?.ganadores, [{ nombre: 'Persona 1', premio: 'Una clave de VyMotion' }, { nombre: 'Persona 3', premio: 'Una playera' }])
   await pedir(a, '/comunidad/rifa/visto', { rifa: id })
   assert.equal(await ganada(env, a.id), undefined)
   // Una cerrada sin ganadores queda cancelada y no sale en la comunidad.
@@ -223,7 +223,7 @@ test('los créditos se suman una vez; un corte en la suma queda para revisar', a
   assert.ok(estado('uno').correo)
   assert.equal(estado('dos').estado, 'revisar')
   assert.equal(correos.length, 1)
-  assert.match(correos[0].subject, /1 llave de 10,000 créditos de Sloth/)
+  assert.match(correos[0].subject, /1 llave de 10,000 créditos de VyMotion/)
   assert.match(correos[0].text, /10,000 CREDITOS DE VOZ/)
 })
 
@@ -237,6 +237,6 @@ test('elegir da distintos, a lo más los que hay; la ruleta tapa el correo de qu
   assert.equal(nombreDe({ nombre: '', email: 'arisa@proton.me' }), 'ar•••@proton.me')
   assert.equal(nombreDe({ nombre: 'Moy', email: 'x@y.z' }), 'Moy')
   // Es lo que se lleva cada uno, aunque ganen varios.
-  assert.equal(premioDe(10000), '1 llave de 10,000 créditos de Sloth')
-  assert.equal(premioDe(236483), '1 llave de 236,483 créditos de Sloth')
+  assert.equal(premioDe(10000), '1 llave de 10,000 créditos de VyMotion')
+  assert.equal(premioDe(236483), '1 llave de 236,483 créditos de VyMotion')
 })

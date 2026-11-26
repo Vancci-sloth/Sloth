@@ -9,7 +9,7 @@ import { correr, Detenido } from './youtube.ts'
 /**
  * TikTok para Ideas: buscar lo que escribe tu público, leer los comentarios de un video y leer cuentas. Buscar y comentar
  * piden sesión, y van por la página web con la cuenta de investigación de TikTok, en su navegador
- * (`navegador-investigacion.ts`). No se firma nada: la página pide su JSON y Sloth lo lee al pasar, como en las
+ * (`navegador-investigacion.ts`). No se firma nada: la página pide su JSON y VyMotion lo lee al pasar, como en las
  * herramientas de desarrollo. Las cuentas van por yt-dlp, sin sesión y sin el navegador.
  */
 

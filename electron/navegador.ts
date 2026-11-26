@@ -1,5 +1,5 @@
 /**
- * El navegador integrado, como el de T3 Code: una página por hilo dentro de la ventana de Sloth, que la interfaz pone a
+ * El navegador integrado, como el de T3 Code: una página por hilo dentro de la ventana de VyMotion, que la interfaz pone a
  * la derecha del chat (o en el centro del estudio) con el botón del globo (`web/src/Navegador.tsx`). La usan tú y el
  * agente a la vez: Playwright MCP (`server/navegador-agente.ts`) se conecta a la del hilo por el relevo CDP de aquí
  * (`relevo.ts`), y lo que abre se ve sin otra ventana. Las pestañas de más son tuyas: páginas como cualquier otra, con
@@ -13,21 +13,17 @@
  * nada con una que corre timers), aunque el agente siga conectado: solo se despierta mientras una operación suya está en
  * curso, y unos segundos después (`actividad-navegador.ts`). Las de las redes y la voz nunca: trabajan escondidas. Una que
  * nadie ve ni usa en `OCIOSA` se cierra; al volver a verla, o si vuelve el agente, se abre en su última dirección. Todas comparten un perfil aparte del de la interfaz (`persist:navegador`): lo que inicies en una lo
- * tiene el agente en todas. La de las redes (`NAVEGADOR_REDES`), donde Sloth publica en TikTok, va con el suyo
- * (`persist:redes`): la sesión con la que publicas no la tiene ningún agente. La de la voz (`NAVEGADOR_VOZ`), donde Sloth
+ * tiene el agente en todas. La de las redes (`NAVEGADOR_REDES`), donde VyMotion publica en TikTok, va con el suyo
+ * (`persist:redes`): la sesión con la que publicas no la tiene ningún agente. La de la voz (`NAVEGADOR_VOZ`), donde VyMotion
  * genera las voces en AI Studio con tu cuenta de Google (`server/voz/`), también (`persist:voz`).
  *
  * El relevo escucha en 127.0.0.1, con un secreto en la ruta, y anota dónde en `data/navegador-integrado.json` (con el
  * pid de este proceso, para que el servidor sepa si sigue vivo). La próxima vez repite puerto y secreto: el agente de un
  * hilo que siguió abierto vuelve a encontrarlo.
- *
- * Desde la web (ADR 0025) no hay vista nativa: el mismo servidor del relevo da por HTTP (`remoto`) cómo van las páginas,
- * una captura de la de un hilo y lo que se le hace (ir, atrás, un clic, la rueda, el teclado), y el servidor de Sloth lo
- * pasa a la web (`server/navegador-remoto.ts`).
  */
 import { randomBytes } from 'node:crypto'
 import { mkdirSync, readFileSync } from 'node:fs'
-import { createServer, type IncomingMessage, type ServerResponse } from 'node:http'
+import { createServer } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { join } from 'node:path'
 import { app, ipcMain, Menu, session, shell, WebContentsView, type BrowserWindow, type Session, type WebContents } from 'electron'
@@ -37,8 +33,7 @@ import { crearRelevo, type Relevo } from './relevo.ts'
 import { actividadNavegador } from './actividad-navegador.ts'
 import { audioNavegador } from './audio-navegador.ts'
 import { type EnGoogle, vigilarGoogle } from './google.ts'
-import { type AccionNavegador, type EntradaNavegador, type EstadoNavegador, NAVEGADOR_REDES, NAVEGADOR_VOZ, type PantallaNavegador } from '../shared/types.ts'
-import { entradaCdp } from '../shared/entrada-cdp.ts'
+import { type AccionNavegador, type EstadoNavegador, NAVEGADOR_REDES, NAVEGADOR_VOZ, type PantallaNavegador } from '../shared/types.ts'
 
 const PARTICION = 'persist:navegador'
 const PARTICION_REDES = 'persist:redes'
@@ -50,7 +45,7 @@ const frenable = (hilo: string) => !PERFILES[hilo]
 /** Lo que espera una página que nadie ve ni usa antes de cerrarse. */
 const OCIOSA = 20 * 60_000
 /** --bg de web/src/styles.css: lo que se ve mientras la página pinta. */
-const FONDO = '#0f0e0c'
+const FONDO = '#0d0d0d'
 /** Los escalones del zoom de una página. */
 const ZOOMS = [0.5, 0.67, 0.75, 0.9, 1, 1.1, 1.25, 1.5, 2]
 
@@ -62,7 +57,6 @@ interface Hoja {
   /** Las conexiones del agente, cada una con su relevo. */
   conexiones: Map<WebSocket, Relevo>
   actividad: ReturnType<typeof actividadNavegador>
-  /** Solo suena la que se ve; `silenciar` es la preferencia de quien la mira. */
   audio: ReturnType<typeof audioNavegador>
   /** La última vez que se vio o se usó. */
   usada: number
@@ -101,7 +95,7 @@ let vista: { hilo: string; caja: Caja; pantalla: PantallaNavegador | null } | nu
  * el agente no podría pulsar nada en ella.
  */
 let medida = { width: 1280, height: 800 }
-/** Donde va lo de Sloth (`data/`). */
+/** Donde va lo de VyMotion (`data/`). */
 let carpeta = ''
 /** Las ventanas que abrió una página (las de OAuth), por su contenido. */
 const ventanasDeGoogle = new WeakMap<WebContents, BrowserWindow>()
@@ -134,20 +128,9 @@ const enGoogle: EnGoogle = {
   }
 }
 
-/**
- * Lo de la ventana que la web también pide por el relevo (`/<secreto>/ventana/…`, `server/navegador-remoto.ts`): la
- * versión nueva de Sloth y ponerla. En la nube (ADR 0026) nadie ve la ventana, y es lo único que la sabe.
- */
-export interface DeLaVentana {
-  actualizacion: () => Promise<unknown>
-  actualizar: () => unknown
-}
-let deLaVentana: DeLaVentana | undefined
-
 /** Pone el navegador: lo que pide la interfaz, el perfil de las páginas y el relevo para el agente. */
-export function iniciarNavegador(appDir: string, ventana?: DeLaVentana) {
+export function iniciarNavegador(appDir: string) {
   carpeta = appDir
-  deLaVentana = ventana
   for (const p of [PARTICION, PARTICION_REDES, PARTICION_VOZ]) prepararPerfil(session.fromPartition(p))
 
   ipcMain.on('navegador:ver', (_e, hilo: string | null, caja?: Caja, pantalla?: PantallaNavegador | null) => ver(hilo, caja, pantalla))
@@ -187,7 +170,7 @@ function prepararPerfil(perfil: Session) {
   })
 }
 
-/** La ventana de Sloth, cada vez que se abre: las páginas van dentro de ella. */
+/** La ventana de VyMotion, cada vez que se abre: las páginas van dentro de ella. */
 export function ventanaDelNavegador(v: BrowserWindow) {
   ventana = v
   for (const h of hojas.values()) v.contentView.addChildView(h.vista)
@@ -220,8 +203,7 @@ function abrir(hilo: string): Hoja {
     wc.setBackgroundThrottling(frenable(hilo) && ahorro)
     if (wc.debugger.isAttached()) await wc.debugger.sendCommand('Emulation.setFocusEmulationEnabled', { enabled: !ahorro })
   })
-  // Solo suena la página que se ve: una escondida (otro hilo, el panel cerrado, Sloth minimizada) se calla y, al volver,
-  // respeta el silencio que le pusiste. La de las redes publica escondida y la de la voz genera: esas nunca suenan.
+  // Una página recién creada tampoco suena hasta que realmente se muestra.
   const audio = audioNavegador((si) => { if (!wc.isDestroyed()) wc.setAudioMuted(si) }, !!PERFILES[hilo])
   // Google no deja entrar dentro de la app: se entra en Edge (`google.ts`). Las redes y la voz lo hacen a su manera.
   if (!PERFILES[hilo]) {
@@ -259,7 +241,7 @@ function abrir(hilo: string): Hoja {
   // El «¿Salir del sitio?» de una página: la ventana no lo enseña, y sin esto cancelaría cada navegación (la del agente,
   // la de las redes y la tuya). Se sale sin preguntar.
   wc.on('will-prevent-unload', (e) => e.preventDefault())
-  // Con el foco en la página, Ctrl+R es suyo: el menú de Sloth recargaría la interfaz.
+  // Con el foco en la página, Ctrl+R es suyo: el menú de VyMotion recargaría la interfaz.
   wc.on('before-input-event', (e, t) => {
     if (t.type !== 'keyDown' || !(t.control || t.meta) || t.alt || t.key.toLowerCase() !== 'r') return
     e.preventDefault()
@@ -402,10 +384,9 @@ function colocar(h: Hoja) {
   const v = h.vista
   const e = estado(h)
   const visible = !!ventana && vista?.hilo === h.hilo && !!e.url && !e.error && !e.google
-  // Con Sloth minimizada o escondida tampoco la ve nadie: la vista sigue puesta, pero la página puede descansar y callarse.
-  const laVen = visible && ventana!.isVisible() && !ventana!.isMinimized()
-  h.actividad.ver(laVen)
-  h.audio.ver(laVen)
+  h.audio.ver(visible && !!ventana?.isVisible() && !ventana.isMinimized())
+  // Con VyMotion minimizada o escondida tampoco la ve nadie: la vista sigue puesta, pero la página puede descansar.
+  h.actividad.ver(visible && ventana!.isVisible() && !ventana!.isMinimized())
   if (!visible || !ventana || !vista) return v.setVisible(false)
   // La caja llega en píxeles de la interfaz: con zoom, no son los de la ventana.
   const z = ventana.webContents.getZoomFactor()
@@ -478,12 +459,7 @@ function relevar(archivo: string) {
     // La primera vez.
   }
   const secreto = typeof antes.secreto === 'string' && antes.secreto ? antes.secreto : randomBytes(18).toString('hex')
-  const http = createServer((req, res) =>
-    void remoto(req, res, secreto).catch((e) => {
-      if (!res.headersSent) res.writeHead(500, { 'content-type': 'application/json' })
-      res.end(JSON.stringify({ error: e instanceof Error ? e.message : String(e) }))
-    })
-  )
+  const http = createServer((_req, res) => res.writeHead(404).end())
   // El WebSocketServer repite los errores de `http`; sin este oyente tumbaban la app (los atiende `http.on('error')`).
   new WebSocketServer({ server: http, maxPayload: 64 * 1024 * 1024 }).on('error', () => {}).on('connection', (ws, req) => {
     const [, s, hilo] = new URL(req.url ?? '/', 'http://x').pathname.split('/')
@@ -557,105 +533,4 @@ async function conectar(ws: WebSocket, hilo: string) {
     avisar(h)
   })
   avisar(h)
-}
-
-/** Lo más que se espera una captura para la web. */
-const CAPTURA_TOPE = 8000
-/** El depurador de la página, el mismo que comparte con el agente (`conectar`). */
-function depurador(wc: WebContents) {
-  if (!wc.debugger.isAttached()) wc.debugger.attach('1.3')
-  return wc.debugger
-}
-
-function leerCuerpo(req: IncomingMessage): Promise<Record<string, unknown>> {
-  return new Promise((ok) => {
-    let t = ''
-    req.on('data', (d) => (t += d))
-    req.on('end', () => {
-      try {
-        ok(JSON.parse(t || '{}'))
-      } catch {
-        ok({})
-      }
-    })
-  })
-}
-
-/**
- * La página de cada hilo, desde la web (por `server/navegador-remoto.ts`), en `/<secreto>/remoto/…`:
- * - `GET estados`: cómo van todas, como `navegador:estados`.
- * - `GET <hilo>/captura`: una captura en JPEG, con su medida en píxeles CSS (`x-ancho`, `x-alto`). 204 si no hay
- *   página.
- * - `POST <hilo>/ir {url}`, `POST <hilo>/hacer {accion}` y `POST <hilo>/entrada` (`EntradaNavegador`).
- * Solo el servidor de esta computadora: con el secreto y sin `Origin`. También `GET ventana/actualizacion` y
- * `POST ventana/actualizar` (`DeLaVentana`).
- */
-async function remoto(req: IncomingMessage, res: ServerResponse, secreto: string) {
-  const u = new URL(req.url ?? '/', 'http://x')
-  const [, s, que, uno, accion] = u.pathname.split('/')
-  const responder = (status: number, datos?: unknown) => {
-    res.writeHead(status, { 'content-type': 'application/json', 'cache-control': 'no-store' })
-    res.end(datos === undefined ? '' : JSON.stringify(datos))
-  }
-  if (s !== secreto || req.headers.origin || !uno) return responder(404)
-  if (que === 'ventana') {
-    if (!deLaVentana) return responder(404)
-    if (uno === 'actualizacion' && req.method === 'GET') return responder(200, await deLaVentana.actualizacion())
-    if (uno === 'actualizar' && req.method === 'POST') return responder(200, await deLaVentana.actualizar())
-    return responder(404)
-  }
-  if (que !== 'remoto') return responder(404)
-  if (uno === 'estados' && req.method === 'GET') return responder(200, [...hojas.values()].map(estado))
-  const hilo = decodeURIComponent(uno)
-  if (!/^[\w~-]+$/.test(hilo)) return responder(400)
-
-  if (accion === 'captura' && req.method === 'GET') {
-    const h = hojas.get(hilo) ?? (ultimas.has(hilo) ? reabrir(hilo) : undefined)
-    if (!h) return responder(204)
-    await h.lista
-    const wc = h.vista.webContents
-    if (wc.isDestroyed() || !estado(h).url) return responder(204)
-    // Mide lo mismo que para el agente: la web la encoge a su caja, como el tamaño fijo del panel.
-    h.usada = Date.now()
-    // `capturePage` la pinta aunque esté escondida; `Page.captureScreenshot` de CDP se quedaba esperando un cuadro que
-    // una página escondida no dibuja.
-    const foto = await h.actividad.usar(() =>
-      Promise.race([
-        (async () => {
-          const m = (await depurador(wc).sendCommand('Page.getLayoutMetrics')) as { cssVisualViewport: { clientWidth: number; clientHeight: number } }
-          const imagen = await wc.capturePage()
-          return { datos: imagen.isEmpty() ? null : imagen.toJPEG(60), ancho: Math.round(m.cssVisualViewport.clientWidth), alto: Math.round(m.cssVisualViewport.clientHeight) }
-        })(),
-        new Promise<null>((r) => setTimeout(() => r(null), CAPTURA_TOPE))
-      ])
-    )
-    if (!foto?.datos) return responder(503, { error: 'La página no se dejó ver. Se vuelve a intentar.' })
-    res.writeHead(200, { 'content-type': 'image/jpeg', 'cache-control': 'no-store', 'x-ancho': String(foto.ancho), 'x-alto': String(foto.alto) })
-    return void res.end(foto.datos)
-  }
-
-  if (req.method !== 'POST') return responder(404)
-  const c = await leerCuerpo(req)
-  if (accion === 'ir') {
-    if (typeof c.url !== 'string' || !/^https?:\/\//i.test(c.url)) return responder(400)
-    llevar(hojas.get(hilo) ?? abrir(hilo), c.url)
-    return responder(200, { ok: true })
-  }
-  if (accion === 'hacer') {
-    // El menú y «abrir fuera» son de la ventana: en la web los hace su propia página.
-    const permitidas: AccionNavegador[] = ['atras', 'adelante', 'recargar', 'parar', 'acercar', 'alejar', 'zoomNormal', 'cerrar']
-    if (permitidas.includes(c.accion as AccionNavegador)) hacer(hilo, c.accion as AccionNavegador)
-    return responder(200, { ok: true })
-  }
-  if (accion === 'entrada') {
-    const h = hojas.get(hilo)
-    if (!h || h.vista.webContents.isDestroyed()) return responder(404)
-    const e = c as unknown as EntradaNavegador
-    const wc = h.vista.webContents
-    h.usada = Date.now()
-    // Con la página encogida, Chromium toma los clics en píxeles de la caja, como los del agente (`conectar`).
-    await h.actividad.usar(() => entradaCdp((metodo, params) => depurador(wc).sendCommand(metodo, params), e, h.escala))
-    return responder(200, { ok: true })
-  }
-  responder(404)
 }

@@ -22,7 +22,7 @@ import { Detenido } from './youtube.ts'
  *   que cambia, porque llegó su transcripción, se vuelve a vectorizar; los demás no);
  * - `temas.json`: los temas (`Temas`).
  *
- * Son un extra: sin el Python de Sloth, o si el modelo no se puede bajar (la primera vez, unos 490 MB), un paso lo dice y
+ * Son un extra: sin el Python de VyMotion, o si el modelo no se puede bajar (la primera vez, unos 490 MB), un paso lo dice y
  * la investigación sigue.
  */
 
@@ -99,7 +99,7 @@ function leerVectores(carpeta: string): { indice: Indice; filas: Float32Array } 
  */
 export async function vectorizar(carpeta: string, videos: VideoYT[], ctx: Pick<Ctx, 'paso' | 'avance' | 'signal'>): Promise<void> {
   const python = rutaPythonSloth()
-  if (!python) return void ctx.paso('temas', 'Sin el Python de Sloth no agrupo los videos por tema.', 'Instálalo en Opciones, en lo que necesitan los estilos.')
+  if (!python) return void ctx.paso('temas', 'Sin el Python de VyMotion no agrupo los videos por tema.', 'Instálalo en Opciones, en lo que necesitan los estilos.')
   ctx.avance(0, 1, 'Temas · lo que dice cada video')
   const textos = videos.map((v) => ({ v, ...dicho(carpeta, v) })).filter((t) => t.texto)
   let { indice, filas } = leerVectores(carpeta)
@@ -209,7 +209,7 @@ export async function parecidos(
     q = filas.subarray(i * dim, (i + 1) * dim)
   } else if (consulta.texto?.trim()) {
     const python = rutaPythonSloth()
-    if (!python) throw new Error('Sin el Python de Sloth no puedo vectorizar el texto: busca con el id de un video.')
+    if (!python) throw new Error('Sin el Python de VyMotion no puedo vectorizar el texto: busca con el id de un video.')
     const tmp = mkdtempSync(join(tmpdir(), 'sloth-vectores-'))
     try {
       const entrada = join(tmp, 'consulta.jsonl')
@@ -233,7 +233,7 @@ export async function parecidos(
 }
 
 /**
- * Corre `vectores.py` con el Python de Sloth y sus banderas, y devuelve su respuesta. `avance` recibe lo que lleva, de 0 a
+ * Corre `vectores.py` con el Python de VyMotion y sus banderas, y devuelve su respuesta. `avance` recibe lo que lleva, de 0 a
  * 1, y `linea`, cada línea que no es de avance (avisos). Si falla, con su última línea de error; si se detiene la
  * investigación, lo mata.
  */

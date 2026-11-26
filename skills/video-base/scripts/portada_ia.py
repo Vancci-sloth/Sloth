@@ -1,6 +1,6 @@
 """
 La portada generada con IA, con lo que el usuario eligió en el menú «Imágenes» del compositor (la línea `Imágenes:`):
-un modelo de Google Flow (por la API de Sloth, `SLOTH_URL`) o ChatGPT (el `image_gen` de Codex). Pensada para correr de
+un modelo de Google Flow (por la API de VyMotion, `SLOTH_URL`) o ChatGPT (el `image_gen` de Codex). Pensada para correr de
 fondo desde el principio, mientras se hacen la voz y el render: no mira el video, parte del título, el estilo y las
 referencias (el personaje del canal, el protagonista, las fotos que adjuntó el usuario). El pedido es el de PORTADA.md.
 
@@ -85,11 +85,11 @@ def pedir(ruta: str, datos: dict | None = None, espera: float = 15) -> dict:
             return json.loads(r.read() or b"{}")
     except urllib.error.HTTPError as e:
         try:
-            raise Falla(json.loads(e.read()).get("error") or f"Sloth respondió {e.code}")
+            raise Falla(json.loads(e.read()).get("error") or f"VyMotion respondió {e.code}")
         except ValueError:
-            raise Falla(f"Sloth respondió {e.code}")
+            raise Falla(f"VyMotion respondió {e.code}")
     except (urllib.error.URLError, TimeoutError, ConnectionError):
-        raise Falla(f"no contesta Sloth en {URL}")
+        raise Falla(f"no contesta VyMotion en {URL}")
 
 
 def con_flow(modelo: str, prompt: str, refs: list[Path], horizontal: bool, crudo: Path) -> str:
@@ -211,4 +211,5 @@ def main() -> None:
     print(f"✓ portada con IA en {time.time() - inicio:.0f} s: {salida} ({gasto})")
 
 
-main()
+if __name__ == "__main__":
+    main()

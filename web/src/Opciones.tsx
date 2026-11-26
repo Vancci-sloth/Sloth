@@ -1,8 +1,8 @@
 import { type ReactNode, useEffect, useRef, useState } from 'react'
 import { type CuentaClaude as Cuenta, type Opciones as Datos, type EstadoAgente, type LimitesClaude, type Model, type NavegadorDeFuera, NAVEGADOR_REDES, type Requisito, type VersionClaude } from '../../shared/types'
+import { usePoll } from './usePoll'
 import { api, leerCuenta } from './api'
 import { Arranque } from './Arranque'
-import { ponerTema, TEMAS, type Tema, useTema } from './temas'
 import { NOMBRE_AGENTE, PROVEEDORES, type Proveedor, proveedorDe } from '../../shared/providers'
 import { ActividadAgente } from './ActividadAgente'
 import { AvisoAgentes } from './Actualizar'
@@ -14,12 +14,8 @@ import { Picker } from './Composer'
 import { EspacioDisco } from './Espacio' // espacio en disco
 import { discoLleno } from './items'
 import { TuEquipo } from './Equipo' // tu equipo
-import { TuCelular } from './Celular' // tu celular
 import { Icono, type NombreIcono } from './Iconos'
 import { SuscripcionOpciones, VersionYApoyo } from './Licencia' // apoyo
-import { RespaldoOpciones } from './Respaldo' // tu Sloth en otra computadora
-import { SlothWebOpciones } from './SlothWeb' // Sloth en la web
-import { ALLA, enLaNube, enLaWeb } from './web'
 import { Logo } from './Logos'
 import { BotonNavegador } from './Navegador'
 import { RadarOpciones } from './RadarOpciones' // radar
@@ -29,7 +25,6 @@ import { ConNavegadorRedes, RedesOpciones } from './Redes' // redes
 import { YoutubeOpciones } from './Youtube'
 import { useVoz, VozOpciones } from './Voz' // voz de AI Studio
 import { FlowOpciones } from './Flow' // Google Flow
-import { MetaOpciones } from './Meta' // Meta Muse
 import { VENTA } from '../../shared/venta'
 import './Opciones.css'
 
@@ -56,7 +51,7 @@ const AGENTES = '/opciones/agentes'
 
 const SECCIONES = [
   ['redes', 'Redes', 'compartir'], ['agentes', 'Agentes de IA', 'cubo'], ['creacion', 'Voz e imágenes', 'imagen'],
-  ['perfil', 'Perfil y avisos', 'campana'], ['equipo', 'Equipo', 'pulso'], ['dispositivos', 'Otros dispositivos', 'movil'],
+  ['perfil', 'Perfil y avisos', 'campana'], ['equipo', 'Equipo', 'pulso'],
   VENTA ? ['apoyo', 'Apoyo', 'estrella'] : ['integraciones', 'Integraciones', 'globo']
 ] as const satisfies readonly Apartado[]
 
@@ -87,8 +82,6 @@ function Ajustes({ onDone, iniciando, onIniciando, seccion, apartado, avisosEsti
           {activa === 'redes' && iniciando && <BotonNavegador hilo={NAVEGADOR_REDES} trabajando={false} />}
         </div>
       </header>
-      {/* Desde la web, los inicios de sesión de la computadora se ven aquí (server/ventanas-remotas.ts). */}
-      {enLaWeb && <VueltaWeb />}
       <nav className="opciones-secciones" aria-label="Secciones de Opciones">
         {SECCIONES.map(([id, nombre, icono]) => <a key={id} href={`#/opciones/${id}`} aria-current={activa === id ? 'page' : undefined}><Icono de={icono} />{nombre}</a>)}
       </nav>
@@ -98,7 +91,7 @@ function Ajustes({ onDone, iniciando, onIniciando, seccion, apartado, avisosEsti
           {activa === 'redes' && <CampoAscii variante="malla" />}
           <div>
             <h2>Redes</h2>
-            <p>Por donde salen tus videos. Sloth los programa en cada red y te avisa si algo falla.</p>
+            <p>Por donde salen tus videos. VyMotion los programa en cada red y te avisa si algo falla.</p>
           </div>
           <a className="boton" href="#/mis-videos" title="Revisa y programa los que faltan, de todos los estilos">
             Programar videos
@@ -108,10 +101,10 @@ function Ajustes({ onDone, iniciando, onIniciando, seccion, apartado, avisosEsti
           <RedesOpciones onIniciando={onIniciando} />
           <YoutubeOpciones />
         </div>
-        <p className="grupo-nota">Los verticales salen en TikTok, Instagram y YouTube Shorts; los largos, en YouTube. Sloth tiene que estar abierto mientras sube a TikTok y a YouTube; Instagram publica aunque la computadora esté apagada.</p>
+        <p className="grupo-nota">Los verticales salen en TikTok, Instagram y YouTube Shorts; los largos, en YouTube. VyMotion tiene que estar abierto mientras sube a TikTok y a YouTube; Instagram publica aunque la computadora esté apagada.</p>
       </section>}
       {activa === 'apoyo' && VENTA && (
-        <Grupo titulo="Apoyo" nota="Sloth es gratis. El apoyo es opcional y se cobra con PayPal; cancelado, lo ya pagado sigue valiendo hasta su fecha.">
+        <Grupo titulo="Apoyo" nota="VyMotion es gratis. El apoyo es opcional y se cobra con PayPal; cancelado, lo ya pagado sigue valiendo hasta su fecha.">
           <SuscripcionOpciones />
         </Grupo>
       )}
@@ -133,35 +126,6 @@ function Ajustes({ onDone, iniciando, onIniciando, seccion, apartado, avisosEsti
           </div>
         </div>
       </Grupo>
-      <Grupo titulo="Apariencia" nota="Cambia al instante y se recuerda en esta computadora. Los fondos y el movimiento de Cristal se quedan quietos si tu sistema pide reducir el movimiento.">
-        <Apariencia />
-      </Grupo>
-      </>}
-      {/* Lo que solo tiene Sloth: usarla desde otro dispositivo, traer tu Sloth a otra computadora y el celular. */}
-      {activa === 'dispositivos' && <>
-      {enLaNube ? (
-        <Grupo
-          titulo="Sloth en la nube"
-          nota="Esta Sloth corre en tu Codespace de GitHub, sin tu computadora. Entra desde cualquier navegador con tu cuenta de GitHub en esta misma dirección. Deja abierta la pestaña de tu Codespace: mientras usas Sloth o algo trabaja, ahí le avisa a GitHub. Sin ella, GitHub la detiene tras un rato sin uso (en sus opciones lo subes hasta 4 horas) y la enciendes otra vez en github.com/codespaces: tus chats y tus videos se quedan."
-        >
-          <p className="small">
-            <a href="https://github.com/settings/codespaces" target="_blank" rel="noreferrer">
-              Cambiar cuánto espera GitHub antes de detenerla
-            </a>
-          </p>
-        </Grupo>
-      ) : (
-        <Grupo
-          titulo="Sloth en la web"
-          nota="Usa tu Sloth desde el navegador del celular o de otra computadora, con tus mismos chats, agentes y videos. Todo sigue trabajando en esta computadora: tiene que estar encendida, con internet y con Sloth abierto. La conexión va cifrada por un túnel de Cloudflare, y solo entran los dispositivos que conectes aquí. ¿Sin computadora? Sloth también corre en la nube, en web.sloth.vancci.org."
-        >
-          <SlothWebOpciones />
-        </Grupo>
-      )}
-      <Grupo titulo="Tu Sloth en otra computadora" nota="Con tu clave, Sloth guarda sola una copia de tus estilos, tus chats, «Sobre ti» y tus marcas. Escribe esa clave en otra computadora y te ofrece traerlo todo. Los videos y las cuentas conectadas no viajan.">
-        <RespaldoOpciones />
-      </Grupo>
-      <TuCelular />
       </>}
       {activa === 'creacion' && <OpcionesCreacion apartado={apartado} />}
       {activa === 'integraciones' && !VENTA && <>
@@ -190,6 +154,7 @@ function OpcionesAgentes() {
     </Grupo>
     <Grupo titulo="Conexión">
       {p === 'claude' ? <Agentes /> : p === 'codex' ? <CuentaCodex /> : p === 'opencode' ? <CuentaOpenCode /> : <CuentaAgente key={p} p={p} />}
+      {p === 'pi' && <OpenRouter />}
     </Grupo>
   </>)
   return <ActividadAgente proveedor={p} navegacion={navegacion} conexion={conexion} />
@@ -198,8 +163,8 @@ function OpcionesAgentes() {
 type Apartado = readonly [id: string, titulo: string, icono: NombreIcono]
 
 const CREACION = [
-  ['google', 'Google AI Studio', 'microfono'], ['sloth', 'Voces de Sloth', 'sonido'], ['externos', 'Proveedores externos', 'globo'],
-  ['flow', 'Google Flow', 'imagen'], ['privacidad', 'Privacidad de Flow', 'escudo'], ['meta', 'Meta Muse', 'imagen']
+  ['google', 'Google AI Studio', 'microfono'], ['sloth', 'Voces de VyMotion', 'sonido'], ['externos', 'Proveedores externos', 'globo'],
+  ['flow', 'Google Flow', 'imagen'], ['privacidad', 'Privacidad de Flow', 'escudo']
 ] as const satisfies readonly Apartado[]
 
 const EQUIPO = [
@@ -229,10 +194,9 @@ function OpcionesCreacion({ apartado }: { apartado?: string }) {
       {activa === 'externos' && <p>Conecta un proveedor con su llave de API para añadir sus voces al selector.</p>}
       {activa === 'flow' && <p>Gestiona las cuentas y los créditos para generar imágenes con Nano Banana y clips con Veo.</p>}
       {activa === 'privacidad' && <p>Decide si Flow puede usar tus generaciones para mejorar sus productos y si puedes enviar imágenes de referencia.</p>}
-      {activa === 'meta' && <p>Agrega tus cuentas de Meta para generar imágenes y videos con Muse; Sloth reparte los pedidos entre ellas.</p>}
     </header>
     <div className={`panel${activa === 'externos' ? ' opciones-proveedores' : ''}`}>
-      {activa === 'meta' ? <MetaOpciones /> : esFlow ? <FlowOpciones voz={voz} privacidad={activa === 'privacidad'} /> : <VozOpciones voz={voz} vista={activa} />}
+      {esFlow ? <FlowOpciones voz={voz} privacidad={activa === 'privacidad'} /> : <VozOpciones voz={voz} vista={activa} />}
     </div>
   </NavegacionOpciones>
 }
@@ -280,7 +244,7 @@ function Fallo({ error, className = '' }: { error?: string; className?: string }
   )
 }
 
-/** Las llaves de API que usa Sloth: para qué es cada una y dónde se saca. `logo`, si no es el de su id. */
+/** Las llaves de API que usa VyMotion: para qué es cada una y dónde se saca. `logo`, si no es el de su id. */
 const LLAVES: Record<'youtube' | 'meta', { nombre: string; para: string; url: string; logo?: string; ayuda: ReactNode }> = {
   youtube: {
     nombre: 'YouTube',
@@ -425,7 +389,7 @@ function Llave({ id }: { id: keyof typeof LLAVES }) {
 }
 
 /**
- * La cuenta de Claude con la que trabaja Sloth (la de Claude Code en esta computadora). «Conectar con Claude» abre el
+ * La cuenta de Claude con la que trabaja VyMotion (la de Claude Code en esta computadora). «Conectar con Claude» abre el
  * navegador para autorizarla; si no se abrió, el enlace de respaldo da un código que se pega aquí. Sirve también para
  * cambiar de cuenta: vuelve a autorizar.
  */
@@ -440,11 +404,7 @@ function useCuenta(fresco = false, proveedor = 'claude') {
 
   // Mientras autorizas en el navegador, se mira cada dos segundos si ya entraste.
   const conectando = !!cuenta?.conectando
-  useEffect(() => {
-    if (!conectando) return
-    const id = setInterval(() => leer(), 2000)
-    return () => clearInterval(id)
-  }, [conectando])
+  usePoll(() => leer(), 2000, conectando)
   // Al entrar o al cerrar sesión, el inicio vuelve a mirar qué cuentas hay (`useCuentas`).
   const antes = useRef<boolean>(undefined)
   useEffect(() => {
@@ -473,13 +433,6 @@ type UsoCuenta = ReturnType<typeof useCuenta>
  */
 function Autorizando({ c }: { c: UsoCuenta }) {
   if (!c.cuenta?.conectando) return null
-  // Desde la web, el inicio de sesión sale en el panel de abajo a la derecha (`VentanasRemotas.tsx`).
-  if (enLaWeb)
-    return (
-      <div className="fila-extra">
-        <p className="small">Sigue los pasos en el panel «En {ALLA}», abajo a la derecha: abre el enlace, entra con tu cuenta y pega ahí el código que te da. Al terminar, esto se actualiza solo.</p>
-      </div>
-    )
   return (
     <div className="fila-extra">
       <p className="small">Autoriza a Claude Code en la pestaña que se abrió. Al terminar, esto se actualiza solo.</p>
@@ -597,7 +550,7 @@ function useLlave(c: UsoCuenta, proveedor: 'claude' | 'codex') {
             , no en tu plan.{' '}
           </>
         )}
-        Se guarda solo en Sloth, en esta computadora. {a.hilos}
+        Se guarda solo en VyMotion, en esta computadora. {a.hilos}
       </p>
     </form>
   )
@@ -782,7 +735,7 @@ export function CuentaOpenCode({ aviso = false, onFalta }: { aviso?: boolean; on
             />
           ) : (
             <span>
-              Sloth trabaja con tu cuenta de OpenCode, que se crea gratis en su página. Sus modelos gratis no te cobran nada; si
+              VyMotion trabaja con tu cuenta de OpenCode, que se crea gratis en su página. Sus modelos gratis no te cobran nada; si
               le pones saldo, también puedes usar los de pago. Pueden equivocarse más que Claude o ChatGPT, y no hacen imágenes
               (portadas ni personajes nuevos).
             </span>
@@ -836,62 +789,27 @@ export function CuentaOpenCode({ aviso = false, onFalta }: { aviso?: boolean; on
 }
 
 /** Los agentes que llegaron después de Claude, Codex y OpenCode (`server/proveedores.ts`), en el orden de Opciones. */
-export const OTROS_AGENTES = ['deepseek', 'openrouter', 'freellmapi', 'grok', 'antigravity', 'gemini', 'cursor', 'muse', 'pi', 'omp'] as const satisfies readonly Proveedor[]
+export const OTROS_AGENTES = ['deepseek', 'grok', 'antigravity', 'gemini', 'cursor', 'muse', 'pi'] as const satisfies readonly Proveedor[]
 type OtroAgente = (typeof OTROS_AGENTES)[number]
 
 /**
  * Cómo se conecta cada uno y qué hay que saber antes, a la vista. `ventana`: el agente abre su propia ventana para
  * iniciar sesión; `navegador`: da un enlace que se autoriza en el navegador; `llave`: se pega una llave de API.
- * `direccion`: con la llave se puede escribir dónde está (FreeLLMAPI en otra computadora); sin ella, se busca en esta.
  */
-const OTROS: Record<OtroAgente, { titulo: string; logo: string; como: 'ventana' | 'navegador' | 'llave'; texto: ReactNode; ayuda?: ReactNode; uso?: string; abreSolo?: string; beta?: boolean; direccion?: string }> = {
+const OTROS: Record<OtroAgente, { titulo: string; logo: string; como: 'ventana' | 'navegador' | 'llave'; texto: ReactNode; ayuda?: ReactNode; uso?: string; abreSolo?: string; beta?: boolean }> = {
   deepseek: {
     titulo: 'DeepSeek · con tu llave de API',
     logo: 'deepseek',
     como: 'llave',
     beta: true,
-    texto: 'Trabaja en el mismo Claude Code de Sloth, con los modelos de DeepSeek: las skills, los subagentes y el navegador van igual que con Claude. Se cobra por uso, del saldo de tu cuenta de DeepSeek.',
+    texto: 'Trabaja en el mismo Claude Code de VyMotion, con los modelos de DeepSeek: las skills, los subagentes y el navegador van igual que con Claude. Se cobra por uso, del saldo de tu cuenta de DeepSeek.',
     ayuda: (
       <>
         Créala en{' '}
         <a href="https://platform.deepseek.com/api_keys" target="_blank" rel="noreferrer">
           platform.deepseek.com
         </a>{' '}
-        y ponle saldo. Se guarda solo en Sloth, en esta computadora.
-      </>
-    )
-  },
-  openrouter: {
-    titulo: 'OpenRouter · con tu llave de API',
-    logo: 'openrouter',
-    como: 'llave',
-    beta: true,
-    texto: 'Trabaja en el mismo Claude Code de Sloth, con el modelo que elijas del catálogo de OpenRouter, de la marca que sea: las skills, los subagentes y el navegador van igual que con Claude. Se cobra por uso, de tus créditos de OpenRouter; sus modelos gratis no gastan.',
-    ayuda: (
-      <>
-        Créala en{' '}
-        <a href="https://openrouter.ai/settings/keys" target="_blank" rel="noreferrer">
-          openrouter.ai
-        </a>
-        . Para los modelos de pago, ponle créditos; los gratis tienen un tope de mensajes al día. Se guarda solo en Sloth, en esta computadora.
-      </>
-    )
-  },
-  freellmapi: {
-    titulo: 'FreeLLMAPI · gratis, en tu computadora',
-    logo: 'freellmapi',
-    como: 'llave',
-    beta: true,
-    direccion: 'Dirección, solo si está en otra computadora',
-    texto: 'Trabaja en el mismo Claude Code de Sloth, con los modelos gratis que juntes en FreeLLMAPI: un programa que instalas tú y que reparte lo que le pides entre los rangos gratis de Google, Groq, NVIDIA y otros. Tiene que estar abierto mientras Sloth trabaja.',
-    ayuda: (
-      <>
-        Instala{' '}
-        <a href="https://github.com/tashfeenahmed/freellmapi#readme" target="_blank" rel="noreferrer">
-          FreeLLMAPI
-        </a>
-        , ponle las llaves gratis de sus proveedores y pega aquí su llave única (en su icono de la bandeja, «Copy Key»). Sloth lo busca en esta computadora. Se guarda
-        solo en Sloth, en esta computadora.
+        y ponle saldo. Se guarda solo en VyMotion, en esta computadora.
       </>
     )
   },
@@ -900,7 +818,7 @@ const OTROS: Record<OtroAgente, { titulo: string; logo: string; como: 'ventana' 
     logo: 'grok',
     como: 'ventana',
     beta: true,
-    texto: 'Sloth trabaja con tu cuenta de Grok. Al conectar se abre una ventana de Grok que te lleva a autorizarla en el navegador.',
+    texto: 'VyMotion trabaja con tu cuenta de Grok. Al conectar se abre una ventana de Grok que te lleva a autorizarla en el navegador.',
     uso: 'https://grok.com'
   },
   antigravity: {
@@ -909,21 +827,21 @@ const OTROS: Record<OtroAgente, { titulo: string; logo: string; como: 'ventana' 
     como: 'navegador',
     beta: true,
     abreSolo: 'Abriendo Antigravity: al terminar se abre sola la página de Google',
-    texto: 'Sloth trabaja con tu cuenta de Google en Antigravity, con sus modelos de Gemini. Si esa cuenta paga Google AI Pro o Ultra, usa la cuota de tu plan; si no, la gratis. La cuenta se autoriza en el navegador.'
+    texto: 'VyMotion trabaja con tu cuenta de Google en Antigravity, con sus modelos de Gemini. La cuenta se autoriza en el navegador.'
   },
   gemini: {
     titulo: 'Gemini · con tu llave de API',
     logo: 'gemini',
     como: 'llave',
     beta: true,
-    texto: 'Trabaja con Gemini CLI y tu llave de AI Studio: no con tu cuenta ni tu plan de Google, que Gemini CLI ya no acepta. Si pagas Google AI Pro o Ultra, tu plan se usa en Antigravity. La llave gratis alcanza para probar; para trabajar, actívale la facturación.',
+    texto: 'Trabaja con Gemini CLI y tu llave de AI Studio: no con tu cuenta ni tu plan de Google, que Gemini CLI ya no acepta. La llave gratis alcanza para probar; para trabajar, actívale la facturación.',
     ayuda: (
       <>
         Créala en{' '}
         <a href="https://aistudio.google.com/apikey" target="_blank" rel="noreferrer">
           aistudio.google.com
         </a>
-        . Se guarda solo en Sloth, en esta computadora.
+        . Se guarda solo en VyMotion, en esta computadora.
       </>
     )
   },
@@ -931,13 +849,13 @@ const OTROS: Record<OtroAgente, { titulo: string; logo: string; como: 'ventana' 
     titulo: 'Cursor',
     logo: 'cursor',
     como: 'navegador',
-    texto: 'Sloth trabaja con tu cuenta de Cursor, que pide un plan de pago para su agente. La cuenta se autoriza en el navegador.'
+    texto: 'VyMotion trabaja con tu cuenta de Cursor, que pide un plan de pago para su agente. La cuenta se autoriza en el navegador.'
   },
   muse: {
     titulo: 'Muse Code · Meta',
     logo: 'muse',
     como: 'ventana',
-    texto: 'Sloth trabaja con tu cuenta de Meta. Al conectar se abre una ventana de Muse Code que te lleva a autorizarla.'
+    texto: 'VyMotion trabaja con tu cuenta de Meta. Al conectar se abre una ventana de Muse Code que te lleva a autorizarla.'
   },
   pi: {
     titulo: 'Pi',
@@ -948,20 +866,7 @@ const OTROS: Record<OtroAgente, { titulo: string; logo: string; como: 'ventana' 
     ayuda: (
       <>
         En la ventana de Pi, elige tu proveedor y sigue sus pasos: se cierra sola al terminar. Pi también usa las llaves de API que tengas en las variables
-        de tu usuario, pero no las que guardaste en Sloth, salvo que se lo elijas aquí.
-      </>
-    )
-  },
-  omp: {
-    titulo: 'omp · oh-my-pi',
-    logo: 'omp',
-    como: 'ventana',
-    beta: true,
-    texto: 'omp es Pi con más herramientas, y trabaja con el proveedor que conectes en él: tu plan de Claude, de ChatGPT o de Copilot, o una llave de API (DeepSeek, OpenRouter…).',
-    ayuda: (
-      <>
-        En la ventana de omp, elige tu proveedor y sigue sus pasos. Si ya tienes omp instalado, Sloth usa ese, con sus mismas cuentas. omp también usa las
-        llaves de API que tengas en las variables de tu usuario, pero no las que guardaste en Sloth.
+        de tu usuario, pero no las que guardaste en VyMotion, salvo que se lo elijas aquí.
       </>
     )
   }
@@ -979,14 +884,13 @@ export function CuentaAgente({ p, aviso = false, onFalta }: { p: OtroAgente; avi
   const version = useVersion(p, !aviso, a?.instalado)
   const [pegando, setPegando] = useState(false)
   const [llave, setLlave] = useState('')
-  const [direccion, setDireccion] = useState('')
   const cuenta = c.cuenta
   const falta = cuenta ? !cuenta.conectada : undefined
   useEffect(() => onFalta?.(falta), [falta])
   if (aviso && !falta) return null
   const espera = cuenta?.conectando
   const guardarLlave = (nueva: string | null) =>
-    c.pedir(`/api/${p}/acceso`, { api: !!nueva, llave: nueva, ...(o.direccion ? { direccion } : {}) }).then((x) => x && (setPegando(false), setLlave(''), setDireccion('')))
+    c.pedir(`/api/${p}/acceso`, { api: !!nueva, llave: nueva }).then((x) => x && (setPegando(false), setLlave('')))
   const conectar = () => {
     if (o.como === 'llave') return setPegando(true)
     if (o.como === 'ventana') return void c.conectar()
@@ -1030,10 +934,10 @@ export function CuentaAgente({ p, aviso = false, onFalta }: { p: OtroAgente; avi
                   label: o.como === 'llave' ? 'Llave' : 'Cuenta',
                   options: [
                     ...(cuenta.uso || o.uso ? [{ value: 'uso', label: o.como === 'llave' ? 'Ver tu saldo ↗' : 'Ver tu uso ↗' }] : []),
-                    { value: 'cambiar', label: o.como === 'llave' ? 'Cambiar de llave' : activa ? 'Conectar otra cuenta' : 'Volver a autorizar' },
+                    ...(!cuenta.perfilAdicional ? [{ value: 'cambiar', label: o.como === 'llave' ? 'Cambiar de llave' : activa ? 'Conectar otra cuenta' : 'Volver a autorizar' },
                     activa && otras.length
                       ? { value: `quitar:${activa.id}`, label: 'Quitar esta cuenta' }
-                      : { value: 'quitar', label: o.como === 'llave' ? 'Quitar la llave' : 'Cerrar sesión' },
+                      : { value: 'quitar', label: o.como === 'llave' ? 'Quitar la llave' : 'Cerrar sesión' }] : []),
                   ],
                 },
                 ...(otras.length ? [{ label: 'Cambiar a', options: otras.map((x) => ({ value: `usar:${x.id}`, label: x.quien })) }] : []),
@@ -1064,20 +968,11 @@ export function CuentaAgente({ p, aviso = false, onFalta }: { p: OtroAgente; avi
           )
         )}
       </div>
-      {p === 'antigravity' && activa && !aviso && (
-        <p className="fila-extra muted small">
-          {cuenta?.plan === 'gratis'
-            ? 'Esta cuenta va con la cuota gratis de Antigravity, que se renueva cada semana. Si le pones Google AI Pro o Ultra, Sloth usa la cuota de tu plan sin conectar nada más.'
-            : cuenta?.plan
-              ? `Esta cuenta tiene ${cuenta.plan}: Sloth usa la cuota de tu plan.`
-              : 'Si esta cuenta paga Google AI Pro o Ultra, Sloth usa la cuota de tu plan. Cuál tiene se sabe con su primer hilo.'}
-        </p>
-      )}
       {activa && !aviso && (
         <p className="fila-extra muted small">
           {otras.length
-            ? `Trabaja con ${activa.quien}. Cuando a una cuenta se le acaba la cuota, Sloth sigue con la siguiente.`
-            : 'Puedes conectar más cuentas de Google con «Conectar otra cuenta», en el menú de la tuya: cuando a una se le acaba la cuota, Sloth sigue con la siguiente.'}
+            ? `Trabaja con ${activa.quien}. Cuando a una cuenta se le acaba la cuota, VyMotion sigue con la siguiente.`
+            : 'Puedes conectar más cuentas de Google con «Conectar otra cuenta», en el menú de la tuya: cuando a una se le acaba la cuota, VyMotion sigue con la siguiente.'}
         </p>
       )}
       {p === 'antigravity' && cuenta?.conectada && !aviso && !espera && <div className="fila-extra"><button type="button" className="boton" onClick={conectar} disabled={c.ocupado}>Agregar cuenta</button></div>}
@@ -1089,15 +984,10 @@ export function CuentaAgente({ p, aviso = false, onFalta }: { p: OtroAgente; avi
             <button className="primary" disabled={c.ocupado || !llave.trim()}>
               {c.ocupado ? 'Probando…' : 'Guardar'}
             </button>
-            <button type="button" className="ghost" onClick={() => (setPegando(false), setLlave(''), setDireccion(''))}>
+            <button type="button" className="ghost" onClick={() => (setPegando(false), setLlave(''))}>
               Cancelar
             </button>
           </div>
-          {o.direccion && (
-            <div className="opcion-fila">
-              <input type="text" placeholder={o.direccion} value={direccion} onChange={(e) => setDireccion(e.target.value)} autoComplete="off" spellCheck={false} />
-            </div>
-          )}
           {o.ayuda && <p className="muted small">{o.ayuda}</p>}
         </form>
       )}
@@ -1115,7 +1005,7 @@ export function CuentaAgente({ p, aviso = false, onFalta }: { p: OtroAgente; avi
       {cuenta?.llavesSloth && !!cuenta.llavesSloth.de.length && !aviso && (
         <div className="fila-extra pago">
           <span className="muted small">
-            Tienes en Sloth llaves de {cuenta.llavesSloth.de.join(', ')}.{' '}
+            Tienes en VyMotion llaves de {cuenta.llavesSloth.de.join(', ')}.{' '}
             {cuenta.llavesSloth.usar ? `${o.titulo} las usa, y lo que hagas con esos modelos se cobra por uso en ellas.` : `${o.titulo} no las ve: así no cobra en ellas sin que lo elijas.`}
           </span>
           <Interruptor on={cuenta.llavesSloth.usar} disabled={c.ocupado} onCambiar={(usar) => void c.pedir(`/api/${p}/llaves`, { usar })} etiqueta="Usarlas en Pi" />
@@ -1125,7 +1015,8 @@ export function CuentaAgente({ p, aviso = false, onFalta }: { p: OtroAgente; avi
       {version.aviso}
     </div>
   )
-  return aviso ? <section className="panel cuenta-aviso">{contenido}</section> : contenido
+  const conPerfiles = ['deepseek', 'gemini', 'cursor', 'grok', 'muse', 'pi'].includes(p)
+  return aviso ? <section className="panel cuenta-aviso">{contenido}</section> : <>{contenido}{conPerfiles && <PerfilesDeAgente c={c} p={p} />}</>
 }
 
 /** La cuenta de ChatGPT, solo si falta, como la de Claude: en la bienvenida. */
@@ -1141,7 +1032,7 @@ export function AvisoPrimerAgente({ onIr }: { onIr?(): void }) {
           <Logo de="python-sloth" />
           <div className="fila-nombre">
             <strong>Conecta tu primer agente</strong>
-            <span>Sloth hace los videos con una IA: Claude, ChatGPT, OpenCode (gratis) u otra. Elige una en Opciones y conéctala una sola vez.</span>
+            <span>VyMotion hace los videos con una IA: Claude, ChatGPT, OpenCode (gratis) u otra. Elige una en Opciones y conéctala una sola vez.</span>
           </div>
           <button className="primary" onClick={() => (onIr?.(), (location.hash = AGENTES))}>
             Conectar la IA
@@ -1167,7 +1058,7 @@ function AvisoClaude({ onFalta, aAgentes }: { onFalta?(falta?: boolean): void; a
           <Logo de="claude" />
           <div className="fila-nombre">
             <strong>Conecta tu cuenta de Claude</strong>
-            {!c.cuenta.conectando && <span>Sloth trabaja con tu plan de pago de Claude (Pro o Max), o con una llave de API. La cuenta se autoriza una sola vez en el navegador.</span>}
+            {!c.cuenta.conectando && <span>VyMotion trabaja con tu plan de pago de Claude (Pro o Max), o con una llave de API. La cuenta se autoriza una sola vez en el navegador.</span>}
           </div>
           {agentes?.claude.instalando ? (
             <Bajando a={agentes.claude} />
@@ -1246,7 +1137,7 @@ function CuentaCodex({ aviso = false, onFalta }: { aviso?: boolean; onFalta?(fal
               }
             />
           ) : (
-            <span>Sloth trabaja con tu plan de pago de ChatGPT (Plus o Pro), o con una llave de API, y con ella hace las imágenes de los videos: portadas y personajes. La cuenta se autoriza en el navegador.</span>
+            <span>VyMotion trabaja con tu plan de pago de ChatGPT (Plus o Pro), o con una llave de API, y con ella hace las imágenes de los videos: portadas y personajes. La cuenta se autoriza en el navegador.</span>
           )}
         </div>
         {agentes?.codex.instalando ? <Bajando a={agentes.codex} /> : version.estado}
@@ -1266,20 +1157,20 @@ function CuentaCodex({ aviso = false, onFalta }: { aviso?: boolean; onFalta?(fal
       </div>
       {!aviso && cuenta && llave.selector}
       {llave.formulario}
-      {url && <p className="fila-extra small"><a href={url} target="_blank" rel="noreferrer">Abrir inicio de sesión de ChatGPT ↗</a>{cuenta?.conectando?.codigo ? <> y escribe este código: <strong className="mono">{cuenta.conectando.codigo}</strong></> : null}. Vuelve aquí después de autorizar.</p>}
+      {url && <p className="fila-extra small"><a href={url} target="_blank" rel="noreferrer">Abrir inicio de sesión de ChatGPT ↗</a>. Vuelve aquí después de autorizar.</p>}
       {!aviso && cuenta?.conectada && <Limites key={cuenta.quien} proveedor="codex" />}
       <Fallo error={c.error} />
       {version.aviso}
     </div>
   )
-  return aviso ? <section className="panel cuenta-aviso">{contenido}</section> : <>{contenido}{cuenta && !llave.activa && <CuentasDelAgente c={c} p="codex" conectar={conectar} />}</>
+  return aviso ? <section className="panel cuenta-aviso">{contenido}</section> : <>{contenido}{cuenta && !llave.activa && <PerfilesDeAgente c={c} p="codex" conectar={conectar} />}</>
 }
 
 /** `plus` → `Plus`: el plan como lo escribe su marca. */
 const conMayuscula = (s?: string) => s && s[0].toUpperCase() + s.slice(1)
 
 /**
- * Lo que las skills necesitan fuera de Sloth (FFmpeg, Python…), y el botón que baja lo que falta. Con `skill`, solo lo
+ * Lo que las skills necesitan fuera de VyMotion (FFmpeg, Python…), y el botón que baja lo que falta. Con `skill`, solo lo
  * que pide esa skill; sin ella (Opciones), todo.
  */
 function useRequisitos(fresco = false, skill?: string, esperar = false) {
@@ -1310,11 +1201,7 @@ function useRequisitos(fresco = false, skill?: string, esperar = false) {
 
   // Mientras se instala, se mira cada tres segundos cómo va.
   const trabajando = !!lista?.some((r) => r.estado)
-  useEffect(() => {
-    if (!trabajando) return
-    const id = setInterval(() => leer(), 3000)
-    return () => clearInterval(id)
-  }, [trabajando])
+  usePoll(() => leer(), 3000, trabajando)
 
   function bajar(ids?: string[]) {
     setError('')
@@ -1503,7 +1390,7 @@ function EstadoRequisito({ r, resumido }: { r: Requisito; resumido?: boolean }) 
 }
 
 /**
- * La versión de un agente (`estado`, a la derecha de su fila), la que trae Sloth: llega al día con cada versión de Sloth.
+ * La versión de un agente (`estado`, a la derecha de su fila), la que trae VyMotion: llega al día con cada versión de VyMotion.
  * `aviso`, debajo, si no se pudo leer.
  */
 function useVersion(de: Proveedor, mirar = true, instalado?: boolean) {
@@ -1569,7 +1456,7 @@ function Agentes() {
             ) : cuenta.conectando ? (
               <span className="falta">Esperando al navegador…</span>
             ) : (
-              <span className="falta">Sin cuenta: Sloth trabaja con tu plan de pago de Claude (Pro o Max) o con una llave de API</span>
+              <span className="falta">Sin cuenta: VyMotion trabaja con tu plan de pago de Claude (Pro o Max) o con una llave de API</span>
             )}
           </div>
           {agentes?.claude.instalando ? <Bajando a={agentes.claude} /> : version.estado}
@@ -1587,64 +1474,91 @@ function Agentes() {
         <Fallo error={c.error} />
         {version.aviso}
       </div>
-      {cuenta && !llave.activa && <CuentasDelAgente c={c} p="claude" conectar={(perfil) => void c.pedir('/api/claude/conectar', { perfil })} />}
+      {cuenta && !llave.activa && <PerfilesDeAgente c={c} p="claude" />}
     </>
   )
 }
 
-/**
- * Las cuentas de Claude o de ChatGPT (`server/perfiles-agentes.ts`): la original y las que agregues, cada una con su
- * sesión. La activa es la de los hilos nuevos; cada hilo sigue con la suya. Con una sola, solo «Agregar otra cuenta».
- */
-function CuentasDelAgente({ c, p, conectar }: { c: UsoCuenta; p: 'claude' | 'codex'; conectar(perfil: string): void }) {
+function PerfilesDeAgente({ c, p, conectar }: { c: UsoCuenta; p: Proveedor; conectar?(perfil: string): void }) {
   const [datos, setDatos] = useState<{ activa: string; perfiles: { id: string; quien?: string; bloqueado?: boolean }[] }>()
   const [error, setError] = useState('')
+  const [editando, setEditando] = useState(false)
+  const [llave, setLlave] = useState('')
+  const [nombre, setNombre] = useState('')
+  const conLlave = p === 'deepseek' || p === 'gemini' || p === 'cursor'
   const ruta = `/api/${p}/perfiles`
   const conectando = !!c.cuenta?.conectando
-  const leer = () => api<NonNullable<typeof datos>>(ruta).then((d) => (setDatos(d), setError('')), (e) => setError(e.message))
-  useEffect(() => void leer(), [conectando, c.cuenta?.quien])
-  const cambiar = (cuerpo: { usar?: string; quitar?: string }) =>
-    api<NonNullable<typeof datos>>(ruta, cuerpo).then((d) => {
-      setDatos(d)
-      setError('')
-      // La cuenta que se ve arriba es la activa: se vuelve a mirar.
-      void c.pedir(`/api/${p}/cuenta?fresco`, undefined)
-    }, (e) => setError(e.message))
+  const leer = () => api<NonNullable<typeof datos>>(ruta).then(setDatos, e => setError(e.message))
+  useEffect(() => { void leer() }, [conectando, ruta])
   const bloqueado = c.ocupado || conectando
-  const nombre = p === 'claude' ? 'Claude' : 'ChatGPT'
-  const lista = datos ? [{ id: 'original', quien: 'La cuenta original' as string | undefined, bloqueado: false }, ...datos.perfiles] : []
-  return (
-    <div className="item cuentas-agente">
-      <div className="fila">
-        <div className="fila-nombre">
-          <strong>Otras cuentas de {nombre}</strong>
-          <span>Los hilos nuevos usan la activa; cada hilo sigue con la suya. Si una llega a su límite, el hilo puede seguir con otra.</span>
-        </div>
-        <button className="boton" disabled={bloqueado || !datos} onClick={() => conectar('nueva')}>Agregar otra cuenta</button>
-      </div>
-      {datos && datos.perfiles.length > 0 && (
-        <ul className="cuentas-agente-lista">
-          {lista.map(({ id, quien, bloqueado: otroCorreo }) => {
-            const autorizada = !!quien && !otroCorreo
-            return (
-              <li key={id}>
-                <span title={quien}>{quien ?? 'Sin autorizar'}{otroCorreo && ' · entró otro correo'}</span>
-                {datos.activa === id && autorizada ? (
-                  <span className="estado">Activa</span>
-                ) : autorizada ? (
-                  <button className="ghost small" disabled={bloqueado} onClick={() => void cambiar({ usar: id })}>Usar en los hilos nuevos</button>
-                ) : (
-                  <button className="ghost small" disabled={bloqueado} onClick={() => conectar(id)}>Autorizar</button>
-                )}
-                {id !== 'original' && <button className="ghost small" disabled={bloqueado} title="Quita la cuenta y su sesión de esta computadora" onClick={() => confirm(`¿Quitar ${quien ?? 'esta cuenta'} de Sloth?`) && void cambiar({ quitar: id })}>Quitar</button>}
-              </li>
-            )
-          })}
-        </ul>
-      )}
-      <Fallo error={error} />
+  const autorizar = (perfil: string) => conectar ? conectar(perfil) : void c.pedir(`/api/${p}/conectar`, { perfil })
+  return <div className="item cuentas-claude">
+    <div className="fila">
+      <div className="fila-nombre"><strong>Cuentas de {NOMBRE_AGENTE[p]}</strong><span>La cuenta elegida se usa en los hilos nuevos.</span></div>
+      <button className="boton" disabled={bloqueado || !datos} onClick={() => conLlave ? setEditando(v => !v) : autorizar('nuevo')}>{conLlave ? 'Agregar llave' : 'Agregar cuenta'}</button>
     </div>
-  )
+    {editando && <form className="fila-extra" onSubmit={e => {
+      e.preventDefault()
+      void c.pedir(ruta, { llave, nombre }).then(cuenta => {
+        if (!cuenta) return
+        setLlave(''); setNombre(''); setEditando(false); void leer()
+      })
+    }}>
+      <input aria-label="Nombre de la cuenta" placeholder="Nombre de la cuenta (opcional)" value={nombre} onChange={e => setNombre(e.target.value)} maxLength={100} />
+      <input type="password" aria-label="Llave de API de la cuenta" placeholder="Llave de API" autoComplete="off" value={llave} onChange={e => setLlave(e.target.value)} required />
+      <button className="boton" disabled={bloqueado || !llave.trim()}>Guardar cuenta</button>
+    </form>}
+    {!!datos?.perfiles.length && <div className="cuentas-claude-lista">
+      {[{ id: 'original', quien: 'Cuenta original', bloqueado: false }, ...datos.perfiles].map(({ id, quien, bloqueado: reautorizar }) => {
+        const activa = datos.activa === id
+        const autorizado = quien && !reautorizar
+        return <div key={id}>
+          <span title={quien}>{quien ?? 'Autorización pendiente'}</span>
+          {activa && autorizado ? <span className="estado">Activa</span> : <button className="ghost small" disabled={bloqueado} onClick={() => {
+            if (autorizado) void c.pedir(ruta, { id }).then(leer)
+            else if (!conLlave) autorizar(id)
+          }}>{autorizado ? 'Usar cuenta' : 'Autorizar'}</button>}
+        </div>
+      })}
+    </div>}
+    <Fallo error={error} />
+  </div>
+}
+
+function OpenRouter() {
+  const [estado, setEstado] = useState<{ final?: string }>()
+  const [editando, setEditando] = useState(false)
+  const [llave, setLlave] = useState('')
+  const [ocupado, setOcupado] = useState(false)
+  const [error, setError] = useState('')
+  useEffect(() => {
+    void api<NonNullable<typeof estado>>('/api/pi/openrouter').then(setEstado, e => setError(e.message))
+  }, [])
+  async function guardar(valor: string | null) {
+    setOcupado(true)
+    setError('')
+    try {
+      setEstado(await api('/api/pi/openrouter', { llave: valor }))
+      setLlave('')
+      setEditando(false)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    } finally { setOcupado(false) }
+  }
+  return <div className="item">
+    <div className="fila">
+      <div className="fila-nombre"><strong>OpenRouter</strong><span>{estado?.final ? `Llave del perfil original de Pi · …${estado.final}` : 'Amplía el catálogo del perfil original de Pi con tu llave de OpenRouter.'}</span></div>
+      {estado && <button className="boton" disabled={ocupado} onClick={() => setEditando(v => !v)}>{estado.final ? 'Gestionar llave' : 'Conectar OpenRouter'}</button>}
+    </div>
+    {editando && <form className="fila-extra" onSubmit={e => { e.preventDefault(); void guardar(llave) }}>
+      <input type="password" aria-label="Llave de OpenRouter" placeholder="Pega tu llave de OpenRouter" autoComplete="off" value={llave} onChange={e => setLlave(e.target.value)} />
+      <div className="fila-acciones">
+        <button className="boton" type="submit" disabled={!llave.trim() || ocupado}>{ocupado ? 'Comprobando…' : 'Guardar llave'}</button>
+        {estado?.final && <button className="ghost" type="button" disabled={ocupado} onClick={() => void guardar(null)}>Quitar llave</button>}
+      </div>
+    </form>}
+    <Fallo error={error} />
+  </div>
 }
 
 /**
@@ -1694,7 +1608,7 @@ function cuandoReinicia(d: Date) {
 }
 
 /**
- * Los avisos de cuando un hilo termina o te necesita mientras miras otra cosa (`avisos.ts`). En la ventana de Sloth ya
+ * Los avisos de cuando un hilo termina o te necesita mientras miras otra cosa (`avisos.ts`). En la ventana de VyMotion ya
  * tienen permiso; en Edge, encenderlas se lo pide, y si lo niega se dice dónde dárselo.
  */
 function Avisos() {
@@ -1714,7 +1628,7 @@ function Avisos() {
     const p = permiso === 'default' ? await Notification.requestPermission() : permiso
     setPermiso(p)
     if (p !== 'granted') return setAyuda('permiso')
-    void notificar({ titulo: 'Así avisa Sloth', cuerpo: 'Cuando un hilo termine mientras miras otra cosa.', ids: [] })
+    void notificar({ titulo: 'Así avisa VyMotion', cuerpo: 'Cuando un hilo termine mientras miras otra cosa.', ids: [] })
     setAyuda('windows')
   }
 
@@ -1734,13 +1648,13 @@ function Avisos() {
       </div>
       {ayuda === 'permiso' && (
         <p className="small fila-extra">
-          Edge no deja avisar a Sloth. Para permitirlo, escribe <span className="mono">edge://settings/content/notifications</span> en una ventana de Edge,
+          Edge no deja avisar a VyMotion. Para permitirlo, escribe <span className="mono">edge://settings/content/notifications</span> en una ventana de Edge,
           añade <span className="mono">{location.origin}</span> en «Permitir» (o quítalo de «No permitir») y vuelve aquí.
         </p>
       )}
       {ayuda === 'windows' && (
         <p className="muted small fila-extra">
-          ¿No salió? Mira que Windows deje avisar a {window.sloth ? 'Sloth' : 'Microsoft Edge'} (Configuración → Sistema → Notificaciones) y que «No molestar» esté apagado.
+          ¿No salió? Mira que Windows deje avisar a {window.sloth ? 'VyMotion' : 'Microsoft Edge'} (Configuración → Sistema → Notificaciones) y que «No molestar» esté apagado.
         </p>
       )}
     </div>
@@ -1748,7 +1662,7 @@ function Avisos() {
 }
 
 /**
- * En qué navegador de tu computadora se entra con Google (`server/chromium.ts`): el que toma Sloth o el que elijas. Solo
+ * En qué navegador de tu computadora se entra con Google (`server/chromium.ts`): el que toma VyMotion o el que elijas. Solo
  * sale si hay más de uno entre los que elegir.
  */
 function NavegadorDeGoogle() {
@@ -1766,7 +1680,7 @@ function NavegadorDeGoogle() {
   return (
     <Grupo
       titulo="Navegador"
-      nota="Google no deja iniciar sesión dentro de una app: ese paso se da en un navegador de tu computadora, con un perfil aparte del tuyo, y la sesión pasa a Sloth. Si lo cambias, puede que Google te pida entrar otra vez en Voz y en Flow."
+      nota="Google no deja iniciar sesión dentro de una app: ese paso se da en un navegador de tu computadora, con un perfil aparte del tuyo, y la sesión pasa a VyMotion. Si lo cambias, puede que Google te pida entrar otra vez en Voz y en Flow."
     >
       <div className="item">
         <div className="fila">
@@ -1775,7 +1689,7 @@ function NavegadorDeGoogle() {
           </span>
           <div className="fila-nombre">
             <strong>Para entrar con Google</strong>
-            <span>{elegido ? `Siempre en ${elegido.nombre}.` : `Lo elige Sloth: ahora, ${datos.automatico}.`}</span>
+            <span>{elegido ? `Siempre en ${elegido.nombre}.` : `Lo elige VyMotion: ahora, ${datos.automatico}.`}</span>
           </div>
           <Picker
             className="acciones"
@@ -1800,60 +1714,5 @@ function Interruptor({ on, onCambiar, etiqueta, disabled }: { on: boolean; onCam
         <span />
       </button>
     </label>
-  )
-}
-
-/**
- * Desde la web: un inicio de sesión que vuelve a `localhost` (YouTube, Antigravity) no carga en este dispositivo. Pegando
- * esa dirección, la computadora la abre y termina (`/api/web/vuelta`, `server/ventanas-remotas.ts`).
- */
-function VueltaWeb() {
-  const [url, setUrl] = useState('')
-  const [aviso, setAviso] = useState('')
-  async function mandar(ev: React.FormEvent) {
-    ev.preventDefault()
-    setAviso('')
-    try {
-      const r = await api<{ ok: boolean }>('/api/web/vuelta', { url: url.trim() })
-      setAviso(r.ok ? `Listo: ${ALLA} terminó el inicio de sesión.` : 'Sloth la abrió, pero no terminó: vuelve a conectar.')
-      setUrl('')
-    } catch (e) {
-      setAviso(e instanceof Error ? e.message : String(e))
-    }
-  }
-  return (
-    <div className="grupo-nota vuelta-web">
-      <p>Estás usando Sloth desde la web. Lo que conectar una cuenta abre en {ALLA} (su terminal o su navegador para Google) sale aquí, en el panel «En {ALLA}», abajo a la derecha.</p>
-      <form onSubmit={(ev) => void mandar(ev)}>
-        <input value={url} placeholder="¿Terminó en una página que no carga (localhost o 127.0.0.1)? Pega aquí su dirección" aria-label="Dirección de vuelta" onChange={(ev) => setUrl(ev.target.value)} />
-        <button className="ghost small" type="submit" disabled={!url.trim()}>
-          Terminar
-        </button>
-      </form>
-      {aviso && <p className="small">{aviso}</p>}
-    </div>
-  )
-}
-
-/** Opciones → Apariencia: el tema de la interfaz (`temas.ts`). */
-function Apariencia() {
-  const tema = useTema()
-  return (
-    <div className="item">
-      <div className="fila">
-        <div className="fila-nombre">
-          <strong>Tema</strong>
-          <span>{TEMAS[tema].descripcion}</span>
-        </div>
-        <Picker
-          label={TEMAS[tema].nombre}
-          nombre="Tema"
-          value={tema}
-          abajo
-          groups={[{ label: 'Tema', options: (Object.keys(TEMAS) as Tema[]).map((t) => ({ value: t, label: TEMAS[t].nombre, detalle: t === 'sloth' ? 'el de siempre' : undefined })) }]}
-          onChange={(t) => ponerTema(t as Tema)}
-        />
-      </div>
-    </div>
   )
 }

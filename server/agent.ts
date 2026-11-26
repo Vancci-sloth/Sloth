@@ -26,30 +26,25 @@ export interface AgentOptions {
   effort?: string
   /** Para retomar una sesión que ya existía. */
   resume?: string
-  /** La carpeta de la cuenta de Claude o de ChatGPT del hilo, si no es la original (`server/perfiles-agentes.ts`). */
+  /** Configuración privada de la cuenta de Claude a la que pertenece este hilo. */
   configClaude?: string
-  configCodex?: string
+  /** Directorio aislado del proveedor usado por este hilo. `null` corresponde a la cuenta original. */
+  configAgente?: string | null
   /** Un video de un lote: nadie lo mira mientras trabaja (su navegador va sin ventana y con un perfil limpio). */
   lote?: boolean
-  /** El hilo: su agente usa la página del hilo en el navegador integrado. */
-  hilo?: string
+  /** Página del navegador integrado para el agente. Con null el trabajo usa solo su render local. */
+  hilo?: string | null
   /** Codex: si trabaja con la llave de API o con la cuenta de ChatGPT. Sin él, lo que esté elegido en Opciones. */
   conLlave?: boolean
   /** Claude: las herramientas y los MCP que no se le ofrecen (`Card.sinHerramientas`). */
   sinHerramientas?: string[]
-  /**
-   * Lee algo ajeno (un estilo de la comunidad por aprobar, `server/estilos-revision.ts`): solo lee archivos, sin
-   * escribir, ejecutar ni conectarse a nada. Solo lo cumple Claude Code (`SOLO_LEER` en `server/claude.ts`); con otro
-   * agente, el hilo no arranca.
-   */
-  soloLeer?: boolean
   onEvent(event: AgentEvent): void
   onProviderSession(id: string): void
   /** Lo que lleva escrito un `Write` antes de terminar. Opcional: no todo proveedor lo da. */
   onDraft?(draft: FileDraft): void
   /**
    * El proceso del agente ya no está: lo que se le mande se perdería, el siguiente mensaje abre otro. Con `caida`, se cayó
-   * (no lo cerró Sloth), y `turno` dice si cortó un turno a la mitad.
+   * (no lo cerró VyMotion), y `turno` dice si cortó un turno a la mitad.
    */
   onExit?(caida?: { error: string; turno: boolean }): void
 }

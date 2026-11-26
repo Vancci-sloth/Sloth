@@ -1,7 +1,6 @@
 import assert from 'node:assert/strict'
-import { mkdtemp, rm } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { mkdir, mkdtemp, rm, rmdir } from 'node:fs/promises'
+import { join, resolve } from 'node:path'
 import test from 'node:test'
 import { fechaActividad } from '../shared/actividad-agentes.ts'
 import type { AgentEvent, SessionMeta } from '../shared/types.ts'
@@ -9,9 +8,14 @@ import { actividadAgentes } from './actividad-agentes.ts'
 import { guardar } from './disco.ts'
 
 test('agrupa los turnos de un hilo traspasado por agente, modelo registrado y día', async t => {
-  const dir = await mkdtemp(join(tmpdir(), 'sloth-actividad-'))
+  const base = resolve('data')
+  await mkdir(base, { recursive: true })
+  const dir = await mkdtemp(join(base, 'prueba-actividad-'))
   const archivo = join(dir, 'hilo.jsonl')
-  t.after(() => rm(dir, { recursive: true, force: true }))
+  t.after(async () => {
+    await rm(archivo, { force: true })
+    await rmdir(dir)
+  })
 
   const at = Date.now()
   const tokens = { input: 23, output: 5, cacheRead: 8 }

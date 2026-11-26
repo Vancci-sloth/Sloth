@@ -168,8 +168,8 @@ Qué enseñar por cada cosa que se menciona y las recetas de lo raro (un post de
    la línea `Carpeta:`, exacta; sin ella, `el-diff-N`; `--marca <nombre>` si hay línea `Marca:`) y, ya en esa carpeta,
    `node <skill>/scripts/preinvestigar.mjs <los enlaces del mensaje>` (lee lo que trajo el usuario y lo que eso
    enlaza) y `node <skill>/scripts/buscar.mjs "consulta" "consulta" …` (todas las búsquedas de una vez, en inglés y con
-   los nombres propios; `--horas 72` para lo reciente). Buscan en el radar de Sloth y dejan cada página en
-   `fuentes/textos/`. Si sale con el código 3 (Sloth cerrado), todo va por WebSearch y
+   los nombres propios; `--horas 72` para lo reciente). Buscan en el radar de VyMotion y dejan cada página en
+   `fuentes/textos/`. Si sale con el código 3 (VyMotion cerrado), todo va por WebSearch y
    `node <skill>/scripts/leer.mjs <url> …`. Con un video de YouTube de tema, además y de fondo:
    `python <skill>/scripts/fuente.py <url> fuentes/tema` (lo baja y lo transcribe en `fuentes/tema/transcripcion.txt`).
    Con la línea `Serie:`, lee su archivo antes ([`SERIES.md`](../video-base/SERIES.md)): manda en el tema.
@@ -224,7 +224,7 @@ Si algo que el episodio necesita de verdad no cabe en `momentos.json`, díselo a
 
 ## Entorno
 
-- El Python de Sloth solo se usa para yt-dlp y la transcripción: lo llaman los scripts (`scripts/comun.py`).
+- El Python de VyMotion solo se usa para yt-dlp y la transcripción: lo llaman los scripts (`scripts/comun.py`).
 - `node_modules` del episodio es una unión a la carpeta que comparten todos: no corras `npm install` en él.
 - Lo que se baja para un episodio (recortes, metraje, memes) se queda en la carpeta del noticiero y sirve al siguiente.
 - WebFetch no puede leer x.com ni openai.com: `scripts/leer.mjs` sí (también PDFs).

@@ -12,11 +12,11 @@ import { bytes, cuerpo, json as enviar } from '../http.ts'
 import { COBRO } from '../licencia.ts'
 
 /**
- * Voices Cloning (https://www.voicescloning.art), el proveedor de voz de Sloth, visto desde esta computadora. No hay
+ * Voices Cloning (https://www.voicescloning.art), el proveedor de voz de VyMotion, visto desde esta computadora. No hay
  * llave aquí: la del socio la guarda el cobro (`licencias/src/voz.ts`), que sabe quién eres (tu cuenta o tu apoyo, o el
  * creador con su llave de `publicar.txt`) y gasta tus créditos, no los de otro. Sus voces van como `vc:<voice_id>`.
  *
- * Sus voces se ven en el menú «Voz» de Sloth, como las demás: con el pase de una hora que da el cobro (`/voz/sesion`),
+ * Sus voces se ven en el menú «Voz» de VyMotion, como las demás: con el pase de una hora que da el cobro (`/voz/sesion`),
  * este servidor pide a su API (la misma que usa su ventana, `embed.js`) los proveedores, el catálogo con su búsqueda y
  * sus filtros, y clona tu voz (`/api/voz/vc/proveedores`, `/catalogo`, `/clonar`). La que eliges o clonas se guarda en
  * `data/voz/voices-cloning.json`. Su ventana queda para lo demás que ofrecen (diálogo, texto largo, transcribir). Generar es pedir el guion por
@@ -38,8 +38,8 @@ const FRECUENCIA = 44_100
 const RESPIRO = 0.3
 /** Lo más que se espera una tarea que tardó. */
 const ESPERA_TAREA = 10 * 60_000
-const SIN_CUENTA = 'Para usar las voces de Sloth, crea tu cuenta gratis de Sloth (Opciones → Apoyo).'
-const SIN_CONEXION = 'No hay conexión con Sloth para pedir sus voces. Revisa tu internet.'
+const SIN_CUENTA = 'Para usar las voces de VyMotion, crea tu cuenta gratis de VyMotion (Opciones → Apoyo).'
+const SIN_CONEXION = 'No hay conexión con VyMotion para pedir sus voces. Revisa tu internet.'
 /** Su API, la que usa su ventana, con el pase de sesión (`Authorization: Bearer et_…`). */
 const VC = 'https://www.voicescloning.art'
 /** Los proveedores que tiene dentro (`/api/v1/providers`), y lo que se puede pedir de su catálogo. */
@@ -55,12 +55,12 @@ const PAISES: Record<string, [pais: string, de: string]> = {
   SV: ['El Salvador', 'salvadoreña'], GQ: ['Guinea Ecuatorial', 'ecuatoguineana']
 }
 /** El nombre de una voz de Edge, que viene técnico («es-AR-ElenaNeural»): «Elena (Argentina)». Las demás, tal cual. */
-/** Un error del cobro como lo lee el cliente: «las voces de Sloth», sin el nombre del socio. */
+/** Un error del cobro como lo lee el cliente: «las voces de VyMotion», sin el nombre del socio. */
 export function sinSocio(error: string): string {
   return error
-    .replace(/(créditos de voz|usuario) de (las voces de )?Voices Cloning/g, '$1 de Sloth')
-    .replace(/(las )?voces de Voices Cloning( en Sloth)?/g, 'las voces de Sloth')
-    .replace(/Voices Cloning/g, 'las voces de Sloth')
+    .replace(/(créditos de voz|usuario) de (las voces de )?Voices Cloning/g, '$1 de VyMotion')
+    .replace(/(las )?voces de Voices Cloning( en VyMotion)?/g, 'las voces de VyMotion')
+    .replace(/Voices Cloning/g, 'las voces de VyMotion')
     .replace(/(^|[.:] )las/g, (_, a: string) => `${a}Las`)
 }
 
@@ -128,7 +128,7 @@ export function voicesCloning(carpeta: string, o: { credencial(): Credencial | u
       throw new Fallo(502, SIN_CONEXION)
     }
     const datos = ((await r.json().catch(() => ({}))) ?? {}) as Respuesta<T>['datos']
-    // Al cliente las voces son de Sloth: un cobro de antes aún nombra al socio en sus errores (Administrador lo ve tal cual).
+    // Al cliente las voces son de VyMotion: un cobro de antes aún nombra al socio en sus errores (Administrador lo ve tal cual).
     if (!ruta.startsWith('/voz/admin') && typeof datos.error === 'string') datos.error = sinSocio(datos.error)
     const espera = Number(r.headers.get('retry-after'))
     return { status: r.status, datos, ...(Number.isFinite(espera) && espera > 0 ? { espera } : {}) }
@@ -152,14 +152,14 @@ export function voicesCloning(carpeta: string, o: { credencial(): Credencial | u
       try {
         r = await fetch(`${VC}${ruta}`, { method: init.form ? 'POST' : 'GET', headers: { authorization: `Bearer ${await conPase()}` }, body: init.form, signal: AbortSignal.timeout(2 * 60_000) })
       } catch {
-        throw new Fallo(502, 'No hay conexión con las voces de Sloth. Revisa tu internet.')
+        throw new Fallo(502, 'No hay conexión con las voces de VyMotion. Revisa tu internet.')
       }
       if (r.status === 401 && intento === 0) {
         pase = undefined
         continue
       }
       const datos = ((await r.json().catch(() => ({}))) ?? {}) as T & { error?: string }
-      if (!r.ok) throw new Fallo(r.status, datos.error ?? `Las voces de Sloth respondieron ${r.status}.`)
+      if (!r.ok) throw new Fallo(r.status, datos.error ?? `Las voces de VyMotion respondieron ${r.status}.`)
       return datos
     }
   }
@@ -201,7 +201,7 @@ export function voicesCloning(carpeta: string, o: { credencial(): Credencial | u
   }
   let leyendoFichas = false
   /**
-   * Las fichas que falten o tengan más de 12 h, tras leer el panel y al abrir Sloth (con el panel guardado): así la de
+   * Las fichas que falten o tengan más de 12 h, tras leer el panel y al abrir VyMotion (con el panel guardado): así la de
    * cualquiera se abre al momento, también la de quien no salió en las últimas llamadas. Las que nunca se han leído
    * van primero, de tres en tres; las viejas (que ya se enseñan mientras tanto), de una en una cada 300 ms.
    */
@@ -234,7 +234,7 @@ export function voicesCloning(carpeta: string, o: { credencial(): Credencial | u
       leyendoFichas = false
     }
   }
-  /** Al abrir Sloth en la computadora del creador, con la lista del panel guardado (si ya se leyó alguna vez). */
+  /** Al abrir VyMotion en la computadora del creador, con la lista del panel guardado (si ya se leyó alguna vez). */
   let fichasAlAbrir = false
   function leerFichasAlAbrir(llave: { llave: string }) {
     if (fichasAlAbrir) return
@@ -250,7 +250,7 @@ export function voicesCloning(carpeta: string, o: { credencial(): Credencial | u
   const deshaciendo = new Set<string>()
 
   type PanelCobro = { llaves?: { id: string; usuarios: { status: number; datos: { users?: unknown[]; total?: number; per_page?: number } } }[]; cuentas?: Record<string, unknown> }
-  /** El panel de la página 1 con los usuarios de las demás páginas de cada llave (hasta 20), y sus cuentas de Sloth. */
+  /** El panel de la página 1 con los usuarios de las demás páginas de cada llave (hasta 20), y sus cuentas de VyMotion. */
   async function conTodasLasPaginas(llave: { llave: string }, datos: unknown, url: URL): Promise<unknown> {
     const panel = datos as PanelCobro
     const paginas = Math.min(20, Math.max(1, ...(panel.llaves ?? []).map((l) => Math.ceil((Number(l.usuarios.datos.total) || 0) / (Number(l.usuarios.datos.per_page) || 100)))))
@@ -285,7 +285,7 @@ export function voicesCloning(carpeta: string, o: { credencial(): Credencial | u
 
   async function pedirBien<T>(ruta: string, init?: Parameters<typeof pedir>[1]): Promise<T> {
     const r = await pedir<T>(ruta, init)
-    if (r.status >= 400) throw new Fallo(r.status, r.datos.error ?? `El cobro de Sloth respondió ${r.status}.`)
+    if (r.status >= 400) throw new Fallo(r.status, r.datos.error ?? `El cobro de VyMotion respondió ${r.status}.`)
     return r.datos
   }
 
@@ -296,7 +296,7 @@ export function voicesCloning(carpeta: string, o: { credencial(): Credencial | u
       info = { configurado: d.disponible, creador: d.creador, creditos: d.creditos, usados: d.usados, hoy: d.hoy, generaciones: d.generaciones, estado: d.estado }
       error = ''
     } catch (e) {
-      // Sin cuenta de Sloth no es un error: solo no se ofrece.
+      // Sin cuenta de VyMotion no es un error: solo no se ofrece.
       error = e instanceof Fallo && e.status === 401 ? '' : mensaje(e)
       if (e instanceof Fallo && e.status === 401) info = { configurado: false, creador: false }
     }
@@ -328,7 +328,7 @@ export function voicesCloning(carpeta: string, o: { credencial(): Credencial | u
         await espera(Math.min(60, r.espera ?? [5, 15, 30][intento]) * 1000)
         continue
       }
-      throw new Fallo(r.status, r.datos.error ?? `Las voces de Sloth respondieron ${r.status}.`)
+      throw new Fallo(r.status, r.datos.error ?? `Las voces de VyMotion respondieron ${r.status}.`)
     }
   }
 
@@ -380,7 +380,7 @@ export function voicesCloning(carpeta: string, o: { credencial(): Credencial | u
     /** La voz de un guion entero, como WAV, y cuánto dura. */
     async generar(id: string, texto: string): Promise<{ wav: Uint8Array; segundos: number }> {
       if (!info.configurado) await refrescar()
-      if (!info.configurado) throw new Error(error || 'Las voces de Sloth no están disponibles en esta computadora: hace falta la cuenta de Sloth (Opciones → Apoyo). Mientras, pídele la voz al usuario.')
+      if (!info.configurado) throw new Error(error || 'Las voces de VyMotion no están disponibles en esta computadora: hace falta la cuenta de VyMotion (Opciones → Apoyo). Mientras, pídele la voz al usuario.')
       const partes: Uint8Array[] = []
       for (const t of trozosParaVoz(texto, MAX)) partes.push(await trozo(id, t))
       void refrescar()
@@ -402,7 +402,7 @@ export function voicesCloning(carpeta: string, o: { credencial(): Credencial | u
       if (url.pathname !== '/api/admin' && !url.pathname.startsWith('/api/admin/')) return false
       const llave = o.creador()
       if (url.pathname === '/api/admin' && req.method === 'GET') {
-        // La barra lo pregunta al abrir Sloth: es cuando se ponen al día las fichas, de fondo.
+        // La barra lo pregunta al abrir VyMotion: es cuando se ponen al día las fichas, de fondo.
         if (llave) leerFichasAlAbrir(llave)
         return enviar(res, 200, { creador: !!llave })
       }
@@ -456,7 +456,7 @@ export function voicesCloning(carpeta: string, o: { credencial(): Credencial | u
           // en cuatro, 45 s como mucho). Solo se nota la primera vez de todas; después son las de quien se dio de alta.
           await leerFichasNuevas(llave, r.datos as PanelConUsuarios, 45_000)
           mkdirSync(carpeta, { recursive: true })
-          // Las fichas al disco antes que el panel: si Sloth se cierra entre los dos, nadie queda listado sin la suya.
+          // Las fichas al disco antes que el panel: si VyMotion se cierra entre los dos, nadie queda listado sin la suya.
           escribirFichas()
           guardar(panel, JSON.stringify({ ...r.datos, leido: Date.now() }))
           void leerFichasDeFondo(llave, r.datos as PanelConUsuarios)
@@ -484,7 +484,7 @@ export function voicesCloning(carpeta: string, o: { credencial(): Credencial | u
           }
           const q = new URL(req.url ?? '', 'http://x').searchParams
           const proveedor = q.get('proveedor') ?? 'elevenlabs'
-          if (!PROVEEDORES_VC.test(proveedor)) return enviar(res, 400, { error: 'Ese proveedor no está en las voces de Sloth.' })
+          if (!PROVEEDORES_VC.test(proveedor)) return enviar(res, 400, { error: 'Ese proveedor no está en las voces de VyMotion.' })
           const p = new URLSearchParams({ provider: proveedor, page: String(Math.max(1, Number(q.get('pagina')) || 1)), per_page: '30' })
           if (proveedor !== 'clone') p.set('language', 'es')
           for (const f of FILTROS_VC) if (q.get(f)) p.set(f, q.get(f)!.slice(0, 40))
@@ -547,13 +547,13 @@ async function bajar(url: string): Promise<Uint8Array> {
   try {
     u = new URL(url)
   } catch {
-    throw new Error('Las voces de Sloth dieron un enlace de audio que no sirve.')
+    throw new Error('Las voces de VyMotion dieron un enlace de audio que no sirve.')
   }
-  if (u.protocol !== 'https:' || !/(^|\.)voicescloning\.art$/.test(u.hostname)) throw new Error(`Las voces de Sloth dieron el audio en otro sitio (${u.hostname}).`)
+  if (u.protocol !== 'https:' || !/(^|\.)voicescloning\.art$/.test(u.hostname)) throw new Error(`Las voces de VyMotion dieron el audio en otro sitio (${u.hostname}).`)
   for (let intento = 0; ; intento++) {
     try {
       const r = await fetch(u, { signal: AbortSignal.timeout(2 * 60_000) })
-      if (!r.ok) throw new Error(`Las voces de Sloth no dieron el audio (${r.status}).`)
+      if (!r.ok) throw new Error(`Las voces de VyMotion no dieron el audio (${r.status}).`)
       return new Uint8Array(await r.arrayBuffer())
     } catch (e) {
       if (intento >= 2) throw e
@@ -570,7 +570,7 @@ export async function pcmDeMp3(mp3: Uint8Array): Promise<Uint8Array> {
     await correr('ffmpeg', ['-nostdin', '-v', 'error', '-y', '-i', `${base}.mp3`, '-f', 's16le', '-acodec', 'pcm_s16le', '-ac', '1', '-ar', String(FRECUENCIA), `${base}.pcm`], { timeout: 120_000 })
     return new Uint8Array(readFileSync(`${base}.pcm`))
   } catch (e) {
-    throw new Error(`No se pudo leer el audio de las voces de Sloth con ffmpeg: ${mensaje(e)}`)
+    throw new Error(`No se pudo leer el audio de las voces de VyMotion con ffmpeg: ${mensaje(e)}`)
   } finally {
     rmSync(`${base}.mp3`, { force: true })
     rmSync(`${base}.pcm`, { force: true })

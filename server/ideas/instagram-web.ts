@@ -7,7 +7,7 @@ import type { Hallado } from './tiktok.ts'
  * La búsqueda de Instagram para Ideas: cada frase que se busca en TikTok se busca también aquí. La API de Meta no deja
  * buscar (por hashtag pide la revisión «Instagram Public Content Access»), así que va por la página, con una cuenta de
  * Instagram desechable que solo investiga, en el navegador de investigación (`navegador-investigacion.ts`). Como en
- * TikTok, la página pide su JSON y Sloth lo lee al pasar. La búsqueda no da vistas: las da la cuenta de cada Reel, leída con
+ * TikTok, la página pide su JSON y VyMotion lo lee al pasar. La búsqueda no da vistas: las da la cuenta de cada Reel, leída con
  * la API oficial (`instagram.ts`).
  */
 

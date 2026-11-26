@@ -1,4 +1,4 @@
-// Levanta el servidor y abre Sloth en su ventana (electron/main.ts). Si el servidor sale con 75 (botón «Reiniciar
+// Levanta el servidor y abre VyMotion en su ventana (electron/main.ts). Si el servidor sale con 75 (botón «Reiniciar
 // backend»), lo vuelve a levantar: así la app aplica los cambios de su código.
 import { spawn } from 'node:child_process'
 import { existsSync, readFileSync } from 'node:fs'
@@ -50,14 +50,14 @@ process.env.PATH = [...camino, process.env.PATH].join(delimiter)
  */
 async function abrir() {
   opened = true
-  console.log('Abriendo la ventana de Sloth…')
+  console.log('Abriendo la ventana de VyMotion…')
   try {
     const errorPreparando = await ventanaPreparada
     if (errorPreparando) throw errorPreparando
     const { abrirVentana } = await import('./electron.mjs')
     if (await abrirVentana(URL)) return
   } catch (error) {
-    console.error(`No se pudo abrir la ventana de Sloth; va en el navegador. ${error instanceof Error ? error.message : error}`)
+    console.error(`No se pudo abrir la ventana de VyMotion; va en el navegador. ${error instanceof Error ? error.message : error}`)
   }
   const [cmd, ...args] = process.platform === 'win32' ? ['cmd', '/c', 'start', '', 'msedge', `--app=${URL}`] : [process.platform === 'darwin' ? 'open' : 'xdg-open', URL]
   spawn(cmd, args, { detached: true, stdio: 'ignore' }).on('error', () => {}).unref()
@@ -66,7 +66,7 @@ async function abrir() {
 function run() {
   const child = spawn(process.execPath, SERVIDOR, { cwd: APP, stdio: ['inherit', 'pipe', 'inherit'] })
   child.on('error', (error) => {
-    console.error(`No se pudo arrancar Sloth: ${error.message}`)
+    console.error(`No se pudo arrancar VyMotion: ${error.message}`)
     process.exitCode = 1
   })
   child.stdout.pipe(process.stdout, { end: false })

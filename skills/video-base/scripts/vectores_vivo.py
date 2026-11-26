@@ -1,11 +1,11 @@
 """
-El modelo de vectores de Sloth (multilingual-e5, `python/procesos/vectores.py`) cargado y esperando, para que cada
+El modelo de vectores de VyMotion (multilingual-e5, `python/procesos/vectores.py`) cargado y esperando, para que cada
 `huellas.py` no lo cargue otra vez: con el proceso de siempre, buscar o revisar un texto nuevo tarda ~18 s (importar
 torch y leer el modelo); aquí, menos de un segundo.
 
 Lo arranca `vectorizar()` de sloth.py la primera vez que hace falta (y `nuevo.py`, al crear un video, para que ya esté
-listo). Corre con el Python de Sloth, escucha en un puerto local que anota en %TEMP%/sloth-vectores.json y se cierra
-solo tras 10 min sin pedidos. Cada pedido es una línea JSON como la entrada de un proceso de Sloth
+listo). Corre con el Python de VyMotion, escucha en un puerto local que anota en %TEMP%/sloth-vectores.json y se cierra
+solo tras 10 min sin pedidos. Cada pedido es una línea JSON como la entrada de un proceso de VyMotion
 (`{"files": [...], "options": {...}}`) y contesta otra con la respuesta de `vectores.process`, o `{"error": "..."}`.
 
 Siempre en el procesador: los pedidos de huellas son pocos textos (vectores.py usa la tarjeta desde 64), y así no

@@ -1,4 +1,4 @@
-# El motor en vivo: Sloth reproduce el video sin renderizar
+# El motor en vivo: VyMotion reproduce el video sin renderizar
 
 Fecha: 2026-10-22
 
@@ -11,14 +11,14 @@ un cambio había que describir de palabra qué y dónde.
 
 La referencia fue Creatorize (video «Build a VIRAL Faceless Youtube Channel With Opus 5.5», g russ): mientras Claude
 escribe las escenas, el video se puede recorrer en tiempo real, cada cambio aparece solo, y se elige con el ratón un
-elemento, una toma o un tramo para pedir el arreglo. Su motor es propio (Three.js); los estilos de Sloth son proyectos de
+elemento, una toma o un tramo para pedir el arreglo. Su motor es propio (Three.js); los estilos de VyMotion son proyectos de
 Remotion, y el usuario no quería tocar las skills.
 
 ## Decisión
 
-Sloth arma él solo la vista en vivo de cualquier carpeta de video que sea un proyecto de Remotion (`server/motor.ts`):
+VyMotion arma él solo la vista en vivo de cualquier carpeta de video que sea un proyecto de Remotion (`server/motor.ts`):
 
-- **Con lo que trae el proyecto.** Usa su esbuild y su `@remotion/player` (ya vienen con `@remotion/cli`), así que Sloth
+- **Con lo que trae el proyecto.** Usa su esbuild y su `@remotion/player` (ya vienen con `@remotion/cli`), así que VyMotion
   no añade paquetes y la versión de Remotion es siempre la del video. La página (`server/motor-pagina.jsx`) se arma desde
   la carpeta del video; la app compilada la copia aparte.
 - **Sin pedirle nada a la skill.** Al proyecto le llega un `remotion` igual al suyo salvo `registerRoot` y

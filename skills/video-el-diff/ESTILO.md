@@ -20,7 +20,7 @@ en orden, como un resumen, es lo que el usuario rechazó como plano.
 
 ## Largo
 
-Lo pide Sloth en la línea `Duración: <n> minutos por video.` (en un plan de shorts es lo de cada short; si no, lo del
+Lo pide VyMotion en la línea `Duración: <n> minutos por video.` (en un plan de shorts es lo de cada short; si no, lo del
 episodio, en vertical o en horizontal).
 El usuario lee a unas 3 palabras por segundo, 180 por minuto: un short de 1 minuto son unas 180 palabras, uno de 3
 unas 540, y un episodio de 10 minutos unas 1,800. Sin esa línea, el episodio es de unas 1,100 palabras (6 minutos). `hacer.py --revisa --dura <minutos>` cuenta lo que se narra y para si te pasas o te quedas corto más de
@@ -211,7 +211,7 @@ mucho, revisa la frase que lo causa.
 
 ## Episodio sobre un producto del usuario
 
-Cuando el tema es la app del usuario y la meta es su lista de espera (episodio 4, Sloth):
+Cuando el tema es la app del usuario y la meta es su lista de espera (episodio 4, VyMotion):
 - **La historia es una noche real de uso, con sus datos**: a qué hora pegó el link, qué escribió la app, qué error
   cachó, qué aprendió y cuánto costó. Funciona mejor que la lista de funciones.
 - **El mejor gancho es algo que la app hizo mal o de más**. En el episodio 4 fue el patrocinador inventado con su

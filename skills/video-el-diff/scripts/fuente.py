@@ -1,5 +1,5 @@
 """
-Baja un video de YouTube (o X) y lo transcribe con WhisperX, con los procesos de Sloth.
+Baja un video de YouTube (o X) y lo transcribe con WhisperX, con los procesos de VyMotion.
 
     python fuente.py <url> <carpeta>          p. ej. fuentes/tema  o  fuentes/estilo
 
@@ -82,7 +82,7 @@ def bajar(url: str, carpeta: Path, yt: bool) -> None:
             tmp.mkdir()
             if i:
                 print("\n-- reintento con el cliente web_embedded de YouTube --")
-            # yt-dlp como módulo: el .exe de uv del Python de Sloth no arranca.
+            # yt-dlp como módulo: el .exe de uv del Python de VyMotion no arranca.
             sloth("-m", "yt_dlp", *extra, "-f", "bv*[height<=1080][ext=mp4]+ba[ext=m4a]/b[ext=mp4]/b",
                   "--merge-output-format", "mp4", "-o", "video.mp4", "--write-info-json", "--no-progress", url, cwd=tmp)
             if (tmp / "video.mp4").exists() and (not yt or altura(tmp) >= MINIMO):

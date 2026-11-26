@@ -6,7 +6,9 @@ Lo que comparten los estilos de vídeo: el lote, los errores ya vistos y los scr
 - **La usan:** `reel-collage` y `video-explicativo` (sus scripts, `LOTE.md` y este archivo; `video-explicativo`, también
   las huellas), `video-documental` (el motor, `sloth.py`, `chrome.mjs`, el render, masterizar y comprobar), `frutinovela`
   (`FLOW.md`, `sloth.py`, la hoja, masterizar, comprobar y la portada), los estilos que hace
-  cada quien con `crear-estilo` y los procesos de Python de Sloth (`sloth.py`).
+  cada quien con `crear-estilo` y los procesos de Python de VyMotion (`sloth.py`). **`motion-graphics`** usa el motor
+  ([`MOTOR.md`](MOTOR.md), `momentos.py`), `chrome.mjs` y `ffmpeg.mjs` para dibujar, y `musica.py` (con su `--bpm`),
+  `masterizar.mjs`, `portada.mjs`, `comprobar.mjs` y la hoja; su kit y su director son suyos.
 - **`video-el-diff`** se hace con el motor común ([`MOTOR.md`](MOTOR.md), `scripts/momentos.py`), pero su plantilla y
   su director son suyos: el usuario los afina a mano, y desde aquí no se les mueve nada. Además toma prestados
   `chrome.mjs`, `recorte.py`, la portada (`PORTADA.md`, `portada_sin_ia.mjs`) y `sloth.py` (con su `ffmpeg_h264`), así
@@ -14,14 +16,13 @@ Lo que comparten los estilos de vídeo: el lote, los errores ya vistos y los scr
 
 | Archivo | Qué es |
 |---|---|
-| [ESTILO.md](ESTILO.md) | Lo que necesita todo estilo: los 30 requisitos con que se hace, se comparte y se aprueba uno, y cuáles comprueba Sloth solo |
 | [MOTOR.md](MOTOR.md) | El motor: un video desde `momentos.json` (qué se ve en cada palabra) y un `hacer.py` que hace lo demás. El contrato que siguen el explicativo, el documental y El Diff, y con el que nace un estilo nuevo |
 | [FORMATO.md](FORMATO.md) | Vertical u horizontal: todo estilo hace los dos, y qué cambia de uno a otro (`Formato:` del mensaje) |
 | [LOTE.md](LOTE.md) | Lo que cambia cuando el vídeo es uno de un lote; solo se lee si el mensaje trae `Lote:` |
 | [PORTADA.md](PORTADA.md) | La portada que todo vídeo vertical lleva de primer fotograma, en el estilo de su vídeo, y la miniatura de YouTube del horizontal |
 | [VOZ.md](VOZ.md) | La voz que el usuario elige al pedir el vídeo (`Voz:` del mensaje): mandarla él o generarla tú en AI Studio con el MCP `voz` |
-| [FLOW.md](FLOW.md) | La línea `Imágenes:` (con ChatGPT o con Google Flow), los clips de Flow y Meta Muse, con lo que gastan |
-| [SERIES.md](SERIES.md) | Las series (`series/`), formatos fijos del canal para todo estilo: Sloth las ofrece al crear un vídeo; solo se lee si el mensaje trae `Serie:` |
+| [FLOW.md](FLOW.md) | La línea `Imágenes:` (con ChatGPT o con Google Flow) y los clips de Flow, con lo que gastan |
+| [SERIES.md](SERIES.md) | Las series (`series/`), formatos fijos del canal para todo estilo: VyMotion las ofrece al crear un vídeo; solo se lee si el mensaje trae `Serie:` |
 | `scripts/` | Las herramientas (abajo) |
 
 `<base>` es esta carpeta, `video-base`, junto a las skills de cada estilo.
@@ -33,8 +34,8 @@ en el script.
 
 ### Windows, Python y FFmpeg
 
-- El Python de Sloth se lanza siempre con `-E -s -B -X utf8` (`scripts/sloth.py` ya lo hace). Sin `-B` reescribe sus
-  `.pyc`, Sloth cree que el entorno se dañó y vuelve a bajar 4 GB. yt-dlp va como módulo (`-m yt_dlp`): el `.exe` no
+- El Python de VyMotion se lanza siempre con `-E -s -B -X utf8` (`scripts/sloth.py` ya lo hace). Sin `-B` reescribe sus
+  `.pyc`, VyMotion cree que el entorno se dañó y vuelve a bajar 4 GB. yt-dlp va como módulo (`-m yt_dlp`): el `.exe` no
   arranca.
 - Los parches de varias líneas van en un `.py` o con la herramienta de edición, no en un heredoc de bash. Y al escribir
   un archivo desde Python en Windows, `newline="\n"`: si no, lo pasa a CRLF y el diff sale entero.
@@ -58,7 +59,7 @@ en el script.
 
 ### Lo que adjunta el usuario
 
-- Cada imagen del mensaje trae su ruta en una línea `Imagen adjunta: <ruta>` (en `data\attachments` de Sloth). Si va en
+- Cada imagen del mensaje trae su ruta en una línea `Imagen adjunta: <ruta>` (en `data\attachments` de VyMotion). Si va en
   el video, cópiala a `public/` de la raíz del proyecto (la carpeta con su `package.json`, la de `Carpeta:`) y úsala con
   `staticFile('<nombre>')`: Remotion no sirve una ruta absoluta ni una de fuera de `public/`, y el primer render salía
   sin ella. No la busques por el disco ni la pidas otra vez.
@@ -74,7 +75,7 @@ en el script.
 
 - No cierres el turno con el vídeo a medias. Si una comprobación falla (`medir.py`, `comprobar.mjs`), arregla lo que dice
   y vuelve a renderizar hasta que pase: un vídeo de Codex cerró su turno con un borrador que no pasaba la de movimiento
-  y el usuario se quedó esperando. Sloth lee de las etapas de la card lo que falta y te pide que sigas, pero cada vuelta
+  y el usuario se quedó esperando. VyMotion lee de las etapas de la card lo que falta y te pide que sigas, pero cada vuelta
   cuesta. Cierra solo con el vídeo y la portada hechos, o con una pregunta cuando necesites algo que solo puede darte el
   usuario (su voz, una foto, elegir).
 
@@ -88,10 +89,9 @@ en el script.
 
 ## Un estilo nuevo
 
-Cumple [lo que necesita todo estilo](ESTILO.md); lo de abajo es por qué.
 Su skill dice lo suyo y usa de aquí lo que ya existe: si te ves copiando un párrafo o un script de otro estilo, va
-aquí. Nace con su card en `cards.json` de Sloth, con sus `etapas`, cada una con su `fase` (`idea`, `guion`, `sonido`,
-`video` o `entrega`: Idea · Guion · Sonido y voz · Video · Entrega, ver `FASES` en `shared/types.ts` de Sloth). `listo`
+aquí. Nace con su card en `cards.json` de VyMotion, con sus `etapas`, cada una con su `fase` (`idea`, `guion`, `sonido`,
+`video` o `entrega`: Idea · Guion · Sonido y voz · Video · Entrega, ver `FASES` en `shared/types.ts` de VyMotion). `listo`
 es el glob que la da por hecha y, si no dice otra cosa en `muestra`, lo que el panel enseña de ella. El video terminado
 es el de la etapa «Video». Hace los dos formatos, vertical y horizontal ([FORMATO.md](FORMATO.md)): su plantilla
 compone los dos y su skill dice, en su sección «Formato», cómo se acomoda en cada uno. Lleva su portada
@@ -113,11 +113,11 @@ Todos dicen cómo se usan si los corres sin argumentos. Node sin dependencias y 
 | `portada_ia.py <chatgpt\|modelo de Flow> salida.png --titulo "…" --estilo "…" --que "…" [--ref img]… [--horizontal]` | La portada con IA de fondo, desde el principio y sin cuadros del vídeo, con lo elegido en `Imágenes:`; deja `salida.png.json` con cómo va y lo que gastó, y si no hay cuenta o falla, lo dice para que el estilo use su respaldo |
 | `portada_sin_ia.mjs video.mp4 portada.png --titulo "…" [--horizontal]` | La portada sin cuenta de ChatGPT: un cuadro del vídeo y el título encima, en la zona que se ve; con `--horizontal`, la miniatura de YouTube (1280x720) |
 | `chrome.mjs` (librería) | Busca Chrome o Edge (o el de `CHROME`) y lo abre sin ventana: `abrirChrome({ ancho, alto })`. En macOS captura sin el modo determinista del headless shell, que allí puede impedir el arranque; Windows y Linux conservan ese modo |
-| `sloth.py`, `fuente.py` | El Python de Sloth (el transcriptor, yt-dlp) y bajar y transcribir un vídeo. `proceso()` dice antes cuánto tardará la voz en este equipo y luego cuánto falta, cada 10 %. WhisperX va de uno en uno en toda la máquina (`turno_gpu`) y, con una NVIDIA, ya cargado (`voz_viva.py`, que se va tras 10 min sin uso): 6 min de voz salen en ~40 s en vez de cargar Whisper cada vez (de 36 s a 10 min con la máquina ocupada), y las descargas de YouTube también (`turno_youtube`): los vídeos de un lote esperan ahí su turno. `vectorizar` usa el modelo de vectores ya cargado (`vectores_vivo.py`, que se va tras 10 min sin uso): un texto nuevo tarda menos de un segundo en vez de ~18. Un video de YouTube que otro vídeo ya bajó se enlaza de su carpeta en vez de bajarlo |
-| `huellas.py buscar\|revisar\|cerrar <skill>` | Que ningún vídeo de un estilo salga igual a otro ya hecho: la huella de cada uno (lo que cuenta y cómo se ve, y su hoja de ocho cuadros) en `<skill>/huellas/`, comparada contra todas por el script, que solo dice lo que choca. Python del sistema con numpy y Pillow; los textos, con los vectores de Sloth |
+| `sloth.py`, `fuente.py` | El Python de VyMotion (el transcriptor, yt-dlp) y bajar y transcribir un vídeo. `proceso()` dice antes cuánto tardará la voz en este equipo y luego cuánto falta, cada 10 %. WhisperX va de uno en uno en toda la máquina (`turno_gpu`) y, con una NVIDIA, ya cargado (`voz_viva.py`, que se va tras 10 min sin uso): 6 min de voz salen en ~40 s en vez de cargar Whisper cada vez (de 36 s a 10 min con la máquina ocupada), y las descargas de YouTube también (`turno_youtube`): los vídeos de un lote esperan ahí su turno. `vectorizar` usa el modelo de vectores ya cargado (`vectores_vivo.py`, que se va tras 10 min sin uso): un texto nuevo tarda menos de un segundo en vez de ~18. Un video de YouTube que otro vídeo ya bajó se enlaza de su carpeta en vez de bajarlo |
+| `huellas.py buscar\|revisar\|cerrar <skill>` | Que ningún vídeo de un estilo salga igual a otro ya hecho: la huella de cada uno (lo que cuenta y cómo se ve, y su hoja de ocho cuadros) en `<skill>/huellas/`, comparada contra todas por el script, que solo dice lo que choca. Python del sistema con numpy y Pillow; los textos, con los vectores de VyMotion |
 | `banco.py ver\|tomar\|guardar <skill> <serie>` | El banco de historias de una serie, en `<skill>/series/banco/`: las candidatas ya leídas y comprobadas que no se usaron ([SERIES.md](SERIES.md)) |
-| `espacio.py` (librería) | El disco: `enlazar_modulos` (un solo `node_modules` por plantilla, en %LOCALAPPDATA%/sloth-modulos, enlazado desde cada video: antes cada uno copiaba ~1 GB), `limpiar_temporales` (las `remotion-*` de %TEMP% que dejan los renders cortados) y `comprobar_disco` (para antes de renderizar sin espacio). Sloth hace lo mismo en Opciones → Espacio en disco |
-| `equipo.cjs` (librería) | El render según este equipo: `tarjeta3D()` (avisa si Chrome dibuja el 3D por software), `estimado(cuadros)` y `falta(parte, desde)` para decir cuánto tardará, y `anotarRender()` del final, que Sloth enseña en Opciones → Tu equipo |
+| `espacio.py` (librería) | El disco: `enlazar_modulos` (un solo `node_modules` por plantilla, en %LOCALAPPDATA%/sloth-modulos, enlazado desde cada video: antes cada uno copiaba ~1 GB), `limpiar_temporales` (las `remotion-*` de %TEMP% que dejan los renders cortados) y `comprobar_disco` (para antes de renderizar sin espacio). VyMotion hace lo mismo en Opciones → Espacio en disco |
+| `equipo.cjs` (librería) | El render según este equipo: `tarjeta3D()` (avisa si Chrome dibuja el 3D por software), `estimado(cuadros)` y `falta(parte, desde)` para decir cuánto tardará, y `anotarRender()` del final, que VyMotion enseña en Opciones → Tu equipo |
 | `momentos.py` (librería) | Lo común de los `hacer.py` del motor ([MOTOR.md](MOTOR.md)): anclar cada momento a su palabra, decir todos los ✗ de una vez, los pasos con su segundo (`revision/tiempos.json`, `✓ listo`), lo que mira quien juzga (`hoja`, `tiras`, `pares`) y la portada con IA de todo estilo (`con_imagenes`, `pedir_portada`, `esperar_portada`) |
 | `render.cjs <salida.mp4> --id=<composición>` | El render de un proyecto de Remotion con un solo Chrome, diciendo cuánto falta, y puesto en su sitio aunque el estudio tenga abierto el de antes. `--antes=<módulo>` prepara algo en el paquete antes de dibujar (el documental saca ahí los cuadros de sus clips: 6 veces más rápido) |
 | `remotion.cjs` (librería) | `empaquetar(raiz)`: el `bundle()` de Remotion en una carpeta de %TEMP% que se borra al terminar (la de Remotion se quedaba, con una copia de `public/`). Todo script que empaquete usa este |

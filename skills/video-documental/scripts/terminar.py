@@ -36,7 +36,7 @@ def correr(cmd, cwd, fatal=True):
 
 
 def poner(tmp: Path, salida: Path) -> None:
-    """Si el estudio de Sloth está enseñando la salida, Windows no deja reemplazarla: se reintenta y, si no, se aparta."""
+    """Si el estudio de VyMotion está enseñando la salida, Windows no deja reemplazarla: se reintenta y, si no, se aparta."""
     for _ in range(20):
         try:
             return os.replace(tmp, salida)

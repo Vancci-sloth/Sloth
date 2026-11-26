@@ -7,7 +7,7 @@ Cómo se generan las poses del personaje, sus bocas y las caras o texturas del p
 Codex usa la cuenta de ChatGPT del usuario. Antes de la primera imagen de cada video, `codex login status` (sale 0 si
 hay sesión). Sin sesión no se genera ninguna: se usa lo que ya hay (las poses que tiene el personaje, el logo real en
 vez de una textura) y se le dice al usuario una vez, en una frase llana, qué quedó sin hacer y que conectando ChatGPT
-en Sloth (Opciones → Codex) sale completo.
+en VyMotion (Opciones → Codex) sale completo.
 
 Con su `image_gen` (no dibuja con código). El pedido va en un `.txt`, en inglés, y dice qué archivo dejar:
 

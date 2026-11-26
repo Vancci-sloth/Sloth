@@ -11,7 +11,7 @@ import { llaveEnUso } from './acceso.ts'
 import { correr } from './version.ts'
 
 /**
- * Lo que las skills necesitan fuera de Sloth: FFmpeg, Python y sus paquetes, el Python de Sloth y, opcional, la cuenta de
+ * Lo que las skills necesitan fuera de VyMotion: FFmpeg, Python y sus paquetes, el Python de VyMotion y, opcional, la cuenta de
  * ChatGPT. Quien abre la app por primera vez ve encima del compositor lo que le falta al estilo elegido (de los paquetes,
  * solo los que importa su skill), y «Descargar todo» lo instala uno tras otro, sin permisos de administrador (todo va a
  * su usuario). ChatGPT no se instala: se conecta en Opciones.
@@ -19,7 +19,7 @@ import { correr } from './version.ts'
  * FFmpeg y el Python de las skills se bajan ya armados a `BAJADAS` (que scripts/start.mjs pone primero en el PATH). El
  * Python, en Mac y Linux, es siempre ese: el del sistema
  * falta (Mac) o no deja instalar paquetes con pip (Ubuntu). En Windows sirve el que ya tengas mientras haya paquetes
- * compilados para él; si no, `paquetes` pasa al de Sloth.
+ * compilados para él; si no, `paquetes` pasa al de VyMotion.
  */
 
 /**
@@ -75,14 +75,14 @@ const EXE_PY = WINDOWS ? 'python.exe' : join('bin', 'python3')
 /** Los modelos de la transcripción y de los vectores, en una carpeta por modelo (`modelos_transcripcion.py`). */
 export const MODELOS = join(process.env.APPDATA ?? '', 'youtube', 'modelos')
 export const BANDERAS = ['-E', '-s', '-B', '-X', 'utf8']
-/** Lo que Sloth baja para las skills (FFmpeg; fuera de Windows, también Python). `bin` va primero en el PATH (scripts/start.mjs). */
+/** Lo que VyMotion baja para las skills (FFmpeg; fuera de Windows, también Python). `bin` va primero en el PATH (scripts/start.mjs). */
 const BAJADAS = join(process.env.APPDATA ?? '', 'sloth', 'piezas')
 const BAJADAS_BIN = join(BAJADAS, 'bin')
 /** El Python propio con que corren las skills: en Windows, su carpeta va en el PATH (scripts/start.mjs). */
 const PYTHON_BAJADO = join(BAJADAS, 'python', 'python', EXE_PY)
 
 /**
- * El `python.exe` del Python de Sloth, o null. Trae yt-dlp y WhisperX y se lanza siempre con `-E -s -B -X utf8`: sin
+ * El `python.exe` del Python de VyMotion, o null. Trae yt-dlp y WhisperX y se lanza siempre con `-E -s -B -X utf8`: sin
  * -B, el que instaló la app de YouTube (archivada) reescribe sus .pyc, aquella app cree que se dañó y vuelve a bajar 4 GB.
  */
 export function rutaPythonSloth(): string | null {
@@ -91,7 +91,7 @@ export function rutaPythonSloth(): string | null {
 }
 
 /**
- * Cuál de los Python de Sloth se usa si hay más de uno (el que instaló esta app, `*-sloth`, y uno de la app de YouTube
+ * Cuál de los Python de VyMotion se usa si hay más de uno (el que instaló esta app, `*-sloth`, y uno de la app de YouTube
  * archivada): el de esta app y, entre iguales, el más nuevo. `python_sloth()` de `sloth.py` elige igual: antes esta
  * miraba uno y las skills usaban otro.
  */
@@ -99,7 +99,7 @@ export function elegirPython(ids: string[], fecha: (id: string) => number): stri
   return [...ids].sort((a, b) => Number(b.endsWith('-sloth')) - Number(a.endsWith('-sloth')) || fecha(b) - fecha(a))[0]
 }
 
-/** La carpeta del Python de Sloth que se usa (`<piezas>/python/<id>`), si está entero (para borrar los otros); si no, null. */
+/** La carpeta del Python de VyMotion que se usa (`<piezas>/python/<id>`), si está entero (para borrar los otros); si no, null. */
 export async function pythonSlothEntero(app: string): Promise<string | null> {
   const python = rutaPythonSloth()
   if (!python) return null
@@ -108,21 +108,21 @@ export async function pythonSlothEntero(app: string): Promise<string | null> {
 }
 
 /**
- * Con qué transcribe la voz el Python de Sloth (`MotorVoz`): sin NVIDIA, Parakeet va unas cinco veces más rápido que
+ * Con qué transcribe la voz el Python de VyMotion (`MotorVoz`): sin NVIDIA, Parakeet va unas cinco veces más rápido que
  * Whisper en el procesador. Se elige al instalarlo y lo dice el nombre de su carpeta.
  */
 export const motorDe = (carpeta: string): Motor => (/-cu\d+/.test(carpeta) ? 'whisper' : /-onnx-/.test(carpeta) ? 'parakeet-solo' : 'parakeet')
 
-/** El motor del Python de Sloth que se usa, o null si no hay. */
+/** El motor del Python de VyMotion que se usa, o null si no hay. */
 export function motorSloth(): Motor | null {
   const python = rutaPythonSloth()
   return python ? motorDe(python.slice(PYTHONES.length)) : null
 }
 
 /**
- * Lo que le falta al Python de Sloth (`falta`: módulos y modelos sin los que no transcribe) y lo que lo haría más rápido
+ * Lo que le falta al Python de VyMotion (`falta`: módulos y modelos sin los que no transcribe) y lo que lo haría más rápido
  * (`mejora`: Parakeet, en uno sin NVIDIA que ya transcribe con Whisper), de `check()` de
- * `python/procesos/modelos_transcripcion.py`, que sabe los tamaños de los modelos. `null` si no hay Python de Sloth o no
+ * `python/procesos/modelos_transcripcion.py`, que sabe los tamaños de los modelos. `null` si no hay Python de VyMotion o no
  * se pudo mirar.
  */
 function revisarPythonSloth(app: string): Promise<{ falta: string[]; mejora: string[] } | null> {
@@ -143,11 +143,11 @@ function revisarPythonSloth(app: string): Promise<{ falta: string[]; mejora: str
 
 const faltaAlPythonSloth = (app: string) => revisarPythonSloth(app).then((r) => r?.falta ?? null)
 
-/** Lo que haría más rápido al Python de Sloth (vacío si nada), o null si no hay o no se pudo mirar. */
+/** Lo que haría más rápido al Python de VyMotion (vacío si nada), o null si no hay o no se pudo mirar. */
 export const mejoraDelPythonSloth = (app: string) => revisarPythonSloth(app).then((r) => r?.mejora ?? null)
 
 /**
- * El Python de Sloth en una computadora nueva: un Python propio (python-build-standalone, sin tocar el del sistema) en
+ * El Python de VyMotion en una computadora nueva: un Python propio (python-build-standalone, sin tocar el del sistema) en
  * `PYTHONES`, con las versiones con que se hizo todo (3.12, torch 2.8, WhisperX 3.8.6), y sus modelos en `MODELOS`. Con
  * una NVIDIA, torch con CUDA y Whisper; sin ella, el torch de CPU y Parakeet (`Motor`). Si se corta, volver a pulsar
  * sigue donde se quedó: pip y los modelos se saltan lo que ya está.
@@ -173,7 +173,7 @@ export const ARQUITECTURA = (() => {
     return 'x64'
   }
 })()
-/** Un Mac con Intel: no hay torch 2.8 para él, así que su Python de Sloth no lleva torch (`parakeet-solo`). */
+/** Un Mac con Intel: no hay torch 2.8 para él, así que su Python de VyMotion no lleva torch (`parakeet-solo`). */
 const SIN_TORCH = process.platform === 'darwin' && ARQUITECTURA === 'x64'
 const PYTHON_STANDALONE = `https://github.com/astral-sh/python-build-standalone/releases/download/20261013/cpython-3.12.15%2B20261013-${SISTEMA[`${process.platform}-${ARQUITECTURA}`] ?? SISTEMA['win32-x64']}-install_only.tar.gz`
 const TORCH = ['torch==2.8.0', 'torchaudio==2.8.0', 'torchvision==0.23.0']
@@ -270,7 +270,7 @@ export async function actualizarYtDlp(app: string, libre: () => boolean) {
 let ytDlp = false
 
 /**
- * Lo que va haciendo la instalación en curso, en su fila en vez de «Descargando…»: el Python de Sloth baja gigas durante
+ * Lo que va haciendo la instalación en curso, en su fila en vez de «Descargando…»: el Python de VyMotion baja gigas durante
  * muchos minutos y, sin decir qué, parece atascado.
  */
 let paso: string | undefined
@@ -446,7 +446,7 @@ const PIEZAS: Pieza[] = [
   paquetes(Object.keys(PAQUETES)),
   {
     id: 'python-sloth',
-    nombre: 'Python de Sloth',
+    nombre: 'Python de VyMotion',
     para: 'El transcriptor y yt-dlp, con sus modelos: bajar y transcribir el video del tema y tu voz (con una tarjeta NVIDIA, Whisper; sin ella, Parakeet, rápido en el procesador). Se baja una vez y ocupa unos 6 GB (unos 10 con NVIDIA).',
     mirar: async (app) => ((await faltaAlPythonSloth(app))?.length === 0 ? '' : null),
     falta: async (app) => {
@@ -475,7 +475,7 @@ export const sinRueda = (error: string) => /No matching distribution found|Could
  * Lo que pip no compila. Fuera de Windows, numba y llvmlite (de rembg, por pymatting): desde la 0.63 y la 0.46 no salen
  * para Mac con Intel, y compilar llvmlite pide LLVM. En Windows, nada: el Python puede ser el tuyo, y en uno recién salido
  * (3.15) pip compilaba scikit-image, también de rembg, y fallaba con un error que nadie entiende. Con esto se queda con la
- * última versión que trae rueda o, si ninguna la trae para tu Python, `paquetes` sigue con el de Sloth.
+ * última versión que trae rueda o, si ninguna la trae para tu Python, `paquetes` sigue con el de VyMotion.
  */
 const SOLO_RUEDAS = WINDOWS ? ':all:' : 'numba,llvmlite'
 
@@ -536,7 +536,7 @@ export async function requisitos(app: string, fresco = false, skill?: string): P
   const ya = listos.get(skill ?? '')
   if (ya && !fresco) return ya
   const lista = await mirar(app, piezas(app, skill))
-  // Lo que no se puede bajar desde aquí (el Python de Sloth) no se arregla volviendo a mirar.
+  // Lo que no se puede bajar desde aquí (el Python de VyMotion) no se arregla volviendo a mirar.
   if (lista.every((r) => (r.listo || !r.instalable) && !r.estado && !r.error)) listos.set(skill ?? '', lista)
   else listos.delete(skill ?? '')
   return lista
@@ -578,7 +578,7 @@ export async function instalar(app: string, ids?: string[], skill?: string) {
 }
 
 /**
- * Instala la mejora del Python de Sloth (Parakeet, `mejoraDelPythonSloth`) aunque ya cuente como listo: es su misma
+ * Instala la mejora del Python de VyMotion (Parakeet, `mejoraDelPythonSloth`) aunque ya cuente como listo: es su misma
  * instalación, que se salta lo que ya está. La pide el aviso del hilo nuevo y Opciones → Tu equipo.
  */
 export function instalarMejora(app: string) {
@@ -618,7 +618,7 @@ async function siguiente(app: string) {
     paso = 'Verificando la instalación'
     refrescarPath()
     if ((await pieza.mirar(app)) !== null) delete fallos[pieza.id]
-    else fallos[pieza.id] ??= 'La instalación terminó, pero Sloth todavía no encuentra todos los componentes. Puedes volver a intentarlo.'
+    else fallos[pieza.id] ??= 'La instalación terminó, pero VyMotion todavía no encuentra todos los componentes. Puedes volver a intentarlo.'
   } catch (e) {
     fallos[pieza.id] ??= e instanceof Error ? e.message : String(e)
   }
@@ -628,7 +628,7 @@ async function siguiente(app: string) {
 
 /**
  * Lo recién instalado entra en el PATH del usuario, no en el de este proceso, que se leyó al arrancar. Se vuelve a leer
- * para encontrarlo sin reiniciar Sloth, y así lo heredan también los agentes que se lancen desde ahora.
+ * para encontrarlo sin reiniciar VyMotion, y así lo heredan también los agentes que se lancen desde ahora.
  */
 function refrescarPath() {
   // Fuera de Windows, todo va a `BAJADAS_BIN`, que ya estaba en el PATH.
@@ -636,7 +636,7 @@ function refrescarPath() {
   const leer = (de: string) =>
     execFileSync('powershell.exe', ['-NoProfile', '-Command', `[Environment]::GetEnvironmentVariable('Path', '${de}')`], { encoding: 'utf8' }).trim()
   try {
-    // Lo de este proceso va primero: el Python de Sloth debe seguir delante del que haya en el sistema.
+    // Lo de este proceso va primero: el Python de VyMotion debe seguir delante del que haya en el sistema.
     const nuevo = [process.env.PATH ?? '', leer('Machine'), leer('User')].join(';').split(';').filter(Boolean)
     process.env.PATH = [...new Set(nuevo)].join(';')
   } catch {

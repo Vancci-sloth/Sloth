@@ -31,7 +31,7 @@ function r2(objetos: Record<string, unknown>) {
 
 const ctx = { waitUntil: () => {}, passThroughOnException: () => {} } as never
 const pedir = (env: unknown, ruta: string, init?: RequestInit) => worker.fetch(new Request(`https://cobro.x${ruta}`, init), env as never, ctx)
-const base = { PAYPAL_MODO: 'prueba', MONEDA: 'USD', ORIGEN: 'https://cobro.x', CORREO_DE: 'Sloth <a@x.com>', CORREO_RESPUESTA: 'soporte@x.com', RESEND_API_KEY: 're_x' }
+const base = { PAYPAL_MODO: 'prueba', MONEDA: 'USD', ORIGEN: 'https://cobro.x', CORREO_DE: 'VyMotion <a@x.com>', CORREO_RESPUESTA: 'soporte@x.com', RESEND_API_KEY: 're_x' }
 
 test('un apoyo no da su clave al abrir el pago: a la app de antes se le dice que apoye desde la página', async () => {
   const { DB } = d1()
@@ -76,35 +76,6 @@ test('la cuenta gratis de una computadora solo se recupera con su mismo correo',
       }).then((r) => r.text())
     assert.doesNotMatch(await unirse('otro@x.com'), /SLOTH-AAAA/)
     assert.match(await unirse('ella@x.com'), /SLOTH-AAAA/)
-  } finally {
-    globalThis.fetch = antes
-  }
-})
-
-test('quien ya apoya y pide una cuenta no gasta cupos: siempre lee que use su clave, y su conexión sigue libre', async () => {
-  const { db, DB } = d1()
-  db.prepare(
-    "INSERT INTO licencias (id, clave, email, plan, monto, fundador, estado, creada, modo) VALUES ('a', 'SLOTH-AAAA-BBBB-CCCC-DDDD', 'apoya@x.com', 'mensual', 10, 0, 'authorized', '2026-11-18', 'prueba')"
-  ).run()
-  const antes = globalThis.fetch
-  globalThis.fetch = (async () => new Response('{"id":"1"}')) as typeof fetch
-  try {
-    const unirse = (email: string) =>
-      pedir({ ...base, DB }, '/suscribir', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json', 'cf-connecting-ip': '203.0.113.7' },
-        body: JSON.stringify({ email, plan: 'gratis', equipo: '3f9a0c1e7b2d4a6f8e0c1b3d5f7a9c2e', acepto: true, terminos: '2026-01-01', porCorreo: true })
-      })
-    // Más veces que las cuentas al día de una conexión y que los correos al día de una dirección.
-    for (let i = 0; i < 8; i++) {
-      const r = await unirse('apoya@x.com')
-      assert.equal(r.status, 409)
-      const texto = await r.text()
-      assert.match(texto, /apoyo activo/)
-      assert.doesNotMatch(texto, /SLOTH-AAAA/)
-    }
-    assert.equal((db.prepare('SELECT COUNT(*) AS n FROM cupos').get() as { n: number }).n, 0)
-    assert.deepEqual(await (await unirse('nueva@x.com')).json(), { enviada: true })
   } finally {
     globalThis.fetch = antes
   }

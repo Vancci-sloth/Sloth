@@ -56,7 +56,7 @@ test('una variante cuenta si es de otra persona y de este mes; la de uno mismo n
   assert.equal(p.get('ana')?.puntos, PUNTOS.variante)
 })
 
-test('un estilo que no está en el reparto (sin aprobar o del creador de Sloth) no suma', () => {
+test('un estilo que no está en el reparto (sin aprobar o del creador de VyMotion) no suma', () => {
   const p = puntosDelMes([{ publicacion: 'oficial', equipo: 'e1', red: 'r1', videos: 5 }], [{ de: 'oficial', autor: 'm-ana', periodo: '2026-11' }], autores, '2026-11')
   assert.equal(p.size, 0)
 })

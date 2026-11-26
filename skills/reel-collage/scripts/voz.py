@@ -9,7 +9,7 @@ Lee `guion.json` de la raíz del proyecto:
     {"voz": "es-MX-JorgeNeural", "rate": "+25%", "antes": 1.5,
      "frases": [{"texto": "lo que dice el guion", "dicho": "como lo pronuncia el TTS", "pausa": 0.6}, ...]}
 
-Con `"studio": "Fola"`, cada frase la genera Sloth en Google AI Studio con esa voz (VOZ.md de video-base) en vez de
+Con `"studio": "Fola"`, cada frase la genera VyMotion en Google AI Studio con esa voz (VOZ.md de video-base) en vez de
 edge-tts: AI Studio no da el tiempo de cada palabra, así que se reparte por letras dentro de su frase. Cada frase se
 pide aparte y queda en fuentes/voz/fNN.wav: al cambiar el guion, solo se vuelven a pedir las que cambiaron.
 `antes` son los segundos en que el clip del gancho suena solo, antes de la primera palabra. `dicho` es opcional (si
@@ -60,7 +60,7 @@ def pedir(ruta: str, datos: dict | None = None) -> dict:
 
 
 def studio(texto: str, voz: str, destino: Path) -> None:
-    """La frase con una voz de AI Studio, que genera Sloth en la cuenta de Google del usuario."""
+    """La frase con una voz de AI Studio, que genera VyMotion en la cuenta de Google del usuario."""
     t = pedir("/api/voz/generar", {"texto": texto, "voz": voz, "salida": str(destino.resolve())})
     while t["estado"] in ("en-fila", "generando"):
         t = pedir(f"/api/voz/trabajos/{t['id']}?esperar=40")
@@ -132,7 +132,7 @@ def comprimir(x: np.ndarray, maximo=0.07):
 
 
 def oir(wav: Path) -> None:
-    from sloth import transcribir  # el Python de Sloth y WhisperX, de video-base
+    from sloth import transcribir  # el Python de VyMotion y WhisperX, de video-base
     d = transcribir(wav)
     print("\nlo que se oye:\n" + " ".join(s["text"].strip() for s in d["segmentos"]))
 

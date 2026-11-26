@@ -35,7 +35,7 @@
 .ec-acciones .primary.ec-boton { flex: 1 1 220px; }
 .ec-boton-suave { border: 1px solid var(--line); color: var(--text); }
 .ec-boton-suave:hover:not(:disabled) { border-color: var(--muted); }
-.ec-leido, .ec-borrar { flex: 1 1 100%; min-height: 56px; background: var(--bad); color: var(--sobre-ambar); font-size: 16px; font-weight: 750; box-shadow: 0 0 0 4px color-mix(in srgb, var(--bad) 22%, transparent), 0 10px 28px color-mix(in srgb, var(--bad) 28%, transparent); }
+.ec-leido, .ec-borrar { flex: 1 1 100%; min-height: 56px; background: var(--bad); color: var(--sobre-ambar); font-size: 16px; font-weight: 750; box-shadow: 0 0 0 4px rgba(224, 108, 85, 0.22), 0 10px 28px rgba(224, 108, 85, 0.28); }
 .ec-borrar { flex-basis: 220px; }
 .ec-leido:hover:not(:disabled), .ec-borrar:hover:not(:disabled) { filter: brightness(1.08); }
 .ec-boton:focus-visible { outline: 2px solid var(--text); outline-offset: 3px; }

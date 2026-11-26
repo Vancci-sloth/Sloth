@@ -2,11 +2,10 @@ import { useEffect, useState } from 'react'
 import type { Card, CambiosCard } from '../../shared/types'
 import { api } from './api'
 import { Confirm } from './Confirm'
-import { abrirRuta } from './web'
 
 /**
  * «Con tus cambios (N)», bajo la card elegida: lo que tú o tu agente cambiaron en su skill (y en video-base, que lee), que
- * es por lo que tus videos pueden salir distintos de los de Sloth. Se quita archivo por archivo o se vuelve a la original
+ * es por lo que tus videos pueden salir distintos de los de VyMotion. Se quita archivo por archivo o se vuelve a la original
  * entera; lo que se pisa queda antes en una copia (`server/originales.ts`). Solo en la app que se vende: en el repo no
  * hay original con qué comparar y no sale. Se vuelve a mirar cuando avanza un hilo de la card, que pudo cambiarla.
  */
@@ -26,7 +25,7 @@ export function TusCambios({ card, clave }: { card: Card; clave: string }) {
     }
   }, [card.id, clave])
 
-  const abrir = (ruta: string) => void abrirRuta(ruta).catch(() => {})
+  const abrir = (ruta: string) => void api('/api/open', { path: ruta })
   async function quitar(uno?: { skill: string; archivo: string }) {
     const e = await api<CambiosCard | null>(`/api/cards/${card.id}/original`, uno ?? {})
     setEstado(e)
@@ -52,7 +51,7 @@ export function TusCambios({ card, clave }: { card: Card; clave: string }) {
       {abierto && (
         <Confirm title={`Tus cambios en «${card.title}»`} action="Volver a la original" onClose={() => setAbierto(false)} onConfirm={() => quitar()}>
           <p>
-            Esto ya no es como lo trae Sloth: lo cambiaste tú o tu agente al pedirle que guardara algo. Por eso tus videos pueden salir
+            Esto ya no es como lo trae VyMotion: lo cambiaste tú o tu agente al pedirle que guardara algo. Por eso tus videos pueden salir
             distintos. Lo que quites se guarda antes en una copia.
           </p>
           <ul className="tus-cambios-lista">
@@ -64,7 +63,7 @@ export function TusCambios({ card, clave }: { card: Card; clave: string }) {
                 {c.borrado && <span> (lo quitaste)</span>}
                 <button
                   onClick={() => (setFallo(''), quitar(c).catch((e: Error) => setFallo(`No se pudo quitar: ${e.message}`)))}
-                  title="Vuelve a dejar solo este archivo como lo trae Sloth"
+                  title="Vuelve a dejar solo este archivo como lo trae VyMotion"
                 >
                   Quitar
                 </button>

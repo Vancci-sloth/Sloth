@@ -137,7 +137,7 @@
 
 /* El catálogo de Voices Cloning: sus proveedores y «Ver más». */
 .voz-aviso-de { font-size: 14.5px; color: var(--amber-2); }
-/* Los créditos de voz que te quedan, en la pestaña Sloth. */
+/* Los créditos de voz que te quedan, en la pestaña VyMotion. */
 .voz-creditos { margin: 0; padding: 8px 12px 2px; font-size: 14.5px; color: var(--suave); }
 .voz-creditos strong { color: var(--amber); font-weight: 600; }
 .voz-creditos.bad { color: var(--bad); }

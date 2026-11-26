@@ -8,15 +8,15 @@ import { OPCIONES, UN_VIDEO_POR_HILO } from './claude.ts'
 import { conSobreTi } from './sobre-ti.ts'
 import { rutaAgente } from './agentes.ts'
 import { CodexRpc } from './codex-rpc.ts'
+import { perfilActivo } from './perfiles-agentes.ts'
 import { navegadorAgente, USA_EL_NAVEGADOR } from './navegador-agente.ts'
 import { mcpVoz } from './voz/index.ts'
 import { mcpFlow } from './flow/index.ts'
-import { mcpMeta } from './meta/index.ts'
 import { costoCodex } from './precios.ts'
 import { SKILLS } from './skills.ts'
 
-/** Codex conserva los hilos en su almacén; Sloth conserva su id y traduce el protocolo al mismo AgentEvent de Claude. */
-export function startCodex(opts: AgentOptions, connect: Conectar = (notify, exit, config, llave) => new CodexRpc(notify, exit, config, llave, opts.configCodex), precio = costoCodex): AgentRun {
+/** Codex conserva los hilos en su almacén; VyMotion conserva su id y traduce el protocolo al mismo AgentEvent de Claude. */
+export function startCodex(opts: AgentOptions, connect: Conectar = (notify, exit, config, llave) => new CodexRpc(notify, exit, config, llave, opts.configAgente === undefined && !llave ? perfilActivo('codex') : opts.configAgente), precio = costoCodex): AgentRun {
   // Con la llave de API o con la cuenta de ChatGPT: un hilo retomado sigue con lo que empezó (`SessionMeta.conLlave`).
   const conLlave = opts.conLlave ?? !!llaveEnUso('codex')
   const llave = conLlave ? codexConLlave(true) ?? null : null
@@ -208,7 +208,7 @@ export function startCodex(opts: AgentOptions, connect: Conectar = (notify, exit
     padreDe.clear()
     segundoPlano()
   }, {
-    mcp_servers: Object.fromEntries(Object.entries({ ...navegadorAgente(opts.lote, opts.hilo), ...mcpVoz(), ...mcpFlow(), ...mcpMeta() }).map(([name, server]) => [name, { command: server.command, args: server.args ?? [], ...(server.env ? { env: server.env } : {}) }]))
+    mcp_servers: Object.fromEntries(Object.entries({ ...navegadorAgente(opts.lote, opts.hilo), ...mcpVoz(), ...mcpFlow() }).map(([name, server]) => [name, { command: server.command, args: server.args ?? [], ...(server.env ? { env: server.env } : {}) }]))
   }, llave)
   const ready = (async () => {
     await rpc.ready
@@ -222,9 +222,9 @@ export function startCodex(opts: AgentOptions, connect: Conectar = (notify, exit
     const r = await rpc.request<{ thread: { id: string } }>(opts.resume ? 'thread/resume' : 'thread/start', {
       ...(opts.resume ? { threadId: opts.resume } : {}), model: modelo, modelProvider: llave?.proveedor ?? 'openai', cwd: opts.cwd,
       approvalPolicy: 'never', sandbox: 'danger-full-access',
-      developerInstructions: conSobreTi(`${OPCIONES}\nLa interfaz y tus respuestas van en español. Haz las preguntas en mensajes normales, sin herramientas de preguntas interactivas. Las skills de Sloth están en ${SKILLS}. La skill invocada es siempre la de esa carpeta: si ves otra con el mismo nombre (en ${join(homedir(), '.codex', 'skills')} u otra), es una copia vieja y no se usa. Respeta la skill invocada y lee sus referencias cuando hagan falta.
+      developerInstructions: conSobreTi(`${OPCIONES}\nLa interfaz y tus respuestas van en español. Haz las preguntas en mensajes normales, sin herramientas de preguntas interactivas. Las skills de VyMotion están en ${SKILLS}. La skill invocada es siempre la de esa carpeta: si ves otra con el mismo nombre (en ${join(homedir(), '.codex', 'skills')} u otra), es una copia vieja y no se usa. Respeta la skill invocada y lee sus referencias cuando hagan falta.
 ${UN_VIDEO_POR_HILO}
-${USA_EL_NAVEGADOR}`)
+${opts.hilo === null ? '' : USA_EL_NAVEGADOR}`)
     })
     threadId = r.thread.id
     opts.onProviderSession(threadId)
@@ -248,7 +248,7 @@ ${USA_EL_NAVEGADOR}`)
     if (path && !existsSync(path)) throw new Error(`No se encontró la skill ${skill!.name}.`)
     return [
       ...images.map((path) => ({ type: 'localImage', path })),
-      { type: 'text', text: skill ? `Usa la skill ${skill.name} de Sloth, la de ${path} (no otra copia con ese nombre).
+      { type: 'text', text: skill ? `Usa la skill ${skill.name} de VyMotion, la de ${path} (no otra copia con ese nombre).
 
 ${text}` : text, text_elements: [] },
       ...(skill ? [{ type: 'skill', name: skill.name, path }] : [])
@@ -315,13 +315,13 @@ interface Notificacion {
 interface Uso { inputTokens: number; cachedInputTokens: number; outputTokens: number; totalTokens: number }
 
 const CERO: Tokens = { input: 0, output: 0, cacheRead: 0 }
-/** Los tokens que cuenta Sloth: la entrada sin la caché, aparte. */
+/** Los tokens que cuenta VyMotion: la entrada sin la caché, aparte. */
 const tokensDe = (u: Uso): Tokens => ({ input: u.inputTokens - u.cachedInputTokens, output: u.outputTokens, cacheRead: u.cachedInputTokens })
 const resta = (a: Tokens, b: Tokens): Tokens => ({ input: a.input - b.input, output: a.output - b.output, cacheRead: a.cacheRead - b.cacheRead })
 const suma = (a: Tokens, b: Tokens): Tokens => ({ input: a.input + b.input, output: a.output + b.output, cacheRead: a.cacheRead + b.cacheRead })
 type Conectar = (notify: (method: string, params: unknown) => void, exit: (error?: Error) => void, config: Record<string, unknown>, llave: CodexLlave | null) => Pick<CodexRpc, 'ready' | 'request' | 'close'>
 
-/** El catálogo viene de Codex, con sus esfuerzos: no se fija una lista de GPT en Sloth. */
+/** El catálogo viene de Codex, con sus esfuerzos: no se fija una lista de GPT en VyMotion. */
 export async function codexModels(): Promise<Model[]> {
   // Sin el programa de Codex (aún no se bajó) no hay catálogo: pedirlo no lo baja.
   if (!rutaAgente('codex')) return []

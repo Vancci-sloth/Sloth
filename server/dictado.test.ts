@@ -1,31 +1,40 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
+import { Readable } from 'node:stream'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { dictado } from './dictado.ts'
 
-const cuenta = { clave: 'SLOTH-AAAA-BBBB-CCCC-DDDD', equipo: '0123456789abcdef0123456789abcdef' }
-
-test('GET /api/dictado pregunta al cobro con tu cuenta; sin cuenta, sin apoyo o sin red, el botón no sale', async (t) => {
+test('dictado envía audio al proveedor y solo devuelve el texto; oculta errores del proveedor', async () => {
   const anterior = globalThis.fetch
-  t.after(() => { globalThis.fetch = anterior })
-  async function llamar(credencial: () => typeof cuenta | undefined, metodo = 'GET') {
+  const clave = process.env.DEEPGRAM_API_KEY
+  process.env.DEEPGRAM_API_KEY = 'clave-de-prueba'
+  async function llamar(tipo: string, audio = 'audio') {
+    const req = Readable.from([Buffer.from(audio)]) as IncomingMessage
+    req.method = 'POST'
+    req.headers = { 'content-type': tipo }
     let status = 0, datos = ''
     const res = { writeHead(s: number) { status = s }, end(s: string) { datos = s } } as unknown as ServerResponse
-    await dictado(credencial, { method: metodo, headers: {} } as IncomingMessage, res)
+    await dictado(req, res)
     return { status, datos: JSON.parse(datos) }
   }
-  assert.deepEqual(await llamar(() => undefined), { status: 200, datos: { disponible: false } })
-  const pedidos: { url: string; headers: Record<string, string> }[] = []
-  globalThis.fetch = (async (url: string, init?: RequestInit) => {
-    pedidos.push({ url, headers: init?.headers as Record<string, string> })
-    return Response.json({ disponible: true, minutos: 29 })
-  }) as typeof fetch
-  assert.deepEqual(await llamar(() => cuenta), { status: 200, datos: { disponible: true, minutos: 29 } })
-  assert.match(pedidos[0].url, /\/dictado$/)
-  assert.equal(pedidos[0].headers['x-sloth-clave'], cuenta.clave)
-  globalThis.fetch = (async () => Response.json({ disponible: false })) as typeof fetch
-  assert.deepEqual(await llamar(() => cuenta), { status: 200, datos: { disponible: false } })
-  globalThis.fetch = (async () => { throw new Error('sin red') }) as typeof fetch
-  assert.deepEqual(await llamar(() => cuenta), { status: 200, datos: { disponible: false } })
-  assert.equal((await llamar(() => cuenta, 'POST')).status, 405)
+  try {
+    globalThis.fetch = async (_url, opciones) => {
+      assert.equal((opciones?.headers as Record<string, string>).Authorization, 'Token clave-de-prueba')
+      assert.ok(opciones?.body instanceof Uint8Array)
+      return Response.json({ results: { channels: [{ alternatives: [{ transcript: 'Hola, crea un video.' }] }] } })
+    }
+    assert.deepEqual(await llamar('audio/webm;codecs=opus'), { status: 200, datos: { texto: 'Hola, crea un video.' } })
+    assert.equal((await llamar('text/plain')).status, 415)
+    assert.equal((await llamar('audio/webm', '')).status, 400)
+    globalThis.fetch = async () => new Response('contenido privado', { status: 401 })
+    const fallo = await llamar('audio/webm')
+    assert.equal(fallo.status, 502)
+    assert.ok(!JSON.stringify(fallo).includes('contenido privado'))
+    globalThis.fetch = async () => Response.json({ results: { channels: [] } })
+    assert.equal((await llamar('audio/webm')).status, 422)
+  } finally {
+    globalThis.fetch = anterior
+    if (clave === undefined) delete process.env.DEEPGRAM_API_KEY
+    else process.env.DEEPGRAM_API_KEY = clave
+  }
 })

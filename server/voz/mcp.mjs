@@ -1,7 +1,7 @@
 /**
- * El MCP `voz`: las herramientas con que un agente (Claude, Codex u OpenCode) pide la voz de un video a Sloth, que la
+ * El MCP `voz`: las herramientas con que un agente (Claude, Codex u OpenCode) pide la voz de un video a VyMotion, que la
  * genera en Google AI Studio con la cuenta del usuario, o con Fish Audio o ElevenLabs con su llave (`index.ts`). Solo
- * habla con la API del servidor (`SLOTH_URL`): ni la sesión de Google ni las llaves pasan por aquí. Es JavaScript sin paquetes, para que el Node de Sloth lo corra igual en el repo
+ * habla con la API del servidor (`SLOTH_URL`): ni la sesión de Google ni las llaves pasan por aquí. Es JavaScript sin paquetes, para que el Node de VyMotion lo corra igual en el repo
  * y en la app compilada (`scripts/compilar.mjs` lo copia tal cual). Habla MCP por stdio, un JSON por renglón.
  *
  * Cada herramienta espera como mucho 40 s a que acabe la voz: Codex corta una herramienta a los 60. Si no acabó, dice
@@ -25,7 +25,7 @@ const HERRAMIENTAS = [
   {
     name: 'generar_voz',
     description:
-      'Genera la narración con la voz pedida y deja el WAV (mono) en `salida`: en Google AI Studio con la cuenta de Google del usuario, o en Fish Audio o ElevenLabs con su llave si la voz es fish:… o elevenlabs:…, o en Voices Cloning con los créditos que da Sloth si es vc:…. Pasa el texto tal como se narra, o `archivo`: un guion en Markdown se narra sin títulos ni encabezados. Las etiquetas van dentro del texto: en AI Studio como <laugh> o <short pause>; en Fish Audio y ElevenLabs entre corchetes, como [laughs] o [whispers]. En AI Studio una frase tarda unos 5 s y 6 minutos de guion unos 100 s; si no acaba en 40 s, devuelve un id para esperarla con estado_voz. Si el texto y la voz no cambiaron desde el último WAV de esa ruta, sale al momento.',
+      'Genera la narración con la voz pedida y deja el WAV (mono) en `salida`: en Google AI Studio con la cuenta de Google del usuario, o en Fish Audio o ElevenLabs con su llave si la voz es fish:… o elevenlabs:…, o en Voices Cloning con los créditos que da VyMotion si es vc:…. Pasa el texto tal como se narra, o `archivo`: un guion en Markdown se narra sin títulos ni encabezados. Las etiquetas van dentro del texto: en AI Studio como <laugh> o <short pause>; en Fish Audio y ElevenLabs entre corchetes, como [laughs] o [whispers]. En AI Studio una frase tarda unos 5 s y 6 minutos de guion unos 100 s; si no acaba en 40 s, devuelve un id para esperarla con estado_voz. Si el texto y la voz no cambiaron desde el último WAV de esa ruta, sale al momento.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -47,7 +47,7 @@ const HERRAMIENTAS = [
 async function pedir(ruta, datos) {
   const r = await fetch(`${URL_SLOTH}${ruta}`, datos ? { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(datos) } : {})
   const json = await r.json().catch(() => ({}))
-  if (!r.ok) throw new Error(json.error ?? `Sloth respondió ${r.status}`)
+  if (!r.ok) throw new Error(json.error ?? `VyMotion respondió ${r.status}`)
   return json
 }
 
@@ -77,7 +77,7 @@ const LLAMADAS = {
       const voces = m.voces.filter((v) => con(v.nombre, v.descripcion, v.propia ? 'tuya' : ''))
       renglones.push(`${nombre}, ${voces.length} voces${b ? ` con «${buscar}»` : ''}: ${voces.map((v) => `${v.nombre}${v.propia ? ' (tuya)' : ''}${v.descripcion ? ` (${v.descripcion})` : ''} = ${motor}:${v.id}`).join('; ')}`)
     }
-    // Voices Cloning, el proveedor de Sloth: las que el usuario eligió o clonó en su ventana (el agente no la abre).
+    // Voices Cloning, el proveedor de VyMotion: las que el usuario eligió o clonó en su ventana (el agente no la abre).
     if (e.vc?.disponible) {
       const voces = e.vc.voces.filter((v) => con(v.nombre, v.descripcion, v.propia ? 'tuya' : ''))
       const creditos = typeof e.vc.creditos === 'number' ? `, ${e.vc.creditos} créditos` : ''

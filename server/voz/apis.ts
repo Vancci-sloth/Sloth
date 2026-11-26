@@ -349,9 +349,9 @@ export function vozPorApi(carpeta: string) {
     async clonar(m: ProveedorVoz, nombre: string, audio: Uint8Array, tipo: string, archivoAudio: string): Promise<string> {
       // El plan gratis de ElevenLabs no deja clonar: se dice antes de mandar la grabación.
       if (m === 'elevenlabs' && guardadas.planes?.[m] && !guardadas.planes[m].clonar)
-        throw new Error('Tu plan gratis de ElevenLabs no deja clonar voces. Clónala en Fish Audio o en Sloth, o sube de plan en ElevenLabs.')
+        throw new Error('Tu plan gratis de ElevenLabs no deja clonar voces. Clónala en Fish Audio o en VyMotion, o sube de plan en ElevenLabs.')
       const clonar = MOTOR[m].clonar
-      if (!clonar) throw new Error(`${MOTORES[m]} no admite clonar voces desde Sloth.`)
+      if (!clonar) throw new Error(`${MOTORES[m]} no admite clonar voces desde VyMotion.`)
       let id: string
       try {
         id = await clonar(pedidor(m), nombre, new Blob([audio as Uint8Array<ArrayBuffer>], { type: tipo || 'audio/wav' }), archivoAudio)

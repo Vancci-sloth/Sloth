@@ -8,14 +8,15 @@ import { rutaAgente } from './agentes.ts'
 import { cuentaConVentana } from './cuenta-ventana.ts'
 import { conSkill, instrucciones, mcpSloth } from './instrucciones.ts'
 import { RpcLineas } from './rpc-lineas.ts'
+import { entornoPerfilAgente, perfilActivo } from './perfiles-agentes.ts'
 
 /**
  * Muse Code, el agente de Meta, por su protocolo (MSP: JSON-RPC por líneas, `muse serve`), como en T3 Code. Lo instala
- * el instalador de Meta en la carpeta de Sloth (`server/agentes.ts`) y trabaja con la cuenta de Meta de cada quien
+ * el instalador de Meta en la carpeta de VyMotion (`server/agentes.ts`) y trabaja con la cuenta de Meta de cada quien
  * (`muse login`, que la guarda donde la guarda siempre Muse). Un proceso por hilo, sin permisos (`allowAll`), como los
- * demás agentes de Sloth.
+ * demás agentes de VyMotion.
  *
- * Muse no admite instrucciones de sistema: las de Sloth van al principio del primer mensaje.
+ * Muse no admite instrucciones de sistema: las de VyMotion van al principio del primer mensaje.
  */
 
 /** El id de cada orden y de cada sesión: un UUIDv7, como los pide Muse. */
@@ -29,7 +30,7 @@ function uuid7() {
 }
 
 /** Sin actualizarse solo: la versión la deja el instalador, y actualizarse a media sesión la cortaría. */
-const entorno = () => ({ ...entornoSinLlaves(), MUSE_NO_AUTO_UPDATE: '1' })
+const entorno = (dir?: string | null) => ({ ...entornoSinLlaves(), MUSE_NO_AUTO_UPDATE: '1', ...entornoPerfilAgente('muse', dir) })
 
 /** La carpeta como la quiere Muse en Windows: con la forma `\\?\` y las mayúsculas del disco (T3 Code). */
 function raiz(cwd: string) {
@@ -38,11 +39,11 @@ function raiz(cwd: string) {
 }
 
 /** Abre `muse serve` y se presenta. */
-async function abrir(args: string[], cwd: string, eventos: Partial<ConstructorParameters<typeof RpcLineas>[4]>) {
+async function abrir(args: string[], cwd: string, eventos: Partial<ConstructorParameters<typeof RpcLineas>[4]>, dir?: string | null) {
   const exe = rutaAgente('muse')
   if (!exe) throw new Error('Muse Code aún no está descargado.')
-  const r = new RpcLineas('Muse Code', exe, ['serve', ...args], { cwd, env: entorno() }, { alAvisar() {}, alPedir: () => ({}), alCerrar() {}, ...eventos })
-  const ini = await r.request('initialize', { clientInfo: { name: 'sloth', title: 'Sloth', version: '1' }, capabilities: { requestedCapabilities: ['sessionMcp'] } }, 60_000)
+  const r = new RpcLineas('Muse Code', exe, ['serve', ...args], { cwd, env: entorno(dir) }, { alAvisar() {}, alPedir: () => ({}), alCerrar() {}, ...eventos })
+  const ini = await r.request('initialize', { clientInfo: { name: 'sloth', title: 'VyMotion', version: '1' }, capabilities: { requestedCapabilities: ['sessionMcp'] } }, 60_000)
   r.notify('initialized', {})
   return { r, ini }
 }
@@ -157,7 +158,7 @@ export function startMuse(opts: AgentOptions): AgentRun {
         return
       }
       case 'userInput/requested':
-        void rpc?.request('userInput/cancel', { commandId: uuid7(), userInputId: p.userInputId, reason: 'Sloth no puede contestar formularios. Pregunta al usuario en un mensaje normal.' }).catch(() => {})
+        void rpc?.request('userInput/cancel', { commandId: uuid7(), userInputId: p.userInputId, reason: 'VyMotion no puede contestar formularios. Pregunta al usuario en un mensaje normal.' }).catch(() => {})
         return
     }
   }
@@ -173,7 +174,7 @@ export function startMuse(opts: AgentOptions): AgentRun {
         }
         opts.onExit?.(cerrado || !error ? undefined : { error: error.message, turno: habia })
       }
-    })
+    }, opts.configAgente === undefined ? perfilActivo('muse') : opts.configAgente)
     rpc = r
     const config = { mcpServers: Object.fromEntries(Object.entries(mcpSloth(opts.lote, opts.hilo)).map(([n, s]) => [n, { transport: 'stdio', mode: 'optional', ...s }])) }
     if (opts.resume) {
@@ -253,7 +254,7 @@ export function startMuse(opts: AgentOptions): AgentRun {
   }
 }
 
-/** Los errores de Muse, en palabras de Sloth. */
+/** Los errores de Muse, en palabras de VyMotion. */
 function errorDe(error = '', tipo?: string): string {
   if (tipo === 'authRequired' || /not logged in|login required|unauthenticated/i.test(error)) return 'Conecta tu cuenta de Meta en Opciones → Muse Code.'
   if (/quota|usage limit|\b429\b/i.test(error)) return 'Llegaste al límite de uso de Muse Code. Espera a que se reinicie.'
@@ -270,11 +271,11 @@ interface ModeloMuse {
 }
 
 /** Los modelos de la cuenta de Meta. Sin sesión, Muse da la lista vacía. */
-export async function modelosMuse(): Promise<Model[]> {
+export async function modelosMuse(dir: string | null | undefined = perfilActivo('muse')): Promise<Model[]> {
   if (!rutaAgente('muse')) return []
   let r: RpcLineas | undefined
   try {
-    r = (await abrir(['--disable-shell', '--disable-write', '--no-session-log'], process.cwd(), {})).r
+    r = (await abrir(['--disable-shell', '--disable-write', '--no-session-log'], process.cwd(), {}, dir)).r
     const { models } = (await r.request('model/list', {}, 30_000)) as { models: ModeloMuse[] }
     // El predeterminado primero.
     return [...models]
@@ -292,7 +293,7 @@ export const cuentaMuse = cuentaConVentana('muse', {
   comando: (exe) => ({ command: [exe, 'login'], env: { MUSE_NO_AUTO_UPDATE: '1' } }),
   // Borra la credencial de Meta que guardó al entrar; un META_API_KEY de tus variables sigue valiendo.
   salir: (exe) => ({ command: [exe, 'logout'], env: { MUSE_NO_AUTO_UPDATE: '1' } }),
-  async estado() {
-    return { conectada: (await modelosMuse()).length > 0 }
+  async estado(dir) {
+    return { conectada: (await modelosMuse(dir ?? null)).length > 0 }
   }
 })

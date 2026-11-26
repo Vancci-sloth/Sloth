@@ -114,7 +114,7 @@ export function SubtitulosEntrega({ sessionId, finales }: { sessionId: string; f
           ) : estado.desactualizado ? (
             <span className="muted small">El video cambió después de ponerle subtítulos: los de abajo son del de antes.</span>
           ) : (
-            estado.estado === 'nada' && <span className="muted small">Gratis: Sloth oye la voz en tu computadora, sin agente ni créditos. Por ahora, en español.</span>
+            estado.estado === 'nada' && <span className="muted small">Gratis: VyMotion oye la voz en tu computadora, sin agente ni créditos. Por ahora, en español.</span>
           )}
           {(!listo || estado.desactualizado) && (
             <button className="final-boton principal" onClick={() => void poner(false)}>

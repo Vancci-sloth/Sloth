@@ -1,11 +1,11 @@
 """
 La marca de quien hace los videos: de qué habla su canal, cómo habla, quién narra abajo y a dónde invita el cierre.
-Vive en `marca.json`, en la carpeta de la card (donde se crean los proyectos; en Sloth, `trabajo/video-explicativo`),
+Vive en `marca.json`, en la carpeta de la card (donde se crean los proyectos; en VyMotion, `trabajo/video-explicativo`),
 y es la misma para todos sus videos. Sus personajes propios, en `personajes/<id>/` junto a ella.
 
 Quien tiene varios canales guarda una marca más por canal en `marcas/<nombre>.json`, con el mismo formato: así
 `marca.json` sigue siendo la de siempre, sin migrar nada, y cada marca es un archivo que se lee igual. El compositor de
-Sloth manda la línea `Marca: <nombre>` cuando el usuario elige una; con ella, `ver`, `guardar` y `aplicar` llevan
+VyMotion manda la línea `Marca: <nombre>` cuando el usuario elige una; con ella, `ver`, `guardar` y `aplicar` llevan
 `--marca <nombre>`.
 
     python -B -X utf8 <skill>/scripts/marca.py ver [--marca <nombre>]

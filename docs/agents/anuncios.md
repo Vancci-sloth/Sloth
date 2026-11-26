@@ -1,13 +1,13 @@
 # Escribir en Anuncios como Vancci
 
 Cada versión que sale se cuenta en Anuncios de la comunidad, a nombre de Vancci, el creador, y a cada miembro le llega una
-notificación con el título del anuncio (si Sloth está cerrada, al abrirla). Al creador no le llega la suya. Lo escribe el agente que la publicó ([publicacion.md](publicacion.md), paso 5) y lo sube sin preguntar. Este tono también
+notificación con el título del anuncio (si VyMotion está cerrada, al abrirla). Al creador no le llega la suya. Lo escribe el agente que la publicó ([publicacion.md](publicacion.md), paso 5) y lo sube sin preguntar. Este tono también
 sirve para cualquier otro anuncio que te pida.
 
 ## Qué va
 
 Parte de los commits que guardaste antes del push y de `novedad.txt`. Los commits son para ti: no los copies. Quédate con
-lo que nota quien usa Sloth (o quien la apoya) y cuéntalo como se lo contaría a sus amigos. Lo interno (pruebas,
+lo que nota quien usa VyMotion (o quien la apoya) y cuéntalo como se lo contaría a sus amigos. Lo interno (pruebas,
 documentación, compilación, GitHub, ADR, archivos, código) no va; si un cambio solo se entiende con tecnicismos, di lo que
 hace por ellos.
 
@@ -15,13 +15,9 @@ hace por ellos.
   ESTILO)`.
 - **Texto:** el saludo; que ya hay nueva actualización y una lista de lo que trae, un punto por renglón empezando con
   `- ` (de 2 a 6; los arreglos chicos, juntos en uno). Si no salió `[para todos]`, que quien apoya ya la tiene y a los
-  demás les llega en 7 días. Para actualizar: abajo a la izquierda sale «Actualizar a Sloth», o cierran y vuelven a abrir
+  demás les llega en 7 días. Para actualizar: abajo a la izquierda sale «Actualizar a VyMotion», o cierran y vuelven a abrir
   la app. Cierra con que anda atento. Sin Markdown: la comunidad lo enseña tal cual, salvo los guiones de la lista.
   Unas 150 palabras como mucho.
-
-Una **express** (un arreglo urgente que sale para todos, [publicacion.md](publicacion.md)) se anuncia más corto: el
-título es `ACTUALIZACION EXPRESS (LO QUE YA QUEDO)` y el texto dice que es express y para todos, qué fallaba y que ya
-quedó (uno o dos puntos), cómo actualizar y el cierre. Unas 100 palabras como mucho. Abajo está el de la 0.4.5.
 
 Escríbelo con Write en `$TEMP` (el título en el primer renglón, el texto debajo) y súbelo:
 `node scripts/anuncio.mjs <archivo>`. Con `--probar` dice qué publicaría, sin publicar.
@@ -77,24 +73,12 @@ corrijo, pero segun yo si era eso. Un abrazooo».
 ```
 NUEVA ACTUALIZACION (YA PUEDEN CREAR SU PROPIO ESTILO)
 Que tal bandita, ya hay nueva actualizacion y esta trae cosas bien chidas:
-- Nuevo estilo: le describen el video que quieren y Sloth les arma su propio estilo con su card. Si no les late lo pueden borrar sin pedos
+- Nuevo estilo: le describen el video que quieren y VyMotion les arma su propio estilo con su card. Si no les late lo pueden borrar sin pedos
 - Llega el Reel de comedia, nada mas le pasan sus fotos y el fondo
 - Llega el Documental :)))
 - Si no tienen NVIDIA la voz ya sale CINCO VECES mas rapido
 
-Quien apoya ya la tiene, a los demas les llega en 7 dias. Para actualizar abajo a la izquierda les sale "Actualizar a Sloth", o cierran y vuelven a abrir la app.
+Quien apoya ya la tiene, a los demas les llega en 7 dias. Para actualizar abajo a la izquierda les sale "Actualizar a VyMotion", o cierran y vuelven a abrir la app.
 
 Ando atento en la comunidad, no se queden con dudas y si ven que algo esta mal diganme y lo arreglo. Un abrazooo
-```
-
-## Así quedó el de la 0.4.5, express
-
-```
-ACTUALIZACION EXPRESS (GOOGLE FLOW YA JALA OTRA VEZ)
-Que tal bandita. Salio una actualizacion express, es un arreglo rapido y es para TODOS.
-- Google cambio su pagina de Flow y por eso les salia "Flow no tomo la referencia" o que no aceptaba el fotograma. Ya quedo: las imagenes con referencia y los videos desde una imagen vuelven a salir
-
-Para actualizar abajo a la izquierda les sale "Actualizar a Sloth", o cierran y vuelven a abrir la app.
-
-Si Flow les sigue fallando con otra cosa mandenme captura y lo arreglo. Ando atento, un abrazooo
 ```

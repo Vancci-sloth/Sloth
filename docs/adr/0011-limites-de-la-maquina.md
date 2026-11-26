@@ -4,7 +4,7 @@ Fecha: 2026-10-30
 
 ## Contexto
 
-Con tres episodios de El Diff a la vez en el equipo del usuario (16 GB, RTX 3050), la voz de 6:54 que Sloth estimó en 40 s
+Con tres episodios de El Diff a la vez en el equipo del usuario (16 GB, RTX 3050), la voz de 6:54 que VyMotion estimó en 40 s
 tardó 22 min: 20 en la fila y 2 de trabajo. Medido ese día:
 
 - Llegaron a 36 subagentes vivos a la vez, 42 GB comprometidos contra 15,6 físicos y 2 GB libres. `import torch` tardó 37 s
@@ -31,16 +31,16 @@ Nada de esto es de un hilo: cada uno se porta bien por su cuenta. Por eso los l�
 - **Tope de navegadores** (`turnoNavegador` en `video-base/scripts/chrome.mjs`): uno por cada 5 GB, hasta 4 (3 en 16 GB).
   `abrirChrome` pide sitio con un archivo por navegador en %TEMP%, con el pid de su dueño. Los render de Remotion no pasan
   por aquí: ya van de uno en uno.
-- **Whisper se carga antes de hacer falta** (`server/voz-viva.ts`): al trabajar un video, Sloth lo carga con
+- **Whisper se carga antes de hacer falta** (`server/voz-viva.ts`): al trabajar un video, VyMotion lo carga con
   `sloth.py calentar-voz`, en cuanto hay turno de la GPU, y un ping por minuto lo mantiene mientras haya videos.
 - **La fila de la GPU va en orden** (`_Fila` de `sloth.py`): primero la voz del usuario (`transcribir.py`), luego el material;
   entre iguales, quien llegó antes. Un archivo con candado por cada uno que espera: si muere, el siguiente lo quita.
 
 ## Consecuencias
 
-- Quien confirma un tercer video acepta el riesgo: Sloth no intenta adivinar cuánto cabe en cada máquina.
+- Quien confirma un tercer video acepta el riesgo: VyMotion no intenta adivinar cuánto cabe en cada máquina.
 - Whisper ocupa 2,6 GB de la tarjeta mientras trabaje un video, también durante el render. Ideas sigue cerrándolo antes de
-  cargar el suyo, y entonces Sloth lo vuelve a cargar cuando ella suelta la GPU.
+  cargar el suyo, y entonces VyMotion lo vuelve a cargar cuando ella suelta la GPU.
 - Lanzar 12 subagentes tarda más: el agente queda retenido hasta que entra el último. Si tras 30 min no hay sitio, arranca
   igual; un navegador espera 15 min. Ambos topes se prefieren vencidos a un agente colgado.
 - Los topes de 8 subagentes y 1,5 GB son estimaciones, no medidas: el pico malo fue de 36. Si con dos videos sigue faltando

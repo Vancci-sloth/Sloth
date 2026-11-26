@@ -24,7 +24,7 @@ function preparar(t: { after(fn: () => void): void }) {
   const env = {
     DB: { prepare: (sql: string) => consulta(sql, []) },
     DESCARGAS: { head: async (k: string) => objetos[k] ?? null },
-    CORREO_DE: 'Sloth <avisos@example.com>', CORREO_RESPUESTA: 'soporte@example.com', RESEND_API_KEY: 're_prueba'
+    CORREO_DE: 'VyMotion <avisos@example.com>', CORREO_RESPUESTA: 'soporte@example.com', RESEND_API_KEY: 're_prueba'
   } as unknown as Env
   const anterior = globalThis.fetch
   t.after(() => { globalThis.fetch = anterior; db.close() })

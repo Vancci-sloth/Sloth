@@ -6,21 +6,21 @@ import { abrirTusCards } from './estilos-perdidos.ts'
 import { huella } from './originales.ts'
 
 /**
- * Cuando una versión de Sloth cambia mucho un estilo, quien lo usaba puede quedarse también con el de antes. El estilo
- * de Sloth se actualiza igual; el de antes queda entre los tuyos, tal cual, y nadie lo cambia.
+ * Cuando una versión de VyMotion cambia mucho un estilo, quien lo usaba puede quedarse también con el de antes. El estilo
+ * de VyMotion se actualiza igual; el de antes queda entre los tuyos, tal cual, y nadie lo cambia.
  *
  * - Quien cambia un estilo a fondo le pone `cambio` a su card en cards.json: la fecha (lo que lo distingue de otro
  *   cambio), qué cambió en palabras del usuario, el enlace de la comparación y lo de la card de antes que ya no es igual.
  * - Al estrenar la versión, antes de poner sus skills (`prepararSkills`, electron/main.ts), `guardarAnteriores` copia la
  *   carpeta de cada estilo con un `cambio` que el usuario aún no tenía a `data/estilos-anteriores/<skill>/`.
- * - Sloth enseña el aviso a todos, hasta que lo leen (`web/src/EstiloCambio.tsx`). Quien tenía el de antes elige:
+ * - VyMotion enseña el aviso a todos, hasta que lo leen (`web/src/EstiloCambio.tsx`). Quien tenía el de antes elige:
  *   «Guardar también el de antes» lo pone entre sus estilos (`conservarAnterior`) y «Usar solo el nuevo» borra la copia
  *   (`olvidarAnterior`). Quien no lo tenía (instaló de cero) solo lo lee. Lo leído va a `estilos-leidos.json`.
- * Lo que cada quien junta al usarlo (huellas, banco, modelos 3D) se queda en el de Sloth: la copia no lo lleva.
+ * Lo que cada quien junta al usarlo (huellas, banco, modelos 3D) se queda en el de VyMotion: la copia no lo lleva.
  */
 
 const CARPETA = 'estilos-anteriores'
-/** Lo que no se copia: se instala o se rehace solo, o es lo que junta cada quien (se queda en el de Sloth). */
+/** Lo que no se copia: se instala o se rehace solo, o es lo que junta cada quien (se queda en el de VyMotion). */
 const FUERA = new Set(['node_modules', 'out', '__pycache__', '.cache', '.git', 'huellas', 'modelos'])
 const FUERA_RUTA = ['series/banco']
 /** El último cambio de cada estilo que este usuario ya tiene. */
@@ -33,13 +33,13 @@ interface Guardado {
   fecha: string
   texto: string
   compara?: string
-  /** La card del de antes: la de Sloth con lo que dice `cambio.antes`. */
+  /** La card del de antes: la de VyMotion con lo que dice `cambio.antes`. */
   card: Partial<Card>
   /** Los archivos de video-base que nombra y que esta versión cambió: con ellos, «Nuevo estilo» lo adapta. */
   adaptar: string[]
 }
 
-/** Lo que va de la card de Sloth a la del de antes. `modelos` no: el de antes iba con lo que eligiera el usuario. */
+/** Lo que va de la card de VyMotion a la del de antes. `modelos` no: el de antes iba con lo que eligiera el usuario. */
 const CAMPOS = ['title', 'description', 'icon', 'version', 'etapas', 'lote', 'editor', 'voz', 'clips', 'musica'] as const
 
 /** «7 nov 2026», de `2026-11-07`. */
@@ -121,7 +121,7 @@ function aAdaptar(carpeta: string, originales: Record<string, string>, nuevas: s
 }
 
 /**
- * El aviso de una card de Sloth que cambió: con su copia del de antes si la hay, y si no, el de su `cambio` mientras este
+ * El aviso de una card de VyMotion que cambió: con su copia del de antes si la hay, y si no, el de su `cambio` mientras este
  * usuario no lo haya leído. `null` si no hay nada que avisar.
  */
 export function anteriorDe(card: Card, datos: string): EstiloAnterior | null {
@@ -146,7 +146,7 @@ const tituloDe = (card: Pick<Card, 'title'>, fecha: string) => `${card.title} (h
 
 /**
  * Pone el estilo de antes entre los tuyos: su skill en `<skills>/<skill>-<fecha>` (con ese nombre en su SKILL.md, para
- * que no se confunda con el de Sloth) y su card en `tusCards`, basada en el de Sloth (los paquetes de Python que pide).
+ * que no se confunda con el de VyMotion) y su card en `tusCards`, basada en el de VyMotion (los paquetes de Python que pide).
  * La copia guardada se va: ya es tuya. Devuelve su card y lo de video-base que cambió desde entonces.
  */
 export function conservarAnterior(o: { card: Card; datos: string; skills: string; tusCards: string }): { id: string; titulo: string; adaptar: string[] } {
@@ -160,7 +160,7 @@ export function conservarAnterior(o: { card: Card; datos: string; skills: string
   if (!existsSync(destino)) {
     cpSync(de, destino, { recursive: true })
     const skill = join(destino, 'SKILL.md')
-    writeFileSync(skill, renombrar(readFileSync(skill, 'utf8'), id, `Versión de «${card.title}» de hasta el ${fechaCorta(g.fecha)}, que el usuario conservó al actualizar Sloth; se usa solo desde su card.`))
+    writeFileSync(skill, renombrar(readFileSync(skill, 'utf8'), id, `Versión de «${card.title}» de hasta el ${fechaCorta(g.fecha)}, que el usuario conservó al actualizar VyMotion; se usa solo desde su card.`))
   }
   // Uno que no se lee no se pisa con solo esta card: se aparta.
   const lista = abrirTusCards(o.tusCards)

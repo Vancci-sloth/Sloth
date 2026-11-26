@@ -1,5 +1,5 @@
 """
-El Python de Sloth y sus procesos (yt-dlp, WhisperX), para los scripts de Python de cualquier estilo.
+El Python de VyMotion y sus procesos (yt-dlp, WhisperX), para los scripts de Python de cualquier estilo.
 
     import sys; sys.path.insert(0, "<base>/scripts")
     from sloth import sloth, proceso, wav16k, MODELOS
@@ -25,11 +25,11 @@ else:
 
 sys.stdout.reconfigure(encoding="utf-8")
 
-# Fuera de Windows, Sloth pone APPDATA (scripts/start.mjs); sin Sloth, la misma carpeta que elige él.
+# Fuera de Windows, VyMotion pone APPDATA (scripts/start.mjs); sin VyMotion, la misma carpeta que elige él.
 APPDATA = Path(os.environ.get("APPDATA") or (Path.home() / "Library" / "Application Support" if sys.platform == "darwin"
                                              else Path(os.environ.get("XDG_CONFIG_HOME") or Path.home() / ".config")))
 MODELOS = APPDATA / "youtube" / "modelos"
-# Los pone Sloth en SLOTH_PROCESOS (también sirve para probar los de otra copia de la app sin tocar la que se usa); sin
+# Los pone VyMotion en SLOTH_PROCESOS (también sirve para probar los de otra copia de la app sin tocar la que se usa); sin
 # ella, los de la app donde vive esta skill (`<app>/skills/video-base/scripts`, aunque se llame por ~/.claude/skills).
 PROCESOS = Path(os.environ.get("SLOTH_PROCESOS") or Path(__file__).resolve().parents[3] / "python" / "procesos")
 BANDERAS = ["-E", "-s", "-B", "-X", "utf8"]
@@ -40,9 +40,9 @@ def python_sloth() -> Path:
     raiz = APPDATA / "youtube" / "piezas" / "python"
     candidatos = list(raiz.glob(f"*/{exe}"))
     if not candidatos:
-        raise SystemExit(f"No encontré el Python de Sloth en {raiz}")
-    # Como `elegirPython` de Sloth (server/requisitos.ts): el que instaló Sloth (`*-sloth`) y, entre iguales, el más nuevo.
-    # Si cada uno eligiera otro, Sloth revisaría uno y las skills usarían el otro.
+        raise SystemExit(f"No encontré el Python de VyMotion en {raiz}")
+    # Como `elegirPython` de VyMotion (server/requisitos.ts): el que instaló VyMotion (`*-sloth`) y, entre iguales, el más nuevo.
+    # Si cada uno eligiera otro, VyMotion revisaría uno y las skills usarían el otro.
     return max(candidatos, key=lambda p: (p.relative_to(raiz).parts[0].endswith("-sloth"), p.stat().st_mtime))
 
 
@@ -226,7 +226,7 @@ def _correr(nombre: str, entrada: str, voz: float) -> tuple[int, str, str]:
 
 def _aparte(script: Path, registro: Path | None = None) -> subprocess.Popen | None:
     """
-    Arranca `script` con el Python de Sloth, suelto de quien lo lanza (sigue vivo cuando este script acaba), con su
+    Arranca `script` con el Python de VyMotion, suelto de quien lo lanza (sigue vivo cuando este script acaba), con su
     salida en `registro` si se da. None si no se pudo.
     """
     salida = open(registro, "w", encoding="utf-8") if registro else subprocess.DEVNULL
@@ -257,7 +257,7 @@ VOZ_ARRANQUE = 15 * 60
 
 def _whisper_en_gpu() -> bool:
     """
-    Si aquí transcribe Whisper en una NVIDIA: el Python de Sloth es el de CUDA (`-cu128-`, como `motorDe` de
+    Si aquí transcribe Whisper en una NVIDIA: el Python de VyMotion es el de CUDA (`-cu128-`, como `motorDe` de
     server/requisitos.ts). Sin ella, Parakeet carga en 4 s y no hace falta tenerlo cargado.
     """
     if os.environ.get("SLOTH_MOTOR"):
@@ -334,7 +334,7 @@ def _con_voz_viva(nombre: str, archivos: list[str], opciones: dict, voz: float) 
 
 def calentar_voz() -> None:
     """
-    Deja Whisper cargado antes de que haga falta, con el turno de la GPU: lo lanza Sloth cuando un video empieza a
+    Deja Whisper cargado antes de que haga falta, con el turno de la GPU: lo lanza VyMotion cuando un video empieza a
     trabajar (`server/voz-viva.ts`). Sin NVIDIA no hace nada: Parakeet carga en 4 s.
     """
     if _whisper_en_gpu():
@@ -345,7 +345,7 @@ def calentar_voz() -> None:
 
 def proceso(nombre: str, archivos: list[str], opciones: dict) -> dict:
     """
-    Corre un proceso de Sloth (python/procesos/<nombre>.py): JSON por stdin, JSON en la última línea de stdout. Con una
+    Corre un proceso de VyMotion (python/procesos/<nombre>.py): JSON por stdin, JSON en la última línea de stdout. Con una
     NVIDIA, las transcripciones van a Whisper ya cargado (voz_viva.py): cargarlo en cada una tardaba de 36 s a 10 min.
     """
     entrada = json.dumps({"files": archivos, "options": opciones})
@@ -397,9 +397,9 @@ def calentar_vectores() -> None:
 def vectorizar(archivo: str, opciones: dict) -> dict:
     """Como `proceso("vectores.py", [archivo], opciones)`, con el modelo ya cargado si se puede: el primer pedido lo
     arranca y lo espera (hasta 90 s); si no responde, el proceso de siempre."""
-    # El Python de Sloth sin torch (Mac con Intel) no tiene vectores: que quien llama compare por palabras sin esperar.
+    # El Python de VyMotion sin torch (Mac con Intel) no tiene vectores: que quien llama compare por palabras sin esperar.
     if "-onnx-" in str(python_sloth()):
-        raise SystemExit("este equipo no tiene el modelo de vectores (su Python de Sloth no lleva torch)")
+        raise SystemExit("este equipo no tiene el modelo de vectores (su Python de VyMotion no lleva torch)")
     pedido = {"files": [archivo], "options": opciones}
     r = _pedir_vectores(pedido)
     if r is None:

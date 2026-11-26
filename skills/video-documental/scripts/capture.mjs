@@ -36,7 +36,7 @@ if (!jobsPath || !outDir) { console.error('usage: node capture.mjs <jobs.json> <
 const jobs = JSON.parse(readFileSync(jobsPath, 'utf8'));
 mkdirSync(outDir, { recursive: true });
 
-// Chrome: el que encuentra video-base (CHROME si se puso, el headless shell, el de Sloth, Chrome instalado o Edge).
+// Chrome: el que encuentra video-base (CHROME si se puso, el headless shell, el de VyMotion, Chrome instalado o Edge).
 // Nunca una ruta fija: se rompe con la siguiente actualización.
 const CHROME = buscarChrome();
 if (!CHROME) { console.error('capture.mjs: no encontré Chrome ni Edge. Pon su ruta en CHROME.'); process.exit(1); }

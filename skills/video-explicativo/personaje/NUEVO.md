@@ -6,7 +6,7 @@ Cuando el usuario elige «uno nuevo», se hace una vez, dentro del primer video,
 
 1. **Con o sin ChatGPT.** `codex login status` (sale 0 si hay sesión). Sin sesión no hay poses ni boca: el personaje
    es su foto, quieta, recortada como sticker. Díselo al usuario en una frase, con lo que gana si conecta ChatGPT en
-   Sloth (Opciones → Codex): poses que actúan cada frase y la boca que se mueve con su voz.
+   VyMotion (Opciones → Codex): poses que actúan cada frase y la boca que se mueve con su voz.
 2. **El id y el proyecto limpio.** Un id corto del personaje (`gata-luna`, `profe-memo`) y `<marca> personaje <id>
    <proyecto>`: deja el proyecto sin las poses del perro.
 3. **La foto base**, en `<proyecto>/perro/perro.png` (la carpeta se llama `perro` aunque sea otro: es la pose

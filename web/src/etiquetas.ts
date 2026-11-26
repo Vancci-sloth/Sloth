@@ -2,9 +2,9 @@
 
 /** La referencia a otro hilo que copia el menú de la barra lateral. Al agente le llega tal cual; a la vista, como etiqueta. */
 export function threadRef(title: string, id: string, app: string): string {
-  return `Hilo de Sloth «${title}» (id ${id}), su historial está en ${app}\\data\\sessions\\${id}.jsonl`
+  return `Hilo de VyMotion «${title}» (id ${id}), su historial está en ${app}\\data\\sessions\\${id}.jsonl`
 }
-export const THREAD = /Hilo de Sloth «(.*?)» \(id \w+\), su historial está en [^\n]*?\.jsonl/
+export const THREAD = /Hilo de VyMotion «(.*?)» \(id \w+\), su historial está en [^\n]*?\.jsonl/
 
 /** El globo de diálogo que distingue la etiqueta de un hilo cuando ya no se sabe de qué card es (hilo borrado). */
 export const THREAD_ICON = 'M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z'

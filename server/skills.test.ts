@@ -8,7 +8,7 @@ import { test } from 'node:test'
 const casa = mkdtempSync(join(tmpdir(), 'sloth-skills-'))
 process.env.HOME = casa
 process.env.USERPROFILE = casa
-// Y las skills como las trae Sloth, que `guardarSkillTuya` no toca.
+// Y las skills como las trae VyMotion, que `guardarSkillTuya` no toca.
 const originales = mkdtempSync(join(tmpdir(), 'sloth-originales-'))
 mkdirSync(join(originales, 'video-base'))
 process.env.SLOTH_SKILLS_ORIGINALES = originales
@@ -54,7 +54,7 @@ test('Codex lee las mismas skills que Claude, y una copia vieja sale de sus carp
   assert.ok(existsSync(join(casa, 'otro-sitio', 'SKILL.md')))
 })
 
-test('borrar un estilo tuyo guarda su skill en una copia y quita sus enlaces, sin tocar las de Sloth', (t) => {
+test('borrar un estilo tuyo guarda su skill en una copia y quita sus enlaces, sin tocar las de VyMotion', (t) => {
   const raiz = mkdtempSync(join(tmpdir(), 'sloth-tuya-'))
   t.after(() => rmSync(raiz, { recursive: true, force: true }))
   t.after(() => rmSync(originales, { recursive: true, force: true }))

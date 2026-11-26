@@ -1,10 +1,10 @@
 /**
- * Lo que queda de los créditos de voz de cada mes. Sloth los dio en noviembre de 2026 a quien pagaba activamente el
+ * Lo que queda de los créditos de voz de cada mes. VyMotion los dio en noviembre de 2026 a quien pagaba activamente el
  * apoyo: 100.000 al mes, sin acumular. Desde el 15 de noviembre de 2026 ya no se dan, por decisión del creador: quien
  * los recibió conserva su saldo, nadie más los recibe y no se rellenan. Lo entregado sigue en `voz_mensual` (migración
  * 0024) y se ve en Administrador → Créditos mensuales; una fila en `enviando` o `revisar` se comprueba en el proveedor.
  *
- * Aquí siguen: la marca que abre las voces de Sloth a todos (`APERTURA_VOZ`, que deja `scripts/publicar.mjs` al
+ * Aquí siguen: la marca que abre las voces de VyMotion a todos (`APERTURA_VOZ`, que deja `scripts/publicar.mjs` al
  * terminar de subir una versión), el mes de Ciudad de México (también lo usa el fondo), quién apoya con el sugerido o
  * más (`daCreditos`, la regla de la rifa) y la cuenta de cuánto saldo queda libre para rifar o regalar.
  */

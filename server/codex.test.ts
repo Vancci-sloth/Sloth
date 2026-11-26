@@ -89,7 +89,7 @@ test('texto por trozos y mensaje completo no duplican la respuesta; cada turno t
   h.run.close()
 })
 
-test('un mensaje en curso usa steer; si el turno acabó abre otro y avisa a Sloth', async () => {
+test('un mensaje en curso usa steer; si el turno acabó abre otro y avisa a VyMotion', async () => {
   const h = preparar()
   h.run.send('Primero')
   h.run.steer('Cambio durante el arranque')

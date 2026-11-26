@@ -15,7 +15,7 @@ function escribir(archivo: string, texto: string) {
 const EXPLICATIVO = { id: 'video-explicativo', title: 'Video explicativo', description: 'Explica.', skill: 'video-explicativo', icon: 'pizarra', etapas: [{ nombre: 'Guion', listo: 'guion.md', fase: 'guion' }] }
 const NUEVO = { id: 'nuevo-estilo', title: 'Nuevo estilo', description: '', skill: 'crear-estilo', cwd: '{app}/skills' }
 
-/** Una Sloth instalada recién actualizada: cards.json de la versión nueva y, en sus skills, las de Sloth y las tuyas. */
+/** Una VyMotion instalada recién actualizada: cards.json de la versión nueva y, en sus skills, las de VyMotion y las tuyas. */
 function sloth() {
   const raiz = mkdtempSync(join(tmpdir(), 'sloth-perdidos-'))
   const app = join(raiz, 'app')
@@ -60,7 +60,7 @@ test('un estilo tuyo que se quedó sin card la recupera de su hilo de «Nuevo es
   }
 })
 
-test('sin hilo, la card se rehace con su SKILL.md y el estilo de Sloth del que partió; no toca las demás ni lo que no es estilo', () => {
+test('sin hilo, la card se rehace con su SKILL.md y el estilo de VyMotion del que partió; no toca las demás ni lo que no es estilo', () => {
   const s = sloth()
   try {
     s.tuyo('receta-rapida', 'Receta rápida')

@@ -5,11 +5,11 @@ import { rutaAgente, versionFija, versionVisible } from './agentes.ts'
 
 /**
  * La versión de cada agente, que Opciones enseña en su fila: la del programa que se usa (`server/agentes.ts`), que llega
- * con cada versión de Sloth o con «Actualizar los agentes». Sin él, no está instalado.
+ * con cada versión de VyMotion o con «Actualizar los agentes». Sin él, no está instalado.
  */
 export type Agente = Proveedor
 
-/** Corre un comando y devuelve lo que escribió. Si falla, el error lleva el final de la salida. En `env`, `undefined` quita la variable. */
+/** Corre un comando y devuelve lo que escribió. Si falla, el error lleva el final de la salida. */
 export function correr(comando: string, cwd: string, env?: Record<string, string | undefined>): Promise<string> {
   return new Promise((ok, falla) => {
     const proc = spawn(comando, { cwd, shell: true, stdio: ['ignore', 'pipe', 'pipe'], ...(env ? { env: { ...process.env, ...env } } : {}) })

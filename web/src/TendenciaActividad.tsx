@@ -1,7 +1,5 @@
 import { useEffect, useRef } from 'react'
 
-/** La tendencia de cada día en la actividad de un agente (`ActividadAgente.tsx`): una línea por serie, en un lienzo. */
-
 type Serie = { nombre: string; color: string; valores: number[] }
 const compacta = new Intl.NumberFormat('es', { notation: 'compact', maximumFractionDigits: 1 })
 const fechaCorta = new Intl.DateTimeFormat('es', { month: 'short', day: 'numeric' })
@@ -34,7 +32,7 @@ export function TendenciaActividad({ series, dias, elegido, onElegir }: {
       const y = (valor: number) => MARGEN.arriba + alto * (1 - valor / techo)
       ctx.font = '11px Inter, system-ui, sans-serif'
       ctx.fillStyle = color('--muted')
-      ctx.strokeStyle = color('--line')
+      ctx.strokeStyle = color('--line-hover')
       ctx.textAlign = 'right'
       ctx.textBaseline = 'middle'
       ctx.setLineDash([2, 4])

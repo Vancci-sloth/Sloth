@@ -2,7 +2,7 @@ import type { Rendimiento, VideoPropio } from '../../shared/types.ts'
 import { LARGO } from '../../shared/ideas.ts'
 
 /**
- * Cómo le fue a tus videos largos, con la cuenta de YouTube que Sloth ya conectó para subir: vistas y likes de la API de
+ * Cómo le fue a tus videos largos, con la cuenta de YouTube que VyMotion ya conectó para subir: vistas y likes de la API de
  * datos; retención, de dónde llegaron y qué buscaron, de YouTube Analytics (alcanza el permiso `youtube.readonly`). Las
  * impresiones y el % de clics no salen en ninguna API: los lee Claude en Studio y los deja en `studio.json`.
  */

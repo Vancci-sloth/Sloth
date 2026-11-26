@@ -9,7 +9,7 @@ import { promisify } from 'node:util'
  * La carpeta con sus nombres largos, para vigilarla con `fs.watch` y `recursive`. Con un nombre corto de Windows
  * («C:\Users\RUNNER~1\AppData\…», como llega `%TEMP%` en muchas máquinas), libuv aborta el proceso entero al primer
  * cambio («Assertion failed: !_wcsnicmp(filename, dir, dirlen)», fs-event.c), sin un error que atrapar. Así fallaba
- * `modelos3d.test.ts` en Windows en GitHub, y así se habría caído Sloth con una carpeta que le llegara en esa forma.
+ * `modelos3d.test.ts` en Windows en GitHub, y así se habría caído VyMotion con una carpeta que le llegara en esa forma.
  * Si la carpeta no existe, lanza, como `watch`.
  */
 export const largo = (carpeta: string): string => realpathSync.native(carpeta)

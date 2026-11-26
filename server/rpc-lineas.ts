@@ -2,7 +2,7 @@ import { spawn, spawnSync, type ChildProcessWithoutNullStreams } from 'node:chil
 
 /**
  * Un agente que habla JSON-RPC 2.0, un mensaje por línea, por su entrada y su salida: los de ACP (Grok, Antigravity) y
- * Muse. Como `CodexRpc`, pero también contesta lo que el agente le pregunta a Sloth (`alPedir`).
+ * Muse. Como `CodexRpc`, pero también contesta lo que el agente le pregunta a VyMotion (`alPedir`).
  *
  * Las líneas se parten solo en `\n`: `readline` también parte en U+2028 y U+2029, que llegan dentro del texto del modelo
  * (T3 Code, `provider-pi/rpc.ts`). Lo que no es JSON (avisos del programa) va a `alTexto`.
@@ -109,7 +109,7 @@ export class RpcLineas {
   }
 
   /**
-   * Cierra el agente y lo que lanzó (sus MCP, sus comandos). `esperar`, al salir Sloth: lo que se lanza sin esperar no
+   * Cierra el agente y lo que lanzó (sus MCP, sus comandos). `esperar`, al salir VyMotion: lo que se lanza sin esperar no
    * alcanza a terminar el árbol y deja vivos a sus hijos.
    */
   close(esperar = false) {

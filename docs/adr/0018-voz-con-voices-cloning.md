@@ -4,10 +4,10 @@ Fecha: 2026-11-06
 
 ## Contexto
 
-Voices Cloning (www.voicescloning.art) es el proveedor de voz oficial de Sloth. No es una llave por persona, como Fish
-Audio o ElevenLabs: Sloth es su socio, con una llave `pk_live_…` y un saldo general que el creador recarga pagándoles.
+Voices Cloning (www.voicescloning.art) es el proveedor de voz oficial de VyMotion. No es una llave por persona, como Fish
+Audio o ElevenLabs: VyMotion es su socio, con una llave `pk_live_…` y un saldo general que el creador recarga pagándoles.
 Cada quien es un usuario suyo (`external_id`) con sus créditos, y gasta los suyos y el saldo general a la vez. Su guía
-pide que la llave viva en «tu servidor», pero el servidor de Sloth corre en la computadora de cada quien: ahí cualquiera
+pide que la llave viva en «tu servidor», pero el servidor de VyMotion corre en la computadora de cada quien: ahí cualquiera
 la sacaría del instalador, y con ella el encabezado `X-Partner-User` dejaría gastar los créditos de otro.
 
 ## Decisión
@@ -27,9 +27,9 @@ la sacaría del instalador, y con ella el encabezado `X-Partner-User` dejaría g
   Voices Cloning a quien tiene o tuvo créditos, que el creador da por correo desde Administrador. Así el saldo general
   no se gasta antes de decidir cuánto da cada plan. Mientras se prueba, `VOZ_SOLO_CREADOR` («1» desde el 6 de noviembre de
   2026) la deja solo para el creador, aunque alguien más tenga créditos: el cobro se lo niega a los demás.
-- **Las voces se eligen en el menú «Voz» de Sloth**, como las de Fish Audio y ElevenLabs (cambió el 6 de noviembre de
+- **Las voces se eligen en el menú «Voz» de VyMotion**, como las de Fish Audio y ElevenLabs (cambió el 6 de noviembre de
   2026; antes, en su ventana `embed.js`, que se veía ajena y no dejaba grabar). El cobro sigue dando solo el pase de una
-  hora (`/voz/sesion`); con él, el servidor de Sloth pide a su API, la misma que usa su ventana, los proveedores
+  hora (`/voz/sesion`); con él, el servidor de VyMotion pide a su API, la misma que usa su ventana, los proveedores
   (`/api/v1/providers`), el catálogo con su búsqueda y sus filtros (`/api/v1/voices`) y clonar (`/api/v1/voices/clone`).
   El pase es de ese usuario, así que no deja gastar los créditos de otro, y la llave del socio no sale del cobro. Sus
   muestras son públicas y pasan por el mismo proxy que las demás. La elegida o clonada queda como `vc:<voice_id>`
@@ -37,7 +37,7 @@ la sacaría del instalador, y con ella el encabezado `X-Partner-User` dejaría g
   PCM con ffmpeg y queda el mismo WAV, así que ninguna skill cambia. Su ventana queda en Opciones → Voz para lo demás que
   ofrecen (diálogo, texto largo, transcribir).
 - **Todo queda anotado en el cobro** (`voz_registro`, 180 días): cada alta, pase, voz, tarea y cambio de créditos, con lo
-  que gastó y si falló, por qué. Administrador, en la Sloth del creador (la que tiene su `admin.txt`), lo junta con
+  que gastó y si falló, por qué. Administrador, en la VyMotion del creador (la que tiene su `admin.txt`), lo junta con
   lo que dice Voices Cloning (saldo, usuarios, consumo) y deja sumar, quitar, suspender y dar de alta.
 
 ## Consecuencias
@@ -46,7 +46,7 @@ la sacaría del instalador, y con ella el encabezado `X-Partner-User` dejaría g
   de todas, falla para todos a la vez: el creador lo ve en Administrador, y AI Studio, Fish Audio y ElevenLabs siguen
   como respaldo. Quien se muda pierde sus voces clonadas (la app se lo dice al pedir una).
 - Clonar con el micrófono no funcionaba dentro de su ventana (su `Permissions-Policy` lo bloquea): desde que se clona
-  con su API, se graba en el menú de Sloth como con los demás.
+  con su API, se graba en el menú de VyMotion como con los demás.
 - Su API para el pase de sesión no está documentada: es la que usa su ventana (vista el 6-nov-2026). Si la cambian, el
   menú lo dice y la voz sigue generándose por el cobro.
 - La forma de su consumo (`/usage`) no está documentada: Administrador la enseña tal cual, como tabla.

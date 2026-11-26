@@ -12,7 +12,7 @@ function escribir(archivo: string, texto: string) {
   writeFileSync(archivo, texto)
 }
 
-/** Una Sloth con el explicativo de antes puesto y la versión nueva por poner. */
+/** Una VyMotion con el explicativo de antes puesto y la versión nueva por poner. */
 function sloth() {
   const raiz = mkdtempSync(join(tmpdir(), 'sloth-anteriores-'))
   const skills = join(raiz, 'skills')

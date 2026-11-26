@@ -1,14 +1,10 @@
 import { execFile, type ExecFileException } from 'node:child_process'
 import { createHash } from 'node:crypto'
-import { chmodSync, constants, createWriteStream, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
-import { access, stat } from 'node:fs/promises'
-import { homedir } from 'node:os'
+import { chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { delimiter, dirname, join, resolve } from 'node:path'
-import { Readable, Transform } from 'node:stream'
-import { pipeline } from 'node:stream/promises'
 import { fileURLToPath } from 'node:url'
 import { brotliDecompressSync } from 'node:zlib'
-import { PROVEEDORES, programaDe, type Programa, type Proveedor } from '../shared/providers.ts'
+import { programaDe, type Programa, type Proveedor } from '../shared/providers.ts'
 import type { AgentesAlDia, EstadoAgente } from '../shared/types.ts'
 import type { AgentOptions, AgentRun } from './agent.ts'
 import { correr } from './version.ts'
@@ -19,17 +15,16 @@ import { correr } from './version.ts'
  * el primer mensaje de un hilo suyo) a `PIEZAS/<agente>`, y queda para las siguientes versiones mientras no cambie la
  * suya. Lo mismo para los proveedores que vengan: una entrada más en `AGENTES`.
  *
- * Casi todos salen de npm, con el npm que trae Sloth. Muse Code, con el instalador de Meta; Antigravity, del zip que
- * publica Google (como los baja T3 Code), y omp, de su release de GitHub, si no hay ya uno instalado. DeepSeek,
- * OpenRouter y FreeLLMAPI no tienen programa: usan el de Claude Code (`programaDe`).
+ * Casi todos salen de npm, con el npm que trae VyMotion. Muse Code, con el instalador de Meta, y Antigravity, del zip que
+ * publica Google (como los baja T3 Code). DeepSeek no tiene programa: usa el de Claude Code (`programaDe`).
  *
- * En el repo (y en las versiones de Sloth que aún lo traían dentro) el programa de Claude, Codex y OpenCode ya está en
+ * En el repo (y en las versiones de VyMotion que aún lo traían dentro) el programa de Claude, Codex y OpenCode ya está en
  * node_modules de la app, y se usa ese.
  */
 
 const APP = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 /**
- * En un Mac con Apple Silicon, la Sloth de Intel (con Rosetta) dejó aquí programas de Intel con la misma versión: la de
+ * En un Mac con Apple Silicon, la VyMotion de Intel (con Rosetta) dejó aquí programas de Intel con la misma versión: la de
  * ARM baja los suyos aparte, o usaría esos.
  */
 const PIEZAS = join(process.env.APPDATA ?? '', 'sloth', 'piezas', process.platform === 'darwin' && process.arch === 'arm64' ? 'agentes-arm64' : 'agentes')
@@ -45,7 +40,7 @@ const versionDe = (paquete: string): string => JSON.parse(readFileSync(join(APP,
 interface Agente {
   nombre: string
   /**
-   * La versión, para los que no trae la app: va en el nombre de su carpeta, así otra versión de Sloth que pida otra la
+   * La versión, para los que no trae la app: va en el nombre de su carpeta, así otra versión de VyMotion que pida otra la
    * baja aparte.
    */
   version?: string
@@ -81,20 +76,6 @@ const ANTIGRAVITY: Record<string, { url: string; sha256: string }> = {
   'win32-x64': { url: 'windows/agy-acp-server-1.4.1-windows-x86_64.zip', sha256: '5f5b7d0328df17c128b2be338d4567b0d24e56ace8196e88794fec37d1372554' },
   'win32-arm64': { url: 'windows/agy-acp-server-1.4.1-windows-arm64.zip', sha256: '24c52bbc12aae20f55eb53d373669412d95a9c44fd59be4ea4e355918b91fbf7' }
 }
-
-/**
- * El programa de omp de cada sistema, como lo publica su release de GitHub, con su huella (la de su `SHA256SUMS.txt`) y
- * lo que pesa. En Linux, el de glibc: el de musl es para Alpine, donde Sloth no corre.
- */
-const OMP: Record<string, { archivo: string; sha256: string; mb: number }> = {
-  'win32-x64': { archivo: 'omp-windows-x64.exe', sha256: '4e18f472975bb87f9b1992f1d5981b9a1403fd559cdb3eb96f1f1a7d709096ef', mb: 260 },
-  'win32-arm64': { archivo: 'omp-windows-arm64.exe', sha256: 'e4f49878210729893ee7ef69f7a13d8ce539d0b6a30b957b9f6be7b5d74b32b3', mb: 245 },
-  'darwin-arm64': { archivo: 'omp-darwin-arm64', sha256: 'd5a3324acd98375a01698a1b0c018be48caed2956c8aa9044ad137fe43bc0400', mb: 235 },
-  'darwin-x64': { archivo: 'omp-darwin-x64', sha256: '6ffecb22a9fe01a98f90f91a2ef04a697850a23bf4dde83adad2fe80e51a8353', mb: 245 },
-  'linux-x64': { archivo: 'omp-linux-x64', sha256: '04e9490f9394da6d6804474cc2e41eb3d18f8e26215df4b34bdd4ad4c0d8a401', mb: 300 },
-  'linux-arm64': { archivo: 'omp-linux-arm64', sha256: 'f022f720c4899eb24c6e5e34dcbbae98ae05f5532bb03e97dffc02cfc8dd9a6f', mb: 255 }
-}
-const OMP_EXE = WINDOWS ? 'omp.exe' : 'omp'
 
 const AGENTES: Record<Programa, Agente> = {
   claude: {
@@ -138,7 +119,7 @@ const AGENTES: Record<Programa, Agente> = {
   pi: {
     nombre: 'Pi',
     version: '1.4.0',
-    // Es de Node: corre con el de Sloth (`comandoAgente`).
+    // Es de Node: corre con el de VyMotion (`comandoAgente`).
     paquete() {
       return `@earendil-works/pi-coding-agent@${this.version}`
     },
@@ -158,7 +139,7 @@ const AGENTES: Record<Programa, Agente> = {
   cursor: {
     nombre: 'Cursor',
     version: '1.2.0',
-    // Corre dentro de Sloth (`server/cursor.ts` lo importa de aquí), con sus ayudantes de cada sistema al lado.
+    // Corre dentro de VyMotion (`server/cursor.ts` lo importa de aquí), con sus ayudantes de cada sistema al lado.
     paquete() {
       return `@cursor/sdk@${this.version}`
     },
@@ -209,36 +190,13 @@ const AGENTES: Record<Programa, Agente> = {
     // baja otra vez.
     exe: (r) => (existsSync(join(r, WINDOWS ? 'localharness_external.exe' : 'localharness_external')) ? join(r, WINDOWS ? 'agy_acp_server.exe' : 'agy_acp_server.par') : null),
     pesa: '230 MB'
-  },
-  omp: {
-    nombre: 'omp',
-    version: '19.1.1',
-    // De su release de GitHub: su paquete de npm es para Bun. Se escribe mientras baja (pesa cientos de MB) y se borra si
-    // su huella no es la de `OMP`. Si ya hay un omp instalado, no se baja (`ompDelSistema`).
-    async instalar(dir) {
-      const o = OMP[plataforma]
-      if (!o) throw new Error(`omp no trae un programa para esta computadora (${plataforma}).`)
-      const res = await fetch(`https://github.com/can1357/oh-my-pi/releases/download/v${this.version}/${o.archivo}`)
-      if (!res.ok || !res.body) throw new Error(`GitHub respondió ${res.status} al pedir omp.`)
-      const exe = join(dir, OMP_EXE)
-      const huella = createHash('sha256')
-      const contar = new Transform({ transform: (trozo, _c, listo) => (huella.update(trozo), listo(null, trozo)) })
-      await pipeline(Readable.fromWeb(res.body as import('node:stream/web').ReadableStream), contar, createWriteStream(exe))
-      if (huella.digest('hex') !== o.sha256) {
-        rmSync(exe, { force: true })
-        throw new Error('El archivo de omp no es el que publica su autor. Vuelve a intentarlo.')
-      }
-      if (!WINDOWS) chmodSync(exe, 0o755)
-    },
-    exe: (r) => join(r, OMP_EXE),
-    pesa: `${OMP[plataforma]?.mb ?? 260} MB`
   }
 }
 
-/** Donde queda lo que se bajó de cada agente; con su versión, si la fija Sloth. */
+/** Donde queda lo que se bajó de cada agente; con su versión, si la fija VyMotion. */
 const carpeta = (p: Programa) => join(PIEZAS, p, ...(AGENTES[p].version ? [AGENTES[p].version!] : []))
 /**
- * Va en la carpeta del agente mientras se baja. Si Sloth se cierra a media descarga, el programa queda a medias y no
+ * Va en la carpeta del agente mientras se baja. Si VyMotion se cierra a media descarga, el programa queda a medias y no
  * arranca (en Windows, `spawn EFTYPE`): con la marca, no cuenta como bajado y se baja otra vez.
  */
 const BAJANDO = '.bajando'
@@ -249,75 +207,7 @@ const BAJANDO = '.bajando'
  */
 export const rutaAgente = (p: Proveedor): string | null => (instalando.has(programaDe(p)) ? null : buscar(programaDe(p)))
 
-/** El omp que ya está instalado manda sobre el que bajó Sloth: es el de la terminal, y así no se bajan cientos de MB. */
-const buscar = (p: Programa): string | null => (p === 'omp' ? ompDelSistema() : null) ?? elegido(p)?.exe ?? null
-
-/**
- * El omp que ya está en la computadora (su instalador, Homebrew, bun, mise), con su versión. Se busca en el PATH y donde lo
- * dejan sus instaladores, porque las apps abiertas desde el Finder no heredan el PATH de la terminal. Sin `where` ni
- * `which`, que detendrían el servidor: se mira cada archivo sin esperar, y otra vez cada `CADA_OMP`, así uno que se instale
- * con Sloth abierta se ve sin reiniciar. En Windows, solo `omp.exe`: el `omp.cmd` de npm es para Bun, y Node no lanza un
- * `.cmd` sin consola.
- */
-let ompSistema: { exe: string | null; version?: string; fecha?: number; t: number } = { exe: null, t: 0 }
-let mirandoOmp: Promise<string | null> | undefined
-const CADA_OMP = 30_000
-/** La más vieja con la que se ha probado su ACP (la del PR #32 era la 18). */
-const OMP_MINIMA = '18.0.0'
-
-function lugaresOmp(): string[] {
-  const casa = homedir()
-  const suyos = WINDOWS ? [join(process.env.LOCALAPPDATA ?? join(casa, 'AppData', 'Local'), 'omp')] : [join(casa, '.local', 'bin'), '/opt/homebrew/bin', '/usr/local/bin']
-  const dirs = [...(process.env.PATH ?? '').split(delimiter), ...suyos, join(casa, '.bun', 'bin')]
-  return [...new Set(dirs.map((d) => d.trim().replace(/^"(.*)"$/, '$1')).filter((d) => d && !d.startsWith(PIEZAS)))].map((d) => join(d, OMP_EXE))
-}
-
-/** Vuelve a buscarlo; si ya se está buscando, espera a esa búsqueda. */
-export function buscarOmpDelSistema(): Promise<string | null> {
-  mirandoOmp ??= (async () => {
-    let exe: string | null = null
-    let version: string | undefined
-    let fecha: number | undefined
-    for (const ruta of lugaresOmp()) {
-      try {
-        await access(ruta, WINDOWS ? constants.F_OK : constants.X_OK)
-        const s = await stat(ruta)
-        if (!s.isFile()) continue
-        fecha = s.mtimeMs
-      } catch {
-        continue
-      }
-      // Solo cuenta si arranca y dice su versión (`omp/19.1.1` → `19.1.1`), una vez por programa (otra vez si se
-      // actualizó), y si no es de antes de `OMP_MINIMA`: uno roto o viejo no tapa al que bajaría Sloth.
-      version = ruta === ompSistema.exe && fecha === ompSistema.fecha ? ompSistema.version : await versionQueDice(ruta)
-      if (version && !masNueva(OMP_MINIMA, version)) {
-        exe = ruta
-        break
-      }
-    }
-    ompSistema = { exe, version, fecha, t: Date.now() }
-    return exe
-  })().finally(() => (mirandoOmp = undefined))
-  return mirandoOmp
-}
-
-/** Lo que dice `exe --version`, si arranca. Uno que no es programa falla de golpe, no por el callback. */
-function versionQueDice(exe: string): Promise<string | undefined> {
-  return new Promise((ok) => {
-    try {
-      execFile(exe, ['--version'], { timeout: 15_000, windowsHide: true }, (_e, salida) => ok(/(\d+\.\d+\.\d+)/.exec(String(salida ?? ''))?.[1]))
-    } catch {
-      ok(undefined)
-    }
-  })
-}
-
-/** El que se encontró la última vez; si ya pasó `CADA_OMP`, se busca otra vez de fondo. */
-function ompDelSistema(): string | null {
-  if (Date.now() - ompSistema.t > CADA_OMP) void buscarOmpDelSistema()
-  return ompSistema.exe && existsSync(ompSistema.exe) ? ompSistema.exe : null
-}
-void buscarOmpDelSistema()
+const buscar = (p: Programa): string | null => elegido(p)?.exe ?? null
 
 /** Las versiones que «Actualizar los agentes» bajó de uno (`AL_DIA`), cada una en su carpeta. */
 const versiones = (p: Programa) => join(carpeta(p), 'versiones')
@@ -326,7 +216,7 @@ const APARTE = '.borrando'
 
 /**
  * Dónde está el programa de un agente: en la app (repo), en su carpeta o, si se actualizó, en la de cada versión que
- * bajó. Va el más nuevo; así una Sloth que trae uno más nuevo que el bajado usa el suyo. `bajados`: sin el de la app.
+ * bajó. Va el más nuevo; así una VyMotion que trae uno más nuevo que el bajado usa el suyo. `bajados`: sin el de la app.
  */
 function elegido(p: Programa, bajados = false): { raiz: string; exe: string; version: string } | null {
   // Muse se instala en `muse/` dentro de su carpeta (su instalador no deja elegir el nombre del lanzador).
@@ -382,11 +272,9 @@ export function cabe(v: string, base: string, fijas: number): boolean {
   return !!x && !!y && x.slice(0, fijas).every((c, i) => c === y[i]) && masNueva(v, base)
 }
 
-/** La versión de un agente que no trae la app: la que fija Sloth o, la de Muse, la que dejó su instalador. */
+/** La versión de un agente que no trae la app: la que fija VyMotion o, la de Muse, la que dejó su instalador. */
 export function versionFija(p: Proveedor): string | undefined {
   const g = programaDe(p)
-  // El omp del sistema dice la suya, no la que Sloth bajaría.
-  if (g === 'omp' && ompDelSistema()) return ompSistema.version
   if (g !== 'muse') return AGENTES[g].version
   try {
     return readFileSync(join(carpeta('muse'), 'muse', '.muse-version'), 'utf8').trim()
@@ -396,7 +284,7 @@ export function versionFija(p: Proveedor): string | undefined {
 }
 
 /**
- * Cómo se lanza un agente: su programa, o el Node de Sloth con él si es de Node (Pi). `null` si no se ha bajado.
+ * Cómo se lanza un agente: su programa, o el Node de VyMotion con él si es de Node (Pi). `null` si no se ha bajado.
  */
 export function comandoAgente(p: Proveedor): { command: string; args: string[] } | null {
   const exe = rutaAgente(p)
@@ -431,7 +319,7 @@ export function estadoAgente(p: Proveedor): EstadoAgente {
 }
 
 export const estadoAgentes = () =>
-  Object.fromEntries(PROVEEDORES.map((p) => [p, estadoAgente(p)])) as Record<Proveedor, EstadoAgente>
+  Object.fromEntries((['claude', 'codex', 'opencode', 'deepseek', ...(Object.keys(AGENTES) as Programa[]).filter((p) => !['claude', 'codex', 'opencode'].includes(p))] as Proveedor[]).map((p) => [p, estadoAgente(p)])) as Record<Proveedor, EstadoAgente>
 
 /** Qué agente se está bajando o actualizando: reiniciar el servidor cortaría la descarga. */
 export const bajandoAgente = () => {
@@ -455,11 +343,6 @@ export function asegurarAgente(proveedor: Proveedor): Promise<string> {
   errores.delete(p)
   const a = AGENTES[p]
   const descarga = (async () => {
-    // Puede que se haya instalado omp después de la última vez que se buscó: entonces no se baja.
-    if (p === 'omp') {
-      const suyo = await buscarOmpDelSistema()
-      if (suyo) return suyo
-    }
     const dir = carpeta(p)
     // Lo que quedó de otra versión, o de una descarga cortada, se va: npm daría por instalado un paquete a medias.
     rmSync(join(PIEZAS, p), { recursive: true, force: true })
@@ -496,11 +379,11 @@ export function asegurarAgente(proveedor: Proveedor): Promise<string> {
 }
 
 /**
- * Claude Code, Codex y OpenCode llegan con cada versión de Sloth (su paquete en package.json), pero sacan otra casi a
+ * Claude Code, Codex y OpenCode llegan con cada versión de VyMotion (su paquete en package.json), pero sacan otra casi a
  * diario, con los modelos nuevos. «Actualizar los agentes», arriba del hilo nuevo, baja la más nueva de los que ya están,
- * sin esperar a la siguiente Sloth. Cada versión va en su carpeta (`versiones`): los hilos abiertos siguen con la de antes
- * y los nuevos van con la nueva. Solo dentro de las cifras que fija Sloth (`fijas`): el SDK de Claude cambia su API en la
- * 0.4 y el cliente de OpenCode es de la 2.2; Codex pasa a cualquier 0.x, porque Sloth solo le habla a su app-server.
+ * sin esperar a la siguiente VyMotion. Cada versión va en su carpeta (`versiones`): los hilos abiertos siguen con la de antes
+ * y los nuevos van con la nueva. Solo dentro de las cifras que fija VyMotion (`fijas`): el SDK de Claude cambia su API en la
+ * 0.4 y el cliente de OpenCode es de la 2.2; Codex pasa a cualquier 0.x, porque VyMotion solo le habla a su app-server.
  * `registro` es el paquete que se pregunta a npm; `base`, el que trae la app.
  */
 const AL_DIA: Partial<Record<Programa, { registro: string; base: string; fijas: number }>> = {
@@ -619,7 +502,7 @@ async function bajarVersion(p: Programa, n: Publicada) {
  * corre) se queda para la próxima: primero se mueve aparte, para no borrar a medias la que sigue en uso.
  */
 function soltarViejas(p: Programa) {
-  // La que queda es la más nueva de las bajadas, no la de la app: en el repo, la Sloth instalada usa estas mismas.
+  // La que queda es la más nueva de las bajadas, no la de la app: en el repo, la VyMotion instalada usa estas mismas.
   const queda = elegido(p, true)?.raiz
   const viejas = queda === carpeta(p) ? [] : [join(carpeta(p), 'node_modules')]
   try {
@@ -691,7 +574,7 @@ export function conAgente(p: Proveedor, opts: AgentOptions, arrancar: (opts: Age
   }
 }
 
-/** Instala `paquete` en `dir` con el npm de Sloth, sin package.json propio ni scripts de instalación. */
+/** Instala `paquete` en `dir` con el npm de VyMotion, sin package.json propio ni scripts de instalación. */
 export function entornoInstalacionNpm(env: NodeJS.ProcessEnv): Record<string, undefined> {
   // npm start exporta la política del .npmrc como variable de entorno. npm 11 la interpreta como un flag de CLI.
   return Object.fromEntries(Object.keys(env).filter((nombre) => /^npm_config_allow[-_]scripts$/i.test(nombre)).map((nombre) => [nombre, undefined]))
@@ -707,7 +590,7 @@ function npm(dir: string, paquete: string) {
  */
 async function arranca(exe: string): Promise<boolean> {
   for (let i = 0; i < 30; i++) {
-    // Pi es de Node: corre con el de Sloth.
+    // Pi es de Node: corre con el de VyMotion.
     const [comando, args] = exe.endsWith('.js') ? [process.execPath, [exe, '--version']] : [exe, ['--version']]
     // EFTYPE sale de golpe, no por el callback.
     const error = await new Promise<ExecFileException | null>((ok) => execFile(comando, args, { timeout: 30000, windowsHide: true }, ok)).catch((e: ExecFileException) => e)
@@ -720,7 +603,7 @@ async function arranca(exe: string): Promise<boolean> {
 
 /**
  * Si el programa bajado de un agente no arranca porque no es un programa (Windows: EFTYPE; Linux: ENOEXEC), quedó a
- * medias de una descarga cortada en una Sloth que aún no ponía `BAJANDO`: se borra, y la próxima vez que se pida se baja
+ * medias de una descarga cortada en una VyMotion que aún no ponía `BAJANDO`: se borra, y la próxima vez que se pida se baja
  * otra vez. Dice si lo borró. El de la app (repo) no se toca.
  */
 export function descartarRoto(p: Proveedor, e: unknown): boolean {

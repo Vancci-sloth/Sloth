@@ -1,5 +1,6 @@
 import { existsSync, readdirSync, readFileSync, renameSync } from 'node:fs'
 import { dirname, join } from 'node:path'
+import { NUEVO_ESTILO } from '../shared/crear-estilo.ts'
 import type { Card } from '../shared/types.ts'
 import { guardar } from './disco.ts'
 import { baseDe, type DeSloth } from './estilos.ts'
@@ -8,24 +9,22 @@ import { nombreCopia } from './originales.ts'
 /**
  * Los estilos tuyos que se quedan sin card. Su skill vive en `<app>/skills/<id>`, que ninguna versión toca, pero su card
  * se pierde si no está en `data/tus-cards.json`: un agente de «Nuevo estilo» que la puso en `cards.json` (cada versión de
- * Sloth lo reemplaza), uno que no llegó a escribirla o un `tus-cards.json` que no se puede leer. En la app que se vende,
+ * VyMotion lo reemplaza), uno que no llegó a escribirla o un `tus-cards.json` que no se puede leer. En la app que se vende,
  * al arrancar y al acabar cada turno de un hilo de «Nuevo estilo»:
- * - `mudarTuyas`: una card de `cards.json` con una skill que no trae Sloth pasa a `tus-cards.json`. También cada vez que
+ * - `mudarTuyas`: una card de `cards.json` con una skill que no trae VyMotion pasa a `tus-cards.json`. También cada vez que
  *   cambia `cards.json`, para que la siguiente versión ya no se la lleve.
- * - `recuperarEstilos`: cada carpeta de `<app>/skills` que es un estilo (su SKILL.md usa video-base), que no trae Sloth y
+ * - `recuperarEstilos`: cada carpeta de `<app>/skills` que es un estilo (su SKILL.md usa video-base), que no trae VyMotion y
  *   que ninguna card usa, recupera su card: la última que escribió un hilo de «Nuevo estilo», y si no hay, una hecha con
- *   su SKILL.md y la card del estilo de Sloth del que partió. Un estilo que borraste no vuelve: su carpeta ya no está ahí.
+ *   su SKILL.md y la card del estilo de VyMotion del que partió. Un estilo que borraste no vuelve: su carpeta ya no está ahí.
  */
 
-/** La card que lanza la skill `crear-estilo`: sus hilos escriben las cards de los estilos tuyos. */
-const NUEVO_ESTILO = 'nuevo-estilo'
 const ID = /^[a-z0-9]+(-[a-z0-9]+)*$/
-/** Lo de la card del estilo de Sloth que hereda uno tuyo rehecho. `lote` no: su prefijo es de ese estilo. */
+/** Lo de la card del estilo de VyMotion que hereda uno tuyo rehecho. `lote` no: su prefijo es de ese estilo. */
 const HEREDA = ['icon', 'etapas', 'voz', 'clips', 'musica', 'editor'] as const
 
 interface Rutas {
   app: string
-  /** Las skills como las trae esta versión (`SLOTH_SKILLS_ORIGINALES`): lo que está ahí es de Sloth. */
+  /** Las skills como las trae esta versión (`SLOTH_SKILLS_ORIGINALES`): lo que está ahí es de VyMotion. */
   originales: string
 }
 
@@ -36,7 +35,7 @@ export function cuidarEstilos(o: Rutas): string[] {
   return [...mudarTuyas(o), ...recuperarEstilos(o)]
 }
 
-/** Pasa a `tus-cards.json` las cards de `cards.json` que no son de Sloth. Devuelve sus ids. */
+/** Pasa a `tus-cards.json` las cards de `cards.json` que no son de VyMotion. Devuelve sus ids. */
 export function mudarTuyas(o: Rutas): string[] {
   const { cardsJson, tusCards } = rutas(o.app)
   const lista = leer(cardsJson)
@@ -77,7 +76,7 @@ export function recuperarEstilos(o: Rutas): string[] {
 }
 
 /**
- * Las cards de `tus-cards.json` para añadirle otras. Si no se puede leer, Sloth ya no enseñaba ninguna: no se pisa, se
+ * Las cards de `tus-cards.json` para añadirle otras. Si no se puede leer, VyMotion ya no enseñaba ninguna: no se pisa, se
  * aparta a su lado (`tus-cards <fecha> que no se leía.json`), por si alguien quiere lo que tenía, y se empieza de nuevo.
  */
 export function abrirTusCards(tusCards: string): Partial<Card>[] {
@@ -151,7 +150,7 @@ function cierra(s: string, ini: number): number {
   return -1
 }
 
-/** Una card hecha con lo que hay: el título y la descripción de su SKILL.md, y lo demás del estilo de Sloth del que partió. */
+/** Una card hecha con lo que hay: el título y la descripción de su SKILL.md, y lo demás del estilo de VyMotion del que partió. */
 function rehecha(id: string, carpeta: string, estilos: DeSloth[], deSloth: Partial<Card>[]): Partial<Card> {
   const md = texto(join(carpeta, 'SKILL.md'))
   const fin = md.startsWith('---') ? md.indexOf('\n---', 3) : -1

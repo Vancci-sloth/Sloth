@@ -15,7 +15,7 @@ recolor: rotate only the hues inside FROM-TO (degrees) to TARGET; keeps value an
          lights or clouds. "Change the colours" in the brief means this.
 
 Everything is seeded: the same call gives the same pixels (renders must be deterministic).
-Run with:  python -I -B -X utf8  (numpy + cv2 + PIL: los pide la card en Sloth, en Requisitos)
+Run with:  python -I -B -X utf8  (numpy + cv2 + PIL: los pide la card en VyMotion, en Requisitos)
 """
 import argparse, os, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))   # formato.py (con -I la carpeta del script no está en sys.path)

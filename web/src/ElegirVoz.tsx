@@ -43,7 +43,7 @@ interface Item {
 const NOMBRE_MOTOR: Record<Motor, string> = { 'ai-studio': 'AI Studio', ...MOTORES }
 /**
  * De dónde sale cada motor, para no confundirlos: Fish Audio y ElevenLabs van con la llave que pusiste; AI Studio, con
- * tu cuenta de Google; Voices Cloning es el de Sloth, con sus créditos.
+ * tu cuenta de Google; Voices Cloning es el de VyMotion, con sus créditos.
  */
 const ORIGEN: Record<Motor, string> = { 'ai-studio': 'tu cuenta de Google', fish: 'tu llave', elevenlabs: 'tu llave', vibi: 'tu llave', groq: 'tu llave', vc: 'tus créditos' }
 const conOrigen = (m: Motor) => `${NOMBRE_MOTOR[m]} · ${ORIGEN[m]}`
@@ -60,10 +60,10 @@ const TUYA = 'tuya-'
 const FRASE_BASE = 'Hola, así sonaría tu video con esta voz.'
 const RECIENTES = 'voz-recientes'
 const FAVORITAS = 'voz-favoritas'
-/** Los proveedores de las voces de Sloth de la última vez, para contarlas al momento. */
+/** Los proveedores de las voces de VyMotion de la última vez, para contarlas al momento. */
 const PROVEEDORES_VC = 'voz-proveedores-sloth'
 const FRASE = 'voz-frase'
-/** Las muestras públicas se oyen a través de Sloth, que las guarda la primera vez (`server/voz/muestras.ts`). */
+/** Las muestras públicas se oyen a través de VyMotion, que las guarda la primera vez (`server/voz/muestras.ts`). */
 const local = (url: string) => `/api/voz/muestra?u=${encodeURIComponent(url)}`
 
 /** Un texto guardado en este navegador; sin almacenamiento, vacío. */
@@ -152,7 +152,7 @@ function Huella({ de }: { de: string }) {
 }
 
 /** Lo que se oye: un solo audio a la vez; las muestras ya bajadas (al pasar por encima) suenan sin esperar. */
-/** `generada`: tras generar tu frase con una voz (las de Sloth gastan créditos: se vuelven a leer). */
+/** `generada`: tras generar tu frase con una voz (las de VyMotion gastan créditos: se vuelven a leer). */
 function useOir(frase: string, generada?: (it: Item) => void) {
   const [sonando, setSonando] = useState<string>()
   const [cargando, setCargando] = useState<string>()
@@ -412,7 +412,7 @@ function Panel(props: { voz: UsoVoz; valor: string; propia?: string; ancho?: num
   useEffect(() => {
     if (filtro === 'vc') void voz.releerVc().catch(() => {})
   }, [filtro]) // eslint-disable-line react-hooks/exhaustive-deps
-  // Se piden en cuanto Sloth ofrece sus voces, no al entrar en su pestaña: así cuenta las 900 y pico desde el principio.
+  // Se piden en cuanto VyMotion ofrece sus voces, no al entrar en su pestaña: así cuenta las 900 y pico desde el principio.
   // Mientras llegan, las de la última vez (de este navegador).
   useEffect(() => {
     if (!conVc) return
@@ -494,7 +494,7 @@ function Panel(props: { voz: UsoVoz; valor: string; propia?: string; ancho?: num
       if (elegidas.length) s.push({ titulo: 'Ya en tu menú', items: elegidas })
       const ya = new Set(elegidas.map((i) => i.valor))
       const p = vcProveedores.find((x) => x.id === vcProveedor)
-      s.push({ titulo: `${p?.nombre ?? 'Sloth'}${vcCatalogo.total ? ` · ${vcCatalogo.total.toLocaleString('es-MX')} voces` : ''}`, items: vcCatalogo.items.filter((i) => !ya.has(i.valor)) })
+      s.push({ titulo: `${p?.nombre ?? 'VyMotion'}${vcCatalogo.total ? ` · ${vcCatalogo.total.toLocaleString('es-MX')} voces` : ''}`, items: vcCatalogo.items.filter((i) => !ya.has(i.valor)) })
       return s
     }
     if (buscando) {
@@ -517,7 +517,7 @@ function Panel(props: { voz: UsoVoz; valor: string; propia?: string; ancho?: num
       if (tuyas.length) s.push({ titulo: `Tus voces · ${conOrigen(m)}`, items: tuyas })
     }
     const vc = todas.filter((i) => i.motor === 'vc' && !i.propia)
-    if (vc.length) s.push({ titulo: typeof e?.vc?.creditos === 'number' ? `Sloth · te quedan ${e.vc.creditos.toLocaleString('es-MX')} créditos` : conOrigen('vc'), items: vc })
+    if (vc.length) s.push({ titulo: typeof e?.vc?.creditos === 'number' ? `VyMotion · te quedan ${e.vc.creditos.toLocaleString('es-MX')} créditos` : conOrigen('vc'), items: vc })
     const usos = new Map<string, Item[]>()
     for (const i of todas.filter((x) => x.motor === 'ai-studio')) usos.set(i.uso ?? '', [...(usos.get(i.uso ?? '') ?? []), i])
     for (const [uso, items] of usos) s.push({ titulo: `AI Studio · ${uso}`, items })
@@ -541,7 +541,7 @@ function Panel(props: { voz: UsoVoz; valor: string; propia?: string; ancho?: num
     return f
   }, [secciones, props.propia, buscando])
 
-  // La primera vez que se abre, Sloth baja de fondo las muestras de las primeras voces, para que suenen al instante.
+  // La primera vez que se abre, VyMotion baja de fondo las muestras de las primeras voces, para que suenen al instante.
   const calentado = useRef(false)
   useEffect(() => {
     if (!props.abierto || calentado.current) return
@@ -712,13 +712,13 @@ function Panel(props: { voz: UsoVoz; valor: string; propia?: string; ancho?: num
               {e.vc.hoy ? ` · hoy usaste ${e.vc.hoy.toLocaleString('es-MX')}` : ''} · oír las muestras no gasta
             </>
           ) : (
-            'Te quedan 0 créditos de voz: las muestras se oyen gratis, pero tu frase y la voz del video no. Pídele más al creador de Sloth.'
+            'Te quedan 0 créditos de voz: las muestras se oyen gratis, pero tu frase y la voz del video no. Pídele más al creador de VyMotion.'
           )}
         </p>
       )}
       {filtro === 'vc' && vcProveedores.length > 0 && (
         <div className="voz-filtros voz-rasgos voz-de-vc">
-          <div className="voz-pestanas" role="group" aria-label="De dónde salen las voces de Sloth">
+          <div className="voz-pestanas" role="group" aria-label="De dónde salen las voces de VyMotion">
             {vcProveedores.map((p) => (
               <button key={p.id} className={vcProveedor === p.id ? 'on' : ''} aria-pressed={vcProveedor === p.id} title={p.aviso ? `${p.nombre}: ${p.aviso}` : p.nombre} onClick={() => (setVcProveedor(p.id), campo.current?.focus())}>
                 {p.nombre}
@@ -818,7 +818,7 @@ function Panel(props: { voz: UsoVoz; valor: string; propia?: string; ancho?: num
           </div>
         ))}
         {filtro === 'vc' && vcError && <p className="voz-vacio bad">{vcError}</p>}
-        {filtro === 'vc' && vcCargando && <p className="voz-vacio">Trayendo las voces de Sloth…</p>}
+        {filtro === 'vc' && vcCargando && <p className="voz-vacio">Trayendo las voces de VyMotion…</p>}
         {filtro === 'vc' && !vcCargando && vcCatalogo.mas && (
           <button className="voz-mas" onClick={() => pedirCatalogo(vcCatalogo.pagina + 1)}>
             Ver más voces ({(vcCatalogo.total - vcCatalogo.items.length).toLocaleString('es-MX')} más)
@@ -840,9 +840,9 @@ function Panel(props: { voz: UsoVoz; valor: string; propia?: string; ancho?: num
             )}
             {e?.vc?.disponible && (
               <button onClick={() => (setFiltro('vc'), campo.current?.focus())}>
-                <Logo de="sloth" nombre="Sloth" chico />
+                <Logo de="sloth" nombre="VyMotion" chico />
                 <span className="voz-texto">
-                  <strong>Voces de Sloth</strong>
+                  <strong>Voces de VyMotion</strong>
                   <small>Cientos de voces con tus créditos: buscas, oyes y eliges</small>
                 </span>
               </button>
@@ -927,7 +927,7 @@ const PARA_LEER = [
 
 /**
  * Clonar tu voz sin salir del menú: la grabas ahí mismo (o subes una grabación) y queda en Fish Audio o ElevenLabs,
- * en tu cuenta (o en Voices Cloning, con los créditos de Sloth). `onListo` recibe la voz nueva.
+ * en tu cuenta (o en Voices Cloning, con los créditos de VyMotion). `onListo` recibe la voz nueva.
  */
 function Clonar({ voz, onListo, onVolver }: { voz: UsoVoz; onListo(v?: string): void; onVolver(): void }) {
   const e = voz.estado
@@ -1052,10 +1052,10 @@ function Clonar({ voz, onListo, onVolver }: { voz: UsoVoz; onListo(v?: string): 
           : archivo
             ? `${archivo.name}, ${(archivo.size / 1e6).toFixed(1)} MB. Queda privada: en tu cuenta de ${MOTORES[destino]}${destino === 'fish' ? ' o, si no deja crearla sin saldo, en esta computadora' : ''}.`
             : 'De 30 s a un minuto hablando tú, sin música. Queda privada, en tu cuenta.'}
-        {sinClonar(destino) && ' Tu plan gratis de ElevenLabs no deja clonar: elige Fish Audio o Sloth, o sube de plan en ElevenLabs.'}
+        {sinClonar(destino) && ' Tu plan gratis de ElevenLabs no deja clonar: elige Fish Audio o VyMotion, o sube de plan en ElevenLabs.'}
       </p>
       <input className="voz-nombre" value={nombre} onChange={(ev) => setNombre(ev.target.value)} placeholder="Cómo se llama" aria-label="Cómo se llama tu voz" />
-      {destino === 'vc' && <p className="small muted">En Sloth, con tus créditos.</p>}
+      {destino === 'vc' && <p className="small muted">En VyMotion, con tus créditos.</p>}
       {error && <p className="bad small">{error}</p>}
       <div className="voz-clonar-pie">
         <button className="primary" disabled={ocupado || grabando || !archivo || !nombre.trim() || sinClonar(destino)} onClick={() => void clonar()}>

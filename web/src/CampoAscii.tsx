@@ -1,12 +1,4 @@
 import { useEffect, useRef } from 'react'
-import { useDelTema } from './temas'
-
-/**
- * El fondo de signos de los temas que lo piden (`temas.ts`, Cristal): una trama de caracteres en un lienzo que llena a su
- * padre, que se aparta del puntero al pasar. No es una animación sin fin: se pinta al cambiar de tamaño y al mover el
- * puntero dentro de su tarjeta, a 30 cuadros por segundo como mucho, y se detiene escondido o fuera de la vista. Con
- * movimiento reducido, queda quieto. En el tema Sloth no se dibuja nada. El color es el `color` de su CSS.
- */
 
 const SIGNOS = '.:~-+=>*$%#'
 const PASO_X = 8
@@ -55,13 +47,8 @@ function ramas(x: number, y: number, ancho: number, alto: number) {
   return fuerza
 }
 
-export type VarianteAscii = 'onda' | 'orbita' | 'malla' | 'onda-lateral' | 'ramas'
-
-export function CampoAscii({ variante = 'onda' }: { variante?: VarianteAscii }) {
-  return useDelTema().fondos ? <Lienzo variante={variante} /> : null
-}
-
-function Lienzo({ variante }: { variante: VarianteAscii }) {
+/** Campo acotado. Redibuja al cambiar de tamaño o al mover el puntero dentro de su tarjeta. */
+export function CampoAscii({ variante = 'onda' }: { variante?: 'onda' | 'orbita' | 'malla' | 'onda-lateral' | 'ramas' }) {
   const lienzo = useRef<HTMLCanvasElement>(null)
   useEffect(() => {
     const canvas = lienzo.current
@@ -76,6 +63,7 @@ function Lienzo({ variante }: { variante: VarianteAscii }) {
     let visible = true
     let ultimo = 0
     let tramas: Float32Array | undefined
+    let color: string | undefined
 
     function pintar(tiempo: number) {
       cuadro = 0
@@ -111,7 +99,9 @@ function Lienzo({ variante }: { variante: VarianteAscii }) {
       ctx.clearRect(0, 0, width, height)
       ctx.font = '10px monospace'
       ctx.textBaseline = 'top'
-      ctx.fillStyle = getComputedStyle(canvas).color
+      // El color se lee una vez por tamaño, no en cada cuadro (`getComputedStyle` fuerza a recalcular estilos).
+      color ??= getComputedStyle(canvas).color
+      ctx.fillStyle = color
       const actual = reducir.matches ? undefined : puntero
       const retorno = salida ? Math.max(0, 1 - (tiempo - salida) / 240) : 1
       let celda = 0
@@ -150,6 +140,12 @@ function Lienzo({ variante }: { variante: VarianteAscii }) {
     const pedir = () => { if (!cuadro && visible && !document.hidden) cuadro = requestAnimationFrame(pintar) }
     const mover = (e: PointerEvent) => {
       if (!visible || document.hidden || reducir.matches || e.pointerType === 'touch') return
+      // Con un diálogo encima (una publicación abierta en la comunidad), el fondo no se ve: no se redibuja a 30 cuadros
+      // por segundo detrás de él cada vez que mueves el ratón.
+      if (e.target instanceof Element && e.target.closest('[aria-modal="true"], .com-velo, .modal')) {
+        if (puntero) salir()
+        return
+      }
       const rect = canvas.getBoundingClientRect()
       if (e.clientX < rect.left - RADIO || e.clientX > rect.right + RADIO || e.clientY < rect.top - RADIO || e.clientY > rect.bottom + RADIO) {
         if (puntero) salir()
@@ -166,6 +162,7 @@ function Lienzo({ variante }: { variante: VarianteAscii }) {
     const observar = new ResizeObserver(() => {
       mapaRamas = undefined
       tramas = undefined
+      color = undefined
       pedir()
     })
     observar.observe(canvas)

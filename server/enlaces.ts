@@ -18,7 +18,7 @@ const ESPERA = 6000
 const MAX_BYTES = 400_000
 const AGENTE = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36'
 
-/** Loopback, redes privadas y enlace local: un enlace pegado no puede hacer que Sloth pida algo a la red de casa. */
+/** Loopback, redes privadas y enlace local: un enlace pegado no puede hacer que VyMotion pida algo a la red de casa. */
 const PRIVADAS = new BlockList()
 for (const [red, bits] of [['0.0.0.0', 8], ['10.0.0.0', 8], ['100.64.0.0', 10], ['127.0.0.0', 8], ['169.254.0.0', 16], ['172.16.0.0', 12], ['192.168.0.0', 16]] as const) PRIVADAS.addSubnet(red, bits, 'ipv4')
 for (const [red, bits] of [['::', 128], ['::1', 128], ['fc00::', 7], ['fe80::', 10]] as const) PRIVADAS.addSubnet(red, bits, 'ipv6')

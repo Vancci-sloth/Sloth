@@ -1,6 +1,6 @@
 /**
- * Anclar Sloth a la barra de tareas (el paso de la bienvenida, web/src/Bienvenida.tsx). Windows solo lo pregunta si lo
- * pide la ventana de Sloth, al frente y con su AppUserModelID; pedido desde el instalador o desde una ventana invisible de
+ * Anclar VyMotion a la barra de tareas (el paso de la bienvenida, web/src/Bienvenida.tsx). Windows solo lo pregunta si lo
+ * pide la ventana de VyMotion, al frente y con su AppUserModelID; pedido desde el instalador o desde una ventana invisible de
  * otro programa, dice que no sin preguntar. En Windows 11 al día se pide con TaskbarManager, que Electron no trae: se llama
  * a Windows con koffi, desde este proceso. En los de antes (Windows 10, 11 hasta 23H2), ayudante.exe hace lo que hacen
  * Edge y Firefox (scripts/ayudante).
@@ -19,7 +19,7 @@ const INFO = '00000036-0000-0000-C000-000000000046' // IAsyncInfo
 /** Si Windows contesta que no antes de esto, no preguntó: nadie decide tan rápido. */
 const SIN_PREGUNTAR = 1500
 
-/** Si Sloth está anclada; `null` fuera de la app instalada en Windows, donde no se ofrece. */
+/** Si VyMotion está anclada; `null` fuera de la app instalada en Windows, donde no se ofrece. */
 export function anclada(): boolean | null {
   if (!app.isPackaged || process.platform !== 'win32') return null
   let accesos: string[] = []

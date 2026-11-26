@@ -10,7 +10,7 @@ import './Admin.css'
 
 /**
  * Administrador: solo en la computadora del creador (la que tiene su llave de `publicar.txt`; en las demás, la barra no
- * la enseña y el servidor no la sirve). Todo lo de Voices Cloning, el proveedor de voz de Sloth (`licencias/src/voz.ts`).
+ * la enseña y el servidor no la sirve). Todo lo de Voices Cloning, el proveedor de voz de VyMotion (`licencias/src/voz.ts`).
  *
  * Se abre al instante con lo último que se leyó (lo guarda el servidor en `data/voz/admin.json`, y aquí en memoria) y se
  * vuelve a leer de fondo: el cobro tarda unos segundos en preguntar a cada llave. Arriba, el buscador (ya enfocado; «/»
@@ -69,7 +69,7 @@ interface Panel {
   errores: { status: number; codigo: string | null; veces: number; ultima: string; error: string | null }[]
   /** Cuándo lo leyó el servidor (ms), en lo guardado. */
   leido?: number
-  /** El servidor de Sloth ya juntó los usuarios de todas las páginas de cada llave. */
+  /** El servidor de VyMotion ya juntó los usuarios de todas las páginas de cada llave. */
   todasLasPaginas?: boolean
 }
 
@@ -153,7 +153,7 @@ function guardado(): Promise<Panel | undefined> {
 }
 
 /**
- * Si esta Sloth es la del creador: la barra enseña Administrador solo entonces, y ya trae lo último leído. Arranca con
+ * Si esta VyMotion es la del creador: la barra enseña Administrador solo entonces, y ya trae lo último leído. Arranca con
  * lo último que se supo en esta computadora (si no, «Administrador» salía un momento después y empujaba la lista de
  * hilos) y el servidor lo confirma.
  */
@@ -361,7 +361,7 @@ export const Admin = memo(function Admin({ activa, pestana = 'usuarios', onPesta
         )}
         {panel?.soloCreador && (
           <p className="admin-aviso">
-            Por ahora las voces de Sloth son <strong>solo para ti</strong>. Se abren a todos cuando se termine de publicar la actualización que las trae.
+            Por ahora las voces de VyMotion son <strong>solo para ti</strong>. Se abren a todos cuando se termine de publicar la actualización que las trae.
           </p>
         )}
 
@@ -580,7 +580,7 @@ const Usuarios = memo(function Usuarios({ filas, buscar, abierto, onAbrir, soloC
             <thead>
               <tr>
                 {cabeza('nombre', 'Usuario')}
-                <th>Plan en Sloth</th>
+                <th>Plan en VyMotion</th>
                 {cabeza('creditos', 'Créditos', true)}
                 {cabeza('usados', 'Usados', true)}
                 {cabeza('desde', 'Desde')}
@@ -627,7 +627,7 @@ const Usuarios = memo(function Usuarios({ filas, buscar, abierto, onAbrir, soloC
   )
 })
 
-/** Dar créditos a un correo de Sloth que aún no está en la lista (o sumarle, si ya usaba las voces). */
+/** Dar créditos a un correo de VyMotion que aún no está en la lista (o sumarle, si ya usaba las voces). */
 function Alta({ email, onHecho }: { email: string; onHecho(texto: string): void }) {
   const [creditos, setCreditos] = useState('')
   const [ocupado, setOcupado] = useState(false)
@@ -650,7 +650,7 @@ function Alta({ email, onHecho }: { email: string; onHecho(texto: string): void 
       }}
     >
       <span>
-        Darle créditos a <strong>{email}</strong> (su cuenta de Sloth)
+        Darle créditos a <strong>{email}</strong> (su cuenta de VyMotion)
       </span>
       <input type="text" inputMode="numeric" placeholder="Créditos" aria-label="Créditos para la alta" aria-invalid={malo} value={creditos} onChange={(e) => setCreditos(e.target.value)} disabled={ocupado} />
       <button className="primary" disabled={ocupado || malo}>

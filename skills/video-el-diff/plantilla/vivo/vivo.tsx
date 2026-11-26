@@ -1,4 +1,4 @@
-// La vista en vivo: el mismo video que renderiza final.py, reproducido en el navegador con el Player de Remotion. Sloth
+// La vista en vivo: el mismo video que renderiza final.py, reproducido en el navegador con el Player de Remotion. VyMotion
 // la mete en su editor y la mueve con mensajes: { vivo: "ir", t } salta al segundo t, { vivo: "play" } y
 // { vivo: "pausa" }. Responde { vivo: "tiempo", t, playing } cada vez que cambia el cuadro o el estado.
 import React, { useEffect, useRef } from "react";

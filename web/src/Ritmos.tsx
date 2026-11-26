@@ -123,7 +123,7 @@ function RitmoDe(props: { base: string; titulo: string; logos: string[]; evento:
       {!cambiado && estado.fijas > 0 && (
         <p className="muted small">
           {estado.fijas === 1 ? '1 ya está en TikTok y se queda' : `${estado.fijas} ya están en TikTok y se quedan`} a su hora: TikTok no deja cambiarla desde
-          Sloth. Las que aún esperan en la cola sí se mueven.
+          VyMotion. Las que aún esperan en la cola sí se mueven.
         </p>
       )}
       {hecho && <p className="ritmo-hecho small">{hecho}</p>}

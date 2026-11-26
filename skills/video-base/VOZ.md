@@ -1,8 +1,8 @@
 # La voz: la línea `Voz:`
 
-El usuario elige en el compositor de Sloth si manda él la voz o si la generas tú. Puedes generarla con una voz de Google
+El usuario elige en el compositor de VyMotion si manda él la voz o si la generas tú. Puedes generarla con una voz de Google
 AI Studio (Gemini 3.8 Flash TTS, en su cuenta de Google), con una de Fish Audio o ElevenLabs (con su llave; puede ser
-la suya, clonada) o con una de las voces de Sloth (`vc:`, con los créditos que le da Sloth; al usuario llámalas «voces de Sloth»). Lo elegido
+la suya, clonada) o con una de las voces de VyMotion (`vc:`, con los créditos que le da VyMotion; al usuario llámalas «voces de VyMotion»). Lo elegido
 llega en el primer mensaje:
 
 - `Voz: genérala tú en AI Studio con la voz <Nombre> …` o `Voz: genérala tú con Fish Audio (o ElevenLabs), voz «…»: en
@@ -17,7 +17,7 @@ Cloning, y para Vibi: el mismo `generar_voz`, el mismo archivo y los mismos paso
 ## Generarla
 
 Con la herramienta `generar_voz` del MCP `voz` (en Claude, `mcp__voz__generar_voz`), en cuanto el guion esté listo.
-Si tu skill trae un script que la pide a Sloth por la misma vía (`/api/voz/generar`), como `voz.py --studio` del
+Si tu skill trae un script que la pide a VyMotion por la misma vía (`/api/voz/generar`), como `voz.py --studio` del
 explicativo, usa solo el script: con los dos se pide dos veces. La herramienta lleva:
 
 - `voz`: la que trae la línea, tal cual (`Fola`, o `fish:…` / `elevenlabs:…` / `vc:…` con su id).
@@ -42,7 +42,7 @@ pídela otra vez una sola vez; si se repite, díselo al usuario.
 - **Sin cuenta conectada, o se fue la sesión (AI Studio), o sin llave (Fish Audio, ElevenLabs):** dile al usuario que
   la conecte en Opciones → Voz. Mientras, pídele su voz como siempre.
 - **La cuota del día, sin saldo o sin créditos, u otro error:** dile el error tal cual y pídele su voz. Lo gratis de
-  Fish Audio era hasta el 30 de noviembre de 2026. Los créditos de las voces de Sloth los da el creador de Sloth.
+  Fish Audio era hasta el 30 de noviembre de 2026. Los créditos de las voces de VyMotion los da el creador de VyMotion.
 - **Una voz que no existe:** `voces` dice las que hay. Usa la más parecida del mismo proveedor y díselo.
 
 Si el usuario eligió una voz, no la generes de otra forma (edge-tts, otro proveedor): o sale de donde eligió o la

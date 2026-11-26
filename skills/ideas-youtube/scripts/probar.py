@@ -4,7 +4,7 @@ vistas y el más visto. Sirve para elegir las palabras con que el público pide 
 
     python probar.py "crear videos con ia" "editar videos con ia" "automatizar videos con ia"
 
-Usa el yt-dlp del Python de Sloth, siempre con -E -s -B -X utf8 (sin -B reescribe sus .pyc y la app de YouTube vuelve
+Usa el yt-dlp del Python de VyMotion, siempre con -E -s -B -X utf8 (sin -B reescribe sus .pyc y la app de YouTube vuelve
 a bajar 4 GB). Si no lo encuentra, el yt-dlp del Python con que se corre este script.
 """
 
@@ -22,7 +22,7 @@ LARGO = 240  # 4 minutos: lo de menos son shorts
 
 def python_ytdlp() -> list[str]:
     raiz = Path(os.environ.get("APPDATA", "")) / "youtube" / "piezas" / "python"
-    # El mismo que elige Sloth (`elegirPython` en server/requisitos.ts): el suyo (`*-sloth`) y, entre iguales, el más nuevo.
+    # El mismo que elige VyMotion (`elegirPython` en server/requisitos.ts): el suyo (`*-sloth`) y, entre iguales, el más nuevo.
     sloth = sorted(raiz.glob("*/python/python.exe"), key=lambda p: (p.relative_to(raiz).parts[0].endswith("-sloth"), p.stat().st_mtime))
     if sloth:
         return [str(sloth[-1]), "-E", "-s", "-B", "-X", "utf8"]

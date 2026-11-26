@@ -1,15 +1,15 @@
 /**
- * El cobro de Sloth: el apoyo mensual o anual con PayPal, las cuentas gratis y la clave que revisa la app
- * (`server/licencia.ts`). Sloth es gratis: el apoyo es opcional y quita el recordatorio de la app. La página
+ * El cobro de VyMotion: el apoyo mensual o anual con PayPal, las cuentas gratis y la clave que revisa la app
+ * (`server/licencia.ts`). VyMotion es gratis: el apoyo es opcional y quita el recordatorio de la app. La página
  * (sloth.vancci.org) suscribe desde el navegador (`POST /suscribir`, que da el enlace de pago de PayPal) y,
  * pagada, `/gracias` enseña la clave y el instalador; la clave llega también por correo. La
  * app crea una cuenta gratis con su `equipo` (`plan: 'gratis'`, que da una de plan `cuenta`) para entrar a la comunidad;
  * su clave solo llega por correo (`unirse`).
- * Al abrir y cada pocas horas, Sloth pregunta cómo va su clave (`POST /licencia`). La respuesta va firmada con `FIRMA`
- * (Ed25519): Sloth la guarda y, sin internet, vale hasta su `hasta` sin que se pueda alargar a mano.
+ * Al abrir y cada pocas horas, VyMotion pregunta cómo va su clave (`POST /licencia`). La respuesta va firmada con `FIRMA`
+ * (Ed25519): VyMotion la guarda y, sin internet, vale hasta su `hasta` sin que se pueda alargar a mano.
  *
  * PayPal manda: cada aviso (`POST /webhook/paypal`) y cada revisión vuelven a leer la suscripción o la orden de su API,
- * así que un aviso perdido o repetido solo cambia cuándo se entera Sloth. En D1, `licencias` (una por suscripción o
+ * así que un aviso perdido o repetido solo cambia cuándo se entera VyMotion. En D1, `licencias` (una por suscripción o
  * lugar gratis) y `equipos` (las computadoras de cada clave, `EQUIPOS` como mucho). El mensual es una suscripción
  * (`paypal`) a un plan de su monto, que se crea la primera vez (`paypal_ids`).
  *
@@ -43,10 +43,8 @@
  * con su primer pago, la página ofrece el precio de Fundador aunque los lugares estén ocupados. Cada suscripción conserva el monto y la moneda con que se creó: las de antes
  * del 30 de octubre de 2026 siguen en pesos; las nuevas, en `MONEDA`. Desde el 13 de noviembre de 2026 el apoyo es uno
  * solo, de $10 (199 MXN), que es también el de Fundador: las de más bajaron a $10 y lo pagado de más se les dio como
- * tiempo (`bajar-apoyo.ts`). Desde el 18 de noviembre de 2026 ese precio es una escalera (`escalera.ts`): sube
- * `PRECIO_SUBE` por cada `PRECIO_CADA` personas que apoyan, y a quien entra con el precio del día le baja lo mismo cada
- * mes hasta `PRECIO_MENSUAL`, que sigue siendo el de Fundador y el que cuenta en `apoyan`.
- * Cuando Sloth se vendía, las primeras personas se unieron gratis de por vida (plan `gratis`, `GRATIS` como mucho): son
+ * tiempo (`bajar-apoyo.ts`).
+ * Cuando VyMotion se vendía, las primeras personas se unieron gratis de por vida (plan `gratis`, `GRATIS` como mucho): son
  * fundadoras como las primeras que apoyan (`esFundador`), con lo nuevo `ANTICIPO` antes y sin el recordatorio. Ya no se
  * dan.
  *
@@ -66,27 +64,15 @@
  * automático: se aceptan sus términos y el pago único.
  *
  * Y la comunidad (`/comunidad/*`, en `comunidad.ts`), de quien tiene una licencia activa, y la voz de Voices Cloning
- * (`/voz/*`, en `voz.ts`), que guarda aquí la llave del socio. Y la copia de cada Sloth, para traerla a otra computadora
- * con la misma clave (`/respaldo*`, en `respaldo.ts`).
+ * (`/voz/*`, en `voz.ts`), que guarda aquí la llave del socio.
  */
 import type { VersionLiberable } from '../../shared/types.ts'
-import { actualizarCelular } from './actualizar-celular.ts'
-import { celular } from './celular.ts'
-import { aLaVista, comunidad, creditos, olvidarSueltos } from './comunidad.ts'
-import { guardado } from './guardado.ts'
+import { comunidad, creditos, olvidarSueltos } from './comunidad.ts'
 import { cancelarStripe, firmaDeStripe, leerStripe, modoStripe, pagoDeSesion, sesion, sesionStripe, suscripcionStripe, type PagoStripe, type SesionStripe } from './stripe.ts'
 import { olvidarRegistroVoz, voz } from './voz.ts'
-import { dictado, olvidarDictado } from './dictado.ts'
 import { entregarRifas } from './rifa.ts'
 import { APERTURA_VOZ } from './voz-mensual.ts'
-import { avisoCorreo } from './aviso-correo.ts'
 import { bajarApoyo, reanudarPausadas } from './bajar-apoyo.ts'
-import { bajarCadaMes, comoBaja, comoSigue, pasoEn, precioDe, siVuelves, tuPrecioSeQueda } from './escalera.ts'
-import { olvidarRespaldos, respaldo } from './respaldo.ts'
-import { escapar, htmlDeCorreo } from './plantilla-correo.ts'
-import { LOGO_PNG } from './logo-correo.ts'
-import { HOST_ENTRADA, olvidarWeb, web } from './web.ts'
-import { youtube } from './youtube.ts'
 
 export interface Env {
   DB: D1Database
@@ -120,18 +106,10 @@ export interface Env {
   NOWPAYMENTS_IPN_SECRET?: string
   /** La llave privada Ed25519 en PKCS8 y base64. */
   FIRMA: string
-  /** La app de Google de Sloth para YouTube (`src/youtube.ts`), solo para quien apoya. Sin las dos, no se ofrece. */
-  YOUTUBE_CLIENT_ID?: string
-  YOUTUBE_CLIENT_SECRET?: string
   /** La dirección de este Worker, para la página a la que vuelve el cliente tras pagar. */
   ORIGEN: string
-  /** El apoyo de cada mes con menos de `PRECIO_CADA` personas, y hasta donde le baja a cada quien (`escalera.ts`). */
   PRECIO_MENSUAL: number
   PRECIO_ANUAL: number
-  /** La escalera: cuánto sube el apoyo por cada `PRECIO_CADA` personas que apoyan, y cuánto le baja a cada quien cada mes. Sin ellos, no hay. */
-  PRECIO_SUBE?: number
-  PRECIO_SUBE_MXN?: number
-  PRECIO_CADA?: number
   /** Lo menos que se apoya con el monto que elija cada quien, al mes o de una vez. */
   APOYO_MINIMO: number
   /** Desde cuánto al mes es un apoyo grande: su insignia en la comunidad. */
@@ -147,14 +125,14 @@ export interface Env {
   APOYO_MINIMO_CRIPTO: number
   /** Con `"1"`, no se abren apoyos nuevos con PayPal (la página lo esconde): mientras PayPal revisa la cuenta. Los de antes siguen. */
   SIN_PAYPAL?: string
-  /** Los lugares gratis de por vida que se dieron cuando Sloth se vendía: ya no se dan. */
+  /** Los lugares gratis de por vida que se dieron cuando VyMotion se vendía: ya no se dan. */
   GRATIS: number
   /** Las primeras personas que apoyan, fundadoras (hasta `FUNDADORES_HASTA` si se pone, una fecha ISO). */
   FUNDADORES: number
   FUNDADORES_HASTA?: string
   /** Para los correos (avisos de cobro y folios). Sin ella, no se mandan: se anotan en el registro. */
   RESEND_API_KEY?: string
-  /** De quién salen (`Sloth <avisos@vancci.org>`, dominio verificado en Resend) y adónde se responden. */
+  /** De quién salen (`VyMotion <avisos@vancci.org>`, dominio verificado en Resend) y adónde se responden. */
   CORREO_DE: string
   CORREO_RESPUESTA: string
   /**
@@ -167,22 +145,10 @@ export interface Env {
   VOZ_CREDITOS?: number
   /** Con `"1"`, las voces de Voices Cloning son solo del creador, aunque alguien más tenga créditos. */
   VOZ_SOLO_CREADOR?: string
-  /** Con `"1"`, la app del celular solo abre a quien apoya hoy (`celular.ts`). */
-  CELULAR_SOLO_APOYO?: string
-  /**
-   * Las llaves de Deepgram de Sloth para el dictado de quien apoya (`dictado.ts`): `DEEPGRAM_API_KEY` y, si hay más,
-   * `DEEPGRAM_API_KEY_2`, `_3`…, que se usan en orden y se saltan al acabarse. Sin ninguna, no se ofrece.
-   */
-  DEEPGRAM_API_KEY?: string
-  [llave: `DEEPGRAM_API_KEY_${number}`]: string | undefined
-  /** Los minutos que dicta cada quien al día con esas llaves; 30 si no se pone. */
-  DICTADO_MINUTOS?: number
-  /** Con menos saldo que esto (en dólares), una llave se salta; 0.05 si no se pone. */
-  DICTADO_SALDO_MINIMO?: number
 }
 
 /**
- * `unico`: un apoyo de una vez, que vale un mes; `gratis`: un lugar gratis de por vida, de cuando Sloth se vendía;
+ * `unico`: un apoyo de una vez, que vale un mes; `gratis`: un lugar gratis de por vida, de cuando VyMotion se vendía;
  * `cuenta`: una cuenta gratis, sin apoyo.
  */
 type Plan = 'mensual' | 'anual' | 'unico' | 'gratis' | 'cuenta'
@@ -237,10 +203,6 @@ export interface Fila {
   /** La suscripción de PayPal o Mercado Pago que se pausó para no cobrar antes de `extra_hasta`: el cron la reanuda ese día. */
   reanudar?: string | null
   extra_avisado?: string | null
-  /** Hasta dónde baja su cobro de cada mes, en su moneda (`escalera.ts`); vacío, no baja. */
-  piso?: number | null
-  /** El `pagado_hasta` del mes con que ya bajó: una vez por cada mes pagado. */
-  bajado?: string | null
 }
 
 /** Lo que el cobro guarda de una suscripción o de los pagos del año. `hasta`: su próximo cobro o su fin, si se sabe. */
@@ -269,9 +231,6 @@ type Tarifas = Pick<
   | 'FUNDADORES_HASTA'
   | 'PRECIO_MENSUAL'
   | 'PRECIO_ANUAL'
-  | 'PRECIO_SUBE'
-  | 'PRECIO_SUBE_MXN'
-  | 'PRECIO_CADA'
   | 'APOYO_MINIMO'
   | 'APOYO_GRANDE'
   | 'MONEDA'
@@ -282,12 +241,7 @@ type Tarifas = Pick<
 >
 /** Lo que cuesta el apoyo en una moneda: el sugerido al mes y al año, y de cuánto a cuánto se elige. */
 export interface Precios {
-  /** El apoyo de hoy, con las personas que apoyan: lo que paga el primer mes quien entra. */
   mensual: number
-  /** Hasta dónde le baja, y lo que cuesta con menos de `cada` personas. */
-  base: number
-  /** Cuánto sube por cada `cada` personas y cuánto baja cada mes; 0 sin escalera. */
-  paso: number
   anual: number
   minimo: number
   grande: number
@@ -387,7 +341,7 @@ const COBRO_PAYPAL: Record<string, string> = {
   FAILED: 'rejected'
 }
 const DIA = 24 * 3600_000
-/** Sin internet, Sloth sigue abierta hasta una semana desde la última respuesta. */
+/** Sin internet, VyMotion sigue abierta hasta una semana desde la última respuesta. */
 const SIN_CONEXION = 7 * DIA
 /** Cada cuánto se vuelve a leer de PayPal (o de Mercado Pago) una suscripción al revisarla; pendiente, casi siempre (esperan el pago). */
 const REVISAR = 6 * 3600_000
@@ -470,36 +424,6 @@ export function esFundador(t: string) {
   return `((${t}.fundador = 1 AND ${t}.autorizada IS NOT NULL AND julianday(${t}.pagado_hasta) > julianday('now')) OR (${t}.plan = 'gratis' AND ${t}.estado = 'gratis'))`
 }
 
-/**
- * Si un correo apoya hoy, como lo ve la comunidad (la insignia de `comunidad.ts`, que abre la tienda de estilos): un
- * apoyo suyo pagado y sin vencer, o su lugar gratis de por vida. Va firmado en su licencia (`firmada`).
- */
-export async function apoyaHoy(env: Env, email: string): Promise<boolean> {
-  return !!(await env.DB.prepare(
-    `SELECT 1 FROM licencias l WHERE l.email = ? AND l.plan IN ('mensual', 'anual', 'unico', 'gratis') AND l.modo = 'produccion'
-     AND (${esFundador('l')} OR julianday(l.pagado_hasta) > julianday('now')) LIMIT 1`
-  )
-    .bind(email)
-    .first())
-}
-
-/**
- * Si el correo tiene una suscripción de PayPal que llegó a pagarse, y hasta cuándo vale lo que pagó por ahí. Sloth ya
- * no acepta pagos por PayPal (la cuenta sigue en revisión desde el 5 de noviembre de 2026): la app le pide, en grande,
- * que la cancele en su PayPal (`web/src/AvisoPaypal.tsx`), y lo enseña como apoyo, no como «Cancelado». No a quien ya
- * apoya cada mes con otra pasarela ni a quien pagó una sola vez con PayPal, que no tiene nada que cancelar.
- */
-export async function cancelarPaypal(env: Env, email: string): Promise<{ hasta?: string } | undefined> {
-  const f = await env.DB.prepare(
-    `SELECT MAX(pagado_hasta) AS hasta FROM licencias l WHERE l.email = ? AND l.paypal IS NOT NULL AND l.autorizada IS NOT NULL AND l.modo = 'produccion'
-     AND NOT EXISTS (SELECT 1 FROM licencias o WHERE o.email = l.email AND o.paypal IS NULL AND o.estado = 'authorized' AND o.modo = 'produccion')
-     HAVING COUNT(*) > 0`
-  )
-    .bind(email)
-    .first<{ hasta: string | null }>()
-  return f ? { hasta: f.hasta ?? undefined } : undefined
-}
-
 /** Un enlace de invitación de Fundador que sigue en pie (`enlaces_fundador`): sin revocar y sin que nadie haya pagado con él. */
 async function enlaceFundador(env: Env, codigo: unknown): Promise<boolean> {
   if (typeof codigo !== 'string' || !/^[A-Za-z0-9]{8,32}$/.test(codigo)) return false
@@ -507,10 +431,10 @@ async function enlaceFundador(env: Env, codigo: unknown): Promise<boolean> {
 }
 /** Se avisa del cobro cuando faltan esto o menos días: el cron corre cada mañana, así que el aviso llega con 6 o 7. */
 const AVISO = 7 * DIA
-/** Lo que la página de Sloth llama desde el navegador. */
+/** Lo que la página de VyMotion llama desde el navegador. */
 const PUBLICAS = new Set(['/precio', '/version', '/suscribir', '/creditos'])
 /** Quién vende, al pie de cada correo (art. 76 Bis III de la LFPC): su nombre, domicilio y contacto están en los términos de la página, no aquí. */
-const PROVEEDOR = 'Sloth, de Vancci · Quién vende, su domicilio y su contacto: https://sloth.vancci.org/terminos'
+const PROVEEDOR = 'VyMotion, de Vancci · Quién vende, su domicilio y su contacto: https://sloth.vancci.org/terminos'
 
 /** `ultima.json` en `DESCARGAS`. */
 interface Ultima {
@@ -531,25 +455,17 @@ const abreALaPrimera = (u: Ultima) => !!u.firmada && !u.sinTicket
 
 export class Rechazo extends Error {
   status: number
-  /** Lo que dijo la pasarela: para decidir en el código, nunca para el cliente (puede traer pedazos de una llave). */
-  detalle?: string
-  constructor(status: number, mensaje: string, detalle?: string) {
+  constructor(status: number, mensaje: string) {
     super(mensaje)
     this.status = status
-    this.detalle = detalle
   }
 }
 
 export default {
   async fetch(req: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(req.url)
-    // La entrada de Sloth en la web tiene su propio dominio, donde no vive nada más (src/web.ts).
-    if (url.hostname === HOST_ENTRADA) {
-      url.pathname = `/web${url.pathname === '/' ? '' : url.pathname}`
-      return web(req, env, url).catch((e) => (e instanceof Rechazo ? json({ error: e.message }, e.status) : json({ error: 'Algo falló. Intenta otra vez en un momento.' }, 500)))
-    }
     if (!PUBLICAS.has(url.pathname)) return atender(req, env, ctx, url)
-    // La página de Sloth (sloth.vancci.org) enseña el precio y la versión, y suscribe: también sus errores se leen.
+    // La página de VyMotion (sloth.vancci.org) enseña el precio y la versión, y suscribe: también sus errores se leen.
     const r =
       req.method === 'OPTIONS'
         ? new Response(null, { status: 204, headers: { 'access-control-allow-methods': 'GET, POST', 'access-control-allow-headers': 'content-type', 'access-control-max-age': '86400' } })
@@ -569,10 +485,7 @@ export default {
     ctx.waitUntil(avisarCobros(env).catch((e) => console.error('Avisos de cobro', e instanceof Error ? e.message : e)))
     ctx.waitUntil(env.DB.prepare('DELETE FROM cupos WHERE creado < ?').bind(new Date(Date.now() - 2 * DIA).toISOString()).run())
     ctx.waitUntil(olvidarRegistroVoz(env).catch((e) => console.error('Registro de la voz', e instanceof Error ? e.message : e)))
-    ctx.waitUntil(olvidarDictado(env).catch((e) => console.error('Uso del dictado', e instanceof Error ? e.message : e)))
     ctx.waitUntil(olvidarSueltos(env).catch((e) => console.error('Archivos sueltos de la comunidad', e instanceof Error ? e.message : e)))
-    ctx.waitUntil(olvidarRespaldos(env).catch((e) => console.error('Copias que nadie renueva', e instanceof Error ? e.message : e)))
-    ctx.waitUntil(olvidarWeb(env).catch((e) => console.error('Sloth en la web', e instanceof Error ? e.message : e)))
   }
 } satisfies ExportedHandler<Env>
 
@@ -581,11 +494,6 @@ async function atender(req: Request, env: Env, ctx: ExecutionContext, url: URL):
     if (req.method === 'GET' && url.pathname === '/precio') return json(await precios(env, url.searchParams.get('fundador') ?? undefined))
     // Los Fundadores que pidieron salir en los créditos de la página.
     if (req.method === 'GET' && url.pathname === '/creditos') return json({ fundadores: await creditos(env) })
-    // El logo de los correos (`plantilla-correo.ts`).
-    if (req.method === 'GET' && url.pathname === '/correo/sloth.png')
-      return new Response(Uint8Array.from(atob(LOGO_PNG), (c) => c.charCodeAt(0)), {
-        headers: { 'content-type': 'image/png', 'cache-control': 'public, max-age=31536000, immutable' }
-      })
     if (req.method === 'GET' && url.pathname === '/version') return json(await ultimaPara(req, env, sistema(url.searchParams.get('so'))))
     if (req.method === 'GET' && url.pathname === '/ultima') return await ultimaLigera(req, env, ctx, sistema(url.searchParams.get('so')))
     if ((req.method === 'GET' || req.method === 'HEAD') && url.pathname === '/descargar') {
@@ -614,21 +522,14 @@ async function atender(req: Request, env: Env, ctx: ExecutionContext, url: URL):
     if (req.method === 'POST' && url.pathname === '/pago') return await pago(env, await cuerpo(req))
     if (req.method === 'POST' && url.pathname === '/a-mano') return await aMano(req, env)
     if (req.method === 'POST' && url.pathname === '/bajar-apoyo') return await bajarApoyo(req, env)
-    if (req.method === 'POST' && url.pathname === '/aviso-correo') return await avisoCorreo(req, env)
-    if (req.method === 'POST' && url.pathname === '/celular') return await celular(req, env, await cuerpo(req))
-    if (url.pathname.startsWith('/celular/')) return await actualizarCelular(req, env, url)
     if (url.pathname === '/comunidad' || url.pathname.startsWith('/comunidad/')) return await comunidad(req, env, url, ctx)
     if (url.pathname === '/voz' || url.pathname.startsWith('/voz/')) return await voz(req, env, ctx, url)
-    if (url.pathname === '/dictado' || url.pathname.startsWith('/dictado/')) return await dictado(req, env, ctx, url)
-    if (url.pathname === '/respaldo' || url.pathname.startsWith('/respaldo/')) return await respaldo(req, env, url)
-    if (url.pathname === '/youtube' || url.pathname.startsWith('/youtube/')) return await youtube(req, env, url)
-    if (url.pathname === '/web' || url.pathname.startsWith('/web/')) return await web(req, env, url)
     return json({ error: 'No existe' }, 404)
   } catch (error) {
     if (error instanceof Rechazo) return json({ error: error.message }, error.status)
     console.error(url.pathname, error instanceof Error ? error.message : error)
     if ((url.pathname === '/comunidad' || url.pathname.startsWith('/comunidad/')) && esTopeDeD1(error)) return json({ error: comunidadCaida() }, 503)
-    return json({ error: 'Algo falló en el cobro de Sloth. Intenta otra vez en un momento.' }, 500)
+    return json({ error: 'Algo falló en el cobro de VyMotion. Intenta otra vez en un momento.' }, 500)
   }
 }
 
@@ -645,7 +546,7 @@ const WHATSAPP = 'https://chat.whatsapp.com/KXzXmw8yPLYKlTJHGuVSXd'
 
 async function ultima(env: Env, so: Sistema = 'windows'): Promise<Ultima> {
   const u = await env.DESCARGAS.get(ULTIMAS[so])
-  if (!u) throw new Rechazo(404, so === 'windows' ? 'Todavía no hay una versión de Sloth para descargar.' : `Todavía no hay una versión de Sloth para ${NOMBRES[so]}.`)
+  if (!u) throw new Rechazo(404, so === 'windows' ? 'Todavía no hay una versión de VyMotion para descargar.' : `Todavía no hay una versión de VyMotion para ${NOMBRES[so]}.`)
   return u.json<Ultima>()
 }
 
@@ -701,7 +602,7 @@ async function ultimaLigera(req: Request, env: Env, ctx: ExecutionContext, so: S
  * por el correo, como la insignia de la comunidad: quien apoyó desde la tienda de estilos sigue con la clave de su cuenta
  * gratis, y con solo mirar el plan de esa clave no recibía lo nuevo antes.
  */
-export async function apoya(req: Request, env: Env): Promise<boolean> {
+async function apoya(req: Request, env: Env): Promise<boolean> {
   const clave = (req.headers.get('x-sloth-clave') ?? '').replace(/\s+/g, '').toUpperCase()
   const equipo = req.headers.get('x-sloth-equipo') ?? ''
   if (!CLAVE.test(clave) || !EQUIPO.test(equipo)) return false
@@ -743,10 +644,7 @@ async function anteriorDe(env: Env, so: Sistema): Promise<Ultima | undefined> {
  * última no: con el número de `/ultima`, que es público, cualquiera armaría su nombre.
  */
 async function actualizaciones(req: Request, env: Env, url: URL): Promise<Response> {
-  let archivo = ''
-  try {
-    archivo = decodeURIComponent(url.pathname.slice('/actualizaciones/'.length))
-  } catch {}
+  const archivo = decodeURIComponent(url.pathname.slice('/actualizaciones/'.length))
   if (!publicable(archivo)) throw new Rechazo(404, 'No existe')
   const yml = AL_DIA.test(archivo)
   let llave = archivo
@@ -799,7 +697,7 @@ export function rangoDe(cabecera: string | null, bytes: number): { offset: numbe
 async function publicar(req: Request, env: Env, url: URL): Promise<Response> {
   if (!conLlave(req, env)) throw new Rechazo(401, 'No autorizado.')
   const archivo = url.searchParams.get('archivo') ?? ''
-  if (!publicable(archivo)) throw new Rechazo(400, 'El archivo debe ser un instalador de Sloth (.exe, .dmg, .zip de Mac o .AppImage), su .blockmap o latest.yml.')
+  if (!publicable(archivo)) throw new Rechazo(400, 'El archivo debe ser un instalador de VyMotion (.exe, .dmg, .zip de Mac o .AppImage), su .blockmap o latest.yml.')
   if (req.method === 'POST' && url.pathname === '/publicar/inicio')
     return json({ upload: (await env.DESCARGAS.createMultipartUpload(archivo, { httpMetadata: { contentType: 'application/octet-stream' } })).uploadId })
   const subida = env.DESCARGAS.resumeMultipartUpload(archivo, url.searchParams.get('upload') ?? '')
@@ -854,32 +752,29 @@ async function publicar(req: Request, env: Env, url: URL): Promise<Response> {
  * El precio de hoy. Las suscripciones de prueba y las cuentas gratis no cuentan: solo las pagadas de verdad y los lugares
  * gratis de por vida. `quedan`: los lugares públicos de Fundador libres. Con un enlace de Fundador en pie (`codigo`),
  * `fundador`: la página ofrece ese apoyo. `apoyan`: quienes tienen pagado y sin vencer el precio de Fundador o más, cada
- * mes o una vez. Contarlos recorre `licencias` entera: la página los lee guardados (`guardado.ts`); al apoyar (`alDia`),
- * que es cuando se decide quién es Fundador, se cuentan en el momento.
+ * mes o una vez.
  */
-async function precios(env: Env, codigo?: unknown, alDia = false) {
-  const contar = () =>
-    env.DB.prepare(
-      `SELECT COUNT(CASE WHEN ${esFundador('licencias')} THEN 1 END) AS fundadores,
-              COUNT(CASE WHEN julianday(pagado_hasta) > julianday('now') AND ((moneda = ? AND monto >= ?) OR (moneda = 'MXN' AND monto >= ?)) THEN 1 END) AS apoyan
-       FROM licencias WHERE plan IN ('mensual', 'anual', 'unico') AND modo = 'produccion'`
-    )
-      .bind(env.MONEDA, Number(env.PRECIO_MENSUAL), Number(env.PRECIO_MENSUAL_MXN))
-      .first<Cuenta>()
-  const c = alDia ? await contar() : await guardado(env, 'precio', contar)
+async function precios(env: Env, codigo?: unknown) {
+  const c = await env.DB.prepare(
+    `SELECT COUNT(CASE WHEN ${esFundador('licencias')} THEN 1 END) AS fundadores,
+            COUNT(CASE WHEN julianday(pagado_hasta) > julianday('now') AND ((moneda = ? AND monto >= ?) OR (moneda = 'MXN' AND monto >= ?)) THEN 1 END) AS apoyan
+     FROM licencias WHERE plan IN ('mensual', 'anual', 'unico') AND modo = 'produccion'`
+  )
+    .bind(env.MONEDA, Number(env.PRECIO_MENSUAL), Number(env.PRECIO_MENSUAL_MXN))
+    .first<Cuenta>()
   // Mercado Pago solo se ofrece con su token del modo de hoy.
   const conMp = !!(env.MP_MODO === 'produccion' ? env.MP_ACCESS_TOKEN_PRODUCCION : env.MP_ACCESS_TOKEN)
   // Cripto, con la llave y la clave de los avisos de NOWPayments; cobra los mismos precios, en `MONEDA`, pero el monto
   // elegido va desde `APOYO_MINIMO_CRIPTO`.
   const conCripto = !!(env.NOWPAYMENTS_API_KEY && env.NOWPAYMENTS_IPN_SECRET)
   const t = tarifa(c ?? { fundadores: 0, apoyan: 0 }, env, conMp)
-  const cripto: Precios = { mensual: t.mensual, base: t.base, paso: t.paso, anual: t.anual, minimo: Number(env.APOYO_MINIMO_CRIPTO), grande: t.grande, maximo: t.maximo, moneda: t.moneda }
+  const cripto: Precios = { mensual: t.mensual, anual: t.anual, minimo: Number(env.APOYO_MINIMO_CRIPTO), grande: t.grande, maximo: t.maximo, moneda: t.moneda }
   const fundador = codigo !== undefined && (await enlaceFundador(env, codigo))
   // La tarjeta, con Stripe y la clave de sus avisos, a los mismos precios en `MONEDA`.
   const conTarjeta = !!(env.STRIPE_SECRET_KEY && env.STRIPE_WEBHOOK_SECRET)
-  // Cuántos estilos tiene la tienda de la comunidad (los que ven todos, como `sinApoyo` en `tienda.ts`), para que la página
+  // Cuántos estilos tiene la tienda de la comunidad (los aprobados, como `cerrada` en `tienda.ts`), para que la página
   // diga «Más de N estilos». Si la consulta falla, no va: el precio no depende de ella.
-  const estilos = await env.DB.prepare(`SELECT COUNT(*) AS n FROM publicaciones WHERE categoria = 'estilos' AND ${aLaVista()}`)
+  const estilos = await env.DB.prepare("SELECT COUNT(*) AS n FROM publicaciones WHERE categoria = 'estilos' AND aprobada = 1")
     .first<{ n: number }>()
     .then((f) => f?.n ?? 0, () => 0)
   return {
@@ -892,27 +787,15 @@ async function precios(env: Env, codigo?: unknown, alDia = false) {
   }
 }
 
-/** Lo que paga hoy el primer mes quien entra, en la moneda que se pida: `undefined` sin escalera o si no se pudo contar. */
-async function apoyoDeHoy(env: Env): Promise<(moneda: string) => number | undefined> {
-  const t = await precios(env).catch(() => undefined)
-  return (moneda) => (!t?.paso ? undefined : moneda === 'MXN' ? t.mxn?.mensual : moneda === t.moneda ? t.mensual : undefined)
-}
-
 /**
  * El precio sugerido, el mismo para todos, y desde cuánto se apoya con el monto que elija cada quien (`minimo`) o es un
  * apoyo grande (`grande`), en `MONEDA` (con PayPal) y, con `conMp`, en pesos (`mxn`, con Mercado Pago). `quedan`: los
- * lugares de fundador que quedan; `apoyan`, para las metas del roadmap y para la escalera (`escalera.ts`): `mensual` es
- * `base` más `paso` por cada `cada` personas que apoyan.
+ * lugares de fundador que quedan; `apoyan`, para las metas del roadmap.
  */
 export function tarifa(c: Cuenta, env: Tarifas, conMp = false, ahora = Date.now()) {
   const abierto = !env.FUNDADORES_HASTA || ahora < Date.parse(env.FUNDADORES_HASTA)
-  const cada = Number(env.PRECIO_CADA) || 0
-  const escalera = (base: number, sube: unknown) => {
-    const paso = (cada && Number(sube)) || 0
-    return { mensual: precioDe(base, paso, cada, c.apoyan), base, paso }
-  }
   const mxn: Precios = {
-    ...escalera(Number(env.PRECIO_MENSUAL_MXN), env.PRECIO_SUBE_MXN),
+    mensual: Number(env.PRECIO_MENSUAL_MXN),
     anual: Number(env.PRECIO_ANUAL_MXN),
     minimo: Number(env.APOYO_MINIMO_MXN),
     grande: Number(env.APOYO_GRANDE_MXN),
@@ -921,23 +804,20 @@ export function tarifa(c: Cuenta, env: Tarifas, conMp = false, ahora = Date.now(
   }
   return {
     quedan: abierto ? Math.max(0, Number(env.FUNDADORES) - c.fundadores) : 0,
-    ...escalera(Number(env.PRECIO_MENSUAL), env.PRECIO_SUBE),
+    mensual: Number(env.PRECIO_MENSUAL),
     anual: Number(env.PRECIO_ANUAL),
     minimo: Number(env.APOYO_MINIMO),
     grande: Number(env.APOYO_GRANDE),
     maximo: APOYO_MAXIMO[env.MONEDA] ?? APOYO_MAXIMO.USD,
     moneda: env.MONEDA,
     ...(conMp && mxn.mensual ? { mxn } : {}),
-    cada,
     apoyan: c.apoyan
   }
 }
 
 /**
- * Cuánto se cobra: el anual, su precio; el mensual, el de hoy si no se elige otro; el de una vez, el que se elija.
- * El elegido va en enteros de su moneda, de `minimo` a `maximo`: cada monto mensual de PayPal es un plan. Sin monto lo
- * pide la app de antes de la escalera (su tienda dice «$10 USD al mes»): también paga el de hoy, por decisión del
- * creador, y el monto y cómo baja los ve en la página de pago de Stripe antes de pagar.
+ * Cuánto se cobra: el anual, su precio; el mensual, el sugerido si no se elige otro; el de una vez, el que se elija.
+ * El elegido va en enteros de su moneda, de `minimo` a `maximo`: cada monto mensual de PayPal es un plan.
  */
 export function montoDe(plan: 'mensual' | 'anual' | 'unico', elegido: unknown, p: Pick<Precios, 'mensual' | 'anual' | 'minimo' | 'maximo' | 'moneda'>): number {
   if (plan === 'anual') return p.anual
@@ -960,7 +840,7 @@ async function suscribir(env: Env, c: Record<string, unknown>, desde: string): P
   if (!EMAIL.test(email) || email.length > 254) throw new Rechazo(400, 'Escribe un correo válido.')
   const plan: Plan = c.plan === 'gratis' ? 'gratis' : c.plan === 'anual' ? 'anual' : c.plan === 'unico' ? 'unico' : 'mensual'
   if (plan !== 'gratis' && c.equipo !== undefined)
-    throw new Rechazo(409, 'Para apoyar, entra a sloth.vancci.org: tu clave te llega por correo al confirmarse el pago. Luego escríbela en Opciones de Sloth, en «Ya apoyo».')
+    throw new Rechazo(409, 'Para apoyar, entra a sloth.vancci.org: tu clave te llega por correo al confirmarse el pago. Luego escríbela en Opciones de VyMotion, en «Ya apoyo».')
   const equipo = plan === 'gratis' ? equipoDe(c) : undefined
   // Con Mercado Pago, en pesos; con PayPal o con cripto, en `MONEDA`. La app de antes no manda `pasarela`: PayPal.
   const pasa: Pasarela = c.pasarela === 'mercadopago' || c.pasarela === 'tarjeta' || c.pasarela === 'cripto' ? c.pasarela : 'paypal'
@@ -974,7 +854,7 @@ async function suscribir(env: Env, c: Record<string, unknown>, desde: string): P
     )
   const acepto = new Date().toISOString()
   if (plan === 'gratis') return unirse(env, email, equipo!, acepto, terminos, desde, c.porCorreo === true)
-  const t = await precios(env, c.fundador, true)
+  const t = await precios(env, c.fundador)
   if (pasa === 'paypal' && t.sinPaypal) throw new Rechazo(400, 'Por ahora no se puede pagar con PayPal: elige tarjeta, Mercado Pago o cripto.')
   if ((pasa === 'mercadopago' && !t.mxn) || (pasa === 'tarjeta' && !t.tarjeta) || (pasa === 'cripto' && !t.cripto)) throw new Rechazo(400, 'Por ahora no se puede pagar así: elige otra forma de pago.')
   // La página de la tarjeta de Mercado Pago (`/pagar`, hasta el 6 de noviembre de 2026) mandaba el monto en pesos y su
@@ -1000,16 +880,10 @@ async function suscribir(env: Env, c: Record<string, unknown>, desde: string): P
   // Cada intento abre un pago en la pasarela y una fila: pocos al día por conexión, que nadie llene D1 ni alarme a la pasarela.
   if (!(await cupo(env, desde, 'pago', PAGOS_AL_DIA))) throw new Rechazo(429, 'Desde esta conexión ya se abrieron muchos pagos hoy. Prueba mañana, o escríbenos.')
 
-  // Fundador, cada mes o una vez, con el precio de Fundador de su moneda (`base`) o más: con un enlace de Fundador que
-  // nadie ha usado (aunque no queden lugares; el enlace queda usado con su pago), o en uno de los lugares públicos libres.
-  const conEnlace = !!t.fundador && plan !== 'anual' && monto >= p.base
-  const deFundador = conEnlace || (t.quedan > 0 && plan !== 'anual' && monto >= p.base)
-  // El mensual al precio del día baja cada mes hasta su piso (`escalera.ts`); con cripto, no menos de lo que acepta
-  // NOWPayments. Quien elige otro monto se queda con él. La página y la app dicen cuál es (`sugerido`) con el monto que
-  // enseñaron: si el precio cambió mientras tanto, paga ese y le baja igual, que es lo que aceptó. La página y la app
-  // de antes de la escalera no lo dicen: baja si es el precio de hoy (el que va sin monto).
-  const piso = Math.max(p.base, p.minimo)
-  const baja = plan === 'mensual' && monto > piso && (c.sugerido === true || monto === p.mensual)
+  // Fundador, cada mes o una vez, con el precio de Fundador de su moneda o más: con un enlace de Fundador que nadie ha
+  // usado (aunque no queden lugares; el enlace queda usado con su pago), o en uno de los lugares públicos libres.
+  const conEnlace = !!t.fundador && plan !== 'anual' && monto >= p.mensual
+  const deFundador = conEnlace || (t.quedan > 0 && plan !== 'anual' && monto >= p.mensual)
   const fila: Fila = {
     id: crypto.randomUUID(),
     clave: nuevaClave(),
@@ -1036,11 +910,10 @@ async function suscribir(env: Env, c: Record<string, unknown>, desde: string): P
     paypal: null,
     orden: null,
     cripto: null,
-    stripe: null,
-    piso: baja ? piso : null
+    stripe: null
   }
-  await env.DB.prepare('INSERT INTO licencias (id, clave, email, plan, monto, moneda, fundador, enlace_fundador, estado, creada, acepto, terminos, modo, piso) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
-    .bind(fila.id, fila.clave, email, plan, fila.monto, fila.moneda, fila.fundador, fila.enlace_fundador, fila.estado, fila.creada, acepto, terminos, fila.modo, fila.piso ?? null)
+  await env.DB.prepare('INSERT INTO licencias (id, clave, email, plan, monto, moneda, fundador, enlace_fundador, estado, creada, acepto, terminos, modo) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+    .bind(fila.id, fila.clave, email, plan, fila.monto, fila.moneda, fila.fundador, fila.enlace_fundador, fila.estado, fila.creada, acepto, terminos, fila.modo)
     .run()
   // Dónde se paga y en qué columna queda: la suscripción mensual, o el pago del año o del apoyo de una vez.
   let abierto: { columna: 'orden' | 'paypal' | 'preapproval' | 'preferencia' | 'cripto' | 'stripe'; id: string; enlace: string }
@@ -1065,7 +938,7 @@ async function suscribir(env: Env, c: Record<string, unknown>, desde: string): P
 /** La página de PayPal en español, sin dirección de envío, y de vuelta a `/gracias` al pagar o al salir. */
 function experiencia(env: Env, f: Fila, accion: 'PAY_NOW' | 'SUBSCRIBE_NOW') {
   const vuelta = `${env.ORIGEN}/gracias?s=${f.id}`
-  return { brand_name: 'Sloth', locale: 'es-MX', shipping_preference: 'NO_SHIPPING', user_action: accion, return_url: vuelta, cancel_url: vuelta }
+  return { brand_name: 'VyMotion', locale: 'es-MX', shipping_preference: 'NO_SHIPPING', user_action: accion, return_url: vuelta, cancel_url: vuelta }
 }
 
 /** El enlace `rel` de lo que dio PayPal. */
@@ -1088,7 +961,7 @@ async function suscripcionPaypal(env: Env, f: Fila): Promise<{ id: string; enlac
 
 /** Un año, o un apoyo de una vez: una orden de PayPal con la fila en `custom_id`, que se cobra cuando el cliente la aprueba. */
 async function ordenPaypal(env: Env, f: Fila): Promise<{ id: string; enlace: string }> {
-  const description = f.plan === 'unico' ? 'Sloth - apoyo de una vez' : 'Sloth - plan anual'
+  const description = f.plan === 'unico' ? 'VyMotion - apoyo de una vez' : 'VyMotion - plan anual'
   const o = await paypal<OrdenPaypal>(env, 'POST', '/v2/checkout/orders', {
     intent: 'CAPTURE',
     purchase_units: [{ custom_id: f.id, description, soft_descriptor: 'SLOTH', amount: { currency_code: f.moneda, value: f.monto.toFixed(2) } }],
@@ -1101,7 +974,7 @@ async function ordenPaypal(env: Env, f: Fila): Promise<{ id: string; enlace: str
 async function suscripcionMp(env: Env, f: Fila): Promise<{ id: string; enlace: string }> {
   const p = await mp<Preapproval>(env, 'POST', '/preapproval', {
     // Sin acentos ni «·»: con ellos, Mercado Pago contesta «Parameters passed are invalid».
-    reason: 'Sloth - plan mensual',
+    reason: 'VyMotion - plan mensual',
     external_reference: f.id,
     payer_email: f.email,
     auto_recurring: { frequency: 1, frequency_type: 'months', transaction_amount: f.monto, currency_id: f.moneda },
@@ -1128,7 +1001,7 @@ export function mensualRechazado(mensaje: string): string {
  * en `stripe_pagos`, por cobrar, para contarse cuando se paguen.
  */
 async function pagoStripe(env: Env, f: Fila): Promise<{ id: string; enlace: string }> {
-  const s = await sesionStripe(env, f, comoBaja(env, f))
+  const s = await sesionStripe(env, f)
   if (!s.url) throw new Rechazo(502, 'Stripe no dio el enlace de pago')
   if (f.plan !== 'mensual') await guardarPagoStripe(env, f, pagoDeSesion(s))
   return { id: s.id, enlace: s.url }
@@ -1142,7 +1015,7 @@ async function preferenciaMp(env: Env, f: Fila): Promise<{ id: string; enlace: s
   const vuelta = `${env.ORIGEN}/gracias?s=${f.id}`
   const unico = f.plan === 'unico'
   const p = await mp<{ id: string; init_point: string }>(env, 'POST', '/checkout/preferences', {
-    items: [{ id: unico ? 'sloth-una-vez' : 'sloth-anual', title: unico ? 'Sloth - apoyo de una vez' : 'Sloth - plan anual', quantity: 1, unit_price: f.monto, currency_id: f.moneda }],
+    items: [{ id: unico ? 'sloth-una-vez' : 'sloth-anual', title: unico ? 'VyMotion - apoyo de una vez' : 'VyMotion - plan anual', quantity: 1, unit_price: f.monto, currency_id: f.moneda }],
     payer: { email: f.email },
     external_reference: f.id,
     back_urls: { success: vuelta, pending: vuelta, failure: vuelta },
@@ -1164,7 +1037,7 @@ async function facturaCripto(env: Env, f: Fila): Promise<{ id: string; enlace: s
     price_amount: f.monto,
     price_currency: f.moneda.toLowerCase(),
     order_id: f.id,
-    order_description: { mensual: 'Sloth - un mes de apoyo', anual: 'Sloth - plan anual', unico: 'Sloth - apoyo de una vez' }[f.plan as 'mensual' | 'anual' | 'unico'],
+    order_description: { mensual: 'VyMotion - un mes de apoyo', anual: 'VyMotion - plan anual', unico: 'VyMotion - apoyo de una vez' }[f.plan as 'mensual' | 'anual' | 'unico'],
     ipn_callback_url: `${env.ORIGEN}/webhook/cripto`,
     success_url: vuelta,
     cancel_url: vuelta
@@ -1173,7 +1046,7 @@ async function facturaCripto(env: Env, f: Fila): Promise<{ id: string; enlace: s
   return { id: String(i.id), enlace: i.invoice_url }
 }
 
-/** El plan mensual de PayPal de `monto` en `moneda`, que se crea la primera vez (y el producto «Sloth», también una vez). */
+/** El plan mensual de PayPal de `monto` en `moneda`, que se crea la primera vez (y el producto «VyMotion», también una vez). */
 async function planPaypal(env: Env, monto: number, moneda: string): Promise<string> {
   const llave = `${env.PAYPAL_MODO}:mensual:${moneda}:${monto}`
   const plan = await idPaypal(env, llave)
@@ -1181,10 +1054,10 @@ async function planPaypal(env: Env, monto: number, moneda: string): Promise<stri
   const deProducto = `${env.PAYPAL_MODO}:producto`
   const producto =
     (await idPaypal(env, deProducto)) ??
-    (await guardarIdPaypal(env, deProducto, (await paypal<{ id: string }>(env, 'POST', '/v1/catalogs/products', { name: 'Sloth', type: 'SERVICE', category: 'SOFTWARE' })).id))
+    (await guardarIdPaypal(env, deProducto, (await paypal<{ id: string }>(env, 'POST', '/v1/catalogs/products', { name: 'VyMotion', type: 'SERVICE', category: 'SOFTWARE' })).id))
   const nuevo = await paypal<{ id: string }>(env, 'POST', '/v1/billing/plans', {
     product_id: producto,
-    name: 'Sloth - plan mensual',
+    name: 'VyMotion - plan mensual',
     status: 'ACTIVE',
     billing_cycles: [
       {
@@ -1217,9 +1090,6 @@ async function guardarIdPaypal(env: Env, llave: string, id: string): Promise<str
  * cobrado de la orden que deja de ser la última. Da adónde ir a pagar.
  */
 async function renovar(env: Env, f: Fila): Promise<string> {
-  // Cada vez abre un cobro nuevo en la pasarela: un enlace del correo pedido sin parar (un escáner, o quien lo tenga)
-  // los apilaría, y los de Stripe pendientes se vuelven a leer en cada `refrescar`.
-  if (!(await cupo(env, f.id, 'renovar', 10))) throw new Rechazo(429, 'Ya pediste muchos enlaces para pagar hoy. Usa el último que abriste o intenta mañana.')
   // Con tarjeta, otra sesión de Stripe.
   if (f.stripe) {
     const s = await pagoStripe(env, f)
@@ -1247,7 +1117,7 @@ async function renovar(env: Env, f: Fila): Promise<string> {
 /**
  * Una cuenta gratis, para la comunidad, activa desde ya. Su clave solo va al correo: así cada cuenta es de un correo
  * de verdad, y quien escribe uno ajeno no entra. Pedirla otra vez la vuelve a mandar, pocas veces al día. La misma
- * computadora con el mismo correo (reinstaló Sloth) recupera la suya, y también un lugar gratis de por vida que ya
+ * computadora con el mismo correo (reinstaló VyMotion) recupera la suya, y también un lugar gratis de por vida que ya
  * tuviera: el `equipo` solo no basta, porque cualquier programa de esa computadora lo lee. `desde` (su conexión) pide
  * pocas al día. La app de antes no manda `porCorreo` y espera la clave: se le dice dónde escribirla.
  */
@@ -1260,14 +1130,12 @@ async function unirse(env: Env, email: string, equipo: string, acepto: string, t
     await vigilar(env, email, 'pidió otra cuenta con su correo bloqueado', true)
     throw new Rechazo(403, BLOQUEADA)
   }
-  let clave = (await env.DB.prepare("SELECT clave FROM licencias WHERE email = ? AND plan = 'cuenta' AND estado = 'gratis' LIMIT 1").bind(email).first<{ clave: string }>())?.clave
-  // Antes de los cupos: a quien ya apoya no se le hace cuenta ni se le manda correo, así que insistir no gasta nada y
-  // siempre lee que use su clave (la app le abre dónde escribirla), no que pidió muchas cuentas.
-  if (!clave) await sinOtra(env, email, false)
   if (!(await cupo(env, desde, 'cuenta', CUENTAS_AL_DIA))) throw new Rechazo(429, 'Desde esta conexión ya se pidieron muchas cuentas hoy. Prueba mañana.')
   if (!(await cupo(env, await resumen(`correo:${email}`), 'correo', CORREOS_AL_DIA)))
     throw new Rechazo(429, `Ya te mandamos tu clave a ${email} varias veces hoy. Búscala en ese correo (también en spam o promociones).`)
+  let clave = (await env.DB.prepare("SELECT clave FROM licencias WHERE email = ? AND plan = 'cuenta' AND estado = 'gratis' LIMIT 1").bind(email).first<{ clave: string }>())?.clave
   if (!clave) {
+    await sinOtra(env, email, false)
     clave = nuevaClave()
     await env.DB.prepare(
       `INSERT INTO licencias (id, clave, email, plan, monto, fundador, estado, autorizada, creada, acepto, terminos, modo)
@@ -1276,14 +1144,14 @@ async function unirse(env: Env, email: string, equipo: string, acepto: string, t
       .bind(crypto.randomUUID(), clave, email, acepto, acepto, acepto, terminos, env.PAYPAL_MODO)
       .run()
   }
-  const enviada = await correo(env, email, 'Tu cuenta de Sloth', [
+  const enviada = await correo(env, email, 'Tu cuenta de VyMotion', [
     'Hola:',
-    'Ya tienes tu cuenta de Sloth: con ella entras a la comunidad. Sloth es gratis y lo seguirá siendo.',
-    `Tu clave es ${clave}. Escríbela en Sloth para entrar, y guárdala: con ella entras desde otra computadora (dos a la vez). También queda en Opciones de Sloth.`,
-    'Sloth trabaja con la IA que ya tengas: Claude, ChatGPT, OpenCode (que tiene modelos gratis) y otros agentes. Con uno basta, y Sloth no te cobra aparte: lo conectas en Opciones, en Agentes. Si tienes dudas, responde a este correo.'
+    'Ya tienes tu cuenta de VyMotion: con ella entras a la comunidad. VyMotion es gratis y lo seguirá siendo.',
+    `Tu clave es ${clave}. Escríbela en VyMotion para entrar, y guárdala: con ella entras desde otra computadora (dos a la vez). También queda en Opciones de VyMotion.`,
+    'VyMotion trabaja con la IA que ya tengas: Claude, ChatGPT, OpenCode (que tiene modelos gratis) y otros agentes. Con uno basta, y VyMotion no te cobra aparte: lo conectas en Opciones, en Agentes. Si tienes dudas, responde a este correo.'
   ]).catch((e) => (console.error('Correo de la cuenta', e instanceof Error ? e.message : e), false))
   if (!enviada) throw new Rechazo(502, 'No pudimos mandarte el correo con tu clave. Prueba en un rato.')
-  if (!porCorreo) throw new Rechazo(409, `Te mandamos tu clave a ${email}. Escríbela en Opciones de Sloth, en «Ya apoyo».`)
+  if (!porCorreo) throw new Rechazo(409, `Te mandamos tu clave a ${email}. Escríbela en Opciones de VyMotion, en «Ya apoyo».`)
   return json({ enviada: true })
 }
 
@@ -1298,10 +1166,10 @@ async function sinOtra(env: Env, email: string, apoyar: boolean) {
     .bind(email)
     .all<Pick<Fila, 'plan' | 'estado'>>()
   if (results.some((f) => f.plan === 'gratis'))
-    throw new Rechazo(409, 'Ese correo ya tiene Sloth gratis de por vida. Usa su clave: está en Opciones de Sloth, en la computadora donde te uniste.')
+    throw new Rechazo(409, 'Ese correo ya tiene VyMotion gratis de por vida. Usa su clave: está en Opciones de VyMotion, en la computadora donde te uniste.')
   if (results.some((f) => f.estado === 'authorized' || f.estado === 'pagado'))
-    throw new Rechazo(409, 'Ya hay un apoyo activo con ese correo. Usa su clave: te llegó a ese correo al apoyar, en «Tu clave de Sloth» (si no lo ves, revisa spam o promociones).')
-  if (!apoyar && results.length) throw new Rechazo(409, 'Ese correo ya tiene una cuenta de Sloth. Su clave te llegó por correo, en «Tu cuenta de Sloth».')
+    throw new Rechazo(409, 'Ya hay un apoyo activo con ese correo. Usa su clave: te la mandamos por correo y está en Opciones de VyMotion.')
+  if (!apoyar && results.length) throw new Rechazo(409, 'Ese correo ya tiene una cuenta de VyMotion. Su clave te llegó por correo, en «Tu cuenta de VyMotion».')
 }
 
 /** Si la clave sigue activa en esta computadora, firmado. Lee la suscripción o los pagos de PayPal (o de Mercado Pago) si hace rato que no. */
@@ -1335,28 +1203,19 @@ async function cancelar(env: Env, c: Record<string, unknown>): Promise<Response>
     const yaEstaba = (e: unknown) => {
       if (!(e instanceof Rechazo) || e.status !== (fila.paypal ? 422 : 400)) throw e
     }
-    if (fila.paypal) await paypal(env, 'POST', `/v1/billing/subscriptions/${encodeURIComponent(fila.paypal)}/cancel`, { reason: 'Cancelada desde Sloth' }).catch(yaEstaba)
+    if (fila.paypal) await paypal(env, 'POST', `/v1/billing/subscriptions/${encodeURIComponent(fila.paypal)}/cancel`, { reason: 'Cancelada desde VyMotion' }).catch(yaEstaba)
     else await mp(env, 'PUT', `/preapproval/${encodeURIComponent(fila.preapproval!)}`, { status: 'cancelled' }).catch(yaEstaba)
     fila = await refrescar(env, fila)
     if (fila.estado !== 'cancelled') throw new Rechazo(502, `${pasarela(fila)} no pudo cancelar la suscripción. Intenta otra vez en un momento.`)
   }
   // El comprobante de la cancelación (Profeco pide dar un folio), una sola vez.
-  // Dos «Cancelar» a la vez: solo el que pone el folio manda el correo; el otro lee el folio que quedó.
-  let pusoFolio = false
   if (fila.estado === 'cancelled' && !fila.folio) {
-    const nuevo = { folio: `C-${letras(8)}`, cancelada: new Date().toISOString() }
-    const r = await env.DB.prepare('UPDATE licencias SET folio = ?, cancelada = ? WHERE id = ? AND folio IS NULL').bind(nuevo.folio, nuevo.cancelada, fila.id).run()
-    pusoFolio = r.meta.changes > 0
-    fila = pusoFolio ? { ...fila, ...nuevo } : ((await env.DB.prepare('SELECT * FROM licencias WHERE id = ?').bind(fila.id).first<Fila>()) ?? fila)
-  }
-  if (pusoFolio && fila.folio) {
-    const hasta = fila.pagado_hasta && Date.parse(fila.pagado_hasta) > Date.now() ? ` Sloth sigue abierta hasta el ${fecha(fila.pagado_hasta)}, lo que ya pagaste.` : ''
-    // Con la escalera (`escalera.ts`), quien vuelve entra con el precio del día.
-    const vuelve = pasoEn(env, fila.moneda) ? [siVuelves(fila, (await apoyoDeHoy(env))(fila.moneda))] : []
-    await correo(env, fila.email, `Cancelaste tu suscripción a Sloth · folio ${fila.folio}`, [
+    fila = { ...fila, folio: `C-${letras(8)}`, cancelada: new Date().toISOString() }
+    await env.DB.prepare('UPDATE licencias SET folio = ?, cancelada = ? WHERE id = ?').bind(fila.folio, fila.cancelada, fila.id).run()
+    const hasta = fila.pagado_hasta && Date.parse(fila.pagado_hasta) > Date.now() ? ` VyMotion sigue abierta hasta el ${fecha(fila.pagado_hasta)}, lo que ya pagaste.` : ''
+    await correo(env, fila.email, `Cancelaste tu suscripción a VyMotion · folio ${fila.folio}`, [
       'Hola:',
-      `Cancelamos tu suscripción a Sloth. Tu folio de cancelación es ${fila.folio}. ${pasarela(fila)} ya no te hará más cobros.${hasta}`,
-      ...vuelve,
+      `Cancelamos tu suscripción a VyMotion. Tu folio de cancelación es ${fila.folio}. ${pasarela(fila)} ya no te hará más cobros.${hasta}`,
       'Si no fuiste tú, responde a este correo.'
     ]).catch((e) => console.error('Correo de cancelación', e instanceof Error ? e.message : e))
   }
@@ -1364,7 +1223,7 @@ async function cancelar(env: Env, c: Record<string, unknown>): Promise<Response>
 }
 
 /**
- * Adónde se va a pagar desde Sloth: con un año pagado de una vez, el pago del año siguiente (con el de una vez, otro
+ * Adónde se va a pagar desde VyMotion: con un año pagado de una vez, el pago del año siguiente (con el de una vez, otro
  * mes). La tarjeta de la suscripción mensual se cambia en la cuenta de PayPal (o de Mercado Pago) del cliente.
  */
 async function pago(env: Env, c: Record<string, unknown>): Promise<Response> {
@@ -1578,7 +1437,7 @@ function leerMp(p: Preapproval): Lectura {
   return { estado: p.status as Estado, hasta: p.status === 'authorized' ? p.next_payment_date : undefined }
 }
 
-/** Una suscripción de PayPal, con los estados de Mercado Pago, que son los que entiende Sloth. Como allá, cancelada vale la fecha del último cobro que se vio. */
+/** Una suscripción de PayPal, con los estados de Mercado Pago, que son los que entiende VyMotion. Como allá, cancelada vale la fecha del último cobro que se vio. */
 export function leerPaypal(s: Pick<SuscripcionPaypal, 'status' | 'billing_info'>): Lectura {
   const estado: Estado =
     s.status === 'ACTIVE' ? 'authorized' : s.status === 'SUSPENDED' ? 'paused' : s.status === 'CANCELLED' || s.status === 'EXPIRED' ? 'cancelled' : 'pending'
@@ -1711,8 +1570,7 @@ async function guardarEstado(env: Env, fila: Fila, l: Lectura): Promise<Fila> {
   await env.DB.prepare('UPDATE licencias SET estado = ?, pagado_hasta = ?, autorizada = COALESCE(autorizada, ?), revisada = ? WHERE id = ?')
     .bind(estado, nueva.pagado_hasta, nueva.autorizada, ahora, fila.id)
     .run()
-  // Con un mes recién pagado, el apoyo que baja cada mes queda cobrando el monto siguiente (`escalera.ts`).
-  return bajarCadaMes(env, nueva)
+  return nueva
 }
 
 /**
@@ -1780,20 +1638,14 @@ export async function reenviarClaves(env: Env, ahora = Date.now()) {
 
 /** La clave y cómo empezar, al confirmarse el primer pago. */
 function bienvenida(env: Env, f: Fila) {
-  // El apoyo que baja cada mes (`escalera.ts`): lo que se le cobra el siguiente. Y a todo el que apoya cada mes con
-  // cobro automático, que su precio se queda con él mientras siga.
-  const sigue = comoSigue(env, f)
-  const seQueda = f.plan === 'mensual' && !deUnaVez(f) && !deAMano(f) && pasoEn(env, f.moneda) ? tuPrecioSeQueda(env, f) : undefined
-  return correo(env, f.email, `Tu clave de Sloth: ${f.clave}`, [
+  return correo(env, f.email, `Tu clave de VyMotion: ${f.clave}`, [
     'Hola:',
     deAMano(f)
-      ? `Recibimos tu apoyo: gracias por apoyar a Sloth. Eres Fundador hasta el ${fecha(f.pagado_hasta!)}. Guarda este correo, es donde queda tu clave.`
-      : `${pasarela(f)} confirmó tu pago: gracias por apoyar a Sloth. Guarda este correo, es donde queda tu clave.`,
+      ? `Recibimos tu apoyo: gracias por apoyar a VyMotion. Eres Fundador hasta el ${fecha(f.pagado_hasta!)}. Guarda este correo, es donde queda tu clave.`
+      : `${pasarela(f)} confirmó tu pago: gracias por apoyar a VyMotion. Guarda este correo, es donde queda tu clave.`,
     `Tu clave: ${f.clave}`,
-    ...(sigue ? [sigue] : []),
-    ...(seQueda ? [seQueda] : []),
-    `Pégala en Sloth, en Opciones, y deja de salirte el recordatorio. Si aún no la tienes, descárgala en ${env.ORIGEN}/descargar (Mac: ${env.ORIGEN}/descargar?so=mac; Linux: ${env.ORIGEN}/descargar?so=linux). La clave sirve en dos computadoras a la vez.`,
-    'Sloth trabaja con la IA que ya tengas: Claude, ChatGPT, OpenCode (que tiene modelos gratis) y otros agentes. Con uno basta, y Sloth no te cobra aparte: lo conectas en Opciones, en Agentes. Si tienes dudas, responde a este correo.'
+    `Pégala en VyMotion, en Opciones, y deja de salirte el recordatorio. Si aún no la tienes, descárgala en ${env.ORIGEN}/descargar (Mac: ${env.ORIGEN}/descargar?so=mac; Linux: ${env.ORIGEN}/descargar?so=linux). La clave sirve en dos computadoras a la vez.`,
+    'VyMotion trabaja con la IA que ya tengas: Claude, ChatGPT, OpenCode (que tiene modelos gratis) y otros agentes. Con uno basta, y VyMotion no te cobra aparte: lo conectas en Opciones, en Agentes. Si tienes dudas, responde a este correo.'
   ])
 }
 
@@ -1841,7 +1693,7 @@ async function aMano(req: Request, env: Env): Promise<Response> {
 }
 
 /**
- * Si abre Sloth y hasta cuándo, sin volver a preguntar. Autorizada, abre mientras PayPal o Mercado Pago la mantengan así
+ * Si abre VyMotion y hasta cuándo, sin volver a preguntar. Autorizada, abre mientras PayPal o Mercado Pago la mantengan así
  * (reintentan los cobros que fallan y la cancela si no puede); cancelada, en pausa o pagada de una vez, hasta el fin de
  * lo pagado. Un lugar gratis abre siempre.
  */
@@ -1852,7 +1704,7 @@ export function vigencia(f: Pick<Fila, 'estado' | 'pagado_hasta'>, ahora: number
   return { activa: false, hasta: ahora }
 }
 
-/** Lo que guarda Sloth: `datos` tal cual se firmó (un JSON en texto) y su firma. */
+/** Lo que guarda VyMotion: `datos` tal cual se firmó (un JSON en texto) y su firma. */
 async function firmada(env: Env, f: Fila, equipo: string, ahora: number): Promise<Response> {
   // La pausada al bajar el apoyo sigue activa y se reanuda sola: la app la enseña con su próximo cobro y su «Cancelar».
   const estado: Estado = f.estado === 'paused' && f.reanudar ? 'authorized' : f.estado
@@ -1860,8 +1712,6 @@ async function firmada(env: Env, f: Fila, equipo: string, ahora: number): Promis
   // Fundador: un apoyo de su correo que entró entre los primeros y se llegó a pagar (`esFundador`), o su lugar gratis de por vida.
   const fundador = !!(await env.DB.prepare(`SELECT 1 FROM licencias l WHERE l.email = ? AND ${esFundador('l')} LIMIT 1`).bind(f.email).first())
   const datos = JSON.stringify({
-    // Si su correo apoya hoy. Siempre va, también `false`: con eso la app cierra los estilos que instaló de la comunidad.
-    apoya: await apoyaHoy(env, f.email),
     clave: f.clave,
     equipo,
     email: f.email,
@@ -1874,30 +1724,26 @@ async function firmada(env: Env, f: Fila, equipo: string, ahora: number): Promis
     emitido: new Date(ahora).toISOString(),
     enlace: f.estado === 'pending' ? (f.enlace ?? undefined) : undefined,
     folio: f.folio ?? undefined,
-    fundador: fundador || undefined,
-    cancelarPaypal: await cancelarPaypal(env, f.email)
+    fundador: fundador || undefined
   })
   const llave = await crypto.subtle.importKey('pkcs8', base64(env.FIRMA), { name: 'Ed25519' }, false, ['sign'])
   const firma = await crypto.subtle.sign({ name: 'Ed25519' }, llave, new TextEncoder().encode(datos))
   return json({ datos, firma: btoa(String.fromCharCode(...new Uint8Array(firma))) })
 }
 
-/**
- * Anota que `?2` usa la clave `?1` si las demás vistas desde `?4` son menos de `?5`. Contar y anotar es un solo paso:
- * si fueran dos, varias computadoras que piden a la vez pasarían todas el conteo.
- */
-export const EQUIPO_NUEVO =
-  'INSERT INTO {tabla} (clave, equipo, visto) SELECT ?1, ?2, ?3 WHERE (SELECT COUNT(*) FROM {tabla} WHERE clave = ?1 AND equipo != ?2 AND visto > ?4) < ?5 ON CONFLICT (clave, equipo) DO UPDATE SET visto = excluded.visto'
-
-/** Guarda que esta computadora (o este celular, con `tabla`) usa la clave. `false` si ya la usan `max` otras. */
-export async function recordarEquipo(env: Env, clave: string, equipo: string, ahora: number, tabla: 'equipos' | 'celulares' = 'equipos', max = EQUIPOS): Promise<boolean> {
-  const r = await env.DB.prepare(EQUIPO_NUEVO.replaceAll('{tabla}', tabla))
-    .bind(clave, equipo, new Date(ahora).toISOString(), new Date(ahora - VISTO).toISOString(), max)
+/** Guarda que esta computadora usa la clave. `false` si ya la usan `EQUIPOS` otras. */
+async function recordarEquipo(env: Env, clave: string, equipo: string, ahora: number): Promise<boolean> {
+  const otros = await env.DB.prepare('SELECT COUNT(*) AS n FROM equipos WHERE clave = ? AND equipo != ? AND visto > ?')
+    .bind(clave, equipo, new Date(ahora - VISTO).toISOString())
+    .first<{ n: number }>()
+  if ((otros?.n ?? 0) >= EQUIPOS) return false
+  await env.DB.prepare('INSERT INTO equipos (clave, equipo, visto) VALUES (?, ?, ?) ON CONFLICT (clave, equipo) DO UPDATE SET visto = excluded.visto')
+    .bind(clave, equipo, new Date(ahora).toISOString())
     .run()
-  return r.meta.changes > 0
+  return true
 }
 
-export async function porClave(env: Env, valor: unknown): Promise<Fila> {
+async function porClave(env: Env, valor: unknown): Promise<Fila> {
   const clave = String(valor ?? '').replace(/\s+/g, '').toUpperCase()
   const fila = CLAVE.test(clave) ? await env.DB.prepare('SELECT * FROM licencias WHERE clave = ?').bind(clave).first<Fila>() : null
   if (!fila) throw new Rechazo(404, 'No encontramos esa clave. Revisa que esté bien escrita.')
@@ -1964,13 +1810,13 @@ export async function vigilar(env: Env, email: string, motivo: string, bloqueada
     ? [`${BLOQUEADA} Ya no entra a la comunidad, y con este correo no se abre otra.`]
     : [`Detectamos actividad sospechosa en tu cuenta: ${motivo}.`, 'Desde ahora tu cuenta queda vigilada. Si sigue, la bloqueamos y ya no entras a la comunidad.']
   await Promise.all([
-    correo(env, email, 'Actividad sospechosa en tu cuenta de Sloth', ['Hola:', ...suyo, 'Si crees que es un error, responde a este correo.']),
+    correo(env, email, 'Actividad sospechosa en tu cuenta de VyMotion', ['Hola:', ...suyo, 'Si crees que es un error, responde a este correo.']),
     correo(env, env.CORREO_RESPUESTA, `Cuenta ${tipo}: ${email}`, [`${email}: ${motivo}.`, bloqueada ? 'Ya estaba bloqueada; se le avisó.' : 'Se le avisó que queda vigilada.'])
   ]).catch((e) => console.error('Correo de vigilancia', e instanceof Error ? e.message : e))
 }
 
 /** La conexión de quien pide, resumida: para su cupo, sin guardar su IP. */
-export async function conexion(req: Request): Promise<string> {
+async function conexion(req: Request): Promise<string> {
   return `ip:${await resumen(`sloth:${redDe(req.headers.get('cf-connecting-ip') ?? '')}`)}`
 }
 
@@ -1996,7 +1842,7 @@ export function redDe(ip: string): string {
 }
 
 /** Si pide quien publica, con la llave `PUBLICAR`. */
-export const conLlave = (req: Request, env: Env) => !!env.PUBLICAR && iguales(req.headers.get('authorization') ?? '', `Bearer ${env.PUBLICAR}`)
+const conLlave = (req: Request, env: Env) => !!env.PUBLICAR && iguales(req.headers.get('authorization') ?? '', `Bearer ${env.PUBLICAR}`)
 
 /** Si pide el creador: con su llave `ADMIN`, o con la de publicar, que también lo es. */
 export const delCreador = (req: Request, env: Env) => conLlave(req, env) || (!!env.ADMIN && iguales(req.headers.get('authorization') ?? '', `Bearer ${env.ADMIN}`))
@@ -2024,7 +1870,7 @@ export async function mp<T>(env: Env, metodo: string, ruta: string, cuerpo?: unk
   if (!r.ok) {
     // Solo el estado y el mensaje: nada del cliente.
     console.error('Mercado Pago', metodo, ruta.replace(/\?.*$/, '').replace(/\/[\w-]{12,}$/, '/…'), r.status, datos.message ?? '')
-    throw new Rechazo(r.status, 'Mercado Pago no respondió bien. Intenta otra vez en un momento.', datos.message)
+    throw new Rechazo(r.status, datos.message ?? `Mercado Pago respondió ${r.status}`)
   }
   return datos as T
 }
@@ -2058,7 +1904,7 @@ export async function paypal<T>(env: Env, metodo: string, ruta: string, cuerpo?:
   if (!r.ok) {
     // Solo el estado y el error: nada del cliente.
     console.error('PayPal', metodo, ruta.replace(/\/[\w-]{12,}(?=\/|$)/g, '/…'), r.status, datos.name ?? '', datos.details?.[0]?.issue ?? '')
-    throw new Rechazo(r.status, 'PayPal no respondió bien. Intenta otra vez en un momento.', datos.message)
+    throw new Rechazo(r.status, datos.message ?? `PayPal respondió ${r.status}`)
   }
   return datos as T
 }
@@ -2075,7 +1921,7 @@ async function nowpayments<T>(env: Env, metodo: string, ruta: string, cuerpo?: u
   if (!r.ok) {
     // Solo el estado y el mensaje: nada del cliente.
     console.error('NOWPayments', metodo, ruta.replace(/\/\d+$/, '/…'), r.status, datos.message ?? '')
-    throw new Rechazo(r.status, 'NOWPayments no respondió bien. Intenta otra vez en un momento.', datos.message)
+    throw new Rechazo(r.status, datos.message ?? `NOWPayments respondió ${r.status}`)
   }
   return datos as T
 }
@@ -2104,8 +1950,6 @@ export async function avisarCobros(env: Env, ahora = Date.now()) {
   const { results } = await env.DB.prepare(
     "SELECT * FROM licencias WHERE estado IN ('authorized', 'pagado') AND plan != 'unico' AND pagado_hasta IS NOT NULL AND (avisado_para IS NULL OR avisado_para != pagado_hasta)"
   ).all<Fila>()
-  // Lo que paga hoy quien entra (`escalera.ts`), para decirle a quien ya apoya que su precio se queda con él.
-  let hoy: ((moneda: string) => number | undefined) | undefined
   for (const vieja of results) {
     if (!faltaAvisar(vieja, ahora)) continue
     const f = await refrescar(env, vieja).catch(() => null)
@@ -2114,19 +1958,17 @@ export async function avisarCobros(env: Env, ahora = Date.now()) {
     // Pagado de una vez: el año, o el mes con cripto.
     const lapso = f.plan === 'anual' ? 'año' : 'mes'
     const con = f.stripe ? 'tarjeta, en Stripe' : f.cripto ? 'cripto, con NOWPayments' : f.preferencia && !f.orden ? 'Mercado Pago' : 'PayPal'
-    const seQueda = f.estado === 'authorized' && f.plan === 'mensual' && pasoEn(env, f.moneda) ? [tuPrecioSeQueda(env, f, (hoy ??= await apoyoDeHoy(env))(f.moneda))] : []
     const enviado = await (f.estado === 'pagado'
-      ? correo(env, f.email, `Tu ${lapso} de Sloth se acaba el ${fecha(f.pagado_hasta!)}`, [
+      ? correo(env, f.email, `Tu ${lapso} de VyMotion se acaba el ${fecha(f.pagado_hasta!)}`, [
           'Hola:',
-          `Tu ${lapso} de apoyo a Sloth se acaba el ${fecha(f.pagado_hasta!)}. No se renueva solo: no te vamos a cobrar nada.`,
+          `Tu ${lapso} de apoyo a VyMotion se acaba el ${fecha(f.pagado_hasta!)}. No se renueva solo: no te vamos a cobrar nada.`,
           `Si quieres seguir apoyando, paga el ${lapso} siguiente (${f.monto.toLocaleString('es-MX')} ${f.moneda}, IVA incluido) con ${con}: ${env.ORIGEN}/renovar?s=${f.id}. Tu clave es la misma y el ${lapso} nuevo empieza cuando se acabe este.`,
-          'También lo renuevas desde Sloth: Opciones, Apoyo, «Renovar». Si tienes dudas, responde a este correo.'
+          'También lo renuevas desde VyMotion: Opciones, Apoyo, «Renovar». Si tienes dudas, responde a este correo.'
         ])
-      : correo(env, f.email, `Tu próximo cobro de Sloth: ${fecha(f.pagado_hasta!)}`, [
+      : correo(env, f.email, `Tu próximo cobro de VyMotion: ${fecha(f.pagado_hasta!)}`, [
           'Hola:',
-          `El ${fecha(f.pagado_hasta!)} ${pasarela(f)} te cobrará ${f.monto.toLocaleString('es-MX')} ${f.moneda} (IVA incluido) por tu suscripción ${cada} a Sloth.`,
-          ...seQueda,
-          'Si no quieres que se renueve, cancélala antes de esa fecha en Sloth: Opciones, Suscripción, «Cancelar suscripción». También puedes responder a este correo o escribirnos por WhatsApp. Lo ya pagado sigue valiendo hasta su fecha.'
+          `El ${fecha(f.pagado_hasta!)} ${pasarela(f)} te cobrará ${f.monto.toLocaleString('es-MX')} ${f.moneda} (IVA incluido) por tu suscripción ${cada} a VyMotion.`,
+          'Si no quieres que se renueve, cancélala antes de esa fecha en VyMotion: Opciones, Suscripción, «Cancelar suscripción». También puedes responder a este correo o escribirnos por WhatsApp. Lo ya pagado sigue valiendo hasta su fecha.'
         ])
     ).catch((e) => (console.error('Aviso de cobro', e instanceof Error ? e.message : e), false))
     if (enviado) await env.DB.prepare('UPDATE licencias SET avisado_para = ? WHERE id = ?').bind(f.pagado_hasta, f.id).run()
@@ -2147,8 +1989,7 @@ export async function correo(env: Env, para: string, asunto: string, parrafos: s
     return false
   }
   const pie = `${PROVEEDOR} · ${env.CORREO_RESPUESTA}`
-  // El texto se viste solo, con los colores de Sloth (`plantilla-correo.ts`); `text` queda para quien no lee HTML.
-  const html = htmlDeCorreo(asunto, parrafos, { origen: env.ORIGEN, pie: PROVEEDOR, respuesta: env.CORREO_RESPUESTA, interno: para === env.CORREO_RESPUESTA })
+  const html = `<div style="font:15px/1.6 system-ui,sans-serif;color:#1b1408;max-width:560px">${parrafos.map((p) => `<p>${escapar(p)}</p>`).join('')}<p style="color:#9a907f;font-size:12px">${escapar(pie)}</p></div>`
   const cuerpo = JSON.stringify({ from: env.CORREO_DE, to: [para], reply_to: env.CORREO_RESPUESTA, subject: asunto, text: [...parrafos, '', pie].join('\n\n'), html })
   const llave = idempotencia ?? crypto.randomUUID()
   // Con demasiados a la vez (429) o una falla suya (5xx), Resend pide volver a intentar: dos veces más, con pausa.
@@ -2167,6 +2008,10 @@ export async function correo(env: Env, para: string, asunto: string, parrafos: s
     }
     throw new Error(`Resend respondió ${r.status}: ${(await r.text()).slice(0, 200)}`)
   }
+}
+
+function escapar(texto: string): string {
+  return texto.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 }
 
 /** «21 de noviembre de 2026», en la hora de la Ciudad de México. */
@@ -2190,13 +2035,13 @@ async function gracias(env: Env, url: URL): Promise<Response> {
   if (!fila)
     return pagina(
       '¡Listo!',
-      `${correoAviso('tu correo')}<p>Tu clave te llega por correo en cuanto se confirme tu pago: pégala en Sloth, en Opciones.</p>`
+      `${correoAviso('tu correo')}<p>Tu clave te llega por correo en cuanto se confirme tu pago: pégala en VyMotion, en Opciones.</p>`
     )
   if (vigencia(fila, Date.now()).activa)
     return pagina(
-      '¡Gracias por apoyar a Sloth!',
+      '¡Gracias por apoyar a VyMotion!',
       `${correoAviso(escapar(fila.email))}
-<a class="boton" href="/descargar">Descargar Sloth para Windows</a>
+<a class="boton" href="/descargar">Descargar VyMotion para Windows</a>
 <p class="otros">También para <a href="/descargar?so=mac">Mac</a> y <a href="/descargar?so=linux">Linux</a>.</p>
 <ol><li>Instálala. Si Windows dice «Windows protegió tu PC», da clic en <b>Más información</b> y luego en <b>Ejecutar de todas formas</b>.</li>
 <li>Ábrela y pega en Opciones la clave de tu correo: deja de salirte el recordatorio. Sirve en dos computadoras a la vez.</li>
@@ -2223,7 +2068,7 @@ async function renovacion(env: Env, url: URL): Promise<Response> {
   const id = url.searchParams.get('s') ?? ''
   const fila = /^[\w-]{36}$/.test(id) ? await env.DB.prepare('SELECT * FROM licencias WHERE id = ?').bind(id).first<Fila>() : null
   if (!fila || !deUnaVez(fila) || fila.estado !== 'pagado')
-    return pagina('Este enlace ya no sirve', '<p>Para apoyar a Sloth, entra a <a href="https://sloth.vancci.org">sloth.vancci.org</a>, o responde al correo y te ayudamos.</p>')
+    return pagina('Este enlace ya no sirve', '<p>Para apoyar a VyMotion, entra a <a href="https://sloth.vancci.org">sloth.vancci.org</a>, o responde al correo y te ayudamos.</p>')
   return Response.redirect(await renovar(env, fila), 303)
 }
 
@@ -2234,30 +2079,30 @@ async function renovacion(env: Env, url: URL): Promise<Response> {
  */
 function avisoMac(intel: Ultima | undefined, arm: Ultima | undefined, viejo?: Ultima): Response {
   const boton = (u: Ultima, so: Sistema, cual: string, principal: boolean) =>
-    `<a class="${principal ? 'boton' : 'boton otro'}" href="/descargar?so=${so}&amp;visto">Descargar Sloth ${u.version} para ${cual}</a>`
+    `<a class="${principal ? 'boton' : 'boton otro'}" href="/descargar?so=${so}&amp;visto">Descargar VyMotion ${u.version} para ${cual}</a>`
   const elegir = intel && arm
   const sinFirma = [intel, arm, viejo].some((u) => u && !abreALaPrimera(u))
-  // Las que se enseñan y no van firmadas; si son todas, se dice de «Sloth para Mac».
+  // Las que se enseñan y no van firmadas; si son todas, se dice de «VyMotion para Mac».
   const macs: [string, Ultima | undefined][] = [['La de Apple Silicon', arm], ['La de Intel', intel], ['La de macOS 12', viejo]]
   const vistas = macs.filter(([, u]) => u)
   const sinFirmaDe = vistas.filter(([, u]) => u && !abreALaPrimera(u)).map(([n]) => n)
-  const quien = sinFirmaDe.length === vistas.length ? 'Sloth para Mac' : sinFirmaDe.join(' y ').replace(' y La', ' y la')
+  const quien = sinFirmaDe.length === vistas.length ? 'VyMotion para Mac' : sinFirmaDe.join(' y ').replace(' y La', ' y la')
   const deMac12 = viejo
     ? intel || arm
       ? '<p>¿Tu Mac se quedó en <b>macOS 12 (Monterey)</b> y no se puede actualizar? Baja la de macOS 12: abre, pero es probable que <b>Claude</b> y otras funciones no anden ahí.</p>'
       : '<p>Para Mac con <b>macOS 12 (Monterey)</b>. Abre, pero es probable que <b>Claude</b> y otras funciones no anden ahí: si tu Mac se puede actualizar a macOS 13 o más nuevo, mejor actualízala y baja la normal.</p>'
     : ''
   const pasos = sinFirma
-    ? `<ol><li>Abre el archivo que se baja y arrastra <b>Sloth</b> a <b>Aplicaciones</b>.</li>
+    ? `<ol><li>Abre el archivo que se baja y arrastra <b>VyMotion</b> a <b>Aplicaciones</b>.</li>
 <li>Ábrela. macOS dirá que no puede comprobarla: cierra ese aviso, ve a <b>Configuración del Sistema → Privacidad y seguridad</b> y pulsa <b>«Abrir de todos modos»</b>. Solo la primera vez.</li>
-<li>Cuando salga una versión nueva, Sloth te avisa y la bajas aquí otra vez, encima de la que tienes: tus videos y tus hilos se quedan.</li></ol>`
-    : `<ol><li>Abre el archivo que se baja y arrastra <b>Sloth</b> a <b>Aplicaciones</b>.</li>
-<li>Ábrela. Las versiones nuevas se ponen solas: Sloth te avisa y basta con «Actualizar».</li></ol>`
+<li>Cuando salga una versión nueva, VyMotion te avisa y la bajas aquí otra vez, encima de la que tienes: tus videos y tus hilos se quedan.</li></ol>`
+    : `<ol><li>Abre el archivo que se baja y arrastra <b>VyMotion</b> a <b>Aplicaciones</b>.</li>
+<li>Ábrela. Las versiones nuevas se ponen solas: VyMotion te avisa y basta con «Actualizar».</li></ol>`
   return pagina(
-    'Sloth para Mac',
+    'VyMotion para Mac',
     `${elegir ? '<p>Elige la de tu Mac: en el menú de Apple → <b>Acerca de esta Mac</b>, si dice <b>Chip Apple M1</b> o más nuevo, es Apple Silicon; si dice <b>Procesador Intel</b>, es Intel. Las dos piden macOS 13 o más nuevo.</p>' : intel || arm ? '<p>Pide macOS 13 o más nuevo.</p>' : ''}
 ${deMac12}
-${sinFirma ? `<p>${quien} todavía no ${sinFirmaDe.length > 1 && quien !== 'Sloth para Mac' ? 'llevan' : 'lleva'} la firma de Apple: macOS pide un paso más la primera vez.</p>` : ''}
+${sinFirma ? `<p>${quien} todavía no ${sinFirmaDe.length > 1 && quien !== 'VyMotion para Mac' ? 'llevan' : 'lleva'} la firma de Apple: macOS pide un paso más la primera vez.</p>` : ''}
 ${arm ? boton(arm, 'mac-arm64', elegir ? 'Mac con Apple Silicon (M1 o más nuevo)' : 'Mac', true) : ''}
 ${intel ? boton(intel, 'mac', elegir ? 'Mac con Intel (i5, i7 o i9)' : 'Mac', !arm) : ''}
 ${viejo ? boton(viejo, 'mac12', 'Mac con macOS 12', !arm && !intel) : ''}
@@ -2268,13 +2113,13 @@ ${!elegir && intel ? '<p class="otros">Para Mac con Intel. En un Mac con M1 o m�
 
 /** Que la clave llega también por correo, bien a la vista: es lo que queda si se cierra la página. */
 function correoAviso(para: string): string {
-  return `<div class="correo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg><div><b>Tu clave te llega a ${para}</b>, con el enlace para descargar Sloth. Puedes cerrar esta página: la tienes ahí. Si no la ves en unos minutos, revisa spam o promociones.</div></div>`
+  return `<div class="correo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg><div><b>Tu clave te llega a ${para}</b>, con el enlace para descargar VyMotion. Puedes cerrar esta página: la tienes ahí. Si no la ves en unos minutos, revisa spam o promociones.</div></div>`
 }
 
-/** Una página suelta con los colores de Sloth. Con `recargar`, se recarga sola cada tantos segundos. */
+/** Una página suelta con los colores de VyMotion. Con `recargar`, se recarga sola cada tantos segundos. */
 function pagina(titulo: string, cuerpo: string, recargar?: number): Response {
   return new Response(
-    `<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex">${recargar ? `<meta http-equiv="refresh" content="${recargar}">` : ''}<title>${titulo} · Sloth</title>
+    `<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex">${recargar ? `<meta http-equiv="refresh" content="${recargar}">` : ''}<title>${titulo} · VyMotion</title>
 <style>body{margin:0;min-height:100vh;display:grid;place-items:center;background:#0f0e0c;color:#ede6d6;font:16px/1.55 system-ui,sans-serif}
 main{max-width:460px;padding:32px}h1{font-size:22px;margin:0 0 10px}p,li{color:#9a907f}p{margin:0 0 16px}b{color:#ede6d6}a{color:#e8a33d}ol{margin:20px 0 0;padding-left:20px}li{margin:6px 0}
 .clave{display:flex;gap:10px;align-items:center;margin:0 0 16px;padding:12px 14px;border:1px solid #2e2a24;border-radius:10px;background:#171512}

@@ -1,82 +1,89 @@
 import { useEffect, useLayoutEffect, type RefObject } from 'react'
-import { useDelTema } from './temas'
+import { gsap } from 'gsap'
 
-/**
- * El movimiento de los temas que lo piden (`temas.ts`, Cristal), con la Web Animations API: cada animación dura menos de
- * medio segundo y acaba sola; ninguna se repite sin fin. Con «reducir movimiento» del sistema, nada se mueve. En el tema
- * Sloth no hace nada.
- *
- * - `Movimiento`: un pulso corto al pulsar un botón, y en la barra lateral y los menús de cada vista la marca de lo elegido
- *   viaja de lo de antes a lo nuevo. Una sola escucha para toda la app, también para los menús que se montan después.
- * - `useTransicionApartado`: lo de una vista entra suave al cambiar de vista.
- * - `useEntradaEstilo`: el nombre y la descripción del estilo elegido entran al cambiar de estilo.
- */
+const PREFERENCIA = '(prefers-reduced-motion: reduce)'
+const CONTROLES = 'button:is(.barra-nuevo,.new-chat,.primary,.boton,.ghost,.send,.picker-trigger,.notificaciones-boton,.plegar,.opciones-volver,.card,.mis-accion,.m3d-accion), .pie > button, .opciones-secciones a, .opciones-apartados-nav a, .actividad-vistas button, .opciones-agentes-lateral button'
+const NAVEGACION = '.youtube-apartados, .youtube-paginacion nav, .centro-redes-nav, .opciones-secciones, .opciones-apartados-nav, .opciones-agentes-lateral'
 
-const REDUCIDO = '(prefers-reduced-motion: reduce)'
-const quieto = () => matchMedia(REDUCIDO).matches
-const CONTROLES = 'button:is(.new-chat,.primary,.boton,.ghost,.send,.picker-trigger,.plegar,.card,.mis-accion,.m3d-accion,.dictado-boton,.estilo-importar), .pie > button'
-/** Donde la marca de lo elegido viaja de un sitio a otro. */
-const NAVEGACION = '.sidebar, .youtube-apartados, .youtube-paginacion nav, .centro-redes-nav, .opciones-secciones, .opciones-apartados-nav, .opciones-agentes-lateral'
+/** El contenido entra después del cambio de React, sin bloquear clics ni desplazar el layout. */
+export function useTransicionApartado(ref: RefObject<HTMLElement | null>, clave: string) {
+  useLayoutEffect(() => {
+    if (!ref.current || matchMedia(PREFERENCIA).matches) return
+    const animacion = ref.current.animate([
+      { opacity: .35, transform: 'translateY(7px)' },
+      { opacity: 1, transform: 'translateY(0)' },
+    ], { duration: 280, easing: 'cubic-bezier(.22,1,.36,1)' })
+    return () => animacion.cancel()
+  }, [ref, clave])
+}
 
+/** Una sola escucha para los controles, incluso los de los menús que se montan después. */
 export function Movimiento() {
-  const { movimiento } = useDelTema()
   useEffect(() => {
-    if (!movimiento) return
-    const capas = new Set<HTMLElement>()
+    const reducir = matchMedia(PREFERENCIA)
+    const pulsos = new Map<HTMLElement, gsap.core.Timeline>()
+    const selecciones = new Set<HTMLElement>()
+    const limpiar = () => {
+      for (const pulso of pulsos.values()) pulso.revert()
+      pulsos.clear()
+      for (const capa of selecciones) capa.remove()
+      selecciones.clear()
+    }
     const pulsar = (e: MouseEvent) => {
-      if (quieto() || !(e.target instanceof Element)) return
+      if (reducir.matches || !(e.target instanceof Element)) return
       const control = e.target.closest('button, a, [role="button"]')
-      if (!(control instanceof HTMLElement) || control.matches(':disabled,[aria-disabled="true"]')) return
-      const nav = control.closest(NAVEGACION)
-      const previo = nav?.querySelector('.new-chat.active, .session-row.active, [aria-current="page"], [aria-selected="true"]')
-      // En la barra lateral, solo sus destinos y sus hilos; en los menús de cada vista, cualquiera de sus botones.
-      const destino = nav?.matches('.sidebar') ? control.matches('.new-chat, .session-row') : true
-      if (previo instanceof HTMLElement && previo !== control && destino) {
-        const desde = previo.getBoundingClientRect()
-        const hasta = control.getBoundingClientRect()
-        const capa = document.createElement('div')
-        capa.className = 'movimiento-seleccion'
-        Object.assign(capa.style, { left: `${hasta.left}px`, top: `${hasta.top}px`, width: `${hasta.width}px`, height: `${hasta.height}px`, borderRadius: getComputedStyle(control).borderRadius })
-        document.body.append(capa)
-        capas.add(capa)
-        capa.animate(
-          [
-            { transform: `translate(${desde.left - hasta.left}px,${desde.top - hasta.top}px) scale(${desde.width / hasta.width},${desde.height / hasta.height})`, opacity: 0.7 },
-            { transform: 'translate(0,0) scale(1)', opacity: 0.45, offset: 0.8 },
-            { transform: 'translate(0,0) scale(1)', opacity: 0 }
-          ],
-          { duration: 340, easing: 'cubic-bezier(.22,1,.36,1)' }
-        ).onfinish = () => (capa.remove(), capas.delete(capa))
+      if (control instanceof HTMLElement) {
+        const nav = control.closest(NAVEGACION)
+        const previo = nav?.querySelector('[aria-current="page"], [aria-selected="true"], .active')
+        if (previo instanceof HTMLElement && previo !== control && !control.matches(':disabled')) {
+          limpiar()
+          const desde = previo.getBoundingClientRect(), hasta = control.getBoundingClientRect()
+          const capa = document.createElement('div')
+          capa.className = 'movimiento-seleccion'
+          Object.assign(capa.style, { left: `${hasta.left}px`, top: `${hasta.top}px`, width: `${hasta.width}px`, height: `${hasta.height}px`, borderRadius: getComputedStyle(control).borderRadius })
+          document.body.append(capa)
+          selecciones.add(capa)
+          const animacion = capa.animate([
+            { transform: `translate(${desde.left-hasta.left}px,${desde.top-hasta.top}px) scale(${desde.width/hasta.width},${desde.height/hasta.height})`, opacity: .7 },
+            { transform: 'translate(0,0) scale(1)', opacity: .45, offset: .8 },
+            { transform: 'translate(0,0) scale(1)', opacity: 0 },
+          ], {duration: 340, easing: 'cubic-bezier(.22,1,.36,1)'})
+          animacion.onfinish = () => { capa.remove(); selecciones.delete(capa) }
+        }
       }
-      if (control.matches(CONTROLES)) control.animate([{ scale: '1' }, { scale: '0.96', offset: 0.27 }, { scale: '1' }], { duration: 330, easing: 'ease-out' })
+      if (!(control instanceof HTMLElement) || !control.matches(CONTROLES) || control.matches(':disabled,[aria-disabled="true"]')) return
+      pulsos.get(control)?.revert()
+      const pulso = gsap.timeline({ onComplete: () => {
+        control.style.removeProperty('--pulso-control')
+        pulsos.delete(control)
+      } })
+      pulsos.set(control, pulso)
+      pulso.to(control, { '--pulso-control': .96, duration: .09, ease: 'power2.out' })
+        .to(control, { '--pulso-control': 1, duration: .24, ease: 'power3.out' })
     }
     document.addEventListener('click', pulsar, true)
+    reducir.addEventListener('change', limpiar)
     return () => {
       document.removeEventListener('click', pulsar, true)
-      for (const capa of capas) capa.remove()
+      reducir.removeEventListener('change', limpiar)
+      limpiar()
     }
-  }, [movimiento])
+  }, [])
   return null
 }
 
-/** Lo de una vista entra suave cuando cambia `clave`, sin tapar los clics ni mover nada de sitio. */
-export function useTransicionApartado(ref: RefObject<HTMLElement | null>, clave: string) {
-  const { movimiento } = useDelTema()
-  useLayoutEffect(() => {
-    if (!movimiento || !ref.current || quieto()) return
-    const animacion = ref.current.animate([{ opacity: 0.35, transform: 'translateY(7px)' }, { opacity: 1, transform: 'translateY(0)' }], { duration: 280, easing: 'cubic-bezier(.22,1,.36,1)' })
-    return () => animacion.cancel()
-  }, [ref, clave, movimiento])
-}
-
-/** El nombre y la descripción del estilo elegido entran al cambiar de estilo. */
-export function useEntradaEstilo(ref: RefObject<HTMLElement | null>, estilo: string) {
-  const { movimiento } = useDelTema()
+/** Entrada corta para el contenido del estilo seleccionado. */
+export function useEntradaEstilo(ref: RefObject<HTMLDivElement | null>, estilo: string) {
   useEffect(() => {
-    if (!movimiento || !ref.current || quieto()) return
-    const animaciones = Array.from(ref.current.querySelectorAll<HTMLElement>(':scope > h1, :scope > p'), (el, i) =>
-      el.animate([{ transform: 'translateY(5px)', opacity: 0.55 }, { transform: 'translateY(0)', opacity: 1 }], { duration: 270, delay: i * 35, easing: 'ease-out', fill: 'backwards' })
-    )
-    return () => animaciones.forEach((a) => a.cancel())
-  }, [ref, estilo, movimiento])
+    const reducir = matchMedia(PREFERENCIA)
+    if (reducir.matches || !ref.current) return
+    const entrada = gsap.fromTo(ref.current.querySelectorAll(':scope > .new-head-fila h1, :scope > p'),
+      { y: 5, opacity: .76 }, { y: 0, opacity: 1, duration: .26, ease: 'power3.out', clearProps: 'transform,opacity' })
+    const limpiar = () => { entrada.revert() }
+    reducir.addEventListener('change', limpiar)
+    return () => {
+      reducir.removeEventListener('change', limpiar)
+      limpiar()
+    }
+  }, [ref, estilo])
 }

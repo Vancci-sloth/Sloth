@@ -22,9 +22,9 @@ export function formaYoutube(v: VideoHecho) {
   if (!formas.has(clave)) formas.set(clave, execFileP('ffprobe', ['-v', 'error', '-select_streams', 'v:0', '-show_entries', 'stream=width,height:format=duration', '-of', 'json', v.ruta], { timeout: 15_000, windowsHide: true })
     .then(({ stdout }) => {
       const j = JSON.parse(stdout) as { streams?: { width: number; height: number }[]; format?: { duration?: string } }
-      const stream = j.streams?.[0]
-      return { formato: !stream?.width || !stream.height ? 'desconocido' as const : stream.height >= stream.width ? 'vertical' as const : 'horizontal' as const, duracion: Number(j.format?.duration) || 0 }
-    }, () => ({ formato: 'desconocido' as const, duracion: 0 })))
+      const stream = j?.streams?.[0]
+      return { formato: !stream?.width || !stream.height ? 'desconocido' as const : stream.height >= stream.width ? 'vertical' as const : 'horizontal' as const, duracion: Number(j?.format?.duration) || 0 }
+    }).catch(() => ({ formato: 'desconocido' as const, duracion: 0 })))
   return formas.get(clave)!
 }
 

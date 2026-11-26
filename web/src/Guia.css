@@ -8,15 +8,6 @@
 .guia-campos input, .guia-campos textarea, .esc .guia-campos textarea { width: 100%; min-height: 0; padding: 8px 10px; background: var(--bg); border: 1px solid var(--line); border-radius: var(--radio); color: var(--text); font-size: 13.5px; line-height: 1.45; resize: vertical; }
 .guia-campos input:focus, .guia-campos textarea:focus { outline: none; border-color: var(--amber); }
 .guia-campos input::placeholder, .guia-campos textarea::placeholder { color: var(--muted); }
-/* Lo que se marca, igual para todos: con qué lo hace y con qué agentes funciona. Una casilla por renglón, dos columnas. */
-.guia-marcar { margin: 0; padding: 0; border: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 6px 14px; min-width: 0; }
-.guia-marcar legend { padding: 0 0 6px; color: var(--text); font-size: 12.5px; font-weight: 600; }
-.guia-marcar legend em { color: var(--muted); font-style: normal; font-weight: 500; }
-.guia-campos .guia-marcar label { flex-direction: row; align-items: flex-start; gap: 7px; color: var(--muted); font-size: 12.5px; line-height: 1.4; cursor: pointer; }
-.guia-campos .guia-marcar label > span { color: var(--muted); font-weight: 400; }
-.guia-marcar label strong { color: var(--text); font-weight: 600; }
-.guia-campos .guia-marcar input { width: auto; flex: none; margin: 2px 0 0; padding: 0; accent-color: var(--amber); }
-.guia-marcar.agentes { grid-template-columns: repeat(4, 1fr); }
 /* Al editar la publicación de un estilo, bajo su texto. */
 .esc .guia-campos { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); }
 

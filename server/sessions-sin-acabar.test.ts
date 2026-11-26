@@ -38,7 +38,7 @@ function preparar(t: test.TestContext, model = 'codex:gpt-prueba') {
     sessions,
     meta,
     emit,
-    /** Las veces que Sloth le pidió que siguiera. */
+    /** Las veces que VyMotion le pidió que siguiera. */
     pedidos: () => mandados.filter((m) => m.startsWith('Cerraste tu turno')),
     avisos: () => eventos.flatMap((e) => (e.t === 'info' ? [e.text] : [])),
     /** Un turno que trabaja y acaba (`ok`) con `texto` como último mensaje; luego pasa el rato de calma. */
@@ -51,13 +51,13 @@ function preparar(t: test.TestContext, model = 'codex:gpt-prueba') {
   })
 }
 
-test('si el agente cierra su turno con el video a medias, Sloth le pide que siga con lo que falta', (t) => {
+test('si el agente cierra su turno con el video a medias, VyMotion le pide que siga con lo que falta', (t) => {
   const h = preparar(t)
   h.sessions.send(h.meta.id, 'Hazme el video')
   h.turno()
   assert.equal(h.pedidos().length, 1)
   assert.match(h.pedidos()[0], /falta Video, Portada/)
-  assert.ok(h.avisos().some((a) => a.includes('Sloth le pide que siga')))
+  assert.ok(h.avisos().some((a) => a.includes('VyMotion le pide que siga')))
   assert.equal(h.sessions.meta(h.meta.id)?.running, true)
 })
 
@@ -168,6 +168,6 @@ test('un bloque <opciones> a mitad del mensaje no impide continuar el video', (t
   h.turno('Antes dudé entre <opciones>A\nB</opciones> pero ya elegí. Sigo con el render.')
   assert.equal(h.pedidos().length, 1)
   assert.match(h.pedidos()[0], /falta Video, Portada/)
-  assert.deepEqual(h.avisos(), ['El agente cerró su turno con el video sin acabar (falta: Video, Portada): Sloth le pide que siga.'])
+  assert.deepEqual(h.avisos(), ['El agente cerró su turno con el video sin acabar (falta: Video, Portada): VyMotion le pide que siga.'])
   assert.equal(h.sessions.meta(h.meta.id)?.running, true)
 })

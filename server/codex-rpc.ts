@@ -17,8 +17,7 @@ export class CodexRpc {
     config: Record<string, unknown> = {},
     /** Con qué trabaja: la llave de API, o `null` para la cuenta de ChatGPT. Sin él, lo elegido en Opciones. */
     llave: CodexLlave | null = codexConLlave() ?? null,
-    /** La carpeta de una cuenta de ChatGPT agregada (`server/perfiles-agentes.ts`); sin ella, la de siempre. */
-    directorio?: string
+    directorio?: string | null
   ) {
     // El programa, de la app o bajado aparte (`server/agentes.ts`). Quien abre un hilo de Codex lo baja antes (`conAgente`).
     const exe = rutaAgente('codex')
@@ -28,9 +27,8 @@ export class CodexRpc {
     const env = { ...process.env }
     for (const key of ['OPENAI_API_KEY', 'CODEX_API_KEY', 'CODEX_ACCESS_TOKEN', 'OPENAI_IDENTITY_TOKEN_FILE', 'OPENAI_FEDERATION_RULE_ID']) delete env[key]
     Object.assign(env, llave?.env)
-    // Una cuenta agregada guarda su sesión en un archivo de su carpeta: en el llavero del sistema, todas pisarían la misma.
-    if (directorio && !llave) env.CODEX_HOME = directorio
-    const ajustes = { ...config, ...(directorio && !llave ? { cli_auth_credentials_store: 'file' } : {}), ...(llave?.config ?? { model_provider: 'openai', forced_login_method: 'chatgpt' }) }
+    if (directorio) env.CODEX_HOME = directorio
+    const ajustes = { ...config, ...(directorio ? { cli_auth_credentials_store: 'file' } : {}), ...(llave?.config ?? { model_provider: 'openai', forced_login_method: 'chatgpt' }) }
     const args = ['app-server', '--listen', 'stdio://', ...Object.entries(ajustes).flatMap(([key, value]) => ['-c', `${key}=${toml(value)}`])]
     this.proc = spawn(exe, args, { env, windowsHide: true, stdio: 'pipe' })
     // stderr no es el protocolo; se drena sin guardar datos de autenticación ni volcarlos a la interfaz.
@@ -39,8 +37,8 @@ export class CodexRpc {
       let m: { id?: number | string; method?: string; params?: unknown; result?: unknown; error?: { message: string } }
       try { m = JSON.parse(line) } catch { return this.finalizar(new Error('Codex envió una respuesta que no se pudo leer.')) }
       if (m.method && m.id !== undefined) {
-        // Sloth pregunta con mensajes y botones. Una herramienta interactiva desconocida no queda esperando para siempre.
-        this.proc.stdin.write(JSON.stringify({ id: m.id, error: { code: -32601, message: 'Sloth no admite esta petición interactiva. Pregunta al usuario con un mensaje.' } }) + '\n')
+        // VyMotion pregunta con mensajes y botones. Una herramienta interactiva desconocida no queda esperando para siempre.
+        this.proc.stdin.write(JSON.stringify({ id: m.id, error: { code: -32601, message: 'VyMotion no admite esta petición interactiva. Pregunta al usuario con un mensaje.' } }) + '\n')
       } else if (m.method) this.onNotification(m.method, m.params)
       else if (typeof m.id === 'number') {
         const p = this.pendientes.get(m.id)
@@ -54,7 +52,7 @@ export class CodexRpc {
     this.proc.on('error', (e) => this.finalizar(e))
     this.proc.on('exit', (code) => this.finalizar(new Error(`El proceso de Codex se cerró (código ${code}).`), false))
     this.proc.stdin.on('error', (e) => this.finalizar(e))
-    this.ready = this.request('initialize', { clientInfo: { name: 'sloth', title: 'Sloth', version: '0.1.0' } })
+    this.ready = this.request('initialize', { clientInfo: { name: 'sloth', title: 'VyMotion', version: '0.1.0' } })
       .then(() => { this.proc.stdin.write(JSON.stringify({ method: 'initialized' }) + '\n') })
     // Puede fallar antes de que el llamador llegue a esperar la inicialización.
     void this.ready.catch(() => {})

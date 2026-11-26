@@ -33,7 +33,7 @@ gastan y qué hacer si fallan) antes de empezar. Lo que se midió en los ejemplo
   nuevos. El personaje con nombre de una marca o de una persona real no va.
 - **Sin texto en lo generado.** Ni letreros, ni subtítulos, ni marcas de agua en los cuadros o los clips. Los
   subtítulos los pone `unir.py`.
-- El proyecto va en la carpeta de la línea `Carpeta: <nombre>` del mensaje, con ese nombre exacto (el estudio de Sloth
+- El proyecto va en la carpeta de la línea `Carpeta: <nombre>` del mensaje, con ese nombre exacto (el estudio de VyMotion
   la busca ahí). Sin la línea, `frutinovela-<tema>`.
 
 ## Formato
@@ -81,7 +81,7 @@ Antes de inventar a uno, mira si ya está.
    o salió con texto, pídelo otra vez: no gasta. Listo cuando los personajes se ven iguales en todos.
 6. **Clips.** Mira con `estado_flow` sin `id` cuánto les queda a sus cuentas. Dile al usuario cuántos clips son, cuánto
    gastan y si alcanzan (paso «Lo que no se negocia»), y pídelos todos seguidos,
-   sin esperar uno para pedir el siguiente. Sloth los reparte entre sus cuentas con calma, dos a la vez. Usa `generar_video` con
+   sin esperar uno para pedir el siguiente. VyMotion los reparte entre sus cuentas con calma, dos a la vez. Usa `generar_video` con
    `primerCuadro` `cuadros/esc-<NN>.jpg`, el formato del video, el modelo, la resolución y el tope de la línea `Clips:` (sin ella,
    Veo 3.1 - Lite, salvo que el usuario pida otro) y
    `salida` `clips/esc-<NN>.mp4`. El prompt, en inglés, describe la acción. El diálogo va en español, entre comillas y

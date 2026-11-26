@@ -269,11 +269,10 @@ function useSonido(sessionId: string, pistas: Pista[], silencio: boolean) {
       if (!p || silencio || ahora - ultimo.current < 70) return
       ultimo.current = ahora
       const a = (audio.current ??= new Audio())
-      // Con la ruta y su versión: el render que se rehace con el mismo nombre suena el nuevo.
-      const clave = `${p.ruta}@${p.t ?? ''}`
-      if (a.dataset.ruta !== clave) {
-        a.src = `/api/sessions/${sessionId}/archivo?ruta=${encodeURIComponent(p.ruta)}&t=${p.t ?? ''}`
-        a.dataset.ruta = clave
+        const clave = `${p.ruta}@${p.t ?? ''}`
+        if (a.dataset.ruta !== clave) {
+          a.src = `/api/sessions/${sessionId}/archivo?ruta=${encodeURIComponent(p.ruta)}&t=${p.t ?? ''}`
+          a.dataset.ruta = clave
       }
       a.currentTime = t - p.desde + p.recorte
       a.play().catch(() => {})

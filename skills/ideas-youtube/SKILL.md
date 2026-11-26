@@ -1,18 +1,18 @@
 ---
 name: ideas-youtube
-description: Propone ideas de video largo para un canal de YouTube a partir de la investigación que hizo Sloth en su nicho (outliers medidos contra su canal), con un método de demanda y empaque — señales de demanda, empaque tomado de nichos vecinos, gancho de 4 P y riesgo dicho sin rodeos — y prepara una idea elegida para grabarla. La lanza la sección Ideas de Sloth; úsala también cuando pidan qué video hacer en un canal, ideas con evidencia, o preparar el esquema de una idea para grabar.
+description: Propone ideas de video largo para un canal de YouTube a partir de la investigación que hizo VyMotion en su nicho (outliers medidos contra su canal), con un método de demanda y empaque — señales de demanda, empaque tomado de nichos vecinos, gancho de 4 P y riesgo dicho sin rodeos — y prepara una idea elegida para grabarla. La lanza la sección Ideas de VyMotion; úsala también cuando pidan qué video hacer en un canal, ideas con evidencia, o preparar el esquema de una idea para grabar.
 ---
 
 # Ideas para YouTube
 
-Trabajas en la carpeta de un canal de la sección Ideas de Sloth. La sección enseña al usuario cada archivo que escribes,
+Trabajas en la carpeta de un canal de la sección Ideas de VyMotion. La sección enseña al usuario cada archivo que escribes,
 según aparece: escribe en la raíz de la carpeta y no crees subcarpetas.
 
 Lo que ya está aquí:
 
 - `canal.json`: el perfil. `publico` (a quién le habla y quién compra), `meta` (para qué es el canal), `semillas` (lo que se
   buscó), `vecinos` (nichos con la misma intención), `referencias` y `handle` (el canal del usuario, si lo hay).
-- `resumen.json`: **léelo primero, entero.** Es la investigación ya contada por Sloth, para que no la rehagas a mano, y
+- `resumen.json`: **léelo primero, entero.** Es la investigación ya contada por VyMotion, para que no la rehagas a mano, y
   solo con lo que trajo el perfil de hoy:
   - `criterios`: cómo se contó todo. Léelo antes que los números.
   - `muestra`: cuántas búsquedas, canales, videos medidos y outliers hay, de cuántos se leyó la fecha, cuántos se
@@ -34,7 +34,7 @@ Lo que ya está aquí:
   - `temas`: los videos agrupados por lo que dicen (título y transcripción, con un modelo multilingüe), aunque usen
     otras palabras u otro idioma. Por tema: su `nombre` (sus palabras distintivas, no un título), videos, medidos,
     outliers, cuántos pasan su mediana, en qué idiomas, sus mejores outliers y sus ejemplos.
-- `investigacion.json`: lo que Sloth leyó de YouTube con yt-dlp, entero (más de 600 KB). **No lo leas entero:** consúltalo
+- `investigacion.json`: lo que VyMotion leyó de YouTube con yt-dlp, entero (más de 600 KB). **No lo leas entero:** consúltalo
   solo para lo que el resumen no trae, con un script corto que imprima solo lo que buscas. Por ejemplo, todos los videos
   de un canal:
 
@@ -71,9 +71,9 @@ Lo que ya está aquí:
 - `rendimiento.json`, `studio.json` y `diagnostico.md`, si el canal es el que el usuario conectó en YouTube: cómo le fue
   a sus propios videos largos y lo que se concluyó de eso (ver «Diagnosticar tus videos»).
 
-Si no hay `resumen.json` (la skill se lanzó fuera de Sloth), saca esas cuentas tú de `investigacion.json`, con scripts.
+Si no hay `resumen.json` (la skill se lanzó fuera de VyMotion), saca esas cuentas tú de `investigacion.json`, con scripts.
 
-Sloth le da al hilo `mcp__ideas__parecidos({ texto })` o `({ video: id })`: los videos de la investigación que dicen algo
+VyMotion le da al hilo `mcp__ideas__parecidos({ texto })` o `({ video: id })`: los videos de la investigación que dicen algo
 más parecido, en las tres redes y en cualquier idioma. Sirve para juntar la evidencia de un tema que se dice con otras
 palabras y para ver si una idea ya existe. En `evidencia` van solo los ids de este `investigacion.json`. Si no tienes la
 herramienta, sigue sin ella.
@@ -92,7 +92,7 @@ público a fondo antes de buscar nada.
 - **Una pregunta por mensaje**, corta y en lenguaje llano, sin jerga («nicho», «awareness», «outlier»). Después de
   preguntar, termina tu turno y espera la respuesta.
 - **Pon de 2 a 4 ejemplos para elegir** debajo de la pregunta, numerados. Sácalos de lo que ya sabes: lo que haya en
-  `canal.json` y lo que vende si es Sloth (lee `AGENTS.md` en la carpeta de la app). Él puede contestar «la 2», mezclar o
+  `canal.json` y lo que vende si es VyMotion (lee `AGENTS.md` en la carpeta de la app). Él puede contestar «la 2», mezclar o
   escribir otra cosa.
 - **Si contesta «no sé», no insistas igual.** Pregunta lo mismo desde otro lado, con una situación concreta: «Piensa en la
   última persona que te escribió interesada: ¿qué hacía?».
@@ -107,7 +107,7 @@ público a fondo antes de buscar nada.
 2. **Quién compra** (`publico`): una persona concreta, no «todo el mundo». Qué hace, qué quiere lograr, qué ha intentado
    y por qué no le funcionó, y si ya sabe que existe algo como lo que vende o solo conoce el problema. Escríbelo en una o
    dos frases, como lo diría el usuario.
-3. **Su canal** (`handle`) y el **nombre** del canal en Sloth, si aún dice «Canal nuevo».
+3. **Su canal** (`handle`) y el **nombre** del canal en VyMotion, si aún dice «Canal nuevo».
 4. **Lo que su público escribe en YouTube** (`semillas`). Propón de 8 a 12 frases de 2 a 5 palabras, como las escribiría
    esa persona y no como las diría un experto. Pruébalas antes de proponerlas:
 
@@ -126,7 +126,7 @@ Al terminar, enseña el perfil completo en cinco líneas y dile que ya puede pul
 
 ## Diagnosticar tus videos
 
-Lo pide «Diagnosticar», en «Tus videos». Sloth acaba de dejar en `rendimiento.json` los videos largos del usuario de los
+Lo pide «Diagnosticar», en «Tus videos». VyMotion acaba de dejar en `rendimiento.json` los videos largos del usuario de los
 últimos 90 días, del más nuevo al más viejo: `vistas`, `visto` (qué % del video ve cada quien), `a30` y `a60` (cuántos
 de cada 100 siguen a los 30 s y al minuto), `fuentes` (de dónde llegaron: `SUBSCRIBER` es el inicio y las suscripciones,
 `RELATED_VIDEO` los sugeridos, `YT_SEARCH` la búsqueda), `busquedas` (qué escribieron) y `privado`. Lo de Analytics
@@ -276,9 +276,9 @@ De 5 a 8 ideas, de la más segura a la más arriesgada. Cada una es un tema de `
   nunca se usó (mira también los de `anteriores/*/ideas.json`).
 - **Las ideas elegidas no se quitan nunca.** Si `estado.json` marca una como `elegida`, sigue en `ideas.json` con su mismo
   `id`, aunque la investigación nueva la debilite: mejórala y dilo en su `riesgo`. No le des ese `id` a otra idea: es lo
-  que la une a su hilo. Antes de cada vuelta, Sloth guarda la anterior en `anteriores/<fecha>/`, así que puedes reescribir
-  el archivo sin miedo a perder nada; y si al terminar falta una elegida, Sloth la vuelve a poner como estaba.
-- **`terminosNuevos`** es la rama de «recomendados» que Sloth no puede leer: los términos que salen de los títulos de los
+  que la une a su hilo. Antes de cada vuelta, VyMotion guarda la anterior en `anteriores/<fecha>/`, así que puedes reescribir
+  el archivo sin miedo a perder nada; y si al terminar falta una elegida, VyMotion la vuelve a poner como estaba.
+- **`terminosNuevos`** es la rama de «recomendados» que VyMotion no puede leer: los términos que salen de los títulos de los
   outliers y que convendría buscar en la siguiente vuelta.
 
 Al terminar, di en el chat cuál harías primero y por qué, en dos o tres frases.

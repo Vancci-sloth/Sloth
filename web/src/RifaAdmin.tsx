@@ -11,7 +11,7 @@ import './Rifa.css'
 
 /**
  * La rifa, en Administrador (`licencias/src/rifa.ts`): «Abrir la rifa» (la comunidad solo ve «llévate créditos de
- * Sloth»), quién participa y la ruleta, cuando quieras y cuantas veces quieras mientras esté abierta: cada «Rifar» lleva
+ * VyMotion»), quién participa y la ruleta, cuando quieras y cuantas veces quieras mientras esté abierta: cada «Rifar» lleva
  * una lista de premios, del mayor al menor (cuántos ganan cada uno y sus créditos, o uno que das a mano), que la ruleta
  * reparte en orden entre quienes aún no ganan.
  * «Rifar» abre la ruleta a toda la pantalla; «Girar» sortea en el cobro y la ruleta cae en quien ganó, uno por uno. El
@@ -37,7 +37,7 @@ const leerFila = (f: Fila) => {
 }
 
 /** Lo mismo que dice el cobro (`premioDe`): lo que se lleva cada ganador. */
-const premioDe = (creditos: number) => `1 llave de ${creditos.toLocaleString('en-US')} créditos de Sloth`
+const premioDe = (creditos: number) => `1 llave de ${creditos.toLocaleString('en-US')} créditos de VyMotion`
 /** Como `nombreDe` del cobro: el nombre o el correo tapado, que la ruleta puede salir en un live. */
 const tapado = (p: { nombre: string; email: string }) => p.nombre || `${p.email.split('@')[0].slice(0, 2)}•••@${p.email.split('@')[1] ?? ''}`
 
@@ -48,7 +48,7 @@ export function RifaAdmin() {
   const [cerrar, setCerrar] = useState(false)
   const [abriendo, setAbriendo] = useState(false)
   // Lo que se rifa: una lista de premios, del mayor al menor, que se elige al rifar, no al abrir (la comunidad solo ve
-  // «llévate créditos de Sloth»).
+  // «llévate créditos de VyMotion»).
   const [premios, setPremios] = useState<Fila[]>([{ ganan: '1', creditos: '10000', premio: '' }])
 
   const cargar = useCallback(
@@ -81,7 +81,7 @@ export function RifaAdmin() {
   return (
     <section className="admin-seccion admin-rifa">
       <p className="muted small">
-        Entre las cuentas gratis y los apoyos de menos de $10 USD. Quien paga $10 o más y los Fundadores no participan. Mientras está abierta sale hasta arriba de la comunidad como «Participa en la rifa · Llévate créditos de Sloth», sin decir cuántos. Rifa cuando quieras y cuantas veces quieras, cada vez con su premio: nadie gana dos veces en la misma rifa. Cada ganador recibe sus créditos en su cuenta de voz, el aviso en su Sloth y un correo.
+        Entre las cuentas gratis y los apoyos de menos de $10 USD. Quien paga $10 o más y los Fundadores no participan. Mientras está abierta sale hasta arriba de la comunidad como «Participa en la rifa · Llévate créditos de VyMotion», sin decir cuántos. Rifa cuando quieras y cuantas veces quieras, cada vez con su premio: nadie gana dos veces en la misma rifa. Cada ganador recibe sus créditos en su cuenta de voz, el aviso en su VyMotion y un correo.
       </p>
       {error && <p className="bad small">{error}</p>}
       {panel && !a && (
@@ -133,7 +133,7 @@ export function RifaAdmin() {
                       aria-label={`Nombre del premio ${i + 1}`}
                       type="text"
                       maxLength={140}
-                      placeholder={x.creditos > 0 ? premioDe(x.creditos) : 'Escribe qué es: una clave de Sloth PRO, una playera…'}
+                      placeholder={x.creditos > 0 ? premioDe(x.creditos) : 'Escribe qué es: una clave de VyMotion PRO, una playera…'}
                       value={f.premio}
                       onChange={(e) => cambiarFila(i, { premio: e.target.value })}
                     />
@@ -159,7 +159,7 @@ export function RifaAdmin() {
               créditos, se le suman a su cuenta de voz en cuanto la ruleta lo elige; sin créditos, el premio lo das tú y su aviso y su correo dicen que le
               escribes.
             </p>
-            {cerrada && <p className="bad small ancho">Las voces de Sloth aún son solo para ti: los créditos se rifan cuando se publique la actualización que las abre. Puedes rifar algo sin créditos (0).</p>}
+            {cerrada && <p className="bad small ancho">Las voces de VyMotion aún son solo para ti: los créditos se rifan cuando se publique la actualización que las abre. Puedes rifar algo sin créditos (0).</p>}
             <div className="admin-rifa-botones ancho">
               <button className="ruleta-girar" disabled={!entran.length || !valido || cerrada} title={entran.length ? undefined : 'Nadie más puede ganar todavía'}>
                 Rifar
@@ -213,7 +213,7 @@ function Ganadores({ ganadores, onCambio }: { ganadores: GanadorRifa[]; onCambio
       <h2 className="admin-rifa-subtitulo">Ganadores</h2>
       {error && <p className="bad small">{error}</p>}
       <Tabla
-        cabeza={['Cuándo', 'Premio', 'Ganó', 'Entrega', 'Correo', 'Lo vio en Sloth', '']}
+        cabeza={['Cuándo', 'Premio', 'Ganó', 'Entrega', 'Correo', 'Lo vio en VyMotion', '']}
         filas={ganadores.map((g) => [
           fecha(g.cuando),
           g.premio,
@@ -377,7 +377,7 @@ function Ruleta({ sorteo: pedido, nombres, onCerrar }: { sorteo: { rifa: string;
           <path className="ruleta-flecha" d={`M${C - 22} 0L${C + 22} 0L${C} 48Z`} />
         </svg>
         <div className="ruleta-lado">
-          <span className="admin-antetitulo">Rifa de Sloth</span>
+          <span className="admin-antetitulo">Rifa de VyMotion</span>
           <h2>{acabo ? (total > 1 ? '¡Ya hay ganadores!' : '¡Ya hay ganador!') : girando ? 'Girando…' : sorteo ? 'Siguiente ganador' : `Entre ${num(nombres.length)} ${nombres.length === 1 ? 'persona' : 'personas'}`}</h2>
           {!acabo && premioDelGiro && (
             <p className="ruleta-premio">
@@ -403,7 +403,7 @@ function Ruleta({ sorteo: pedido, nombres, onCerrar }: { sorteo: { rifa: string;
           {error && <p className="bad small">{error}</p>}
           {acabo ? (
             <>
-              <p className="muted small">Su aviso en Sloth y su correo ya van en camino. La rifa sigue abierta: puedes volver a rifar cuando quieras.</p>
+              <p className="muted small">Su aviso en VyMotion y su correo ya van en camino. La rifa sigue abierta: puedes volver a rifar cuando quieras.</p>
               <button className="ruleta-girar" onClick={onCerrar}>
                 Listo
               </button>

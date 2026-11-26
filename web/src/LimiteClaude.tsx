@@ -1,115 +1,55 @@
-import { useEffect, useRef, useState } from 'react'
-import type { CuentaClaude, LimitesClaude } from '../../shared/types'
+import { useEffect, useState } from 'react'
+import type { LimitesClaude } from '../../shared/types'
 import { api } from './api'
-import { reinicio } from './LimitesContexto'
 import { Picker } from './Composer'
-import { MarcaAgente } from './Logos'
+import { reinicio } from './LimitesContexto'
 
-/** Lo que queda por debajo de esto ya cuenta como lleno: lo mismo que pinta de rojo «Uso». */
-const LLENO = 10
+type CuentaHilo = { alternativas: { id: string; quien: string }[] }
 
-/**
- * En el aviso «Llegaste al límite de tu plan de Claude» (`Fallo` en Timeline.tsx), sin abrir «Uso»: cuánto queda del límite
- * que se llenó y cuándo vuelve; «Seguir con otra cuenta», una de las ya autorizadas, y «Usar otra cuenta de Claude», que
- * agrega una como Opciones → Agentes. El hilo pasa a ella con el resumen de lo hablado (`cambiarCuentaClaude`) y sigue
- * solo (`onSeguir`). Si entra con la misma, lo dice. Con la llave de API no hay plan ni cuenta que cambiar.
- */
-export function LimiteClaude({ hilo, onSeguir, ocupado }: { hilo?: string; onSeguir(): Promise<unknown>; ocupado: boolean }) {
-  // Las otras cuentas de Claude ya autorizadas (`server/perfiles-agentes.ts`): el hilo sigue en una con el resumen.
-  const [otras, setOtras] = useState<{ id: string; quien: string }[]>([])
-  const [pasando, setPasando] = useState(false)
-  useEffect(() => {
-    if (!hilo) return
-    let vivo = true
-    api<{ alternativas: { id: string; quien: string }[] }>(`/api/sessions/${hilo}/cuenta-claude`).then((r) => vivo && setOtras(r.alternativas), () => {})
-    return () => {
-      vivo = false
-    }
-  }, [hilo])
+/** Muestra los límites del perfil del hilo y permite pasar su resumen a otra cuenta. */
+export function LimiteClaude({ hilo, onSeguir, ocupado }: { hilo: string; onSeguir(): Promise<unknown>; ocupado: boolean }) {
+  const [datos, setDatos] = useState<CuentaHilo>()
   const [limites, setLimites] = useState<LimitesClaude>()
-  const [cuenta, setCuenta] = useState<CuentaClaude>()
-  const [nota, setNota] = useState<{ texto: string; mal?: boolean }>()
-  // El correo con que se pulsó «Usar otra cuenta»; mientras no haya, no se está cambiando.
-  const antes = useRef<string | undefined>(undefined)
-  const leerCuenta = () => api<CuentaClaude>('/api/claude/cuenta').then(setCuenta, () => {})
+  const [error, setError] = useState('')
+  const [cambiando, setCambiando] = useState(false)
+  const ruta = `/api/sessions/${hilo}/cuenta-claude`
   useEffect(() => {
-    void api<LimitesClaude>(`/api/claude/limites${hilo ? `?hilo=${encodeURIComponent(hilo)}` : ''}`).then(setLimites, () => {})
-    void leerCuenta()
-  }, [])
+    let vigente = true
+    void api<CuentaHilo>(ruta).then(d => { if (vigente) setDatos(d) }, e => { if (vigente) setError(e.message) })
+    void api<LimitesClaude>(`/api/claude/limites?hilo=${encodeURIComponent(hilo)}`).then(d => { if (vigente) setLimites(d) }, () => {})
+    return () => { vigente = false }
+  }, [hilo, ruta])
 
-  // Mientras autorizas en el navegador, se mira cada dos segundos si ya entraste.
-  const conectando = !!cuenta?.conectando
-  useEffect(() => {
-    if (!conectando) return
-    const id = setInterval(leerCuenta, 2000)
-    return () => clearInterval(id)
-  }, [conectando])
+  if (limites?.llave) return null
+  const ventanas = (limites?.ventanas ?? []).map(v => ({ ...v, queda: Math.max(0, Math.round(100 - v.uso)) }))
+  const llenas = ventanas.filter(v => v.queda <= 10)
+  const relevantes = llenas.length ? llenas : ventanas.sort((a, b) => a.queda - b.queda).slice(0, 1)
 
-  useEffect(() => {
-    if (antes.current === undefined || !cuenta || cuenta.conectando) return
-    const era = antes.current
-    antes.current = undefined
-    if (cuenta.error || !cuenta.conectada) return setNota({ texto: cuenta.error ?? 'No se terminó de autorizar la cuenta. Vuelve a intentarlo.', mal: true })
-    if (cuenta.quien === era)
-      return setNota({ texto: `Entraste otra vez con ${era}. Para usar otra, cierra sesión en claude.ai y vuelve a pulsar «Usar otra cuenta».`, mal: true })
-    setNota({ texto: `Sigue con ${cuenta.quien}.` })
-    // La agregada es ya la activa: el hilo pasa a ella.
-    ;(hilo ? api(`/api/sessions/${hilo}/cuenta-claude`, { id: 'activa' }) : Promise.resolve())
-      .then(() => onSeguir())
-      .catch((e) => setNota({ texto: e instanceof Error ? e.message : String(e), mal: true }))
-  }, [cuenta])
-
-  if (cuenta?.llave?.activa || limites?.llave) return null
-  const llenos = (limites?.ventanas ?? []).map((v) => ({ ...v, queda: Math.max(0, Math.round(100 - v.uso)) }))
-  // Los que se llenaron; si la lectura aún no lo ve, el que menos tiene.
-  const vistos = llenos.filter((v) => v.queda <= LLENO)
-  const ventanas = vistos.length ? vistos : [...llenos].sort((a, b) => a.queda - b.queda).slice(0, 1)
-
-  function otra() {
-    setNota(undefined)
-    antes.current = cuenta?.quien ?? ''
-    api<CuentaClaude>('/api/claude/conectar', { perfil: 'nueva' }).then(setCuenta, (e) => {
-      antes.current = undefined
-      setNota({ texto: e instanceof Error ? e.message : String(e), mal: true })
-    })
+  async function seguirCon(id: string) {
+    setCambiando(true)
+    setError('')
+    try {
+      await api(ruta, { id })
+      await onSeguir()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setCambiando(false)
+    }
   }
 
-  return (
-    <>
-      {ventanas.map((v) => (
-        <span key={v.nombre} className="turn-ayuda-linea">
-          {v.nombre}: <b className={v.queda <= LLENO ? 'bad' : ''}>{v.queda} % disponible</b>
-          {v.reinicia && ` · se restablece en ${reinicio(v.reinicia, Date.now())}`}
-        </span>
-      ))}
-      {conectando ? (
-        <span className="turn-ayuda-linea">
-          Autoriza la otra cuenta en la pestaña que se abrió. Si entra sola con {cuenta?.quien ?? 'la de antes'}, cierra sesión en
-          claude.ai y elige la otra.
-        </span>
-      ) : (
-        nota && <span className={`turn-ayuda-linea ${nota.mal ? 'bad' : ''}`}>{nota.texto}</span>
-      )}
-      {hilo && otras.length > 0 && (
-        <Picker
-          label={pasando ? 'Pasando el hilo…' : 'Seguir con otra cuenta de Claude'}
-          value=""
-          disabled={ocupado || pasando}
-          groups={[{ label: 'Tus cuentas de Claude', options: otras.map((c) => ({ value: c.id, label: c.quien })) }]}
-          onChange={(id) => {
-            setPasando(true)
-            setNota(undefined)
-            api(`/api/sessions/${hilo}/cuenta-claude`, { id })
-              .then(() => onSeguir())
-              .catch((e) => setNota({ texto: e instanceof Error ? e.message : String(e), mal: true }))
-              .finally(() => setPasando(false))
-          }}
-        />
-      )}
-      <button className="seguir-con" disabled={ocupado || conectando || !cuenta} title={cuenta?.quien ? `Ahora trabaja con ${cuenta.quien}` : undefined} onClick={otra}>
-        <MarcaAgente de="claude" />
-        {conectando ? 'Esperando al navegador…' : 'Usar otra cuenta de Claude'}
-      </button>
-    </>
-  )
+  return <>
+    {relevantes.map(v => <span key={v.nombre} className="turn-ayuda-linea">
+      {v.nombre}: <b className={v.queda <= 10 ? 'bad' : ''}>{v.queda} % disponible</b>
+      {v.reinicia && ` · se restablece en ${reinicio(v.reinicia, Date.now())}`}
+    </span>)}
+    {error && <span className="turn-ayuda-linea bad">{error}</span>}
+    {!!datos?.alternativas.length ? <Picker
+      label="Seguir con otra cuenta de Claude"
+      value=""
+      disabled={ocupado || cambiando}
+      groups={[{ label: 'Cuentas de Claude', options: datos.alternativas.map(c => ({ value: c.id, label: c.quien })) }]}
+      onChange={id => void seguirCon(id)}
+    /> : <a className="turn-ayuda-linea" href="#/opciones/agentes">Gestionar cuentas de Claude</a>}
+  </>
 }

@@ -1,14 +1,7 @@
-/* YouTube reutiliza las filas de Opciones, los botones de Entrega y el modal de Sloth. */
+/* YouTube reutiliza las filas de Opciones, los botones de Entrega y el modal de VyMotion. */
 .youtube-pagina { display: flex; flex: 1; min-width: 0; min-height: 0; height: 100%; padding: 20px 24px; }
 .youtube-pagina .youtube-revision { width: 100%; height: 100%; max-height: none; border: 0; border-radius: 0; background: transparent; }
 .youtube-pagina .youtube-revision-head { padding-top: 8px; }
-.youtube-pagina .youtube-revision-head > button { order: -1; display: inline-flex; align-items: center; gap: 6px; align-self: flex-start; white-space: nowrap; }
-.youtube-pagina .youtube-revision-head > button .ico { width: 15px; height: 15px; }
-.youtube-pagina .youtube-revision-head > div { flex: 1; }
-.youtube-pagina .youtube-revision-pie { background: var(--bg); }
-.youtube-revision .youtube-chat { display: inline-flex; align-items: center; gap: 7px; white-space: nowrap; }
-.youtube-revision .youtube-chat .ico { width: 15px; height: 15px; }
-@media (max-width: 900px) { .youtube-pagina { padding: 12px 8px; } }
 .youtube-pagina .youtube-revision-head > button { order: -1; white-space: nowrap; }
 .youtube-pagina .youtube-revision-head > div { flex: 1; }
 .youtube-pagina .youtube-revision-pie { background: var(--bg); }
@@ -35,6 +28,10 @@
 .youtube-boton:hover { color: var(--amber); border-color: var(--amber); }
 .youtube-lote-barra { display: flex; flex: none; align-items: center; justify-content: space-between; gap: 14px; padding: 12px 16px; border: 1px solid var(--line); border-radius: var(--radio); background: var(--panel-2); }
 .youtube-lote-barra > div { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; }
+.youtube-lote-titulo { display: inline-flex; align-items: center; gap: 6px; }
+.youtube-lote-titulo .logo { width: 22px; height: 22px; flex: none; }
+.youtube-lote-acciones :is(.primary, .boton) { display: inline-flex; align-items: center; justify-content: center; gap: 7px; }
+.youtube-lote-acciones button > .ico { width: 15px; height: 15px; flex: none; }
 .youtube-lote-barra .primary { padding: 7px 14px; font-size: 13px; flex: none; }
 .youtube-lote-acciones { justify-content: flex-end; }
 .youtube-lote-acciones .boton { padding: 7px 12px; border: 1px solid var(--line); border-radius: 8px; font-size: 13px; }
@@ -88,9 +85,7 @@
 .youtube-herramientas > label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--muted); }
 .youtube-herramientas .boton { padding: 7px 12px; }
 .youtube-herramientas .ghost { padding: 7px 4px; font-size: 12px; }
-.youtube-revision .desplegable.campo { display: flex; }
-.youtube-revision .desplegable.campo > .picker-trigger { min-height: 36px; padding: 8px 10px; background: var(--panel-2); font-size: 13px; }
-.youtube-revision input:not([type=checkbox]):not([type=file]), .youtube-revision textarea { min-width: 0; width: 100%; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel-2); color: var(--text); font-size: 13px; }
+.youtube-revision input:not([type=checkbox]):not([type=file]), .youtube-revision textarea, .youtube-revision select { min-width: 0; width: 100%; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel-2); color: var(--text); font-size: 13px; }
 .youtube-revision input[type=checkbox] { accent-color: var(--amber); }
 .youtube-revision :focus-visible { outline: 1px solid var(--amber); outline-offset: 2px; }
 .youtube-revision input:disabled, .youtube-revision select:disabled, .youtube-revision textarea:disabled { opacity: 0.7; }

@@ -1,6 +1,6 @@
 ---
 name: modelos-3d
-description: La biblioteca de modelos 3D de los videos (three.js en Remotion), para no hacer dos veces el mismo. Antes de modelar cualquier objeto 3D, búscalo aquí y tráelo al proyecto; si no está o no alcanza, hazlo o mejóralo con el formato de la biblioteca y guárdalo para los siguientes videos. Se ve en Sloth, en «Modelos 3D».
+description: La biblioteca de modelos 3D de los videos (three.js en Remotion), para no hacer dos veces el mismo. Antes de modelar cualquier objeto 3D, búscalo aquí y tráelo al proyecto; si no está o no alcanza, hazlo o mejóralo con el formato de la biblioteca y guárdalo para los siguientes videos. Se ve en VyMotion, en «Modelos 3D».
 ---
 
 # La biblioteca de modelos 3D
@@ -8,9 +8,9 @@ description: La biblioteca de modelos 3D de los videos (three.js en Remotion), p
 El usuario va a hacer muchos videos con 3D y no quiere que se desperdicie ninguno: **antes de hacer un modelo se busca
 aquí, y lo que se hace se guarda aquí.** Cada modelo es un componente de React Three Fiber con su miniatura
 (`modelos/<id>/vista.webp`, `vista.webm` con la cámara que se mece y `vuelta.webm` con la vuelta entera, que se gira
-arrastrando en su ficha) y su ficha (`modelo.json`: qué es, para qué sirve, sus etiquetas y de qué video salió). Sloth
+arrastrando en su ficha) y su ficha (`modelo.json`: qué es, para qué sirve, sus etiquetas y de qué video salió). VyMotion
 los enseña en «Modelos 3D», en la barra de la izquierda, y en la ficha de cada uno lo gira de verdad con el visor 3D de
-toda la biblioteca (`visor.tsx`, que `modelos.py visor` arma en `visor/`; `vista` lo vuelve a armar, y Sloth también
+toda la biblioteca (`visor.tsx`, que `modelos.py visor` arma en `visor/`; `vista` lo vuelve a armar, y VyMotion también
 solo si le falta un modelo).
 
 Todo se hace con `scripts/modelos.py` (sin dependencias). Salvo `buscar`, se corre en la carpeta del proyecto del video:
@@ -93,7 +93,7 @@ python -B -X utf8 <esta skill>/scripts/modelos.py guardar <id> --nombre "Caja fu
   --hace "se abre; el candado se abre" --etiquetas "caja fuerte, bóveda, ahorro, bloqueado" [--cuadro 20]
 ```
 
-Su ficha es lo que el usuario lee en Sloth para decidir si le sirve, así que cada campo dice algo distinto:
+Su ficha es lo que el usuario lee en VyMotion para decidir si le sirve, así que cada campo dice algo distinto:
 
 - `--resumen`: para qué sirve, en pocas palabras (45 letras como mucho). Va debajo del nombre en el cartel.
 - `--categoria`: su tipo, uno de `categorias.json` (Protagonistas, Objetos, Logos e íconos, Medidores, Flujos,
@@ -117,10 +117,10 @@ vuelve a guardar. Al mejorar uno, solo se pasa lo que cambió; `--hace` y `--eti
 
 La biblioteca es de cada quien y empieza vacía: la moneda y el ícono 3D que trae la plantilla del explicativo están
 en `plantilla/`, que `usar` encuentra y `buscar` no enseña (si mejoras uno y lo guardas, pasa a la biblioteca). Lo
-guardado queda en la biblioteca de esta computadora (`modelos/` de esta skill), que se ve en «Modelos 3D» de Sloth: al
+guardado queda en la biblioteca de esta computadora (`modelos/` de esta skill), que se ve en «Modelos 3D» de VyMotion: al
 entregar el video, dile al usuario qué modelos sumaste o mejoraste.
 
-## 6. Un modelo sin video («Nuevo modelo» en Sloth)
+## 6. Un modelo sin video («Nuevo modelo» en VyMotion)
 
 Desde «Modelos 3D», el usuario describe un objeto (a veces con una imagen de referencia, que llega en su mensaje: **mírala**
 antes de modelar) y se abre un hilo en una carpeta propia, vacía. Ahí:
@@ -129,8 +129,9 @@ antes de modelar) y se abre un hilo en una carpeta propia, vacía. Ahí:
 2. `python -B -X utf8 <esta skill>/scripts/modelos.py nuevo <id> --nombre "…" --descripcion "…"` hace de la carpeta un
    proyecto de prueba (Remotion y three, con el `node_modules` que comparten los videos explicativos) y deja el andamio en
    `src/modelos/<id>.tsx`.
-3. Escribe el modelo con las reglas de (4), `vista <id>`, **mírala**, corrige, y `guardar` (5) con su ficha entera.
-4. Dile al usuario que ya está en «Modelos 3D» y qué puede hacer.
+3. Identifica en la referencia los rasgos que determinan el parecido. En un personaje, compara la altura de la cabeza con la del cuerpo, la separación de los ojos, el perfil de nariz y mentón, los bordes de la ropa, los dedos y el calzado. Modela el relieve y las uniones que se ven al girarlo. Ajusta el material de cada superficie según la luz de la referencia.
+4. Escribe el modelo con las reglas de (4) y ejecuta `revisar <id>`. Abre los tres PNG de `out/revision-3d/<id>/` y compáralos con las imágenes originales. Usa la vista más próxima a la foto para comprobar el parecido y las otras dos para detectar piezas flotantes, intersecciones o caras planas. Corrige las diferencias visibles y repite la revisión. Luego ejecuta `guardar` (5) con su ficha y solo las acciones implementadas.
+5. Dile al usuario que ya está en «Modelos 3D» y qué puede hacer.
 
-`importar` es de Sloth («Importar .glb», sin agente): mete un `.glb` hecho fuera con un componente que lo carga, lo centra
+`importar` es de VyMotion («Importar .glb», sin agente): mete un `.glb` hecho fuera con un componente que lo carga, lo centra
 y lo escala, y abre los comprimidos con Draco o Meshopt.

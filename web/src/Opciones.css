@@ -209,17 +209,17 @@
 .logo.chico img { width: 18px; height: 18px; }
 .logos { flex: none; display: flex; padding-right: 4px; }
 .logos .logo + .logo { margin-left: -5px; }
-/* Los colores de cada marca, solo en su logo. Los demás van sobre el fondo de Sloth. */
+/* Los colores de cada marca, solo en su logo. Los demás van sobre el fondo de VyMotion. */
 .logo-claude { background: #d97757; box-shadow: none; }
 .logo-codex { background: #000; box-shadow: none; }
 .logo-opencode { background: #f1ecec; box-shadow: none; }
 .logo-deepseek { background: #4d6bfe; box-shadow: none; }
-.logo-cursor, .logo-grok, .logo-elevenlabs, .logo-openrouter, .logo-freellmapi { background: #000; box-shadow: none; }
+.logo-cursor, .logo-grok, .logo-elevenlabs { background: #000; box-shadow: none; }
 .logo-muse { background: #0467df; box-shadow: none; }
 .logo-ffmpeg { background: #007808; box-shadow: none; }
 .logo-paquetes { background: #3775a9; box-shadow: none; }
 .logo-instagram { background: radial-gradient(circle at 30% 107%, #fdf497 0%, #fdf497 5%, #fd5949 45%, #d6249f 60%, #285aeb 90%); box-shadow: none; }
-.logo.chico:is(.logo-claude, .logo-codex, .logo-opencode, .logo-deepseek, .logo-openrouter, .logo-freellmapi, .logo-cursor, .logo-grok, .logo-elevenlabs, .logo-muse, .logo-ffmpeg, .logo-paquetes, .logo-instagram) { box-shadow: 0 0 0 2px var(--panel-2); }
+.logo.chico:is(.logo-claude, .logo-codex, .logo-opencode, .logo-deepseek, .logo-cursor, .logo-grok, .logo-elevenlabs, .logo-muse, .logo-ffmpeg, .logo-paquetes, .logo-instagram) { box-shadow: 0 0 0 2px var(--panel-2); }
 
 /* La línea de debajo del nombre cuando se abre (las herramientas) o despliega (la cuenta de Claude). */
 .resumen, .sub .picker-trigger { align-self: flex-start; display: inline-flex; align-items: center; gap: 6px; height: auto; margin-left: -6px; padding: 1px 6px; border-radius: 6px; color: var(--muted); font-size: 12px; transition: color 0.15s, background 0.15s; }
@@ -274,91 +274,7 @@
 .limite-barra.alto span { background: var(--amber); }
 .limite-barra.lleno span { background: var(--bad); }
 
-/* El saldo de voz de Sloth, con la misma barra de consumo que los planes de los agentes. */
+/* El saldo de voz de VyMotion, con la misma barra de consumo que los planes de los agentes. */
 .creditos-sloth { font-size: 12px; }
 .creditos-sloth > .limite-nombre:first-child { align-items: baseline; color: var(--text); }
 .creditos-sloth > .limite-nombre > strong { font-size: 24px; line-height: 1.2; font-weight: 600; }
-/* Desde la web: pegar la dirección de vuelta de un inicio de sesión (VueltaWeb). */
-.vuelta-web { display: flex; flex-direction: column; gap: 6px; }
-.vuelta-web p { margin: 0; }
-.vuelta-web form { display: flex; gap: 8px; }
-.vuelta-web input { flex: 1; min-width: 0; height: 30px; padding: 0 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--panel-2); color: var(--text); font-size: 12px; }
-
-/* Tu celular (`Celular.tsx`): el QR a la izquierda y, a su lado, cómo escanearlo, las direcciones y la llave. */
-.item.celular { display: flex; gap: 20px; align-items: flex-start; padding: 16px; }
-.celular-qr { flex: none; width: 176px; height: 176px; border-radius: 8px; }
-.celular-texto { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 8px; font-size: 12.5px; }
-.celular-texto strong { font-size: 13.5px; }
-.celular-texto ol { margin: 0; padding-left: 18px; color: var(--suave); }
-.celular-texto p { margin: 0; }
-.celular-direcciones { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 4px; }
-.celular-direcciones li { display: flex; flex-direction: column; }
-.celular-botones { display: flex; gap: 16px; }
-.celular-botones button { display: inline-flex; align-items: center; gap: 6px; }
-.celular-botones svg { width: 14px; height: 14px; }
-
-/* La actividad de los agentes (ActividadAgente.tsx): cifras, la tendencia o el calendario, y el detalle del día. */
-.actividad-agente { gap: 14px; padding: clamp(10px, 2cqw, 18px); }
-.actividad-agente p { margin: 0; }
-.actividad-titulo { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 10px; }
-.actividad-titulo > span { margin-left: auto; color: var(--muted); font-size: 12px; }
-.actividad-encabezado { display: grid; grid-template-columns: 1.35fr 1fr 1fr; padding: 8px 0; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; }
-.actividad-encabezado > div { display: grid; align-content: start; min-width: 0; padding: 0 clamp(7px, 1.5cqw, 14px); }
-.actividad-encabezado > div + div { border-left: 1px solid var(--line); }
-.actividad-encabezado span { color: var(--muted); font-size: 11px; }
-.actividad-encabezado strong { overflow-wrap: anywhere; font-size: clamp(15px, 2.8cqw, 24px); line-height: 1.3; font-variant-numeric: tabular-nums; }
-.actividad-contenido { display: grid; grid-template-columns: minmax(0, 1fr) minmax(138px, .48fr); align-items: start; gap: 12px; }
-.actividad-contenido-tendencia { grid-template-columns: minmax(0, 1fr); }
-.actividad-vacia { display: flex; align-items: center; gap: 12px; padding: 14px; border: 1px dashed var(--line); border-radius: 8px; background: var(--panel); }
-.actividad-vacia > .ico { flex: none; width: 21px; height: 21px; color: var(--amber); }
-.actividad-vacia p { color: var(--muted); font-size: 12px; }
-.actividad-vistas { display: flex; flex-wrap: wrap; gap: 3px; align-self: flex-start; padding: 3px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; }
-.actividad-vistas button { padding: 4px 10px; border-radius: 5px; color: var(--muted); font-size: 12px; }
-.actividad-vistas button:hover { color: var(--text); }
-.actividad-vistas button[aria-pressed='true'] { background: var(--amber-tinte); color: var(--text); }
-.actividad-tendencia { min-width: 0; padding: 8px 8px 5px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); }
-.actividad-tendencia canvas { display: block; width: 100%; height: clamp(136px, 24cqw, 220px); cursor: crosshair; }
-.actividad-tendencia-pie { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 12px; padding: 0 5px 4px; color: var(--muted); font-size: 11px; }
-.actividad-tendencia-pie span { display: inline-flex; align-items: center; gap: 5px; }
-.actividad-tendencia-pie i { display: inline-block; width: 9px; height: 3px; border-radius: 2px; }
-.actividad-tendencia-pie input { appearance: none; flex: 0 1 125px; min-width: 48px; height: 18px; margin: 0 0 0 auto; background: transparent; cursor: ew-resize; }
-.actividad-tendencia-pie input::-webkit-slider-runnable-track { height: 3px; border-radius: 3px; background: var(--line); }
-.actividad-tendencia-pie input::-webkit-slider-thumb { appearance: none; width: 11px; height: 11px; margin-top: -4px; border: 2px solid var(--panel); border-radius: 50%; background: var(--amber); box-shadow: 0 0 0 1px var(--amber); }
-.actividad-tendencia-pie input:focus-visible { outline: 1px solid var(--amber); outline-offset: 2px; border-radius: 4px; }
-.actividad-contenido-tendencia .actividad-detalle dl { grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: 4px 14px; }
-.actividad-scroll { min-width: 0; overflow-x: auto; padding: 3px; container-type: inline-size; --celda: clamp(12px, calc((100cqw - (var(--semanas) - 1) * 4px) / var(--semanas)), 30px); }
-.actividad-meses, .actividad-calendario { display: grid; width: max-content; gap: 4px; grid-auto-flow: column; grid-auto-columns: var(--celda); }
-.actividad-meses { margin-bottom: 5px; font-size: 10px; color: var(--muted); }
-.actividad-meses span { white-space: nowrap; }
-.actividad-calendario { grid-template-rows: repeat(7, var(--celda)); }
-.actividad-calendario button, .actividad-leyenda span { border: 1px solid var(--line); border-radius: 3px; background: color-mix(in srgb, var(--amber) var(--intensidad), var(--panel)); }
-.actividad-calendario button.con-turnos { border-color: color-mix(in srgb, var(--amber) 45%, var(--line)); animation: actividad-entrada 220ms ease-out; }
-.actividad-calendario button:hover { border-color: var(--text); }
-.actividad-calendario button[aria-pressed='true'] { outline: 1px solid var(--amber); outline-offset: 1px; }
-.actividad-leyenda { display: flex; align-items: center; gap: 4px; margin-top: 8px; color: var(--muted); font-size: 10px; }
-.actividad-leyenda span { width: 10px; height: 10px; }
-.actividad-detalle { display: grid; gap: 5px; align-content: start; padding: 10px 11px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); font-size: 12px; color: var(--muted); }
-.actividad-detalle strong { color: var(--text); }
-.actividad-detalle dl { display: grid; gap: 2px; margin: 0; }
-.actividad-detalle dl div { display: flex; justify-content: space-between; gap: 5px; }
-.actividad-detalle dd { margin: 0; color: var(--text); font-variant-numeric: tabular-nums; }
-.actividad-barras { display: flex; height: 5px; overflow: hidden; border-radius: 8px; transform-origin: left; animation: actividad-barra 240ms ease-out; }
-.actividad-barras .input { background: var(--amber); }
-.actividad-barras .cacheRead { background: color-mix(in srgb, var(--amber) 50%, var(--panel)); }
-.actividad-barras .output { background: var(--amber-2); }
-@keyframes actividad-entrada { from { opacity: 0.4; } }
-@keyframes actividad-barra { from { transform: scaleX(0); } }
-@media (prefers-reduced-motion: reduce) {
-  .actividad-calendario button.con-turnos, .actividad-barras { animation: none; }
-}
-@media (prefers-reduced-motion: no-preference) {
-  .actividad-tendencia canvas { animation: revelar-grafica 420ms ease-out both; }
-  @keyframes revelar-grafica { from { clip-path: inset(0 100% 0 0); opacity: .65; } }
-}
-@media (max-width: 690px) { .actividad-contenido { grid-template-columns: minmax(0, 1fr); } }
-.actividad-calendario button:focus-visible { outline: 2px solid var(--amber); outline-offset: 1px; }
-
-/* Las cuentas de Claude o de ChatGPT (CuentasDelAgente en Opciones.tsx). */
-.cuentas-agente-lista { margin: 8px 0 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 2px; }
-.cuentas-agente-lista li { display: flex; align-items: center; gap: 10px; padding: 4px 0; font-size: 13px; }
-.cuentas-agente-lista li > span:first-child { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

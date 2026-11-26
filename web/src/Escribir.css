@@ -25,10 +25,8 @@
 .esc-estilo { height: 100%; display: flex; align-items: center; gap: 8px; padding: 0 30px 0 12px; color: var(--text); font-size: 12.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .esc-estilo .esc-ico { color: var(--amber); flex: none; }
 .esc-miniatura.subiendo .esc-estilo { color: var(--muted); }
-/* El estilo que se adjunta: un desplegable con la cara de los otros botones de adjuntar. */
-.esc-elegir-estilo { color: var(--muted); font-size: 12.5px; font-weight: 600; }
-.esc-elegir-estilo > .picker-trigger { height: 30px; padding: 0 9px; border-radius: 999px; }
-.esc-elegir-estilo > .picker-trigger:hover:not(:disabled), .esc-elegir-estilo.open > .picker-trigger { background: var(--line); color: var(--text); }
+.esc-elegir-estilo select { appearance: none; border: 0; outline: none; background: none; color: inherit; font: inherit; cursor: pointer; }
+.esc-elegir-estilo select option { background: var(--panel); color: var(--text); }
 .esc-miniatura img, .esc-miniatura video { width: 100%; height: 100%; object-fit: cover; display: block; }
 .esc-miniatura button { position: absolute; top: 4px; right: 4px; width: 20px; height: 20px; display: grid; place-items: center; border-radius: 50%; background: color-mix(in srgb, var(--bg) 82%, transparent); color: var(--text); font-size: 13px; line-height: 1; opacity: 0; transition: opacity 0.15s; }
 .esc-miniatura:hover button, .esc-miniatura button:focus-visible { opacity: 1; }
@@ -94,3 +92,57 @@
 @media (max-width: 720px) {
   .esc-pista { display: none; }
 }
+
+
+/* Vidrio negro donde se escribe, como las tarjetas de la comunidad; al escribir, el aro verde del «sí». */
+.esc {
+  border-color: color-mix(in srgb, var(--text) 12%, transparent);
+  background: linear-gradient(160deg, color-mix(in srgb, var(--text) 7%, transparent), transparent 42%), color-mix(in srgb, var(--bg) 62%, transparent);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--text) 12%, transparent);
+}
+.esc.compacto { background: color-mix(in srgb, var(--bg) 50%, transparent); }
+.esc:focus-within {
+  border-color: color-mix(in srgb, var(--ok) 42%, transparent);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--text) 12%, transparent), 0 0 0 4px color-mix(in srgb, var(--ok) 13%, transparent);
+}
+.esc.soltando { border-color: var(--ok); box-shadow: 0 0 0 4px color-mix(in srgb, var(--ok) 16%, transparent); }
+
+/* Publicar o comentar: cristal verde. Cancelar, cristal gris. */
+.esc-listo {
+  border: 1px solid color-mix(in srgb, var(--ok) 60%, var(--bg));
+  background: linear-gradient(180deg, color-mix(in srgb, var(--ok) 55%, var(--text)) 0%, var(--ok) 52%, color-mix(in srgb, var(--ok) 72%, var(--bg)) 100%);
+  color: var(--sobre-ambar);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--text) 55%, transparent), inset 0 -3px 6px color-mix(in srgb, var(--ok) 35%, var(--bg)), 0 6px 18px color-mix(in srgb, var(--ok) 22%, transparent);
+}
+.esc-listo:hover:not(:disabled) {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--ok) 65%, var(--text)) 0%, var(--ok) 52%, color-mix(in srgb, var(--ok) 72%, var(--bg)) 100%);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--text) 60%, transparent), inset 0 -3px 6px color-mix(in srgb, var(--ok) 35%, var(--bg)), 0 10px 26px color-mix(in srgb, var(--ok) 32%, transparent);
+  transform: translateY(-2px);
+}
+.esc-listo:disabled { border-color: color-mix(in srgb, var(--text) 10%, transparent); background: color-mix(in srgb, var(--text) 6%, transparent); color: var(--muted); box-shadow: none; }
+.esc-cancelar { border: 1px solid color-mix(in srgb, var(--text) 11%, transparent); background: color-mix(in srgb, var(--text) 5%, transparent); }
+.esc-cancelar:hover { background: color-mix(in srgb, var(--text) 11%, transparent); border-color: color-mix(in srgb, var(--text) 20%, transparent); color: var(--text); }
+
+/* Captura, Video y Estilo: cristal negro, cada uno con su icono de color. El de ayuda, con el color de su agente. */
+.esc-adjuntar {
+  border: 1px solid color-mix(in srgb, var(--text) 11%, transparent);
+  background: color-mix(in srgb, var(--text) 5%, transparent);
+  color: var(--suave);
+  transition: color 0.15s, background 0.15s, border-color 0.15s, transform 0.14s;
+}
+.esc-adjuntar:hover:not(:disabled), .esc-adjuntar.on {
+  background: color-mix(in srgb, var(--tono, var(--text)) 14%, transparent);
+  border-color: color-mix(in srgb, var(--tono, var(--text)) 42%, transparent);
+  color: var(--text);
+  transform: translateY(-1px);
+}
+.esc-adjuntar .ico, .esc-adjuntar .com-ico { color: var(--tono, var(--muted)); }
+.esc-adjuntar[data-de='captura'] { --tono: var(--acento-imagen); }
+.esc-adjuntar[data-de='video'] { --tono: var(--acento-claude); }
+.esc-adjuntar[data-de='estilo'] { --tono: var(--acento-voz); }
+.esc.soltando .esc-adjuntar[data-de='captura'] { --tono: var(--ok); color: var(--ok); }
+.esc-ayuda {
+  border: 1px solid color-mix(in srgb, var(--text) 11%, transparent);
+  background: color-mix(in srgb, var(--text) 5%, transparent);
+}
+.esc-ayuda:hover:not(:disabled) { background: color-mix(in srgb, var(--text) 11%, transparent); border-color: color-mix(in srgb, var(--text) 20%, transparent); }

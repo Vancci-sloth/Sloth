@@ -9,7 +9,7 @@ import momentos from "./datos/momentos.json";
 import { CON_PERSONAJE } from "./marca";
 
 /**
- * El formato del video, el que eligió el usuario en Sloth (la línea `Formato:`; `nuevo.py --formato` lo deja en
+ * El formato del video, el que eligió el usuario en VyMotion (la línea `Formato:`; `nuevo.py --formato` lo deja en
  * datos/formato.json): vertical, 1080×1920 (TikTok, Reels, Shorts), u horizontal, 1920×1080 (YouTube). Se compone en
  * ese desde el principio: nada se recorta ni se rellena al otro (FORMATO.md de video-base).
  */

@@ -97,7 +97,7 @@ test('del guion se narra lo de debajo de los encabezados, sin ellos ni comentari
 
 test('las voces de Fish Audio, ElevenLabs y Voices Cloning van con su prefijo; lo demás es AI Studio', () => {
   assert.deepEqual(motorDe('vc:voz-123'), { motor: 'vc', id: 'voz-123' })
-  assert.equal(lineaVoz({}, 'vc:voz-123', 'Enya'), 'Voz: genérala tú con Sloth, voz «Enya»: en generar_voz pon la voz vc:voz-123 (cómo, en video-base/VOZ.md).')
+  assert.equal(lineaVoz({}, 'vc:voz-123', 'Enya'), 'Voz: genérala tú con VyMotion, voz «Enya»: en generar_voz pon la voz vc:voz-123 (cómo, en video-base/VOZ.md).')
   assert.deepEqual(motorDe('fish:8ef4a238'), { motor: 'fish', id: '8ef4a238' })
   assert.deepEqual(motorDe('elevenlabs:21m00Tcm'), { motor: 'elevenlabs', id: '21m00Tcm' })
   assert.deepEqual(motorDe('Fola'), { motor: 'ai-studio', id: 'Fola' })

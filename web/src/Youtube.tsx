@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { ConexionYoutube } from '../../shared/youtube'
+import { usePoll } from './usePoll'
 import { api } from './api'
 import { Logo } from './Logos'
 import { abrirRevisionYoutube } from './youtube-ruta'
@@ -19,12 +20,7 @@ export function YoutubeOpciones() {
     mirar()
     return () => { vivo = false }
   }, [])
-  useEffect(() => {
-    if (!conexion?.conectando) return
-    let vivo = true
-    const t = setInterval(() => api<ConexionYoutube>('/api/youtube').then((c) => { if (vivo) setConexion(c) }, (e) => { if (vivo) setError(e.message) }), 3000)
-    return () => { vivo = false; clearInterval(t) }
-  }, [conexion?.conectando])
+  usePoll(() => api<ConexionYoutube>('/api/youtube').then(setConexion, (e) => setError(e.message)), 3000, !!conexion?.conectando)
   async function importar(file?: File) {
     if (!file) return
     setError('')
@@ -37,15 +33,14 @@ export function YoutubeOpciones() {
     } catch (e) { setError(e instanceof Error ? e.message : String(e)) }
     finally { setOcupado(false); if (fichero.current) fichero.current.value = '' }
   }
-  /** `conSloth`: con la app de Google de Sloth (si apoyas); si no, con la tuya. */
-  async function conectar(conSloth: boolean) {
+  async function conectar() {
     // Abre la pestaña en el clic para que el navegador no bloquee la autorización como ventana emergente.
     const ventana = window.open('about:blank', '_blank')
     if (ventana) ventana.opener = null
     setOcupado(true)
     setError('')
     try {
-      const r = await api<{ url: string }>('/api/youtube/conectar', { sloth: conSloth })
+      const r = await api<{ url: string }>('/api/youtube/conectar', {})
       setEnlace(r.url)
       if (ventana) ventana.location.href = r.url
       setConexion(await api<ConexionYoutube>('/api/youtube'))
@@ -59,7 +54,6 @@ export function YoutubeOpciones() {
     catch (e) { setError(e instanceof Error ? e.message : String(e)) }
     finally { setOcupado(false) }
   }
-  const conSloth = !!conexion?.sloth?.apoya
   return (
     <div className="item" data-red="youtube">
       <div className="fila">
@@ -72,27 +66,17 @@ export function YoutubeOpciones() {
         <span className={`estado ${conexion?.conectando ? 'moviendo' : conexion?.cuenta ? '' : 'apagado'}`}>
           {conexion?.conectando ? 'Esperando a Google…' : conexion?.cuenta?.nombre ?? 'Sin conectar'}
         </span>
-        {conexion?.cuenta && (conexion.conSloth || conexion.cliente) ? (
-          <button className="boton" disabled={ocupado} onClick={() => conectar(!!conexion.conSloth && (conSloth || !conexion.cliente))}>{conexion.programar ? 'Cambiar canal' : 'Autorizar programación'}</button>
-        ) : conSloth ? (
-          <button className="primary" disabled={ocupado} onClick={() => conectar(true)}>Conectar canal</button>
-        ) : conexion?.cliente ? (
-          <button className="boton" disabled={ocupado} onClick={() => conectar(false)}>Conectar canal</button>
+        {conexion?.cliente ? (
+          <button className="boton" disabled={ocupado} onClick={conectar}>{conexion.cuenta ? conexion.programar ? 'Cambiar canal' : 'Autorizar programación' : 'Conectar canal'}</button>
         ) : <button className="primary" disabled={ocupado || !conexion} onClick={() => setAbierto(true)}>Configurar</button>}
       </div>
-      {conSloth && !conexion?.conSloth && <div className="fila-extra small"><p><Legal /></p></div>}
-      {conexion?.conSloth && conexion.sloth && !conexion.sloth.apoya && (
-        <p className="fila-extra small">Tu canal está conectado con la app de Sloth, que es para quienes apoyan. Vuelve a apoyar para seguir subiendo, o conéctalo con tu propia app de Google en «Conexión y ayuda».</p>
-      )}
       {abierto && (
         <div className="fila-extra">
-          {conexion?.sloth && <p>{conexion.sloth.apoya ? 'Con tu apoyo, tu canal se conecta con la app de Sloth, sin estos pasos.' : 'Quienes apoyan a Sloth conectan su canal con la app de Sloth, sin estos pasos.'}</p>}
-          {conSloth && conexion?.cuenta && !conexion.conSloth && <div className="opcion-fila"><button className="boton" disabled={ocupado} onClick={() => conectar(true)}>Pasar a la app de Sloth</button></div>}
-          <p>{conexion?.sloth ? 'O con tu propia app de Google: es gratis y se hace una sola vez.' : 'Subes con tu propia app de Google: es gratis y se hace una sola vez.'}</p>
+          <p>Subes con tu propia app de Google: es gratis y se hace una sola vez.</p>
           <ol className="youtube-pasos">
             <li>
               En Google Cloud, <a href="https://console.cloud.google.com/projectcreate" target="_blank" rel="noreferrer">crea un proyecto</a> (por ejemplo,
-              «Sloth») y <a href="https://console.cloud.google.com/apis/library/youtube.googleapis.com" target="_blank" rel="noreferrer">activa YouTube Data API v3</a>.
+              «VyMotion») y <a href="https://console.cloud.google.com/apis/library/youtube.googleapis.com" target="_blank" rel="noreferrer">activa YouTube Data API v3</a>.
             </li>
             <li>
               En <a href="https://console.cloud.google.com/auth/overview" target="_blank" rel="noreferrer">Google Auth Platform</a>, pulsa «Comenzar»: un nombre
@@ -110,7 +94,6 @@ export function YoutubeOpciones() {
               Pulsa «Conectar canal» y elige tu canal. Google avisa «no ha verificado esta app»: es la tuya, así que entra con «Configuración avanzada» → «Ir a…».
             </li>
           </ol>
-          {conexion?.cliente && conexion.conSloth && <div className="opcion-fila"><button className="boton" disabled={ocupado} onClick={() => conectar(false)}>Pasar a mi app</button></div>}
           <div className="opcion-fila">
             <input ref={fichero} type="file" accept=".json,application/json" hidden aria-label="Credenciales OAuth de YouTube" onChange={(e) => importar(e.target.files?.[0])} />
             <button className="boton" disabled={ocupado || conexion?.conectando} onClick={() => fichero.current?.click()}>{conexion?.cliente ? 'Cambiar JSON OAuth' : 'Importar JSON OAuth'}</button>
@@ -125,18 +108,8 @@ export function YoutubeOpciones() {
   )
 }
 
-/** Lo que las políticas de la API de YouTube piden enseñar antes de conectar el canal con la app de Sloth. */
-function Legal() {
-  return <>
-    Al conectar tu canal con la app de Sloth aceptas los <a href="https://www.youtube.com/t/terms" target="_blank" rel="noreferrer">Términos de servicio de YouTube</a>.
-    Google trata tus datos según su <a href="https://policies.google.com/privacy" target="_blank" rel="noreferrer">Política de privacidad</a>; lo que hace Sloth con ellos está
-    en su <a href="https://sloth.vancci.org/privacidad#youtube" target="_blank" rel="noreferrer">aviso de privacidad</a>.
-  </>
-}
-
 type VideoYoutube = { cardId: string; ruta: string; titulo: string }
 
-/** Abre la revisión de YouTube (`#/youtube`) solo con este video. */
 export function YoutubeBoton({ video, disabled, chico, nombre }: { video: VideoYoutube; disabled?: boolean; chico?: boolean; nombre?: string }) {
   return <>
     <button type="button" data-red="youtube" className={chico ? 'youtube-boton' : 'final-boton'} title={video.ruta} disabled={disabled} onClick={(e) => { e.stopPropagation(); abrirRevisionYoutube(video.cardId, video.ruta) }}>{nombre ? `Revisar ${nombre} para YouTube` : 'Revisar YouTube'}</button>

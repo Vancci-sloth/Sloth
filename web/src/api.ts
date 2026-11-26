@@ -7,10 +7,10 @@ export class ErrorApi extends Error {
 
 const cuentasEnCurso = new Map<string, Promise<unknown>>()
 
-/** Una sola lectura de cada cuenta a la vez: al abrir, el inicio, la bienvenida y Opciones la piden juntos. */
+/** Un solo pedido por cuenta mientras otro control espera la misma respuesta. */
 export function leerCuenta<T>(ruta: string): Promise<T> {
-  const antes = cuentasEnCurso.get(ruta)
-  if (antes) return antes as Promise<T>
+  const enCurso = cuentasEnCurso.get(ruta)
+  if (enCurso) return enCurso as Promise<T>
   const lectura = api<T>(ruta).finally(() => cuentasEnCurso.delete(ruta))
   cuentasEnCurso.set(ruta, lectura)
   return lectura
@@ -30,7 +30,7 @@ async function pedir(path: string, body?: unknown): Promise<Response> {
     try {
       return await fetch(path, body === undefined ? undefined : { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
     } catch {
-      if (body !== undefined || i >= 10) throw new Error('No se pudo hablar con Sloth: puede que se esté reiniciando. Intenta otra vez en unos segundos.')
+      if (body !== undefined || i >= 10) throw new Error('No se pudo hablar con VyMotion: puede que se esté reiniciando. Intenta otra vez en unos segundos.')
       await new Promise((r) => setTimeout(r, 1500))
     }
   }
@@ -41,8 +41,6 @@ export async function api<T = any>(path: string, body?: unknown): Promise<T> {
   // Sin JSON es que el servidor no conoce la ruta: casi siempre, un cambio en server/ que aún no se ha reiniciado. Vite
   // contesta esas rutas con la página (200, HTML) o con un 404.
   const data = await res.json().catch(() => {
-    // Desde la web, un error de Cloudflare (502, 530…) en HTML es que el túnel no llega: Sloth se reinicia o se cerró.
-    if (res.status >= 500 && location.protocol === 'https:' && location.hostname !== 'localhost') throw new Error(location.hostname.endsWith('.trycloudflare.com') ? 'No hay conexión con tu Sloth: puede que se esté reiniciando o que tu computadora se haya apagado.' : 'No hay conexión con tu Sloth: puede que se esté reiniciando o que tu Codespace se haya detenido.')
     const desconocida = res.status === 404 || res.headers.get('content-type')?.includes('text/html')
     throw new Error(desconocida ? 'El servidor aún no conoce esta función: pulsa «Reiniciar backend».' : `El servidor respondió ${res.status}`)
   })

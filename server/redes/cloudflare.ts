@@ -4,7 +4,7 @@ import { escribir, leer, variablesListas } from '../opciones.ts'
 import { NUBE, SECRETO } from './instagram.ts'
 
 /**
- * La nube de quien usa Sloth, en su propia cuenta de Cloudflare: con un token suyo, Sloth monta ahí el Worker de `nube/`
+ * La nube de quien usa VyMotion, en su propia cuenta de Cloudflare: con un token suyo, VyMotion monta ahí el Worker de `nube/`
  * (su bucket R2, el cron de cada minuto y su dirección en workers.dev) sin wrangler, y lo vuelve a subir cuando la app
  * trae otra versión (`nubeAlDia`). Así cada quien publica en Instagram con sus credenciales y su nube, sin pasar por la
  * del dueño. La del dueño se despliega con `npm run nube -- deploy` y no deja token aquí: esto no la toca.
@@ -54,11 +54,11 @@ async function cf<T>(token: string, metodo: string, ruta: string, cuerpo?: unkno
 
 /**
  * Monta (o pone al día) la nube en la cuenta del token y deja en las variables del usuario su dirección, el secreto que
- * comparte con Sloth y el token, para subirla otra vez con cada versión. Devuelve la dirección.
+ * comparte con VyMotion y el token, para subirla otra vez con cada versión. Devuelve la dirección.
  */
 export async function montarNube(token: string): Promise<string> {
   token = token.trim()
-  // El mismo secreto si ya la habías montado: si no, Sloth y la nube dejarían de entenderse a mitad de una cola.
+  // El mismo secreto si ya la habías montado: si no, VyMotion y la nube dejarían de entenderse a mitad de una cola.
   const secreto = (leer(TOKEN) && leer(SECRETO)) || randomBytes(32).toString('base64url')
   const { url, js } = await desplegar(token, NOMBRE, secreto)
   escribir(TOKEN, token)
@@ -75,9 +75,9 @@ export async function montarNube(token: string): Promise<string> {
 /** Sube el Worker `nombre`, con su bucket del mismo nombre, a la cuenta del token. No guarda nada en esta computadora. */
 export async function desplegar(token: string, nombre: string, secreto: string): Promise<{ url: string; js: string }> {
   const cuentas = await cf<{ id: string }[]>(token, 'GET', '/accounts').catch((e) => {
-    throw new Error(e instanceof Cloudflare ? 'Cloudflare no aceptó ese token. Créalo con el enlace de Sloth y cópialo entero.' : e.message)
+    throw new Error(e instanceof Cloudflare ? 'Cloudflare no aceptó ese token. Créalo con el enlace de VyMotion y cópialo entero.' : e.message)
   })
-  if (!cuentas.length) throw new Error('Ese token no tiene permiso sobre ninguna cuenta. Créalo otra vez con el enlace de Sloth.')
+  if (!cuentas.length) throw new Error('Ese token no tiene permiso sobre ninguna cuenta. Créalo otra vez con el enlace de VyMotion.')
   const cuenta = `/accounts/${cuentas[0].id}`
 
   // El bucket: si ya existe (la montaste antes), sirve el mismo. Sin R2 activado, Cloudflare no deja crearlo.
@@ -122,7 +122,7 @@ export async function desplegar(token: string, nombre: string, secreto: string):
 }
 
 /**
- * Al arrancar: si la nube es de las que monta Sloth y la app trae otro Worker, se sube el nuevo. La del dueño (sin token)
+ * Al arrancar: si la nube es de las que monta VyMotion y la app trae otro Worker, se sube el nuevo. La del dueño (sin token)
  * no se toca. Si falla, sigue la de antes, y se intenta en el siguiente arranque.
  */
 export async function nubeAlDia() {

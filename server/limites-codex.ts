@@ -5,7 +5,7 @@ type Ventana = { usedPercent: number; windowDurationMins?: number | null; resets
 type Limite = { limitId?: string | null; limitName?: string | null; primary?: Ventana | null; secondary?: Ventana | null }
 export type LimitesCodexRpc = { rateLimits?: Limite | null; rateLimitsByLimitId?: Record<string, Limite> | null }
 
-/** Convierte todas las cuotas que devuelve Codex al formato que ya usa Sloth para Claude. */
+/** Convierte todas las cuotas que devuelve Codex al formato que ya usa VyMotion para Claude. */
 export function ventanasCodex(respuesta: LimitesCodexRpc): LimitesClaude {
   const grupos = respuesta.rateLimitsByLimitId && Object.keys(respuesta.rateLimitsByLimitId).length
     ? Object.entries(respuesta.rateLimitsByLimitId)

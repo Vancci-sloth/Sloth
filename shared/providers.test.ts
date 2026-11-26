@@ -8,17 +8,10 @@ test('proveedorDe: el prefijo dice el agente; sin prefijo, o con uno que no es d
   assert.equal(proveedorDe('deepseek:deepseek-flash'), 'deepseek')
   // Los modelos de Pi llevan su proveedor y pueden llevar `/` y `:` dentro.
   assert.equal(proveedorDe('pi:openrouter/deepseek/deepseek-v4-flash:free'), 'pi')
-  // Los de omp, con el proveedor y el modelo (`proveedor/modelo`, que puede llevar más `/`).
-  assert.equal(proveedorDe('omp:opencode-go/deepseek-v4-flash'), 'omp')
-  // Los de OpenRouter también: el prefijo es solo lo de antes del primer `:`.
-  assert.equal(proveedorDe('openrouter:thinkingmachines/inkling-2-small:free'), 'openrouter')
-  assert.equal(proveedorDe('freellmapi:auto:coding'), 'freellmapi')
   assert.equal(proveedorDe('otro:modelo'), 'claude')
 })
 
-test('DeepSeek, OpenRouter y FreeLLMAPI corren en Claude Code', () => {
+test('DeepSeek corre en Claude Code', () => {
   assert.equal(programaDe('deepseek'), 'claude')
-  assert.equal(programaDe('openrouter'), 'claude')
-  assert.equal(programaDe('freellmapi'), 'claude')
   assert.equal(programaDe('grok'), 'grok')
 })

@@ -16,7 +16,7 @@ function masNuevo(raiz, sub) {
 
 /**
  * Dónde está Chrome. Primero `CHROME` si el usuario la puso; después el headless shell (el más rápido para capturar),
- * el de las piezas de Sloth, el de puppeteer o playwright, Chrome instalado y, al final, Edge. Nunca una ruta fija con
+ * el de las piezas de VyMotion, el de puppeteer o playwright, Chrome instalado y, al final, Edge. Nunca una ruta fija con
  * versión: se rompe en cuanto se actualiza.
  */
 export function buscarChrome() {

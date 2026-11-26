@@ -15,7 +15,7 @@ import './Rifa.css'
 const GANASTE = 'sloth-rifa-ganaste'
 export const avisarGanasteRifa = (g: RifaGanada, prueba = false) => dispatchEvent(new CustomEvent(GANASTE, { detail: { g, prueba } }))
 
-/** El confeti, una sola vez: tiras y puntos del color de Sloth que caen a distintas velocidades. */
+/** El confeti, una sola vez: tiras y puntos del color de VyMotion que caen a distintas velocidades. */
 const CONFETI = Array.from({ length: 34 }, (_, i) => ({
   x: (i * 37) % 100,
   y: -10 - ((i * 13) % 30),
@@ -86,13 +86,13 @@ export function GanasteRifa() {
           <Icono de="regalo" />
         </span>
         <p className="cv-antetitulo">
-          <Icono de="boleto" /> Rifa de Sloth{aviso.prueba ? ' · prueba' : ''}
+          <Icono de="boleto" /> Rifa de VyMotion{aviso.prueba ? ' · prueba' : ''}
         </p>
         <h2 id="gr-titulo">Ganasteeeee la rifa :)))</h2>
         <p className="gr-premio">{g.premio}</p>
         {g.creditos > 0 ? (
           <p className="cv-texto">
-            Neta felicidades. {g.entregados ? 'Ya te deje' : 'En unos minutos te llegan'} <b>{cuantos}</b> creditos de voz en tu cuenta de Sloth, completamente gratis. No tienes que hacer nada mas: escoge una voz o clona LA TUYA y el agente la usa solita
+            Neta felicidades. {g.entregados ? 'Ya te deje' : 'En unos minutos te llegan'} <b>{cuantos}</b> creditos de voz en tu cuenta de VyMotion, completamente gratis. No tienes que hacer nada mas: escoge una voz o clona LA TUYA y el agente la usa solita
             para tus videos.
           </p>
         ) : (

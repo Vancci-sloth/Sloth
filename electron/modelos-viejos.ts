@@ -1,5 +1,5 @@
 /**
- * Los modelos 3D del dueño de Sloth que las versiones hasta la 0.3.2 dejaban en la biblioteca de cada cliente
+ * Los modelos 3D del dueño de VyMotion que las versiones hasta la 0.3.2 dejaban en la biblioteca de cada cliente
  * (`app\skills\modelos-3d\modelos`). Ya no van: cada quien hace los suyos, y `prepararSkills` (main.ts) quita estos. Por
  * cada uno, la huella de cada versión de su `<id>.tsx` que salió (sha256 con los saltos de línea en LF, 16 letras): si el
  * del cliente no es ninguna, lo cambió, ya es suyo y se queda. Sale de la historia de git hasta 94fb103, la 0.3.2. La

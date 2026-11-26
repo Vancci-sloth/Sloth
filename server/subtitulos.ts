@@ -9,7 +9,7 @@ import { cuerpo, json } from './http.ts'
 
 /**
  * Los subtítulos de un video terminado, en la Entrega del hilo (`web/src/Subtitulos.tsx`, dentro de `Final.tsx`): sin
- * agente ni IA de pago. El transcriptor local de Sloth saca cada palabra con su tiempo (`video-base/scripts/subtitulos.py`),
+ * agente ni IA de pago. El transcriptor local de VyMotion saca cada palabra con su tiempo (`video-base/scripts/subtitulos.py`),
  * aquí se juntan en renglones, se escriben el .srt y un .ass con el estilo elegido, y FFmpeg los graba en una copia.
  *
  * Van en la carpeta del video, fuera de `out/` para que no cuenten como otro video terminado:
@@ -121,7 +121,7 @@ export function srt(renglones: Renglon[]): string {
     .join('\n')
 }
 
-/** El ámbar de Sloth (`--amber`), como lo escribe ASS: &HBBGGRR. */
+/** El ámbar de VyMotion (`--amber`), como lo escribe ASS: &HBBGGRR. */
 const AMBAR = '&H3DA3E8&'
 const BLANCO = '&HFFFFFF&'
 
@@ -161,13 +161,13 @@ export function ass(renglones: Renglon[], o: OpcionesSubtitulos, v: Medidas): st
     '',
     '[V4+ Styles]',
     'Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding',
-    `Style: Sloth,${LETRA[o.estilo]},${tamano},&H00FFFFFF,&H00FFFFFF,&H00000000,&H80000000,-1,0,0,0,100,100,0,0,1,${borde},${o.estilo === 'resaltada' ? 0 : Math.round(borde / 2)},${alineacion},${margenH},${margenH},${margenV},1`,
+    `Style: VyMotion,${LETRA[o.estilo]},${tamano},&H00FFFFFF,&H00FFFFFF,&H00000000,&H80000000,-1,0,0,0,100,100,0,0,1,${borde},${o.estilo === 'resaltada' ? 0 : Math.round(borde / 2)},${alineacion},${margenH},${margenH},${margenV},1`,
     '',
     '[Events]',
     'Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text'
   ]
   const t = tiempos(renglones)
-  const evento = (inicio: number, fin: number, texto: string) => `Dialogue: 0,${tiempoAss(inicio)},${tiempoAss(fin)},Sloth,,0,0,0,,${texto}`
+  const evento = (inicio: number, fin: number, texto: string) => `Dialogue: 0,${tiempoAss(inicio)},${tiempoAss(fin)},VyMotion,,0,0,0,,${texto}`
   const eventos: string[] = []
   renglones.forEach((r, i) => {
     if (o.estilo === 'clasicos') return eventos.push(evento(t[i].inicio, t[i].fin, limpio(r.palabras.map((p) => p.text).join(' '))))
@@ -264,7 +264,7 @@ export interface Dependencias {
   carpeta(sessionId: string): string | undefined
   /** La carpeta de `video-base/scripts`, donde está `subtitulos.py`. */
   scripts: string
-  /** El Python de Sloth, o null si aún no se bajó. */
+  /** El Python de VyMotion, o null si aún no se bajó. */
   python(): string | null
   banderas: string[]
 }
@@ -341,7 +341,7 @@ export function subtitulos(d: Dependencias) {
 
   async function transcribir(l: Lugar, opciones: OpcionesSubtitulos): Promise<Guardado> {
     const python = d.python()
-    if (!python) throw new Error('Falta el transcriptor de Sloth: descárgalo en Opciones → Requisitos («Python de Sloth»).')
+    if (!python) throw new Error('Falta el transcriptor de VyMotion: descárgalo en Opciones → Requisitos («Python de VyMotion»).')
     actual = { video: l.video, estado: 'transcribiendo', aviso: 'Transcribiendo la voz en tu computadora…' }
     const t = fecha(l.video)
     const medidas = await medir(l.video, l.dir)

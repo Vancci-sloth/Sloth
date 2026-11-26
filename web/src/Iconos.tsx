@@ -1,10 +1,109 @@
 /**
- * Los iconos de trazo de Sloth (los de Lucide, lucide.dev): un nombre y sus trazos, del color del texto que los rodea y
+ * Los iconos de trazo de VyMotion (los de Lucide, lucide.dev): un nombre y sus trazos, del color del texto que los rodea y
  * del tamaño que les dé el CSS. Para la barra lateral y las secciones; los logos de otras marcas van en `Logos.tsx`.
  */
-import { TRAZOS, type NombreIcono } from './trazos'
+const TRAZOS = {
+  mas: ['M12 5v14', 'M5 12h14'],
+  foco: ['M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5', 'M9 18h6', 'M10 22h4'],
+  video: ['M6 3.8a1 1 0 0 1 1.5-.86l11.5 7.2a1 1 0 0 1 0 1.72l-11.5 7.2A1 1 0 0 1 6 18.2z'],
+  flechaArriba: ['m5 12 7-7 7 7', 'M12 19V5'],
+  flecha: ['M5 12h14', 'm12 5 7 7-7 7'],
+  pin: ['M12 17v5', 'M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z'],
+  lapiz: ['M21.17 6.81a1 1 0 0 0-3.99-3.99L3.84 16.17a2 2 0 0 0-.5.83l-1.32 4.35a.5.5 0 0 0 .62.62l4.35-1.32a2 2 0 0 0 .83-.5z', 'm15 5 4 4'],
+  basura: ['M3 6h18', 'M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6', 'M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2'],
+  palomita: ['M20 6 9 17l-5-5'],
+  imagen: ['M5 3h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z', 'M9 7a2 2 0 1 0 0 4 2 2 0 0 0 0-4z', 'm21 15-3.09-3.09a2 2 0 0 0-2.82 0L6 21'],
+  reabrir: ['M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8', 'M3 3v5h5'],
+  hilo: ['M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z'],
+  cerrar: ['M18 6 6 18', 'm6 6 12 12'],
+  pulso: ['M3 3v18h18', 'm6 14 4-4 4 2 5-6'],
+  alerta: ['m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3', 'M12 9v4', 'M12 17h.01'],
+  // Comunidad
+  pulgar: ['M7 10v12', 'M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2a3.13 3.13 0 0 1 3 3.88Z'],
+  personas: ['M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2', 'M9 3a4 4 0 1 0 0 8 4 4 0 0 0 0-8z', 'M22 21v-2a4 4 0 0 0-3-3.87', 'M16 3.13a4 4 0 0 1 0 7.75'],
+  informacion: ['M12 11v5', 'M12 8h.01', 'M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20z'],
+  pregunta: ['M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20z', 'M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3', 'M12 17h.01'],
+  megafono: ['m3 11 18-5v12L3 14v-3z', 'M11.6 16.8a3 3 0 1 1-5.8-1.6'],
+  compartir: ['M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8', 'm16 6-4-4-4 4', 'M12 2v13'],
+  campana: ['M10.268 21a2 2 0 0 0 3.464 0', 'M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326'],
+  bandera: ['M4 22V4a1 1 0 0 1 .4-.8A6 6 0 0 1 8 2c3 0 5 2 7.333 2q2 0 3.067-.8A1 1 0 0 1 20 4v10a1 1 0 0 1-.4.8A6 6 0 0 1 16 16c-3 0-5-2-8-2a6 6 0 0 0-4 1.528'],
+  responder: ['m9 17-5-5 5-5', 'M20 18v-2a4 4 0 0 0-4-4H4'],
+  // Los estilos de la comunidad: instalar uno y revisarlo antes de aprobarlo.
+  descargar: ['M12 15V3', 'M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4', 'm7 10 5 5 5-5'],
+  escudo: ['M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z', 'm9 12 2 2 4-4'],
+  // Los del reproductor del estudio y su línea de tiempo.
+  pausa: ['M7 4h2a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1z', 'M15 4h2a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1h-2a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1z'],
+  atras: ['M19 20 9 12l10-8z', 'M5 19V5'],
+  adelante: ['M5 4l10 8-10 8z', 'M19 5v14'],
+  musica: ['M9 18V5l12-2v13', 'M6 15a3 3 0 1 0 0 6 3 3 0 0 0 0-6z', 'M18 13a3 3 0 1 0 0 6 3 3 0 0 0 0-6z'],
+  sonido: ['M11 4.7a.7.7 0 0 0-1.2-.5L6.4 7.6A1.4 1.4 0 0 1 5.4 8H3a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2.4a1.4 1.4 0 0 1 1 .4l3.4 3.4a.7.7 0 0 0 1.2-.5z', 'M16 9a5 5 0 0 1 0 6', 'M19.4 18.4a9 9 0 0 0 0-12.8'],
+  silencio: ['M11 4.7a.7.7 0 0 0-1.2-.5L6.4 7.6A1.4 1.4 0 0 1 5.4 8H3a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2.4a1.4 1.4 0 0 1 1 .4l3.4 3.4a.7.7 0 0 0 1.2-.5z', 'm22 9-6 6', 'm16 9 6 6'],
+  bucle: ['m17 2 4 4-4 4', 'M3 11v-1a4 4 0 0 1 4-4h14', 'm7 22-4-4 4-4', 'M21 13v1a4 4 0 0 1-4 4H3'],
+  acercar: ['M11 3a8 8 0 1 0 0 16 8 8 0 0 0 0-16z', 'm21 21-4.3-4.3', 'M11 8v6', 'M8 11h6'],
+  alejar: ['M11 3a8 8 0 1 0 0 16 8 8 0 0 0 0-16z', 'm21 21-4.3-4.3', 'M8 11h6'],
+  ajustar: ['m18 8 4 4-4 4', 'M2 12h20', 'm6 8-4 4 4 4'],
+  // Lo elegido en el video para pedir un cambio: un elemento del cuadro, una escena o un tramo.
+  // Herramientas 3D: cada acción con su dibujo propio (no se repiten entre la barra, la vista y la edición).
+  crear: ['M21.64 3.64 20.36 2.36a1.2 1.2 0 0 0-1.7 0L3.36 18.3a1.2 1.2 0 0 0 0 1.7l1.27 1.27a1.2 1.2 0 0 0 1.7 0L21.64 5.34a1.2 1.2 0 0 0 0-1.7z', 'm14 7 3 3', 'M10 2v2', 'M19 14v2', 'M7 8H3'],
+  seleccionar: ['M4 4.5 20 11l-6.2 1.6a2 2 0 0 0-1.4 1.4L11 20z'],
+  geometria: ['M4 4h4v4H4z', 'M16 4h4v4h-4z', 'M4 16h4v4H4z', 'M16 16h4v4h-4z', 'M8 6h8', 'M6 8v8', 'M18 8v8', 'M8 18h8'],
+  materiales: ['M12 22a1 1 0 0 1 0-20 10 9 0 0 1 10 9 5 5 0 0 1-5 5h-2.25a1.75 1.75 0 0 0-1.4 2.8l.3.4a1.75 1.75 0 0 1-1.4 2.8z', 'M7.5 10.5h.01', 'M12 7.5h.01', 'M16.5 10.5h.01'],
+  optimizar: ['M12 14l4-4', 'M3.34 19a10 10 0 1 1 17.32 0'],
+  espejo: ['M8 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h3', 'M16 3h3a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-3', 'M12 2v2', 'M12 8v2', 'M12 14v2', 'M12 20v2'],
+  partes: ['M16 3h5v5', 'M8 3H3v5', 'M21 3l-7.5 7.5', 'M3 3l7.5 7.5', 'M16 21h5v-5', 'M8 21H3v-5', 'M21 21l-7.5-7.5', 'M3 21l7.5-7.5'],
+  ver: ['M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7z', 'M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6z'],
+  mover: ['M5 9l-3 3 3 3', 'M9 5l3-3 3 3', 'M15 19l-3 3-3-3', 'M19 9l3 3-3 3', 'M2 12h20', 'M12 2v20'],
+  rotar: ['M4 12a8 8 0 0 1 14.3-4.9', 'M18 3v4.5h-4.5', 'M20 12a8 8 0 0 1-14.3 4.9', 'M6 21v-4.5h4.5'],
+  escalar: ['M15 3h6v6', 'M9 21H3v-6', 'M21 3l-7 7', 'M3 21l7-7'],
+  deshacer: ['M9 14 4 9l5-5', 'M4 9h10.5a5.5 5.5 0 0 1 0 11H11'],
+  guardar: ['M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z', 'M17 21v-8H7v8', 'M7 3v5h8'],
+  rehacer: ['M15 14l5-5-5-5', 'M20 9H9.5a5.5 5.5 0 0 0 0 11H13'],
+  restablecer: ['M2.5 4v6h6', 'M2.66 15a10 10 0 1 0 .57-5.66L2.5 10'],
+  encuadrar: ['M3 7V5a2 2 0 0 1 2-2h2', 'M17 3h2a2 2 0 0 1 2 2v2', 'M21 17v2a2 2 0 0 1-2 2h-2', 'M7 21H5a2 2 0 0 1-2-2v-2', 'M12 12h.01'],
+  malla: ['M12 3 21 8v8l-9 5-9-5V8z', 'M12 3v18', 'M3 8l18 8', 'M21 8 3 16'],
+  cuadricula: ['M3 3h18v18H3z', 'M3 9h18', 'M3 15h18', 'M9 3v18', 'M15 3v18'],
+  mira: ['M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20z', 'M22 12h-4', 'M6 12H2', 'M12 6V2', 'M12 22v-4'],
+  // El radar de noticias, en Opciones.
+  radar: ['M19.07 4.93A10 10 0 0 0 6.99 3.34', 'M4 6h.01', 'M2.29 9.62A10 10 0 1 0 21.31 8.35', 'M16.24 7.76A6 6 0 1 0 8.23 16.67', 'M12 18h.01', 'M17.99 11.66A6 6 0 0 1 15.77 16.67', 'M12 10a2 2 0 1 0 0 4 2 2 0 0 0 0-4z', 'm13.41 10.59 5.66-5.66'],
+  escena: ['M4 3h16a1 1 0 0 1 1 1v16a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z', 'M7 3v18', 'M17 3v18', 'M3 12h18', 'M3 7.5h4', 'M3 16.5h4', 'M17 7.5h4', 'M17 16.5h4'],
+  tramo: ['M6 7v10', 'M18 7v10', 'M6 12h12'],
+  // Modelos 3D: un hilo de «Nuevo modelo» e «Importar .glb».
+  cubo: ['M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z', 'm3.3 7 8.7 5 8.7-5', 'M12 22V12'],
+  subtitulos: ['M5 5h14a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2z', 'M7 15h4', 'M15 15h2', 'M7 11h2', 'M13 11h4'],
+  importar: ['M12 3v12', 'm8 11 4 4 4-4', 'M8 5H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-4'],
+  // La biblioteca: copiar su nombre, el orden, pasar al de al lado y girarlo arrastrando.
+  copiar: ['M10 8h10a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H10a2 2 0 0 1-2-2V10a2 2 0 0 1 2-2z', 'M4 16a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2'],
+  ordenar: ['m21 16-4 4-4-4', 'M17 20V4', 'm3 8 4-4 4 4', 'M7 4v16'],
+  anterior: ['m15 18-6-6 6-6'],
+  siguiente: ['m9 18 6-6-6-6'],
+  girar: ['M3 12a9 3 0 0 0 18 0', 'M3 12a9 3 0 0 1 15.5-2.1', 'm16 7 2.5 2.9-3.3 1.6'],
+  // Los de las cards de estilo (`icon` en cards.json): un televisor con antena, una pizarra, una claqueta y una cara que ríe.
+  risa: ['M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20z', 'M18 13a6 6 0 0 1-6 5 6 6 0 0 1-6-5h12Z', 'M9 9h.01', 'M15 9h.01'],
+  noticiero:['M4 7h16a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2z', 'm17 2-5 5-5-5'],
+  pizarra: ['M2 3h20', 'M21 3v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V3', 'm7 21 5-5 5 5'],
+  claqueta: ['M20.2 6 3 11l-.9-2.4c-.3-1.1.3-2.2 1.3-2.5l13.5-4c1.1-.3 2.2.3 2.5 1.3Z', 'm6.2 5.3 3.1 3.9', 'm12.4 3.4 3.1 4', 'M3 11h18v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z'],
+  // El navegador de cada hilo.
+  globo: ['M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20z', 'M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20', 'M2 12h20'],
+  izquierda: ['m12 19-7-7 7-7', 'M19 12H5'],
+  recargar: ['M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8', 'M21 3v5h-5'],
+  fuera: ['M15 3h6v6', 'M10 14 21 3', 'M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6'],
+  movil: ['M7 2h10a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z', 'M12 18h.01'],
+  puntos: ['M12 5h.01', 'M12 12h.01', 'M12 19h.01'],
+  // El menú «Voz»: buscar, grabar tu voz y guardar una en favoritas.
+  buscar: ['M11 3a8 8 0 1 0 0 16 8 8 0 0 0 0-16z', 'm21 21-4.3-4.3'],
+  microfono: ['M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z', 'M19 10v2a7 7 0 0 1-14 0v-2', 'M12 19v3'],
+  estrella: ['M11.53 2.3a.53.53 0 0 1 .95 0l2.31 4.68a2.12 2.12 0 0 0 1.6 1.16l5.16.76a.53.53 0 0 1 .3.9l-3.74 3.64a2.12 2.12 0 0 0-.61 1.88l.88 5.14a.53.53 0 0 1-.77.56l-4.62-2.43a2.12 2.12 0 0 0-1.97 0L6.4 21.01a.53.53 0 0 1-.77-.56l.88-5.14a2.12 2.12 0 0 0-.61-1.88L2.16 9.8a.53.53 0 0 1 .29-.9l5.17-.76a2.12 2.12 0 0 0 1.6-1.16z'],
+  // La insignia de los Fundadores en la comunidad.
+  corona: ['M11.56 3.27a.5.5 0 0 1 .88 0l2.95 5.6a1 1 0 0 0 1.52.3l4.27-3.67a.5.5 0 0 1 .8.52l-2.83 10.25a1 1 0 0 1-.96.73H5.81a1 1 0 0 1-.96-.73L2.02 6.02a.5.5 0 0 1 .8-.52l4.27 3.67a1 1 0 0 0 1.52-.3z', 'M5 21h14'],
+  calendario: ['M8 2v4', 'M16 2v4', 'M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z', 'M3 10h18'],
+  // «Desbloquea N estilos», en la tienda de quien no apoya (el candado abierto de Lucide).
+  candado: ['M5 11h14a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2z', 'M7 11V7a5 5 0 0 1 9.9-1'],
+  // La rifa de la comunidad.
+  boleto: ['M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z', 'M13 5v2', 'M13 17v2', 'M13 11v2'],
+  regalo: ['M4 8h16a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z', 'M12 8v13', 'M19 12v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-7', 'M7.5 8a2.5 2.5 0 0 1 0-5A4.8 8 0 0 1 12 8a4.8 8 0 0 1 4.5-5 2.5 2.5 0 0 1 0 5'],
+}
 
-export type { NombreIcono }
+export type NombreIcono = keyof typeof TRAZOS
 /** Los trazos de un icono, para quien lo dibuja con otro color (la corona de los Fundadores). */
 export const trazosDe = (nombre: NombreIcono): readonly string[] => TRAZOS[nombre]
 export const esIcono =(nombre: string): nombre is NombreIcono => Object.hasOwn(TRAZOS, nombre)

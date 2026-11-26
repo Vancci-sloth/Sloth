@@ -25,7 +25,7 @@
 
 /* «Mis videos»: cómo van en redes. Si no falta nada, en verde; si no, cuántos hay en cada estado, y cada uno filtra. */
 .resumen-redes { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; font-size: 13px; }
-.resumen-redes.todo-bien { gap: 10px; padding: 9px 14px; border-radius: var(--radio); border: 1px solid color-mix(in srgb, var(--ok) 35%, transparent); background: color-mix(in srgb, var(--ok) 8%, transparent); }
+.resumen-redes.todo-bien { gap: 10px; padding: 9px 14px; border-radius: var(--radio); border: 1px solid rgba(143, 193, 119, 0.35); background: rgba(143, 193, 119, 0.08); }
 .resumen-redes.todo-bien strong { color: var(--ok); }
 .resumen-check { display: grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; background: var(--ok); color: var(--sobre-ambar); font-size: 12px; font-weight: 800; flex: none; }
 .resumen-estado { display: inline-flex; align-items: center; gap: 7px; height: 32px; padding: 0 10px; border-radius: 8px; font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; transition: background 0.15s; }
@@ -78,7 +78,7 @@
 .calendario-red { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 12px; font-size: 13px; }
 .calendario-dias { display: flex; flex-wrap: wrap; gap: 4px; }
 .calendario-dia { display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 44px; padding: 3px 5px 6px; border-radius: 7px; border: 1px solid var(--line); color: var(--muted); font-size: 10.5px; font-variant-numeric: tabular-nums; }
-.calendario-dia.lleno { border-color: color-mix(in srgb, var(--ok) 35%, transparent); }
+.calendario-dia.lleno { border-color: rgba(143, 193, 119, 0.35); }
 .calendario-dia .puntos { display: flex; gap: 2px; }
 .calendario-dia i { width: 6px; height: 6px; border-radius: 50%; box-shadow: inset 0 0 0 1px var(--amber); }
 .calendario-dia i.si { box-shadow: inset 0 0 0 1.5px var(--ok); }

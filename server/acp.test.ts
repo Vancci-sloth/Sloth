@@ -5,7 +5,7 @@ import { dirname, join } from 'node:path'
 import test from 'node:test'
 import type { AgentEvent } from '../shared/types.ts'
 import { startAcp, type SaborAcp } from './acp.ts'
-import { elegirCuenta, errorAntigravity, grupoDe, planDe, renuevaEn } from './antigravity.ts'
+import { elegirCuenta, errorAntigravity, grupoDe, renuevaEn } from './antigravity.ts'
 import { errorGemini } from './gemini.ts'
 
 /**
@@ -23,7 +23,7 @@ process.stdin.on('data', (d) => {
   while ((i = resto.indexOf('\\n')) >= 0) {
     const m = JSON.parse(resto.slice(0, i))
     resto = resto.slice(i + 1)
-    // La respuesta de Sloth al permiso: con ella acaba el turno.
+    // La respuesta de VyMotion al permiso: con ella acaba el turno.
     if (m.id === 900 && !m.method) {
       pedidos.push('permiso ' + m.result.outcome.optionId)
       const u = (update) => decir({ method: 'session/update', params: { sessionId: 's1', update } })
@@ -109,21 +109,6 @@ test('ACP: un turno elige el modelo y el esfuerzo, acepta el permiso una vez y c
   )
   const fin = events.find((e) => e.t === 'turn_end')
   assert.deepEqual(fin && fin.t === 'turn_end' && { ok: fin.ok, tokens: fin.tokens, costUsd: fin.costUsd }, { ok: true, tokens: { input: 400, output: 50, cacheRead: 600 }, costUsd: 0.0025 })
-})
-
-test('ACP: lo que escribe un proceso nuevo del mismo hilo (al retomarlo) no lleva el id de lo de antes', async () => {
-  const ids: string[] = []
-  for (let i = 0; i < 2; i++) {
-    const { run, events, listo } = correr()
-    run.send('hola')
-    await listo
-    run.close()
-    const primero = events.find((e) => e.t === 'text')
-    if (primero?.t === 'text') ids.push(primero.id)
-  }
-  // Si se repitiera, la interfaz pegaría el texto del segundo al primer mensaje del hilo.
-  assert.equal(ids.length, 2)
-  assert.notEqual(ids[0], ids[1])
 })
 
 test('ACP: el turno que Grok abre solo al acabar una tarea de fondo se cierra, con su costo', async () => {
@@ -274,15 +259,14 @@ process.stdin.on('data', (d) => {
         u({ sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: pedidos.join(',') } })
         decir({ id: m.id, result: { stopReason: 'end_turn', usage: { inputTokens: 1000, cachedReadTokens: 600, outputTokens: 20, thoughtTokens: 30 } } })
       }
-    } else if (m.method === 'authenticate') decir({ id: m.id, result: process.env.PLAN ? { _meta: { antigravity: { tier: JSON.parse(process.env.PLAN) } } } : {} })
-    else if (m.id !== undefined) decir({ id: m.id, result: {} })
+    } else if (m.id !== undefined) decir({ id: m.id, result: {} })
   }
 })
 `
 const SCRIPT_GEMINI = join(dirname(SCRIPT), 'gemini.mjs')
 writeFileSync(SCRIPT_GEMINI, COMO_GEMINI)
 
-function correrGemini(env: Record<string, string> = {}, otro: Partial<SaborAcp> = {}) {
+function correrGemini(env: Record<string, string> = {}) {
   const events: AgentEvent[] = []
   const sabor: SaborAcp = {
     nombre: 'Gemini',
@@ -292,8 +276,7 @@ function correrGemini(env: Record<string, string> = {}, otro: Partial<SaborAcp> 
     modo: 'yolo',
     sinCompactar: true,
     sinCuenta: 'Pega tu llave.',
-    traducir: errorGemini,
-    ...otro
+    traducir: errorGemini
   }
   let fin!: () => void
   const listo = new Promise<void>((ok) => (fin = ok))
@@ -321,7 +304,7 @@ test('ACP como Gemini: el modo va con set_mode sin abrir un turno, y cuenta como
   assert.equal(run.compact, undefined)
 })
 
-test('ACP como Gemini: una llave que Google rechaza acaba el turno en palabras de Sloth', async () => {
+test('ACP como Gemini: una llave que Google rechaza acaba el turno en palabras de VyMotion', async () => {
   const { run, events, listo } = correrGemini({ LLAVE_MALA: '1' })
   run.send('hola')
   await listo
@@ -330,7 +313,7 @@ test('ACP como Gemini: una llave que Google rechaza acaba el turno en palabras d
   assert.deepEqual(fin && fin.t === 'turn_end' && { ok: fin.ok, error: fin.error }, { ok: false, error: 'Google no aceptó tu llave de Gemini. Cámbiala en Opciones.' })
 })
 
-test('Gemini: el límite de la llave se dice en palabras de Sloth, y lo demás no se toca', () => {
+test('Gemini: el límite de la llave se dice en palabras de VyMotion, y lo demás no se toca', () => {
   assert.match(errorGemini('{"error":{"code":429,"status":"RESOURCE_EXHAUSTED"}}') ?? '', /límite de tu llave/)
   assert.equal(errorGemini('otro fallo'), undefined)
 })
@@ -443,20 +426,6 @@ test('Antigravity: conoce sus errores y deja pasar lo demás', () => {
   assert.equal(errorAntigravity(`The input tokens exceed… ${'x'.repeat(3000)}`), undefined)
 })
 
-test('Antigravity: el plan de Google de la cuenta sale de lo que contesta el inicio de sesión', async () => {
-  // Lo que contesta la 1.4.1 con una cuenta gratis.
-  const gratis = { name: 'Antigravity Starter Quota', id: 'free-tier', upgradeUri: 'https://antigravity.google/g1-upgrade' }
-  const vistos: unknown[] = []
-  const { run, listo } = correrGemini({ PLAN: JSON.stringify(gratis) }, { cuenta: () => 'A', alAutenticar: (resultado, cuenta) => vistos.push([planDe(resultado), cuenta]) })
-  run.send('hola')
-  await listo
-  run.close()
-  assert.deepEqual(vistos, [[{ id: 'free-tier', nombre: 'Antigravity Starter Quota' }, 'A']])
-  assert.deepEqual(planDe({ _meta: { antigravity: { tier: { id: 'g1-pro-tier' } } } }), { id: 'g1-pro-tier', nombre: 'g1-pro-tier' })
-  assert.equal(planDe({}), undefined)
-  assert.equal(planDe(undefined), undefined)
-})
-
 test('Antigravity: la cuota es por grupo, y al acabarse en una cuenta sigue la siguiente que tenga', () => {
   assert.equal(renuevaEn('Your limit will reset in 5 days, 2 hours.'), (5 * 24 + 2) * 3_600_000)
   assert.equal(renuevaEn('Your limit will reset in 45 minutes.'), 45 * 60_000)
@@ -478,53 +447,4 @@ test('ACP: sin cuenta, el turno acaba pidiendo conectarla', async () => {
   run.close()
   const fin = events.find((e) => e.t === 'turn_end')
   assert.deepEqual(fin && fin.t === 'turn_end' && { ok: fin.ok, error: fin.error }, { ok: false, error: 'Conecta tu cuenta de Grok en Opciones.' })
-})
-
-/**
- * Uno que contesta como omp 19.1.1: `usage_update` con el costo en dólares de toda la sesión (cada turno cuesta 0.002),
- * los tokens del turno en `result.usage`, y `session/resume` sin repetir nada.
- */
-const COMO_OMP = `
-let resto = '', gastado = Number(process.env.GASTADO ?? 0)
-const decir = (m) => process.stdout.write(JSON.stringify({ jsonrpc: '2.0', ...m }) + '\\n')
-process.stdin.on('data', (d) => {
-  resto += d
-  let i
-  while ((i = resto.indexOf('\\n')) >= 0) {
-    const m = JSON.parse(resto.slice(0, i))
-    resto = resto.slice(i + 1)
-    if (m.method === 'initialize') decir({ id: m.id, result: { protocolVersion: 1, agentCapabilities: { loadSession: true, sessionCapabilities: { resume: {} } } } })
-    else if (m.method === 'session/new') decir({ id: m.id, result: { sessionId: 'o1' } })
-    else if (m.method === 'session/prompt') {
-      gastado += 0.002
-      decir({ method: 'session/update', params: { sessionId: m.params.sessionId, update: { sessionUpdate: 'usage_update', size: 128000, used: 1200, cost: { amount: gastado, currency: 'USD' } } } })
-      decir({ id: m.id, result: { stopReason: 'end_turn', usage: { inputTokens: 1200, outputTokens: 10, totalTokens: 1210 } } })
-    } else if (m.id !== undefined) decir({ id: m.id, result: {} })
-  }
-})
-`
-const SCRIPT_OMP = join(dirname(SCRIPT), 'omp.mjs')
-writeFileSync(SCRIPT_OMP, COMO_OMP)
-
-/** Dos turnos en una sesión de omp, nueva o retomada (con lo que ya llevaba gastado): el costo de cada uno. */
-async function costosOmp(resume?: string) {
-  const fines: { costUsd?: number; tokens?: unknown }[] = []
-  let fin!: () => void
-  let listo = new Promise<void>((ok) => (fin = ok))
-  const sabor: SaborAcp = { nombre: 'omp', prefijo: 'omp', lanzar: () => ({ command: process.execPath, args: [SCRIPT_OMP], env: { ...process.env, GASTADO: resume ? '0.01' : '0' } }), sinCuenta: 'Conecta un proveedor.' }
-  const run = startAcp(sabor, { cwd: tmpdir(), model: 'omp:simulador/eco', resume, onEvent: (e) => e.t === 'turn_end' && (fines.push({ costUsd: e.costUsd, tokens: e.tokens }), fin()), onProviderSession() {} })
-  for (const texto of ['uno', 'dos']) {
-    run.send(texto)
-    await listo
-    listo = new Promise<void>((ok) => (fin = ok))
-  }
-  run.close()
-  return fines.map((f) => ({ ...f, costUsd: f.costUsd && Math.round(f.costUsd * 1e6) / 1e6 }))
-}
-
-test('ACP: el costo de `usage_update` es el de la sesión, y a cada turno va lo que creció', async () => {
-  const tokens = { input: 1200, output: 10, cacheRead: 0 }
-  assert.deepEqual(await costosOmp(), [{ costUsd: 0.002, tokens }, { costUsd: 0.002, tokens }])
-  // Retomada, lo de antes no se sabe hasta el primer aviso: ese turno va sin costo, no con el de toda la sesión.
-  assert.deepEqual(await costosOmp('o1'), [{ costUsd: undefined, tokens }, { costUsd: 0.002, tokens }])
 })

@@ -1,4 +1,4 @@
-# Rendimiento de Sloth
+# Rendimiento de VyMotion
 
 Mide antes de cambiar y después de cambiar, en la app compilada: la de desarrollo corre Vite y tsx, y sus tiempos no dicen
 nada de lo que recibe la gente. Varias ideas razonables de abajo no sirvieron: por eso están apuntadas.
@@ -15,7 +15,7 @@ nada de lo que recibe la gente. Varias ideas razonables de abajo no sirvieron: p
   HTTP al montarse. Límites reales: `--cpus`, `--memory`, y `--device-read-bps`/`--device-read-iops` al crear el contenedor
   (escribir `io.max` desde dentro da error). En frío: `echo 3 > /proc/sys/vm/drop_caches` antes de cada arranque.
 - **Dónde se va el tiempo del servidor:** `node --cpu-prof` sobre `app/server/index.mjs`, con un `--require` que llame a
-  `process.exit` al ver «Sloth en». Lo que bloquea es lo que no suelta el hilo; suma por función, no por paquete.
+  `process.exit` al ver «VyMotion en». Lo que bloquea es lo que no suelta el hilo; suma por función, no por paquete.
 - **Si se congela después de arrancar:** pregúntale al servidor cada 50 ms y apunta lo que pase de 100 ms. Para saber quién
   fue, envuelve `ChildProcess.prototype.spawn` y los `*Sync` de `fs` y `child_process` (con `syncBuiltinESMExports`) en un
   gancho al principio de `app/server/index.mjs`, y mide un `setInterval` de 10 ms. Electron no deja pasar `NODE_OPTIONS`.
@@ -55,7 +55,7 @@ nada de lo que recibe la gente. Varias ideas razonables de abajo no sirvieron: p
 - `/api/cards/:id/cambios` leía 370 archivos en cada vista de una card, y todo lo demás esperaba. Ahora va sin detener el
   servidor, y lo que no cambió no se relee (`cambiosDe`). Si varias rutas tardan lo mismo a la vez, busca qué las detiene.
 - Importar `playwright-core` costaba casi 400 ms de cada arranque: se carga al usarlo (`server/playwright.ts`). No importes
-  nada pesado arriba de un módulo del servidor: todos se evalúan al abrir Sloth.
+  nada pesado arriba de un módulo del servidor: todos se evalúan al abrir VyMotion.
 - El 76 % de lo que se bajaba al abrir un hilo eran salidas de herramientas, que solo se ven al abrir su fila: se piden
   entonces (`sinSalidasLargas`). Lo que sigue trabajando va entero.
 - Con Playwright a demanda (`server/navegador-mcp.mjs`), el hilo que sí usa el navegador paga 1,1 s la primera vez.
@@ -66,7 +66,7 @@ nada de lo que recibe la gente. Varias ideas razonables de abajo no sirvieron: p
 - Liberar lo que ya nadie usa (1 de noviembre; probado con simulaciones, sin medida de RAM ni CPU en la app real):
   `opencode serve` se cierra a un minuto de quedarse sin hilos ni consultas, también cuando solo se abrió para listar
   modelos; los motores y los `fs.watch` de carpetas, a los cinco minutos; las ondas de audio van a un máximo de 32 archivos
-  en bytes, con FFmpeg de uno en uno. Una página a la vista también descansa con Sloth minimizada o escondida.
+  en bytes, con FFmpeg de uno en uno. Una página a la vista también descansa con VyMotion minimizada o escondida.
 - Para comparar: la memoria y la CPU de todo el árbol de procesos al abrir, tras acabar varios hilos y diez minutos después,
   con las mismas cuentas, videos y pestañas. Los bytes de una compilación no sustituyen esa medida.
 
@@ -82,36 +82,47 @@ En Linux (Docker, xvfb, 42 hilos reales, hasta la interfaz montada):
 - En frío con un disco tan lento, lo ganado no se nota: las dos versiones varían de 25 a 39 s, con arranques sueltos de
   100 a 170 s. Node vacío ya tarda 4,8 s y el servidor solo unos 10 s; lo demás es Electron con Chromium.
 
-Lo que el agente abre en una página: Codex solo usaba el navegador de Sloth 1 de 6 veces (curl o `cua_repl`, igual antes de
+Lo que el agente abre en una página: Codex solo usaba el navegador de VyMotion 1 de 6 veces (curl o `cua_repl`, igual antes de
 estos cambios); con `USA_EL_NAVEGADOR`, 6 de 6. La prueba es una página cuyo código pone JavaScript, con cada dirección distinta.
 
-El muro de la tienda que se mueve (19 de noviembre, copia de desarrollo, Edge con la GPU real, 61 estilos y diez videos de
-1080p a la vista; se bajó y subió por el muro durante 8 s):
+## Apertura de hilos grandes (12 de octubre)
 
-| Al bajar por el muro                     | Con React | Por fuera (`muroVivo.ts`) |
-| ---------------------------------------- | --------- | ------------------------- |
-| Cuadros de más de 25 ms                  | 30        | menos de 1                |
-| El peor cuadro                           | 69 ms     | 26 ms                     |
-| CPU de todos los procesos                | 161 %     | 107 %                     |
-| Cuadros de más de 25 ms, CPU 4× más lenta | 104       | 13                        |
+Dos hilos tardaban 5,5 s y 11,7 s en abrir. Un JSONL de 285 MB contenía 283 MB de actualizaciones de herramientas
+porque Codex repetía la salida acumulada en cada fragmento. El panel de cambios también ejecutaba Git de forma
+síncrona en el servidor principal.
 
-- Lo que daba tirones era que cada portada que entraba o salía de la pantalla volvía a dibujar el muro y montaba o
-  desmontaba un `<video>`. Ahora cada portada trae su video vacío y `muroVivo.ts` le pone y le quita la fuente; arranca
-  solo la que lleva 160 ms a la vista, y de una en una.
-- Quieto, diez videos andando gastan lo mismo que antes: un 45 % de un núcleo entre todos los procesos, y el hilo
-  principal un 1 %. Es de reproducirlos (se decodifican en la GPU, `D3D11VideoDecoder`), no de la app. Con adelantos de
-  320 px baja a un 33 %: el adelanto ahorra descarga, casi nada de procesador.
+Tras guardar solo los fragmentos nuevos, leer una vista compacta y mover Git a un worker, los mismos hilos abrieron
+en 87 ms y 387 ms en un servidor de medición aislado. Volver a un hilo tardó 52 ms, abrir un chat nuevo 18–33 ms y
+abrir el hilo mientras trabajaba 138 ms. La vista compacta pesó 4,6 MB. Reconstruirla tardó 1,3 s y leerla tras
+reiniciar, 19 ms. La vista se valida con el tamaño y la fecha del JSONL original.
 
-## Arranque más ligero (22 de noviembre)
+Pruebas relacionadas: `server/historial.test.ts`, `server/sessions-historial.test.ts`, `shared/historial.test.ts`,
+`server/eventos-en-vivo.test.ts` y `server/codex.test.ts`. La suscripción por hilo sigue el criterio de la
+[arquitectura de T3 Code](https://github.com/pingdotgg/t3code/blob/main/docs/internals/overview.md).
 
-Sin medirlo aquí: `npm start` arma la ventana de Electron mientras arranca el servidor; Vite recibe React y `marked` ya
-dichos y precalienta `main.tsx`; los catálogos de los agentes se piden de dos en dos y uno que falla no frena a los demás;
-yt-dlp se mira a los dos minutos de abrir; las previas de las cards usan un hilo de filtro y dos de x264, y la cuenta de
-cada agente se lee una vez aunque la pidan varios a la vez (`leerCuenta`). Las voces de Fish, ElevenLabs, Vibi y Groq ya
-no se piden al abrir: solo la llave que aún no tiene su lista. Las vistas `lazy()` y un
-carrusel que solo prepara la previa que se mira se quedaron fuera.
+Al abrir una vista grande del historial, el servidor comprime su caché con gzip (DEFLATE, nivel 1) en segundo plano,
+de una en una. El JSONL sigue disponible para los agentes y las herramientas que leen su ruta directamente. En una prueba
+de compresión de cinco cachés locales, pasaron de 12,52 MB a 7,65 MB (39 % menos). La prueba mide espacio de esas cachés,
+sin medir el tiempo de apertura de Electron. Las ediciones de Imágenes liberan la copia temporal de la referencia al terminar.
 
 ## Lo que se midió y no vale la pena
+
+**Interfaz del repo (21 de noviembre).** En Edge sin interfaz visible, con CPU a 4× y rutas locales simuladas,
+se contaron 27 → 20 peticiones al abrir Inicio y 15 → 10 al abrir directamente Imágenes, incluyendo unos cuatro
+segundos después de montar cada vista. El banner respondió HTTP 200. El tiempo de pintado varió y esta medición,
+sin FFmpeg ni proveedores reales, no demuestra una mejora de tiempo en Electron compilado.
+
+Mis videos consulta al abrir y deja que el navegador pida las portadas al acercarse a ellas. El carrusel prepara
+solo la previa que se mira y detiene su video al salir. Administración se monta al abrirla. Modelos 3D, Ideas,
+Redes e Imágenes se importan por vista. El backend limita a dos consultas simultáneas los catálogos de agentes y
+usa las voces guardadas al abrir. Imágenes lee metadatos desde caché, muestra doce tarjetas por tanda y pausa la
+consulta de la cola cuando la ventana queda oculta.
+
+Arranque del repo (20 de noviembre): `npm start` prepara Electron en paralelo al servidor; Vite precalienta
+`src/main.tsx` y recibe las dependencias principales explícitamente. Los errores al lanzar Electron ya salen en la
+terminal, y un fallo al crear el proceso permite abrir el navegador. En una prueba local con puerto separado:
+servidor listo en 2.062 ms; HTML 252 ms, módulo principal 180 ms y estado 49 ms. Es una medición de desarrollo,
+sin comparación anterior ni comprobación del primer pintado de Electron; no sustituye la medición de la app compilada.
 
 - Partir el JS de la interfaz con `lazy()`: se monta en 25 ms, y en 90 ms con la CPU 6× más lenta, ya en caché. En frío, unos
   100–300 ms, solo la primera vez tras actualizar.
@@ -135,3 +146,12 @@ carrusel que solo prepara la previa que se mira se quedaron fuera.
   recargas, por `Page.reload` y `location.reload`, con y sin el depurador, y la peor tardó 1,24 s.
 - Por qué lanzar un programa detiene al que lo lanza, ver arriba.
 - Una vez, Grok dijo que el MCP navegador «sigue conectándose» durante 30 s. No se repitió en 6 arranques con registro.
+
+## La comunidad (25 de noviembre; sin medida en la app real)
+
+- El fondo de ramas (`CampoAscii`) se redibujaba a 30 cuadros por segundo detrás de una publicación abierta, que además
+  lo desenfocaba (`backdrop-filter`) en cada cuadro: ahora no reacciona al ratón sobre un diálogo, y el velo no desenfoca.
+- Las tarjetas del feed y el buscador van con `memo` y el feed con `content-visibility`: abrir una publicación o escribir
+  ya no vuelve a dibujar cientos de tarjetas. El buscador guarda el texto ya normalizado de cada publicación.
+- Las imágenes se suben achicadas a 1920 px en WebP, y las fotos de perfil a 512 (`achicarImagen` en `Escribir.tsx`).
+  Las que ya están en el Worker siguen enteras: el feed las dibuja en 132×96, y lo que falta es una miniatura del Worker.

@@ -1,5 +1,5 @@
 """
-Baja un video (YouTube, X, Instagram) y lo transcribe con WhisperX, con el Python de Sloth.
+Baja un video (YouTube, X, Instagram) y lo transcribe con WhisperX, con el Python de VyMotion.
 
     python -B fuente.py <url> <carpeta>          p. ej. fuentes/tema  o  fuentes/estilo
 
@@ -25,7 +25,7 @@ from pathlib import Path
 from sloth import MODELOS, PROCESOS, proceso, sloth, turno_youtube, wav16k
 
 YOUTUBE = re.compile(r"(?:youtube\.com/(?:watch\?(?:.*&)?v=|shorts/|live/|embed/)|youtu\.be/)([\w-]{11})")
-# Donde dejan sus fuentes los vídeos: los de las cards de Sloth (`<app>/trabajo/<card>/<vídeo>`, la app de PROCESOS).
+# Donde dejan sus fuentes los vídeos: los de las cards de VyMotion (`<app>/trabajo/<card>/<vídeo>`, la app de PROCESOS).
 PROYECTOS = [(PROCESOS.parents[1] / "trabajo").as_posix() + "/*/*/fuentes"]
 # Lo que no sirve para sacar clips ni cuadros: el formato 18 (640x360) que da el cliente mweb.
 MINIMO = 720
@@ -64,7 +64,7 @@ def enlazar(origen: Path, carpeta: Path, archivos: tuple[str, ...]) -> None:
 
 
 def bajar(url: str, carpeta: Path) -> None:
-    # yt-dlp como módulo: el .exe de uv del Python de Sloth no arranca.
+    # yt-dlp como módulo: el .exe de uv del Python de VyMotion no arranca.
     with turno_youtube():
         r = sloth("-m", "yt_dlp", "-f", "bv*[height<=1080][ext=mp4]+ba[ext=m4a]/b[ext=mp4]/b", "--merge-output-format",
                   "mp4", "-o", "video.mp4", "--write-info-json", "--no-progress", url, cwd=carpeta)

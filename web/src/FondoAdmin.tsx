@@ -2,7 +2,6 @@ import { useCallback, useEffect, useState } from 'react'
 import type { ParteReparto, RepartoFondo } from '../../shared/types'
 import { fecha, num, Tabla } from './Admin'
 import { api } from './api'
-import { Desplegable } from './Desplegable'
 import { Confirm } from './Confirm'
 import { Icono } from './Iconos'
 import { dinero } from './Tienda'
@@ -45,7 +44,13 @@ export function FondoAdmin() {
           <div className="admin-fondo-cabeza">
             <label>
               <span className="admin-antetitulo">Periodo</span>
-              <Desplegable campo nombre="Periodo" valor={r.periodo} opciones={r.periodos.map((p) => ({ value: p.id, label: p.mes }))} onCambio={setPeriodo} />
+              <select value={r.periodo} onChange={(e) => setPeriodo(e.target.value)}>
+                {r.periodos.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.mes}
+                  </option>
+                ))}
+              </select>
             </label>
             <div>
               <span className="admin-antetitulo">{r.cerrado ? `Cerrado el ${fecha(r.cerrado)}` : r.termino ? 'Terminó: ya se puede cerrar' : 'En curso, en vivo'}</span>

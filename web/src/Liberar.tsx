@@ -24,7 +24,7 @@ export function Liberar({ onAnunciar }: { onAnunciar(version: string): void }) {
   // Casi siempre es la misma en los tres; si no, cada una con su sistema.
   const nombre = (lista: VersionLiberable[]) => {
     const versiones = [...new Set(lista.map((s) => s.version))]
-    return versiones.length === 1 ? `Sloth ${versiones[0]}` : lista.map((s) => `${SISTEMAS[s.so]} ${s.version}`).join(', ')
+    return versiones.length === 1 ? `VyMotion ${versiones[0]}` : lista.map((s) => `${SISTEMAS[s.so]} ${s.version}`).join(', ')
   }
   const ultima = sistemas.map((s) => s.version).sort((a, b) => b.localeCompare(a, undefined, { numeric: true }))[0]
 

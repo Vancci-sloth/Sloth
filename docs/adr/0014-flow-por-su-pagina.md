@@ -29,13 +29,13 @@ paga por segundo con llave. Se probó el 1 de noviembre de 2026, con una cuenta 
   de Fast), no se genera. Un pedido igual al último de esa ruta no se repite (`.huella`).
 - **«Ayudar a mejorar Flow» se apaga para todos, y cada quien puede encenderlo** en Opciones → Google Flow. Se pone antes
   del primer pedido y se comprueba recargando; si no se puede, no se genera.
-- **El aviso de privacidad de Flow lo acepta cada quien**, en la ventana de «Abrir Flow». Sloth no le da clic por nadie.
+- **El aviso de privacidad de Flow lo acepta cada quien**, en la ventana de «Abrir Flow». VyMotion no le da clic por nadie.
 - **Cada quien elige con qué se hacen sus imágenes**: en el compositor, «Imágenes» manda la línea `Imágenes:`
   (`shared/flow.ts`) con ChatGPT o con un modelo de Flow, y gana sobre lo que diga la skill. Sin elección, lo que esté
   conectado, primero ChatGPT.
 - Un solo resultado por pedido, solo desde texto. Animar y extender quedan para el issue #6.
 - **Las referencias, con la confirmación de cada quien.** Subir una imagen pide aceptar en Flow «Derechos para usar esta
-  imagen». Sloth lo acepta solo si el usuario confirmó lo mismo en Sloth (`derechos`, con su fecha): al elegir Flow, o en
+  imagen». VyMotion lo acepta solo si el usuario confirmó lo mismo en VyMotion (`derechos`, con su fecha): al elegir Flow, o en
   Opciones. Sin eso, un pedido con referencias no se hace. Probado con la pose, la boca (`bocas.py` no movió nada) y una
   portada con tres cuadros y título con acentos: el mismo perro, 0 créditos, de 30 a 90 s.
 

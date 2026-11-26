@@ -1,11 +1,12 @@
 import { execFile } from 'node:child_process'
 import { createHash } from 'node:crypto'
-import { existsSync, mkdirSync, readdirSync, renameSync, rmSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, renameSync, rmSync } from 'node:fs'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { join } from 'node:path'
 import { promisify } from 'node:util'
 import type { Card, Previa } from '../shared/types.ts'
 import { servir, ultimoVideo } from './etapas.ts'
+import { guardar } from './disco.ts'
 
 /**
  * La previa de cada card de estilo: un clip mudo de 6 s, sacado a trozos de su video terminado más nuevo, y su primer
@@ -24,6 +25,8 @@ const LADO = 320
 const FPS = 24
 
 export function previas(dir: string, cards: () => Card[]) {
+  const indice = join(dir, 'ultimas.json')
+  let ultimas: Record<string, string> | undefined
   // Las que se están haciendo, para que dos peticiones a la vez esperen al mismo FFmpeg. Al acabar, bien o mal, salen: una
   // que falló (FFmpeg que faltaba, un render que ahogó la máquina) se vuelve a intentar en la siguiente petición.
   const enCurso = new Map<string, Promise<string | undefined>>()
@@ -48,7 +51,6 @@ export function previas(dir: string, cards: () => Card[]) {
     await execFileP('ffmpeg', [
       '-nostdin', '-v', 'error', '-y',
       ...inicios.flatMap((s) => ['-ss', s.toFixed(2), '-t', String(largo), '-i', origen]),
-      // Con pocos hilos: es una previa de fondo y no debe quitarle la máquina a un render.
       '-filter_complex_threads', '1', '-filter_complex', `${tramos};${juntos}`,
       '-map', '[clip]', '-an', '-c:v', 'libx264', '-threads', '2', '-preset', 'veryfast', '-crf', '30', '-pix_fmt', 'yuv420p', '-movflags', '+faststart', `${tmp}.mp4`,
       '-map', '[cuadro]', '-frames:v', '1', '-q:v', '4', `${tmp}.jpg`
@@ -75,23 +77,37 @@ export function previas(dir: string, cards: () => Card[]) {
     return hecha
   }
 
-  /** `GET /api/previas`: la de cada card de estilo que tenga un video terminado. `GET /api/previas/<archivo>` sirve una. */
+  /** Solo prepara el estilo que el usuario mira. Una consulta sin tarjeta no lanza FFmpeg. */
   async function api(req: IncomingMessage, res: ServerResponse, url: URL): Promise<boolean> {
     if (req.method !== 'GET') return false
     const archivo = /^\/api\/previas\/(\w+\.(?:mp4|jpg))$/.exec(url.pathname)
     if (archivo) return servir(req, res, join(dir, archivo[1]))
     if (url.pathname !== '/api/previas') return false
 
-    const todas: Record<string, Previa> = {}
-    const nombres = await Promise.all(cards().map(async (c) => [c.id, c.etapas ? await previa(c) : undefined] as const))
-    for (const [id, n] of nombres) if (n) todas[id] = { video: `/api/previas/${n}.mp4`, cuadro: `/api/previas/${n}.jpg` }
-    // Las de videos que ya no son los últimos sobran.
-    const usadas = new Set(nombres.map(([, n]) => n))
-    try {
-      for (const f of readdirSync(dir)) if (!f.startsWith('_') && !usadas.has(f.split('.')[0])) rmSync(join(dir, f), { force: true })
-    } catch {}
+    const id = url.searchParams.get('card')
+    const card = id ? cards().find((c) => c.id === id && c.etapas) : undefined
+    const nombre = card ? await previa(card) : undefined
+    let resultado: Previa | null = null
+    if (card && nombre) {
+      resultado = { video: `/api/previas/${nombre}.mp4`, cuadro: `/api/previas/${nombre}.jpg` }
+      try {
+        if (!ultimas) {
+          ultimas = {}
+          if (existsSync(indice)) Object.assign(ultimas, JSON.parse(readFileSync(indice, 'utf8')))
+        }
+        const anterior = ultimas[card.id]
+        if (anterior !== nombre) {
+          ultimas = { ...ultimas, [card.id]: nombre }
+          guardar(indice, JSON.stringify(ultimas))
+          if (anterior && /^[a-f0-9]{12}$/.test(anterior) && !Object.values(ultimas).includes(anterior)) {
+            rmSync(join(dir, `${anterior}.mp4`), { force: true })
+            rmSync(join(dir, `${anterior}.jpg`), { force: true })
+          }
+        }
+      } catch { /* Un índice ocupado no impide reproducir la previa terminada. */ }
+    }
     res.writeHead(200, { 'content-type': 'application/json' })
-    res.end(JSON.stringify(todas))
+    res.end(JSON.stringify(id ? resultado : {}))
     return true
   }
 

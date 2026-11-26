@@ -92,7 +92,7 @@ test('un regalo de créditos da una cuenta gratis a quien no tiene, suma una sol
     ADMIN: 'admin',
     VOICES_PK_LIVE: 'pk_live_a',
     PAYPAL_MODO: 'prueba',
-    CORREO_DE: 'Sloth <a@x.com>',
+    CORREO_DE: 'VyMotion <a@x.com>',
     CORREO_RESPUESTA: 'soporte@x.com',
     RESEND_API_KEY: 're_x'
   }

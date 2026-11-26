@@ -13,10 +13,6 @@ export interface ConexionYoutube {
   error?: string
   /** El canal concedió el permiso para editar la fecha después de poner la miniatura. */
   programar?: boolean
-  /** La app de Google de Sloth ya está lista; `apoya`, si esta computadora la puede usar (es para quien apoya). */
-  sloth?: { apoya: boolean }
-  /** El canal se conectó con la app de Sloth, no con la tuya. */
-  conSloth?: boolean
 }
 
 export interface DatosYoutube {
@@ -103,12 +99,6 @@ export interface RecomendacionYoutube {
   fotogramas: string[]
   fecha: number
 }
-
-/**
- * Lo más que Sloth guarda lo que leyó de la API de YouTube sin volver a leerlo: las políticas (III.E.4) piden borrarlo o
- * actualizarlo a los 30 días.
- */
-export const VIGENCIA_YOUTUBE = 30 * 24 * 3600_000
 
 export interface EstadoRecomendacionYoutube {
   estado: 'cola' | 'trabajando' | 'listo' | 'error'

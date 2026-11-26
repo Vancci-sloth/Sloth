@@ -8,17 +8,19 @@ La biblioteca de modelos 3D: buscar uno antes de hacerlo, traerlo al proyecto y 
     python -B -X utf8 modelos.py guardar <id> --nombre "…" --resumen "…" --categoria "…" --descripcion "…"
                                           --hace "a; b" --etiquetas "a, b" [--cuadro N]
     python -B -X utf8 modelos.py vista <id> [<id>…]        vuelve a sacar su miniatura (y arma el visor)
-    python -B -X utf8 modelos.py visor                     arma el visor 3D de toda la biblioteca (lo que Sloth gira)
+    python -B -X utf8 modelos.py revisar <id>              renderiza frente, tres cuartos y perfil del proyecto antes de guardar
+    python -B -X utf8 modelos.py reparar-vistas [<id>…]   repara miniaturas que faltan, sin tocar un proyecto de video
+    python -B -X utf8 modelos.py visor                     arma el visor 3D de toda la biblioteca (lo que VyMotion gira)
     python -B -X utf8 modelos.py nuevo <id> [--nombre "…"] [--descripcion "…"]
                                           un modelo sin video: arma aquí un proyecto de prueba y el andamio
     python -B -X utf8 modelos.py importar <archivo.glb> --nombre "…" --proyecto <carpeta nueva> [--categoria "…"]
-                                          [--licencia "…"]   mete un .glb hecho fuera (lo usa Sloth, sin agente)
+                                          [--licencia "…"]   mete un .glb hecho fuera (lo usa VyMotion, sin agente)
 
 Todo menos `buscar` e `importar` se corre en la carpeta del proyecto (la que tiene package.json). Un modelo vive en el proyecto en
 src/modelos/<id>.tsx (con src/modelos/comun.tsx) y sus archivos en public/modelos/<id>/; en la biblioteca, en
 modelos/<id>/ con su modelo.json y su vista (vista.webp, la foto; vista.webm, la cámara que se mece; y vuelta.webm, la vuelta entera). Cada proyecto lleva su copia: guardar una versión nueva no rompe
 los videos ya hechos. La biblioteca de cada quien empieza vacía: los que trae la plantilla del explicativo (la moneda, con
-lo que usa) están en plantilla/<id>/, que `usar` encuentra y `buscar` y Sloth no enseñan.
+lo que usa) están en plantilla/<id>/, que `usar` encuentra y `buscar` y VyMotion no enseñan.
 """
 
 import argparse
@@ -41,7 +43,7 @@ PLANTILLA = BIBLIOTECA / "plantilla"
 # Lo único que un modelo puede importar, además de comun y otros modelos: lo demás le llega por props.
 PERMITIDOS = re.compile(r"^(react|react-dom|three|three/.+|@react-three/fiber|remotion|@remotion/.+)$")
 ORDEN = ["nombre", "resumen", "categoria", "descripcion", "hace", "etiquetas", "exporta", "usa", "iconos", "cuadro", "caja", "frente", "actua", "origen", "creado", "actualizado"]
-# Los tipos de modelo, en el orden en que Sloth los enseña. Uno nuevo se suma ahí, con su «para».
+# Los tipos de modelo, en el orden en que VyMotion los enseña. Uno nuevo se suma ahí, con su «para».
 CATEGORIAS = [c["nombre"] for c in json.loads((BIBLIOTECA / "categorias.json").read_text("utf-8"))]
 # Lo que la ficha tiene que traer cuando el modelo es nuevo.
 PIDE = {
@@ -240,9 +242,9 @@ def leer_glb(ruta: Path) -> dict:
         sys.exit(f"El .glb busca archivos que no vienen dentro ({', '.join(fuera[:3])}): expórtalo como .glb con las texturas incluidas.")
     pide = [e for e in datos.get("extensionsRequired", []) if e not in ABRE and not e.startswith("KHR_materials_")]
     if "KHR_texture_basisu" in pide:
-        sys.exit("El .glb trae texturas KTX2 (KHR_texture_basisu), que Sloth todavía no abre: expórtalo con texturas PNG, JPG o WebP.")
+        sys.exit("El .glb trae texturas KTX2 (KHR_texture_basisu), que VyMotion todavía no abre: expórtalo con texturas PNG, JPG o WebP.")
     if pide:
-        sys.exit(f"El .glb pide {', '.join(pide)}, que Sloth todavía no abre: expórtalo sin esa extensión.")
+        sys.exit(f"El .glb pide {', '.join(pide)}, que VyMotion todavía no abre: expórtalo sin esa extensión.")
     return datos
 
 
@@ -355,7 +357,7 @@ def importar(ruta: str, nombre: str, categoria: str, licencia: str | None, proye
         m.write_text(json.dumps(ficha_, ensure_ascii=False, indent=2) + "\n", "utf-8", newline="\n")
         print(f"importado: {id_}", flush=True)
     except BaseException:
-        # A medias no se queda en la biblioteca: sin vista, Sloth lo enseñaría roto. Antes no estaba (se miró arriba).
+        # A medias no se queda en la biblioteca: sin vista, VyMotion lo enseñaría roto. Antes no estaba (se miró arriba).
         shutil.rmtree(MODELOS / id_, ignore_errors=True)
         raise
     finally:
@@ -440,12 +442,14 @@ def de_fondo() -> dict:
     return {"preexec_fn": lambda: os.nice(10)}
 
 
-def vista(ids: list[str]) -> None:
+def vista(ids: list[str], armar_visor: bool = True, revision: bool = False) -> None:
     raiz_ = proyecto()
     if not (raiz_ / "node_modules" / "@remotion" / "renderer").exists():
         sys.exit("Al proyecto le falta node_modules (con @remotion/renderer y @remotion/three).")
     src = raiz_ / "src" / "modelos"
     faltan = [i for i in ids if not (src / f"{i}.tsx").exists()]
+    if faltan and revision:
+        sys.exit(f"Escribe primero el componente del proyecto: {src / (faltan[0] + '.tsx')}")
     if faltan:
         usar(faltan, callado=True)
     # Con su número de proceso: varios agentes pueden sacar vistas a la vez en el mismo proyecto.
@@ -465,19 +469,46 @@ def vista(ids: list[str]) -> None:
         corre.parent.mkdir(exist_ok=True)
         corre_ = (BIBLIOTECA / "scripts" / "vitrina.mjs").read_text("utf-8").replace("src/modelos/_vitrina.tsx", f"src/modelos/_vitrina{n}.tsx")
         corre.write_text(corre_, "utf-8", newline="\n")
-        pares = [f"{id_}:{ficha(id_).get('cuadro', 0)}" for id_ in ids]
-        r = subprocess.run(["node", str(corre), str(MODELOS), *pares], cwd=raiz_, **de_fondo())
+        destino = raiz_ / "out" / "revision-3d" if revision else MODELOS
+        pares = [f"{id_}:{0 if revision else ficha(id_).get('cuadro', 0)}" for id_ in ids]
+        opciones = ["--revision"] if revision else []
+        r = subprocess.run(["node", str(corre), str(destino), *opciones, *pares], cwd=raiz_, **de_fondo())
         if r.returncode:
             sys.exit("No salió la vista: mira el error de arriba (la Muestra tiene que verse sola, sin el resto del video).")
     finally:
         for temporal in (muestras, vitrina, corre):
             temporal.unlink(missing_ok=True)
-    visor()
+    if armar_visor:
+        visor()
+
+
+def reparar_vistas(ids: list[str]) -> None:
+    """Saca miniaturas faltantes en un proyecto temporal y conserva solo los archivos de la biblioteca."""
+    ids = [i for i in ids if (MODELOS / i / "modelo.json").exists() and not (MODELOS / i / "vista.webp").exists()]
+    if not ids:
+        return
+    # Reparar no debe iniciar una instalación de npm en segundo plano. El primer video deja estos módulos compartidos.
+    sys.path.insert(0, str(BIBLIOTECA.parent / "video-base" / "scripts"))
+    from espacio import casa_de  # noqa: PLC0415
+    compartidos = casa_de("video-explicativo", EXPLICATIVO) / "node_modules"
+    if not (compartidos / "remotion").is_dir() or not (compartidos / "@remotion" / "cli").is_dir():
+        print("reparar-vistas: faltan los módulos compartidos; se reintentará cuando haya un video preparado.")
+        return
+    temporal = Path(tempfile.mkdtemp(prefix="vistas-3d-"))
+    aqui = Path.cwd()
+    try:
+        proyecto_prueba(temporal)
+        os.chdir(temporal)
+        usar(ids, callado=True)
+        vista(ids, armar_visor=False)
+    finally:
+        os.chdir(aqui)
+        quitar_proyecto(temporal)
 
 
 def visor() -> None:
     """
-    Arma el visor 3D de toda la biblioteca (`visor.tsx`, `scripts/visor.mjs`) en <biblioteca>/visor: el que Sloth abre en
+    Arma el visor 3D de toda la biblioteca (`visor.tsx`, `scripts/visor.mjs`) en <biblioteca>/visor: el que VyMotion abre en
     la ficha de cada modelo para girarlo, acercarlo y moverlo, con el mismo código de los videos. Se arma en un proyecto
     de prueba aparte (en la carpeta temporal) con todos los modelos, que se borra al terminar: así no llena de modelos el
     proyecto del video. Lo llama `vista` al final; si no sale, la ficha sigue con la vuelta en video.
@@ -485,7 +516,7 @@ def visor() -> None:
     ids = todos()
     if not ids:
         return
-    # Solo con los módulos de los videos ya bajados: armar el visor no baja ~1 GB por su cuenta (lo pide Sloth al abrir la
+    # Solo con los módulos de los videos ya bajados: armar el visor no baja ~1 GB por su cuenta (lo pide VyMotion al abrir la
     # sección, sin avisar). Los baja el primer video explicativo.
     sys.path.insert(0, str(BIBLIOTECA.parent / "video-base" / "scripts"))
     from espacio import casa_de  # noqa: PLC0415
@@ -550,7 +581,7 @@ def guardar(id_: str, dados: dict[str, str | None], cuadro: int | None, sin_vist
     if dados.get("categoria") and dados["categoria"] not in CATEGORIAS:
         sys.exit(f"«{dados['categoria']}» no es un tipo: {', '.join(CATEGORIAS)}. Si de verdad hace falta otro, súmalo a categorias.json.")
     if len(dados.get("resumen") or "") > 45:
-        sys.exit("El resumen es para leerse de un vistazo en Sloth: 45 letras como mucho.")
+        sys.exit("El resumen es para leerse de un vistazo en VyMotion: 45 letras como mucho.")
     lista = lambda texto, sep: [x.strip() for x in texto.split(sep) if x.strip()]  # noqa: E731
     hoy = date.today().isoformat()
     m = {
@@ -605,6 +636,8 @@ def main() -> None:
     g.add_argument("--frente", action="store_true", help="tiene cara (un reloj, un celular, una persona): el video no lo enseña de lado")
     g.add_argument("--caja", help="ancho,alto,fondo: solo si es mucho más alto que ancho (un celular, una botella)")
     sub.add_parser("vista").add_argument("ids", nargs="+")
+    sub.add_parser("revisar").add_argument("id")
+    sub.add_parser("reparar-vistas").add_argument("ids", nargs="*")
     sub.add_parser("visor")
     n = sub.add_parser("nuevo")
     n.add_argument("id")
@@ -636,6 +669,12 @@ def main() -> None:
         importar(a.ruta, a.nombre, a.categoria, a.licencia, a.proyecto, a.sin_modulos, a.sin_modulos)
     elif a.orden == "visor":
         visor()
+    elif a.orden == "revisar":
+        if not re.fullmatch(r"[a-z0-9]+(-[a-z0-9]+)*", a.id):
+            p.error("El id debe llevar solo minúsculas, números y guiones.")
+        vista([a.id], armar_visor=False, revision=True)
+    elif a.orden == "reparar-vistas":
+        reparar_vistas(a.ids or todos())
     else:
         vista(a.ids)
 

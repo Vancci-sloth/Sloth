@@ -148,7 +148,7 @@ try {
     renameSync(tmp, video)
   } catch (err) {
     if (!['EPERM', 'EBUSY', 'EACCES'].includes(err.code)) throw err
-    // Sloth tiene el vídeo abierto (lo sirve al panel): Windows no deja reemplazarlo, pero sí apartarlo y borrarlo.
+    // VyMotion tiene el vídeo abierto (lo sirve al panel): Windows no deja reemplazarlo, pero sí apartarlo y borrarlo.
     const viejo = `${tmp}.viejo`
     renameSync(video, viejo)
     renameSync(tmp, video)

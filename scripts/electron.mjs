@@ -57,9 +57,9 @@ export async function abrirVentana(url) {
     ventana.once('spawn', ok)
     ventana.once('error', fallo)
   })
-  ventana.on('error', (error) => console.error(`No se pudo mantener la ventana de Sloth: ${error.message}`))
+  ventana.on('error', (error) => console.error(`No se pudo mantener la ventana de VyMotion: ${error.message}`))
   ventana.on('exit', (codigo) => {
-    if (codigo) console.error(`La ventana de Sloth se cerró con código ${codigo}. Puedes abrir ${url} en el navegador.`)
+    if (codigo) console.error(`La ventana de VyMotion se cerró con código ${codigo}. Puedes abrir ${url} en el navegador.`)
   })
   ventana.unref()
   return true

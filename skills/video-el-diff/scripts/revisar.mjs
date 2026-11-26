@@ -1,7 +1,7 @@
 /**
  * Una imagen de cada beat (en la fracción indicada) para revisarlos sin ver el video entero. Se corre en la raíz del
  * episodio, por el atajo de la plantilla (`node revisar.mjs 0.95 [b05,b31]`), y deja revision/<beat>_<NN>.jpg a la
- * mitad del tamaño del video (540x960 en vertical), lo que juntan hojas.py y el editor de Sloth.
+ * mitad del tamaño del video (540x960 en vertical), lo que juntan hojas.py y el editor de VyMotion.
  *
  * Cada cuadro lo dibuja el mismo renderizador web que el render final (render_web.mjs), en un solo Edge que recorre los
  * beats en una página: 112 cuadros en unos 10 s. Con renderStill de Remotion eran 130 s (una pestaña por cuadro, que

@@ -12,7 +12,7 @@ type Lanzador = { exe: string; args: string[] }
 let lanzador: Lanzador | null = null
 
 /**
- * Cómo se lanza yt-dlp: con el Python de Sloth y sus banderas (sin `-B` reescribiría sus `.pyc` y la app de YouTube
+ * Cómo se lanza yt-dlp: con el Python de VyMotion y sus banderas (sin `-B` reescribiría sus `.pyc` y la app de YouTube
  * volvería a bajar 4 GB), o con un Python del sistema que lo tenga instalado. `null` si no hay ninguno; se vuelve a
  * mirar cada vez, por si se instaló mientras tanto.
  */
@@ -31,7 +31,7 @@ export function ytdlp(): Lanzador | null {
 /** Una llamada a yt-dlp que devuelve su JSON (`-J`). Los títulos en su idioma: sin `lang=es`, YouTube los traduce. */
 export function correr(args: string[], signal: AbortSignal): Promise<any> {
   const l = ytdlp()
-  if (!l) return Promise.reject(new Error('Falta yt-dlp: instala el Python de Sloth, o corre «python -m pip install yt-dlp».'))
+  if (!l) return Promise.reject(new Error('Falta yt-dlp: instala el Python de VyMotion, o corre «python -m pip install yt-dlp».'))
   return new Promise((ok, mal) => {
     const p = spawn(l.exe, [...l.args, '-m', 'yt_dlp', '-J', '--no-warnings', '--extractor-args', 'youtube:lang=es', ...args], { windowsHide: true })
     let out = ''

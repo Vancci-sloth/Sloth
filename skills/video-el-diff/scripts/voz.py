@@ -5,7 +5,7 @@ Prepara la narración que grabó el usuario. Se corre en la raíz del proyecto d
 
 1. Pasa el audio a WAV (un WAV se copia; lo demás, el m4a del celular, mp3, ogg, opus, aac, flac, webm o mp4, se
    convierte con FFmpeg) y saca su versión de 16 kHz.
-2. Lo transcribe con tiempos por palabra (transcribir.py de Sloth, alineador voxpopuli-es). Los términos (nombres
+2. Lo transcribe con tiempos por palabra (transcribir.py de VyMotion, alineador voxpopuli-es). Los términos (nombres
    propios, marcas) van como pistas a Whisper. Las cifras salen con letra ("noventa y nueve punto dos"): con dígitos,
    el alineador no las sabe situar y corre las palabras vecinas. Si así Whisper se salta voz, vuelve a transcribir con
    dígitos y se queda con la que deje menos voz sin palabras.

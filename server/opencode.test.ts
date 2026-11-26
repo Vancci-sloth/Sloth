@@ -104,7 +104,7 @@ test('crea la sesión en la carpeta del hilo con su modelo, sus reglas y su nave
   const crear = h.pedidos.find((p) => p.metodo === 'session.create')!.input
   assert.deepEqual(crear.model, { providerID: 'opencode', id: 'big-pickle', variant: 'high' })
   assert.equal(crear.location.directory, process.cwd())
-  assert.equal(crear.title, 'Sloth')
+  assert.equal(crear.title, 'VyMotion')
   // La última regla manda: las preguntas interactivas no, los MCP de otros hilos no, los suyos sí.
   assert.deepEqual(crear.permissions.slice(-3), [
     { action: 'question', resource: '*', effect: 'deny' },
@@ -115,7 +115,7 @@ test('crea la sesión en la carpeta del hilo con su modelo, sus reglas y su nave
   assert.deepEqual(h.sesiones, [SESION])
   const prompt = h.pedidos.find((p) => p.metodo === 'session.prompt')!.input
   assert.deepEqual(prompt.skills, [{ id: 'video-explicativo' }])
-  assert.match(prompt.text, /^Usa la skill video-explicativo de Sloth, la de /)
+  assert.match(prompt.text, /^Usa la skill video-explicativo de VyMotion, la de /)
   assert.equal(prompt.delivery, 'queue')
 })
 

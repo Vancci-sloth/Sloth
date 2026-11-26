@@ -1,4 +1,4 @@
-# La voz sin NVIDIA va con Parakeet, y Sloth dice cuánto tarda cada cosa en tu equipo
+# La voz sin NVIDIA va con Parakeet, y VyMotion dice cuánto tarda cada cosa en tu equipo
 
 Fecha: 2026-10-27
 
@@ -22,12 +22,12 @@ sabía cuánto iba a tardar, y la app de Mac, que es de Intel, no podía instala
   adelanto, que no basta para los subtítulos palabra por palabra.
 - **Todo pasa por `python/procesos`**: `parakeet.engine()` elige el motor y las skills no cambian. Una voz de 11 min 10 s
   sale en unos 2 min en el mismo equipo, con 1,9 GB de memoria como mucho.
-- **Opciones → Tu equipo** (`server/equipo.ts`) dice qué eligió Sloth y cuánto tarda aquí la voz y el render, de lo que
-  midió (`equipo.json`). Nadie elige nada: Sloth lo hace solo. `proceso()` de video-base y `render.cjs` del explicativo
+- **Opciones → Tu equipo** (`server/equipo.ts`) dice qué eligió VyMotion y cuánto tarda aquí la voz y el render, de lo que
+  midió (`equipo.json`). Nadie elige nada: VyMotion lo hace solo. `proceso()` de video-base y `render.cjs` del explicativo
   dicen antes y durante cuánto falta.
-- **Quien ya tenía Sloth sin NVIDIA** no ve «falta descargar»: su Whisper sigue sirviendo, y Parakeet es una mejora
+- **Quien ya tenía VyMotion sin NVIDIA** no ve «falta descargar»: su Whisper sigue sirviendo, y Parakeet es una mejora
   (`check()` de `modelos_transcripcion.py`). Arriba del hilo nuevo, junto a «Actualizar Claude Code», le sale «Acelerar
-  Sloth en tu equipo», que la baja con un clic. Uno nuevo sin NVIDIA baja Parakeet y no Whisper (1,6 GB menos).
+  VyMotion en tu equipo», que la baja con un clic. Uno nuevo sin NVIDIA baja Parakeet y no Whisper (1,6 GB menos).
 - **El render final del explicativo** codifica con `veryfast` y crf 14 en vez de `slow` y crf 16, en toda computadora.
   Contra una referencia casi sin pérdida se ven igual (SSIM 0,9935 contra 0,9931) y pesa un 33 % más, pero tarda un 30 %
   menos en el equipo del usuario, con 6 Chrome y con 2: el codificador deja de quitarle procesador al dibujo de cada
@@ -47,7 +47,7 @@ sabía cuánto iba a tardar, y la app de Mac, que es de Intel, no podía instala
 - Con NVIDIA nada cambia: sigue Whisper en la GPU. Parakeet no acepta pistas de nombres (`terminos`): los que escribe
   parecidos («la Sada» por «Lazada») se cambian después por el nombre (`with_terms`). Con eso, de las palabras del guion
   de cuatro videos encuentra del 98,3 al 99,7 %; WhisperX, el 99,5 % en uno de ellos.
-- Una computadora sin NVIDIA que ya tenía el Python de Sloth pide bajar Parakeet (unos 670 MB) en Herramientas de
+- Una computadora sin NVIDIA que ya tenía el Python de VyMotion pide bajar Parakeet (unos 670 MB) en Herramientas de
   video; mientras no lo tiene, transcribe con Whisper como antes.
 - En un Mac con Intel, sin torch: Parakeet sin alinear y sin vectores (ADR 0006).
 - Un idioma fuera de los 25 de Parakeet (japonés, hindi) se transcribe mal sin NVIDIA.

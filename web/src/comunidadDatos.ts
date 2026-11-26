@@ -3,7 +3,7 @@ import { api } from './api'
 
 /**
  * Lo que la Comunidad ya pidió al Worker, para enseñarlo al instante y ponerlo al día después: la lista de cada sección y
- * orden (con las páginas que ya bajaste) y cada publicación abierta con sus comentarios. Vive mientras Sloth está abierto;
+ * orden (con las páginas que ya bajaste) y cada publicación abierta con sus comentarios. Vive mientras VyMotion está abierto;
  * la primera página de «Todo» se queda también en esta computadora (`GUARDADA`), así la comunidad sale aunque sea la
  * primera vez que la abres hoy. De ahí solo salen publicaciones: quién eres, tus avisos y el roadmap vienen siempre del
  * último pedido de esta sesión (`ultimo`), nunca de una copia vieja.
@@ -86,7 +86,7 @@ export function pedirPublicacion(id: string): Promise<Abierta> {
   const ya = abriendo.get(id)
   if (ya) return ya
   const pedido = api<Abierta>(`/api/comunidad/p/${id}`).then(
-    (a) => (borradas.has(id) || abiertas.set(id, a), abriendo.delete(id), a),
+    (a) => (borradas.has(id) || recordarAbierta(id, a), abriendo.delete(id), a),
     (e: unknown) => (abriendo.delete(id), Promise.reject(e))
   )
   abriendo.set(id, pedido)
@@ -100,7 +100,18 @@ export function precargarPublicacion(id: string) {
 
 /** Lo que ya se tiene de una publicación abierta. */
 export const abiertaGuardada = (id: string) => abiertas.get(id)
-export const guardarAbierta = (id: string, a: Abierta) => abiertas.set(id, a)
+export const guardarAbierta = (id: string, a: Abierta) => recordarAbierta(id, a)
+
+/** Las abiertas que se guardan: las últimas 40. Con más, una sesión larga juntaba miles de comentarios en memoria. */
+const ABIERTAS = 40
+function recordarAbierta(id: string, a: Abierta) {
+  abiertas.delete(id)
+  abiertas.set(id, a)
+  for (const k of abiertas.keys()) {
+    if (abiertas.size <= ABIERTAS) break
+    abiertas.delete(k)
+  }
+}
 
 /**
  * Tras escribir: con `borrada`, esa publicación sale de todo lo guardado (también del buscador); sin ella (una nueva), lo
@@ -169,7 +180,7 @@ export function conocidas(): PublicacionComunidad[] {
  * Las palabras de lo que se busca, como las compara el Worker (`palabrasDe` en `licencias/src/comunidad.ts`): en
  * minúsculas y sin acentos, con la ñ.
  */
-export const palabrasDe = (q: string) =>
+export const palabrasDe = (q: string, hasta = 6) =>
   q
     .toLowerCase()
     .normalize('NFD')
@@ -180,15 +191,31 @@ export const palabrasDe = (q: string) =>
     .replace(/õ/g, 'o')
     .split(/[^\p{L}\p{N}]+/u)
     .filter(Boolean)
-    .slice(0, 6)
+    .slice(0, hasta)
+
+/**
+ * El título y el texto ya pasados por `palabrasDe`, guardados: con el índice (2.000 publicaciones), cada tecla del buscador
+ * los normalizaba todos otra vez, y escribir se trababa.
+ */
+const planos = new Map<string, { titulo: string; todo: string }>()
+function planoDe(p: { titulo: string; texto: string }) {
+  const k = `${p.titulo} ${p.texto}`
+  let x = planos.get(k)
+  if (!x) {
+    if (planos.size > 5000) planos.clear()
+    const titulo = palabrasDe(p.titulo, Infinity).join(' ')
+    x = { titulo, todo: `${titulo} ${palabrasDe(p.texto, Infinity).join(' ')}` }
+    planos.set(k, x)
+  }
+  return x
+}
 
 /** Lo mismo que hace el Worker, con lo que ya se tiene: cada palabra en el título o el texto; primero en el título. */
 export function buscarAqui<T extends Pick<PublicacionComunidad, 'titulo' | 'texto' | 'actividad'>>(q: string, entre: T[]): T[] {
   const palabras = palabrasDe(q)
   if (!palabras.length) return []
-  const plano = (t: string) => palabrasDe(t).join(' ')
   return entre
-    .map((p) => ({ p, titulo: plano(p.titulo), todo: `${plano(p.titulo)} ${plano(p.texto)}` }))
+    .map((p) => ({ p, ...planoDe(p) }))
     .filter((x) => palabras.every((w) => x.todo.includes(w)))
     .sort((a, b) => +palabras.every((w) => b.titulo.includes(w)) - +palabras.every((w) => a.titulo.includes(w)) || b.p.actividad.localeCompare(a.p.actividad))
     .map((x) => x.p)

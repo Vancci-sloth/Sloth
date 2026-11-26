@@ -7,7 +7,7 @@ Medido con la misma voz de 147 s en un Core 5 210H, solo con el procesador: Whis
 inicio de cada palabra quedó a 64 ms (mediana) del de WhisperX alineado: si hay torch, `transcribir.py` lo afina con el
 alineador de siempre.
 
-`engine()` elige el motor: Whisper si el torch del Python de Sloth es el de CUDA (se instaló así porque había una NVIDIA
+`engine()` elige el motor: Whisper si el torch del Python de VyMotion es el de CUDA (se instaló así porque había una NVIDIA
 que lo aguanta, `aguantaCuda` de server/requisitos.ts); si no, Parakeet si está puesto, y Whisper en el procesador si
 aún no se bajó. `SLOTH_MOTOR` lo fuerza, para probar.
 

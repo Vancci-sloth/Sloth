@@ -1,4 +1,5 @@
 import { existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, realpathSync, renameSync, rmdirSync, statSync, symlinkSync, unlinkSync } from 'node:fs'
+import { readdir, readFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -12,7 +13,7 @@ import { cambiosDe, nombreCopia, respaldar, restaurar } from './originales.ts'
 /**
  * Donde los agentes buscan las skills. En la app que se vende, ~/.claude/skills, donde las enlaza `enlazarSkills`. Desde
  * el repo, las del repo: su Claude tiene su propia configuración (`configClaudeDev`) y no toca ~/.claude, que es de la
- * Sloth instalada en esta computadora; así esa funciona igual que en la de cualquier cliente. `SLOTH_SKILLS`, si ya viene
+ * VyMotion instalada en esta computadora; así esa funciona igual que en la de cualquier cliente. `SLOTH_SKILLS`, si ya viene
  * puesta, manda (las pruebas imitan así la app que se vende).
  */
 /** Donde la app que se vende enlaza sus skills (`enlazarSkills`, `enlazarSkillsCodex`): la carpeta de Claude del usuario. */
@@ -21,7 +22,7 @@ export const SKILLS = process.env.SLOTH_SKILLS || (VENTA ? CASA : resolve(dirnam
 
 /**
  * La configuración de Claude de la copia del repo, en su `data/claude` (`CLAUDE_CONFIG_DIR`), con sus `skills` enlazadas
- * a las del repo. Su cuenta se conecta aparte, una vez, desde Sloth.
+ * a las del repo. Su cuenta se conecta aparte, una vez, desde VyMotion.
  */
 export function configClaudeDev(app: string): string {
   const dir = join(app, 'data', 'claude')
@@ -38,7 +39,7 @@ export function configClaudeDev(app: string): string {
 /**
  * La app que se vende trae sus skills en `<app>/skills`, y Claude las busca en ~/.claude/skills: enlaza ahí, con una
  * unión, cada una que falte. Las que ya están no se tocan, que pueden ser del usuario; solo se rehace la unión que apunta
- * a una carpeta que ya no existe (Sloth se movió de sitio).
+ * a una carpeta que ya no existe (VyMotion se movió de sitio).
  */
 export function enlazarSkills(app: string) {
   mkdirSync(CASA, { recursive: true })
@@ -58,9 +59,9 @@ export function enlazarSkills(app: string) {
 
 /**
  * Codex no mira ~/.claude/skills: busca en las suyas (`$CODEX_HOME/skills` y `~/.agents/skills`), y si dos skills se
- * llaman igual no gana ninguna. Cada skill de Sloth se enlaza en las dos a la misma de Claude, para que los dos agentes
+ * llaman igual no gana ninguna. Cada skill de VyMotion se enlaza en las dos a la misma de Claude, para que los dos agentes
  * lean los mismos archivos y un cambio valga para ambos; Codex cuenta una sola vez lo que lleva al mismo sitio. Una copia
- * suelta con el nombre de una skill de Sloth (la de una versión de antes) sale a `skills-viejas`, donde Codex ya no la ve.
+ * suelta con el nombre de una skill de VyMotion (la de una versión de antes) sale a `skills-viejas`, donde Codex ya no la ve.
  */
 export function enlazarSkillsCodex(app: string, bases = basesCodex()) {
   for (const base of bases) {
@@ -96,7 +97,7 @@ const basesCodex = () => [process.env.CODEX_HOME || join(homedir(), '.codex'), j
 
 /**
  * Al borrar un estilo tuyo, su skill sale de `<app>/skills` a una copia en `data/skills-tuyas`, por si te arrepientes, y
- * se quitan los enlaces de Claude y Codex que se quedaron sin ella. Una que trae Sloth no se toca. Devuelve la copia.
+ * se quitan los enlaces de Claude y Codex que se quedaron sin ella. Una que trae VyMotion no se toca. Devuelve la copia.
  */
 export function guardarSkillTuya(app: string, skill: string, datos: string, enlaces = VENTA ? [CASA, ...basesCodex().map((b) => join(b, 'skills'))] : []) {
   const dir = join(app, 'skills', skill)
@@ -183,14 +184,15 @@ export async function volverAOriginal(card: Card, todas: Card[], datos: string, 
  * Las series de una skill: cada `series/<id>.md` de su carpeta, con el título de su primera línea `# `. Un estilo de
  * video tiene además las de `video-base/series` (`video-base/SERIES.md`); con el mismo id, la suya manda.
  */
-export function seriesDe(skill: string, estilo: boolean): Serie[] {
+export async function seriesDe(skill: string, estilo: boolean): Promise<Serie[]> {
   const series = new Map<string, Serie>()
   for (const carpeta of [...(estilo ? ['video-base'] : []), skill]) {
     const dir = join(SKILLS, carpeta, 'series')
-    if (!existsSync(dir)) continue
-    for (const f of readdirSync(dir).filter((f) => f.endsWith('.md'))) {
+    // Sin carpeta de series no es error: no se lee nada, y no se bloquea el servidor leyendo archivos uno a uno.
+    const archivos = await readdir(dir).catch(() => [] as string[])
+    for (const f of archivos.filter((f) => f.endsWith('.md'))) {
       const id = f.slice(0, -3)
-      const nombre = /^# (.+)$/m.exec(readFileSync(join(dir, f), 'utf8'))?.[1].trim() ?? id
+      const nombre = /^# (.+)$/m.exec(await readFile(join(dir, f), 'utf8'))?.[1].trim() ?? id
       series.set(id, { id, nombre, archivo: `${carpeta}/series/${f}` })
     }
   }

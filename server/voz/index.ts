@@ -29,7 +29,7 @@ import { voicesCloning } from './voices-cloning.ts'
  * sesión de Google no la tiene ningún agente. Google no deja iniciar sesión dentro de una app, así que se entra en Edge
  * (Chrome en Mac) con su perfil, `data/voz/perfil`, y las cookies de Google pasan a la página (`copiarSesion`).
  * Si la página la pierde, se vuelven a pasar de Edge sin preguntar; solo si Edge también la perdió hay que volver a
- * entrar. Sin la ventana de Sloth (Sloth en Edge), se genera en ese Edge, sin ventana. Probado el 29 de octubre de 2026:
+ * entrar. Sin la ventana de VyMotion (VyMotion en Edge), se genera en ese Edge, sin ventana. Probado el 29 de octubre de 2026:
  * Google acepta en la app la sesión copiada, y una frase sale en unos 4 s; un guion de 6 minutos, en unos 100 s.
  *
  * Una voz a la vez, en fila: los videos de un lote no se pisan la página. El WAV (24 kHz, mono) lo baja el botón
@@ -41,8 +41,8 @@ import { voicesCloning } from './voices-cloning.ts'
  *
  * Las voces de Fish Audio y ElevenLabs (`fish:<id>`, `elevenlabs:<id>`) van por su API, con la llave de cada quien
  * (`apis.ts`): no pasan por la página ni esperan su fila, y dejan el WAV en el mismo sitio, con la misma huella. Igual
- * las de Voices Cloning (`vc:<id>`, `voices-cloning.ts`), el proveedor de Sloth, que van por el cobro con los créditos
- * que da Sloth.
+ * las de Voices Cloning (`vc:<id>`, `voices-cloning.ts`), el proveedor de VyMotion, que van por el cobro con los créditos
+ * que da VyMotion.
  */
 
 const URL_VOZ = 'https://aistudio.google.com/generate-speech'
@@ -80,7 +80,7 @@ export function voz(app: string, socio: Parameters<typeof voicesCloning>[1]) {
   const carpeta = join(app, 'data', 'voz')
   const descargas = join(carpeta, 'descargas')
   // El perfil del Edge donde se entra con Google. El del script viejo de El Diff ya tiene la sesión: se usa mientras no
-  // haya uno de Sloth.
+  // haya uno de VyMotion.
   const nuevo = join(carpeta, 'perfil')
   const viejo = join(process.env.LOCALAPPDATA ?? join(homedir(), '.cache'), 'video-el-diff', 'aistudio')
   const perfil = () => (existsSync(nuevo) || !existsSync(viejo) ? nuevo : viejo)
@@ -202,7 +202,7 @@ export function voz(app: string, socio: Parameters<typeof voicesCloning>[1]) {
   }
 
   /**
-   * Pasa la sesión de Google del Edge a la página de la app (sin la ventana de Sloth, se queda en Edge, que es donde se
+   * Pasa la sesión de Google del Edge a la página de la app (sin la ventana de VyMotion, se queda en Edge, que es donde se
    * genera). `false` si Edge no la tiene. Antes abre AI Studio en Edge, para que Google renueve lo que haga falta.
    */
   async function copiarSesion(): Promise<boolean> {
@@ -243,7 +243,7 @@ export function voz(app: string, socio: Parameters<typeof voicesCloning>[1]) {
   // ── La página de AI Studio ──────────────────────────────────────────────────────────────────────────────────────
 
   /**
-   * La página donde se trabaja: la del navegador integrado o, sin la ventana de Sloth, una pestaña del Edge sin ventana.
+   * La página donde se trabaja: la del navegador integrado o, sin la ventana de VyMotion, una pestaña del Edge sin ventana.
    * `bajarA` pone la carpeta de lo que baje; `soltar` la deja.
    */
   async function pagina(): Promise<{ page: Page; bajarA(carpeta: string): Promise<void>; soltar(): Promise<void> }> {
@@ -305,7 +305,7 @@ export function voz(app: string, socio: Parameters<typeof voicesCloning>[1]) {
         if (correo !== cuenta) (cuenta = correo), guardarCuenta()
         break
       }
-      // Sin la ventana de Sloth la página ya es la de Edge: no hay de dónde pasarla.
+      // Sin la ventana de VyMotion la página ya es la de Edge: no hay de dónde pasarla.
       if (intento === 0 && integrado()?.voz && (await copiarSesion().catch(() => false))) continue
       cuenta = null
       guardarCuenta()
@@ -423,7 +423,7 @@ export function voz(app: string, socio: Parameters<typeof voicesCloning>[1]) {
   /**
    * Quita la sesión de la página de la app y la de Edge: si la de Edge se quedaba, conectar otra vez entraba solo con la
    * misma cuenta y no había cómo elegir otra (con la cuota del día agotada, 5 de noviembre). El perfil del script viejo
-   * de El Diff no se toca: se deja de usar y se empieza uno de Sloth, vacío.
+   * de El Diff no se toca: se deja de usar y se empieza uno de VyMotion, vacío.
    */
   async function desconectar() {
     const ventana = integrado()
@@ -603,7 +603,7 @@ export function voz(app: string, socio: Parameters<typeof voicesCloning>[1]) {
       const { motor } = motorDe(d.voz)
       if (motor === 'vc' && !vc.puede()) await vc.refrescar()
       if (motor === 'vc' && !vc.puede())
-        return enviar(409, { error: 'Las voces de Sloth no están disponibles en esta computadora (hace falta la cuenta de Sloth y créditos de voz). Mientras, pídele la voz al usuario.' }), true
+        return enviar(409, { error: 'Las voces de VyMotion no están disponibles en esta computadora (hace falta la cuenta de VyMotion y créditos de voz). Mientras, pídele la voz al usuario.' }), true
       if (motor !== 'ai-studio' && motor !== 'vc' && !apis.tieneLlave(motor))
         return enviar(409, { error: `No hay llave de ${MOTORES[motor]}: que el usuario la ponga en Opciones → Voz. Mientras, pídele la voz.` }), true
       if (motor === 'ai-studio' && !cuenta)
@@ -684,7 +684,7 @@ export function voz(app: string, socio: Parameters<typeof voicesCloning>[1]) {
     const t = /^\/api\/voz\/trabajos\/(\w+)$/.exec(path)
     if (t && metodo === 'GET') {
       const trabajo = trabajos.get(t[1])
-      if (!trabajo) return enviar(404, { error: 'No conozco esa voz: Sloth se reinició. Vuelve a pedirla (si ya estaba hecha, sale al momento).' }), true
+      if (!trabajo) return enviar(404, { error: 'No conozco esa voz: VyMotion se reinició. Vuelve a pedirla (si ya estaba hecha, sale al momento).' }), true
       const hasta = Date.now() + Math.min(ESPERA_MAXIMA, Number(new URL(req.url ?? '', 'http://x').searchParams.get('esperar') ?? 0) * 1000)
       while ((trabajo.estado === 'en-fila' || trabajo.estado === 'generando') && Date.now() < hasta) await espera(500)
       return enviar(200, publico(trabajo)), true
@@ -697,7 +697,7 @@ export function voz(app: string, socio: Parameters<typeof voicesCloning>[1]) {
     /** La sección Administrador del creador (`/api/admin*`, `voices-cloning.ts`). */
     admin: vc.apiAdmin,
     /** Por qué no se puede reiniciar el servidor: cortaría una voz a medias. */
-    ocupado: () => (trabajando || porApi ? 'Sloth está generando una voz. Espera a que termine.' : null),
+    ocupado: () => (trabajando || porApi ? 'VyMotion está generando una voz. Espera a que termine.' : null),
     /** Lo que Flow (`server/flow/`) toma de aquí: la cuenta y el Edge con la sesión, en el turno de la voz (ver `enTurno`). */
     google: {
       cuenta: () => cuenta,
@@ -715,7 +715,7 @@ export function voz(app: string, socio: Parameters<typeof voicesCloning>[1]) {
   }
 }
 
-/** El MCP `voz` para los agentes (`mcp.mjs`): lo corre el Node de Sloth y habla con la API de este servidor. */
+/** El MCP `voz` para los agentes (`mcp.mjs`): lo corre el Node de VyMotion y habla con la API de este servidor. */
 export function mcpVoz(): Record<string, McpStdioServerConfig> {
   const aqui = dirname(fileURLToPath(import.meta.url))
   // Compilada (`scripts/compilar.mjs`), el servidor va en un solo archivo, server/index.mjs, y el MCP a su lado.

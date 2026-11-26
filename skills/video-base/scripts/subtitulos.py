@@ -1,6 +1,6 @@
 """
 Las palabras de un video, cada una con su tiempo, para sus subtítulos en la Entrega (`server/subtitulos.ts`): sin
-agente ni IA de pago, con el transcriptor local de Sloth (Whisper con NVIDIA, Parakeet sin ella) y el mismo alineador
+agente ni IA de pago, con el transcriptor local de VyMotion (Whisper con NVIDIA, Parakeet sin ella) y el mismo alineador
 que las voces de los videos. Lo demás (los renglones, el .srt y grabarlos en el video) lo hace el servidor.
 
     python subtitulos.py <video> <palabras.json>

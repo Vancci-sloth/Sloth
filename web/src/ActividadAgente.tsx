@@ -107,7 +107,7 @@ function Calendario({ datos, modelo }: { datos: ActividadDiaria[]; modelo: strin
     {!total.turnos ? <div className="actividad-vacia superficie-ascii">
       <CampoAscii />
       <Icono de="pulso" />
-      <div><strong>Sin actividad registrada</strong><p>Cuando terminen turnos en Sloth, aquí verás su evolución y los tokens reportados.</p></div>
+      <div><strong>Sin actividad registrada</strong><p>Cuando terminen turnos en VyMotion, aquí verás su evolución y los tokens reportados.</p></div>
     </div> : <>
     <div className="actividad-vistas" aria-label="Gráfica de actividad" role="group">
       {([['turnos', 'Turnos'], ['tokens', 'Tokens'], ['calendario', 'Calendario']] as const).map(([id, nombre]) =>
@@ -153,7 +153,7 @@ function Calendario({ datos, modelo }: { datos: ActividadDiaria[]; modelo: strin
           <div><dt>Salida</dt><dd>{numero.format(detalle.output)}</dd></div>
         </dl>
         {detalle.turnosConTokens < detalle.turnos && <span>Hay turnos sin datos de tokens.</span>}
-      </> : <span>{detalle.turnos ? 'El agente no reportó tokens ese día.' : total.turnos ? 'Sin turnos ese día.' : 'El uso aparecerá aquí cuando terminen turnos en Sloth.'}</span>}
+      </> : <span>{detalle.turnos ? 'El agente no reportó tokens ese día.' : total.turnos ? 'Sin turnos ese día.' : 'El uso aparecerá aquí cuando terminen turnos en VyMotion.'}</span>}
     </div>
     </div>
     {total.turnosConTokens < total.turnos && <p className="muted small">{numero.format(total.turnosConTokens)} de {numero.format(total.turnos)} turnos reportaron tokens.</p>}

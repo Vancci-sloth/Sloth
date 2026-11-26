@@ -1,6 +1,6 @@
 /**
- * La nube de Sloth para las redes: guarda en R2 los videos que van a Instagram y los publica a su hora con el cron (cada
- * minuto), aunque la computadora esté apagada. Sloth le habla con `SECRETO`; Instagram solo ve `/v/<ref>.mp4`, una ruta
+ * La nube de VyMotion para las redes: guarda en R2 los videos que van a Instagram y los publica a su hora con el cron (cada
+ * minuto), aunque la computadora esté apagada. VyMotion le habla con `SECRETO`; Instagram solo ve `/v/<ref>.mp4`, una ruta
  * al azar que nadie más conoce. Ver `docs/adr/0003-instagram-por-su-api.md`.
  *
  * En el bucket: `videos/<ref>.mp4` (hasta que sale), `cola/<ref>.json` (lo que falta, con `cuando` y `estado` en sus
@@ -57,7 +57,7 @@ export default {
     if (!(await esSloth(req, env))) return json({ error: 'No' }, 401)
 
     try {
-      // Con cuándo caduca el token (si Instagram lo dijo al renovarlo) y por qué falló la última renovación: Sloth avisa.
+      // Con cuándo caduca el token (si Instagram lo dijo al renovarlo) y por qué falló la última renovación: VyMotion avisa.
       if (que === 'cuenta' && req.method === 'GET') {
         const t = await vigente(env)
         return json({ cuenta: t ? `@${(await yo(t.token)).username}` : null, caduca: t?.caduca, renovacion: t?.error })
@@ -142,7 +142,7 @@ export default {
       // Lo `publicado` que sigue en la cola ya salió y falta borrar su video: eso lo hace `guardar`, sin tocar Instagram.
       if (item.estado !== 'publicado')
         try {
-          if (!t) throw new Error('Falta el token de Instagram: pégalo en Sloth, en ⚙ Opciones → Redes.')
+          if (!t) throw new Error('Falta el token de Instagram: pégalo en VyMotion, en ⚙ Opciones → Redes.')
           await avanzar(env, t, item)
           delete item.intentos
         } catch (e) {

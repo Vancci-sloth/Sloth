@@ -3,17 +3,14 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 import { homedir } from 'node:os'
 import { dirname, join, relative, sep } from 'node:path'
 import { gunzipSync, gzipSync } from 'node:zlib'
-import { acentosBien } from '../shared/acentos.ts'
 import { guiaDe } from '../shared/guia.ts'
 import type { Card, GuiaEstilo, OrigenEstilo } from '../shared/types.ts'
-import { VENTA } from '../shared/venta.ts'
 import { guardar } from './disco.ts'
 import { bytes, json as enviar } from './http.ts'
-import { comprobar } from './estilos-requisitos.ts'
 import { huella, nombreCopia } from './originales.ts'
 
 /**
- * Un estilo tuyo, en un archivo para compartirlo (`.sloth-estilo`): su skill y su card, para que otra Sloth lo instale
+ * Un estilo tuyo, en un archivo para compartirlo (`.sloth-estilo`): su skill y su card, para que otra VyMotion lo instale
  * entre sus estilos. Se pasa como archivo o por la comunidad, en la sección Estilos, donde solo sale lo que el creador
  * aprobó (`licencias/src/comunidad.ts`).
  *
@@ -21,10 +18,10 @@ import { huella, nombreCopia } from './originales.ts'
  * orden y con el tamaño que dice. Lo que entra y lo que no:
  * - Solo la carpeta de su skill: ni `video-base` ni otra skill. Sin lo que cada quien junta al usarlo (`PERSONALES`) y sin
  *   lo que se instala o se rehace (`REHECHO`), y solo archivos de los tipos de `TIPOS`: nada de programas.
- * - Solo los paquetes de npm que ya usan los estilos de Sloth (`ajenos`): un estilo no trae dependencias nuevas. Los de
+ * - Solo los paquetes de npm que ya usan los estilos de VyMotion (`ajenos`): un estilo no trae dependencias nuevas. Los de
  *   Python son los del estilo del que partió (`basadoEn`, que lee `server/requisitos.ts`).
  * - `sloth`: la versión donde se hizo, que es la mínima para instalarlo. `usa`: la huella de cada archivo de `video-base`
- *   que nombra. Si al instalar alguno ya no es igual, Sloth ofrece adaptarlo a tu versión con «Nuevo estilo».
+ *   que nombra. Si al instalar alguno ya no es igual, VyMotion ofrece adaptarlo a tu versión con «Nuevo estilo».
  * - Su guía de uso (`guia` de su card, `shared/guia.ts`), si la tiene; la de su publicación en la comunidad manda.
  * Instalar escribe solo en `<app>/skills/<id>` y en `data/tus-cards.json`. Lo de antes, al actualizar, va a
  * `data/skills-tuyas` como al borrar un estilo.
@@ -40,7 +37,7 @@ const ABIERTO = 60 * 1024 * 1024
 const MAX_ARCHIVOS = 3000
 
 /** Lo que junta quien usa el estilo: sus videos, su banco, sus huellas. Las poses del reel son de su persona. */
-export const PERSONALES = ['huellas', 'series/banco', 'modelos']
+const PERSONALES = ['huellas', 'series/banco', 'modelos']
 const PERSONALES_DE: Record<string, string[]> = { 'reel-collage': ['personaje'] }
 /** Lo que se instala o se rehace solo. */
 const REHECHO = new Set(['node_modules', 'out', '__pycache__', '.git', '.cache', '.venv'])
@@ -55,7 +52,7 @@ export interface Manifiesto {
   formato: number
   id: string
   titulo: string
-  /** La versión de Sloth donde se hizo. */
+  /** La versión de VyMotion donde se hizo. */
   sloth: string
   basadoEn?: string
   card: Partial<Card>
@@ -64,7 +61,7 @@ export interface Manifiesto {
   archivos: { ruta: string; bytes: number }[]
 }
 
-/** Los estilos de Sloth que hay aquí: su skill y su carpeta. De ellos salen los paquetes de npm que se permiten. */
+/** Los estilos de VyMotion que hay aquí: su skill y su carpeta. De ellos salen los paquetes de npm que se permiten. */
 export interface DeSloth {
   skill: string
   carpeta: string
@@ -78,8 +75,8 @@ const sirve = (ruta: string) => {
   return SIN_TIPO.has(nombre) || TIPOS.has(extension(nombre))
 }
 
-/** Los archivos de una carpeta, con su ruta relativa (con `/`), sin lo que no viaja. También arma la copia de `server/respaldo.ts`. */
-export function archivosDe(carpeta: string, fuera: string[]): string[] {
+/** Los archivos de una carpeta, con su ruta relativa (con `/`), sin lo que no viaja. */
+function archivosDe(carpeta: string, fuera: string[]): string[] {
   const lista: string[] = []
   const ver = (dir: string) => {
     for (const d of readdirSync(dir, { withFileTypes: true })) {
@@ -94,7 +91,7 @@ export function archivosDe(carpeta: string, fuera: string[]): string[] {
 }
 
 /**
- * El estilo de Sloth del que partió un estilo tuyo: el que dice su card y, si no lo dice (uno de antes), el que comparte
+ * El estilo de VyMotion del que partió un estilo tuyo: el que dice su card y, si no lo dice (uno de antes), el que comparte
  * más archivos con él, que «Nuevo estilo» copia uno y lo cambia.
  */
 export function baseDe(card: Card, carpeta: string, deSloth: DeSloth[]): string | undefined {
@@ -108,7 +105,7 @@ export function baseDe(card: Card, carpeta: string, deSloth: DeSloth[]): string 
   return mejor?.skill
 }
 
-/** Los paquetes de npm que piden sus `package.json` y que ningún estilo de Sloth usa. */
+/** Los paquetes de npm que piden sus `package.json` y que ningún estilo de VyMotion usa. */
 export function ajenos(archivos: Map<string, Buffer>, deSloth: DeSloth[]): string[] {
   const nombres = (texto: string) => {
     try {
@@ -142,24 +139,18 @@ function usaDe(archivos: Map<string, Buffer>, base: string): Record<string, stri
   return Object.fromEntries(Object.entries(usa).sort(([a], [b]) => a.localeCompare(b)))
 }
 
-/**
- * Lo que viaja de la card, sin lo de esta computadora. Lo que se lee de ella (su título, qué hace, los nombres de sus
- * etapas, su guía) va con sus acentos bien aunque su autor la tenga con ellos rotos (`shared/acentos.ts`): así sale del
- * paquete, y así queda al instalar o revisar uno que ya venía mal.
- */
+/** Lo que viaja de la card, sin lo de esta computadora. */
 function cardLimpia(card: Partial<Card>): Partial<Card> {
   const limpia: Record<string, unknown> = {}
   for (const k of CAMPOS) if (card[k] !== undefined) limpia[k] = card[k]
   if (typeof limpia.title !== 'string' || !limpia.title.trim()) throw new EstiloMalo('El estilo no tiene título.')
-  limpia.title = acentosBien(String(limpia.title)).slice(0, 80)
-  limpia.description = acentosBien(String(limpia.description ?? '')).slice(0, 400)
+  limpia.title = String(limpia.title).slice(0, 80)
+  limpia.description = String(limpia.description ?? '').slice(0, 400)
   // Su guía de uso, limpia; una que no dice nada no viaja.
   const guia = guiaDe(limpia.guia)
   if (guia) limpia.guia = guia
   else delete limpia.guia
   if (limpia.etapas !== undefined && !Array.isArray(limpia.etapas)) throw new EstiloMalo('Las etapas del estilo no son una lista.')
-  // En una copia: la card de su autor no se toca.
-  if (limpia.etapas) limpia.etapas = (limpia.etapas as Record<string, unknown>[]).map((e) => (e && typeof e.nombre === 'string' ? { ...e, nombre: acentosBien(e.nombre) } : e))
   // Lo que `listo` y `muestra` buscan es dentro de la carpeta del video.
   for (const e of (limpia.etapas ?? []) as Record<string, unknown>[]) {
     for (const k of ['listo', 'muestra']) if (typeof e[k] === 'string' && ((e[k] as string).includes('..') || /^([a-z]:|[\\/])/i.test(e[k] as string))) throw new EstiloMalo('Una etapa del estilo busca fuera de su carpeta.')
@@ -167,12 +158,8 @@ function cardLimpia(card: Partial<Card>): Partial<Card> {
   return limpia as Partial<Card>
 }
 
-/**
- * Empaqueta un estilo tuyo. `carpeta` es su skill; `base`, la carpeta de video-base. `avisos`: lo que no cumple de lo que
- * necesita todo estilo (`comprobar`, `server/estilos-requisitos.ts`). No impide compartirlo: se le enseña a su autor
- * antes de mandarlo, para que no espere una revisión que ya se sabe cómo acaba.
- */
-export function empaquetar(o: { card: Card; carpeta: string; sloth: string; base: string; deSloth: DeSloth[] }): { paquete: Buffer; manifiesto: Manifiesto; avisos: string[] } {
+/** Empaqueta un estilo tuyo. `carpeta` es su skill; `base`, la carpeta de video-base. */
+export function empaquetar(o: { card: Card; carpeta: string; sloth: string; base: string; deSloth: DeSloth[] }): { paquete: Buffer; manifiesto: Manifiesto } {
   const { card } = o
   if (!card.tuya || !card.skill) throw new EstiloMalo('Solo se comparten los estilos tuyos.')
   if (!existsSync(join(o.carpeta, 'SKILL.md'))) throw new EstiloMalo(`La skill de «${card.title}» no tiene SKILL.md.`)
@@ -181,15 +168,14 @@ export function empaquetar(o: { card: Card; carpeta: string; sloth: string; base
   if (rutas.length > MAX_ARCHIVOS) throw new EstiloMalo(`Tiene ${rutas.length} archivos; un estilo lleva hasta ${MAX_ARCHIVOS}.`)
   const archivos = new Map(rutas.map((r) => [r, readFileSync(join(o.carpeta, ...r.split('/')))]))
   const npm = ajenos(archivos, o.deSloth)
-  if (npm.length) throw new EstiloMalo(`Usa paquetes de npm que Sloth no trae (${npm.join(', ')}). Un estilo compartido solo usa lo que ya usan los de Sloth.`)
-  const limpia = cardLimpia(card)
+  if (npm.length) throw new EstiloMalo(`Usa paquetes de npm que VyMotion no trae (${npm.join(', ')}). Un estilo compartido solo usa lo que ya usan los de VyMotion.`)
   const manifiesto: Manifiesto = {
     formato: FORMATO,
     id: card.skill,
-    titulo: limpia.title!,
+    titulo: card.title,
     sloth: o.sloth,
     ...(basadoEn ? { basadoEn } : {}),
-    card: limpia,
+    card: cardLimpia(card),
     usa: usaDe(archivos, o.base),
     archivos: rutas.map((ruta) => ({ ruta, bytes: archivos.get(ruta)!.length }))
   }
@@ -198,31 +184,31 @@ export function empaquetar(o: { card: Card; carpeta: string; sloth: string; base
   largo.writeUInt32BE(cabeza.length)
   const paquete = gzipSync(Buffer.concat([largo, cabeza, ...rutas.map((r) => archivos.get(r)!)]), { level: 9 })
   if (paquete.length > PESO) throw new EstiloMalo(`Pesa ${mb(paquete.length)}; un estilo pesa hasta ${mb(PESO)}. Quita de su carpeta lo que no haga falta (videos de ejemplo, imágenes grandes).`)
-  return { paquete, manifiesto, avisos: comprobar({ id: card.skill, card: manifiesto.card, basadoEn, archivos, base: o.base, deSloth: o.deSloth }).fallas.map((f) => f.texto) }
+  return { paquete, manifiesto }
 }
 
 const mb = (b: number) => `${(b / 1024 ** 2).toFixed(1)} MB`
 
 /** Abre un paquete y comprueba que es un estilo y que no escribe fuera de su carpeta. */
 export function leerPaquete(paquete: Buffer): { manifiesto: Manifiesto; archivos: Map<string, Buffer> } {
-  if (paquete.length > PESO) throw new EstiloMalo(`Pesa más de ${mb(PESO)}: no es un estilo de Sloth.`)
+  if (paquete.length > PESO) throw new EstiloMalo(`Pesa más de ${mb(PESO)}: no es un estilo de VyMotion.`)
   let todo: Buffer
   try {
     todo = gunzipSync(paquete, { maxOutputLength: ABIERTO })
   } catch {
-    throw new EstiloMalo('Ese archivo no es un estilo de Sloth, o está dañado.')
+    throw new EstiloMalo('Ese archivo no es un estilo de VyMotion, o está dañado.')
   }
   const largo = todo.length >= 4 ? todo.readUInt32BE(0) : 0
   let m: Manifiesto
   try {
     m = JSON.parse(todo.subarray(4, 4 + largo).toString('utf8'))
   } catch {
-    throw new EstiloMalo('Ese archivo no es un estilo de Sloth, o está dañado.')
+    throw new EstiloMalo('Ese archivo no es un estilo de VyMotion, o está dañado.')
   }
-  if (typeof m?.formato !== 'number') throw new EstiloMalo('Ese archivo no es un estilo de Sloth.')
-  if (m.formato > FORMATO) throw new EstiloMalo('Ese estilo es de una Sloth más nueva: actualiza la tuya para instalarlo.')
+  if (typeof m?.formato !== 'number') throw new EstiloMalo('Ese archivo no es un estilo de VyMotion.')
+  if (m.formato > FORMATO) throw new EstiloMalo('Ese estilo es de una VyMotion más nueva: actualiza la tuya para instalarlo.')
   if (typeof m.id !== 'string' || !ID.test(m.id) || m.id.length > 60) throw new EstiloMalo('El nombre del estilo no es válido.')
-  if (typeof m.sloth !== 'string' || !/^\d+\.\d+\.\d+$/.test(m.sloth)) throw new EstiloMalo('El estilo no dice de qué versión de Sloth es.')
+  if (typeof m.sloth !== 'string' || !/^\d+\.\d+\.\d+$/.test(m.sloth)) throw new EstiloMalo('El estilo no dice de qué versión de VyMotion es.')
   if (!Array.isArray(m.archivos) || m.archivos.length > MAX_ARCHIVOS) throw new EstiloMalo('La lista de archivos del estilo no es válida.')
   const archivos = new Map<string, Buffer>()
   let desde = 4 + largo
@@ -251,7 +237,7 @@ export function compararVersion(a: string, b: string): number {
   return 0
 }
 
-/** Los archivos de video-base que el estilo usa y que en esta Sloth ya no son como cuando se hizo (o ya no están). */
+/** Los archivos de video-base que el estilo usa y que en esta VyMotion ya no son como cuando se hizo (o ya no están). */
 export function cambiadosDesde(m: Manifiesto, base: string): string[] {
   return Object.entries(m.usa)
     .filter(([archivo, h]) => {
@@ -266,7 +252,7 @@ export interface Instalado {
   titulo: string
   /** Si ya lo tenías y se puso al día. */
   actualizado: boolean
-  /** Lo de video-base que cambió desde la Sloth donde se hizo: si hay algo, conviene adaptarlo. */
+  /** Lo de video-base que cambió desde la VyMotion donde se hizo: si hay algo, conviene adaptarlo. */
   adaptar: string[]
   sloth: string
 }
@@ -286,19 +272,17 @@ export function instalar(o: {
   origen?: Omit<OrigenEstilo, 'sloth'>
   /** La guía de uso de su publicación en la comunidad: es la que su autor revisó al compartirlo. */
   guia?: GuiaEstilo
-  /** Esta Sloth va por delante de toda versión publicada (el repo): no se frena el que viene de una más nueva. */
-  alDia?: boolean
 }): Instalado {
   const { manifiesto: m, archivos } = leerPaquete(o.paquete)
-  if (!o.alDia && compararVersion(o.sloth, m.sloth) < 0) throw new EstiloMalo(`Este estilo se hizo con Sloth ${m.sloth} y tienes la ${o.sloth}: actualiza Sloth para instalarlo.`)
+  if (compararVersion(o.sloth, m.sloth) < 0) throw new EstiloMalo(`Este estilo se hizo con VyMotion ${m.sloth} y tienes la ${o.sloth}: actualiza VyMotion para instalarlo.`)
   const npm = ajenos(archivos, o.deSloth)
-  if (npm.length) throw new EstiloMalo(`Usa paquetes de npm que Sloth no trae (${npm.join(', ')}). No se instala.`)
+  if (npm.length) throw new EstiloMalo(`Usa paquetes de npm que VyMotion no trae (${npm.join(', ')}). No se instala.`)
   const ya = o.cards.find((c) => c.id === m.id || c.skill === m.id)
   const mismo = !!ya?.tuya && !!ya.origen && ya.skill === m.id && (ya.origen.publicacion ?? '') === (o.origen?.publicacion ?? '')
-  if (ya && !mismo) throw new EstiloMalo(ya.tuya ? `Ya tienes un estilo «${ya.title}» con el nombre ${m.id}. Bórralo o cámbiale el nombre para instalar este.` : `${m.id} es un estilo de Sloth.`)
+  if (ya && !mismo) throw new EstiloMalo(ya.tuya ? `Ya tienes un estilo «${ya.title}» con el nombre ${m.id}. Bórralo o cámbiale el nombre para instalar este.` : `${m.id} es un estilo de VyMotion.`)
   const skills = join(o.app, 'skills')
   const destino = join(skills, m.id)
-  if (!mismo && existsSync(destino)) throw new EstiloMalo(`Ya hay una skill ${m.id} en tu Sloth. Bórrala o cámbiale el nombre para instalar este.`)
+  if (!mismo && existsSync(destino)) throw new EstiloMalo(`Ya hay una skill ${m.id} en tu VyMotion. Bórrala o cámbiale el nombre para instalar este.`)
 
   // Se escribe aparte y entra de una vez: un estilo a medias no se ve nunca.
   const nuevo = join(skills, `.instalando-${m.id}`)
@@ -336,15 +320,11 @@ export function instalar(o: {
  * - `GET /api/estilos`: tus estilos, con de dónde vino cada uno (`origen`).
  * - `POST /api/estilos/<card>/archivo`: lo guarda en Descargas como `<id>.sloth-estilo`. Da `{ruta}`.
  * - `POST /api/estilos/importar`, con el archivo de cuerpo: lo instala (`Instalado`).
- * Lo de la comunidad (subirlo, instalarlo de una publicación) está en `server/comunidad.ts`, que usa este; que el Claude
- * del creador lo lea antes de aprobarlo, en `server/estilos-revision.ts` (`abrir`).
+ * Lo de la comunidad (subirlo, instalarlo de una publicación, revisarlo) está en `server/comunidad.ts`, que usa este.
  */
 export function estilos(app: string, cards: () => Card[]) {
   const tusCards = join(app, 'data', 'tus-cards.json')
   const sloth = (JSON.parse(readFileSync(join(app, 'package.json'), 'utf8')) as { version: string }).version
-  // En el repo, package.json se queda en la versión de antes (la sube `scripts/version-venta.mjs` al compilar), pero su
-  // código va por delante de toda versión publicada: el creador instala y revisa los estilos que se hicieron con ellas.
-  const alDia = !VENTA
   const skills = join(app, 'skills')
   const base = () => join(skills, 'video-base')
   const deSloth = (): DeSloth[] =>
@@ -359,7 +339,7 @@ export function estilos(app: string, cards: () => Card[]) {
   }
 
   const instalarPaquete = (paquete: Buffer, origen?: Omit<OrigenEstilo, 'sloth'>, guia?: GuiaEstilo) =>
-    instalar({ paquete, app, tusCards, cards: cards(), sloth, alDia, base: base(), deSloth: deSloth(), origen, guia })
+    instalar({ paquete, app, tusCards, cards: cards(), sloth, base: base(), deSloth: deSloth(), origen, guia })
 
   async function api(req: IncomingMessage, res: ServerResponse, url: URL): Promise<boolean> {
     const ruta = url.pathname
@@ -385,60 +365,18 @@ export function estilos(app: string, cards: () => Card[]) {
     }
   }
 
-  /** Abre un paquete en `destino`, sin instalarlo, y dice lo que se sabe de él frente a esta Sloth (`desempacar`). */
-  const abrir = (paquete: Buffer, destino: string) => desempacar(paquete, destino, { sloth, alDia, base: base(), deSloth: deSloth() })
-
-  return { api, empaquetarCard, instalarPaquete, abrir, base }
+  return { api, empaquetarCard, instalarPaquete }
 }
 
-/** Esta Sloth, para comparar un paquete con ella: su versión, su video-base y sus estilos. */
-export interface EstaSloth {
-  sloth: string
-  /** Va por delante de toda versión publicada (el repo): que el estilo venga de una más nueva no es una falla. */
-  alDia?: boolean
-  base: string
-  deSloth: DeSloth[]
-}
-
-/** Un paquete abierto para leerlo: lo que Sloth ya sabe de él (`notas`) y, de eso, lo que decide si se aprueba solo. */
-export interface Abierto {
-  manifiesto: Manifiesto
-  notas: string[]
-  /** Lo que no cumple de lo que necesita todo estilo: con alguna, no se aprueba. */
-  fallas: string[]
-  /** Lo que su autor añadió y pide que lo vea una persona: con alguno, no se aprueba solo. */
-  riesgos: string[]
-}
-
-/**
- * Abre un paquete en `destino`, sin instalarlo: para leerlo antes de aprobarlo (`server/estilos-revision.ts`). Da también
- * lo que Sloth ya sabe de él sin leer su código: cómo queda frente a esta Sloth y lo que comprueba de lo que necesita
- * todo estilo (`comprobar`, `server/estilos-requisitos.ts`).
- */
-export function desempacar(paquete: Buffer, destino: string, esta: EstaSloth): Abierto {
-  const { manifiesto: m, archivos } = leerPaquete(paquete)
+/** Abre un paquete en `destino`, sin instalarlo: para leerlo antes de aprobarlo. */
+export function desempacar(paquete: Buffer, destino: string): Manifiesto {
+  const { manifiesto, archivos } = leerPaquete(paquete)
   rmSync(destino, { recursive: true, force: true })
   for (const [ruta, datos] of archivos) {
     const a = join(destino, ...ruta.split('/'))
     mkdirSync(dirname(a), { recursive: true })
     writeFileSync(a, datos)
   }
-  writeFileSync(join(destino, 'estilo.json'), JSON.stringify({ ...m, archivos: undefined }, null, 2) + '\n')
-
-  const notas = [`Trae ${archivos.size} archivos (${mb([...archivos.values()].reduce((s, b) => s + b.length, 0))}).`]
-  const fallas: string[] = []
-  if (!esta.alDia && compararVersion(m.sloth, esta.sloth) > 0) fallas.push(`Se hizo con Sloth ${m.sloth}, más nueva que la que lo revisa (${esta.sloth}).`)
-  else notas.push(`Se hizo con Sloth ${m.sloth}; esta es la ${esta.sloth}.`)
-  const usa = Object.keys(m.usa)
-  const cambiados = cambiadosDesde(m, esta.base)
-  if (!usa.length) notas.push('No nombra ningún archivo de video-base.')
-  else if (cambiados.length) notas.push(`De video-base nombra ${usa.length} archivos; ${cambiados.length} ya no son como cuando se hizo, o ya no están: ${cambiados.join(', ')}. Mira si lo que usa de ellos sigue igual.`)
-  else notas.push(`De video-base nombra ${usa.length} archivos, todos iguales a los de esta Sloth.`)
-  const c = comprobar({ id: m.id, card: m.card, basadoEn: m.basadoEn, archivos, base: esta.base, deSloth: esta.deSloth, npm: ajenos(archivos, esta.deSloth) })
-  if (c.frente) {
-    const lista = (rutas: string[]) => (rutas.length ? `${rutas.length} (${rutas.slice(0, 30).join(', ')}${rutas.length > 30 ? '…' : ''})` : 'ninguno')
-    notas.push(`Frente a ${c.frente.de}, el estilo de Sloth del que partió: ${c.frente.iguales} archivos iguales; cambiados, ${lista(c.frente.cambiados)}; nuevos, ${lista(c.frente.nuevos)}. Lo de su autor está en los cambiados y los nuevos.`)
-  }
-  fallas.push(...c.fallas.map((f) => f.texto))
-  return { manifiesto: m, notas, fallas, riesgos: c.riesgos.slice(0, 40) }
+  writeFileSync(join(destino, 'estilo.json'), JSON.stringify({ ...manifiesto, archivos: undefined }, null, 2) + '\n')
+  return manifiesto
 }

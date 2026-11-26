@@ -24,7 +24,7 @@ function preparar(t: test.TestContext, model = 'codex:gpt-prueba') {
     rmSync(dir, { recursive: true, force: true })
   })
   const avisos = () => eventos.filter((e) => e.t === 'info' && e.text.includes('segundo plano')).length
-  // Lo que Sloth le mandó al agente por su cuenta, sin el primer mensaje.
+  // Lo que VyMotion le mandó al agente por su cuenta, sin el primer mensaje.
   const despertares = () => mandados.filter((m) => m.startsWith('Terminó lo que tenías en segundo plano')).length
   /** Un turno que acaba (`ok`) con algo de fondo que termina después. */
   const turnoConFondo = (ok = true) => {

@@ -5,12 +5,9 @@ import { cancelarAntigravity, conectandoAntigravity, conectarAntigravity, cuenta
 import { startClaude } from './claude.ts'
 import { cancelarCursor, conectandoCursor, conectarCursor, cuentaCursor, modelosCursor, salirCursor, startCursor } from './cursor.ts'
 import { cuentaDeepSeek, deepseekModels } from './deepseek.ts'
-import { cuentaFreeLLMAPI, modelosFreeLLMAPI } from './freellmapi.ts'
 import { cuentaGemini, modelosGemini, startGemini } from './gemini.ts'
 import { cuentaGrok, modelosGrok, startGrok } from './grok.ts'
 import { cuentaMuse, modelosMuse, startMuse } from './muse.ts'
-import { cuentaOmp, modelosOmp, startOmp } from './omp.ts'
-import { cuentaOpenRouter, modelosOpenRouter } from './openrouter.ts'
 import { cuentaPi, llavesPi, modelosPi, salirPi, startPi } from './pi.ts'
 
 /**
@@ -20,40 +17,35 @@ import { cuentaPi, llavesPi, modelosPi, salirPi, startPi } from './pi.ts'
  * `/api/<agente>/…` de server/index.ts y Opciones (`CuentaAgente`, web/src/Opciones.tsx).
  *
  * `como` dice cómo se conecta, para que Opciones lo explique: en una ventana del agente (`ventana`), en el navegador con
- * un enlace (`navegador`) o pegando una llave de API (`llave`: DeepSeek, OpenRouter, FreeLLMAPI y Gemini; se guarda con
- * `/api/<agente>/acceso`).
+ * un enlace (`navegador`) o pegando una llave de API (`llave`, DeepSeek y Gemini; se guarda con `/api/<agente>/acceso`).
  */
 export interface Otro {
   como: 'ventana' | 'navegador' | 'llave'
   start(opts: AgentOptions): AgentRun
   cuenta(fresco?: boolean): Promise<CuentaClaude> | CuentaClaude
-  /** `remoto`: se pidió desde la web (ADR 0025). */
-  conectar?(remoto?: boolean): Promise<CuentaClaude>
+  conectar?(perfil?: string): Promise<CuentaClaude>
   cancelar?(): Promise<CuentaClaude> | CuentaClaude
   salir?(): Promise<CuentaClaude> | CuentaClaude
   conectando?(): string | null
   /** Con varias cuentas conectadas (Antigravity): trabajar con otra, o quitar una. */
-  usar?(id: string): CuentaClaude
+  usar?(id: string): Promise<CuentaClaude> | CuentaClaude
   quitar?(id: string): CuentaClaude
-  /** Usar las llaves guardadas en Sloth, o no (Pi). */
+  /** Usar las llaves guardadas en VyMotion, o no (Pi). */
   llaves?(usar: boolean): Promise<CuentaClaude>
   modelos(): Promise<Model[]>
 }
 
 export const OTROS: Partial<Record<Proveedor, Otro>> = {
   deepseek: { como: 'llave', start: startClaude, cuenta: cuentaDeepSeek, modelos: deepseekModels },
-  openrouter: { como: 'llave', start: startClaude, cuenta: cuentaOpenRouter, modelos: modelosOpenRouter },
-  freellmapi: { como: 'llave', start: startClaude, cuenta: cuentaFreeLLMAPI, modelos: modelosFreeLLMAPI },
   grok: { como: 'ventana', start: startGrok, ...cuentaGrok, modelos: modelosGrok },
   antigravity: { como: 'navegador', start: startAntigravity, cuenta: cuentaAntigravity, conectar: conectarAntigravity, cancelar: cancelarAntigravity, salir: salirAntigravity, usar: usarAntigravity, quitar: quitarAntigravity, conectando: conectandoAntigravity, modelos: modelosAntigravity },
   gemini: { como: 'llave', start: startGemini, cuenta: cuentaGemini, modelos: modelosGemini },
   cursor: { como: 'navegador', start: startCursor, cuenta: cuentaCursor, conectar: conectarCursor, cancelar: cancelarCursor, salir: salirCursor, conectando: conectandoCursor, modelos: modelosCursor },
   muse: { como: 'ventana', start: startMuse, ...cuentaMuse, modelos: modelosMuse },
-  pi: { como: 'ventana', start: startPi, ...cuentaPi, salir: salirPi, llaves: llavesPi, modelos: modelosPi },
-  omp: { como: 'ventana', start: startOmp, ...cuentaOmp, modelos: modelosOmp }
+  pi: { como: 'ventana', start: startPi, ...cuentaPi, salir: salirPi, llaves: llavesPi, modelos: modelosPi }
 }
 
-/** Ninguno de estos informa los límites de un plan a Sloth: se paga por uso o se ve en su página. */
+/** Ninguno de estos informa los límites de un plan a VyMotion: se paga por uso o se ve en su página. */
 export const sinLimites = (): LimitesClaude => ({ ventanas: [] })
 
 /** Qué se está conectando: reiniciar el servidor cortaría el inicio de sesión. */

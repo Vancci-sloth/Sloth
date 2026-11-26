@@ -363,7 +363,7 @@ def duracion_de(url: str) -> float:
 
 
 def de_youtube(id_: str, desde: float, dura: float, crudo: Path) -> str:
-    """El tramo de un video de YouTube, con el yt-dlp del Python de Sloth (en su turno: va de uno en uno)."""
+    """El tramo de un video de YouTube, con el yt-dlp del Python de VyMotion (en su turno: va de uno en uno)."""
     from sloth import sloth
     salida = crudo.with_suffix(".mp4")
     r = sloth("-m", "yt_dlp", "-q", "--no-warnings", "--no-playlist", "-f", "bv*[height<=1080][ext=mp4]/bv*[height<=1080]/b",

@@ -1,9 +1,9 @@
 // La vitrina de la biblioteca: la miniatura de cada modelo (su `Muestra`, quieta en su `cuadro`) con la luz de estudio
-// de los videos, sobre fondo transparente (Sloth le pone detrás su foco) y con su sombra. La cámara, a tres cuartos, se
+// de los videos, sobre fondo transparente (VyMotion le pone detrás su foco) y con su sombra. La cámara, a tres cuartos, se
 // mece de un lado a otro en un ciclo que se repite sin salto: el cuadro 0 es la foto (vista.webp) y el ciclo entero, el
 // video que se ve al pasar el ratón (vista.webm). Aparte, la vuelta entera (vuelta.webm, la composición `<id>--vuelta`): la
 // cámara da toda la vuelta, un cuadro cada 10°, a cuatro alturas seguidas (de frente, 25°, 50° y casi desde arriba), y
-// las luces giran con ella, para que ningún lado quede a oscuras; Sloth la recorre al arrastrar sobre la ficha del modelo
+// las luces giran con ella, para que ningún lado quede a oscuras; VyMotion la recorre al arrastrar sobre la ficha del modelo
 // (de lado gira, de arriba abajo cambia de altura). `modelos.py vista` la copia al proyecto como src/modelos/_vitrina_<pid>.tsx,
 // con _muestras_<pid>.ts (una composición por modelo), saca las tres y la borra.
 import { useThree } from "@react-three/fiber";
@@ -120,7 +120,7 @@ const Estudio: React.FC<{ modelo: React.RefObject<THREE.Group | null>; vuelta?: 
   );
 };
 
-/** Solo la sombra en el piso: el fondo lo pone Sloth. */
+/** Solo la sombra en el piso: el fondo lo pone VyMotion. */
 const Sombra: React.FC = () => (
   <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.002, 0]} receiveShadow>
     <planeGeometry args={[200, 200]} />

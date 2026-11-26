@@ -1,11 +1,11 @@
-# Sloth 2.0
+# VyMotion 2.0
 
 Una app local donde cada skill es una card: describes el trabajo y el agente lo hace a la vista.
 
 ## Dónde buscar
 
 Antes de explorar un área, lee su entrada en `docs/agents/mapa.md`: servidor y proveedores, sesiones, estudio de video,
-galerías, redes, navegador, Ideas, radar, comunidad, requisitos, React y la app del celular (`movil/`). Cada módulo amplía lo suyo en su cabecera.
+galerías, redes, navegador, Ideas, radar, comunidad, requisitos y React. Cada módulo amplía lo suyo en su cabecera.
 Los campos de una card están en `Card` (`shared/types.ts`).
 
 Para mirar o mover la cola de TikTok e Instagram, o decidir qué se publica, lee `docs/agents/redes.md`. Para ver cómo va
@@ -44,11 +44,11 @@ Ahí están los repos, los comandos y cómo verificar cada despliegue. Si algo v
 
 - Rápida y sencilla antes que completa. Antes de añadir algo, pregunta si se puede quitar otra cosa. Lo que se anima sin
   fin va con `steps()`: suave, gasta CPU siempre.
-- La paleta es la de Sloth (variables en `web/src/styles.css`); no inventes colores. La excepción son los logos de otras
+- La paleta es la de VyMotion (variables en `web/src/styles.css`); no inventes colores. La excepción son los logos de otras
   marcas (`web/src/Logos.tsx`). El logo es `web/public/icon.svg`. Los iconos son de trazo (`web/src/Iconos.tsx`), nunca emojis.
 - La interfaz y los comentarios van en español.
-- Las skills viven en `skills/`. Sloth dev las lee de ahí (su Claude usa `data/claude`); `~/.claude/skills` es de la
-  Sloth instalada, como en la compu de cualquier cliente. En los scripts, las demás skills se buscan en `SLOTH_SKILLS`.
+- Las skills viven en `skills/`. VyMotion dev las lee de ahí (su Claude usa `data/claude`); `~/.claude/skills` es de la
+  VyMotion instalada, como en la compu de cualquier cliente. En los scripts, las demás skills se buscan en `SLOTH_SKILLS`.
   Mejorar una skill es editar su carpeta y hacer commit en este repo.
 - Todo estilo de video que crees nace con su card: al terminarlo, añádelo a `cards.json` en el mismo turno, sin
   preguntar, con título, icono y descripción en español, y sus `etapas` con su `fase`. Si ya tenía card, actualízala.
@@ -57,7 +57,7 @@ Ahí están los repos, los comandos y cómo verificar cada despliegue. Si algo v
   de primer cuadro (`PORTADA.md`) y los scripts (ver su `LEEME.md`). Lo que
   se repetiría en dos estilos va a la base. Un estilo se hace con `momentos.json` y `hacer.py` (`MOTOR.md`), también
   `video-el-diff`; su plantilla la afina el usuario a mano y no se toca desde la base.
-- Este archivo entra en cada hilo que programa Sloth, y un test lo para en 1.000 palabras. Lo que entra, saca otra cosa.
+- Este archivo entra en cada hilo que programa VyMotion, y un test lo para en 1.000 palabras. Lo que entra, saca otra cosa.
 
 ## Agent skills
 

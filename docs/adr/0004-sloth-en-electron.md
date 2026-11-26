@@ -1,4 +1,4 @@
-# Sloth en Electron
+# VyMotion en Electron
 
 Fecha: 2026-10-22
 
@@ -6,7 +6,7 @@ Fecha: 2026-10-22
 
 Hasta la 0.2.5, la app que se vende era un lanzador propio en C# (`Sloth.exe`, con la ventana en WebView2) y un instalador
 propio (un zip pegado a un .exe). Cada versión nueva se bajaba entera: más de 300 MB, aunque cambiara una línea. Además,
-el dueño quiere vender Sloth también en Mac, y nada de eso existe fuera de Windows.
+el dueño quiere vender VyMotion también en Mac, y nada de eso existe fuera de Windows.
 
 ## Decisión
 
@@ -17,7 +17,7 @@ La ventana, el instalador y las actualizaciones pasan a Electron, como T3 Code:
 - electron-builder arma un instalador NSIS de un clic (`scripts/compilar.mjs`). Instala donde estaba la 0.2
   (`%LOCALAPPDATA%\Programs\Sloth`), con el mismo AppUserModelID (`Sloth.App`): lo anclado y los avisos siguen.
 - electron-updater baja de cada versión nueva solo los pedazos de su instalador que cambiaron, con su mapa de bloques.
-  Los sirve el cobro de Sloth (`licencias/`, `/actualizaciones/`), uno por petición
+  Los sirve el cobro de VyMotion (`licencias/`, `/actualizaciones/`), uno por petición
   (`useMultipleRangeRequest: false`).
 
 Lo que no cambia: el servidor y las skills siguen igual, en `app\` junto a Sloth.exe, con su propio Node (las skills
@@ -26,8 +26,8 @@ actualizar los deja (`customRemoveFiles` en scripts/instalador.nsh), así que pa
 rompe los hilos (guardan su carpeta con la ruta completa). Las skills viajan en `resources\skills` y la app las pone en
 `app\skills` sin pisar lo que guardan de tus videos.
 
-La barra de título lleva el color de Sloth con `accentColor` de Electron. Anclar a la barra de tareas lo ofrece la
-bienvenida: Windows solo pregunta si lo pide la ventana de Sloth al frente (desde el instalador dice que no sin
+La barra de título lleva el color de VyMotion con `accentColor` de Electron. Anclar a la barra de tareas lo ofrece la
+bienvenida: Windows solo pregunta si lo pide la ventana de VyMotion al frente (desde el instalador dice que no sin
 preguntar), con TaskbarManager, que Sloth.exe llama con koffi (`electron/barra.ts`). En los Windows de antes lo hace
 `ayudante.exe` (C#), que también quita el ancla al desinstalar.
 

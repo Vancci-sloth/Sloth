@@ -1,18 +1,20 @@
 import { appendFileSync, closeSync, existsSync, mkdirSync, openSync, readdirSync, readFileSync, rmSync, statfsSync, statSync, writeSync } from 'node:fs'
+import { decodificarTitulo, tituloGenerado, tituloInicial } from './titulos.ts'
 import { cpus, freemem, totalmem } from 'node:os'
 import { join } from 'node:path'
 import { historialLigero } from '../shared/historial.ts'
-import { decodificarTitulo, tituloGenerado, tituloInicial } from './titulos.ts'
-import { leerHistorial, primerUsuario } from './historial.ts'
+import { leerHistorial, leerVistaSync, primerUsuario } from './historial.ts'
 import type { AgentEvent, FileDraft, SessionMeta } from '../shared/types.ts'
-import { NOMBRE_AGENTE, programaDe, proveedorDe } from '../shared/providers.ts'
+import { MODELO3D_CARD } from '../shared/modelos3d.ts'
+import { NOMBRE_AGENTE, programaDe, proveedorDe, type Proveedor } from '../shared/providers.ts'
 import { llaveEnUso } from './acceso.ts'
-import { ORIGINAL, perfilesAgente } from './perfiles-agentes.ts'
-import { perfilClaudeAutorizando } from './cuenta.ts'
-import { perfilCodexAutorizando } from './cuenta-codex.ts'
-import { conRutas, sinArrancar, type AgentRun, type SkillRef } from './agent.ts'
+import { conRutas, sinArrancar, type AgentOptions, type AgentRun, type SkillRef } from './agent.ts'
 import { conAgente } from './agentes.ts'
 import { startClaude } from './claude.ts'
+import { CLAUDE_ORIGINAL, perfilesAgente, perfilesClaude, tienePerfiles } from './perfiles-agentes.ts'
+import { perfilCodexAutorizando } from './cuenta-codex.ts'
+import { perfilVentanaAutorizando } from './cuenta-ventana.ts'
+import { perfilClaudeAutorizando } from './cuenta.ts'
 import { startCodex } from './codex.ts'
 import { startOpenCode } from './opencode.ts'
 import { OTROS } from './proveedores.ts'
@@ -29,7 +31,7 @@ const LIBRE = 2e9
 /** Cuánto espera el hilo, con el segundo plano recién vacío, antes de decir que ya no queda nada (`avisarFondo`). */
 const CALMA = 4000
 /**
- * Cuántas veces seguidas, sin que escribas, Sloth le pide a un agente que siga: uno de Codex u OpenCode que acabó su turno
+ * Cuántas veces seguidas, sin que escribas, VyMotion le pide a un agente que siga: uno de Codex u OpenCode que acabó su turno
  * con algo en segundo plano (`avisarFondo`) o cualquiera que lo cerró con el video a medias (`sinAcabar`).
  */
 const DESPERTARES = 3
@@ -86,13 +88,13 @@ type Mensaje = Extract<AgentEvent, { t: 'user' }>
 
 /**
  * Si el mensaje acaba preguntándole algo al usuario: con «?» o con el bloque `<opciones>` de sus botones, que las
- * instrucciones de Sloth (`OPCIONES`, claude.ts) ponen al final de toda pregunta cerrada, en todos los agentes.
+ * instrucciones de VyMotion (`OPCIONES`, claude.ts) ponen al final de toda pregunta cerrada, en todos los agentes.
  */
 function preguntaAlFinal(texto: string): boolean {
   return /<opciones>[\s\S]*<\/opciones>\s*$/.test(texto) || /\?[\s*_`)"»]*$/.test(texto)
 }
 /** El último mensaje del agente en estos eventos (no el de un subagente), entero. */
-export function ultimoTexto(events: AgentEvent[]): string {
+function ultimoTexto(events: AgentEvent[]): string {
   const ultimo = events.findLast((e) => e.t === 'text' && !e.parent)
   if (ultimo?.t !== 'text') return ''
   return events.map((e) => (e.t === 'text' && e.id === ultimo.id ? e.delta : '')).join('')
@@ -123,8 +125,6 @@ export class Sessions {
   esVideo: (meta: SessionMeta) => boolean = () => false
   /** Lo que su card no le ofrece al agente (`Card.sinHerramientas`). */
   sinHerramientas: (meta: SessionMeta) => string[] | undefined = () => undefined
-  /** Si el hilo lee algo ajeno y su agente solo puede leer (`AgentOptions.soloLeer`). */
-  soloLeer: (meta: SessionMeta) => boolean = () => false
 
   constructor(
     private dir: string,
@@ -135,8 +135,6 @@ export class Sessions {
     private crearAgente: (opts: Parameters<typeof startCodex>[0]) => AgentRun = (opts) => {
       const p = proveedorDe(opts.model)
       const start = OTROS[p]?.start ?? (p === 'codex' ? startCodex : p === 'opencode' ? startOpenCode : startClaude)
-      // Solo Claude Code trabaja sin poder escribir ni ejecutar: a otro agente no se le da a leer algo ajeno.
-      if (opts.soloLeer && start !== startClaude) return sinArrancar(opts, 'Esto solo lo lee Claude: aquí es el único que trabaja sin poder escribir ni ejecutar nada. Elige un modelo de Claude.')
       return conAgente(p, opts, (o) => start(o))
     },
     /** Lo que le falta al video del hilo, leído de su carpeta (`queFalta`, etapas.ts); nada si no es de un estilo. */
@@ -153,11 +151,12 @@ export class Sessions {
         continue
       }
       this.metas.set(meta.id, meta)
-      // Los hilos de antes se llamaban como la ruta de su primer adjunto: se les pone su primer mensaje, limpio.
+      // Repara únicamente el antiguo nombre automático que era una ruta adjunta.
       if (/^["']?[A-Za-z]:[\\/]/.test(meta.title)) {
-        const primero = this.load(meta.id).find((e) => e.t === 'user')
+        const primero = this.load(meta.id).find(e => e.t === 'user')
         if (primero?.t === 'user' && meta.title === primero.text.split('\n')[0].slice(0, 80)) {
-          meta.title = tituloInicial(primero.text, meta.title)
+          meta.title = tituloInicial(primero.text, 'Proyecto de video')
+          meta.tituloPendiente = meta.title
           this.save(meta)
         }
       }
@@ -173,7 +172,6 @@ export class Sessions {
       if (cortado) this.emit(meta.id, { t: 'turn_end', at: Date.now(), ok: false, error: 'el servidor se cerró a mitad del turno.', caida: true })
       // Lo que corría en segundo plano murió con el servidor.
       if (tareas.length) this.emit(meta.id, { t: 'background', tasks: [] })
-      // El chat de una imagen del estudio no tiene agente que retomar: lo escribe el estudio (`hilo-imagen.ts`).
       if (!meta.imagenEstudio) this.retomar(meta, mensajes, cortado, tareas)
     }
     // La memoria se libera sin que nada lo avise: cada tanto se mira si ya cabe el siguiente video.
@@ -221,10 +219,18 @@ export class Sessions {
   }
 
   /** Panel de etapas: la carpeta del hilo, que el usuario cambia por otra (`server/etapas.ts`). */
-  setCarpeta(id: string, carpeta: string) {
+  setCarpeta(id: string, carpeta: string, nueva = false) {
     const meta = this.metas.get(id)
     if (!meta) return
+    const carpetaAnterior = meta.carpeta
     meta.carpeta = carpeta
+    if (nueva) {
+      if (!meta.carpetasGeneradas) {
+        const original = this.primerUsuario(id)?.text.match(/(?:^|\n)Carpeta: ([\p{L}\p{N}_-]+)\s*$/u)?.[1]
+        meta.carpetasGeneradas = original && original === carpetaAnterior ? [original] : []
+      }
+      meta.carpetasGeneradas.push(carpeta)
+    }
     this.save(meta)
   }
 
@@ -233,48 +239,72 @@ export class Sessions {
     return [...this.metas.values()].some((m) => m.running || m.background?.length)
   }
 
-  /**
-   * Un hilo que llega de otra computadora (`server/respaldo.ts`), con su historial: entra quieto, sin agente ni sesión
-   * que retomar. `false` si aquí ya hay uno con ese id, que no se toca.
-   */
-  traer(meta: SessionMeta, registro: string): boolean {
-    if (this.metas.has(meta.id)) return false
-    guardar(join(this.dir, `${meta.id}.jsonl`), registro)
-    this.metas.set(meta.id, meta)
-    this.save(meta)
-    return true
-  }
-
   /** Con `carpeta`, el hilo nace sabiendo dónde trabaja: la de su video, nuevo o que ya existe. */
-  /** Con `generarTitulo`, su agente le pone un título corto en su primer turno (`server/titulos.ts`). */
-  create(input: { cardId: string; title: string; model: string; effort?: string; cwd: string; carpeta?: string; generarTitulo?: boolean; imagenEstudio?: string }): SessionMeta {
+  create(input: { cardId: string; title: string; model: string; effort?: string; cwd: string; carpeta?: string; carpetasGeneradas?: string[]; generarTitulo?: boolean; imagenEstudio?: string; modelo3d?: SessionMeta['modelo3d'] }): SessionMeta {
     const now = Date.now()
     const { generarTitulo, ...campos } = input
-    const meta: SessionMeta = { id: now.toString(36) + Math.random().toString(36).slice(2, 6), ...campos, ...(generarTitulo ? { tituloPendiente: input.title } : {}), createdAt: now, updatedAt: now, running: false }
+    const meta: SessionMeta = { id: now.toString(36) + Math.random().toString(36).slice(2, 6), ...campos, ...(generarTitulo ? {tituloPendiente: input.title} : {}), createdAt: now, updatedAt: now, running: false }
     this.metas.set(meta.id, meta)
     this.events.set(meta.id, [])
     this.save(meta)
     return meta
   }
 
-  /** Lo que pasó en el chat de una imagen del estudio (`hilo-imagen.ts`), sin mandarle nada a un agente. */
+  /** Registra eventos que produjo el estudio en su historial, sin mandar otro turno a un agente. */
   registrarImagen(id: string, ...events: AgentEvent[]) {
     if (!this.metas.get(id)?.imagenEstudio) return
     for (const event of events) this.emit(id, event)
   }
 
-  send(id: string, text: string, skill?: SkillRef, images: string[] = []): void {
+  vincularImagen(id: string, imagen: string, titulo: string) {
+    const meta = this.metas.get(id)
+    if (!meta || meta.running || meta.background?.length || meta.imagenEstudio) return
+    meta.imagenEstudio = imagen
+    meta.desdeImagen = this.load(id).length
+    this.cerrarQuieto(id)
+    this.rename(id, titulo)
+    return meta
+  }
+
+  /** Un turno de trabajo con el modelo elegido, sin crear un hilo de VyMotion. */
+  async textoInterno(input: Pick<SessionMeta, 'model' | 'effort' | 'cwd'>, mensaje: string) {
+    let run: AgentRun | undefined
+    let reloj: ReturnType<typeof setTimeout> | undefined
+    const textos: AgentEvent[] = []
+    try {
+      return await new Promise<{ texto: string; cierre: Extract<AgentEvent, { t: 'turn_end' }> }>((ok, mal) => {
+        const meta: SessionMeta = { ...input, id: '', title: '', cardId: '', createdAt: Date.now(), updatedAt: Date.now(), running: false }
+        reloj = setTimeout(() => mal(new Error('El modelo tardó demasiado en preparar el prompt.')), 120_000)
+        run = this.runFor(meta, {
+          onEvent: (e) => {
+            if (e.t === 'text' && !e.parent) textos.push(e)
+            if (e.t === 'turn_end') {
+              if (e.ok) ok({ texto: ultimoTexto(textos).trim(), cierre: e })
+              else mal(new Error(e.error || 'El modelo no pudo preparar el prompt.'))
+            }
+          },
+          onExit: () => mal(new Error('El modelo se cerró antes de terminar el prompt.'))
+        })
+        run.send(mensaje)
+      })
+    } finally {
+      clearTimeout(reloj)
+      run?.close()
+    }
+  }
+
+  send(id: string, text: string, skill?: SkillRef, images: string[] = [], visible = text): void {
     if (text.trim() === '/compact' && !images.length) return this.compactar(id)
     if (this.compactando.has(id)) throw new Error('Espera a que termine la compactación.')
     const meta = this.metas.get(id)
     if (!meta) throw new Error('No existe esa sesión')
-    if (meta.imagenEstudio) throw new Error('Este chat es de una imagen: pide el cambio desde su editor, en Imágenes.')
+    if (meta.imagenEstudio) throw new Error('Abre la imagen en el editor para pedir otro cambio.')
     // Escribirle a un video que esperaba lo arranca ya, y lo que escribiste le llega en ese primer turno.
     if (meta.pendiente) {
       this.empezar(meta)
       return this.steer(id, text, images)
     }
-    this.emit(id, { t: 'user', text, at: Date.now(), ...(images.length ? { images } : {}) })
+    this.emit(id, { t: 'user', text: visible, at: Date.now(), ...(images.length ? { images } : {}) })
     this.turno(meta, text, skill, images)
   }
 
@@ -298,9 +328,8 @@ export class Sessions {
     const traspaso = meta.vieneDe ? { de: NOMBRE_AGENTE[meta.vieneDe], historial: join(this.dir, `${meta.id}.jsonl`) } : undefined
     const antes = meta.resumir ? `${resumenDelHilo(this.load(meta.id), meta.carpeta ?? meta.lote?.carpeta, traspaso)}\n\n` : ''
     this.emit(meta.id, { t: 'turn_start', at: Date.now() })
-    // Mientras el hilo tenga su nombre de partida, su agente le pone uno corto como parte del mismo trabajo.
     const titulo = meta.tituloPendiente === meta.title
-      ? `\n\nPara Sloth: como parte de este mismo trabajo, al principio, escribe en ${JSON.stringify(this.archivoTitulo(meta))} un título de 2 a 7 palabras en español para esta conversación (solo el título, 80 letras como mucho). Que diga qué se hace y para qué, sin rutas, nombres de archivos ni la voz elegida. Luego sigue con lo que se te pide.`
+      ? `\n\nOrganización de VyMotion: como parte de este mismo trabajo, escribe en ${JSON.stringify(join(meta.cwd, `.vymotion-titulo-${meta.id}.txt`))} un título descriptivo de 2 a 7 palabras en español para esta conversación (máximo 80 caracteres, solo el título). Resume el producto y el propósito del pedido; no uses rutas, nombres de archivos ni la configuración de voz. Hazlo al principio y continúa con la tarea del usuario.`
       : ''
     this.runFor(meta).send(antes + conRutas(text, images) + titulo, pide, images)
   }
@@ -312,7 +341,7 @@ export class Sessions {
   crearLote(input: { cardId: string; model: string; effort?: string; cwd: string }, videos: { title: string; text: string; carpeta: string }[], skill?: SkillRef, images: string[] = []): SessionMeta[] {
     const lote = Date.now().toString(36)
     const metas = videos.map((v, i) => {
-      const meta = this.create({ ...input, title: v.title })
+      const meta = this.create({ ...input, title: v.title, carpetasGeneradas: [v.carpeta] })
       meta.lote = { id: lote, n: i + 1, de: videos.length, carpeta: v.carpeta }
       if (skill) meta.skill = skill.name
       meta.pendiente = { text: v.text, ...(images.length ? { images } : {}) }
@@ -381,10 +410,10 @@ export class Sessions {
     let text = ''
     if (mensajes.length) {
       const varios = mensajes.length > 1
-      text = `(Sloth se cerró antes de que leyeras ${varios ? 'estos mensajes' : 'este mensaje'}. Te ${varios ? 'los' : 'lo'} vuelvo a mandar.)\n\n${mensajes.map((m) => m.text).join('\n\n')}`
+      text = `(VyMotion se cerró antes de que leyeras ${varios ? 'estos mensajes' : 'este mensaje'}. Te ${varios ? 'los' : 'lo'} vuelvo a mandar.)\n\n${mensajes.map((m) => m.text).join('\n\n')}`
     } else if (meta.lote && (cortado || tareas.length)) {
       const muerto = tareas.length ? `, y se cortó lo que corría en segundo plano (${tareas.join('; ')})` : ''
-      text = `(Sloth se cerró a mitad de tu trabajo${muerto}.) Continúa donde te quedaste. Antes, mira en tu carpeta qué quedó a medias: un render o un subagente cortado no terminó.`
+      text = `(VyMotion se cerró a mitad de tu trabajo${muerto}.) Continúa donde te quedaste. Antes, mira en tu carpeta qué quedó a medias: un render o un subagente cortado no terminó.`
     }
     if (!text) return
     const images = mensajes.flatMap((m) => m.images ?? [])
@@ -408,7 +437,7 @@ export class Sessions {
       meta.pendiente = { text: 'Sigue con lo que estabas haciendo, sin preguntar si no hace falta.' }
     }
     this.save(meta)
-    this.emit(meta.id, { t: 'info', text: sola ? 'Sloth abrió una sesión nueva con un resumen de lo hablado, y sigue desde ahí.' : 'Tu próximo mensaje abre una sesión nueva con un resumen de lo hablado.' })
+    this.emit(meta.id, { t: 'info', text: sola ? 'VyMotion abrió una sesión nueva con un resumen de lo hablado, y sigue desde ahí.' : 'Tu próximo mensaje abre una sesión nueva con un resumen de lo hablado.' })
     if (sola) setTimeout(() => this.repartir())
   }
 
@@ -425,15 +454,23 @@ export class Sessions {
   }
 
   /** Le habla al agente sin esperar a que acabe el turno: lo lee entre una herramienta y la siguiente. Sin turno en curso, abre uno. */
-  steer(id: string, text: string, images: string[] = []) {
+  steer(id: string, text: string, images: string[] = [], visible = text) {
     if (text.trim() === '/compact' && !images.length) return this.compactar(id)
     if (this.compactando.has(id)) throw new Error('Espera a que termine la compactación.')
     const meta = this.metas.get(id)
     if (!meta) throw new Error('No existe esa sesión')
-    if (meta.imagenEstudio) throw new Error('Este chat es de una imagen: pide el cambio desde su editor, en Imágenes.')
-    if (!meta.running) return this.send(id, text, undefined, images)
-    this.emit(id, { t: 'user', text, at: Date.now(), ...(images.length ? { images } : {}) })
+    if (meta.imagenEstudio) throw new Error('Abre la imagen en el editor para pedir otro cambio.')
+    if (!meta.running) return this.send(id, text, undefined, images, visible)
+    this.emit(id, { t: 'user', text: visible, at: Date.now(), ...(images.length ? { images } : {}) })
     this.runFor(meta).steer(conRutas(text, images), images)
+  }
+
+  editarModelo3D(id: string, modelo: string) {
+    const meta = this.metas.get(id)
+    if (!meta?.modelo3d) throw new Error('No existe el chat del modelo 3D.')
+    meta.modelo3d.editando = modelo
+    delete meta.archived
+    this.save(meta)
   }
 
   async interrupt(id: string) {
@@ -485,6 +522,8 @@ export class Sessions {
       if (meta.vieneDe === ahora) delete meta.vieneDe
       delete meta.providerSessionId
       delete meta.conLlave
+      delete meta.perfilClaude
+      delete meta.perfilAgente
       meta.resumir = true
       this.emit(id, { t: 'info', text: `El hilo pasa de ${NOMBRE_AGENTE[antes]} a ${NOMBRE_AGENTE[ahora]}: tu próximo mensaje le lleva lo hablado, la carpeta y la skill.` })
     }
@@ -500,34 +539,34 @@ export class Sessions {
     this.save(meta)
   }
 
-  /**
-   * Cierra los procesos quietos de un agente: tras cambiar de cuenta, el siguiente mensaje abre uno con la nueva. Con
-   * `perfil`, solo los hilos de esa cuenta (los de las demás siguen con la suya).
-   */
+  /** Cierra los procesos quietos de un agente: tras cambiar de cuenta, el siguiente mensaje abre uno con la nueva. */
   soltarQuietos(proveedor: string, perfil?: string) {
     for (const [id] of this.runs) {
       const meta = this.metas.get(id)
-      if (!meta || proveedorDe(meta.model) !== proveedor) continue
-      const suya = proveedor === 'claude' ? meta.perfilClaude : meta.perfilCodex
-      if (!perfil || (suya ?? ORIGINAL) === perfil) this.cerrarQuieto(id)
+      const perfilHilo = proveedor === 'claude' ? meta?.perfilClaude : meta?.perfilAgente
+      if (meta && proveedorDe(meta.model) === proveedor && (!perfil || (perfilHilo ?? CLAUDE_ORIGINAL) === perfil)) this.cerrarQuieto(id)
     }
   }
 
-  /** Si algún hilo trabaja con esa cuenta: cerrarle la sesión o volver a autorizarla lo cortaría. */
-  cuentaOcupada(proveedor: 'claude' | 'codex', perfil: string) {
-    return [...this.metas.values()].some((m) => proveedorDe(m.model) === proveedor && ((proveedor === 'claude' ? m.perfilClaude : m.perfilCodex) ?? ORIGINAL) === perfil && (m.running || !!m.background?.length))
+  claudeOcupado(perfil: string) {
+    return [...this.metas.values()].some(meta => proveedorDe(meta.model) === 'claude'
+      && (meta.perfilClaude ?? CLAUDE_ORIGINAL) === perfil && (meta.running || meta.background?.length))
   }
 
-  /**
-   * «Seguir con otra cuenta de Claude» (el aviso del límite, `LimiteClaude.tsx`): el hilo pasa a esa cuenta con el resumen
-   * de lo hablado, como un relevo: su sesión de antes vive en la carpeta de la otra.
-   */
-  cambiarCuentaClaude(id: string, perfil: string) {
+  perfilOcupado(proveedor: Proveedor, perfil: string) {
+    return [...this.metas.values()].some(meta => proveedorDe(meta.model) === proveedor
+      && (meta.perfilAgente ?? CLAUDE_ORIGINAL) === perfil && (meta.running || meta.background?.length))
+  }
+
+  cambiarPerfilClaude(id: string, perfil: string) {
     const meta = this.metas.get(id)
-    if (!meta || proveedorDe(meta.model) !== 'claude') throw new Error('Este hilo no es de Claude.')
-    if (meta.running || meta.background?.length) throw new Error('Espera a que termine lo que hace Claude.')
-    if ((meta.perfilClaude ?? ORIGINAL) === perfil) return
-    if (perfilClaudeAutorizando(perfil) || !perfilesAgente('claude').autorizada(perfil)) throw new Error('Autoriza primero esa cuenta de Claude, en Opciones → Agentes.')
+    if (!meta || proveedorDe(meta.model) !== 'claude') throw new Error('Ese hilo no usa Claude.')
+    if (meta.running || meta.background?.length) throw new Error('Espera a que termine el turno de Claude.')
+    const anterior = meta.perfilClaude ?? CLAUDE_ORIGINAL
+    if (anterior === perfil) return
+    const cuentas = perfilesClaude().leer()
+    if (perfilClaudeAutorizando(perfil) || (perfil !== CLAUDE_ORIGINAL && !cuentas.perfiles.some(p => p.id === perfil && p.quien && !p.bloqueado)))
+      throw new Error('Autoriza esa cuenta de Claude primero.')
     meta.perfilClaude = perfil
     this.relevar(meta, false)
   }
@@ -541,40 +580,21 @@ export class Sessions {
     this.save(meta)
   }
 
-  /** Donde el agente deja el título corto del hilo (`turno`). */
-  private archivoTitulo(meta: SessionMeta) {
-    return join(meta.cwd, `.sloth-titulo-${meta.id}.txt`)
-  }
-
-  /** Al acabar un turno, el título que dejó el agente; si alguien ya lo renombró, se queda el suyo. */
-  private tomarTitulo(meta: SessionMeta) {
-    const archivo = this.archivoTitulo(meta)
-    if (!existsSync(archivo)) return
-    try {
-      const nuevo = statSync(archivo).size <= 512 ? tituloGenerado(decodificarTitulo(readFileSync(archivo))) : undefined
-      if (nuevo && meta.tituloPendiente === meta.title) {
-        meta.title = nuevo
-        delete meta.tituloPendiente
-        this.save(meta)
-      }
-      rmSync(archivo, { force: true })
-    } catch {
-      // Si el archivo sigue ocupado, se queda el título que tiene.
-    }
-  }
-
   /** Borra la sesión del disco. Con el agente trabajando no: se cortaría a medias. */
-  remove(id: string) {
+  remove(id: string, borrarArchivos?: () => void) {
     const meta = this.metas.get(id)
     if (!meta) return
     if (meta.running || meta.background?.length) throw new Error('El agente sigue trabajando en este hilo. Detenlo antes de eliminarlo.')
     this.cerrar(id)
     this.cerrarRegistro(id)
+    borrarArchivos?.()
+    rmSync(join(this.dir, 'vistas', `${id}.json`), { force: true })
+    rmSync(join(this.dir, 'vistas', `${id}.json.gz`), { force: true })
+    rmSync(join(this.dir, `${id}.jsonl`), { force: true })
+    rmSync(join(this.dir, `${id}.json`), { force: true })
     this.metas.delete(id)
     this.events.delete(id)
-    rmSync(join(this.dir, `${id}.json`), { force: true })
-    rmSync(join(this.dir, `${id}.jsonl`), { force: true })
-    rmSync(join(this.dir, 'vistas', `${id}.json`), { force: true })
+    this.compactarPendiente.delete(id)
     this.pushRemoved(id)
   }
 
@@ -603,7 +623,7 @@ export class Sessions {
    * Cuando lo de segundo plano (subagentes, comandos, un Monitor) termina con el turno ya acabado, el hilo lo dice: el
    * agente suele cerrar su turno con «todo listo» mientras algo sigue, y sin esto había que preguntarle si ya acabó. Espera
    * `CALMA`: al terminar una tarea, Claude Code abre él solo un turno para leerla, y eso no es quedarse quieto. Solo con el
-   * proceso del agente vivo: si se cerró o se reinició Sloth, lo de fondo se cortó, no terminó.
+   * proceso del agente vivo: si se cerró o se reinició VyMotion, lo de fondo se cortó, no terminó.
    *
    * Codex y OpenCode no abren ese turno: un video de Codex cerraba el suyo con sus subagentes trabajando y se quedaba
    * parado cuando acababan (29 de octubre). A ellos se les despierta para que sigan (`DESPERTARES`).
@@ -623,7 +643,7 @@ export class Sessions {
       const veces = this.despertados.get(id) ?? 0
       if (programaDe(proveedorDe(meta.model)) !== 'claude' && meta.acaboBien && veces < DESPERTARES && this.runs.has(id)) {
         this.despertados.set(id, veces + 1)
-        this.emit(id, { t: 'info', text: 'Terminó lo que seguía en segundo plano: Sloth le pide al agente que siga.' })
+        this.emit(id, { t: 'info', text: 'Terminó lo que seguía en segundo plano: VyMotion le pide al agente que siga.' })
         return this.turno(meta, 'Terminó lo que tenías en segundo plano (tus subagentes o comandos). Si lo que pidió el usuario aún no está acabado, sigue con lo que falta sin preguntar; si ya lo está, no hagas nada más.')
       }
       this.emit(id, { t: 'info', text: 'Terminó lo que seguía en segundo plano: ya no queda nada trabajando en este hilo.' })
@@ -640,7 +660,7 @@ export class Sessions {
    * borrador sin pasar la comprobación de movimiento, dijo «el video aún no está terminado» y acabó (29 de octubre).
    * Pasados `CALMA`, si el turno acabó bien, trabajó (usó alguna herramienta), no acaba preguntándote algo, no deja nada
    * en segundo plano (de eso se ocupa `avisarFondo`) y a la carpeta le falta algo que no tienes que dar tú (`faltaDe`),
-   * Sloth le pide que siga. Vale para todos los estilos, también los tuyos: lo que falta sale de las etapas de su card.
+   * VyMotion le pide que siga. Vale para todos los estilos, también los tuyos: lo que falta sale de las etapas de su card.
    */
   private sinAcabar(id: string, meta: SessionMeta, event: AgentEvent) {
     if (event.t === 'turn_start' || event.t === 'user') {
@@ -665,10 +685,10 @@ export class Sessions {
       if (!falta.length) return
       const veces = this.despertados.get(id) ?? 0
       if (veces >= DESPERTARES) {
-        return this.emit(id, { t: 'info', text: `El video sigue sin acabar (falta: ${falta.join(', ')}) y Sloth ya le pidió ${veces} veces seguidas que siguiera. Dile tú cómo seguir.` })
+        return this.emit(id, { t: 'info', text: `El video sigue sin acabar (falta: ${falta.join(', ')}) y VyMotion ya le pidió ${veces} veces seguidas que siguiera. Dile tú cómo seguir.` })
       }
       this.despertados.set(id, veces + 1)
-      this.emit(id, { t: 'info', text: `El agente cerró su turno con el video sin acabar (falta: ${falta.join(', ')}): Sloth le pide que siga.` })
+      this.emit(id, { t: 'info', text: `El agente cerró su turno con el video sin acabar (falta: ${falta.join(', ')}): VyMotion le pide que siga.` })
       this.turno(
         meta,
         `Cerraste tu turno, pero el video aún no está terminado: en su carpeta falta ${falta.join(', ')}. Sigue sin preguntar hasta terminarlo. Si una comprobación falla, arregla lo que dice y vuelve a probar; no cierres el turno con un borrador. Para solo si necesitas algo que únicamente puede darte el usuario, y entonces pídeselo con una pregunta.`
@@ -709,33 +729,51 @@ export class Sessions {
     this.despertadores.clear()
     this.cerrarRegistros(true)
     for (const id of [...this.runs.keys()]) this.cerrar(id)
-    // Si Sloth no se reinicia después (una actualización que falló), el siguiente mensaje retoma la sesión.
+    // Si VyMotion no se reinicia después (una actualización que falló), el siguiente mensaje retoma la sesión.
     this.runs.clear()
   }
 
-  private runFor(meta: SessionMeta): AgentRun {
-    const live = this.runs.get(meta.id)
+  private runFor(meta: SessionMeta, interno?: Pick<AgentOptions, 'onEvent' | 'onExit'>): AgentRun {
+    const live = !interno && this.runs.get(meta.id)
     if (live) return live
     // Un hilo de Codex sigue con la llave o con la cuenta con que empezó; los de antes de las llaves, con la cuenta.
-    const conLlave = proveedorDe(meta.model) === 'codex' ? (meta.providerSessionId ? !!meta.conLlave : !!llaveEnUso('codex')) : undefined
-    const { perfilClaude, perfilCodex, espera } = this.cuentaDe(meta, conLlave)
-    const opciones: Parameters<typeof this.crearAgente>[0] = {
+    const proveedor = proveedorDe(meta.model)
+    const conLlave = proveedor === 'codex' ? (meta.providerSessionId ? !!meta.conLlave : meta.perfilAgente ? !!meta.conLlave : !!llaveEnUso('codex')) : undefined
+    const otros = tienePerfiles(proveedor) ? perfilesAgente(proveedor) : undefined
+    const cuentasOtros = otros?.leer()
+    const perfilAgente = cuentasOtros ? meta.perfilAgente ?? (meta.providerSessionId || conLlave ? CLAUDE_ORIGINAL : cuentasOtros.activa) : undefined
+    const bloqueadoOtro = perfilAgente && (cuentasOtros?.perfiles.some(p => p.id === perfilAgente && p.bloqueado) || (proveedor === 'codex' && perfilCodexAutorizando(perfilAgente)) || perfilVentanaAutorizando(proveedor, perfilAgente))
+    const perfiles = perfilesClaude()
+    const cuentas = proveedorDe(meta.model) === 'claude' ? perfiles.leer() : undefined
+    const perfilClaude = cuentas
+      ? meta.perfilClaude ?? (meta.providerSessionId || llaveEnUso('claude') ? CLAUDE_ORIGINAL : cuentas.activa)
+      : undefined
+    const bloqueado = perfilClaude && (perfilClaudeAutorizando(perfilClaude) || cuentas?.perfiles.some(p => p.id === perfilClaude && p.bloqueado))
+    if (perfilClaude && !bloqueado && meta.perfilClaude !== perfilClaude) {
+      meta.perfilClaude = perfilClaude
+      if (!interno) this.save(meta)
+    }
+    if (perfilAgente && !bloqueadoOtro && meta.perfilAgente !== perfilAgente) {
+      meta.perfilAgente = perfilAgente
+      meta.conLlave = conLlave || undefined
+      if (!interno) this.save(meta)
+    }
+    const opciones: AgentOptions = {
       cwd: meta.cwd,
       model: meta.model,
       effort: meta.effort,
       resume: meta.providerSessionId,
-      configClaude: perfilClaude ? perfilesAgente('claude').configuracion(perfilClaude) : undefined,
-      configCodex: perfilCodex ? perfilesAgente('codex').configuracion(perfilCodex) : undefined,
+      ...(perfilClaude && perfilClaude !== CLAUDE_ORIGINAL ? { configClaude: perfiles.configuracion(perfilClaude) } : {}),
+      ...(perfilAgente ? { configAgente: otros?.configuracion(perfilAgente) ?? null } : {}),
       lote: !!meta.lote,
-      hilo: meta.id,
+      hilo: meta.modelo3d || meta.cardId === MODELO3D_CARD.id ? null : interno ? undefined : meta.id,
       conLlave,
       sinHerramientas: this.sinHerramientas(meta),
-      soloLeer: this.soloLeer(meta),
-      onEvent: (event) => this.emit(meta.id, event),
-      onDraft: (draft) => this.pushDraft(meta.id, draft),
+      onEvent: interno?.onEvent ?? ((event) => this.emit(meta.id, event)),
+      onDraft: interno ? undefined : (draft) => this.pushDraft(meta.id, draft),
       // Un proceso muerto no recibe nada: se olvida, y el siguiente mensaje abre otro que retoma la sesión. Si se cayó,
       // lo que no leyó o lo que cortó sigue como tras una caída del servidor.
-      onExit: (caida) => {
+      onExit: interno?.onExit ?? ((caida) => {
         if (this.runs.get(meta.id) === run) {
           clearTimeout(this.relojes.get(meta.id))
           this.relojes.delete(meta.id)
@@ -743,45 +781,20 @@ export class Sessions {
           this.runs.delete(meta.id)
         }
         if (caida && this.metas.has(meta.id)) this.retomar(meta, caida.turno ? sinLeer(this.load(meta.id)) : [], caida.turno, meta.background ?? [])
-      },
+      }),
       onProviderSession: (providerId) => {
+        if (interno || !this.metas.has(meta.id)) return
         meta.providerSessionId = providerId
-        meta.conLlave = conLlave || undefined
-        // Su sesión vive en la carpeta de esa cuenta: el hilo se queda con ella.
         meta.perfilClaude = perfilClaude
-        meta.perfilCodex = perfilCodex
+        meta.conLlave = conLlave || undefined
         delete meta.resumir
         delete meta.vieneDe
         this.save(meta)
       }
     }
-    const run = espera ? sinArrancar(opciones, espera) : this.crearAgente(opciones)
-    this.runs.set(meta.id, run)
+    const run = bloqueado || bloqueadoOtro ? sinArrancar(opciones, `Termina de autorizar esta cuenta de ${NOMBRE_AGENTE[proveedor]} en Opciones.`) : this.crearAgente(opciones)
+    if (!interno) this.runs.set(meta.id, run)
     return run
-  }
-
-  /**
-   * Con qué cuenta de Claude o de ChatGPT trabaja el hilo (`server/perfiles-agentes.ts`): la suya, si ya tiene; uno de
-   * antes de que hubiera varias, o con la llave de API, la original; uno nuevo, la que usan los hilos nuevos. Si la suya
-   * se quitó, sigue en la activa con el resumen de lo hablado. Mientras se autoriza, espera (`espera`).
-   */
-  private cuentaDe(meta: SessionMeta, conLlave?: boolean): { perfilClaude?: string; perfilCodex?: string; espera?: string } {
-    const p = proveedorDe(meta.model)
-    if (p !== 'claude' && p !== 'codex') return {}
-    if (p === 'codex' && conLlave) return {}
-    const cuentas = perfilesAgente(p)
-    const guardada = p === 'claude' ? meta.perfilClaude : meta.perfilCodex
-    let perfil = guardada ?? (meta.providerSessionId || (p === 'claude' && llaveEnUso('claude')) ? ORIGINAL : cuentas.leer().activa)
-    if (!cuentas.autorizada(perfil) && !(p === 'claude' ? perfilClaudeAutorizando(perfil) : perfilCodexAutorizando(perfil))) {
-      // La suya ya no está (se quitó, o entró otro correo): sigue en la activa, con el resumen.
-      perfil = cuentas.autorizada(cuentas.leer().activa) ? cuentas.leer().activa : ORIGINAL
-      if (guardada) {
-        delete meta.providerSessionId
-        meta.resumir = true
-      }
-    }
-    const espera = (p === 'claude' ? perfilClaudeAutorizando(perfil) : perfilCodexAutorizando(perfil)) ? `Termina de autorizar esta cuenta de ${NOMBRE_AGENTE[p]} en Opciones → Agentes.` : undefined
-    return p === 'claude' ? { perfilClaude: perfil, espera } : { perfilCodex: perfil, espera }
   }
 
   private emit(id: string, event: AgentEvent) {
@@ -797,7 +810,6 @@ export class Sessions {
     if (event.t === 'thinking') event.at ??= Date.now() // panel de etapas
     // El error nombra el plan de quien falló, aunque el hilo pase luego a otro agente.
     if (event.t === 'turn_end' && !event.ok) event.agente ??= proveedorDe(meta.model)
-    // Con qué modelo fue el turno, para la actividad de cada agente en Opciones (`server/actividad-agentes.ts`).
     if (event.t === 'turn_end') event.model ??= meta.model
     const list = this.load(id)
     list.push(event)
@@ -807,7 +819,18 @@ export class Sessions {
     if (event.t === 'turn_end' && event.ok) delete meta.retomas
     if (event.t === 'turn_end') {
       meta.acaboBien = event.ok
-      if (meta.tituloPendiente) this.tomarTitulo(meta)
+      const archivo = join(meta.cwd, `.vymotion-titulo-${meta.id}.txt`)
+      if (existsSync(archivo)) {
+        try {
+          const nuevo = statSync(archivo).size <= 512 ? tituloGenerado(decodificarTitulo(readFileSync(archivo))) : undefined
+          if (nuevo && meta.tituloPendiente === meta.title) {
+            meta.title = nuevo
+            delete meta.tituloPendiente
+            this.save(meta)
+          }
+          rmSync(archivo, {force: true})
+        } catch { /* El título provisional sigue siendo usable si el archivo aún está ocupado. */ }
+      }
     }
     if (running !== meta.running || event.t === 'user') {
       meta.running = running
@@ -846,10 +869,10 @@ export class Sessions {
       const file = join(this.dir, `${id}.jsonl`)
       try {
         const fuente = statSync(file)
-        const vista = JSON.parse(readFileSync(join(this.dir, 'vistas', `${id}.json`), 'utf8'))
-        if (vista.version === 1 && vista.bytes === fuente.size && vista.mtime === fuente.mtimeMs && Array.isArray(vista.events)) {
+        const vista = leerVistaSync(join(this.dir, 'vistas', `${id}.json`), fuente)
+        if (vista) {
           if (vista.terminado === false) escribir(() => appendFileSync(file, '\n'))
-          list = vista.events as AgentEvent[]
+          list = vista.events
           this.events.set(id, list)
           this.soltar(id)
           return list
@@ -922,7 +945,7 @@ export class Sessions {
     }
   }
 
-  /** Los registros que llevan un rato sin eventos se cierran. Con `todos`, todos (al cerrar Sloth). */
+  /** Los registros que llevan un rato sin eventos se cierran. Con `todos`, todos (al cerrar VyMotion). */
   cerrarRegistros(todos = false) {
     const antes = Date.now() - QUIETO_REGISTRO
     for (const [id, r] of this.registros) if (todos || r.ultimo < antes) this.cerrarRegistro(id)

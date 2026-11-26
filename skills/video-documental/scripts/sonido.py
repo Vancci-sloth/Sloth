@@ -2,7 +2,7 @@
 
     python -I -B -X utf8 <skill>/scripts/sonido.py <base.wav> <sfx-cues.txt> <salida.wav> [--dur 46.4]
 
-Lo llama el director al final de cada armado (`mezclar()`), así el monitor en vivo de Sloth suena igual que el render:
+Lo llama el director al final de cada armado (`mezclar()`), así el monitor en vivo de VyMotion suena igual que el render:
 `public/sonido.wav` es la única pista de audio del proyecto de Remotion.
 
 sfx-cues.txt lo escriben los dispositivos (Comp.write_cues); una pista por línea:
@@ -95,7 +95,7 @@ def mezclar(base, cues, salida, dur=None):
 
 
 def poner(tmp, salida):
-    """Si el estudio de Sloth está leyendo la salida, Windows no deja reemplazarla: se reintenta y, si no, se copia encima."""
+    """Si el estudio de VyMotion está leyendo la salida, Windows no deja reemplazarla: se reintenta y, si no, se copia encima."""
     import shutil, time
     for _ in range(10):
         try:

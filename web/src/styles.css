@@ -1,64 +1,54 @@
-/* La paleta de Sloth: oscuro cálido con acento ámbar. Es el tema «Sloth»; los demás la cambian en su archivo (`web/src/temas/`). */
+/* Cod Gray es la escala neutra de VyMotion. Éxito y error tienen colores propios. */
 :root {
-  --bg: #0f0e0c;
-  --panel: #171512;
-  --panel-2: #221f1b;
-  --line: #2e2a24;
-  /* Un borde al pasar el ratón o con el foco. */
-  --line-hover: #4a4236;
-  --text: #ede6d6;
-  --muted: #9a907f;
+  --gris-50: #fafafa;
+  --gris-100: #f5f5f5;
+  --gris-200: #e6e6e6;
+  --gris-300: #d3d3d3;
+  --gris-400: #a3a3a3;
+  --gris-500: #727272;
+  --gris-600: #535353;
+  --gris-700: #404040;
+  --gris-800: #272727;
+  --gris-900: #1a1a1a;
+  --gris-950: #0d0d0d;
+  --bg: var(--gris-950);
+  --panel: var(--gris-900);
+  --panel-2: var(--gris-800);
+  --line: var(--gris-700);
+  --line-hover: var(--gris-600);
+  --linea-tarjeta: color-mix(in srgb, var(--gris-50) 11%, var(--bg));
+  --radio-tarjeta: 17px;
+  --text: var(--gris-100);
+  --muted: var(--gris-400);
   /* Lo secundario del inicio, que se tiene que leer bien: entre --muted y --text, más de 9,5:1 sobre el compositor (el menú
      «Voz» tiene el suyo). */
-  --suave: color-mix(in srgb, var(--muted) 35%, var(--text));
-  --amber: #e8a33d;
-  --amber-2: #f4b04a;
+  --suave: var(--gris-200);
+  /* Los componentes usan estos nombres para el acento y el texto sobre él. */
+  --amber: var(--gris-300);
+  --amber-2: var(--gris-50);
   --amber-tinte: color-mix(in srgb, var(--amber) 13%, transparent);
-  --sobre-ambar: #1b1408;
+  --sobre-ambar: var(--gris-950);
   --ok: #8fc177;
   --bad: #e06c55;
-  /*
-   * Lo que usa el diseño común (el de Sloth) en los dos temas: la escala de grises, el borde y el radio de las tarjetas,
-   * el cristal y el color de cada agente, función y red. En el tema Sloth todo sale de su paleta (el acento es el ámbar
-   * y el cristal es plano); Cristal les pone los suyos (`temas/cristal.css`).
-   */
-  --gris-50: var(--text);
-  --gris-100: var(--text);
-  --gris-200: var(--suave);
-  --gris-300: var(--muted);
-  --gris-400: var(--muted);
-  --gris-500: var(--line-hover);
-  --gris-600: var(--line-hover);
-  --gris-700: var(--line);
-  --gris-800: var(--panel-2);
-  --gris-900: var(--panel);
-  --gris-950: var(--bg);
-  --linea-tarjeta: var(--line);
-  --radio-tarjeta: 14px;
-  --cristal-fondo: var(--panel);
-  --cristal-borde: var(--line);
-  --cristal-reflejo: none;
-  --acento-claude: var(--amber);
-  --acento-codex: var(--amber);
-  --acento-gemini: var(--amber);
-  --acento-deepseek: var(--amber);
-  --acento-opencode: var(--amber);
-  --acento-grok: var(--amber);
-  --acento-antigravity: var(--amber);
-  --acento-cursor: var(--amber);
-  --acento-muse: var(--amber);
-  --acento-pi: var(--amber);
-  --acento-openrouter: var(--amber);
-  --acento-freellmapi: var(--amber);
-  --acento-voz: var(--amber);
-  --acento-imagen: var(--amber);
-  --acento-youtube: var(--amber);
-  --acento-tiktok: var(--amber);
-  --acento-tiktok-rosa: var(--amber);
-  --acento-instagram: var(--amber);
-  --acento-instagram-final: var(--amber);
-  /* El color del agente elegido en el compositor; Cristal lo cambia por el de cada uno (`data-proveedor`). */
-  --acento-modelo: var(--amber);
+  /* Acentos de los controles de IA y de las acciones del compositor. */
+  --acento-claude: #d99b80;
+  --acento-codex: #8cbcff;
+  --acento-gemini: #b5a2f6;
+  --acento-deepseek: #86b9f5;
+  --acento-opencode: var(--gris-200);
+  --acento-grok: var(--gris-300);
+  --acento-antigravity: #c5adf2;
+  --acento-cursor: var(--gris-100);
+  --acento-muse: #88b7fa;
+  --acento-pi: #b5d5a0;
+  --acento-voz: #90d6cb;
+  --acento-imagen: #b9aff2;
+  /* Acentos de marca para las acciones de publicación, sobre la base neutra. */
+  --acento-youtube: #ff5252;
+  --acento-tiktok: #25f4ee;
+  --acento-tiktok-rosa: #fe2c55;
+  --acento-instagram: #e87ab9;
+  --acento-instagram-final: #f5ab65;
   --radio: 10px;
   --mono: 'JetBrains Mono', 'Cascadia Code', Consolas, monospace;
   color-scheme: dark;
@@ -74,7 +64,40 @@ body {
 }
 button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; padding: 0; }
 button:disabled { cursor: default; opacity: 0.45; }
-.vista-cargando { padding: 16px 24px; color: var(--muted); }
+.vista-cargando {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  padding: clamp(24px, 5vw, 56px) clamp(18px, 5vw, 64px);
+  color: var(--muted);
+  background: radial-gradient(circle at 78% 4%, color-mix(in srgb, var(--acento-codex) 7%, transparent), transparent 34%), var(--bg);
+}
+.vista-cargando-cabecera { display: flex; align-items: center; gap: 14px; max-width: 760px; }
+.vista-cargando-icono { width: 42px; height: 42px; flex: none; border: 1px solid var(--line); border-radius: 13px; background: linear-gradient(145deg, var(--panel-2), var(--panel)); box-shadow: inset 0 1px color-mix(in srgb, var(--text) 9%, transparent); }
+.vista-cargando-kicker { margin: 0 0 4px; color: var(--amber); font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+.vista-cargando h1 { margin: 0; color: var(--text); font-size: clamp(24px, 3vw, 32px); letter-spacing: -.03em; }
+.vista-cargando-cabecera p:last-child { margin: 4px 0 0; }
+.vista-cargando-nav { display: flex; gap: 8px; padding-bottom: 14px; border-bottom: 1px solid var(--linea-tarjeta); }
+.vista-cargando-nav i { display: block; width: clamp(72px, 10vw, 124px); height: 32px; border: 1px solid var(--linea-tarjeta); border-radius: 10px; background: var(--panel); }
+.vista-cargando-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; max-width: 1050px; }
+.vista-cargando-grid i { min-height: 154px; border: 1px solid var(--linea-tarjeta); border-radius: 17px; background: linear-gradient(110deg, var(--panel) 25%, color-mix(in srgb, var(--text) 7%, var(--panel)) 42%, var(--panel) 58%); background-size: 230% 100%; animation: carga-apartado 1.15s steps(8, end) infinite; }
+.vista-cargando-imagenes .vista-cargando-icono { border-radius: 12px; }
+.vista-cargando-estilos .vista-cargando-grid i { min-height: 205px; }
+.vista-cargando-modelos3d .vista-cargando-grid i:first-child { grid-column: span 2; }
+.vista-error { flex: 1; min-height: 0; display: grid; align-content: center; justify-items: start; gap: 10px; padding: 32px clamp(20px, 6vw, 80px); background: radial-gradient(circle at 80% 20%, color-mix(in srgb, var(--bad) 8%, transparent), transparent 35%), var(--bg); }
+.vista-error-icono { display: grid; place-items: center; width: 42px; height: 42px; border: 1px solid color-mix(in srgb, var(--bad) 45%, var(--line)); border-radius: 13px; color: var(--bad); background: color-mix(in srgb, var(--bad) 9%, var(--panel)); }
+.vista-error-icono .ico { width: 22px; height: 22px; }
+.vista-error h1 { margin: 0; font-size: 24px; letter-spacing: -.02em; }
+.vista-error p { max-width: 520px; margin: 0 0 8px; color: var(--muted); }
+@keyframes carga-apartado { to { background-position: -130% 0; } }
+@media (prefers-reduced-motion: reduce) { .vista-cargando-grid i { animation: none; } }
+@media (max-width: 700px) {
+  .vista-cargando { padding: 24px 16px; }
+  .vista-cargando-grid { grid-template-columns: 1fr; }
+  .vista-cargando-modelos3d .vista-cargando-grid i:first-child { grid-column: auto; }
+}
 .campo-ascii { position: absolute; inset: 0 0 0 auto; width: min(45%, 330px); height: 100%; pointer-events: none; color: var(--gris-500); mask-image: linear-gradient(to right, transparent, #000 55%); }
 .superficie-ascii { position: relative; isolation: isolate; overflow: hidden; border: 1px solid var(--linea-tarjeta); border-radius: var(--radio-tarjeta); background: radial-gradient(ellipse at top right, var(--panel-2), transparent 72%), var(--panel); }
 .superficie-ascii > .campo-ascii { z-index: -1; }
@@ -105,12 +128,73 @@ input, textarea, select { font: inherit; color: inherit; }
 .spacer { flex: 1; }
 .link { color: var(--muted); }
 .link:hover { color: var(--text); }
-::-webkit-scrollbar { width: 10px; height: 10px; }
-::-webkit-scrollbar-thumb { background: var(--panel-2); border-radius: 999px; border: 2px solid var(--bg); }
-/* Donde se cruzan las dos barras: sin esto, Chromium pinta un cuadro blanco. */
-::-webkit-scrollbar-corner { background: transparent; }
+/* El scroll de navegación conserva el aspecto habitual. Las marcas se reservan a los historiales. */
+@media (forced-colors: none) and (pointer: fine) {
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-thumb { background: var(--panel-2); border: 2px solid var(--bg); border-radius: 999px; }
+  ::-webkit-scrollbar-corner { background: transparent; }
+  [data-scroll-chat] { --avance-scroll: 0%; }
+  [data-scroll-chat]::-webkit-scrollbar:vertical { width: 14px; }
+  [data-scroll-chat]::-webkit-scrollbar-track:vertical {
+    background:
+      linear-gradient(var(--text), var(--text)) right calc(12% + var(--avance-scroll) * .76) / 14px 2px no-repeat,
+      repeating-linear-gradient(var(--gris-700) 0 2px, transparent 2px 10px) right center / 5px 76% no-repeat;
+  }
+  [data-scroll-chat][data-scroll-previsualizado]::-webkit-scrollbar-track:vertical {
+    background: repeating-linear-gradient(var(--gris-700) 0 2px, transparent 2px 10px) right center / 5px 76% no-repeat;
+  }
+  [data-scroll-chat]::-webkit-scrollbar-thumb:vertical { background: transparent; border: 0; }
+}
 
-.app { display: grid; grid-template-columns: 248px 1fr; height: 100%; }
+/* El carril de vista previa ocupa la misma zona que la barra nativa. */
+.scroll-interactivo {
+  position: fixed; z-index: 2147483647; overflow: hidden; cursor: pointer; touch-action: none;
+}
+.scroll-interactivo[hidden] { display: none; }
+.scroll-interactivo::before, .scroll-interactivo::after {
+  content: ''; position: absolute; inset-inline: 0; pointer-events: none;
+}
+.scroll-interactivo::before {
+  top: calc(var(--vecinas-y) - 30px); height: 62px;
+  opacity: 0; transform: scaleX(.42); transform-origin: right;
+  background:
+    linear-gradient(var(--gris-600), var(--gris-600)) right 0 top 0 / 6px 2px no-repeat,
+    linear-gradient(var(--gris-600), var(--gris-600)) right 0 top 10px / 8px 2px no-repeat,
+    linear-gradient(var(--gris-500), var(--gris-500)) right 0 top 20px / 11px 2px no-repeat,
+    linear-gradient(var(--gris-500), var(--gris-500)) right 0 top 30px / 12px 2px no-repeat,
+    linear-gradient(var(--gris-500), var(--gris-500)) right 0 top 40px / 11px 2px no-repeat,
+    linear-gradient(var(--gris-600), var(--gris-600)) right 0 top 50px / 8px 2px no-repeat,
+    linear-gradient(var(--gris-600), var(--gris-600)) right 0 top 60px / 6px 2px no-repeat;
+}
+.scroll-interactivo[data-vecinas]::before { opacity: 1; transform: scaleX(1); }
+@media (prefers-reduced-motion: no-preference) {
+  .scroll-interactivo::before { transition: opacity 140ms ease, transform 150ms ease-out; }
+  .scroll-interactivo[data-vecinas]::before { animation: scroll-vecinas-entrada 150ms ease-out; }
+  @keyframes scroll-vecinas-entrada { from { opacity: 0; transform: scaleX(.42); } }
+}
+.scroll-interactivo::after { top: calc(var(--marca-y) - 1px); height: 2px; background: var(--text); }
+
+.scroll-vista-chat {
+  position: fixed; z-index: 2147483647; pointer-events: none;
+  width: min(320px, calc(100vw - 24px)); padding: 10px 12px;
+  background: var(--panel-2); color: var(--text);
+  border: 1px solid var(--linea-tarjeta); border-radius: var(--radio);
+  box-shadow: 0 8px 24px color-mix(in srgb, var(--bg) 58%, transparent);
+  font-size: 12px; line-height: 1.45; overflow-wrap: anywhere;
+}
+.scroll-vista-chat > strong {
+  display: block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+}
+.scroll-vista-chat > p {
+  margin: 4px 0 0; color: var(--muted);
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .scroll-vista-chat:not([hidden]) { animation: scroll-vista-entrada 140ms ease-out; }
+  @keyframes scroll-vista-entrada { from { opacity: 0; transform: translateX(4px); } }
+}
+
+.app { display: grid; grid-template-columns: 248px minmax(0, 1fr); height: 100%; }
 
 /* Barra lateral: en Barra.css. Aquí, la selección de varios hilos y el menú de cada uno. */
 /* La selección: un globo fuera de la barra lateral, a media altura, con su pico señalando a los hilos. */
@@ -120,7 +204,7 @@ input, textarea, select { font: inherit; color: inherit; }
 .select-pill button { padding: 5px 10px; border-radius: 9px; font-size: 12.5px; color: var(--muted); }
 .select-pill button:hover:not(:disabled) { background: var(--line); color: var(--text); }
 .select-pill button.danger { color: var(--bad); }
-.select-pill button.danger:hover:not(:disabled) { background: color-mix(in srgb, var(--bad) 13%, transparent); color: var(--bad); }
+.select-pill button.danger:hover:not(:disabled) { background: rgba(224, 108, 85, 0.13); color: var(--bad); }
 .select-count { min-width: 26px; height: 26px; padding: 0 7px; margin-right: 4px; display: grid; place-items: center; border-radius: 999px; background: var(--amber); color: var(--sobre-ambar); font-size: 12px; font-weight: 700; cursor: help; }
 .select-pill .select-close { padding: 5px 9px; }
 .select-error { position: absolute; top: calc(100% + 6px); left: 0; width: max-content; max-width: 280px; padding: 4px 10px; border-radius: 8px; background: var(--panel-2); border: 1px solid var(--line); }
@@ -242,7 +326,6 @@ input, textarea, select { font: inherit; color: inherit; }
 /* «Importar» un estilo que te pasaron: texto con su icono, sin cápsula. */
 .estilo-importar { display: flex; align-items: center; gap: 6px; padding: 3px 6px; border-radius: 6px; color: var(--suave); font-size: 15px; transition: color 0.15s; }
 .estilo-importar:hover { color: var(--amber); }
-a.estilo-importar { text-decoration: none; }
 .importar-error { margin-right: 8px; }
 .cards { flex: 1; min-height: 0; overflow-y: auto; display: grid; grid-template-columns: repeat(auto-fill, minmax(168px, 1fr)); grid-auto-rows: max-content; gap: 14px; margin: 0 -6px; padding: 4px 6px 6px; }
 /* Encajadas: cada cartel del tamaño que cabe, juntos y pegados al compositor. */
@@ -291,13 +374,32 @@ a.estilo-importar { text-decoration: none; }
 .cards-carrusel .card-desc { font-size: 12px; }
 .cards-carrusel .card-uso { font-size: 11px; }
 .cards-carrusel .card-previa { border-radius: 8px; }
+.cards-carrusel .card-previa-video { opacity: 0; }
+.cards-carrusel .card-previa-video[data-reproduciendo] { opacity: 1; }
+.cards-carrusel .card-fondo { background: radial-gradient(ellipse at top right, var(--linea-tarjeta), transparent 65%); }
 @media (max-height: 700px) {
   .new-bottom > .new-head { height: 110px; }
   .new-bottom > .new-head { margin-bottom: 12px; }
   .estante { justify-content: safe flex-end; }
 }
 @media (prefers-reduced-motion: no-preference) {
-  .cards-carrusel .card { transition: transform 450ms cubic-bezier(.22,.8,.3,1), opacity 350ms ease, visibility 350ms, border-color 150ms ease; }
+  .cards-carrusel .card {
+    transition: transform 390ms cubic-bezier(.22,1,.36,1), opacity 250ms ease-out, visibility 250ms,
+      border-color 180ms ease-out, box-shadow 300ms ease-out;
+  }
+  .cards-carrusel .card[data-salto] { transition-property: opacity, visibility, border-color, box-shadow; }
+  .cards-carrusel .card[data-salto][data-visible] { animation: cartel-entrada-lateral 220ms ease-out; }
+  .cards-carrusel .card.active { box-shadow: 0 18px 30px color-mix(in srgb, var(--bg) 78%, transparent); }
+  .cards-carrusel .card-previa-video { transition: opacity 140ms ease; }
+  @keyframes cartel-entrada-lateral { from { opacity: 0; } }
+  .new-session-video .new-bottom > .composer {
+    transform-origin: center bottom;
+    transition: border-color 150ms, translate 360ms cubic-bezier(.22,1,.36,1),
+      scale 360ms cubic-bezier(.22,1,.36,1), box-shadow 360ms ease-out;
+  }
+  .viendo-estilo.new-session-video .new-bottom > .composer { translate: 0 -4px; scale: .98; }
+  .viendo-estilo.new-session-video .estilo-galeria-cabecera { animation: estilo-galeria-entrada 280ms cubic-bezier(.22,1,.36,1); }
+  @keyframes estilo-galeria-entrada { from { opacity: .65; transform: translateY(5px); } }
 }
 /* Una columna: arriba su icono y qué hace (lo que quepa), abajo el nombre y su uso, enteros aunque ocupen dos líneas. */
 .card { position: relative; display: flex; flex-direction: column; aspect-ratio: 3 / 4; overflow: hidden; isolation: isolate; container-type: size; border-radius: 12px; border: 1px solid var(--line); background: var(--panel-2); text-align: left; transition: border-color 0.15s; }
@@ -324,16 +426,6 @@ a.estilo-importar { text-decoration: none; }
    si no, lo movía. */
 .card:has(.card-previa) .card-pie { background: linear-gradient(to top, color-mix(in srgb, var(--bg) 94%, transparent) 55%, color-mix(in srgb, var(--bg) 70%, transparent) 80%, transparent); }
 .card-title { font-size: 15px; font-weight: 650; line-height: 1.3; overflow-wrap: anywhere; }
-/* Un estilo de la comunidad sin apoyo vigente (`Card.bloqueada`): apagado, con su candado junto al nombre. */
-.card.bloqueada .card-previa, .card.bloqueada .card-fondo { opacity: 0.4; }
-.card-candado { margin-right: 5px; color: var(--amber); }
-/* Y en el sitio de su compositor, por qué no hace videos y cómo volver (SinApoyo.tsx). */
-.sin-apoyo { display: flex; align-items: center; gap: 14px; padding: 14px 16px; border: 1px solid var(--amber); border-radius: 12px; background: var(--amber-tinte); text-align: left; }
-.sin-apoyo > .icon-trazo { flex: none; width: 22px; height: 22px; color: var(--amber); }
-.sin-apoyo > div { flex: 1; min-width: 0; }
-.sin-apoyo p { margin: 3px 0 0; color: var(--suave); font-size: 13px; }
-.sin-apoyo .primary { flex: none; white-space: nowrap; }
-@media (max-width: 760px) { .sin-apoyo { flex-wrap: wrap; } }
 .card.active .card-title { color: var(--amber-2); }
 .card-uso { font-size: 12px; line-height: 1.35; color: var(--suave); overflow-wrap: anywhere; }
 .card-uso.vivo { color: var(--amber); }
@@ -494,25 +586,6 @@ a.estilo-importar { text-decoration: none; }
 .quote-chip .chip-name { font-weight: 400; font-style: italic; }
 .link-chip small { margin-left: 1px; }
 a.link-chip:hover { border-color: var(--amber); }
-/* «Afinar» (Composer.tsx): el botón, la línea de encima del campo y los huecos del pedido afinado, subrayados en ámbar. */
-.afinar { display: flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px; border-radius: 8px; font-size: 15px; color: var(--amber-2); background: var(--amber-tinte); white-space: nowrap; transition: background 0.15s; }
-.afinar:hover:not(:disabled) { background: color-mix(in srgb, var(--amber) 22%, transparent); }
-.afinar:disabled { opacity: 0.65; cursor: default; }
-.afinar .icon-trazo { width: 16px; height: 16px; vertical-align: 0; }
-.afinado { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 14px; margin-bottom: -6px; padding: 0 6px; font-size: 14px; color: var(--suave); }
-.afinado-quien { display: flex; align-items: center; gap: 7px; font-weight: 600; color: var(--text); }
-.afinado-quien .icon-trazo { width: 16px; height: 16px; color: var(--amber); }
-.afinado-falta { color: var(--amber-2); }
-.afinado button { display: flex; align-items: center; gap: 5px; font-size: 14px; color: var(--suave); }
-.afinado button:hover { color: var(--text); }
-.afinado button .icon-trazo { width: 15px; height: 15px; }
-.afinado-escrito { margin: 0 6px -6px; padding-left: 10px; border-left: 2px solid var(--line); color: var(--suave); white-space: pre-wrap; overflow-wrap: anywhere; }
-.chip.hueco-chip { gap: 1px; margin: 0 1px; padding: 0 1px; border: 0; border-bottom: 1.5px dashed color-mix(in srgb, var(--amber) 70%, transparent); border-radius: 0; background: none; color: var(--amber-2); font-size: inherit; font-weight: inherit; line-height: inherit; vertical-align: baseline; user-select: none; cursor: pointer; }
-.chip.hueco-chip:hover, .chip.hueco-chip.abierto { border-bottom-style: solid; border-bottom-color: var(--amber); }
-.hueco-flecha { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; opacity: 0.7; }
-.hueco-menu .picker-option { white-space: normal; }
-.hueco-otra { display: block; width: calc(100% + 8px); margin: 4px -4px -4px; padding: 9px 14px; border: 0; border-top: 1px solid var(--line); border-radius: 0 0 12px 12px; background: none; color: var(--text); font: inherit; font-size: 13px; outline: 0; }
-.hueco-otra::placeholder { color: var(--muted); }
 .composer-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 6px; }
 .composer-bar .picker-trigger { white-space: nowrap; }
 /* Un grupo de botones donde solo uno está elegido (`Segmento`): el formato, la duración, el modo del modelo… */
@@ -520,12 +593,6 @@ a.link-chip:hover { border-color: var(--amber); }
 .segmento button { padding: 2px 10px; border-radius: 999px; color: var(--muted); transition: background 0.15s, color 0.15s; white-space: nowrap; }
 .segmento button:hover:not(:disabled) { color: var(--text); }
 .segmento button.on { background: var(--amber-tinte); color: var(--amber); }
-/* El dibujo del aparato junto a Vertical / Horizontal: gira al cambiar de formato. */
-.segmento-dispositivo { align-items: center; }
-.formato-dispositivo { display: grid; place-items: center; flex: none; width: 28px; color: var(--text); }
-.formato-dispositivo svg { width: 20px; height: 20px; }
-.segmento-dispositivo[data-orientacion="horizontal"] .formato-dispositivo svg { transform: rotate(90deg); }
-@media (prefers-reduced-motion: no-preference) { .formato-dispositivo svg { transition: transform 0.3s ease; } }
 .picker { position: relative; }
 .picker-trigger { display: flex; align-items: center; gap: 5px; height: 28px; padding: 0 8px 0 10px; border-radius: 8px; font-size: 12.5px; color: var(--muted); transition: background 0.15s, color 0.15s; }
 .picker-trigger svg { opacity: 0.7; transition: transform 0.15s; }
@@ -533,15 +600,7 @@ a.link-chip:hover { border-color: var(--amber); }
 .picker.open > .picker-trigger svg { transform: rotate(180deg); }
 .picker-menu { position: absolute; bottom: calc(100% + 8px); left: 0; z-index: 30; min-width: 190px; max-height: 360px; overflow-y: auto; padding: 4px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45); animation: rise 0.12s ease-out; }
 .picker-group + .picker-group { margin-top: 4px; padding-top: 4px; border-top: 1px solid var(--line); }
-/* El buscador de una lista larga se queda arriba mientras la lista corre debajo. */
-.picker-buscar { position: sticky; top: -4px; z-index: 1; display: block; width: calc(100% + 8px); margin: -4px -4px 4px; padding: 9px 14px; border: 0; border-bottom: 1px solid var(--line); border-radius: 12px 12px 0 0; background: var(--panel); font-size: 13px; outline: none; }
-.picker-buscar::placeholder { color: var(--muted); }
 .picker-label { display: block; padding: 6px 10px 4px; font-size: 11px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); }
-/* Los modelos de cada proveedor, bajo su logo. */
-.picker-group[data-proveedor] .picker-label { display: flex; align-items: center; gap: 7px; }
-.picker-label .logo.chico { width: 18px; height: 18px; border-radius: 5px; }
-.picker-label .logo.chico svg { width: 11px; height: 11px; }
-.picker-label .logo.chico img { width: 13px; height: 13px; }
 .picker-option { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; padding: 6px 10px; border-radius: 7px; font-size: 13px; text-align: left; white-space: nowrap; color: var(--text); }
 .picker-option:hover { background: var(--panel-2); }
 .picker-option.on { color: var(--amber); background: var(--amber-tinte); }
@@ -551,18 +610,16 @@ a.link-chip:hover { border-color: var(--amber); }
 .picker-modelo-logo { display: inline-flex; align-items: center; gap: 8px; min-width: 0; }
 .picker-modelo-logo > .logo { flex: none; }
 .picker-menu.down { bottom: auto; top: calc(100% + 8px); animation-name: drop; }
-/*
- * El desplegable de toda la app (Desplegable.tsx): donde iría un <select>, que el sistema pinta a su manera. Toma la
- * letra y el color de donde está; con `campo`, la cara de un campo de formulario.
- */
-.desplegable { display: inline-flex; min-width: 0; }
-.desplegable > .picker-trigger { gap: 6px; max-width: 100%; height: auto; min-height: 28px; padding: 3px 6px 3px 8px; color: inherit; font: inherit; }
-.desplegable > .picker-trigger:disabled { opacity: 0.6; cursor: default; }
-.desplegable > .picker-trigger:focus-visible { outline: 1px solid var(--amber); outline-offset: 2px; }
-.desplegable-valor { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.desplegable.campo > .picker-trigger { width: 100%; min-height: 34px; justify-content: space-between; padding: 6px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--text); }
-.desplegable.campo > .picker-trigger:hover:not(:disabled), .desplegable.campo.open > .picker-trigger { border-color: var(--muted); background: var(--bg); }
-/* La lista de modelos dentro de Avanzado conserva el menú de Sloth y sale por encima de su panel. */
+.picker-vista-ayuda {
+  position: fixed; inset: auto; margin: 0; box-sizing: border-box; max-height: calc(100dvh - 24px);
+  padding: 12px; border: 1px solid var(--cristal-borde); border-radius: 12px;
+  color: var(--text); background: var(--panel); box-shadow: var(--cristal-reflejo); overflow: auto;
+}
+.boton-ayuda { display: grid; place-items: center; width: 28px; height: 28px; flex: none; border-radius: 7px; color: var(--muted); }
+.boton-ayuda svg { width: 15px; height: 15px; }
+.boton-ayuda:is(:hover, :focus-visible) { color: var(--text); background: var(--panel-2); }
+.boton-ayuda:focus-visible { outline: 1px solid var(--text); outline-offset: -2px; }
+/* La lista de modelos dentro de Avanzado conserva el menú de VyMotion y sale por encima de su panel. */
 .picker-menu.picker-flotante { position: fixed; margin: 0; min-width: 0; color: var(--text); }
 .picker-buscable { scroll-padding-top: 48px; }
 .picker-buscar { position: sticky; z-index: 1; top: -6px; display: flex; align-items: center; gap: 8px; padding: 6px 8px; background: var(--panel); }
@@ -758,10 +815,12 @@ span.sub-avatar > .logo.chico svg { width: 13px; height: 13px; }
 .modal-body a { color: var(--amber); }
 .modal h2 { margin: 0 0 8px; font-size: 17px; font-weight: 650; }
 .modal-body { color: var(--muted); font-size: 13.5px; }
+.aviso-ventana-detalle { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 45vh; overflow-y: auto; }
+.aviso-ventana-recordar { display: flex; align-items: center; gap: 6px; margin-top: 12px; }
 .modal-body code { font-family: var(--mono); font-size: 12.5px; color: var(--amber); }
 /* Lo que el aviso no puede dejar pasar: quitar algo también quita otra cosa. */
-.modal-body .aviso-grande { margin: 4px 0 12px; padding: 12px 14px; border: 1px solid var(--bad); border-radius: 12px; background: color-mix(in srgb, var(--bad) 13%, transparent); color: var(--bad); font-size: 15px; font-weight: 600; line-height: 1.4; }
-.modal-actions { display: flex; justify-content: flex-end; align-items: center; gap: 16px; margin-top: 20px; }
+.modal-body .aviso-grande { margin: 4px 0 12px; padding: 12px 14px; border: 1px solid var(--bad); border-radius: 12px; background: rgba(224, 108, 85, 0.13); color: var(--bad); font-size: 15px; font-weight: 600; line-height: 1.4; }
+.modal-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: 16px; margin-top: 20px; }
 .primary.danger { background: var(--bad); color: var(--sobre-ambar); }
 .primary.danger:hover:not(:disabled) { background: var(--bad); filter: brightness(1.1); }
 .movimiento-seleccion { position: fixed; z-index: 10000; pointer-events: none; transform-origin: top left; border: 1px solid color-mix(in srgb, var(--text) 25%, transparent); background: color-mix(in srgb, var(--text) 9%, transparent); box-shadow: inset 0 1px 0 color-mix(in srgb, var(--text) 15%, transparent); }

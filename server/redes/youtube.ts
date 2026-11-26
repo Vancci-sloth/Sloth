@@ -8,7 +8,7 @@ import { SinSesion } from './navegador.ts'
 
 /**
  * YouTube Shorts: los verticales de la cola de redes suben a tu canal, privados y con su hora (`publishAt`), y YouTube
- * los publica solo, aunque Sloth esté cerrado. Va por la API, con el canal que conectas en Opciones → YouTube (el de los
+ * los publica solo, aunque VyMotion esté cerrado. Va por la API, con el canal que conectas en Opciones → YouTube (el de los
  * videos largos, `server/youtube.ts`); aquí solo se enciende o se apaga (`interruptor`), para que conectar el canal de
  * los largos no mande también los verticales. Un vertical de hasta 3 minutos es Short para YouTube; uno más largo sale
  * como video normal. Lo de cada subida vive en `data/redes/youtube.json`, por `ref`: un reintento sigue donde se quedó y

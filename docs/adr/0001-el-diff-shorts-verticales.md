@@ -2,7 +2,7 @@
 
 Fecha: 2026-10-08
 
-Reemplazada en parte el 2026-10-16: Sloth ya no tiene el plan de shorts (3), el selector de duración (5), la voz del
+Reemplazada en parte el 2026-10-16: VyMotion ya no tiene el plan de shorts (3), el selector de duración (5), la voz del
 lote (6) ni «Ambos» en El Diff.
 
 ## Contexto
@@ -37,7 +37,7 @@ llegaron a la fase 2). Lo que salió:
    enlace salen **los SMP mínimos que cuentan todo lo relevante**: pueden ser uno o veinte. El número no lo fija lo que
    pida el usuario, sino el material.
 3. **El plan de shorts lo aprueba el usuario** antes de hacerlos: todos de un clic, o eligiendo cuáles sí. Cada short
-   aprobado es su propio hilo en Sloth (como un video de un lote) y todos comparten la investigación y el material del
+   aprobado es su propio hilo en VyMotion (como un video de un lote) y todos comparten la investigación y el material del
    enlace: nada se baja ni se captura dos veces.
 4. **Sin logo hablado ni despedida** en los shorts: el sello EL DIFF va pequeño en pantalla, y el short termina
    invitando a ver más en el canal de YouTube.

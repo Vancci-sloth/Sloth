@@ -3,12 +3,12 @@ import { asegurarAgente, rutaAgente } from './agentes.ts'
 import { CONSOLA, conexion, soltarConexion } from './opencode.ts'
 
 /**
- * La cuenta de OpenCode con la que trabaja Sloth: sin ella no hay OpenCode (sin cuenta, el uso gratis es de toda la
+ * La cuenta de OpenCode con la que trabaja VyMotion: sin ella no hay OpenCode (sin cuenta, el uso gratis es de toda la
  * computadora y se acaba enseguida). Se crea gratis en opencode.ai; con saldo, sirven también los modelos de pago. Se
  * conecta como en la terminal de OpenCode: su página pide confirmar un código y OpenCode termina solo. OpenCode recuerda
  * cada cuenta que se conectó y trabaja con la activa (`credential.activate`): así se cambia de una a otra.
  *
- * Todo va al `opencode serve` de Sloth (`server/opencode.ts`), con sus datos en `data/opencode`: no toca la cuenta del
+ * Todo va al `opencode serve` de VyMotion (`server/opencode.ts`), con sus datos en `data/opencode`: no toca la cuenta del
  * OpenCode que tenga instalado el usuario.
  */
 
@@ -130,7 +130,7 @@ export async function usarCuentaOpenCode(id: string): Promise<Cuenta> {
   return cuentaOpenCode()
 }
 
-/** Quitar una cuenta de Sloth. La cuenta sigue en opencode.ai; se puede volver a conectar. */
+/** Quitar una cuenta de VyMotion. La cuenta sigue en opencode.ai; se puede volver a conectar. */
 export async function quitarCuentaOpenCode(id: string): Promise<Cuenta> {
   const s = await conexion()
   try {

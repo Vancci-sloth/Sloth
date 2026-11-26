@@ -8,9 +8,9 @@ import { BANDERAS, instalacionDe, instalarMejora, MODELOS, mejoraDelPythonSloth,
 import { CABEN } from './sessions.ts'
 
 /**
- * Opciones → Tu equipo: qué tiene esta computadora y cómo trabaja Sloth en ella. Nadie tiene que elegir nada para que
- * funcione igual de bien en una vieja que en una con NVIDIA; Sloth lo elige solo y aquí lo dice:
- * - la voz, con Whisper en la NVIDIA o con Parakeet en el procesador (`MotorVoz`, al instalar el Python de Sloth);
+ * Opciones → Tu equipo: qué tiene esta computadora y cómo trabaja VyMotion en ella. Nadie tiene que elegir nada para que
+ * funcione igual de bien en una vieja que en una con NVIDIA; VyMotion lo elige solo y aquí lo dice:
+ * - la voz, con Whisper en la NVIDIA o con Parakeet en el procesador (`MotorVoz`, al instalar el Python de VyMotion);
  * - cuántos videos de un lote van a la vez (`CABEN` de sessions.ts);
  * - y cuánto tarda cada cosa, de `equipo.json` (junto a los modelos), que escriben cada transcripción
  *   (`python/procesos/medidas.py`) y el render de cada estilo (`video-base/scripts/equipo.cjs`).
@@ -64,7 +64,7 @@ export function equipo(o: { app: string; ocupado: () => string | null }) {
   let midiendo = false
   let error: string | undefined
   let probado = false
-  // Mirar la mejora es lanzar el Python de Sloth (~1 s) y el hilo nuevo la pide cada vez: se recuerda un minuto, y se
+  // Mirar la mejora es lanzar el Python de VyMotion (~1 s) y el hilo nuevo la pide cada vez: se recuerda un minuto, y se
   // vuelve a mirar en cuanto termina de instalarse.
   let mejora: { hay: boolean; cuando: number; instalaba: boolean } | undefined
 
@@ -78,10 +78,10 @@ export function equipo(o: { app: string; ocupado: () => string | null }) {
     return mejora.hay || instala ? { ...estado } : undefined
   }
 
-  /** Mide la voz con `medir.py`. Sin Python de Sloth o con algo trabajando, no. */
+  /** Mide la voz con `medir.py`. Sin Python de VyMotion o con algo trabajando, no. */
   function medir(): string | null {
     const python = rutaPythonSloth()
-    if (!python) return 'Antes hay que descargar el Python de Sloth (Herramientas de video).'
+    if (!python) return 'Antes hay que descargar el Python de VyMotion (Herramientas de video).'
     const ocupado = o.ocupado()
     if (ocupado) return ocupado
     if (midiendo) return null
@@ -146,5 +146,5 @@ export function equipo(o: { app: string; ocupado: () => string | null }) {
     return false
   }
 
-  return { api, ocupado: () => (midiendo ? 'Sloth está midiendo tu equipo. Espera unos segundos.' : null) }
+  return { api, ocupado: () => (midiendo ? 'VyMotion está midiendo tu equipo. Espera unos segundos.' : null) }
 }

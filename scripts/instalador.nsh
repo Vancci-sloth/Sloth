@@ -5,7 +5,7 @@
 ; app\modulos, `junto` en electron/mudanza.ts). Para mover lo de una Sloth ya instalada: Opciones → Espacio en disco.
 
 !ifndef BUILD_UNINSTALLER
-  !define MUI_DIRECTORYPAGE_TEXT_TOP "Tus videos y la IA local (unos 5 a 10 GB) van con Sloth: si tu disco está lleno, elige otro. Si ya la tienes, se queda en su carpeta; para moverla, usa Opciones → Espacio en disco."
+  !define MUI_DIRECTORYPAGE_TEXT_TOP "Tus videos y la IA local (unos 5 a 10 GB) van con VyMotion: si tu disco está lleno, elige otro. Si ya la tienes, se queda en su carpeta; para moverla, usa Opciones → Espacio en disco."
 !endif
 
 ; Siempre solo para tu usuario, sin preguntar: para todos iría a Archivos de programa, donde Sloth no puede guardar tus
@@ -125,7 +125,7 @@
       quedan:
       ; La IA local: el Python que instaló Sloth (`*-sloth`, server/requisitos.ts) y sus modelos. Se vuelve a bajar.
       IfFileExists "$APPDATA\youtube\piezas\python\*.*" 0 sinIA
-      MessageBox MB_YESNO|MB_ICONQUESTION "¿Borrar también la IA local que bajó Sloth (unos 5 a 10 GB)?$\n$\nSi vuelves a instalar Sloth, se baja otra vez." IDNO sinIA
+      MessageBox MB_YESNO|MB_ICONQUESTION "¿Borrar también la IA local que bajó VyMotion (unos 5 a 10 GB)?$\n$\nSi vuelves a instalar VyMotion, se baja otra vez." IDNO sinIA
         FindFirst $0 $1 "$APPDATA\youtube\piezas\python\*-sloth"
         ${DoWhile} $1 != ""
           RMDir /r "$APPDATA\youtube\piezas\python\$1"

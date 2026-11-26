@@ -7,7 +7,7 @@ import { preguntarAlRegistro } from './registro.ts'
 
 /**
  * Las llaves de API no viven en la app: van a las variables de entorno del usuario de Windows, donde las leen los
- * scripts de las skills (también fuera de Sloth); en Mac y Linux, a `VARIABLES`. En otra computadora se escriben de nuevo
+ * scripts de las skills (también fuera de VyMotion); en Mac y Linux, a `VARIABLES`. En otra computadora se escriben de nuevo
  * en Opciones.
  */
 const YOUTUBE = 'YOUTUBE_API_KEY'
@@ -18,7 +18,7 @@ const GRAPH = 'https://graph.facebook.com/v25.0'
 /**
  * Lo leído del registro. Cada `reg query` es un proceso que para el servidor hasta que acaba, y se pedían en cada vista
  * de Ideas y en cada llamada a la nube: se lee una vez por arranque, y lo que se guarda desde Opciones se apunta aquí.
- * Una variable que cambies fuera de Sloth se ve al reiniciarlo.
+ * Una variable que cambies fuera de VyMotion se ve al reiniciarlo.
  */
 const leidas = new Map<string, string>()
 
@@ -28,7 +28,7 @@ let todas = false
 /** Las variables de una respuesta de `reg query HKCU\Environment`. Separa con cuatro espacios. */
 export const variablesDeReg = (salida: string) => [...salida.matchAll(/^ {4}(.+?) {4}REG_\w+ {4}(.*?)\s*$/gm)].map((m) => [m[1], m[2]] as const)
 
-/** Todas de una vez, sin detener el arranque: lo que corre al abrir Sloth espera a esto antes de `leer`. */
+/** Todas de una vez, sin detener el arranque: lo que corre al abrir VyMotion espera a esto antes de `leer`. */
 export const variablesListas: Promise<void> = process.platform !== 'win32'
   ? Promise.resolve()
   : preguntarAlRegistro(['query', 'HKCU\\Environment']).then(
@@ -85,7 +85,7 @@ export function escribir(nombre: string, valor: string | null) {
       env: { ...process.env, SLOTH_VALOR: valor ?? '' }
     })
   leidas.set(nombre, valor ?? '')
-  // Los agentes que se lancen desde ahora la heredan sin reiniciar Sloth.
+  // Los agentes que se lancen desde ahora la heredan sin reiniciar VyMotion.
   if (valor) process.env[nombre] = valor
   else delete process.env[nombre]
 }

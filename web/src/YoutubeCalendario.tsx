@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { CalendarioYoutube } from '../../shared/youtube'
 import { diasYoutube } from '../../shared/youtube-fechas'
+import { usePoll } from './usePoll'
 import { api } from './api'
 import { Logo } from './Logos'
 import './Redes.css'
@@ -15,15 +16,15 @@ export function CalendarioYoutube() {
   const [datos, setDatos] = useState<CalendarioYoutube | null>(null)
   const [ahora, setAhora] = useState(() => new Date())
   const [error, setError] = useState('')
+  const leer = () => api<CalendarioYoutube>('/api/youtube/calendario').then((r) => { setDatos(r); setAhora(new Date()); setError('') }, (e) => setError(e.message))
   useEffect(() => {
-    let vivo = true
-    const leer = () => api<CalendarioYoutube>('/api/youtube/calendario').then((r) => { if (vivo) { setDatos(r); setAhora(new Date()); setError('') } }, (e) => { if (vivo) setError(e.message) })
     void leer()
-    const t = setInterval(leer, datos?.pendientes ? 5000 : 60_000)
     addEventListener('sloth-youtube', leer)
     addEventListener('sloth-videos', leer)
-    return () => { vivo = false; clearInterval(t); removeEventListener('sloth-youtube', leer); removeEventListener('sloth-videos', leer) }
-  }, [!!datos?.pendientes])
+    return () => { removeEventListener('sloth-youtube', leer); removeEventListener('sloth-videos', leer) }
+  }, [])
+  // Con pendientes se mira cada 5 s; sin ellos, cada minuto. Con la ventana oculta no se pregunta.
+  usePoll(leer, datos?.pendientes ? 5000 : 60_000, true)
   if (!datos?.cuenta) return error ? <p className="bad small">No se pudo leer el calendario de YouTube: {error}</p> : null
   const c = diasYoutube(datos.publicaciones, ahora, datos.siguiente)
   const salio = (p: { cuando: string }) => Date.parse(p.cuando) <= ahora.getTime()

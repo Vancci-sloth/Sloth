@@ -20,7 +20,7 @@ export interface SubidaYoutube extends EstadoSubidaYoutube {
 const BLOQUE = 8 * 1024 * 1024
 
 /**
- * Título, descripción e idioma. Los videos de Sloth van en español: sin decirlo, YouTube marcó su audio en inglés. Al
+ * Título, descripción e idioma. Los videos de VyMotion van en español: sin decirlo, YouTube marcó su audio en inglés. Al
  * actualizar, lo que no se manda se borra, así que subir y programar usan esta misma forma.
  */
 export const snippetYoutube = (d: DatosYoutube) => ({ title: d.titulo, description: d.descripcion, categoryId: '28', defaultLanguage: 'es', defaultAudioLanguage: 'es' })
@@ -136,9 +136,7 @@ export async function errorYoutube(res: Response): Promise<Error> {
   const json = await res.json().catch(() => null) as { error?: { errors?: { reason?: string }[] } } | null
   const motivo = json?.error?.errors?.[0]?.reason
   if (res.status === 401) return new Error('La autorización de YouTube caducó. Vuelve a conectar el canal en Opciones.')
-  // La cuota es de la app de Google (la de Sloth la comparten todos los que apoyan); el límite de subidas, de tu canal.
-  if (motivo === 'quotaExceeded') return new Error('Se acabaron las subidas de hoy de la app de Google con la que subes. Vuelven a la medianoche, hora del Pacífico de EE. UU.; reintenta entonces.')
-  if (motivo === 'uploadLimitExceeded') return new Error('Tu canal llegó al límite de subidas de YouTube por hoy. Reintenta más tarde.')
+  if (motivo === 'quotaExceeded' || motivo === 'uploadLimitExceeded') return new Error('YouTube alcanzó su límite de subidas. Reintenta más tarde.')
   if (motivo === 'youtubeSignupRequired') return new Error('Esta cuenta de Google todavía no tiene un canal de YouTube.')
   if (res.status === 403) return new Error('YouTube no permitió la subida. Revisa los permisos del canal y que YouTube Data API v3 esté activada en Google Cloud.')
   return new Error(`YouTube respondió ${res.status}${motivo && /^[a-zA-Z]+$/.test(motivo) ? ` (${motivo})` : ''}.`)

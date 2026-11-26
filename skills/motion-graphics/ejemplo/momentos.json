@@ -1,0 +1,17 @@
+{
+  "formato": "horizontal",
+  "paleta": "coral",
+  "marca": "VyMotion",
+  "sello": "Carrete de motion — 2026",
+  "portada": "Seis maneras de ir a B",
+  "momentos": [
+    { "plano": "destello", "texto": "Carrete 2026" },
+    { "plano": "titular", "texto": "VyMotion", "pie": "motion designer" },
+    { "plano": "panel", "titulo": "Seis maneras de ir a B", "filas": ["lineal", "entrada", "salida", "atrás", "elástica", "rebote"], "compases": 2 },
+    { "plano": "formas", "figuras": ["circulo", "play", "estrella", "cuadrado"] },
+    { "plano": "trama" },
+    { "plano": "tarjetas", "tarjetas": ["Tipografía cinética", "Cortes al compás", "Color plano"], "texto": "Nada de improvisar" },
+    { "plano": "titular", "texto": "Nunca lineal", "fondo": "apoyo" },
+    { "plano": "cierre", "pie": "motion designer" }
+  ]
+}

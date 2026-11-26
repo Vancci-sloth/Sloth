@@ -71,7 +71,7 @@ function silenciar() {
 /** Lo abre como el de las redes, con su perfil y su puerto. Sin sonido: cada pestaña de la investigación reproduce videos. */
 async function lanzar(app: string) {
   const edge = chromiumDelSistema(false)
-  if (!edge) throw new Error('No encontré Edge, Chrome ni Brave, que es donde Sloth investiga TikTok e Instagram.')
+  if (!edge) throw new Error('No encontré Edge, Chrome ni Brave, que es donde VyMotion investiga TikTok e Instagram.')
   const perfil = join(app, 'data', 'investigacion', 'perfil')
   mkdirSync(perfil, { recursive: true })
   // Sin sincronizar: es un perfil de trabajo, y no tiene por qué traerse tus ajustes ni tus pestañas de otros equipos.

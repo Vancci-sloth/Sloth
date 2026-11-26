@@ -18,8 +18,8 @@ Desde la raíz del proyecto:
   reserva igual y guarda el porqué (para un choque que no lo es).
 - `cerrar` guarda la hoja del video terminado y marca la huella como terminada.
 
-Lo dicho se compara con vectores (multilingual-e5, el proceso `vectores.py` de Sloth: «sala» y «living» quedan cerca),
-guardados en `huellas/.cache`; sin el Python de Sloth, por palabras. El modelo queda cargado entre llamadas
+Lo dicho se compara con vectores (multilingual-e5, el proceso `vectores.py` de VyMotion: «sala» y «living» quedan cerca),
+guardados en `huellas/.cache`; sin el Python de VyMotion, por palabras. El modelo queda cargado entre llamadas
 (`vectores_vivo.py`): un texto nuevo tarda menos de un segundo, no ~18. """
 
 import hashlib
@@ -103,7 +103,7 @@ class Registro:
 # ---- Vectores ------------------------------------------------------------------------------------------------------
 
 class Vectores:
-    """Los vectores de cada texto, con su caché. Si no hay Python de Sloth o falla, `modo` pasa a «palabras»."""
+    """Los vectores de cada texto, con su caché. Si no hay Python de VyMotion o falla, `modo` pasa a «palabras»."""
 
     def __init__(self, registro: Registro):
         self.cache = registro.carpeta / ".cache" / "vectores.npz"

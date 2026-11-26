@@ -1,70 +1,116 @@
-/* El fondo de la comunidad (Fondo.tsx): un panel con borde ámbar, para no competir con el bloque de la rifa. */
-/* Casi siempre, un renglón: su nombre, la raya del reparto con el monto sobre el día de hoy, y cuánto falta. */
-.fondo-renglon { display: flex; align-items: center; gap: 14px; width: 100%; padding: 10px 16px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); color: var(--muted); font-size: 12.5px; font-weight: 650; text-align: left; white-space: nowrap; }
-.fondo-renglon:hover { border-color: color-mix(in srgb, var(--amber) 55%, var(--line)); color: var(--suave); }
-.fondo-renglon > .ico, .fondo-renglon-nombre .ico { flex: none; width: 15px; height: 15px; }
-.fondo-renglon-nombre { display: inline-flex; align-items: center; gap: 7px; color: var(--amber); font-weight: 750; letter-spacing: 0.08em; text-transform: uppercase; }
-.fondo-renglon-monto { color: var(--amber-2); font-size: 17px; font-weight: 850; letter-spacing: -0.02em; }
-.fondo-subio { color: var(--ok); font-weight: 750; }
-.fondo-via { display: flex; flex: 1; align-items: center; gap: 8px; min-width: 0; font-variant-numeric: tabular-nums; white-space: nowrap; }
-.fondo-via i { flex-basis: 0; min-width: 0; height: 3px; border-radius: 2px; }
-.fondo-via-hecho { background: var(--amber); }
-.fondo-via-falta { background: var(--line); }
-.fondo-via i.fondo-via-hoy { flex: none; width: 9px; height: 9px; border-radius: 50%; background: var(--amber); }
-.fondo .fondo-via { flex: none; max-width: 620px; color: var(--muted); font-size: 12.5px; font-weight: 650; }
-.fondo-noticia { margin: 0; color: var(--ok); font-size: 14px; font-weight: 750; font-variant-numeric: tabular-nums; }
-.fondo-cerrar { display: grid; place-items: center; width: 28px; height: 28px; margin: -6px -8px -6px 0; border-radius: 8px; background: none; color: var(--muted); }
-.fondo-cerrar:hover { background: var(--panel-2); color: var(--text); }
-@media (max-width: 760px) {
-  .fondo-renglon-nombre span, .fondo-renglon-faltan { display: none; }
+/* El fondo de la comunidad (Fondo.tsx): vidrio negro y transparente, con el verde de VyMotion (--ok) para el dinero.
+   Va al final del feed, no arriba: lo que se lleva la comunidad no compite con lo que la gente publica. */
+.fondo {
+  position: relative; isolation: isolate; overflow: hidden;
+  display: flex; flex-direction: column; gap: 12px; margin-top: 28px; padding: 26px 28px;
+  border: 1px solid color-mix(in srgb, var(--text) 12%, transparent); border-radius: 22px;
+  background:
+    linear-gradient(160deg, color-mix(in srgb, var(--text) 8%, transparent), transparent 42%),
+    color-mix(in srgb, var(--bg) 62%, transparent);
+  backdrop-filter: blur(22px) saturate(160%); -webkit-backdrop-filter: blur(22px) saturate(160%);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--text) 16%, transparent), inset 0 -1px 0 color-mix(in srgb, var(--bg) 60%, transparent), 0 24px 60px color-mix(in srgb, var(--bg) 60%, transparent);
 }
-.fondo { display: flex; flex-direction: column; gap: 10px; padding: 24px 28px; border: 1px solid var(--amber); border-radius: 16px; background: linear-gradient(135deg, var(--amber-tinte), transparent 70%), var(--panel); }
-.fondo-antetitulo { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin: 0; color: var(--amber); font-size: 12.5px; font-weight: 750; letter-spacing: 0.08em; text-transform: uppercase; }
-.fondo-antetitulo .ico { width: 16px; height: 16px; }
-.fondo-vivo { margin-left: auto; color: var(--ok); font-size: 11.5px; letter-spacing: 0.06em; }
-.fondo h2 { margin: 2px 0 0; color: var(--suave); font-size: 16px; font-weight: 650; }
-.fondo-monto { margin: 0; color: var(--amber-2); font-size: 44px; font-weight: 850; line-height: 1; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
-.fondo-texto { margin: 0; max-width: 620px; color: var(--text); font-size: 14.5px; line-height: 1.5; }
-.fondo-acciones { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 20px; margin-top: 4px; }
-/* Cómo se cuentan los puntos: una pregunta que abre las reglas del reparto. */
-.fondo-reglas-boton { display: inline-flex; align-items: center; gap: 6px; padding: 0; background: none; color: var(--suave); font-size: 13.5px; font-weight: 600; }
-.fondo-reglas-boton:hover { color: var(--text); }
-.fondo-reglas-boton .ico { width: 15px; height: 15px; }
-.fondo-reglas { max-width: 720px; margin: 0; padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel-2); color: var(--suave); font-size: 13.5px; line-height: 1.55; }
-.fondo-reglas p { margin: 0; }
-.fondo-reglas p + p { margin-top: 8px; }
-.fondo-reglas b { color: var(--amber-2); }
-.fondo-boton { display: inline-flex; align-items: center; gap: 10px; padding: 12px 22px; border-radius: 12px; background: var(--amber); color: var(--sobre-ambar); font-size: 15px; font-weight: 800; transition: transform 0.12s ease; }
-.fondo-boton:hover { transform: translateY(-2px); }
-.fondo-boton .ico { width: 18px; height: 18px; }
+.fondo-antetitulo { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin: 0; color: var(--suave); font-size: 12px; font-weight: 750; letter-spacing: 0.08em; text-transform: uppercase; }
+.fondo-antetitulo .ico { width: 16px; height: 16px; color: var(--ok); }
+.fondo-vivo { display: inline-flex; align-items: center; gap: 6px; margin-left: auto; color: var(--ok); font-size: 11.5px; letter-spacing: 0.06em; }
+.fondo-vivo::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: var(--ok); box-shadow: 0 0 0 0 color-mix(in srgb, var(--ok) 60%, transparent); animation: fondo-pulso 2.4s steps(12) infinite; }
+@keyframes fondo-pulso { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--ok) 60%, transparent); } 100% { box-shadow: 0 0 0 9px transparent; } }
+.fondo h2 { margin: 2px 0 0; color: var(--suave); font-size: 15.5px; font-weight: 650; }
+
+/* La cifra: entra con sus monedas al abrir y el número sube hasta su monto. */
+.fondo-cifra { position: relative; width: fit-content; max-width: 100%; }
+.fondo-monto {
+  margin: 0; font-size: 46px; font-weight: 850; line-height: 1; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; overflow-wrap: anywhere;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--ok) 55%, var(--text)) 0%, var(--ok) 70%, color-mix(in srgb, var(--ok) 60%, var(--bg)) 100%);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+  filter: drop-shadow(0 0 18px color-mix(in srgb, var(--ok) 28%, transparent));
+}
+.fondo-monedas { position: absolute; inset: -10px -14px auto auto; pointer-events: none; }
+.fondo-monedas i {
+  position: absolute; top: 0; right: calc(var(--i) * 22px); display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%;
+  font-size: 12px; font-style: normal; font-weight: 850; color: var(--sobre-ambar);
+  background: linear-gradient(160deg, color-mix(in srgb, var(--ok) 60%, var(--text)), var(--ok) 60%, color-mix(in srgb, var(--ok) 60%, var(--bg)));
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--text) 60%, transparent), 0 6px 14px color-mix(in srgb, var(--ok) 30%, transparent);
+  animation: fondo-moneda 0.9s cubic-bezier(.2,.8,.2,1) both; animation-delay: calc(var(--i) * 140ms + 200ms);
+}
+@keyframes fondo-moneda {
+  from { opacity: 0; transform: translateY(-46px) rotateY(180deg); }
+  60% { opacity: 1; }
+  to { opacity: 0; transform: translateY(18px) rotateY(0deg); }
+}
+
+.fondo-texto { margin: 0; max-width: 640px; color: var(--text); font-size: 14.5px; line-height: 1.5; }
+/* La línea que acompaña a la cifra al entrar: lo justo para entender qué es. */
+.fondo-linea { margin: 0; max-width: 640px; color: var(--suave); font-size: 14px; line-height: 1.5; }
+.fondo-linea b { color: var(--text); font-weight: 700; }
+/* «Ver más»: abre las cuentas y los pasos, que al entrar no estorban. */
+.fondo-mas {
+  display: inline-flex; align-items: center; gap: 7px; align-self: flex-start; margin-top: 2px; padding: 7px 14px;
+  border: 1px solid color-mix(in srgb, var(--ok) 32%, transparent); border-radius: 999px;
+  background: color-mix(in srgb, var(--ok) 10%, transparent); color: var(--ok); font-size: 13.5px; font-weight: 700;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+.fondo-mas:hover { background: color-mix(in srgb, var(--ok) 18%, transparent); border-color: color-mix(in srgb, var(--ok) 50%, transparent); }
+.fondo-mas .ico { width: 14px; height: 14px; }
+/* Lo que sale al abrirlo, de arriba abajo y una sola vez. */
+.fondo-detalle { display: flex; flex-direction: column; gap: 12px; animation: fondo-abre 0.26s cubic-bezier(.2,.8,.2,1) both; }
+@keyframes fondo-abre { from { opacity: 0; transform: translateY(-6px); } }
+@media (prefers-reduced-motion: reduce) { .fondo-detalle { animation: none; } }
+
+/* El reparto de lo cobrado, partido: Stripe, devuelto, IVA, lo que queda y la mitad para la comunidad. */
+.fondo-reparto { display: flex; height: 12px; max-width: 520px; overflow: hidden; border-radius: 999px; background: color-mix(in srgb, var(--text) 8%, transparent); box-shadow: inset 0 1px 2px color-mix(in srgb, var(--bg) 70%, transparent); }
+.fondo-tramo { display: block; height: 100%; transform-origin: left; animation: fondo-crece 0.9s cubic-bezier(.2,.8,.2,1) both; }
+.fondo-tramo + .fondo-tramo { box-shadow: inset 1px 0 0 color-mix(in srgb, var(--bg) 50%, transparent); }
+.fondo-tramo.comision { background: var(--bad); }
+.fondo-tramo.devuelto { background: var(--gris-600); }
+.fondo-tramo.impuesto { background: var(--muted); }
+.fondo-tramo.queda { background: var(--gris-700); }
+.fondo-tramo.comunidad { background: linear-gradient(180deg, color-mix(in srgb, var(--ok) 70%, var(--text)), var(--ok)); }
+@keyframes fondo-crece { from { transform: scaleX(0); } }
+
+.fondo-acciones { margin-top: 4px; }
+/* Botón de vidrio líquido verde: brillo arriba, sombra de color abajo. */
+.fondo-boton, .fondo-pasos .small {
+  position: relative; overflow: hidden; display: inline-flex; align-items: center; gap: 10px;
+  padding: 12px 22px; border: 1px solid color-mix(in srgb, var(--ok) 60%, var(--bg)); border-radius: 999px;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--ok) 55%, var(--text)) 0%, var(--ok) 52%, color-mix(in srgb, var(--ok) 72%, var(--bg)) 100%);
+  color: var(--sobre-ambar); font-size: 15px; font-weight: 800;
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--text) 55%, transparent), inset 0 -3px 6px color-mix(in srgb, var(--ok) 35%, var(--bg)), 0 8px 24px color-mix(in srgb, var(--ok) 26%, transparent);
+  transition: transform 0.14s ease, box-shadow 0.14s ease;
+}
+.fondo-boton:hover, .fondo-pasos .small:hover { transform: translateY(-2px); box-shadow: inset 0 1px 0 color-mix(in srgb, var(--text) 60%, transparent), inset 0 -3px 6px color-mix(in srgb, var(--ok) 35%, var(--bg)), 0 12px 30px color-mix(in srgb, var(--ok) 36%, transparent); }
+.fondo-boton:active, .fondo-pasos .small:active { transform: translateY(0) scale(0.98); }
+.fondo-boton .ico { width: 18px; height: 18px; flex: none; }
+/* Los botones de los pasos: su icono con su tamaño (si no, el SVG sale enorme) y el texto en un renglón. */
+.fondo-pasos .small { align-self: flex-start; margin-top: auto; padding: 8px 14px; font-size: 13.5px; white-space: nowrap; }
+.fondo-pasos .small .ico { width: 15px; height: 15px; flex: none; }
 
 .fondo-pasos { counter-reset: paso; display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 10px; margin: 6px 0 0; padding: 0; list-style: none; }
-.fondo-pasos li { counter-increment: paso; display: flex; flex-direction: column; align-items: flex-start; gap: 6px; padding: 14px 16px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel-2); }
-.fondo-pasos li::before { content: counter(paso); display: grid; place-items: center; width: 28px; height: 28px; border-radius: 8px; background: var(--amber); color: var(--sobre-ambar); font-size: 14px; font-weight: 850; }
+.fondo-pasos li { counter-increment: paso; display: flex; flex-direction: column; align-items: flex-start; gap: 6px; padding: 14px 16px; border: 1px solid color-mix(in srgb, var(--text) 10%, transparent); border-radius: 16px; background: color-mix(in srgb, var(--bg) 50%, transparent); }
+.fondo-pasos li::before { content: counter(paso); display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; background: var(--ok); color: var(--sobre-ambar); font-size: 14px; font-weight: 850; box-shadow: inset 0 1px 0 color-mix(in srgb, var(--text) 55%, transparent); }
 .fondo-pasos strong { font-size: 15px; font-weight: 750; }
 .fondo-pasos p { margin: 0; color: var(--suave); font-size: 13.5px; line-height: 1.5; }
-.fondo-pasos button { margin-top: auto; }
 
 .fondo-apoyo { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin: 4px 0 0; color: var(--muted); font-size: 13.5px; }
-.fondo-apoyo .ico { width: 15px; height: 15px; color: var(--amber); }
-.fondo-enlace { padding: 0; background: none; color: var(--amber-2); font-weight: 700; text-decoration: underline; text-underline-offset: 3px; }
+.fondo-apoyo .ico { width: 15px; height: 15px; color: var(--ok); }
+.fondo-enlace { padding: 0; background: none; color: var(--ok); font-weight: 700; text-decoration: underline; text-underline-offset: 3px; }
 
 @media (max-width: 760px) {
   .fondo { padding: 20px; }
-  .fondo-monto { font-size: 34px; }
+  .fondo-monto { font-size: 36px; }
 }
 
 /* Las cuentas, ya hechas: cada renglón a la izquierda su concepto y a la derecha su cantidad. */
-.fondo-cuentas { display: grid; gap: 4px; max-width: 420px; margin: 2px 0 0; padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel-2); font-size: 13.5px; }
+.fondo-cuentas { display: grid; gap: 4px; max-width: 420px; margin: 2px 0 0; padding: 12px 14px; border: 1px solid color-mix(in srgb, var(--text) 10%, transparent); border-radius: 16px; background: color-mix(in srgb, var(--bg) 50%, transparent); font-size: 13.5px; }
 .fondo-cuentas div { display: flex; justify-content: space-between; gap: 12px; }
 .fondo-cuentas dt { color: var(--suave); }
 .fondo-cuentas dd { margin: 0; color: var(--text); font-variant-numeric: tabular-nums; }
-.fondo-queda { margin-top: 2px; padding-top: 6px; border-top: 1px solid var(--line); }
+.fondo-queda { margin-top: 2px; padding-top: 6px; border-top: 1px solid color-mix(in srgb, var(--text) 12%, transparent); }
 .fondo-queda dt, .fondo-queda dd { color: var(--text); font-weight: 650; }
-.fondo-mitad dt, .fondo-mitad dd { color: var(--amber-2); font-weight: 800; }
+.fondo-mitad dt, .fondo-mitad dd { color: var(--ok); font-weight: 800; }
 
 /* Lo tuyo en el fondo: si participas, tus puntos y tus partes de antes. */
-.fondo-mio { display: flex; flex-direction: column; gap: 4px; max-width: 620px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel-2); font-size: 13.5px; color: var(--suave); }
+.fondo-mio { display: flex; flex-direction: column; gap: 4px; max-width: 620px; padding: 12px 14px; border: 1px solid color-mix(in srgb, var(--text) 10%, transparent); border-radius: 16px; background: color-mix(in srgb, var(--bg) 50%, transparent); font-size: 13.5px; color: var(--suave); }
 .fondo-mio strong { color: var(--text); font-size: 14px; }
 .fondo-mio strong span { color: var(--suave); font-weight: 500; }
 .fondo-parte { color: var(--text); font-variant-numeric: tabular-nums; }
@@ -76,8 +122,13 @@
 .fondo-binance { display: flex; align-items: flex-end; flex-wrap: wrap; gap: 8px 10px; margin-top: 6px; }
 .fondo-binance label { display: flex; flex-direction: column; gap: 4px; }
 .fondo-binance label span { color: var(--text); font-size: 12.5px; font-weight: 600; }
-.fondo-binance input { width: 240px; max-width: 100%; padding: 8px 10px; border: 1px solid var(--line); border-radius: var(--radio); background: var(--bg); color: var(--text); font-size: 14px; font-variant-numeric: tabular-nums; }
-.fondo-binance input:focus { outline: none; border-color: var(--amber); }
+.fondo-binance input { width: 240px; max-width: 100%; padding: 8px 12px; border: 1px solid color-mix(in srgb, var(--text) 14%, transparent); border-radius: 999px; background: color-mix(in srgb, var(--bg) 70%, transparent); color: var(--text); font-size: 14px; font-variant-numeric: tabular-nums; }
+.fondo-binance input:focus { outline: none; border-color: var(--ok); }
 .fondo-binance p { flex-basis: 100%; margin: 0; color: var(--muted); font-size: 12.5px; line-height: 1.4; }
 .fondo-pasos .fondo-binance button { margin-top: 0; }
 .fondo-pasos .fondo-binance input { width: 100%; }
+
+@media (prefers-reduced-motion: reduce) {
+  .fondo-vivo::before, .fondo-tramo, .fondo-monedas i { animation: none; }
+  .fondo-monedas { display: none; }
+}

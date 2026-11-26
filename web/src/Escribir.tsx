@@ -4,26 +4,17 @@ import { faltaEnGuia, guiaDe } from '../../shared/guia'
 import { NOMBRE_AGENTE, type Proveedor } from '../../shared/providers'
 import type { AdjuntoComunidad, AyudaMejora, OrigenMejora, VideoHecho, VideosDeTodos } from '../../shared/types'
 import { api } from './api'
-import { TarjetasEnlaces } from './Enlaces'
-import { LINK } from './etiquetas'
 import { GuiaCampos } from './Guia'
-import { Desplegable } from './Desplegable'
 import { Icono as IconoBase, type NombreIcono } from './Iconos'
 import { MarcaAgente } from './Logos'
 import './Escribir.css'
 
-/** En Mac el atajo para mandar es Cmd+Enter; en lo demás, Ctrl+Enter. */
-const MAC = /Mac|iPhone|iPad/.test(navigator.userAgent)
-
-/** Las URLs únicas del texto (hasta 4), para la vista previa de enlaces debajo del compositor. */
-const enlacesDelTexto = (texto: string) => [...new Set(texto.split(new RegExp(`(${LINK.source})`, 'g')).filter((_, i) => i % 2))].slice(0, 4)
-
 /**
  * Donde se escribe en la comunidad: una publicación nueva, una que se edita o una mejora pedida desde un hilo
- * (`PedirMejora.tsx`). Crece con el texto; Enter es otra línea y Ctrl+Enter (Cmd en Mac) lo manda (en el título, Enter baja al texto).
+ * (`PedirMejora.tsx`). Crece con el texto; Enter lo manda y Mayús+Enter es otra línea (en el título, Enter baja al texto).
  * Las capturas se pegan, se sueltan o se eligen, y suben a la comunidad en cuanto llegan (`/api/comunidad/archivo`); un
  * video se elige de «Mis videos» y suben sus primeros 5 segundos con su portada (`/api/comunidad/video`): el entero se
- * enlaza en el texto. El de un estilo (`conEstilo`) sube entero: es lo que se ve en la tienda. En Estilos se elige además uno de tus estilos, que se empaqueta y sube (`/api/comunidad/estilo`),
+ * enlaza en el texto. En Estilos se elige además uno de tus estilos, que se empaqueta y sube (`/api/comunidad/estilo`),
  * y bajo el texto va su guía de uso (`Guia.tsx`): sin la plantilla completa no se guarda.
  * «Ayúdame a decirlo» (el símbolo del agente) le pide al agente del hilo (sin hilo, Claude) que
  * entienda lo escrito y proponga cómo decirlo; desde un hilo, con lo que pasaba en él.
@@ -45,11 +36,40 @@ interface Subiendo {
 const Icono = ({ de }: { de: NombreIcono }) => <IconoBase de={de} className="esc-ico" />
 let siguiente = 0
 
+/**
+ * La imagen, de un tamaño que se vea nítida en la comunidad: una captura de 4K pesaba varios MB y, al dibujarla, unos 33 MB
+ * de memoria en cada computadora que abría el feed. Se achica a `lado` px de ancho (las capturas largas de página entera
+ * conservan su alto hasta cuatro veces eso) y va en WebP. Los GIF se quedan como están (se moverían), y también la que ya
+ * era chica o la que no se pudo leer.
+ */
+export async function achicarImagen(f: File, lado = 1920): Promise<Blob> {
+  if (!f.type.startsWith('image/') || f.type === 'image/gif') return f
+  let img: ImageBitmap
+  try {
+    img = await createImageBitmap(f)
+  } catch {
+    return f
+  }
+  try {
+    const escala = Math.min(1, lado / img.width, (lado * 4) / img.height)
+    if (escala === 1 && f.size < 1_500_000) return f
+    const lienzo = document.createElement('canvas')
+    lienzo.width = Math.max(1, Math.round(img.width * escala))
+    lienzo.height = Math.max(1, Math.round(img.height * escala))
+    lienzo.getContext('2d')?.drawImage(img, 0, 0, lienzo.width, lienzo.height)
+    const chica = await new Promise<Blob | null>((r) => lienzo.toBlob(r, 'image/webp', 0.88))
+    return chica && chica.type === 'image/webp' && chica.size < f.size ? chica : f
+  } finally {
+    img.close()
+  }
+}
+
 /** Sube una imagen a la comunidad: de una publicación o de un comentario. */
-export async function subirImagen(f: File): Promise<AdjuntoComunidad> {
+export async function subirImagen(original: File): Promise<AdjuntoComunidad> {
+  const f = await achicarImagen(original)
   const r = await fetch(`/api/comunidad/archivo?tipo=${encodeURIComponent(f.type)}`, { method: 'POST', body: f })
   const j = (await r.json().catch(() => ({}))) as { llave?: string; url?: string; error?: string }
-  if (!r.ok || !j.llave || !j.url) throw new Error(j.error ?? `No se pudo subir ${f.name || 'la captura'}.`)
+  if (!r.ok || !j.llave || !j.url) throw new Error(j.error ?? `No se pudo subir ${original.name || 'la captura'}.`)
   return { tipo: 'imagen', llave: j.llave, url: j.url }
 }
 
@@ -151,7 +171,7 @@ export function Escribir(props: {
   function elegirVideo(v: VideoHecho) {
     setEligiendo(false)
     setError('')
-    void conSubida(`${v.src}&cuadro`, api<AdjuntoComunidad>('/api/comunidad/video', { ruta: v.ruta, entero: !!props.conEstilo }))
+    void conSubida(`${v.src}&cuadro`, api<AdjuntoComunidad>('/api/comunidad/video', { ruta: v.ruta }))
   }
 
   const vacio = !titulo.trim() && !texto.trim() && !adjuntos.length
@@ -247,8 +267,7 @@ export function Escribir(props: {
         placeholder={props.placeholder}
         onChange={(e) => setTexto(e.target.value)}
         onKeyDown={(e) => {
-          // Enter hace salto de línea; se publica solo con el botón. Cmd/Ctrl+Enter publica, como atajo.
-          if (e.key === 'Enter' && (e.metaKey || e.ctrlKey) && !e.nativeEvent.isComposing) {
+          if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
             e.preventDefault()
             void listo()
           }
@@ -261,8 +280,6 @@ export function Escribir(props: {
           void subirImagenes(archivos)
         }}
       />
-      {/* Mientras escribes, la vista previa de los enlaces que pegaste (YouTube, etc.), como se verá en la comunidad. */}
-      <TarjetasEnlaces enlaces={enlacesDelTexto(texto)} />
       {estilo && <GuiaCampos valor={estilo.guia ?? {}} onCambio={(g) => setAdjuntos((l) => l.map((a) => (a === estilo ? { ...a, guia: g as AdjuntoComunidad['guia'] } : a)))} />}
       {(adjuntos.length > 0 || subiendo.length > 0) && (
         <div className="esc-fotos">
@@ -294,7 +311,7 @@ export function Escribir(props: {
             <div
               key={s.id}
               className={`esc-miniatura subiendo${s.poster ? ' video' : s.estilo ? ' estilo' : ''}`}
-              title={s.poster ? (props.conEstilo ? 'Subiendo el video entero…' : 'Subiendo sus primeros 5 segundos…') : s.estilo ? 'Empaquetando el estilo…' : 'Subiendo…'}
+              title={s.poster ? 'Subiendo sus primeros 5 segundos…' : s.estilo ? 'Empaquetando el estilo…' : 'Subiendo…'}
             >
               {s.poster && <img src={s.poster} alt="" />}
               {s.estilo && <span className="esc-estilo">Empaquetando…</span>}
@@ -340,7 +357,7 @@ export function Escribir(props: {
       {/* El error va en su línea: en el pie, entre todos sus botones, se quedaba sin ancho y no se veía. */}
       {error && <p className="esc-error">{error}</p>}
       <div className="esc-pie">
-        <button className="esc-adjuntar" title="Agregar capturas (también puedes pegarlas o soltarlas)" onClick={() => elegir.current?.click()}>
+        <button className="esc-adjuntar" data-de="captura" title="Agregar capturas (también puedes pegarlas o soltarlas)" onClick={() => elegir.current?.click()}>
           <Icono de="imagen" />
           <span>{soltando ? 'Suéltala aquí' : 'Captura'}</span>
         </button>
@@ -357,11 +374,11 @@ export function Escribir(props: {
         />
         {props.conVideo && (
           <span className="esc-video">
-            <button className={`esc-adjuntar${eligiendo ? ' on' : ''}`} title={props.conEstilo ? 'Un video que hiciste con este estilo: sube entero' : 'Los primeros 5 segundos de un video que hiciste con Sloth'} onClick={() => setEligiendo(!eligiendo)}>
+            <button className={`esc-adjuntar${eligiendo ? ' on' : ''}`} data-de="video" title="Los primeros 5 segundos de un video que hiciste con VyMotion" onClick={() => setEligiendo(!eligiendo)}>
               <Icono de="video" />
               <span>Video</span>
             </button>
-            {eligiendo && <MisVideosParaElegir entero={props.conEstilo} onElegir={elegirVideo} onCerrar={() => setEligiendo(false)} />}
+            {eligiendo && <MisVideosParaElegir onElegir={elegirVideo} onCerrar={() => setEligiendo(false)} />}
           </span>
         )}
         {props.conEstilo && <ElegirEstilo onElegir={(cardId) => (setError(''), void conSubida(undefined, api<AdjuntoComunidad>('/api/comunidad/estilo', { cardId }), true))} />}
@@ -376,7 +393,7 @@ export function Escribir(props: {
             {pensando ? `${nombre} está pensando…` : 'Ayúdame a decirlo'}
           </button>
         )}
-        <span className="esc-pista">{MAC ? 'Cmd' : 'Ctrl'}+Enter para {props.accion.toLowerCase()}</span>
+        <span className="esc-pista">Enter para {props.accion.toLowerCase()} · Mayús+Enter, otra línea</span>
         {props.extra}
         {props.onCancelar && (
           <button className="esc-cancelar" onClick={props.onCancelar}>
@@ -398,22 +415,22 @@ function ElegirEstilo({ onElegir }: { onElegir(cardId: string): void }) {
     api<{ id: string; title: string }[]>('/api/estilos').then(setTuyos, () => setTuyos([]))
   }, [])
   return (
-    <Desplegable
-      className="esc-elegir-estilo"
-      nombre="Tus estilos"
-      titulo={tuyos?.length === 0 ? 'Aún no haces ningún estilo: créalo con «Nuevo estilo»' : 'Uno de tus estilos, para que otros lo instalen'}
-      icono={<Icono de="claqueta" />}
-      valor=""
-      vacio={tuyos?.length === 0 ? 'Sin estilos tuyos' : 'Estilo'}
-      disabled={!tuyos?.length}
-      opciones={(tuyos ?? []).map((t) => ({ value: t.id, label: t.title }))}
-      onCambio={onElegir}
-    />
+    <label className="esc-adjuntar esc-elegir-estilo" data-de="estilo" title={tuyos?.length === 0 ? 'Aún no haces ningún estilo: créalo con «Nuevo estilo»' : 'Uno de tus estilos, para que otros lo instalen'}>
+      <Icono de="claqueta" />
+      <select value="" disabled={!tuyos?.length} onChange={(e) => e.target.value && onElegir(e.target.value)}>
+        <option value="">{tuyos?.length === 0 ? 'Sin estilos tuyos' : 'Estilo'}</option>
+        {tuyos?.map((t) => (
+          <option key={t.id} value={t.id}>
+            {t.title}
+          </option>
+        ))}
+      </select>
+    </label>
   )
 }
 
 /** Los videos terminados, del más nuevo al más viejo, para elegir uno. */
-function MisVideosParaElegir({ entero, onElegir, onCerrar }: { entero?: boolean; onElegir(v: VideoHecho): void; onCerrar(): void }) {
+function MisVideosParaElegir({ onElegir, onCerrar }: { onElegir(v: VideoHecho): void; onCerrar(): void }) {
   const [videos, setVideos] = useState<VideoHecho[] | null>(null)
   const [error, setError] = useState('')
   const caja = useRef<HTMLDivElement>(null)
@@ -458,10 +475,10 @@ function MisVideosParaElegir({ entero, onElegir, onCerrar }: { entero?: boolean;
       {createPortal(
         <div ref={caja} className="esc-elegir" style={lugar} role="dialog" aria-label="Elige un video">
           <div className="esc-elegir-titulo">Tus videos</div>
-          <p className="esc-elegir-nota">{entero ? 'Se sube entero: es el que se ve en la tienda.' : 'Se suben sus primeros 5 segundos. Para enseñarlo entero, pega su enlace en el texto.'}</p>
+          <p className="esc-elegir-nota">Se suben sus primeros 5 segundos. Para enseñarlo entero, pega su enlace en el texto.</p>
           {error && <p className="esc-elegir-nada">{error}</p>}
           {videos === null && !error && <p className="esc-elegir-nada">Cargando…</p>}
-          {videos?.length === 0 && <p className="esc-elegir-nada">Aún no terminas ningún video con Sloth.</p>}
+          {videos?.length === 0 && <p className="esc-elegir-nada">Aún no terminas ningún video con VyMotion.</p>}
           {!!videos?.length && (
             <div className="esc-elegir-lista">
               {videos.map((v) => (

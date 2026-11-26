@@ -12,20 +12,20 @@ type Aviso = EstiloAnterior & { card: Card }
 type Hecho = { titulo: string; id: string; adaptar: string[] }
 
 /**
- * Con los avisos activos, al abrir Sloth si esta versión cambió a fondo un estilo (`Card.cambio`) y el aviso está pendiente
+ * Con los avisos activos, al abrir VyMotion si esta versión cambió a fondo un estilo (`Card.cambio`) y el aviso está pendiente
  * (`server/anteriores.ts`): ocupa toda la pantalla, con lo de atrás borroso, y cabe en ella sin bajar. A la izquierda, el
  * mismo video con el de antes y con el nuevo (`cambio.comparacion`); a la derecha, qué cambió y «Leí toda la
  * especificación». Quien tenía el de antes (se guardó al actualizar) elige después: «Guardar también el de antes» lo pasa
- * a sus estilos tal cual y «Usar solo el nuevo» borra la copia. El de Sloth ya es el nuevo pase lo que pase.
+ * a sus estilos tal cual y «Usar solo el nuevo» borra la copia. El de VyMotion ya es el nuevo pase lo que pase.
  * Se puede cerrar (la X, Escape o un clic fuera) para seguir con la app; hasta acabar sus pasos, vuelve a salir al entrar
- * otra vez a ese estilo (`activa`, la card abierta) o al abrir Sloth. A quien abre Sloth por primera vez, después de la
+ * otra vez a ese estilo (`activa`, la card abierta) o al abrir VyMotion. A quien abre VyMotion por primera vez, después de la
  * bienvenida. Si cambiaron varios, uno tras otro.
  */
-export function EstiloCambio({ cards, activa, onDesactivar }: { cards: Card[]; activa?: string; onDesactivar(): void }) {
+export function EstiloCambio({ cards, activa, pausado = false, onDesactivar }: { cards: Card[]; activa?: string; pausado?: boolean; onDesactivar(): void }) {
   const [avisos, setAvisos] = useState<Aviso[]>([])
   /** Los que se cerraron sin acabar: vuelven al entrar a su estilo. */
   const [cerrados, setCerrados] = useState<string[]>([])
-  /** Espera a que se cierre lo que sale antes al abrir Sloth: la bienvenida o la guía de lo nuevo. */
+  /** Espera a que se cierre lo que sale antes al abrir VyMotion: la bienvenida o la guía de lo nuevo. */
   const [bienvenida, setBienvenida] = useState(() => bienvenidaPendiente() || novedadesPendiente())
   const [leido, setLeido] = useState(false)
   const [olvidar, setOlvidar] = useState(false)
@@ -37,7 +37,7 @@ export function EstiloCambio({ cards, activa, onDesactivar }: { cards: Card[]; a
   const clave = cambiados.map((c) => `${c.id}:${c.cambio?.fecha}`).join()
 
   useEffect(() => {
-    if (!clave || bienvenida) return
+    if (!clave || bienvenida || pausado) return
     let vivo = true
     const espera = setTimeout(() => {
       void Promise.all(cambiados.map((card) => api<EstiloAnterior | null>(`/api/cards/${card.id}/anterior`).then((a) => (a ? { ...a, card } : null), () => null))).then(
@@ -48,7 +48,7 @@ export function EstiloCambio({ cards, activa, onDesactivar }: { cards: Card[]; a
       vivo = false
       clearTimeout(espera)
     }
-  }, [clave, bienvenida])
+  }, [clave, bienvenida, pausado])
 
   useEffect(() => {
     const alCerrar = () => setBienvenida(false)
@@ -64,7 +64,7 @@ export function EstiloCambio({ cards, activa, onDesactivar }: { cards: Card[]; a
     if (activa) setCerrados((c) => (c.includes(activa) ? c.filter((id) => id !== activa) : c))
   }, [activa])
 
-  const aviso = bienvenida ? undefined : avisos.find((a) => !cerrados.includes(a.card.id))
+  const aviso = bienvenida || pausado ? undefined : avisos.find((a) => !cerrados.includes(a.card.id))
   useEffect(() => {
     if (!aviso) return
     const alPulsar = (e: KeyboardEvent) => {
@@ -117,7 +117,7 @@ export function EstiloCambio({ cards, activa, onDesactivar }: { cards: Card[]; a
   const antes = typeof card.cambio?.antes?.version === 'string' ? card.cambio.antes.version : undefined
   const pasos = hecho ? (
     <>
-      <p className="ec-texto">Quedó tal como era y no cambia aunque Sloth se actualice. El «{card.title}» de Sloth ya es el nuevo.</p>
+      <p className="ec-texto">Quedó tal como era y no cambia aunque VyMotion se actualice. El «{card.title}» de VyMotion ya es el nuevo.</p>
       {hecho.adaptar.length > 0 && (
         <p className="ec-texto">
           Usa cosas de la base de videos que cambiaron desde entonces ({hecho.adaptar.join(', ')}). Si algo le falla,
@@ -134,7 +134,7 @@ export function EstiloCambio({ cards, activa, onDesactivar }: { cards: Card[]; a
             onClick={() => {
               abrirBorrador(
                 'nuevo-estilo',
-                `Adapta mi estilo «${hecho.titulo}» (la skill ${hecho.id}) a esta versión de Sloth. Es el ${card.title} de antes, y desde entonces cambiaron en video-base: ${hecho.adaptar.join(', ')}.\n\nSigue «Adaptar un estilo instalado» de tu skill.`
+                `Adapta mi estilo «${hecho.titulo}» (la skill ${hecho.id}) a esta versión de VyMotion. Es el ${card.title} de antes, y desde entonces cambiaron en video-base: ${hecho.adaptar.join(', ')}.\n\nSigue «Adaptar un estilo instalado» de tu skill.`
               )
               siguiente()
             }}
@@ -169,7 +169,7 @@ export function EstiloCambio({ cards, activa, onDesactivar }: { cards: Card[]; a
     <>
       <p className="ec-texto">
         ¿Preferías cómo salían antes? Guárdalo también: queda entre tus estilos como <b>«{aviso.titulo}»</b>, tal cual y sin
-        que Sloth lo cambie.
+        que VyMotion lo cambie.
       </p>
       <div className="ec-acciones">
         <button ref={principal} className="primary ec-boton" disabled={ocupado} onClick={() => hacer('conservar')}>

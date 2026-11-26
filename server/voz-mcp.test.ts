@@ -6,7 +6,7 @@ import { join } from 'node:path'
 import { createInterface } from 'node:readline'
 import { test } from 'node:test'
 
-// El MCP de la voz (`voz/mcp.mjs`) contra un servidor de Sloth de mentira: lo que el agente ve al pedir una voz.
+// El MCP de la voz (`voz/mcp.mjs`) contra un servidor de VyMotion de mentira: lo que el agente ve al pedir una voz.
 test('el MCP de la voz pide la voz, espera su turno y dice dónde quedó', async (t) => {
   const pedidos: string[] = []
   const sloth = createServer(async (req, res) => {

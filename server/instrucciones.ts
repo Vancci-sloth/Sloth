@@ -4,20 +4,19 @@ import type { SkillRef } from './agent.ts'
 import { OPCIONES, UN_VIDEO_POR_HILO } from './claude.ts'
 import { mcpVoz } from './voz/index.ts'
 import { mcpFlow } from './flow/index.ts'
-import { mcpMeta } from './meta/index.ts'
 import { navegadorAgente, USA_EL_NAVEGADOR } from './navegador-agente.ts'
 import { SKILLS } from './skills.ts'
 import { conSobreTi } from './sobre-ti.ts'
 
 /**
- * Lo que Sloth le dice a los agentes que no son Claude (Codex lo recibe en `developerInstructions`; OpenCode, Grok,
+ * Lo que VyMotion le dice a los agentes que no son Claude (Codex lo recibe en `developerInstructions`; OpenCode, Grok,
  * Antigravity, Cursor, Muse y Pi, como instrucciones de su sesión o al principio del primer mensaje): los botones de las
- * respuestas, el español, sin preguntas interactivas, dónde están las skills de Sloth, un video por hilo, que el navegador
+ * respuestas, el español, sin preguntas interactivas, dónde están las skills de VyMotion, un video por hilo, que el navegador
  * es el suyo y lo que el usuario contó de sí (`sobre-ti.ts`), que se lee al empezar cada hilo.
  */
 export const instrucciones = () => conSobreTi(INSTRUCCIONES)
 const INSTRUCCIONES = `${OPCIONES}
-La interfaz y tus respuestas van en español, también lo que dices mientras trabajas (en una prueba con Big Pickle, las notas de avance salían en inglés). Haz las preguntas en mensajes normales, sin herramientas de preguntas interactivas. Las skills de Sloth están en ${SKILLS}. La skill invocada es siempre la de esa carpeta: si ves otra con el mismo nombre, es una copia vieja y no se usa. Respeta la skill invocada y lee sus referencias cuando hagan falta.
+La interfaz y tus respuestas van en español, también lo que dices mientras trabajas (en una prueba con Big Pickle, las notas de avance salían en inglés). Haz las preguntas en mensajes normales, sin herramientas de preguntas interactivas. Las skills de VyMotion están en ${SKILLS}. La skill invocada es siempre la de esa carpeta: si ves otra con el mismo nombre, es una copia vieja y no se usa. Respeta la skill invocada y lee sus referencias cuando hagan falta.
 ${UN_VIDEO_POR_HILO}
 ${USA_EL_NAVEGADOR}`
 
@@ -30,9 +29,9 @@ function rutaSkill(skill: SkillRef): string {
 
 /**
  * El mensaje con la skill que invoca, por su ruta, como con Codex y OpenCode: los agentes que no conocen las skills de
- * Sloth la leen de ahí, y los que las conocen no usan otra copia con ese nombre.
+ * VyMotion la leen de ahí, y los que las conocen no usan otra copia con ese nombre.
  */
-export const conSkill = (text: string, skill?: SkillRef) => (skill ? `Usa la skill ${skill.name} de Sloth, la de ${rutaSkill(skill)} (no otra copia con ese nombre).\n\n${text}` : text)
+export const conSkill = (text: string, skill?: SkillRef) => (skill ? `Usa la skill ${skill.name} de VyMotion, la de ${rutaSkill(skill)} (no otra copia con ese nombre).\n\n${text}` : text)
 
 /** El MCP de stdio, como lo dan `navegadorAgente` y `mcpVoz`. */
 interface McpLocal {
@@ -42,11 +41,11 @@ interface McpLocal {
 }
 
 /**
- * Los MCP de Sloth para el agente de un hilo: su navegador, la voz de AI Studio y Google Flow. Las herramientas de Ideas corren
- * dentro del servidor de Sloth: como con Codex, solo llegan a Claude.
+ * Los MCP de VyMotion para el agente de un hilo: su navegador, la voz de AI Studio y Google Flow. Las herramientas de Ideas corren
+ * dentro del servidor de VyMotion: como con Codex, solo llegan a Claude.
  */
-export function mcpSloth(lote?: boolean, hilo?: string): Record<string, McpLocal> {
-  const todos = { ...navegadorAgente(lote, hilo), ...mcpVoz(), ...mcpFlow(), ...mcpMeta() } as Record<string, { command: string; args?: string[]; env?: Record<string, string | undefined> }>
+export function mcpSloth(lote?: boolean, hilo?: string | null): Record<string, McpLocal> {
+  const todos = { ...navegadorAgente(lote, hilo), ...mcpVoz(), ...mcpFlow() } as Record<string, { command: string; args?: string[]; env?: Record<string, string | undefined> }>
   return Object.fromEntries(
     Object.entries(todos).map(([nombre, s]) => [
       nombre,

@@ -68,7 +68,7 @@ function preparar(t: { after(fn: () => void): void }) {
     MONEDA: 'USD',
     FIRMA: 'firma',
     STRIPE_SECRET_KEY: 'sk_prueba',
-    CORREO_DE: 'Sloth <avisos@example.com>',
+    CORREO_DE: 'VyMotion <avisos@example.com>',
     CORREO_RESPUESTA: 'soporte@example.com',
     RESEND_API_KEY: 're_prueba'
   } as unknown as Env
@@ -81,11 +81,8 @@ function preparar(t: { after(fn: () => void): void }) {
     }
     const u = new URL(url)
     assert.equal(u.hostname, 'api.stripe.com')
-    // Un mensual de Sloth: su factura lleva la licencia, y el cobro, su pago.
-    const cobros = [{ id: 'txn_1', amount: 10000, fee: 0, net: 10000, currency: 'usd', reporting_category: 'charge', source: { payment_intent: 'pi_1' } }]
-    const facturas = [{ id: 'in_1', created: 0, total: 10000, tax: 0, payment_intent: 'pi_1', subscription_details: { metadata: { licencia: 'l-1' } } }]
-    const datos = { '/v1/balance_transactions': cobros, '/v1/invoices': facturas }[u.pathname] ?? []
-    return Response.json({ data: datos, has_more: false })
+    const cobros = [{ id: 'txn_1', amount: 10000, fee: 0, net: 10000, currency: 'usd', reporting_category: 'charge' }]
+    return Response.json({ data: u.pathname === '/v1/balance_transactions' ? cobros : [], has_more: false })
   }) as typeof fetch
   t.after(() => {
     globalThis.fetch = anterior
@@ -132,7 +129,7 @@ test('participar es de quien quiera, con un Binance ID por persona; el reparto s
   assert.deepEqual([suyo.participa, suyo.binance, suyo.puntos, suyo.estimado], [true, '••••5678', 9, [{ moneda: 'USD', monto: 50 }]])
   await assert.rejects(participar(pide(), env, beto, { binance: '12345678' }), /ya está en otra cuenta/)
   await assert.rejects(participar(pide(), env, creador, { binance: '99999999' }), /no se lleva del fondo/)
-  assert.deepEqual(correos.map((c) => [c.to[0], c.subject]), [['ana@example.com', 'Cambió adónde se te paga el fondo de Sloth']])
+  assert.deepEqual(correos.map((c) => [c.to[0], c.subject]), [['ana@example.com', 'Cambió adónde se te paga el fondo de VyMotion']])
   assert.match(correos[0].text, /termina en 5678/)
 
   // En vivo: todo el fondo ($50, la mitad de $100) va a quien participa; Beto, con puntos, queda fuera. Solo lo ve el creador.

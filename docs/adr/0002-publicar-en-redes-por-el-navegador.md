@@ -4,8 +4,8 @@ Fecha: 2026-10-08
 
 ## Contexto
 
-Se quería subir a TikTok (la cuenta de Sloth) los videos verticales de El Diff, programados a un ritmo (5 al día desde las 12:00,
-uno por hora), y que Sloth lo hiciera solo con cada video nuevo, en todos los estilos y, más adelante, también en
+Se quería subir a TikTok (la cuenta de VyMotion) los videos verticales de El Diff, programados a un ritmo (5 al día desde las 12:00,
+uno por hora), y que VyMotion lo hiciera solo con cada video nuevo, en todos los estilos y, más adelante, también en
 YouTube e Instagram.
 
 La Content Posting API de TikTok pide una app en developers.tiktok.com (OAuth, permisos `video.upload` o
@@ -15,7 +15,7 @@ texto, y hay que publicarlo a mano, con un máximo de unos 5 pendientes a la vez
 
 ## Decisión
 
-Sloth publica desde la página web de cada red (TikTok Studio), en un Edge con su propio perfil (`data/redes/perfil`),
+VyMotion publica desde la página web de cada red (TikTok Studio), en un Edge con su propio perfil (`data/redes/perfil`),
 manejado por CDP con `playwright-core`. Hace lo mismo que harías a mano: elige el archivo, escribe el texto, elige cada
 hashtag de las sugerencias, marca «Programación» con día y hora, y comprueba en la lista de publicaciones que el video
 salga con su hora.
@@ -39,7 +39,7 @@ salga con su hora.
   Se probó el 2026-10-08 que respeta la hora programada, y el usuario prefirió no esperar la revisión.
 - TikTok Studio guarda en IndexedDB una copia de cada video subido (1,4 GB tras 32 videos). Se borra después de cada
   subida; la sesión no se pierde.
-- TikTok deja programar hasta 10 días antes. Lo que cae más lejos espera en la cola de Sloth, sin error, hasta que entra.
+- TikTok deja programar hasta 10 días antes. Lo que cae más lejos espera en la cola de VyMotion, sin error, hasta que entra.
 - Cuando el módulo falla, el error dice en qué paso («Al poner la hora: …») y guarda lo que se veía en la página
   (`data/redes/fallos/`), que se abre desde el «Falló» del video.
 
@@ -71,14 +71,14 @@ El ritmo es fijo (`RITMO` en `server/redes/index.ts`): 5 al día, de 12:00 a 16:
 
 ## Cambio del 2026-10-24: en el navegador integrado, no en otra ventana
 
-Cada subida a TikTok abría una ventana de Edge encima de Sloth. Ahora, con la ventana de Sloth abierta, se hace en una
-página del navegador integrado (`electron/navegador.ts`), la `redes`, escondida y sin sonido: Sloth la maneja por el
+Cada subida a TikTok abría una ventana de Edge encima de VyMotion. Ahora, con la ventana de VyMotion abierta, se hace en una
+página del navegador integrado (`electron/navegador.ts`), la `redes`, escondida y sin sonido: VyMotion la maneja por el
 mismo relevo CDP que usan los agentes. Para iniciar sesión, Opciones → Redes la enseña debajo de TikTok.
 
 - Tiene su propio perfil (`persist:redes`): la cuenta con la que publicas no la tiene ningún agente.
 - Es una sola página: la subida la usa y al acabar la deja en blanco. Sin uso, se cierra sola como las de los hilos.
 - La sesión de Edge no pasa a la app: hay que iniciar sesión una vez en ella.
-- Sin la ventana de Sloth (abierto en un navegador), sigue el Edge con `data/redes/perfil`. Una ventana de antes de este
+- Sin la ventana de VyMotion (abierto en un navegador), sigue el Edge con `data/redes/perfil`. Una ventana de antes de este
   cambio, también, hasta que se reinicie: no anota `redes` en `data/navegador-integrado.json`.
 
 ## Cambio del 2026-10-27: el ritmo lo eliges tú
@@ -93,4 +93,4 @@ YouTube lleva el suyo. Vive en `data/redes/redes.json` (`ritmo`) y las cuentas, 
 - Lo que se mueve conserva su orden y va a los primeros huecos libres. Un día que ya tiene más de los de ahora (de un
   ritmo de antes) cuenta como lleno.
 - Instagram y YouTube cambian la hora de lo ya programado sin subir el video otra vez. TikTok no deja: lo que ya está
-  en su calendario (hasta 10 días) se queda a su hora; lo que aún espera en la cola de Sloth sí se mueve.
+  en su calendario (hasta 10 días) se queda a su hora; lo que aún espera en la cola de VyMotion sí se mueve.

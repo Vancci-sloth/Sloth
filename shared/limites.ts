@@ -1,5 +1,5 @@
 /**
- * Con cuántos videos trabajando a la vez Sloth deja de arrancar otro sin preguntar (ADR 0011). No es un tope: con 3 en una
+ * Con cuántos videos trabajando a la vez VyMotion deja de arrancar otro sin preguntar (ADR 0011). No es un tope: con 3 en una
  * computadora de 16 GB, una voz de 40 s llegó a tardar 22 min, pero los tres juntos acabaron antes que de dos en dos, y a
  * quien tiene más memoria no le estorban. Lo decide cada quien, cada vez.
  */

@@ -50,17 +50,17 @@ La evidencia (once reels de referencia, transcritos y mirados cuadro a cuadro) e
   los escenarios son recortes de fotos reales con licencia libre.
 - **Un dato que se diga es verdadero**, de su fuente primaria. Si el video del tema dice otra cosa, gana la fuente y se lo
   dices al usuario.
-- El proyecto es `reel-<tema>`, en la carpeta donde Sloth te lanza (`trabajo/reel-collage`: su panel de etapas lo
-  busca ahí); `nuevo.py` lo crea. Si el mensaje trae `Carpeta: reel-<nombre>` (la pone Sloth, sola o en
+- El proyecto es `reel-<tema>`, en la carpeta donde VyMotion te lanza (`trabajo/reel-collage`: su panel de etapas lo
+  busca ahí); `nuevo.py` lo crea. Si el mensaje trae `Carpeta: reel-<nombre>` (la pone VyMotion, sola o en
   la línea `Lote:`), `<tema>` es ese `<nombre>`, exacto: el panel lo busca así. Las rutas que le des al usuario van en un
   bloque de código.
 
 ## Formato
 
-El mensaje trae `Formato: vertical` o `Formato: horizontal` (lo elige el usuario en Sloth); sin esa línea, vertical. El
+El mensaje trae `Formato: vertical` o `Formato: horizontal` (lo elige el usuario en VyMotion); sin esa línea, vertical. El
 reel se hace en ese y solo en ese, compuesto así desde el principio: `nuevo.py <tema> --formato <formato>` lo deja en
 `FORMATO` de `src/datos.ts`, de donde sacan su tamaño la composición y los scripts. Lo común a todos los estilos (nada
-recortado ni con barras; el otro formato es otro video en Sloth), en [`FORMATO.md`](../video-base/FORMATO.md).
+recortado ni con barras; el otro formato es otro video en VyMotion), en [`FORMATO.md`](../video-base/FORMATO.md).
 
 - **`Formato: vertical`** (1080×1920, TikTok, Reels y Shorts): todo apilado, como lo hace él: el comentario arriba, él
   abajo a la derecha y escenarios en fotos verticales. Lleva la portada de primer fotograma (paso 8).
@@ -80,13 +80,13 @@ Cada plano en los dos, en «El formato» de [`ESCENAS.md`](ESCENAS.md).
 
 ## En un lote
 
-Si el mensaje trae `Lote: video 3 de 20. Carpeta: reel-<nombre>` (lo pone Sloth), eres uno de varios reels que hacen a
+Si el mensaje trae `Lote: video 3 de 20. Carpeta: reel-<nombre>` (lo pone VyMotion), eres uno de varios reels que hacen a
 la vez otros agentes, cada uno en su hilo:
 
 - el tema es el video de la línea `Enlace:`;
 - el proyecto es `python <skill>/scripts/nuevo.py <nombre> --formato <formato>`, sin el `reel-` (lo pone `nuevo.py`) y
   con el formato del mensaje: la carpeta tiene que quedar con el nombre exacto de `Carpeta:`, que es donde la busca el
-  panel de Sloth;
+  panel de VyMotion;
 - vale [`LOTE.md`](../video-base/LOTE.md) de `video-base`: no preguntes ni escribas fuera de tu carpeta. Las poses que
   falten se piden al entregar, como siempre, y el fondo lo buscas tú con licencia libre (paso 5). Sin biblioteca de
   poses no hay reel: si está vacía, para y pide las fotos, lo único que se pregunta en un lote.
@@ -141,7 +141,7 @@ la vez otros agentes, cada uno en su hilo:
 ## El personaje
 
 Es el usuario, o quien él quiera: sus fotos son la biblioteca de poses, en `<skill>/personaje/` (un PNG por pose y
-`POSES.md`). Sloth no trae ninguna: cada quien pone las suyas.
+`POSES.md`). VyMotion no trae ninguna: cada quien pone las suyas.
 
 **La primera vez** (no hay `personaje/POSES.md`), antes de empezar el reel pídele en un solo mensaje:
 
@@ -165,4 +165,4 @@ cuerpo (patear, cargar algo arriba, aventar). Cuando el guion pide una que no es
 más parecida y pídele al usuario la nueva al entregar: qué pose, hacia dónde mira, cuerpo completo, la misma ropa. Si
 la manda, `recortar.py <pose>=<foto> --guardar` la recorta y la agrega a la biblioteca; súmala a `POSES.md` y al
 `src/poses.ts` del proyecto (los siguientes reels la reciben solos de `nuevo.py`). No cambies `plantilla/`: se
-reemplaza con cada versión de Sloth.
+reemplaza con cada versión de VyMotion.

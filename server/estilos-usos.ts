@@ -7,7 +7,7 @@ import { guardar, huella } from './disco.ts'
  * Lo que se mide de los estilos de la comunidad para su tienda y el fondo (`licencias/src/tienda.ts`): cada video
  * terminado con un estilo que vino de la sección Estilos (el `origen.publicacion` de su card) se le avisa a la comunidad
  * una vez, con cuál estilo, la huella del archivo y su portada de prueba (su primer cuadro, en chico), que solo ve el
- * creador de Sloth antes de pagar. Lo ya avisado se apunta en `data/estilos-usos.json`.
+ * creador de VyMotion antes de pagar. Lo ya avisado se apunta en `data/estilos-usos.json`.
  * Se revisa al arrancar y al acabar cada turno de un hilo de esos estilos; sin cuenta o sin internet, la siguiente vez.
  * La descarga la avisa la instalación misma (`server/comunidad.ts`).
  */

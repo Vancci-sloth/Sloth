@@ -36,7 +36,7 @@ def main() -> None:
     p.add_argument("--formato", choices=FORMATOS, default="vertical")
     p.add_argument("--marca", help="la de la línea Marca: (marcas/<nombre>.json); sin ella, marca.json")
     a = p.parse_args()
-    # Los episodios se crean donde trabaja el agente (en Sloth, trabajo/video-el-diff).
+    # Los episodios se crean donde trabaja el agente (en VyMotion, trabajo/video-el-diff).
     destino = Path.cwd() / a.nombre
     if destino.exists() and any(destino.iterdir()):
         raise SystemExit(f"{destino} ya existe y no está vacía")

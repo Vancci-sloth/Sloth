@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { copyFileSync, existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
@@ -23,10 +23,10 @@ test('npm instala una pieza local sin EALLOWSCRIPTS con la política heredada sa
   const destino = join(appdata, 'instalacion-local')
   mkdirSync(origen, { recursive: true })
   mkdirSync(destino, { recursive: true })
-  writeFileSync(join(origen, 'package.json'), JSON.stringify({ name: 'sloth-pieza-prueba', version: '1.0.0' }))
+  writeFileSync(join(origen, 'package.json'), JSON.stringify({ name: 'vymotion-pieza-prueba', version: '1.0.0' }))
   const heredado = { ...process.env, npm_config_allow_scripts: 'opencode-ai' }
   await correr(`npm install --prefix "${destino}" --no-save --no-audit --no-fund --ignore-scripts --offline --install-links --package-lock=false "${origen}"`, destino, { ...heredado, ...entornoInstalacionNpm(heredado) })
-  assert.ok(existsSync(join(destino, 'node_modules', 'sloth-pieza-prueba', 'package.json')))
+  assert.ok(existsSync(join(destino, 'node_modules', 'vymotion-pieza-prueba', 'package.json')))
 })
 test.after(() => rmSync(appdata, { recursive: true, force: true }))
 
@@ -59,7 +59,7 @@ test('un programa que no arranca por no ser programa se borra; otro error, no', 
   assert.equal(rutaAgente('grok'), null)
 })
 
-test('«Actualizar los agentes» solo sube dentro de las cifras que fija Sloth', () => {
+test('«Actualizar los agentes» solo sube dentro de las cifras que fija VyMotion', () => {
   assert.equal(cabe('0.3.317', '0.3.311', 2), true)
   assert.equal(cabe('0.4.0', '0.3.311', 2), false)
   assert.equal(cabe('0.166.0', '0.164.0', 1), true)
@@ -88,25 +88,4 @@ test('de Claude Code va el más nuevo: el de la app o el que se actualizó', () 
   assert.equal(rutaAgente('claude'), nueva)
   assert.equal(versionVisible('claude'), '2.99.0.0')
   rmSync(versiones, { recursive: true, force: true })
-})
-
-test('omp: el que se instala con Sloth abierta se ve sin reiniciar, y manda sobre el que bajaría Sloth', async () => {
-  const { buscarOmpDelSistema } = await import('./agentes.ts')
-  const bin = join(appdata, 'bin-omp')
-  mkdirSync(bin, { recursive: true })
-  const antes = process.env.PATH
-  process.env.PATH = [bin, antes].join(process.platform === 'win32' ? ';' : ':')
-  try {
-    const falso = join(bin, process.platform === 'win32' ? 'omp.exe' : 'omp')
-    assert.notEqual(await buscarOmpDelSistema(), falso)
-    // Uno que no arranca no cuenta; uno que dice su versión, sí (en Windows, el Node de las pruebas hace de omp).
-    writeFileSync(falso, 'no soy un programa', { mode: 0o755 })
-    assert.notEqual(await buscarOmpDelSistema(), falso)
-    if (process.platform === 'win32') copyFileSync(process.execPath, falso)
-    else writeFileSync(falso, '#!/bin/sh\necho omp/19.0.0\n', { mode: 0o755 })
-    assert.equal(await buscarOmpDelSistema(), falso)
-    assert.equal(rutaAgente('omp'), falso)
-  } finally {
-    process.env.PATH = antes
-  }
 })

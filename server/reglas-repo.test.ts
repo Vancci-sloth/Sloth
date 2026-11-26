@@ -7,7 +7,7 @@ import type { Card } from '../shared/types.ts'
 /** Reglas del repo que se cumplen solas: escritas solo en AGENTS.md, los hilos las pasaban por alto. */
 const REPO = join(import.meta.dirname, '..')
 
-test('AGENTS.md no pasa de 1.000 palabras: entra en cada hilo que programa Sloth', () => {
+test('AGENTS.md no pasa de 1.000 palabras: entra en cada hilo que programa VyMotion', () => {
   const palabras = readFileSync(join(REPO, 'AGENTS.md'), 'utf8').split(/\s+/).filter(Boolean).length
   assert.ok(palabras <= 1000, `AGENTS.md tiene ${palabras} palabras. Lo que entra, saca otra cosa (a docs/ con un puntero).`)
 })
@@ -26,16 +26,6 @@ test('la interfaz no suma emojis', () => {
       .filter((c) => !(c.codePointAt(0)! >= 0x2190 && c.codePointAt(0)! <= 0x21ff) && !(DEUDA[f] ?? '').includes(c))
     assert.deepEqual([...new Set(nuevos)], [], `web/src/${f} usa emojis: un icono de Iconos.tsx en su lugar`)
   }
-})
-
-/**
- * Un `<select>` lo pinta el sistema: su lista sale blanca y con otra letra, y cada pantalla lo disfrazaba a su manera.
- * Los desplegables son todos el mismo, `Desplegable` (`web/src/Desplegable.tsx`).
- */
-test('la interfaz no usa el <select> del sistema: sus desplegables son `Desplegable`', () => {
-  const web = join(REPO, 'web', 'src')
-  for (const f of readdirSync(web).filter((f) => /\.tsx$/.test(f)))
-    assert.doesNotMatch(readFileSync(join(web, f), 'utf8'), /(?<!`)<(select|option|optgroup)[\s>]/, `web/src/${f} usa un <select> nativo: usa <Desplegable> de Desplegable.tsx`)
 })
 
 test('cada estilo dice su versión, y el que cambió a fondo, también la de antes', () => {

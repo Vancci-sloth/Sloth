@@ -1,4 +1,4 @@
-# Sloth en Mac y Linux
+# VyMotion en Mac y Linux
 
 Fecha: 2026-10-23
 
@@ -8,7 +8,7 @@ publicación, con la notarización sin esperar a Apple más de 10 min).
 
 ## Contexto
 
-Sloth se vendía solo para Windows. El ADR 0004 la pasó a Electron para poder llevarla a Mac, y dejó escrito lo que
+VyMotion se vendía solo para Windows. El ADR 0004 la pasó a Electron para poder llevarla a Mac, y dejó escrito lo que
 faltaba: los datos fuera de la app, Node, FFmpeg y Python de cada sistema, lo que las skills hacían con PowerShell y rutas
 de Windows, y la firma de Apple.
 
@@ -24,16 +24,16 @@ con macOS 12 (cada uno con su `.zip`, con el que se actualiza) y un AppImage par
   al estrenar cada versión a `~/Library/Application Support/Sloth` (Mac) o `~/.local/share/sloth` (Linux), donde viven
   también `data`, `trabajo` y `skills`, igual que en `app\` en Windows (`prepararApp` en electron/main.ts).
 - **%APPDATA%.** Fuera de Windows, scripts/start.mjs lo pone en `~/Library/Application Support` o `~/.config`: el
-  servidor, los agentes y los scripts de las skills buscan ahí el Python de Sloth y sus modelos igual en los tres.
+  servidor, los agentes y los scripts de las skills buscan ahí el Python de VyMotion y sus modelos igual en los tres.
 - **FFmpeg y Python** no se instalan con winget: se bajan ya armados a `%APPDATA%/sloth/piezas/bin`, primero en el PATH
-  (FFmpeg de Martin Riedl en Mac y de BtbN en Linux; Python de python-build-standalone, el mismo del Python de Sloth).
+  (FFmpeg de Martin Riedl en Mac y de BtbN en Linux; Python de python-build-standalone, el mismo del Python de VyMotion).
   El Python del sistema no se usa: en Mac no está y en Ubuntu no deja instalar paquetes con pip.
-- **Python de Sloth y sus modelos.** `server/requisitos.ts` instala un Python propio en
+- **Python de VyMotion y sus modelos.** `server/requisitos.ts` instala un Python propio en
   `%APPDATA%/youtube/piezas/python`, sus paquetes de transcripción y los modelos. Elige CUDA si hay NVIDIA y CPU si no;
   si se corta, vuelve a instalar solo lo que falte. Ya no hace falta copiarlo de otra computadora. En un Mac con Apple
   Silicon, la de Intel corre con Rosetta, pero el Python y FFmpeg se bajan de ARM (`ARQUITECTURA`): corren nativos
   y tienen torch; la de Apple Silicon ya es nativa entera, y baja sus agentes aparte (`piezas/agentes-arm64`), porque
-  en esa carpeta la de Intel pudo dejar los suyos. En un Mac con Intel no hay torch 2.8 (el último para Intel es el 2.2), así que su Python de Sloth va
+  en esa carpeta la de Intel pudo dejar los suyos. En un Mac con Intel no hay torch 2.8 (el último para Intel es el 2.2), así que su Python de VyMotion va
   sin torch: transcribe con Parakeet sin afinar los tiempos (`parakeet-solo`) y no tiene vectores (huellas compara por
   palabras). No se ha probado en un Mac de verdad.
 - **Lo de Windows en el servidor** tiene su par: la Papelera (`NSFileManager` desde `osascript`, sin el Finder, que pide un permiso; `gio trash`), «abrir en su carpeta» (`open -R`, `xdg-open`), la ventana donde se autoriza Claude (Terminal o la
@@ -52,7 +52,7 @@ con macOS 12 (cada uno con su `.zip`, con el que se actualiza) y un AppImage par
   rechaza). La 0.3.43 de Apple Silicon, que se armó a mano, la firmó una sola vez un colaborador (Developer ID
   `BV4282V244`) y no pasó por el cobro: quien la tenga baja a mano la siguiente.
 - **Linux sin aislamiento de Chromium** solo donde no hay otra: Ubuntu 24.04 no deja a un AppImage crear el suyo, y
-  Sloth no abriría. Un guion junto al ejecutable lo mira antes de abrirla (`linuxSinAislamiento` en scripts/compilar.mjs).
+  VyMotion no abriría. Un guion junto al ejecutable lo mira antes de abrirla (`linuxSinAislamiento` en scripts/compilar.mjs).
 
 ## Consecuencias
 
@@ -76,6 +76,6 @@ con macOS 12 (cada uno con su `.zip`, con el que se actualiza) y un AppImage par
   soporte (abril de 2027) o el servidor necesite algo de Node 24, se quita.
 - Linux ARM queda fuera: sería otra máquina en el flujo.
 - El Diff lee con OCR las capturas sin texto: en Windows usa el del sistema; en Mac y Linux, RapidOCR
-  (`skills/video-el-diff/plantilla/ubicar.py`). Sloth instala RapidOCR con los paquetes de El Diff fuera de Windows
+  (`skills/video-el-diff/plantilla/ubicar.py`). VyMotion instala RapidOCR con los paquetes de El Diff fuera de Windows
   (`PAQUETES` en server/requisitos.ts). Las capturas de `pagina.mjs` que ya traen texto evitan el OCR.
 - Anclar a la barra de tareas sigue siendo solo de Windows; en Mac está el Dock, y en Linux, el lanzador de cada escritorio.

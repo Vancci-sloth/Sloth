@@ -7,14 +7,13 @@ import { ConNavegadorRedes, RedesOpciones } from './Redes'
 import { YoutubeOpciones } from './Youtube'
 import { Ritmos } from './Ritmos'
 import { MisVideos } from './MisVideos'
-import { Piloto } from './Piloto' // piloto
 import { Icono, type NombreIcono } from './Iconos'
 import { APARTADOS_REDES, rutaRedes, type ApartadoRedes } from './redes-ruta'
 import './CentroRedes.css'
 
 const apartados = (Object.keys(APARTADOS_REDES) as ApartadoRedes[]).filter((id) => !VENTA || id !== 'ideas')
 const iconos: Record<ApartadoRedes, NombreIcono> = {
-  produccion: 'claqueta', piloto: 'bucle', ideas: 'foco', publicaciones: 'compartir', calendario: 'calendario', cuentas: 'personas'
+  produccion: 'claqueta', ideas: 'foco', publicaciones: 'compartir', calendario: 'calendario', cuentas: 'personas'
 }
 
 /** Un centro para las funciones de creación y publicación existentes, con sus mismas cuentas y colas. */
@@ -60,7 +59,6 @@ export function CentroRedes({ cards, sessions, apartado = 'produccion', onCrear,
           </div>
           {!estilos.length && <p className="muted">Los estilos de video aparecerán aquí cuando estén disponibles.</p>}
         </>}
-        {apartado === 'piloto' && <Piloto />}
         {apartado === 'ideas' && children}
         {apartado === 'publicaciones' && <MisVideos cards={cards} sessions={sessions} estilo={estilo} onEstilo={setEstilo} refDesplazamiento={contenidoRef} />}
         {apartado === 'calendario' && <section className="redes-calendario"><h2>Ritmo de publicación</h2><p className="muted">Configura cuántos videos publicar y en qué horarios. Las publicaciones se revisan y programan desde Publicaciones.</p><Ritmos /><div className="redes-calendario-acciones"><a className="boton" href={rutaRedes('publicaciones')}>Ver publicaciones y su calendario</a></div></section>}

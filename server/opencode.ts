@@ -11,14 +11,13 @@ import { instrucciones } from './instrucciones.ts'
 import { navegadorAgente } from './navegador-agente.ts'
 import { mcpVoz } from './voz/index.ts'
 import { mcpFlow } from './flow/index.ts'
-import { mcpMeta } from './meta/index.ts'
 import { SKILLS } from './skills.ts'
 
 /**
- * OpenCode 2 (`opencode serve`), la versión gratis de Sloth: trabaja con la cuenta de OpenCode de cada quien, que se crea
+ * OpenCode 2 (`opencode serve`), la versión gratis de VyMotion: trabaja con la cuenta de OpenCode de cada quien, que se crea
  * gratis (`server/cuenta-opencode.ts`); sus modelos gratis no cobran nada y los de pago, del saldo de la cuenta. Como lo
  * hace T3 Code (`packages/provider-opencode/src/server/v2`): un solo servidor para todos los hilos, cada hilo una sesión
- * en su carpeta (`location`), y lo de cada hilo va en su sesión: las instrucciones de Sloth
+ * en su carpeta (`location`), y lo de cada hilo va en su sesión: las instrucciones de VyMotion
  * (`session.instructions.entry.put`) y su navegador, un MCP con su nombre (`mcp.add`) que las reglas de la sesión dejan
  * usar solo a ese hilo. Un servidor por hilo chocaría en la base SQLite que comparten.
  *
@@ -39,7 +38,7 @@ const ZEN = ['opencode', 'opencode-go']
 export const CONSOLA = 'opencode'
 
 /**
- * Sloth no pide permisos (como Claude con `bypassPermissions` y Codex con `approvalPolicy: never`). La pregunta interactiva
+ * VyMotion no pide permisos (como Claude con `bypassPermissions` y Codex con `approvalPolicy: never`). La pregunta interactiva
  * se niega: dejaría el turno esperando una respuesta que la interfaz no sabe dar. La última regla que coincide manda.
  */
 const REGLAS = [
@@ -57,9 +56,9 @@ const CONFIG = { permissions: REGLAS, skills: [SKILLS], share: 'disabled', snaps
 interface Servidor {
   client: OpenCodeClient
   proc: ChildProcess
-  /** Lo que escucha cada sesión de Sloth, por su id. */
+  /** Lo que escucha cada sesión de VyMotion, por su id. */
   oyentes: Map<string, (e: Evento) => void>
-  /** La sesión de Sloth de cada subagente (sesión hija), hasta la del agente principal. */
+  /** La sesión de VyMotion de cada subagente (sesión hija), hasta la del agente principal. */
   raiz: Map<string, string>
   usos: number
   reloj?: ReturnType<typeof setTimeout>
@@ -169,7 +168,7 @@ async function abrir(): Promise<Servidor> {
   }
 }
 
-/** Cada evento a su sesión de Sloth: el de un subagente, a la del agente que lo lanzó. */
+/** Cada evento a su sesión de VyMotion: el de un subagente, a la del agente que lo lanzó. */
 function repartir(s: Servidor, e: OpenCodeEvent) {
   const d = (e as { data?: { sessionID?: string; parentID?: string; form?: { sessionID?: string } } }).data
   // El de un formulario va dentro de él.
@@ -248,8 +247,8 @@ export function startOpenCode(opts: AgentOptions, conectar: () => Promise<Servid
   let ventana = 0
   // El nombre de los MCP del hilo: `sloth-<hilo>-<nombre>`. OpenCode esconde los nombres de más de 64 letras.
   const mcp = `sloth-${(opts.hilo ?? randomBytes(4).toString('hex')).replace(/[^a-zA-Z0-9-]/g, '-').slice(0, 24)}`
-  // El navegador y la voz: las herramientas de Ideas corren dentro del servidor de Sloth (como con Codex, no llegan).
-  const servidoresMcp = { ...navegadorAgente(opts.lote, opts.hilo), ...mcpVoz(), ...mcpFlow(), ...mcpMeta() }
+  // El navegador y la voz: las herramientas de Ideas corren dentro del servidor de VyMotion (como con Codex, no llegan).
+  const servidoresMcp = { ...navegadorAgente(opts.lote, opts.hilo), ...mcpVoz(), ...mcpFlow() }
   const reglas = [...REGLAS, { action: 'sloth-*', resource: '*', effect: 'deny' as const }, { action: `${mcp}-*`, resource: '*', effect: 'allow' as const }]
   const emit = opts.onEvent
   // Lo que va llegando a trozos, por id; las herramientas, con su nombre hasta que llega su entrada.
@@ -369,7 +368,7 @@ export function startOpenCode(opts: AgentOptions, conectar: () => Promise<Servid
       case 'form.created':
         // Un formulario que pide elegir algo (un buscador, una respuesta): la interfaz no sabe contestarlo y el turno se
         // quedaría esperando. Se cancela y el agente sigue sin eso.
-        void servidorDe?.client.session.form.cancel({ sessionID: d.form.sessionID, formID: d.form.id, message: 'Sloth no puede contestar formularios. Sigue sin esto, o pregúntaselo al usuario en un mensaje normal.' }).catch(() => {})
+        void servidorDe?.client.session.form.cancel({ sessionID: d.form.sessionID, formID: d.form.id, message: 'VyMotion no puede contestar formularios. Sigue sin esto, o pregúntaselo al usuario en un mensaje normal.' }).catch(() => {})
         return
       case 'permission.asked':
         // Con las reglas no debería pedir nada; si lo pide (una regla de OpenCode que va antes), se acepta como Codex.
@@ -406,7 +405,7 @@ export function startOpenCode(opts: AgentOptions, conectar: () => Promise<Servid
     let viva = opts.resume ? await c.session.get({ sessionID: opts.resume }).then((x) => x.id, () => '') : ''
     if (!viva) {
       // Con título: si no, OpenCode gasta una llamada al modelo en ponerle uno.
-      const nueva = await c.session.create({ location, title: 'Sloth', model: { providerID, id: modelo, ...(opts.effort ? { variant: opts.effort } : {}) }, permissions: reglas })
+      const nueva = await c.session.create({ location, title: 'VyMotion', model: { providerID, id: modelo, ...(opts.effort ? { variant: opts.effort } : {}) }, permissions: reglas })
       viva = nueva.id
     }
     sesion = viva
@@ -465,7 +464,7 @@ export function startOpenCode(opts: AgentOptions, conectar: () => Promise<Servid
     const path = skill?.path ?? (skill && join(SKILLS, skill.name, 'SKILL.md'))
     if (path && !existsSync(path)) throw new Error(`No se encontró la skill ${skill!.name}.`)
     const conocidas = skill ? await c.skill.list({ location: { directory: opts.cwd } }).then((l) => l.data.map((x) => x.id), () => [] as string[]) : []
-    const texto = skill ? `Usa la skill ${skill.name} de Sloth, la de ${path} (no otra copia con ese nombre).\n\n${text}` : text
+    const texto = skill ? `Usa la skill ${skill.name} de VyMotion, la de ${path} (no otra copia con ese nombre).\n\n${text}` : text
     if (!steer) busy = true
     await c.session.prompt({
       sessionID: sesion,
@@ -525,7 +524,7 @@ const limite = (error?: { status?: number; type?: string; message?: string }) =>
 const sinUsoGratis = (error?: { message?: string }) => /free usage/i.test(error?.message ?? '')
 const SIN_USO_GRATIS = 'Se acabó tu uso gratis de OpenCode por ahora (OpenCode no dice cuándo vuelve).'
 
-/** El error de un turno o de una respuesta suelta, en palabras de Sloth. */
+/** El error de un turno o de una respuesta suelta, en palabras de VyMotion. */
 const errorDe = (error: { status?: number; message?: string } | undefined, otro: string | undefined) =>
   sinUsoGratis(error) ? SIN_USO_GRATIS : limite(error) ? 'El modelo gratis llegó a su límite por ahora. Espera unos minutos o elige otro modelo gratis.' : (error?.message ?? otro)
 
@@ -562,7 +561,7 @@ export async function opencodeModels(): Promise<Model[]> {
   }
 }
 
-/** Si hay una cuenta de OpenCode activa: sin ella, Sloth no trabaja con OpenCode (`server/cuenta-opencode.ts`). */
+/** Si hay una cuenta de OpenCode activa: sin ella, VyMotion no trabaja con OpenCode (`server/cuenta-opencode.ts`). */
 export const conCuenta = (client: OpenCodeClient) =>
   client.credential.list().then((l) => l.some((c) => c.integrationID === CONSOLA && c.active), () => false)
 
@@ -580,7 +579,7 @@ export async function redactarOpenCode(model: string | undefined, cwd: string, p
     const elegido = model ?? (await opencodeModels())[0]?.id
     if (!elegido) throw new Error('OpenCode no tiene modelos gratis ahora. Intenta más tarde.')
     const { providerID, id } = modeloDe(elegido)
-    const sesion = await c.session.create({ location: { directory: cwd }, title: 'Sloth', model: { providerID, id }, permissions: [{ action: '*', resource: '*', effect: 'deny' }] })
+    const sesion = await c.session.create({ location: { directory: cwd }, title: 'VyMotion', model: { providerID, id }, permissions: [{ action: '*', resource: '*', effect: 'deny' }] })
     const textos = new Map<string, string>()
     let reloj: ReturnType<typeof setTimeout> | undefined
     try {

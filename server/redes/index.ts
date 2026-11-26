@@ -39,7 +39,7 @@ export interface Sesion {
 }
 
 /**
- * Lo que sabe hacer cada red: `tiktok.ts` (por su página), `instagram.ts` (por la nube de Sloth) y `youtube.ts` (por su
+ * Lo que sabe hacer cada red: `tiktok.ts` (por su página), `instagram.ts` (por la nube de VyMotion) y `youtube.ts` (por su
  * API, con el canal de Opciones → YouTube). Una red nueva es otro archivo así, añadido a `REDES`.
  */
 export interface ModuloRed {
@@ -55,7 +55,7 @@ export interface ModuloRed {
   /** Hasta cuántos días antes deja programar la red. Lo que cae más lejos espera en la cola, sin error, hasta que entre. */
   horizonteDias?: number
   /**
-   * El video se queda fuera de esta computadora desde el primer intento (Instagram, en la nube de Sloth): reintentarlo o
+   * El video se queda fuera de esta computadora desde el primer intento (Instagram, en la nube de VyMotion): reintentarlo o
    * quitarlo no necesita el archivo, y lo que falla se sigue viendo aunque ya lo hayas borrado del disco.
    */
   enLaNube?: boolean
@@ -63,17 +63,17 @@ export interface ModuloRed {
   token?(token: string | null): Promise<string | null>
   cuenta(nav: Navegador): Promise<Sesion>
   /**
-   * Sube el video y lo deja programado para `cuando` (`'2026-10-12 16:00'`): de ahí sale solo, con Sloth cerrado. Lanza un
-   * error si algo no quedó (`SinSesion` si la red cerró la sesión). `ref` es el nombre de esta publicación, que Sloth
+   * Sube el video y lo deja programado para `cuando` (`'2026-10-12 16:00'`): de ahí sale solo, con VyMotion cerrado. Lanza un
+   * error si algo no quedó (`SinSesion` si la red cerró la sesión). `ref` es el nombre de esta publicación, que VyMotion
    * guarda antes de subir: si la subida se corta o se pierde la respuesta, el reintento lleva la misma, y la red que la
    * usa (Instagram, en la nube) ve que ya lo tenía en vez de programarlo dos veces. `reintento`: ya hubo un intento con
-   * esa `ref`, y pudo llegar a la red aunque Sloth no se enterara. `huella`, la del video que se puso en la cola: en una
-   * red `enLaNube`, Sloth no mira el archivo antes de un reintento, y si hay que subirlo otra vez tiene que ser ese. Un
+   * esa `ref`, y pudo llegar a la red aunque VyMotion no se enterara. `huella`, la del video que se puso en la cola: en una
+   * red `enLaNube`, VyMotion no mira el archivo antes de un reintento, y si hay que subirlo otra vez tiene que ser ese. Un
    * error con `captura` (un PNG) guarda lo que se veía en la página al fallar. Si en un reintento ve que ya estaba (en
    * TikTok, con otra hora), devuelve la hora con la que quedó.
    */
   programar(nav: Navegador, p: { ruta: string; huella: string; texto: string; tags: string[]; cuando: string; ref: string; reintento: boolean; infantil?: boolean; sintetico?: boolean }): Promise<void | { cuando: string }>
-  /** Quita de la red lo que se dejó con esa `ref`. Si falla, Sloth no la olvida: se puede volver a intentar. */
+  /** Quita de la red lo que se dejó con esa `ref`. Si falla, VyMotion no la olvida: se puede volver a intentar. */
   quitar?(ref: string): Promise<void>
   /**
    * Lo ya programado cambia de hora volviéndolo a programar con su `ref` (`reintento`), sin subir el video otra vez: «Pasar
@@ -81,8 +81,8 @@ export interface ModuloRed {
    */
   mueve?: boolean
   /**
-   * Lo que pasó después de programarlo, por `ref`: si ya salió o si falló (con su error). La red lo publica sin Sloth, y
-   * Sloth se entera al mirar.
+   * Lo que pasó después de programarlo, por `ref`: si ya salió o si falló (con su error). La red lo publica sin VyMotion, y
+   * VyMotion se entera al mirar.
    */
   estados?(): Promise<Record<string, { estado: 'publicado' } | { estado: 'error'; error: string }>>
 }
@@ -691,35 +691,6 @@ export function redes(app: string, sessions: Sessions, cards: () => Card[], avis
   // Lo que ya estaba programado de antes.
   for (const card of cards()) limpiar(card)
 
-  /**
-   * Pone en la cola de cada red conectada los videos de un estilo con su texto, cada uno en su hueco del ritmo. Solo lo
-   * que no está en esa red, o falló: lo que descartaste no vuelve.
-   */
-  function programar(card: Card, borradores: Borrador[]) {
-    const validas = new Set(videosDe(card, sessions).map((v) => v.ruta))
-    const buenos = borradores.filter((b) => validas.has(b.ruta) && b.texto.trim())
-    for (const r of conectadas()) {
-      const faltan = buenos.filter((b) => {
-        const previa = publicacion(r.id, b.ruta)
-        return !previa || previa.estado === 'error'
-      })
-      for (const { b, cuando } of enOrden(r.id, faltan)) encolar(card, b, r.id, cuando)
-    }
-    guardar()
-    seguir()
-  }
-
-  /** Un video terminado a la cola, con el texto que escribe su agente, sin revisarlo: lo usa el piloto automático. // piloto */
-  async function programarVideo(cardId: string, ruta: string) {
-    if (roto) throw new Error(roto)
-    const card = cards().find((c) => c.id === cardId)
-    if (!card) throw new Error('No existe ese estilo')
-    if (!conectadas().length) throw new Error('No hay ninguna red conectada')
-    const b = await borrador(card, ruta)
-    if (!b.texto.trim()) throw new Error(b.aviso ?? 'No se pudo escribir su texto')
-    programar(card, [b])
-  }
-
   /** Si hay algo de redes a medias que un reinicio cortaría, por qué: «Reiniciar backend» espera a que termine. */
   function ocupado(): string | null {
     const p = datos.publicaciones.find((x) => x.estado === 'subiendo')
@@ -895,8 +866,20 @@ export function redes(app: string, sessions: Sessions, cards: () => Card[], avis
       const { cardId, borradores } = await body<{ cardId: string; borradores: Borrador[] }>(req)
       const card = cards().find((c) => c.id === cardId)
       if (!card) return json(res, 404, { error: 'No existe ese estilo' })
-      if (!conectadas().length) return json(res, 400, { error: 'Conecta una red en Opciones antes de programar.' })
-      programar(card, borradores)
+      const redes = conectadas()
+      if (!redes.length) return json(res, 400, { error: 'Conecta una red en Opciones antes de programar.' })
+      const validas = new Set(videosDe(card, sessions).map((v) => v.ruta))
+      const buenos = borradores.filter((b) => validas.has(b.ruta) && b.texto.trim())
+      for (const r of redes) {
+        // Solo lo que no está en esa red, o falló: lo que descartaste no vuelve.
+        const faltan = buenos.filter((b) => {
+          const previa = publicacion(r.id, b.ruta)
+          return !previa || previa.estado === 'error'
+        })
+        for (const { b, cuando } of enOrden(r.id, faltan)) encolar(card, b, r.id, cuando)
+      }
+      guardar()
+      seguir()
       return json(res, 200, { ok: true })
     }
 
@@ -955,8 +938,7 @@ export function redes(app: string, sessions: Sessions, cards: () => Card[], avis
   }
 
   // Para «Mis videos». Con redes.json dañado, ninguna: todo saldría «Sin programar».
-  // `programarVideo` y `estadoRitmo`, para el piloto automático (`server/piloto.ts`).
-  return { api, ocupado, programarVideo, estadoRitmo, marcas: async (videos: VideoHecho[]) => (roto ? undefined : marcas(videos)) }
+  return { api, ocupado, rutasEnCola: () => datos.publicaciones.filter((p) => p.estado === 'cola' || p.estado === 'subiendo').map((p) => p.ruta), marcas: async (videos: VideoHecho[]) => (roto ? undefined : marcas(videos)) }
 }
 
 function tamano(ruta: string) {

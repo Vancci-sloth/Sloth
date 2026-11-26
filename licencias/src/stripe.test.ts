@@ -25,7 +25,7 @@ test('rechaza un aviso sin firma, con otro cuerpo, viejo o sin el secreto', asyn
   assert.equal(await firmaDeStripe(`v1=${firmar(t)}`, cuerpo, SECRETO, ahora), false)
 })
 
-test('lee la suscripción de Stripe en los estados que entiende Sloth', () => {
+test('lee la suscripción de Stripe en los estados que entiende VyMotion', () => {
   const fin = Date.parse('2026-12-06T12:00:00Z') / 1000
   const hasta = '2026-12-06T12:00:00.000Z'
   const items = { data: [{ current_period_end: fin }] }

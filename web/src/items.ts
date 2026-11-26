@@ -308,7 +308,7 @@ const nombreDeModelo = (m: string) => {
 }
 
 /**
- * Las preguntas cerradas del agente: Sloth le pide (`server/claude.ts`) que las cierre con un bloque `<opciones>`, una
+ * Las preguntas cerradas del agente: VyMotion le pide (`server/claude.ts`) que las cierre con un bloque `<opciones>`, una
  * respuesta por línea, y aquí se separa del texto para dibujarlo como botones. Cuenta el bloque que empieza en su propia
  * línea, fuera de un bloque de código; sin cerrar (aún se escribe), llega hasta el final. Ninguno se queda en el texto,
  * que markdown.ts enseñaría con las etiquetas escritas: el último son los botones, y uno de antes queda como lista.
@@ -414,7 +414,7 @@ export function errorLlano(error = '', caida = false, agente: Proveedor = 'claud
   if (sinConexion(error)) {
     return {
       titulo: `No se pudo conectar con ${nombre}`,
-      ayuda: `Tu computadora no llegó a ${nombre}. Revisa que tengas internet. Si lo tienes, algo bloquea a Sloth: el firewall o el antivirus (déjalo pasar), una VPN o el proxy de una red de trabajo o escuela. Tu pedido no se pierde: pulsa «Reintentar» cuando se arregle.`,
+      ayuda: `Tu computadora no llegó a ${nombre}. Revisa que tengas internet. Si lo tienes, algo bloquea a VyMotion: el firewall o el antivirus (déjalo pasar), una VPN o el proxy de una red de trabajo o escuela. Tu pedido no se pierde: pulsa «Reintentar» cuando se arregle.`,
       reintentar: true
     }
   }
@@ -503,11 +503,6 @@ export function toolSummary(name: string, input: any): { verb: string; detail: s
       return { verb: name.endsWith('video') ? 'Video' : 'Imagen', detail: finDeRuta(String(i.salida ?? '')) }
     case 'mcp__flow__estado_flow':
       return i.id ? { verb: 'Espera en Flow', detail: `pedido ${i.id}` } : { verb: 'Créditos de Flow', detail: 'lo que les queda a tus cuentas' }
-    case 'mcp__meta__generar_video':
-    case 'mcp__meta__generar_imagen':
-      return { verb: name.endsWith('video') ? 'Video con Muse' : 'Imagen con Muse', detail: finDeRuta(String(i.salida ?? '')) }
-    case 'mcp__meta__estado_meta':
-      return i.id ? { verb: 'Espera en Muse', detail: `pedido ${i.id}` } : { verb: 'Uso de Muse', detail: 'lo usado esta semana' }
     case 'ToolSearch':
       // `select:WebSearch,WebFetch` dice qué herramientas carga.
       return { verb: 'Carga herramientas', detail: String(i.query ?? '').replace(/^select:/, '').replaceAll(',', ', ') }

@@ -27,9 +27,9 @@ queda fuera.
 Primero el SMP y luego el material: investigar y capturar todo el video antes de elegir era lo que más tardaba, y casi
 todo se quedaba fuera del short.
 
-1. **Proyecto.** `python <skill>/scripts/nuevo.py <Carpeta>` si el mensaje trae la línea `Carpeta:` (la pone Sloth);
+1. **Proyecto.** `python <skill>/scripts/nuevo.py <Carpeta>` si el mensaje trae la línea `Carpeta:` (la pone VyMotion);
    si no, `python <skill>/scripts/nuevo.py <tema-corto>`. No escribas `shorts.md`: este hilo es el short, y así
-   el panel de Sloth enseña sus etapas (Guion, Tu voz, Escenas…). Listo cuando la carpeta existe.
+   el panel de VyMotion enseña sus etapas (Guion, Tu voz, Escenas…). Listo cuando la carpeta existe.
 2. **Fuentes.** Del paso 1 de [`SKILL.md`](SKILL.md), `fuente.py` y la transcripción completa
    (`fuentes/tema/transcripcion.txt`). Listo cuando la tienes.
 3. **El SMP.** Con la transcripción, elige el SMP que más engancha y mejor se entiende solo, y que cabe en la
@@ -45,10 +45,10 @@ todo se quedaba fuera del short.
 
 ## El plan
 
-1. **Proyecto.** Con la línea `Carpeta:` (la pone Sloth, también en un lote), `python <skill>/scripts/nuevo.py
+1. **Proyecto.** Con la línea `Carpeta:` (la pone VyMotion, también en un lote), `python <skill>/scripts/nuevo.py
    <Carpeta>`. Si no, `python <skill>/scripts/nuevo.py <tema-corto>` (por ejemplo `mistral-large-4`). Esa carpeta es el
    plan: la de cada short será `<plan>-s1`, `<plan>-s2`... Escribe ya `shorts.md` con el tema en un renglón: así el
-   panel de Sloth sabe que este hilo es un plan y enseña sus etapas. Listo cuando la carpeta y `shorts.md` existen.
+   panel de VyMotion sabe que este hilo es un plan y enseña sus etapas. Listo cuando la carpeta y `shorts.md` existen.
 2. **Fuentes.** El paso 1 de [`SKILL.md`](SKILL.md): `fuente.py`, la transcripción completa y lo que enlaza el tema.
    Listo cuando sabes en qué segundo pasa cada cosa que vale la pena contar.
 3. **Los datos.** El paso 2 de [`SKILL.md`](SKILL.md): `fuentes/datos.json` y `citas.py`, con todo lo que cualquiera de
@@ -61,12 +61,12 @@ todo se quedaba fuera del short.
    por minuto): si no cabe, pártelo o quítale puntos. Cada short se entiende solo, sin haber visto los otros. Escribe:
    - `shorts.md`, para el usuario. Por cada short: su SMP, sus cinco puntos con su fuente, el gancho del primer segundo
      y por qué es un short aparte. Al final, lo que dejaste fuera y por qué.
-   - `shorts.json`, para Sloth: `{"shorts": [{"id": "s1", "titulo": "...", "smp": "...", "puntos": ["...", "..."],
+   - `shorts.json`, para VyMotion: `{"shorts": [{"id": "s1", "titulo": "...", "smp": "...", "puntos": ["...", "..."],
      "gancho": "..."}]}`. El `titulo` es como se ve en la lista del panel: seis palabras como mucho.
 
    Listo cuando cada dato de `citas.json` está en un punto de algún SMP o en lo que dejaste fuera.
 5. **Entrega.** Di cuántos shorts propones y por qué ese número, y termina. El usuario los aprueba en la etapa «Shorts»
-   del panel, todos o los que elija, y Sloth abre un hilo por cada uno. En un lote también terminas aquí: es la única
+   del panel, todos o los que elija, y VyMotion abre un hilo por cada uno. En un lote también terminas aquí: es la única
    vez que el lote espera al usuario.
 
 ## Un short

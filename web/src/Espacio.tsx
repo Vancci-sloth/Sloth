@@ -8,8 +8,8 @@ const gb = (b: number) => (b >= 1e9 ? `${(b / 1e9).toFixed(1)} GB` : b >= 1e6 ? 
 const MINIMO = 20e6
 
 /**
- * Opciones → Espacio en disco (`server/espacio.ts`): cuánto queda libre y lo que Sloth y sus videos dejaron y ya no
- * hace falta. Lo seguro va junto en «Liberar» (y Sloth lo borra solo cada 6 horas); lo demás, cada uno con su botón.
+ * Opciones → Espacio en disco (`server/espacio.ts`): cuánto queda libre y lo que VyMotion y sus videos dejaron y ya no
+ * hace falta. Lo seguro va junto en «Liberar» (y VyMotion lo borra solo cada 6 horas); lo demás, cada uno con su botón.
  */
 export function EspacioDisco() {
   const [e, setE] = useState<Espacio>()
@@ -29,6 +29,8 @@ export function EspacioDisco() {
     try {
       const r = await window.sloth!.disco!.llevar()
       if (r.error) setError(r.error)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
     } finally {
       setLlevando(false)
     }
@@ -76,7 +78,7 @@ export function EspacioDisco() {
                   <strong>{gb(e.libre)} libres de {gb(e.total)}</strong>
                   <span>
                     {e.liberado ? `Se liberaron ${gb(e.liberado)}. ` : ''}
-                    {visibles.length ? 'Archivos que puedes liberar. Sloth conserva tus videos terminados, grabaciones y guiones.' : 'Sin archivos para liberar.'}
+                    {visibles.length ? 'Archivos que puedes liberar. VyMotion conserva tus videos terminados, grabaciones y guiones.' : 'Sin archivos para liberar.'}
                   </span>
                   {donde && <span className="mono">Tus videos y la IA local: {donde}</span>}
                 </div>
@@ -99,8 +101,8 @@ export function EspacioDisco() {
       </div>
       {e && error && <p className="bad small fila-extra">{error}</p>}
       <p className="grupo-nota">
-        Lo de «Liberar» Sloth también lo borra solo cada 6 horas, cuando nada trabaja. Lo que usa un hilo que está trabajando se queda para la próxima.
-        {donde && ' «Cambiar de disco» lleva a otro disco tus videos, la IA local, los agentes y las dependencias de los videos; Sloth se detiene mientras los mueve.'}
+        Lo de «Liberar» VyMotion también lo borra solo cada 6 horas, cuando nada trabaja. Lo que usa un hilo que está trabajando se queda para la próxima.
+        {donde && ' «Cambiar de disco» lleva a otro disco tus videos, la IA local, los agentes y las dependencias de los videos; VyMotion se detiene mientras los mueve.'}
       </p>
     </section>
   )

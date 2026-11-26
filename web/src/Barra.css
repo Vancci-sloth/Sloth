@@ -3,9 +3,10 @@
  * abajo, Opciones y Reiniciar backend. Los títulos de sección se ven como los grupos de Opciones.
  */
 
-.sidebar { display: flex; flex-direction: column; background: var(--bg); border-right: 1px solid var(--linea-tarjeta); min-height: 0; }
+.sidebar { display: flex; flex-direction: column; background: var(--bg); border-right: 1px solid var(--linea-tarjeta); min-width: 0; min-height: 0; }
 .brand { display: flex; align-items: center; gap: 9px; padding: 6px 0; font-weight: 700; font-size: 15px; letter-spacing: -0.01em; }
-.brand img { width: 26px; height: 26px; }
+.brand img { width: 26px; height: 26px; flex: none; }
+.barra-etiqueta { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 
 /* Las dos de arriba son filas como las de los hilos, con su icono en la misma columna. */
 .new-chat, .buscar { display: flex; align-items: center; gap: 10px; flex: none; min-height: 34px; margin: 0 10px 2px; padding: 0 10px; border-radius: 8px; text-align: left; transition: background 0.15s, color 0.15s; }
@@ -20,9 +21,6 @@
 .barra-nuevo .new-chat-icon { color: var(--amber); }
 .barra-nuevo:hover { background: color-mix(in srgb, var(--amber) 20%, var(--panel)); }
 /* comunidad: los avisos sin leer, a la derecha de «Comunidad»; plegada, un punto sobre su icono. */
-/* «Comunidad», cuando a un estilo tuyo le falta algo para estar en la tienda: en rojo, con su punto. */
-.new-chat.falta, .new-chat.falta .new-chat-icon { color: var(--bad); }
-.new-chat.falta .nav-cuenta { background: var(--bad); color: var(--bg); }
 .nav-cuenta { min-width: 18px; height: 18px; margin-left: auto; padding: 0 5px; display: grid; place-items: center; border-radius: 999px; background: var(--amber); color: var(--sobre-ambar); font-size: 10.5px; font-weight: 750; font-variant-numeric: tabular-nums; }
 .buscar { margin-bottom: 10px; border: 1px solid var(--line); color: var(--muted); background: var(--bg); cursor: text; }
 .buscar:hover { background: var(--panel-2); }
@@ -136,24 +134,15 @@ button.barra-seccion:hover { color: var(--text); }
 .plegar svg { width: 17px; height: 17px; }
 
 /*
- * Plegada: una columna de iconos, cada uno con su nombre al pasar el ratón. Los textos se esconden con `font-size: 0` (los
- * iconos llevan su propio tamaño): una entrada nueva de la barra se pliega igual sin tocar nada. Las secciones quedan en
- * una raya, y el punto de cada hilo (trabajando, terminó) va sobre su icono.
+ * Plegada: los iconos se quedan en su columna al cambiar el ancho. Las secciones quedan en una raya y el punto de
+ * cada hilo (trabajando, terminó) va sobre su icono.
  */
-.app.plegada { grid-template-columns: 56px 1fr; }
-.barra-velo { display: none; }
-/* En el celular (Sloth en la web), desplegada no cabe al lado: flota encima de lo demás, que se queda donde estaba, y se
-   pliega sola al elegir algo (App.tsx). */
-@media (max-width: 760px) {
-  .app, .app:not(.plegada) { position: relative; grid-template-columns: 56px 1fr; }
-  .app:not(.plegada) > .sidebar { position: absolute; z-index: 60; top: 0; bottom: 0; left: 0; width: min(280px, 85vw); }
-  .barra-velo { display: block; position: absolute; inset: 0; z-index: 59; background: rgba(0, 0, 0, 0.45); }
-  .app:not(.plegada) > .sidebar + * { grid-column: 2; }
-}
+.app.plegada { grid-template-columns: 56px minmax(0, 1fr); }
 .plegada .select-bar { left: 70px; }
-.plegada .brand-fila { flex-direction: column; gap: 0; }
-.plegada .brand { justify-content: center; gap: 0; padding: 3px 0; font-size: 0; }
-.plegada .new-chat, .plegada .buscar { justify-content: center; gap: 0; padding: 0; font-size: 0; }
+.plegada .brand-fila { flex-direction: column; align-items: flex-start; gap: 0; }
+.plegada .brand { width: 28px; gap: 0; padding: 3px 0 3px 1px; }
+.plegada .barra-etiqueta { opacity: 0; }
+.plegada .new-chat, .plegada .buscar { justify-content: flex-start; gap: 0; padding: 0 8px; }
 .plegada .new-chat { position: relative; }
 .plegada .nav-cuenta { position: absolute; top: 4px; right: 10px; min-width: 8px; width: 8px; height: 8px; padding: 0; margin: 0; font-size: 0; }
 .plegada .buscar { cursor: pointer; }
@@ -161,12 +150,32 @@ button.barra-seccion:hover { color: var(--text); }
 .plegada .sessions { scrollbar-width: none; }
 .plegada .barra-seccion { width: auto; height: 1px; margin: 8px 6px; padding: 0; overflow: hidden; background: var(--line); font-size: 0; }
 .plegada .barra-seccion::after, .plegada .lote-row::after { display: none; }
-.plegada .session-row { position: relative; justify-content: center; padding: 8px 0; }
+.plegada .session-row { position: relative; padding: 8px; }
 .plegada :is(.session-title, .session-texto, .draft-tag, .draft-x, .check, .lote-cuenta, .renombrar, .barra-vacio, .lote-pausa) { display: none; }
 .plegada .session-row .dot { position: absolute; top: 4px; right: 4px; }
 .plegada .lote-videos { margin-left: 3px; padding-left: 2px; }
-.plegada .pie button, .plegada .pie .aviso-redes { justify-content: center; gap: 0; padding: 0; font-size: 0; }
+.plegada .lote-videos .session-row { padding-inline: 5px; }
+.plegada .pie button, .plegada .pie .aviso-redes { justify-content: flex-start; gap: 0; padding: 0 8px; font-size: 0; }
 .plegada .pie { margin-inline: 6px; padding-inline: 3px; }
 /* Un fallo del pie (el servidor no compila) queda en un punto rojo, que lo dice al pasar el ratón. */
 .plegada .pie .bad { align-self: center; width: 7px; height: 7px; margin: 6px 0; padding: 0; border-radius: 50%; background: var(--bad); font-size: 0; }
 .plegada .pie .pie-nota { display: none; }
+.plegada .sidebar .plegar svg path { translate: -2px; }
+
+@media (prefers-reduced-motion: no-preference) {
+  .app {
+    --barra-duracion: 330ms;
+    --barra-curva: cubic-bezier(.22,1,.36,1);
+    transition: grid-template-columns var(--barra-duracion) var(--barra-curva);
+  }
+  .app .select-bar { transition: left var(--barra-duracion) var(--barra-curva); }
+  .sidebar .barra-etiqueta {
+    transition: opacity 160ms ease-out 60ms, translate 230ms var(--barra-curva) 60ms;
+  }
+  .plegada .sidebar .barra-etiqueta {
+    opacity: 0;
+    translate: -5px 0;
+    transition-delay: 0s;
+  }
+  .sidebar .plegar svg path { transition: translate var(--barra-duracion) var(--barra-curva); }
+}

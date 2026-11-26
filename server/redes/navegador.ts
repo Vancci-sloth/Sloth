@@ -7,13 +7,13 @@ import { NAVEGADOR_REDES } from '../../shared/types.ts'
 import { integrado } from '../navegador-agente.ts'
 
 /**
- * El navegador de las redes, donde viven las sesiones de TikTok y de las redes que vengan. Sloth lo maneja por CDP,
+ * El navegador de las redes, donde viven las sesiones de TikTok y de las redes que vengan. VyMotion lo maneja por CDP,
  * como lo harías tú a mano. TikTok no tiene API abierta para publicar en público sin una auditoría (ver `docs/adr/`),
  * así que se usa su página web. Instagram sí la tiene y no lo usa.
  *
- * Con la ventana de Sloth abierta, es su página `NAVEGADOR_REDES` del navegador integrado (`electron/navegador.ts`), con
+ * Con la ventana de VyMotion abierta, es su página `NAVEGADOR_REDES` del navegador integrado (`electron/navegador.ts`), con
  * su propio perfil: no abre otra ventana, y se ve en Opciones → Redes. Es una sola página: `pestana` la da y `cerrar` la
- * deja en blanco. Sin la ventana (Sloth en Edge), un Edge con su propio perfil (`data/redes/perfil`).
+ * deja en blanco. Sin la ventana (VyMotion en Edge), un Edge con su propio perfil (`data/redes/perfil`).
  *
  * Google no deja iniciar sesión dentro de una app («el navegador no es seguro»): si la página de la app va a Google, ese
  * paso se da en Edge (`conGoogle`), y la sesión de la red pasa a la app al entrar (`pasarDeEdge`).

@@ -32,7 +32,7 @@ test('el registro abierto escribe cada evento en el disco al momento, y el hilo 
   a.cerrarRegistros(true)
   emitir({ t: 'turn_end', at: Date.now(), ok: true })
   assert.deepEqual(lineas().map((e) => e.t), ['user', 'turn_start', 'text', 'text', 'turn_end'])
-  // Lo lee igual otro Sloth (tras un reinicio).
+  // Lo lee igual otro VyMotion (tras un reinicio).
   a.closeAll()
   assert.equal(crear().get(meta.id)!.events.length, 5)
   // Borrar el hilo con su registro abierto (en Windows, un archivo abierto no siempre se deja borrar).

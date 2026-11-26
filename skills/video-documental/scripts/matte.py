@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """matte.py — cut the speaker out of the RAW camera for the hero beat (the world changes behind
-them, the big red word sits behind their head). Corre con el Python de Sloth, que trae PyTorch: si el Python con que
+them, the big red word sits behind their head). Corre con el Python de VyMotion, que trae PyTorch: si el Python con que
 se lanza no lo tiene, se relanza solo con aquel, en el turno de la GPU (como la transcripción).
 
     python -I -B -X utf8 <skill>/scripts/matte.py --plate public/assets/media/cam_raw.mp4 --start 15.5 --dur 4.4 \
@@ -32,7 +32,7 @@ def medida(plate):
 
 
 def relanzar():
-    """El mismo comando con el Python de Sloth (video-base/scripts/sloth.py), en el turno de la GPU."""
+    """El mismo comando con el Python de VyMotion (video-base/scripts/sloth.py), en el turno de la GPU."""
     import os
     from pathlib import Path
     sys.path.insert(0, str(Path(os.environ.get('SLOTH_SKILLS') or Path.home() / '.claude' / 'skills') / 'video-base' / 'scripts'))

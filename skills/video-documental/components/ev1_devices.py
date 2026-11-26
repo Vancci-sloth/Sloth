@@ -11,7 +11,7 @@ sound lands on the frame the picture changes and the cue sheet can never drift f
     captions(c, [[('might', .82), ('have', .98)], ...], end=1.9)
     c.write_cues('sfx-cues.txt'); c.write('src/edicion.json', audio='sonido.wav')
 
-En Sloth no hay HyperFrames: `Comp.write` deja la edición en `src/edicion.json` y la dibuja el proyecto de Remotion
+En VyMotion no hay HyperFrames: `Comp.write` deja la edición en `src/edicion.json` y la dibuja el proyecto de Remotion
 del video (`plantilla/src/Edicion.tsx`), que mueve la misma línea de tiempo de GSAP cuadro a cuadro. Así se ve en vivo
 en el estudio y se renderiza con Remotion. Las rutas de las imágenes y los clips son relativas a `public/`.
 
@@ -86,7 +86,7 @@ class Comp:
         return vid
 
     def escena(self, nombre, t0, t1):
-        """Una línea del PLAN en el tiempo: en el estudio de Sloth es una escena (en la línea de tiempo, para saltar a
+        """Una línea del PLAN en el tiempo: en el estudio de VyMotion es una escena (en la línea de tiempo, para saltar a
         ella o citarla en el chat)."""
         self.escenas.append({'nombre': nombre, 'f0': round(t0 * FPS), 'f1': round(t1 * FPS)})
 
@@ -98,7 +98,7 @@ class Comp:
 
     def write(self, path='src/edicion.json', tokens='public/assets/ev1/tokens.css', audio=None, title='Editor V1'):
         """La edición para Remotion (`src/Edicion.tsx`). `audio`: el sonido entero (voz, cama y efectos), relativo a
-        public/; lleva su hora para que el monitor de Sloth vuelva a pedirlo cuando cambia."""
+        public/; lleva su hora para que el monitor de VyMotion vuelva a pedirlo cuando cambia."""
         archivo = os.path.join('public', audio) if audio else None
         audio = f'{audio}?v={int(os.path.getmtime(archivo))}' if archivo and os.path.exists(archivo) else None
         doc = {'titulo': title, 'fps': FPS, 'ancho': W, 'alto': H, 'duracion': round(self.dur * FPS),
