@@ -38,6 +38,9 @@
   --cristal-fondo: var(--panel);
   --cristal-borde: var(--line);
   --cristal-reflejo: none;
+  /* Lo que flota sobre la portada de un estudio (Imágenes, Modelos 3D): `EstudioCreacion.css`. */
+  --cristal-fondo-flotante: var(--panel);
+  --cristal-sombra-flotante: 0 16px 36px color-mix(in srgb, var(--bg) 65%, transparent);
   --acento-claude: var(--amber);
   --acento-codex: var(--amber);
   --acento-gemini: var(--amber);
@@ -550,6 +553,17 @@ a.link-chip:hover { border-color: var(--amber); }
 .picker-detalle + svg { margin-left: -4px; }
 .picker-modelo-logo { display: inline-flex; align-items: center; gap: 8px; min-width: 0; }
 .picker-modelo-logo > .logo { flex: none; }
+/* La ayuda de una opción (`ayuda` del Picker, Ayuda.tsx): junto a la lista, al pasar por su botón de información. */
+.picker-vista-ayuda {
+  position: fixed; inset: auto; margin: 0; box-sizing: border-box; max-height: calc(100dvh - 24px);
+  padding: 12px; border: 1px solid var(--cristal-borde); border-radius: 12px;
+  color: var(--text); background: var(--panel); box-shadow: var(--cristal-reflejo); overflow: auto;
+}
+/* El botón «?» de la ayuda de una fase o del formato (AyudaVideo.tsx). */
+.boton-ayuda { display: grid; place-items: center; width: 28px; height: 28px; flex: none; border-radius: 7px; color: var(--muted); }
+.boton-ayuda svg { width: 15px; height: 15px; }
+.boton-ayuda:is(:hover, :focus-visible) { color: var(--text); background: var(--panel-2); }
+.boton-ayuda:focus-visible { outline: 1px solid var(--text); outline-offset: -2px; }
 .picker-menu.down { bottom: auto; top: calc(100% + 8px); animation-name: drop; }
 /*
  * El desplegable de toda la app (Desplegable.tsx): donde iría un <select>, que el sistema pinta a su manera. Toma la

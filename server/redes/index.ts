@@ -956,7 +956,8 @@ export function redes(app: string, sessions: Sessions, cards: () => Card[], avis
 
   // Para «Mis videos». Con redes.json dañado, ninguna: todo saldría «Sin programar».
   // `programarVideo` y `estadoRitmo`, para el piloto automático (`server/piloto.ts`).
-  return { api, ocupado, programarVideo, estadoRitmo, marcas: async (videos: VideoHecho[]) => (roto ? undefined : marcas(videos)) }
+  // `rutasEnCola`: los videos que esperan subirse o se suben, para no borrarlos con su hilo (`server/borrar-hilo.ts`).
+  return { api, ocupado, programarVideo, estadoRitmo, rutasEnCola: () => datos.publicaciones.filter((p) => p.estado === 'cola' || p.estado === 'subiendo').map((p) => p.ruta), marcas: async (videos: VideoHecho[]) => (roto ? undefined : marcas(videos)) }
 }
 
 function tamano(ruta: string) {

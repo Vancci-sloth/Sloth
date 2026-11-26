@@ -55,6 +55,8 @@
   --acento-modelo: var(--gris-300);
   --cristal-fondo: linear-gradient(155deg, color-mix(in srgb, var(--text) 12%, transparent), transparent 62%), color-mix(in srgb, var(--panel) 88%, transparent);
   --cristal-borde: color-mix(in srgb, var(--text) 22%, transparent);
+  --cristal-fondo-flotante: linear-gradient(155deg, color-mix(in srgb, var(--text) 12%, transparent), transparent 62%), color-mix(in srgb, var(--panel) 76%, transparent);
+  --cristal-sombra-flotante: var(--cristal-reflejo), 0 16px 36px color-mix(in srgb, var(--bg) 65%, transparent);
   --cristal-reflejo: inset 0 1px 0 color-mix(in srgb, var(--text) 18%, transparent), inset 0 -1px 0 color-mix(in srgb, var(--bg) 45%, transparent), 0 3px 10px color-mix(in srgb, var(--bg) 35%, transparent);
 
   body :is(.boton, .m3d-accion, .mis-accion, .opciones-volver, .barra-nuevo, .opciones-titulo-acciones .ghost) {

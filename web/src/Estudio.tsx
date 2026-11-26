@@ -1,4 +1,5 @@
 import { Fragment, type ReactNode, useLayoutEffect, useRef, useState, useEffect } from 'react'
+import { AyudaFase } from './AyudaVideo'
 import { esDeEstudio } from '../../shared/etapas'
 import { FASES, type AgentEvent, type Card, type Fase, type SessionMeta } from '../../shared/types'
 import { Editor } from './Editor'
@@ -116,11 +117,15 @@ function BarraDeFases({ fases, p, vista, delAgente, error, onElegir }: { fases: 
         return (
           <Fragment key={f.id}>
             {k > 0 && <span className="fase-sep" aria-hidden="true" />}
-            <button className={`fase ${f.estado.replace(' ', '-')} ${f.id === vista ? 'vista' : ''} ${suya ? 'agente' : ''}`} disabled={!f.abierta} aria-current={f.id === vista ? 'step' : undefined} title={title} onClick={() => onElegir(f.id)}>
-              <span className="fase-punto" />
-              {f.nombre}
-              {va && va.toLowerCase() !== f.nombre.toLowerCase() && <span className="muted">· {va}</span>}
-            </button>
+            <div className="fase-con-ayuda">
+              <button className={`fase ${f.estado.replace(' ', '-')} ${f.id === vista ? 'vista' : ''} ${suya ? 'agente' : ''}`} disabled={!f.abierta} aria-current={f.id === vista ? 'step' : undefined} title={title} onClick={() => onElegir(f.id)}>
+                <span className="fase-punto" />
+                {f.nombre}
+                {va && va.toLowerCase() !== f.nombre.toLowerCase() && <span className="muted">· {va}</span>}
+              </button>
+              {/* Qué revisar en esta fase, con un ejemplo (`AyudaVideo.tsx`). */}
+              <AyudaFase fase={f.id} nombre={f.nombre} disponible={f.abierta} />
+            </div>
           </Fragment>
         )
       })}

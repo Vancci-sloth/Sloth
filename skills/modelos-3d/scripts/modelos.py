@@ -8,6 +8,8 @@ La biblioteca de modelos 3D: buscar uno antes de hacerlo, traerlo al proyecto y 
     python -B -X utf8 modelos.py guardar <id> --nombre "…" --resumen "…" --categoria "…" --descripcion "…"
                                           --hace "a; b" --etiquetas "a, b" [--cuadro N]
     python -B -X utf8 modelos.py vista <id> [<id>…]        vuelve a sacar su miniatura (y arma el visor)
+    python -B -X utf8 modelos.py revisar <id>              renderiza frente, tres cuartos y perfil del proyecto antes de guardar
+    python -B -X utf8 modelos.py reparar-vistas [<id>…]   repara miniaturas que faltan, sin tocar un proyecto de video
     python -B -X utf8 modelos.py visor                     arma el visor 3D de toda la biblioteca (lo que Sloth gira)
     python -B -X utf8 modelos.py nuevo <id> [--nombre "…"] [--descripcion "…"]
                                           un modelo sin video: arma aquí un proyecto de prueba y el andamio
@@ -440,12 +442,14 @@ def de_fondo() -> dict:
     return {"preexec_fn": lambda: os.nice(10)}
 
 
-def vista(ids: list[str]) -> None:
+def vista(ids: list[str], armar_visor: bool = True, revision: bool = False) -> None:
     raiz_ = proyecto()
     if not (raiz_ / "node_modules" / "@remotion" / "renderer").exists():
         sys.exit("Al proyecto le falta node_modules (con @remotion/renderer y @remotion/three).")
     src = raiz_ / "src" / "modelos"
     faltan = [i for i in ids if not (src / f"{i}.tsx").exists()]
+    if faltan and revision:
+        sys.exit(f"Escribe primero el componente del proyecto: {src / (faltan[0] + '.tsx')}")
     if faltan:
         usar(faltan, callado=True)
     # Con su número de proceso: varios agentes pueden sacar vistas a la vez en el mismo proyecto.
@@ -465,14 +469,41 @@ def vista(ids: list[str]) -> None:
         corre.parent.mkdir(exist_ok=True)
         corre_ = (BIBLIOTECA / "scripts" / "vitrina.mjs").read_text("utf-8").replace("src/modelos/_vitrina.tsx", f"src/modelos/_vitrina{n}.tsx")
         corre.write_text(corre_, "utf-8", newline="\n")
-        pares = [f"{id_}:{ficha(id_).get('cuadro', 0)}" for id_ in ids]
-        r = subprocess.run(["node", str(corre), str(MODELOS), *pares], cwd=raiz_, **de_fondo())
+        destino = raiz_ / "out" / "revision-3d" if revision else MODELOS
+        pares = [f"{id_}:{0 if revision else ficha(id_).get('cuadro', 0)}" for id_ in ids]
+        opciones = ["--revision"] if revision else []
+        r = subprocess.run(["node", str(corre), str(destino), *opciones, *pares], cwd=raiz_, **de_fondo())
         if r.returncode:
             sys.exit("No salió la vista: mira el error de arriba (la Muestra tiene que verse sola, sin el resto del video).")
     finally:
         for temporal in (muestras, vitrina, corre):
             temporal.unlink(missing_ok=True)
-    visor()
+    if armar_visor:
+        visor()
+
+
+def reparar_vistas(ids: list[str]) -> None:
+    """Saca miniaturas faltantes en un proyecto temporal y conserva solo los archivos de la biblioteca."""
+    ids = [i for i in ids if (MODELOS / i / "modelo.json").exists() and not (MODELOS / i / "vista.webp").exists()]
+    if not ids:
+        return
+    # Reparar no debe iniciar una instalación de npm en segundo plano. El primer video deja estos módulos compartidos.
+    sys.path.insert(0, str(BIBLIOTECA.parent / "video-base" / "scripts"))
+    from espacio import casa_de  # noqa: PLC0415
+    compartidos = casa_de("video-explicativo", EXPLICATIVO) / "node_modules"
+    if not (compartidos / "remotion").is_dir() or not (compartidos / "@remotion" / "cli").is_dir():
+        print("reparar-vistas: faltan los módulos compartidos; se reintentará cuando haya un video preparado.")
+        return
+    temporal = Path(tempfile.mkdtemp(prefix="vistas-3d-"))
+    aqui = Path.cwd()
+    try:
+        proyecto_prueba(temporal)
+        os.chdir(temporal)
+        usar(ids, callado=True)
+        vista(ids, armar_visor=False)
+    finally:
+        os.chdir(aqui)
+        quitar_proyecto(temporal)
 
 
 def visor() -> None:
@@ -605,6 +636,8 @@ def main() -> None:
     g.add_argument("--frente", action="store_true", help="tiene cara (un reloj, un celular, una persona): el video no lo enseña de lado")
     g.add_argument("--caja", help="ancho,alto,fondo: solo si es mucho más alto que ancho (un celular, una botella)")
     sub.add_parser("vista").add_argument("ids", nargs="+")
+    sub.add_parser("revisar").add_argument("id")
+    sub.add_parser("reparar-vistas").add_argument("ids", nargs="*")
     sub.add_parser("visor")
     n = sub.add_parser("nuevo")
     n.add_argument("id")
@@ -636,6 +669,12 @@ def main() -> None:
         importar(a.ruta, a.nombre, a.categoria, a.licencia, a.proyecto, a.sin_modulos, a.sin_modulos)
     elif a.orden == "visor":
         visor()
+    elif a.orden == "revisar":
+        if not re.fullmatch(r"[a-z0-9]+(-[a-z0-9]+)*", a.id):
+            p.error("El id debe llevar solo minúsculas, números y guiones.")
+        vista([a.id], armar_visor=False, revision=True)
+    elif a.orden == "reparar-vistas":
+        reparar_vistas(a.ids or todos())
     else:
         vista(a.ids)
 

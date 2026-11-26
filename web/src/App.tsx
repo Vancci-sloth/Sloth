@@ -1,6 +1,6 @@
 import { lazy, memo, Suspense, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { CANAL_CARD, IDEAS_CARD } from '../../shared/ideas' // ideas
-import { MODELO3D_CARD } from '../../shared/modelos3d' // modelos 3D
+import { chatsPorModelo3D, MODELO3D_CARD, rutaEditor3D } from '../../shared/modelos3d' // modelos 3D
 import { PUBLICACIONES_CARD } from '../../shared/publicaciones' // «Organizar en chat» de YouTube
 import { REVISION_CARD } from '../../shared/revision' // revisión de estilos
 import type { Afinado, AvanceCorto, AvisoComunidad, Card, Marcas, RifaGanada, Model, Previa, Serie, ServerPush, SessionMeta, VideoHecho } from '../../shared/types'
@@ -36,6 +36,8 @@ import { CON_CHATGPT, conOpenCode, conPrimero, elegirModelos, lineaSubagentes, M
 import { AvisoEquipo } from './Equipo' // tu equipo
 import { MisVideos, Rejilla, VideoDe } from './MisVideos'
 import { abrirPublicacion, Comunidad } from './Comunidad' // comunidad
+import { AyudaCrearVideo } from './AyudaVideo'
+import { MiPerfil } from './MiPerfil' // comunidad: «Mi perfil», su propia página
 import { abrirBorrador, CompartirEstilo, ImportarEstilo, incompletosGuardados, marcarIncompletos } from './Estilos' // estilos compartidos
 import { GuiaVista } from './Guia'
 import { PedirMejora } from './PedirMejora' // comunidad
@@ -75,11 +77,11 @@ type View =
   | { kind: 'opciones'; seccion?: string; apartado?: string }
   | { kind: 'videos'; estilo?: string }
   | { kind: 'estilos' } // el catálogo de estilos
-  | { kind: 'modelos3d' } // modelos 3D
+  | { kind: 'modelos3d'; modeloId?: string } // modelos 3D; con `modeloId`, su editor
   | { kind: 'imagenes'; imagenId?: string } // estudio de Imágenes, o el editor de una
   /** Redes: la producción, Ideas, las publicaciones, el calendario y las cuentas (`CentroRedes.tsx`). */
   | { kind: 'redes'; apartado?: ApartadoRedes; canalId?: string }
-  | { kind: 'comunidad' } // comunidad
+  | { kind: 'comunidad'; perfil?: boolean } // comunidad; `perfil`, «Mi perfil» (su propia página)
   | { kind: 'admin'; pestana?: PestanaAdmin } // Administrador, solo en la computadora del creador
   /** La revisión de YouTube (`youtube-ruta.ts`): `volver` es la vista de donde se abrió. */
   | { kind: 'youtube'; cardId?: string; ruta?: string; volver: string }
@@ -111,9 +113,9 @@ function readHash(): View {
     return VENTA && seccion === 'ideas' ? { kind: 'redes' }
       : { kind: 'redes', apartado: seccion, canalId: seccion === 'ideas' ? apartado || undefined : undefined }
   }
-  if (kind === 'modelos-3d') return { kind: 'modelos3d' } // modelos 3D
+  if (kind === 'modelos-3d') return { kind: 'modelos3d', modeloId: id === 'editar' && apartado && /^[\w-]+$/.test(apartado) ? apartado : undefined } // modelos 3D
   if (kind === 'imagenes') return { kind: 'imagenes', imagenId: id === 'editar' ? apartado : undefined }
-  if (kind === 'comunidad' || kind === 'mejoras') return { kind: 'comunidad' } // comunidad (antes, Mejoras)
+  if (kind === 'comunidad' || kind === 'mejoras') return { kind: 'comunidad', ...(id === 'perfil' ? { perfil: true } : {}) } // comunidad (antes, Mejoras)
   if (kind === 'admin') return { kind: 'admin', pestana: esPestanaAdmin(id) ? id : undefined }
   return { kind: 'new', cardId: kind === 'new' ? id : undefined }
 }
@@ -148,9 +150,9 @@ function go(view: View) {
           : view.kind === 'videos'
             ? `/mis-videos${view.estilo ? `/${view.estilo}` : ''}`
             : view.kind === 'modelos3d' // modelos 3D
-              ? '/modelos-3d'
+              ? view.modeloId ? rutaEditor3D(view.modeloId) : '/modelos-3d'
               : view.kind === 'comunidad' // comunidad
-              ? '/comunidad'
+              ? `/comunidad${view.perfil ? '/perfil' : ''}`
               : view.kind === 'admin'
               ? `/admin${view.pestana ? `/${view.pestana}` : ''}`
               : view.cardId
@@ -293,7 +295,14 @@ export function App() {
     }
   }, [])
 
-  const openId = view.kind === 'session' ? view.id : null
+  // Los chats de un modelo 3D se abren en su editor (`Modelos3D.tsx`), no como un hilo suelto.
+  const chats3D = useMemo(() => chatsPorModelo3D(sessions), [sessions])
+  const destino3D = view.kind === 'session' ? sessions.find((s) => s.id === view.id)?.modelo3d : undefined
+  useEffect(() => {
+    if (destino3D) location.replace(rutaEditor3D(destino3D.editando ?? destino3D.resultado))
+  }, [destino3D])
+  const grupo3D = view.kind === 'modelos3d' && view.modeloId ? chats3D.get(view.modeloId) : undefined
+  const openId = view.kind === 'session' ? view.id : grupo3D?.[0]?.id ?? null
   abierto.current = openId
   // El servidor manda los eventos del hilo abierto. El que se deja se guarda para volver, si no trabaja (`eventos.ts`).
   const deSesiones = useRef(sessions)
@@ -398,6 +407,8 @@ export function App() {
   const lista: (SessionMeta | SessionMeta[])[] = []
   const lotes = new Map<string, SessionMeta[]>()
   for (const s of sessions.filter((s) => !s.archived)) {
+    // De los chats de un mismo modelo 3D, la barra enseña solo el más nuevo: los demás están en su editor.
+    if (s.modelo3d && chats3D.get(s.modelo3d.resultado)?.[0]?.id !== s.id) continue
     if (!s.lote) {
       lista.push(s)
       continue
@@ -524,7 +535,7 @@ export function App() {
   const alFila = useRef<AccionesFila>(null as never)
   alFila.current = {
     clic(s, e) {
-      if (!selected && !e.ctrlKey && !e.metaKey) return go({ kind: 'session', id: s.id })
+      if (!selected && !e.ctrlKey && !e.metaKey) return go(s.modelo3d ? { kind: 'modelos3d', modeloId: s.modelo3d.editando ?? s.modelo3d.resultado } : { kind: 'session', id: s.id })
       if (!selected) setPickY(e.clientY)
       pick(s.id, e.shiftKey)
     },
@@ -802,10 +813,10 @@ export function App() {
         )}
         {view.kind === 'imagenes' && <EstudioImagenes models={models} imagenId={view.imagenId} abrir={(imagenId) => go({ kind: 'imagenes', imagenId })} />}
         {view.kind === 'estilos' && <CatalogoEstilos cards={cards} puedeCrear={!!creador} abrir={abrirChatDeEstilo} />}
-        {view.kind === 'modelos3d' && <Modelos3D />} {/* modelos 3D */}
+        {view.kind === 'modelos3d' && <Modelos3D modelosIA={models} modeloId={view.modeloId} chats={chats3D} />} {/* modelos 3D */}
         </Suspense>
         {view.kind === 'youtube' && <RevisionYoutube key={`${view.cardId ?? ''}:${view.ruta ?? ''}`} cardId={view.cardId} ruta={view.ruta} cerrar={() => { location.hash = view.volver }} />}
-        {view.kind === 'comunidad' && <Comunidad />}
+        {view.kind === 'comunidad' && (view.perfil ? <MiPerfil /> : <Comunidad />)}
         {esCreador && view.kind === 'admin' && (
           <Admin activa pestana={view.pestana} onPestana={irAPestanaAdmin} />
         )}
@@ -864,7 +875,7 @@ export function App() {
       {!plegada && <div className="barra-velo" aria-hidden onClick={() => plegar(true)} />}
       <Novedades />
       <GanasteRifa />
-      {avisosEstilos && <EstiloCambio cards={cards} activa={newCard?.id} onDesactivar={() => setAvisosEstilos(false)} />}
+      {avisosEstilos && <EstiloCambio cards={cards} activa={newCard?.id} pausado={view.kind === 'modelos3d' || (view.kind === 'session' && !!sessions.find((s) => s.id === view.id)?.modelo3d)} onDesactivar={() => setAvisosEstilos(false)} />}
     </div>
   )
 }
@@ -1104,16 +1115,19 @@ function NewSession(props: {
               />
             )}
             {conFormato && (
-              <Segmento
-                dispositivo
-                label="Formato"
-                valor={formato}
-                opciones={[
-                  { id: 'vertical', texto: 'Vertical', title: formatoEscrito ? 'Lo trae la idea' : '1080x1920, para TikTok', disabled: !!formatoEscrito },
-                  { id: 'horizontal', texto: 'Horizontal', title: formatoEscrito ? 'Lo trae la idea' : '1920x1080, para YouTube', disabled: !!formatoEscrito }
-                ]}
-                onCambio={(f) => setFormatos({ ...formatos, [card.id]: f })}
-              />
+              <div className="formato-con-ayuda">
+                <Segmento
+                  dispositivo
+                  label="Formato"
+                  valor={formato}
+                  opciones={[
+                    { id: 'vertical', texto: 'Vertical', title: formatoEscrito ? 'Lo trae la idea' : '1080x1920, para TikTok', disabled: !!formatoEscrito },
+                    { id: 'horizontal', texto: 'Horizontal', title: formatoEscrito ? 'Lo trae la idea' : '1920x1080, para YouTube', disabled: !!formatoEscrito }
+                  ]}
+                  onCambio={(f) => setFormatos({ ...formatos, [card.id]: f })}
+                />
+                <AyudaCrearVideo clips={!!card.clips} />
+              </div>
             )}
             {conFormato && (
               <SelectorVoz
@@ -1532,7 +1546,8 @@ const SessionView = memo(function SessionView({ id, session, card, models }: { i
         <MarcaAgente de={proveedorDe(session.model)} />
       </button>
       {extra}
-      {!deImagen && <BotonNavegador hilo={session.id} trabajando={trabaja} />}
+      {session.modelo3d && <a className="boton small" href={rutaEditor3D(session.modelo3d.editando ?? session.modelo3d.resultado)}>Editor 3D</a>}
+      {!deImagen && !session.modelo3d && card?.id !== MODELO3D_CARD.id && <BotonNavegador hilo={session.id} trabajando={trabaja} />}
     </header>
   )
   const chat = () => (
@@ -1653,18 +1668,7 @@ function SessionMenu({ session, x, y, app, onClose, onSelect, onDeleted, onRenam
   // Eliminar pregunta con el mismo modal que eliminar varios; el menú se va mientras tanto.
   if (borrar)
     return (
-      <Confirm
-        title={`¿Eliminar «${session.title}»?`}
-        action="Eliminar"
-        danger
-        onClose={onClose}
-        onConfirm={async () => {
-          await api(`/api/sessions/${session.id}/delete`, {})
-          onDeleted(session.id)
-        }}
-      >
-        Se borra su historial y no se puede deshacer.
-      </Confirm>
+      <BorrarChats hilos={[session]} ocupados={0} onClose={onClose} onDeleted={() => onDeleted(session.id)} />
     )
 
   return (
@@ -1753,21 +1757,75 @@ function SelectBar({ picked, y, app, onClose, onDeleted }: { picked: SessionMeta
         </button>
       </div>
       {asking && (
-        <Confirm
-          title={free.length === 1 ? `¿Eliminar «${free[0].title}»?` : `¿Eliminar ${free.length} hilos?`}
-          action="Eliminar"
-          danger
+        <BorrarChats
+          hilos={free}
+          ocupados={busy}
           onClose={() => setAsking(false)}
-          onConfirm={async () => {
-            await Promise.all(free.map((s) => api(`/api/sessions/${s.id}/delete`, {})))
-            onDeleted(free.map((s) => s.id))
+          onDeleted={(ids) => {
+            onDeleted(ids)
             onClose()
           }}
-        >
-          Se borra su historial y no se puede deshacer.{busy > 0 && ` ${busy === 1 ? 'Uno sigue trabajando y se queda' : `${busy} siguen trabajando y se quedan`}.`}
-        </Confirm>
+        />
       )}
     </div>
+  )
+}
+
+/**
+ * Eliminar uno o varios hilos, desde su menú o desde la selección de la barra lateral. Si alguno tiene archivos propios (la
+ * carpeta de su video, sus imágenes), un segundo botón los borra también (`server/borrar-hilo.ts`); las carpetas que
+ * comparte con otro hilo se quedan.
+ */
+function BorrarChats({ hilos, ocupados, onClose, onDeleted }: { hilos: SessionMeta[]; ocupados: number; onClose(): void; onDeleted(ids: string[]): void }) {
+  // Solo se pregunta por los que pueden tener archivos: los de un video o de Imágenes.
+  const clave = hilos.map((h) => (h.imagenEstudio || h.carpeta || h.lote || h.carpetasGeneradas?.length ? h.id : '')).join(',')
+  const [plan, setPlan] = useState<{ clave: string; tipos: ('video' | 'imagen' | null)[]; error?: string }>()
+  useEffect(() => {
+    let vigente = true
+    if (clave)
+      Promise.all(clave.split(',').map((id) => (id ? api<{ tipo: 'video' | 'imagen' | null }>(`/api/sessions/${id}/borrado`) : { tipo: null }))).then(
+        (r) => vigente && setPlan({ clave, tipos: r.map((x) => x.tipo) }),
+        (e: Error) => vigente && setPlan({ clave, tipos: [], error: e.message }),
+      )
+    return () => {
+      vigente = false
+    }
+  }, [clave])
+  const actual = plan?.clave === clave ? plan : undefined
+  const videos = !!actual?.tipos.includes('video')
+  const imagenes = !!actual?.tipos.includes('imagen')
+  const archivos = videos && imagenes ? 'sus videos e imágenes' : videos ? 'sus videos' : 'sus imágenes'
+  const varios = hilos.length > 1
+
+  async function borrar(conArchivos: boolean) {
+    const ids: string[] = []
+    const errores: string[] = []
+    for (const [i, h] of hilos.entries()) {
+      try {
+        const { aviso } = await api<{ aviso?: string }>(`/api/sessions/${h.id}/${conArchivos && actual?.tipos[i] ? 'borrado' : 'delete'}`, {})
+        ids.push(h.id)
+        if (aviso) errores.push(aviso)
+      } catch (e) {
+        errores.push(e instanceof Error ? e.message : String(e))
+      }
+    }
+    if (ids.length) onDeleted(ids)
+    if (errores.length) throw new Error([...new Set(errores)].join(' '))
+  }
+
+  return (
+    <Confirm
+      title={varios ? `¿Eliminar ${hilos.length} hilos?` : `¿Eliminar «${hilos[0]?.title}»?`}
+      action={videos || imagenes ? (varios ? 'Eliminar solo los hilos' : 'Eliminar solo el hilo') : 'Eliminar'}
+      danger
+      onClose={onClose}
+      onConfirm={() => borrar(false)}
+      otraAccion={videos || imagenes ? { etiqueta: `Eliminar también ${archivos}`, ejecutar: () => borrar(true) } : undefined}
+    >
+      Se borra su historial y no se puede deshacer.{ocupados > 0 && ` ${ocupados === 1 ? 'Uno sigue trabajando y se queda' : `${ocupados} siguen trabajando y se quedan`}.`}
+      {actual?.error && <p className="bad">{actual.error}</p>}
+      {(videos || imagenes) && <p>Con «Eliminar también», se borran {archivos} y sus archivos de trabajo. Lo que comparte con otro hilo se queda.</p>}
+    </Confirm>
   )
 }
 

@@ -2,6 +2,7 @@ import { existsSync, type FSWatcher, readdirSync, readFileSync, statSync, watch 
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { dirname, join, normalize, sep } from 'node:path'
 import type { Biblioteca3D, Modelo3D } from '../shared/types.ts'
+import { MODELO3D_CARD } from '../shared/modelos3d.ts'
 import { largo } from './disco.ts'
 import { servir } from './etapas.ts'
 import { ejecutar } from './modelos3d-acciones.ts'
@@ -13,7 +14,7 @@ import { ejecutar } from './modelos3d-acciones.ts'
  * los videos la llenan con `modelos.py guardar` y el agente busca en ella antes de hacer uno. Quitarlo es borrar este archivo, sus líneas en `server/index.ts` y las marcadas
  * «modelos 3D» en `web/src`.
  */
-export function modelos3d(raiz: string, opciones: { python?: () => string } = {}) {
+export function modelos3d(raiz: string, opciones: { python?: () => string; sesiones?: () => { cardId?: string; modelo3d?: { resultado?: string } }[]; editado?: (id: string) => boolean } = {}) {
   const dir = join(raiz, 'modelos')
   /** La URL de un archivo de la vista, con su fecha: si se vuelve a sacar, cambia y el navegador no usa la vieja. */
   function url(id: string, archivo: string) {
@@ -40,8 +41,29 @@ export function modelos3d(raiz: string, opciones: { python?: () => string } = {}
    */
   let armando = false
   let intentado = ''
+  let reparandoVistas = false
+  let vistasIntentado = ''
+  function repararVistas(ids: string[]) {
+    if (!opciones.python || armando || reparandoVistas) return
+    const faltan = ids.filter((id) => !existsSync(join(dir, id, 'vista.webp')))
+    if (!faltan.length) {
+      vistasIntentado = ''
+      return
+    }
+    const ultimo = Math.max(...faltan.map((id) => join(dir, id, 'modelo.json')).filter(existsSync).map((ruta) => statSync(ruta).mtimeMs))
+    if (!Number.isFinite(ultimo)) return
+    const firma = `${faltan.join(',')}@${Math.floor(ultimo)}`
+    if (firma === vistasIntentado) return
+    reparandoVistas = true
+    vistasIntentado = firma
+    void ejecutar(opciones.python(), ['-B', '-X', 'utf8', join(raiz, 'scripts', 'modelos.py'), 'reparar-vistas', ...faltan], raiz, { SLOTH_SKILLS: dirname(raiz) }, 5 * 60_000).finally(() => {
+      reparandoVistas = false
+      armada = null
+    })
+  }
   function alDia(ids: string[], v: number) {
-    if (!opciones.python || armando) return
+    repararVistas(ids)
+    if (!opciones.python || armando || reparandoVistas) return
     const archivos = [join(raiz, 'visor.tsx'), ...ids.map((id) => join(dir, id, `${id}.tsx`))]
     const ultimo = Math.max(...archivos.map((a) => (existsSync(a) ? statSync(a).mtimeMs : 0)))
     const conVisor = enElVisor()
@@ -59,11 +81,18 @@ export function modelos3d(raiz: string, opciones: { python?: () => string } = {}
     if (!existsSync(dir)) return []
     const todos: Modelo3D[] = []
     const conVisor = enElVisor()
+    // Los que creó el usuario en «Nuevo modelo»: tienen un chat de esa card cuyo resultado es el modelo.
+    const creados = new Set((opciones.sesiones?.() ?? []).filter((s) => s.cardId === MODELO3D_CARD.id && s.modelo3d?.resultado).map((s) => s.modelo3d!.resultado!))
     for (const id of readdirSync(dir)) {
       try {
         const ficha = JSON.parse(readFileSync(join(dir, id, 'modelo.json'), 'utf8')) as Omit<Modelo3D, 'id' | 'vista' | 'giro' | 'vuelta' | 'visor'>
         const visor3d = conVisor.ids.has(id) ? `/api/modelos3d/visor/index.html?id=${encodeURIComponent(id)}&v=${conVisor.v}` : undefined
-        todos.push({ ...ficha, id, vista: url(id, 'vista.webp'), giro: url(id, 'vista.webm'), vuelta: url(id, 'vuelta.webm'), visor: visor3d })
+        const propia = url(id, 'vista.webp')
+        // Una variante puede estar lista antes de que termine su render. Enseñamos la vista del modelo base mientras se repara,
+        // para que la card siga siendo reconocible y no quede como un bloque vacío.
+        const deBase = !propia && Array.isArray(ficha.usa) ? ficha.usa.map((base) => url(base, 'vista.webp')).find(Boolean) : undefined
+        const procedencia = ficha.origen === 'importado' ? 'importado' : creados.has(id) ? 'creado' : 'video'
+        todos.push({ ...ficha, id, vista: propia ?? deBase, giro: url(id, 'vista.webm'), vuelta: url(id, 'vuelta.webm'), visor: visor3d, procedencia, editado: opciones.editado?.(id) ?? false })
       } catch {
         // Una carpeta sin modelo.json (o a medio escribir) no es un modelo todavía.
       }

@@ -220,11 +220,23 @@ export class Sessions {
     return primerUsuario(join(this.dir, `${id}.jsonl`))
   }
 
-  /** Panel de etapas: la carpeta del hilo, que el usuario cambia por otra (`server/etapas.ts`). */
-  setCarpeta(id: string, carpeta: string) {
+  /**
+   * Panel de etapas: la carpeta del hilo, que el usuario cambia por otra (`server/etapas.ts`). Con `nueva`, la creó Sloth
+   * para este hilo y queda en `carpetasGeneradas`: al eliminar el hilo con sus archivos, son las que se borran.
+   */
+  setCarpeta(id: string, carpeta: string, nueva = false) {
     const meta = this.metas.get(id)
     if (!meta) return
+    const carpetaAnterior = meta.carpeta
     meta.carpeta = carpeta
+    if (nueva) {
+      // Un hilo de antes no las anotaba: la suya era la de la línea `Carpeta:` de su primer mensaje.
+      if (!meta.carpetasGeneradas) {
+        const original = this.primerUsuario(id)?.text.match(/(?:^|\n)Carpeta: ([\p{L}\p{N}_-]+)\s*$/u)?.[1]
+        meta.carpetasGeneradas = original && original === carpetaAnterior ? [original] : []
+      }
+      meta.carpetasGeneradas.push(carpeta)
+    }
     this.save(meta)
   }
 
@@ -247,7 +259,7 @@ export class Sessions {
 
   /** Con `carpeta`, el hilo nace sabiendo dónde trabaja: la de su video, nuevo o que ya existe. */
   /** Con `generarTitulo`, su agente le pone un título corto en su primer turno (`server/titulos.ts`). */
-  create(input: { cardId: string; title: string; model: string; effort?: string; cwd: string; carpeta?: string; generarTitulo?: boolean; imagenEstudio?: string }): SessionMeta {
+  create(input: { cardId: string; title: string; model: string; effort?: string; cwd: string; carpeta?: string; carpetasGeneradas?: string[]; generarTitulo?: boolean; imagenEstudio?: string; modelo3d?: SessionMeta['modelo3d'] }): SessionMeta {
     const now = Date.now()
     const { generarTitulo, ...campos } = input
     const meta: SessionMeta = { id: now.toString(36) + Math.random().toString(36).slice(2, 6), ...campos, ...(generarTitulo ? { tituloPendiente: input.title } : {}), createdAt: now, updatedAt: now, running: false }
@@ -257,13 +269,23 @@ export class Sessions {
     return meta
   }
 
+  /** Un chat de «Modelos 3D» pasa a editar otro modelo (una variante del que hizo): su editor es el de ese. */
+  editarModelo3D(id: string, modelo: string) {
+    const meta = this.metas.get(id)
+    if (!meta?.modelo3d) throw new Error('No existe el chat del modelo 3D.')
+    meta.modelo3d.editando = modelo
+    delete meta.archived
+    this.save(meta)
+  }
+
   /** Lo que pasó en el chat de una imagen del estudio (`hilo-imagen.ts`), sin mandarle nada a un agente. */
   registrarImagen(id: string, ...events: AgentEvent[]) {
     if (!this.metas.get(id)?.imagenEstudio) return
     for (const event of events) this.emit(id, event)
   }
 
-  send(id: string, text: string, skill?: SkillRef, images: string[] = []): void {
+  /** `visible`: lo que se ve del mensaje en el chat, si no es todo lo que va al agente (el pedido de un modelo 3D). */
+  send(id: string, text: string, skill?: SkillRef, images: string[] = [], visible = text): void {
     if (text.trim() === '/compact' && !images.length) return this.compactar(id)
     if (this.compactando.has(id)) throw new Error('Espera a que termine la compactación.')
     const meta = this.metas.get(id)
@@ -274,7 +296,7 @@ export class Sessions {
       this.empezar(meta)
       return this.steer(id, text, images)
     }
-    this.emit(id, { t: 'user', text, at: Date.now(), ...(images.length ? { images } : {}) })
+    this.emit(id, { t: 'user', text: visible, at: Date.now(), ...(images.length ? { images } : {}) })
     this.turno(meta, text, skill, images)
   }
 
@@ -312,7 +334,7 @@ export class Sessions {
   crearLote(input: { cardId: string; model: string; effort?: string; cwd: string }, videos: { title: string; text: string; carpeta: string }[], skill?: SkillRef, images: string[] = []): SessionMeta[] {
     const lote = Date.now().toString(36)
     const metas = videos.map((v, i) => {
-      const meta = this.create({ ...input, title: v.title })
+      const meta = this.create({ ...input, title: v.title, carpetasGeneradas: [v.carpeta] })
       meta.lote = { id: lote, n: i + 1, de: videos.length, carpeta: v.carpeta }
       if (skill) meta.skill = skill.name
       meta.pendiente = { text: v.text, ...(images.length ? { images } : {}) }
@@ -564,12 +586,17 @@ export class Sessions {
   }
 
   /** Borra la sesión del disco. Con el agente trabajando no: se cortaría a medias. */
-  remove(id: string) {
+  /**
+   * `borrarArchivos` aparta los archivos del hilo (`server/borrar-hilo.ts`) después de cerrar su agente y antes de borrar
+   * el hilo: si falla, el hilo se queda.
+   */
+  remove(id: string, borrarArchivos?: () => void) {
     const meta = this.metas.get(id)
     if (!meta) return
     if (meta.running || meta.background?.length) throw new Error('El agente sigue trabajando en este hilo. Detenlo antes de eliminarlo.')
     this.cerrar(id)
     this.cerrarRegistro(id)
+    borrarArchivos?.()
     this.metas.delete(id)
     this.events.delete(id)
     rmSync(join(this.dir, `${id}.json`), { force: true })

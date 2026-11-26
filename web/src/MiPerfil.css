@@ -1,0 +1,128 @@
+/* «Mi perfil» (MiPerfil.tsx): su propia página, con el vidrio negro de la comunidad. */
+.miperfil { position: relative; flex: 1; min-height: 0; overflow-y: auto; }
+.miperfil-centro { position: relative; display: flex; flex-direction: column; gap: 14px; width: 100%; max-width: 680px; margin: 0 auto; padding: 36px 32px 64px; }
+
+.miperfil-cabeza { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 6px; }
+.miperfil-antetitulo { color: var(--muted); font-size: 12px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; }
+.miperfil-cabeza h1 { margin: 2px 0 0; font-size: 30px; font-weight: 750; letter-spacing: -0.03em; }
+.miperfil .com-boton { color: var(--suave); }
+.miperfil .com-boton .ico { width: 15px; height: 15px; }
+
+.miperfil-cargando { color: var(--muted); }
+
+/* Cada cosa tuya en su tarjeta, como las de la comunidad. */
+.miperfil-tarjeta {
+  display: flex; flex-direction: column; gap: 14px; padding: 20px 22px; border-radius: 18px;
+  border: 1px solid color-mix(in srgb, var(--text) 12%, transparent);
+  background: linear-gradient(160deg, color-mix(in srgb, var(--text) 7%, transparent), transparent 42%), color-mix(in srgb, var(--bg) 66%, transparent);
+  backdrop-filter: blur(20px) saturate(160%); -webkit-backdrop-filter: blur(20px) saturate(160%);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--text) 13%, transparent), 0 18px 44px color-mix(in srgb, var(--bg) 50%, transparent);
+}
+/* Cada tarjeta entra por su turno, una tras otra, y solo al abrir la página. */
+.miperfil-tarjeta { animation: miperfil-entra 0.42s cubic-bezier(.2,.8,.2,1) both; animation-delay: calc(var(--turno, 0) * 70ms); }
+@keyframes miperfil-entra { from { opacity: 0; transform: translateY(12px); } }
+
+/* El sello de cada tarjeta: su icono con el color de lo que guarda. */
+.miperfil-titulo { display: flex; align-items: flex-start; gap: 12px; }
+.miperfil-sello {
+  flex: none; display: grid; place-items: center; width: 34px; height: 34px; border-radius: 12px; color: var(--tinte, var(--text));
+  border: 1px solid color-mix(in srgb, var(--tinte, var(--text)) 32%, transparent);
+  background: linear-gradient(160deg, color-mix(in srgb, var(--tinte, var(--text)) 22%, transparent), transparent 75%), color-mix(in srgb, var(--bg) 55%, transparent);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--text) 18%, transparent);
+}
+.miperfil-sello .ico { width: 17px; height: 17px; }
+.miperfil-tarjeta[data-de='foto'] { --tinte: var(--acento-imagen); }
+.miperfil-tarjeta[data-de='nombre'] { --tinte: var(--acento-codex); }
+.miperfil-tarjeta[data-de='creditos'] { --tinte: var(--acento-instagram-final); }
+.miperfil-tarjeta[data-de='numeros'] { --tinte: var(--ok); }
+.miperfil-titulo h2 { margin: 0; font-size: 16px; font-weight: 700; }
+.miperfil-titulo p { margin: 3px 0 0; color: var(--muted); font-size: 13.5px; line-height: 1.45; }
+
+/* Volver: una píldora de cristal, que se nota que se puede apretar. */
+.miperfil-volver {
+  display: inline-flex; align-items: center; gap: 8px; padding: 8px 15px; border-radius: 12px;
+  border: 1px solid color-mix(in srgb, var(--text) 13%, transparent);
+  background: linear-gradient(160deg, color-mix(in srgb, var(--text) 9%, transparent), transparent 70%), color-mix(in srgb, var(--bg) 55%, transparent);
+  color: var(--suave); font-size: 13.5px; font-weight: 650;
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--text) 15%, transparent);
+  transition: color 0.15s, border-color 0.15s, transform 0.15s;
+}
+.miperfil-volver:hover { color: var(--text); border-color: color-mix(in srgb, var(--text) 26%, transparent); transform: translateX(-2px); }
+.miperfil-volver .ico { width: 15px; height: 15px; }
+
+/* Las píldoras de la foto: cristal con el color de lo que hacen. */
+.miperfil-boton {
+  display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border-radius: 12px; white-space: nowrap;
+  border: 1px solid color-mix(in srgb, var(--tono) 38%, transparent);
+  background: linear-gradient(160deg, color-mix(in srgb, var(--tono) 26%, transparent), transparent 72%), color-mix(in srgb, var(--bg) 50%, transparent);
+  color: var(--tono); font-size: 13.5px; font-weight: 700;
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--text) 16%, transparent);
+  transition: background 0.15s, border-color 0.15s, transform 0.14s, box-shadow 0.14s;
+}
+.miperfil-boton:hover:not(:disabled) {
+  transform: translateY(-2px);
+  border-color: color-mix(in srgb, var(--tono) 60%, transparent);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--text) 20%, transparent), 0 8px 20px color-mix(in srgb, var(--tono) 24%, transparent);
+}
+.miperfil-boton:active:not(:disabled) { transform: translateY(0) scale(0.98); }
+.miperfil-boton:disabled { opacity: 0.55; }
+.miperfil-boton .ico { width: 15px; height: 15px; flex: none; }
+.miperfil-boton[data-color='elegir'] { --tono: var(--acento-codex); }
+.miperfil-boton[data-color='encuadrar'] { --tono: var(--acento-imagen); }
+.miperfil-boton[data-color='quitar'] { --tono: var(--bad); }
+
+/* Tu foto: grande, porque es lo que se mira. */
+.miperfil-cara { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; }
+.miperfil-cara > button { border-radius: 50%; transition: box-shadow 0.15s; }
+.miperfil-cara > button:hover { box-shadow: 0 0 0 5px color-mix(in srgb, var(--acento-imagen) 26%, transparent); }
+.miperfil-cara > button.subiendo { opacity: 0.5; }
+.miperfil-cara .com-cara.enorme { width: 104px; height: 104px; font-size: 40px; }
+.miperfil-acciones { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+
+.miperfil-nombre {
+  display: block; width: 100%; padding: 12px 16px; border-radius: 14px; outline: none;
+  border: 1px solid color-mix(in srgb, var(--text) 14%, transparent); background: color-mix(in srgb, var(--bg) 70%, transparent);
+  color: var(--text); font-size: 16px;
+}
+.miperfil-nombre:focus { border-color: color-mix(in srgb, var(--ok) 55%, var(--line)); box-shadow: 0 0 0 3px color-mix(in srgb, var(--ok) 18%, transparent); }
+.miperfil .com-creditos { margin-top: 0; cursor: pointer; }
+.miperfil .com-creditos input { accent-color: var(--ok); }
+
+/* Tus números: cada uno con su nombre debajo. */
+.miperfil-numeros { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; margin: 0; }
+.miperfil-numeros div { padding: 12px 14px; border-radius: 14px; border: 1px solid color-mix(in srgb, var(--text) 10%, transparent); background: color-mix(in srgb, var(--bg) 50%, transparent); }
+.miperfil-numeros dt { color: var(--muted); font-size: 12.5px; }
+.miperfil-numeros dd { margin: 4px 0 0; color: var(--text); font-size: 20px; font-weight: 750; font-variant-numeric: tabular-nums; }
+.miperfil-numeros .miperfil-insignia { color: var(--ok); font-size: 18px; }
+
+.miperfil-error { margin: 0; }
+
+/* La barra de guardar: pegada abajo mientras haya algo sin guardar. */
+.miperfil-pie { display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap; margin-top: 4px; padding: 14px 18px; border-radius: 18px; border: 1px solid transparent; color: var(--muted); font-size: 13.5px; }
+.miperfil-pie.con-cambios {
+  position: sticky; bottom: 14px; color: var(--text);
+  border-color: color-mix(in srgb, var(--ok) 35%, transparent);
+  background: linear-gradient(160deg, color-mix(in srgb, var(--ok) 10%, transparent), transparent 60%), color-mix(in srgb, var(--bg) 82%, transparent);
+  backdrop-filter: blur(20px) saturate(160%); -webkit-backdrop-filter: blur(20px) saturate(160%);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--text) 13%, transparent), 0 16px 40px color-mix(in srgb, var(--bg) 60%, transparent);
+}
+
+/* Guardar: cristal verde, el color del sí en Sloth. */
+.miperfil-pie .esc-listo {
+  padding: 10px 22px; border-radius: 12px; border: 1px solid color-mix(in srgb, var(--ok) 60%, var(--bg));
+  background: linear-gradient(180deg, color-mix(in srgb, var(--ok) 55%, var(--text)) 0%, var(--ok) 52%, color-mix(in srgb, var(--ok) 72%, var(--bg)) 100%);
+  color: var(--sobre-ambar); font-size: 14px; font-weight: 800;
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--text) 55%, transparent), inset 0 -3px 6px color-mix(in srgb, var(--ok) 35%, var(--bg)), 0 8px 24px color-mix(in srgb, var(--ok) 26%, transparent);
+  transition: transform 0.14s ease, box-shadow 0.14s ease;
+}
+.miperfil-pie .esc-listo:hover:not(:disabled) { transform: translateY(-2px); box-shadow: inset 0 1px 0 color-mix(in srgb, var(--text) 60%, transparent), inset 0 -3px 6px color-mix(in srgb, var(--ok) 35%, var(--bg)), 0 12px 30px color-mix(in srgb, var(--ok) 36%, transparent); }
+.miperfil-pie .esc-listo:disabled { opacity: 0.4; box-shadow: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  .miperfil-tarjeta { animation: none; }
+}
+
+@media (max-width: 760px) {
+  .miperfil-centro { padding: 24px 18px 48px; }
+  .miperfil-cabeza h1 { font-size: 24px; }
+}

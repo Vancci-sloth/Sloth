@@ -4,8 +4,8 @@ tranquilo de 92 BPM, con pad, bajo, un arpegio suave y una batería apenas marca
 pelear con ella. La enciende la línea `Música: de fondo` del mensaje (el menú «Voz» del compositor, en las cards con
 `musica`).
 
-    python -B -X utf8 musica.py --poner <video.mp4> [--pista <audio>] [--bajo 10]
-    python -B -X utf8 musica.py <segundos> <salida.wav> [--semilla N]
+    python -B -X utf8 musica.py --poner <video.mp4> [--pista <audio>] [--bajo 10] [--bpm 92]
+    python -B -X utf8 musica.py <segundos> <salida.wav> [--semilla N] [--bpm 92]
 
 `--poner` le pone música bajo la voz a un video terminado, en el mismo archivo y sin tocar la imagen (`-c:v copy`): la
 `--pista` que se le dé (una que el usuario tenga derecho a usar; se repite si es corta) o, sin ella, una sintetizada
@@ -21,7 +21,8 @@ Siempre se mezcla desde el audio del render, nunca encima del resultado: el MP4 
 música, se renderiza otra vez.
 
 La segunda forma solo escribe la música: un WAV de 48 kHz, estéreo y 16 bits, del largo pedido, con entrada y salida
-suaves. Con la misma semilla y el mismo largo sale igual. Necesita numpy y scipy.
+suaves. Con la misma semilla y el mismo largo sale igual. Necesita numpy y scipy. `--bpm` cambia el pulso (92 si no
+se dice): Motion Graphics pide 128 para que los cortes caigan en el compás.
 """
 
 import json
@@ -38,7 +39,7 @@ MARCA = "Sloth: con música"
 AQUI = Path(__file__).resolve().parent
 
 
-def sintetizar(duracion: float, salida: Path, semilla: int = 11) -> None:
+def sintetizar(duracion: float, salida: Path, semilla: int = 11, bpm: float = 92) -> None:
     """Escribe en `salida` la música de `duracion` segundos (ver el encabezado)."""
     import numpy as np
     from scipy.io import wavfile
@@ -88,7 +89,7 @@ def sintetizar(duracion: float, salida: Path, semilla: int = 11) -> None:
         t = t_(0.08)
         return filtro(rng.standard_normal(len(t)), "high", 6000) * np.exp(-t * 60)
 
-    pulso = 60 / 92
+    pulso = 60 / bpm
     compas = 4 * pulso
     total = n + SR
     # Am9, Fmaj7, Cmaj9, G6: abierto y sin tensión, ni triste ni de anuncio.
@@ -159,7 +160,7 @@ def reemplazar(tmp: Path, video: Path) -> None:
         tmp.unlink()
 
 
-def poner(video: Path, pista: Path | None, bajo: float) -> None:
+def poner(video: Path, pista: Path | None, bajo: float, bpm: float = 92) -> None:
     """Mezcla la música bajo la voz de `video` (ver el encabezado)."""
     audio = pista_de_audio(video)
     if not audio:
@@ -175,7 +176,7 @@ def poner(video: Path, pista: Path | None, bajo: float) -> None:
         ffmpeg("-v", "error", "-i", str(video), "-map", "0:a:0", "-ar", str(SR), "-ac", "2", "-c:a", "pcm_f32le", str(voz))
         if sintetizada:
             pista = tmp / "musica.wav"
-            sintetizar(dur, pista)
+            sintetizar(dur, pista, 11, bpm)
         lufs_voz, _ = sonoridad(voz)
         lufs_musica, _ = sonoridad(pista)
         if lufs_voz == float("-inf"):
@@ -227,15 +228,15 @@ def main() -> None:
         del a[i:i + 2]
         return v
 
-    video, pista, bajo, semilla = valor("--poner"), valor("--pista"), valor("--bajo"), valor("--semilla")
+    video, pista, bajo, semilla, bpm = valor("--poner"), valor("--pista"), valor("--bajo"), valor("--semilla"), valor("--bpm")
     if video:
         if a or not Path(video).is_file() or (pista and not Path(pista).is_file()):
             sys.exit(__doc__)
-        poner(Path(video).resolve(), Path(pista).resolve() if pista else None, float(bajo or 10))
+        poner(Path(video).resolve(), Path(pista).resolve() if pista else None, float(bajo or 10), float(bpm or 92))
         return
     if len(a) != 2:
         sys.exit(__doc__)
-    sintetizar(float(a[0]), Path(a[1]), int(semilla or 11))
+    sintetizar(float(a[0]), Path(a[1]), int(semilla or 11), float(bpm or 92))
     print(f"listo: {a[1]} ({float(a[0]):.1f} s)")
 
 

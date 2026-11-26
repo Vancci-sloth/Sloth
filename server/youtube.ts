@@ -608,7 +608,8 @@ export function youtube(app: string, sessions: Sessions, cards: () => Card[], re
   setInterval(() => { void revisar() }, 24 * 3600_000).unref()
   /** El canal conectado y un token para leer sus números (Ideas → «Tus videos»). */
   const lectura = { canal: () => (conectado() ? datos.cuenta?.id : undefined), cuenta: () => (conectado() ? datos.cuenta : null), token }
-  return { api, lectura, ocupado: () => eliminando ? 'Se están enviando videos de YouTube a la Papelera.' : activa || procesando ? 'Se está preparando una publicación de YouTube. Espera a que termine.' : recomendar.ocupado() ?? (autorizando || permiso && permiso.hasta > Date.now() ? 'Se está conectando el canal de YouTube.' : null) }
+  // `rutasEnCola`: los videos que esperan subirse o se suben, para no borrarlos con su hilo (`server/borrar-hilo.ts`).
+  return { api, lectura, rutasEnCola: () => Object.values(datos.subidas).filter((s) => s.estado === 'cola' || s.estado === 'subiendo' || s.estado === 'preparando').flatMap((s) => (s.ruta ? [s.ruta] : [])), ocupado: () => eliminando ? 'Se están enviando videos de YouTube a la Papelera.' : activa || procesando ? 'Se está preparando una publicación de YouTube. Espera a que termine.' : recomendar.ocupado() ?? (autorizando || permiso && permiso.hasta > Date.now() ? 'Se está conectando el canal de YouTube.' : null) }
 }
 
 /** Acepta el JSON descargado para una aplicación de escritorio, nunca una llave de API ni un cliente web. */

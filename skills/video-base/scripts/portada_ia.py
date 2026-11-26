@@ -211,4 +211,5 @@ def main() -> None:
     print(f"✓ portada con IA en {time.time() - inicio:.0f} s: {salida} ({gasto})")
 
 
-main()
+if __name__ == "__main__":
+    main()

@@ -51,12 +51,20 @@ export const markdown = (texto: string) => marked.parse(texto, { async: false })
  * solo cambia en el último: el chat pinta cada bloque una vez y rehace solo ese (`Timeline.tsx`). Con `imagen`, una
  * imagen del disco se pide por esa URL.
  */
-export function bloquesDeMarkdown(texto: string, imagen?: (ruta: string) => string): string[] {
+/** `editorActual`: en el editor 3D, el enlace «Abrir en el editor 3D» al mismo modelo que ya está abierto sobra y se quita. */
+export function bloquesDeMarkdown(texto: string, imagen?: (ruta: string) => string, editorActual?: string): string[] {
   const tokens = marked.lexer(texto)
+  if (editorActual)
+    marked.walkTokens(tokens, (t) => {
+      if (t.type !== 'link' || t.text.trim().toLowerCase() !== 'abrir en el editor 3d') return
+      if (URL.canParse(t.href, editorActual) && new URL(t.href, editorActual).href === editorActual) Object.assign(t, { type: 'text', text: '', tokens: [] })
+    })
   imagenDelDisco = imagen
   try {
     // Cada bloque con las definiciones de enlaces del texto entero (`[uno][1]` … `[1]: https://…`).
-    return tokens.flatMap((t) => (t.type === 'space' ? [] : [marked.parser(Object.assign([t], { links: tokens.links }))]))
+    return tokens
+      .flatMap((t) => (t.type === 'space' ? [] : [marked.parser(Object.assign([t], { links: tokens.links }))]))
+      .filter((html) => !editorActual || html.trim() !== '<p></p>')
   } finally {
     imagenDelDisco = undefined
   }

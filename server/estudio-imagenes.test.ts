@@ -175,3 +175,38 @@ test('el estudio lista solo imágenes terminadas y conserva su tipo al descargar
     await rm(app, { recursive: true, force: true })
   }
 })
+
+test('una imagen subida entra a la galería lista para editarla, con su formato y sin salir de data/attachments', async () => {
+  const app = await mkdtemp(join(tmpdir(), 'sloth-subida-'))
+  try {
+    const servicio = flow(app, { cuenta: () => null, enEdge: async () => { throw new Error('No debe abrir Google Flow') }, abrirEnEdge: async () => {} })
+    const pedir = async (ruta: string, cuerpo?: object) => {
+      const req = Object.assign(Readable.from(cuerpo ? [Buffer.from(JSON.stringify(cuerpo))] : []), { method: cuerpo ? 'POST' : 'GET', url: ruta })
+      const partes: Buffer[] = []
+      let status = 0
+      const res = Object.assign(new Writable({ write(trozo: Buffer, _encoding, done) { partes.push(trozo); done() } }), {
+        writeHead(codigo: number) { status = codigo }
+      })
+      assert.equal(await servicio.api(req as unknown as IncomingMessage, res as unknown as ServerResponse, ruta.split('?')[0]), true)
+      return { status, cuerpo: JSON.parse(Buffer.concat(partes).toString() || 'null') }
+    }
+    // Un PNG de 2×1: formato apaisado 2:1 no existe, así que se queda el más cercano (16:9).
+    const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAIAAAABCAYAAAD0In+7AAAADElEQVR4nGNgYGAAAAAEAAH2FzhVAAAAAElFTkSuQmCC', 'base64')
+    const carpeta = join(app, 'data', 'attachments')
+    await mkdir(carpeta, { recursive: true })
+    await writeFile(join(carpeta, '1795276800000-foto.png'), png)
+    const subida = await pedir('/api/flow/estudio/subir', { ruta: join(carpeta, '1795276800000-foto.png') })
+    assert.equal(subida.status, 200)
+    assert.equal(subida.cuerpo.modelo, 'subida')
+    assert.equal(subida.cuerpo.formato, '16:9')
+    const galeria = await pedir('/api/flow/estudio')
+    assert.deepEqual(galeria.cuerpo.imagenes.map((i: { id: string }) => i.id), [subida.cuerpo.id])
+    assert.deepEqual(await readFile(join(app, 'data', 'imagenes', `${subida.cuerpo.id}.jpg`)), png)
+    // Fuera de la carpeta de adjuntos no se sube nada.
+    await writeFile(join(app, 'secreto.png'), png)
+    assert.equal((await pedir('/api/flow/estudio/subir', { ruta: join(app, 'secreto.png') })).status, 400)
+    assert.equal((await pedir('/api/flow/estudio/subir', { ruta: join(carpeta, '..', '..', '..', 'secreto.png') })).status, 400)
+  } finally {
+    await rm(app, { recursive: true, force: true })
+  }
+})
