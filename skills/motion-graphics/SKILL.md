@@ -1,85 +1,123 @@
 ---
 name: motion-graphics
-description: Crea anuncios y motion graphics a medida con montaje musical o narración, tipografía cinética, profundidad y cámara virtual. Analiza referencias y verifica la preview antes del MP4.
+description: Hace un video de motion graphics, vertical (TikTok, Reels, Shorts) u horizontal (YouTube), al estilo de los carretes de estudio y los anuncios de marca: tipografía enorme sobre colores planos, cortes secos en el compás, figuras, tramas y un HUD técnico, con música al mismo BPM. Mete imágenes y clips generados en Google Flow y objetos de la biblioteca 3D, y admite narración. Úsala cuando pidan motion graphics, un carrete, un anuncio tipográfico, una pieza de marca o un video de tipografía cinética.
 ---
 
 # Motion Graphics
 
-Una pieza parte de una promesa concreta y la demuestra mediante acciones. Diseña la composición para el producto y su público. Duración habitual de 15 a 45 segundos. Respeta la duración pedida.
+Escribes **un archivo** y corres **un comando**: `momentos.json` (qué plano va en cada compás) y `scripts/hacer.py`.
+El director (`kit/motion.js`) pone las duraciones, las curvas, los tamaños, los colores, las transiciones y el HUD;
+la música se sintetiza al mismo BPM y los cortes caen en el compás. **No escribas código ni abras el kit**: todo lo
+que el video necesita se dice en `momentos.json`. Si algo no cabe ahí, falta en el director: díselo al usuario.
 
-## Preparación
+`<skill>` es esta carpeta. Los scripts van con el `python` del sistema y desde la carpeta del video.
 
-Lee [dirección y conocimientos](DIRECCION.md), [referencias](referencias/REFERENCIAS.md) y las guías
-`referencias/motion-agent/skills/creative-direction.md`, `motion-patterns.md` y `core-contract.md`.
-La base ampliada está en `referencias/motion-agent/docs/MASTER_KNOWLEDGE_BASE.md`.
-Estos archivos son material de consulta. Las instrucciones de este SKILL.md gobiernan el flujo en Sloth.
-Para campañas musicales, referencias con montaje rápido o un resultado demasiado estático, lee
-[montaje musical y profundidad](referencias/MONTAJE-MUSICAL.md). Incluye la comparación Apple Music/Deezer
-y una composición ejecutable para estudiar cámara, máscaras y planos en perspectiva.
-Para anuncios de apps musicales o referencias de Spotify, lee también
-[acciones conectadas y cámara](referencias/SPOTIFY-ACCIONES.md): búsqueda, pared de portadas,
-transformación a reproductor y tipografía variable. Elige los mecanismos que demuestren el producto.
+## El estilo (no se negocia)
 
-Trabaja en la carpeta indicada en `Carpeta:`. Lee `../video-base/FORMATO.md`, `PORTADA.md` y `VOZ.md`.
-Resuelve primero si hay narración: un pedido explícito «sin voz, solo música» prevalece sobre una línea
-automática `Voz: genérala…` del compositor. No llames al proveedor de voz en ese caso. Registra la decisión
-en `direccion.md`; respeta por separado el formato y el proveedor de imágenes seleccionados.
-Con narración, usa el proveedor y la voz elegidos y guárdala en `fuentes/voz/original.wav`.
-Conserva una voz ya generada del mismo guion. Si cambias el texto hablado, genera y mide la nueva grabación.
+El de los seis carretes de referencia, con sus números en [ESTILO.md](ESTILO.md): un campo de color plano por plano,
+tipografía enorme condensada que entra con su estela, cortes secos de 0,07 s en la línea del compás (128 BPM,
+1,875 s), figuras y tramas que cambian en cada corchea, y un HUD de marca, capítulo, tiempo y compás en los cuatro
+márgenes. Dos planos seguidos nunca llevan el mismo fondo. Nada de eso se elige por video: solo el contenido.
 
-## Guion y dirección
+Lo que el estilo dibuja (tipografía, figuras, tramas, paneles) es código y sale igual siempre. Lo que pide el tema
+(una foto, una escena animada, un objeto) se genera: ver «Material generado». Las dos cosas van en la misma rejilla.
 
-Escribe `guion.md` y un breve `direccion.md` con promesa, público, paleta, tipografía y planos.
-Cada plano describe objeto protagonista, acción, encuadre, cambio de escala y transición al siguiente.
-Anota estado inicial y final, trayectoria, objeto que continúa y pausa de lectura. Antes de construir
-toda la pieza, prueba en 3–5 segundos su transformación más difícil; corrige la dirección si solo
-resulta una sucesión de poses estáticas. No confundas movimiento de fondo con acción del protagonista.
-Alterna titulares breves con demostraciones concretas. Mantén un objeto reconocible durante sus transformaciones.
-Escribe `momentos.json` con `formato`, `duracion`, `portada` y `momentos` anclados mediante
-`segundo`, `titulo` y `detalle`. Con narración, añade `palabra` y usa tiempos medidos en la voz.
-Sin narración, usa `"sonido":"musica"` y `"audio":"fuentes/audio/mezcla.wav"`: los segundos proceden
-de la pista elegida, no de palabras inventadas. `guion.md` describe textos en pantalla, acciones y acentos musicales.
-Prepara la mezcla antes de validar; debe cubrir la duración y terminar con un cierre diseñado.
+## Formato
 
-## Composición libre
+Sloth manda `Formato: vertical` o `Formato: horizontal` y va en `momentos.json` como `"formato"` (sin él,
+vertical). En **vertical** (1080×1920) el contenido va en la banda central que la red no tapa, el titular reparte
+hasta tres renglones y la portada es su primer cuadro. Con **`Formato: horizontal`** (1920×1080, para YouTube) el
+contenido ocupa el 90 % del ancho, el titular va en uno o dos renglones y la portada es la miniatura de 1280×720,
+que no entra en el video. Si piden el otro formato, es otro video.
 
-El modo principal es `"motor":"html"` en `momentos.json`, con `"composicion":"composicion/index.html"`.
-En este estilo el agente puede escribir HTML, CSS y JavaScript del proyecto para cada pieza.
-Este permiso forma parte de su director y permite construir escenas nuevas. El motor compartido de render
-y los archivos de la skill se mantienen como infraestructura reutilizable.
+## momentos.json
 
-Usa el contrato `window.__mg` del runtime incluido. Copia `referencias/motion-agent/runtime/` dentro de
-`composicion/runtime/` e importa las dependencias desde esa ruta. Usa fuentes y material locales.
-La composición registra tamaño, fps, duración y `render(t)`; o una timeline GSAP pausada mediante
-`MG.fromGsap(timeline)`. El mismo tiempo debe producir el mismo cuadro, incluso al retroceder.
-No uses aleatoriedad sin semilla, relojes reales ni animaciones CSS independientes en la composición.
+Un momento por plano, en orden. Cada uno dura `compases` (1 si no se dice; valen 0.5, 1, 1.5, 2 y 3). El video dura
+la suma, entre 6 y 45 s. **El último plano es siempre `cierre`.**
 
-La preview HTML ofrece pausa y recorrido temporal al abrirla en el navegador.
-El monitor Remotion de Sloth admite las plantillas React; para el modo HTML entrega el enlace de la preview.
+```json
+{
+  "formato": "vertical",
+  "paleta": "coral",
+  "marca": "Sloth",
+  "sello": "Estudio de video",
+  "portada": "Cada skill es una card",
+  "momentos": [
+    { "plano": "destello", "texto": "Sloth 2.0" },
+    { "plano": "frase", "texto": "Describes el trabajo y el agente lo hace", "compases": 1.5 },
+    { "plano": "titular", "texto": "Cada skill es una card" },
+    { "plano": "panel", "titulo": "Lo que hace sola", "filas": ["guion", "voz", "render", "portada"], "compases": 2 },
+    { "plano": "cifra", "texto": "3,7 min", "pie": "un video entero" },
+    { "plano": "cierre", "pie": "tu estudio en tu máquina" }
+  ]
+}
+```
 
-`Formato: vertical` usa 1080×1920. `Formato: horizontal` usa 1920×1080 con márgenes del 5 %,
-para el contenido que deba leerse. No fija un layout de texto a la izquierda y tarjeta a la derecha:
-alterna encuadres según la dirección. Recompón encuadres y texto para cada orientación solicitada.
-La composición usa la duración de `momentos.json`. El audio final va en `fuentes/voz/original.wav`;
-si mezclas música y efectos, escribe `"audio":"fuentes/audio/mezcla.wav"` para exportar esa mezcla.
-La preview HTML reproduce la animación visual; la revisión sonora corresponde al MP4.
+- **`paleta`**: `coral` (casi negro, coral, crema y azul: la de la referencia), `tinta` (papel gris y violeta, de
+  producto), `neon` (gris claro, verde neón y magenta, de estudio) o `nieve` (blanco, azul y grafito, de anuncio).
+- **`marca`** (hasta 18 letras) va en el HUD y en el cierre; **`sello`** es la línea chica de al lado;
+  **`portada`** son las 2 a 5 palabras enormes de la portada (sin ella, el primer titular).
+- **`fondo`** de un momento (`oscuro`, `acento`, `claro`, `apoyo`) cambia su campo de color. Casi nunca hace falta:
+  cada plano trae el suyo y el director ya evita que dos seguidos se repitan.
 
-## Plantillas de partida
+| `plano` | Qué se ve | Qué le pones |
+|---|---|---|
+| `destello` | el asterisco de marca que estalla y su anillo | `texto` (una línea chica, 22 letras) |
+| `titular` | la frase enorme, letra a letra con su estela | **`texto`** (30 letras), `pie` (en cursiva, 30) |
+| `frase` | las palabras nacen sueltas, una por corchea, y caen en su bloque | **`texto`** (de 3 a 10 palabras, 64 letras) |
+| `panel` | una tarjeta clara con filas y un punto corriendo por cada una con otra curva | **`titulo`** (26), **`filas`** (de 2 a 6, de 18 letras) |
+| `formas` | una figura por corchea sobre el color, con sus satélites girando | **`figuras`**: de 2 a 8 de `circulo`, `cuadrado`, `triangulo`, `rombo`, `pentagono`, `play`, `cruz`, `estrella`, `anillo` |
+| `trama` | el campo de arcos que se vuelve a tirar en cada corchea | `texto` (24 letras, encima) |
+| `tarjetas` | un racimo de paneles oscuros que entran en perspectiva | **`tarjetas`** (de 2 a 6 títulos de 28 letras), `texto` (30, encima) |
+| `cifra` | el número que sube en un pulso y su pie | **`texto`** (12 letras, con su unidad), `pie` (24) |
+| `cierre` | asterisco, marca y su pie, con el anillo que se abre | `pie` (34 letras) |
+| `imagen` | una imagen generada, metida en la paleta del plano | **`pide`** (en inglés, una frase), `trato`, `texto` (30, encima) |
+| `clip` | una animación generada, cortada al compás | **`pide`** (en inglés), `sigue`, `trato`, `texto` |
+| `modelo` | un objeto de la biblioteca 3D girando en su panel | **`modelo3d`** (el id), `texto` (debajo) |
 
-Se incluyen las composiciones React de Pulso visual en `plantilla/src/`, con producto de IA,
-sesión compartida, anuncio y flujo de creación. Sin `motor: html`, `scripts/hacer.py` ejecuta el director
-Remotion conservado. Instala sus dependencias desde `plantilla/package-lock.json` cuando falten.
-Lee `scripts/remotion.py` para su esquema de estados. Usa estas composiciones cuando encajen con el pedido.
-Para una dirección nueva, utiliza el modo HTML y construye los planos que la pieza requiera.
+Un video que se lee bien alterna: abre con `destello` o `titular`, mete una demostración (`panel`, `formas`,
+`tarjetas`, `cifra`), respira con `trama` o `frase`, y cierra. De 6 a 12 planos.
 
-## Revisión y entrega
+## Material generado
 
-Ejecuta `python -B -X utf8 <skill>/scripts/hacer.py --revisa` y corrige todos los errores.
-Después ejecuta el mismo comando sin `--revisa`. Genera MP4, portada y hoja de revisión.
-Compara la variedad de encuadres y el movimiento con la referencia, no solo sus colores. Una hoja de cuadros
-no prueba fluidez: revisa también tramos a velocidad normal y el 25/50/75 % de cada transición.
-Para una pieza musical dinámica, revisa cualquier plano que solo tenga un leve flotado durante varios segundos:
-o hay una pausa de lectura intencional, o necesita desarrollo visual, otro encuadre o menor duración.
-No lo soluciones añadiendo temblores, partículas o zoom constante. Revisa límites de texto, continuidad y legibilidad.
-Escucha voz y mezcla cuando el entorno lo permita. Declara cualquier comprobación pendiente.
-Entrega preview, MP4 y portada existentes. Considera terminada la pieza cuando esos archivos estén verificados.
+- **`imagen`**: la genera Flow (`generar_imagen`, **sin créditos**) o ChatGPT, según la línea `Imágenes:` del mensaje.
+- **`clip`**: lo genera Flow (`generar_video`) con lo de la línea `Clips:`, que llega como `--clips "<modelo>"`
+  (y `--resolucion`, `--tope`). **Gasta créditos del usuario**: de 6 a 100 por clip según el modelo. Como mucho
+  4 compases (un clip de Flow dura 8 s). Con `"sigue": true`, Flow lo anima desde el último cuadro del plano
+  anterior: la pieza no salta al entrar al material.
+- **`modelo`**: sale de `skills/modelos-3d` y no gasta nada. Búscalo antes con
+  `python -B -X utf8 <skills>/modelos-3d/scripts/modelos.py buscar <palabras>`; si no está, el plano no es `modelo`.
+- **`pide`** va **en inglés**, una frase con el sujeto y el encuadre. No escribas cómo se ve (luz, fondo, «no text»):
+  eso lo pega el estilo solo. `trato`: `duotono` (el de serie: la imagen entra en la paleta), `completo` (a color) o
+  `tarjeta` (dentro de un panel).
+- `hacer.py --revisa` dice **antes de gastar** qué va a pedir y cuánto cuesta. Lo ya generado no se vuelve a pedir:
+  cambiar una palabra de un `pide` es otro pedido, repetir el video no gasta nada.
+- Si algo no sale (sin cuenta, sin créditos, el proveedor frena la cuenta), el plano se queda con su texto o con una
+  trama del estilo y el video termina igual; `hacer.py` dice cuál y por qué, y no gastó nada.
+
+## Voz
+
+El estilo es de música, como sus referencias: **sin la línea `Voz:` en el mensaje, el video no lleva voz** y no
+llamas a ningún proveedor. Con ella (o si el usuario la pide), `"voz": true` en `momentos.json`,
+`guion.md` con lo que se dice y cada momento con su **`palabra`** (de una a tres palabras del guion, tal cual; `vez`
+si se repite) en vez de `compases`. El plano entra cuando la voz la dice, **pegado a la corchea** para que el corte
+siga cayendo en el ritmo, y la música se mete debajo sola. La línea dice de dónde sale ([VOZ.md](../video-base/VOZ.md)): `hacer.py --studio <Voz>` la genera en AI Studio y
+`--audio <archivo>` usa la que mandó el usuario. Se guarda: corregir un plano no la vuelve a pedir; cambiar el guion, sí.
+
+## Los pasos
+
+1. Escribe `momentos.json` en la carpeta de la línea `Carpeta:` del mensaje (sin ella, `motion-<tema>`). Los textos
+   en español, cortos y en el idioma del usuario; cada plano enseña lo que su texto dice.
+2. `python -B -X utf8 <skill>/scripts/hacer.py --revisa` (menos de un segundo) hasta que diga ✓: dice todo lo que
+   falla de una vez.
+3. `python -B -X utf8 <skill>/scripts/hacer.py` **en segundo plano** y termina tu mensaje: te avisa al acabar. Un
+   vertical de 20 s sin material tarda unos 40 s; con una imagen generada, unos tres minutos (lo que tarda el
+   proveedor, mientras tanto se hacen la música y la portada). Súmale lo del mensaje: `--imagenes chatgpt` o
+   `--imagenes "<modelo>"` (línea `Imágenes:`), `--clips "<modelo>" --resolucion <r> --tope <n>` (línea `Clips:`),
+   `--studio <Voz>` o `--audio <archivo>` (línea `Voz:`), `--pista <archivo>` si el usuario mandó su música.
+4. Mira `revision/hoja.png` y `portada.png`: que cada texto se lea entero y que ningún plano quede vacío. Otro render
+   solo si algo de verdad no se ve, todo en una vuelta (la música y los cuadros que no cambiaron no se repiten).
+   Para mirar un encuadre sin renderizar, `hacer.py --fotos` deja un cuadro por plano en `revision/fotos/`.
+5. Entrega la ruta de `out/motion-graphics.mp4`, cuánto dura, el proceso en una línea, y que el audio no lo oíste.
+
+[`ejemplo/momentos.json`](ejemplo/momentos.json) es el carrete de referencia escrito así.

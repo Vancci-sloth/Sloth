@@ -48,7 +48,10 @@ Este es el mapa:
   `/workspaces/.sloth-nube` y la vigila; se entra por la dirección privada del puerto 4848 (`SLOTH_NUBE`), que el
   servidor atiende como a su ventana. La interfaz va como desde la web (`enLaNube`): todo se baja al dispositivo y
   «Actualizar» va por `/api/ventana/…`. La entrada (`licencias/src/web.ts`) ofrece «Abrir Sloth en la nube».
-- `server/sessions.ts`: cada hilo es `data/sessions/<id>.json` (qué es) y `<id>.jsonl` (lo que pasó). Retoma la sesión
+- `server/sessions.ts`: cada hilo es `data/sessions/<id>.json` (qué es) y `<id>.jsonl` (lo que pasó). «Eliminar» quita
+  solo el chat o, con «Eliminar también», sus imágenes y las carpetas de video que Sloth le creó (`carpetasGeneradas`,
+  `server/borrar-hilo.ts`): lo que comparte con otro hilo se queda, y un video en la cola de Redes o YouTube no se borra;
+  lo que estaba en uso se anota en `data/por-borrar.json` y se borra al arrancar o en el siguiente borrado. Retoma la sesión
   del proveedor tras reiniciar, reparte los lotes según la máquina y cierra el proceso de un video del lote al acabar.
   Un chat de Claude, DeepSeek, Codex u OpenCode con su sesión guardada suelta el proceso a la media hora; los demás
   agentes lo conservan hasta comprobar que retoman. `npm run hilo -- <id>` (`scripts/hilo.mjs`) resume un hilo desde esos archivos.
@@ -103,7 +106,8 @@ Este es el mapa:
 - El estudio de video (`web/src/Estudio.tsx`): toda card cuyas etapas tengan `fase` se ve igual, con las cinco fases
   arriba, la elegida al centro, la línea de tiempo abajo y el chat a la derecha. En la fase Video (`Editor.tsx`), el motor
   en vivo (`server/motor.ts`, ADR 0005) reproduce sin renderizar cualquier proyecto de Remotion y se rehace solo con cada
-  cambio; un clic en el cuadro, una escena o un tramo va al chat como referencia (`Referencia.tsx`).
+  cambio; un clic en el cuadro, una escena o un tramo va al chat como referencia (`Referencia.tsx`). Cada fase y el
+  formato al crear un video llevan su ayuda con un ejemplo (`AyudaVideo.tsx`).
   Los motores y los vigilantes de carpetas se liberan tras cinco minutos sin uso; los hilos a la vista conservan ambos, y
   los que trabajan, sus vigilantes. Las ondas de audio se calculan de una en una y se guardan en bytes, 32 archivos como máximo.
 - El motor de los estilos (`skills/video-base/MOTOR.md`): el agente escribe `momentos.json` (qué se ve en cada
@@ -176,7 +180,9 @@ Este es el mapa:
 - Imágenes (`web/src/EstudioImagenes.tsx`, `EditorImagen.tsx`, `/api/flow/estudio` en `server/flow/index.ts`): pedir una
   imagen sin chat, con un estilo (`shared/estilos-imagen.ts`), un modelo de Flow (la misma fila y cuentas), ChatGPT
   (`server/imagen-codex.ts`) o «Quitar fondo» en tu computadora (`server/flow/recorte.ts`, `video-base/scripts/recorte.py`).
-  El editor marca zonas a mano alzada (cambiar, quitar, conservar). Con «Prompt» y un modelo, `redactar` escribe el pedido
+  El editor marca zonas a mano alzada (cambiar, quitar, conservar; `LienzoZonas.tsx`) y trae ajustes de un clic
+  (`AJUSTES_EDICION_IMAGEN`, cada uno con su ejemplo en `EjemploEdicionImagen.tsx`); «Subir imagen» mete una tuya a la
+  galería para editarla (`/api/flow/estudio/subir`). Con «Prompt» y un modelo, `redactar` escribe el pedido
   y queda un chat de solo lectura de la imagen (`server/flow/hilo-imagen.ts`, `SessionMeta.imagenEstudio`). En `data/imagenes`.
 - El navegador de cada hilo (`electron/navegador.ts`, el globo de `web/src/Navegador.tsx`): el Playwright MCP del agente
   (`server/navegador-agente.ts`, lanzado a demanda por `server/navegador-mcp.mjs`) entra en él por CDP. Sin ventana, un Chrome con `data/navegador`; en lotes, uno limpio.
@@ -195,7 +201,8 @@ Este es el mapa:
   (`licencias/src/comunidad.ts`); cada quien entra con su cuenta gratis (o la clave de su apoyo) y tú, como creador, con la llave de `admin.txt`.
   El feed se ordena por actividad, por lo más reciente o, solo el creador, por «Sin contestar» (`consultaFeed`). Lo ya
   pedido y lo que se adelanta (secciones, comentarios, la página siguiente) vive en `web/src/comunidadDatos.ts`; el
-  buscador, en `/comunidad/buscar` (`consultaBuscar`).
+  buscador, en `/comunidad/buscar` (`consultaBuscar`). «Mi perfil» (`#/comunidad/perfil`, `MiPerfil.tsx`) es su propia
+  página: tu foto, que encuadras con `RecortarFoto.tsx`, tu nombre, tus números y los créditos de Fundador.
   Publicar una mejora (la ven todos): `POST /api/mejoras {texto}`. Un anuncio a nombre del creador, en su tono:
   `docs/agents/anuncios.md`. La rifa (`licencias/src/rifa.ts`): arriba de la comunidad «Participa en la rifa» (`Rifa.tsx`,
   solo quien usa Sloth gratis), en Administrador se arma y se sortea con la ruleta (`RifaAdmin.tsx`); el ganador recibe
@@ -218,7 +225,11 @@ Este es el mapa:
   va en `modelos-3d/plantilla`, sin enseñarse. Sus botones (`server/modelos3d-acciones.ts`, `web/src/Modelos3DAcciones.tsx`):
   «Importar .glb» corre `modelos.py importar` sin agente, en una carpeta temporal que se borra (Draco y Meshopt se
   abren; el decodificador de Draco va con el modelo); «Nuevo modelo» abre un hilo de `MODELO3D_CARD` (`shared/modelos3d.ts`,
-  no sale en el inicio) en su propia carpeta, `<trabajo>/modelos-3d/<nombre>` (skill `modelos-3d`, §6).
+  no sale en el inicio) en su propia carpeta, `<trabajo>/modelos-3d/<nombre>` (skill `modelos-3d`, §6). Cada modelo tiene
+  su editor (`#/modelos-3d/editar/<id>`): el visor con su chat (el de sus variantes, junto), las operaciones para pedirle al
+  agente (`OPERACIONES_3D`, con su ayuda), el formulario de `BorradorModelo3D.tsx` y mover, girar o escalar sus piezas a
+  mano, que se guarda aparte (`server/modelos3d-ediciones.ts`, `data/modelos3d-ediciones/<id>.json`) y solo lo aplica el
+  visor: los videos usan el modelo como está en la skill.
 - Los subtítulos (`server/subtitulos.ts`, `web/src/Subtitulos.tsx`): en la Entrega de un hilo (`Final.tsx`), gratis y sin
   agente. `video-base/scripts/subtitulos.py` transcribe el video terminado con el transcriptor local; el servidor arma los
   renglones, el .srt y un .ass, y FFmpeg graba una copia en `<carpeta del video>/subtitulos/<video>/`, fuera de `out/`

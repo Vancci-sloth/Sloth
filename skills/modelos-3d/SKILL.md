@@ -129,8 +129,9 @@ antes de modelar) y se abre un hilo en una carpeta propia, vacía. Ahí:
 2. `python -B -X utf8 <esta skill>/scripts/modelos.py nuevo <id> --nombre "…" --descripcion "…"` hace de la carpeta un
    proyecto de prueba (Remotion y three, con el `node_modules` que comparten los videos explicativos) y deja el andamio en
    `src/modelos/<id>.tsx`.
-3. Escribe el modelo con las reglas de (4), `vista <id>`, **mírala**, corrige, y `guardar` (5) con su ficha entera.
-4. Dile al usuario que ya está en «Modelos 3D» y qué puede hacer.
+3. Identifica en la referencia los rasgos que determinan el parecido. En un personaje, compara la altura de la cabeza con la del cuerpo, la separación de los ojos, el perfil de nariz y mentón, los bordes de la ropa, los dedos y el calzado. Modela el relieve y las uniones que se ven al girarlo. Ajusta el material de cada superficie según la luz de la referencia.
+4. Escribe el modelo con las reglas de (4) y ejecuta `revisar <id>`. Abre los tres PNG de `out/revision-3d/<id>/` y compáralos con las imágenes originales. Usa la vista más próxima a la foto para comprobar el parecido y las otras dos para detectar piezas flotantes, intersecciones o caras planas. Corrige las diferencias visibles y repite la revisión. Luego ejecuta `guardar` (5) con su ficha y solo las acciones implementadas.
+5. Dile al usuario que ya está en «Modelos 3D» y qué puede hacer.
 
 `importar` es de Sloth («Importar .glb», sin agente): mete un `.glb` hecho fuera con un componente que lo carga, lo centra
 y lo escala, y abre los comprimidos con Draco o Meshopt.

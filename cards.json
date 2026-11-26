@@ -678,32 +678,40 @@
   {
     "id": "motion-graphics",
     "title": "Motion Graphics",
-    "description": "Campañas con montaje musical o narración, tipografía cinética, cámara y profundidad. Composiciones a medida y preview antes del render.",
+    "description": "Un carrete de estudio: tipografía enorme sobre campos de color plano, cortes secos en el compás, figuras, tramas y maquetas de interfaz, con un HUD técnico y música al mismo BPM. Puede meter imágenes y clips generados en Flow y objetos de tu biblioteca 3D, con o sin narración.",
     "skill": "motion-graphics",
-    "version": "1.1",
-    "basadoEn": "video-el-diff",
+    "version": "2.1",
     "icon": "escena",
+    "clips": true,
+    "voz": { "propia": "Sin voz, solo música" },
     "guia": {
-      "das": "Producto, público, mensaje y referencias. Elige formato; puedes pedir solo música, sin voz.",
-      "entrega": "Preview HTML o Remotion, video final con audio y portada.",
-      "ejemplo": "Crea una campaña musical sin voz, con portadas en profundidad, cambios de escala, tipografía cinética y transiciones conectadas al ritmo."
+      "das": "Marca, mensaje y los planos que quieres. Elige formato; el ritmo y los colores los pone el estilo. Si pides imágenes o clips, dilo: se generan y el comando te avisa cuánto cuestan antes de gastarlos.",
+      "entrega": "Video con música (y voz si la pediste), portada y hoja de cuadros.",
+      "ejemplo": "Un carrete de 20 segundos para presentar mi app: abre con el logo, la promesa en una frase, una imagen generada del escritorio de noche, un panel con lo que hace sola y cierra con la marca."
+    },
+    "modelos": {
+      "principal": { "model": "claude-sonnet-5-5", "effort": "medium", "medido": "25 nov 2026: un vertical de 21,6 s sin material en 46 s de máquina (33 s de render) y uno de 15 s con una imagen de Flow y un objeto 3D en 178 s, de los que 136 fueron esperar al proveedor (la música y la portada se hacen mientras). El agente escribe un solo archivo, momentos.json, y lee 1.530 palabras." }
     },
     "etapas": [
       {
-        "nombre": "Guion",
-        "listo": "guion.md",
+        "nombre": "Montaje",
+        "listo": "momentos.json",
         "copiar": true,
         "fase": "guion"
       },
       {
-        "nombre": "Sonido",
-        "listo": "fuentes/{voz/original,audio/mezcla}.wav",
-        "espera": "Prepara la música o mezcla final; añade narración solo si la pediste.",
+        "nombre": "Música",
+        "listo": "fuentes/audio/mezcla.wav",
         "fase": "sonido"
       },
       {
+        "nombre": "Revisión",
+        "listo": "revision/hoja.png",
+        "fase": "video"
+      },
+      {
         "nombre": "Video",
-        "listo": "out/{motion-graphics,pulso-visual}.mp4",
+        "listo": "out/motion-graphics.mp4",
         "fase": "video"
       },
       {
@@ -711,7 +719,31 @@
         "listo": "portada.png",
         "fase": "entrega"
       }
-    ]
+    ],
+    "cambio": {
+      "fecha": "2026-11-26",
+      "titulo": "Un carrete de 20 segundos sale en menos de un minuto de máquina",
+      "texto": "El agente ya no programa cada video en Remotion: escribe en una lista qué plano va en cada compás y Sloth pone las duraciones, las curvas, los colores, las transiciones, el HUD y la música al mismo BPM, con los cortes en el ritmo. Puede meter imágenes y clips de Flow y objetos de tu biblioteca 3D.",
+      "antes": {
+        "version": "1.1",
+        "description": "Campañas con montaje musical o narración, tipografía cinética, cámara y profundidad. Composiciones a medida y preview antes del render.",
+        "basadoEn": "video-el-diff",
+        "clips": null,
+        "voz": null,
+        "modelos": null,
+        "guia": {
+          "das": "Producto, público, mensaje y referencias. Elige formato; puedes pedir solo música, sin voz.",
+          "entrega": "Preview HTML o Remotion, video final con audio y portada.",
+          "ejemplo": "Crea una campaña musical sin voz, con portadas en profundidad, cambios de escala, tipografía cinética y transiciones conectadas al ritmo."
+        },
+        "etapas": [
+          { "nombre": "Guion", "listo": "guion.md", "copiar": true, "fase": "guion" },
+          { "nombre": "Sonido", "listo": "fuentes/{voz/original,audio/mezcla}.wav", "espera": "Prepara la música o mezcla final; añade narración solo si la pediste.", "fase": "sonido" },
+          { "nombre": "Video", "listo": "out/{motion-graphics,pulso-visual}.mp4", "fase": "video" },
+          { "nombre": "Portada", "listo": "portada.png", "fase": "entrega" }
+        ]
+      }
+    }
   },
   {
     "id": "nuevo-estilo",

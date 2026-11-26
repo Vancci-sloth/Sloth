@@ -63,6 +63,8 @@ import { licencia } from './licencia.ts' // suscripción
 import { Sessions, ultimoTexto } from './sessions.ts'
 import { imagenCodex } from './imagen-codex.ts' // estudio de Imágenes
 import { redactar } from './redactar.ts'
+import { carpetasDelHilo, dentroDe, moverProyectos, pendientes, rutaReal } from './borrar-hilo.ts'
+import { edicionesModelos3d } from './modelos3d-ediciones.ts' // modelos 3D: piezas movidas a mano
 import { quitarFondo } from './flow/recorte.ts'
 import { registroDeImagen } from './flow/hilo-imagen.ts'
 import { pedidoParaTitulo, tituloInicial } from './titulos.ts'
@@ -292,16 +294,21 @@ const { miniatura, cuadro, previa: previaChica, previaLista } = miniaturas(join(
 const idear = VENTA ? undefined : ideas(APP, sessions, broadcast, subirLargos?.lectura) // ideas
 // La biblioteca de modelos 3D que llenan los videos, para verla: la de la skill que usan los agentes, que es donde guardan.
 const biblioteca3d = modelos3d(carpetaSkill('modelos-3d') ?? join(APP, 'skills', 'modelos-3d'), {
-  python: () => rutaPythonSloth() ?? (process.platform === 'win32' ? 'python' : 'python3')
+  python: () => rutaPythonSloth() ?? (process.platform === 'win32' ? 'python' : 'python3'),
+  sesiones: () => sessions.list(),
+  editado: (id) => ediciones3d.tiene(id)
 }) // modelos 3D
+// Las piezas que se movieron a mano en el visor, por modelo (`data/modelos3d-ediciones`).
+const ediciones3d = edicionesModelos3d(join(APP, 'data', 'modelos3d-ediciones')) // modelos 3D
+// Lo que al eliminar un hilo estaba en uso y no se pudo borrar (`server/borrar-hilo.ts`): se reintenta al arrancar.
+const porBorrar = pendientes(join(APP, 'data', 'por-borrar.json'))
+void porBorrar.reintentar()
 // «Importar .glb» y «Nuevo modelo», en la misma biblioteca.
 const acciones3d = modelos3dAcciones({
   sessions,
   skillRef,
-  modelo: (p) => {
-    const m = modelos.find((x) => x.id === p.model) ?? modelos.find((x) => proveedorDe(x.id) === 'claude') ?? modelos[0]
-    return m && { model: m.id, effort: m.id === p.model && p.effort ? p.effort : m.defaultEffort }
-  },
+  rutaHistorial: (id) => join(APP, 'data', 'sessions', id + '.jsonl'),
+  modelos: () => modelos,
   adjuntos: ATTACHMENTS,
   biblioteca: carpetaSkill('modelos-3d') ?? join(APP, 'skills', 'modelos-3d'),
   trabajo: join(carpetaTrabajo(APP), 'modelos-3d'),
@@ -894,7 +901,7 @@ async function api(req: IncomingMessage, res: ServerResponse, url: URL): Promise
     // El título corto: el de Claude lo pone Haiku aparte; los demás agentes, en su primer turno (`server/titulos.ts`).
     const pedido = pedidoParaTitulo(input.text)
     const claude = proveedorDe(input.model) === 'claude'
-    const meta = sessions.create({ cardId: card.id, title, model: input.model, effort: input.effort, cwd: card.cwd, carpeta: nueva, generarTitulo: !titulo && !!pedido && !claude && !card.sinHerramientas })
+    const meta = sessions.create({ cardId: card.id, title, model: input.model, effort: input.effort, cwd: card.cwd, carpeta: nueva, carpetasGeneradas: nueva ? [nueva] : undefined, generarTitulo: !titulo && !!pedido && !claude && !card.sinHerramientas })
     const text = [input.text, nueva && `Carpeta: ${nueva}`].filter(Boolean).join('\n\n')
     sessions.send(meta.id, text, card.skill ? skillRef(card.skill) : undefined, input.images)
     // El primer mensaje recortado se cambia por un título corto cuando llega, como un renombrado. Nadie lo espera; si
@@ -954,6 +961,7 @@ async function api(req: IncomingMessage, res: ServerResponse, url: URL): Promise
   if (subirLargos && (await subirLargos.api(req, res, url))) return true // videos largos de YouTube
   if (await previa.api(req, res, url)) return true // previas de las cards
   if (idear && (await idear.api(req, res, url))) return true // ideas
+  if (await ediciones3d.api(req, res, url)) return true // modelos 3D: piezas movidas a mano
   if (await acciones3d.api(req, res, url)) return true // modelos 3D
   if (await biblioteca3d.api(req, res, url)) return true // modelos 3D
   if (await subtitular.api(req, res, url)) return true // subtítulos
@@ -987,13 +995,37 @@ async function api(req: IncomingMessage, res: ServerResponse, url: URL): Promise
       const limpio = String(title ?? '').replace(/\s+/g, ' ').trim().slice(0, 80)
       if (limpio) sessions.rename(id, limpio)
       send(res, limpio ? 200 : 400, limpio ? { ok: true } : { error: 'Escribe un nombre.' })
-    } else if (action === 'delete') {
+    } else if ((action === 'borrado' && (method === 'GET' || method === 'POST')) || (action === 'delete' && method === 'POST')) {
+      // `delete` quita solo el chat. `borrado`: GET dice si tiene archivos propios que borrar (los de su video o sus
+      // imágenes) y POST lo quita con ellos (`server/borrar-hilo.ts`): primero se apartan, y si algo falla, vuelven.
+      let movidas: ReturnType<typeof moverProyectos> | undefined
       try {
-        sessions.remove(id)
-        send(res, 200, { ok: true })
+        const conArchivos = action === 'borrado' && method === 'POST'
+        const hilo = sessions.meta(id)
+        if (!hilo) return send(res, method === 'POST' ? 200 : 404, method === 'POST' ? { ok: true } : { error: 'Este chat ya se eliminó.' })
+        const mirar = conArchivos || method === 'GET'
+        const imagenes = mirar && hilo.imagenEstudio ? generarFlow.archivosDelHilo(hilo.imagenEstudio) : undefined
+        const videos = mirar && !imagenes && conEtapas(id) ? carpetasDelHilo(hilo, sessions.list(), hilo.carpetasGeneradas ? undefined : sessions.primerUsuario(id)?.text) : []
+        if (method === 'GET') return send(res, 200, { tipo: imagenes?.archivos.length ? 'imagen' : videos.length ? 'video' : null })
+        sessions.remove(id, () => {
+          if (!conArchivos) return
+          if (videos.length) {
+            // Un video que espera subirse a Redes o a YouTube no se borra: la subida se quedaría sin archivo.
+            const enCola = [...publicar.rutasEnCola(), ...(subirLargos?.rutasEnCola() ?? [])]
+            if (enCola.some((ruta) => videos.some((carpeta) => dentroDe(carpeta, join(rutaReal(dirname(ruta)) ?? dirname(ruta), basename(ruta))))))
+              throw new Error('Hay un video en cola de publicación. Retíralo de la cola antes de eliminar sus archivos.')
+            movidas = moverProyectos(videos)
+          } else if (imagenes) movidas = generarFlow.moverImagenesDelHilo(imagenes)
+        })
       } catch (error) {
-        send(res, 409, { error: error instanceof Error ? error.message : String(error) })
+        movidas?.restaurar()
+        return send(res, 409, { error: error instanceof Error ? error.message : String(error) })
       }
+      // Lo que estaba en uso se queda anotado y se borra solo después (`porBorrar`): al abrir Sloth o en el siguiente borrado.
+      const quedan = (await movidas?.limpiar()) ?? []
+      porBorrar.anotar(quedan)
+      void porBorrar.reintentar()
+      send(res, 200, quedan.length ? { ok: true, aviso: 'El chat se eliminó. Algunos archivos estaban en uso: se borran solos en cuanto se suelten.' } : { ok: true })
     } else if (action === 'compactar' && method === 'POST') {
       try {
         sessions.compactar(id)

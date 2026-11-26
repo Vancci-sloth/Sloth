@@ -1,0 +1,82 @@
+<!doctype html>
+<!--
+  La página que dibuja el video. La abre scripts/render.mjs en Chrome sin ventana con ?plan=/p/revision/plan.json
+  y llama a seek(t) por cada cuadro; también sirve para mirarlo a mano en el navegador (botón de play).
+  Expone window.DURATION, window.listo, window.fallo, window.seek(t) y window.portada(): el contrato de render.mjs.
+-->
+<meta charset="utf-8">
+<title>Motion Graphics</title>
+<style>
+  html, body { margin: 0; background: #000; overflow: hidden; }
+  canvas { display: block; }
+  #play { position: fixed; left: 12px; bottom: 12px; font: 13px system-ui; padding: 6px 12px; }
+  @media (min-width: 0px) { #play { display: var(--play, none); } }
+</style>
+<canvas id="lienzo"></canvas>
+<button id="play" onclick="reproducir()">▶</button>
+<script type="module">
+  import { montar } from './motion.js'
+
+  const q = new URLSearchParams(location.search)
+  const lienzo = document.getElementById('lienzo')
+  try {
+    for (const [familia, archivo, descriptores] of [
+      ['Titular', 'Inter-900.woff2', { weight: '900' }],
+      ['Mono', 'JetBrainsMono-400.woff2', { weight: '400' }],
+      ['Serif', 'PlayfairDisplay-Italic-Var-latin.woff2', { style: 'italic', weight: '400 900' }],
+    ]) {
+      const letra = new FontFace(familia, `url(./letra/${archivo})`, descriptores)
+      document.fonts.add(await letra.load())
+    }
+    await document.fonts.ready
+
+    const plan = await (await fetch(q.get('plan') || '/p/revision/plan.json')).json()
+    lienzo.width = plan.ancho
+    lienzo.height = plan.alto
+    const escala = Math.min(innerWidth / plan.ancho, innerHeight / plan.alto, 1)
+    if (!q.get('plan') || q.get('mirar')) {
+      lienzo.style.width = plan.ancho * escala + 'px'
+      lienzo.style.height = plan.alto * escala + 'px'
+      document.documentElement.style.setProperty('--play', 'block')
+    }
+    // El material generado (imágenes y los cuadros de los clips) se carga a medida que se dibuja y se guardan ocho:
+    // un clip de dos compases son más de cien cuadros, y tenerlos todos en memoria se come un giga.
+    const guardadas = new Map()
+    const material = {
+      listo: (ruta) => (ruta ? guardadas.get(ruta) || null : null),
+      async pedir(rutas) {
+        for (const ruta of rutas) {
+          if (guardadas.has(ruta)) continue
+          const img = new Image()
+          img.src = '/p/' + ruta
+          try {
+            await img.decode()
+            guardadas.set(ruta, img)
+          } catch {
+            guardadas.set(ruta, null) // no está: el plano se dibuja sin él y hacer.py ya lo dijo
+          }
+          if (guardadas.size > 8) guardadas.delete(guardadas.keys().next().value)
+        }
+      },
+    }
+
+    const pelicula = montar(plan, lienzo.getContext('2d', { alpha: false }), material)
+    window.DURATION = pelicula.duracion
+    window.seek = (t) => pelicula.dibujar(t)
+    window.portada = () => pelicula.portada()
+    window.semilla = (t) => pelicula.semilla(t)
+    await window.seek(0)
+    window.listo = true
+  } catch (e) {
+    window.fallo = (e && e.stack) || String(e)
+  }
+
+  window.reproducir = () => {
+    const desde = performance.now()
+    const paso = () => {
+      const t = (performance.now() - desde) / 1000
+      window.seek(t % window.DURATION).then(() => requestAnimationFrame(paso))
+    }
+    paso()
+  }
+</script>

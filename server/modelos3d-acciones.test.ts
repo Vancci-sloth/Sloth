@@ -35,6 +35,10 @@ async function montar() {
   const corridas: { args: string[]; cwd: string; glb: string }[] = []
   const api = modelos3dAcciones({
     sessions: {
+      list: () => hilos.map(h => h.meta),
+      setModel: (id, model) => { hilos.find(h => h.meta.id === id)!.meta.model = model },
+      editarModelo3D: (id, modelo) => { hilos.find(h => h.meta.id === id)!.meta.modelo3d!.editando = modelo },
+      steer: (id, texto, imagenes) => Object.assign(hilos.find(h => h.meta.id === id)!, { texto, imagenes }),
       create: (i) => {
         const meta = { id: `h${hilos.length + 1}`, ...i, createdAt: 0, updatedAt: 0, running: false } as SessionMeta
         hilos.push({ meta })
@@ -43,7 +47,8 @@ async function montar() {
       send: (_id, texto, _skill, imagenes) => Object.assign(hilos[hilos.length - 1], { texto, imagenes })
     },
     skillRef: (name) => ({ name, path: '/skills/modelos-3d/SKILL.md' }),
-    modelo: (p) => ({ model: p.model ?? 'claude-x', effort: p.effort }),
+    rutaHistorial: id => join(dir, id + '.jsonl'),
+    modelos: () => ['claude-y', 'codex:gpt-prueba'].map((id) => ({ id, label: id, efforts: [] })),
     adjuntos,
     biblioteca,
     trabajo,
@@ -75,11 +80,13 @@ test('POST /nuevo abre un hilo de la card oculta, cada uno en su carpeta', async
   try {
     const imagen = join(m.adjuntos, '1-ref.png')
     writeFileSync(imagen, 'png')
-    assert.equal((await post(`${m.base}/api/modelos3d/nuevo`, { descripcion: 'Caja fuerte con rueda', referencia: imagen, model: 'claude-y' })).status, 200)
+    assert.equal((await post(`${m.base}/api/modelos3d/nuevo`, { descripcion: 'Caja fuerte con rueda', referencia: imagen, model: 'codex:gpt-prueba' })).status, 200)
+    assert.equal((await post(`${m.base}/api/modelos3d/nuevo`, { descripcion: 'Caja fuerte con rueda', model: 'codex:no-disponible' })).status, 409)
+    assert.equal(m.hilos.length, 1)
     assert.equal((await post(`${m.base}/api/modelos3d/nuevo`, { descripcion: 'Caja fuerte con rueda' })).status, 200)
     const [a, b] = m.hilos
     assert.equal(a.meta.cardId, MODELO3D_CARD.id)
-    assert.equal(a.meta.model, 'claude-y')
+    assert.equal(a.meta.model, 'codex:gpt-prueba')
     assert.deepEqual(a.imagenes, [imagen])
     assert.match(a.texto ?? '', /Caja fuerte con rueda/)
     // Dos hilos a la vez no comparten proyecto.
@@ -116,6 +123,56 @@ test('POST /importar pasa el .glb a modelos.py y no deja nada temporal, salga bi
     assert.equal((await fetch(`${m.base}/api/modelos3d/importar`, { method: 'POST', body: glb })).status, 400)
     assert.equal((await fetch(`${m.base}/api/modelos3d/importar?nombre=Moneda`, { method: 'POST', body: glb })).status, 409)
     assert.equal(m.corridas.length, 2)
+  } finally {
+    await m.cerrar()
+  }
+})
+
+test('editar un modelo importado abre un chat y las correcciones retoman ese chat y ese modelo', async () => {
+  const m = await montar()
+  try {
+    const frente = join(m.adjuntos, 'frente.png')
+    const perfil = join(m.adjuntos, 'perfil.webp')
+    for (const ruta of [frente, perfil]) writeFileSync(ruta, 'referencia')
+    const endpoint = `${m.base}/api/modelos3d/nuevo`
+    const pedido = { descripcion: 'Cambia el material a bronce', origen: 'moneda', referencias: [frente, perfil] }
+    const respuesta = await post(endpoint, pedido)
+    assert.equal(respuesta.status, 200)
+    assert.deepEqual((await respuesta.json()).modelo3d, { editando: 'moneda', resultado: 'moneda', operacion: 'mejorar' })
+    assert.deepEqual(m.hilos[0].imagenes, [frente, perfil])
+    assert.match(m.hilos[0].texto ?? '', /Guarda la corrección bajo el mismo id/)
+    assert.doesNotMatch(m.hilos[0].texto ?? '', /Abrir en el editor 3D/)
+    assert.equal((await post(endpoint, { ...pedido, origen: '../moneda' })).status, 404)
+    assert.equal((await post(endpoint, { ...pedido, origen: 'no-existe' })).status, 404)
+    assert.equal((await post(endpoint, { ...pedido, referencias: Array(5).fill(frente) })).status, 400)
+    assert.equal((await post(endpoint, { ...pedido, referencias: [m.adjuntos] })).status, 400)
+    const zonas = [[{ x: 10, y: 20 }, { x: 15, y: 22 }, { x: 12, y: 27 }, { x: 10, y: 20 }], [{ x: 75, y: 30 }], [{ x: 1, y: 2 }, { x: 3, y: 4 }]]
+    assert.equal((await post(endpoint, { ...pedido, zonas: [[{ x: 102, y: 30 }]] })).status, 400)
+    const segunda = await post(endpoint, { ...pedido, zonas })
+    assert.equal((await segunda.json()).id, m.hilos[0].meta.id)
+    assert.equal(m.hilos.length, 1)
+    assert.match(m.hilos[0].texto ?? '', /Zona 1: 10,20 15,22 12,27 10,20\nPunto 2: 75,30\nTrazo 3: 1,2 3,4/)
+  } finally {
+    await m.cerrar()
+  }
+})
+
+test('las versiones antiguas de un modelo siguen en el chat más reciente y permiten corregir durante el turno', async () => {
+  const m = await montar()
+  try {
+    const endpoint = m.base + '/api/modelos3d/nuevo'
+    const guardar = (id: string, origen: string, resultado: string, updatedAt: number) =>
+      m.hilos.push({ meta: { id, model: 'codex:gpt-prueba', createdAt: updatedAt, updatedAt, running: false, modelo3d: { origen, resultado } } as SessionMeta })
+    guardar('anterior', 'moneda', 'version-antigua', 10)
+    guardar('actual', 'version-antigua', 'ultima-version', 20)
+    const pedido = { origen: 'moneda', descripcion: 'Corrige el relieve' }
+    assert.equal((await (await post(endpoint, pedido)).json()).id, 'actual')
+    assert.match(m.hilos[1].texto ?? '', /anterior\.jsonl/)
+    assert.equal(m.hilos[1].meta.modelo3d?.editando, 'moneda')
+    m.hilos[1].meta.running = true
+    assert.equal((await (await post(endpoint, { ...pedido, descripcion: 'También el borde' })).json()).id, 'actual')
+    assert.equal((await post(endpoint, { ...pedido, model: 'claude-y' })).status, 409)
+    assert.equal(m.hilos.length, 2)
   } finally {
     await m.cerrar()
   }

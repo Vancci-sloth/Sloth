@@ -8,6 +8,7 @@ import { esIcono, Icono } from './Iconos'
 import { FlowEnUso, LimitesContexto } from './LimitesContexto'
 import { Dictado } from './Dictado'
 import { Logo } from './Logos'
+import { VistaAyuda } from './Ayuda'
 import type { Resumen } from './eventos'
 import { compact } from './items'
 import { invocacion, LINK, LINK_ICON, linkParts, QUOTE_EVENT, QUOTE_ICON, quoteRef, THREAD, THREAD_ICON, threadIconOf } from './etiquetas'
@@ -455,11 +456,34 @@ export function Picker(props: {
   titulo?: string
   /** Con más de `BUSCAR_DESDE` opciones, un buscador arriba de la lista. */
   buscar?: boolean
-  /** `detalle` va a la derecha de la opción, apagado (lo que cuesta y tarda cada modelo). Con `proveedor`, su logo. */
-  groups: { label: string; proveedor?: string; options: { value: string; label: string; detalle?: string }[] }[]
+  /** `detalle` va a la derecha de la opción, apagado (lo que cuesta y tarda cada modelo). Con `proveedor`, su logo; con `logo`, el de esa opción. */
+  groups: { label: string; proveedor?: string; options: { value: string; label: ReactNode; detalle?: string; logo?: string }[] }[]
+  /** Lo mismo que `nombre`, para quien no ve. */
+  etiqueta?: string
+  /**
+   * Una ayuda por opción (las operaciones del editor 3D): un botón de información a su lado que, al pasar el ratón o al
+   * enfocarlo, enseña `vista` junto a la lista (`Ayuda.tsx`).
+   */
+  ayuda?: { etiqueta(value: string): string | undefined; vista(value: string): ReactNode }
   onChange(value: string): void
 }) {
   const [open, setOpen] = useState(false)
+  const [vista, setVista] = useState<{ valor: string; ancla: HTMLButtonElement }>()
+  const esperaVista = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+  const idVista = useId()
+  const mantenerVista = () => clearTimeout(esperaVista.current)
+  const mostrarVista = (valor: string, ancla: HTMLButtonElement) => {
+    mantenerVista()
+    setVista((actual) => (actual?.ancla === ancla ? actual : { valor, ancla }))
+  }
+  const ocultarVista = () => {
+    mantenerVista()
+    esperaVista.current = setTimeout(() => setVista(undefined), 180)
+  }
+  useEffect(() => {
+    if (!open) setVista(undefined)
+    return () => clearTimeout(esperaVista.current)
+  }, [open])
   // Hacia dónde se abre y cuánto alto le cabe; se mide al abrir.
   const [place, setPlace] = useState({ down: false, max: 360, left: 0, edge: 0, width: 280 })
   const root = useRef<HTMLDivElement>(null)
@@ -468,7 +492,7 @@ export function Picker(props: {
   const largo = !!props.buscar && props.groups.reduce((n, g) => n + g.options.length, 0) > BUSCAR_DESDE
   const palabras = largo ? busca.toLowerCase().split(/\s+/).filter(Boolean) : []
   const groups = palabras.length
-    ? props.groups.map((g) => ({ ...g, options: g.options.filter((o) => palabras.every((p) => `${g.label} ${o.label}`.toLowerCase().includes(p))) })).filter((g) => g.options.length)
+    ? props.groups.map((g) => ({ ...g, options: g.options.filter((o) => palabras.every((p) => `${g.label} ${typeof o.label === 'string' ? o.label : ''}`.toLowerCase().includes(p))) })).filter((g) => g.options.length)
     : props.groups
 
   const toggle = () => {
@@ -505,7 +529,8 @@ export function Picker(props: {
     if (largo) menu.current?.querySelector<HTMLInputElement>('.picker-buscar')?.focus({ preventScroll: true })
     else if (props.flotante) (elegido ?? menu.current?.querySelector<HTMLButtonElement>('.picker-option'))?.focus({ preventScroll: true })
     const mover = (e: Event) => {
-      if (props.flotante && !menu.current?.contains(e.target as Node)) setOpen(false)
+      if (menu.current?.contains(e.target as Node)) return setVista(undefined)
+      if (props.flotante) setOpen(false)
     }
     addEventListener('resize', mover)
     addEventListener('scroll', mover, true)
@@ -519,7 +544,7 @@ export function Picker(props: {
 
   return (
     <div ref={root} className={`picker ${props.className ?? ''} ${open ? 'open' : ''}`}>
-      <button type="button" className="picker-trigger" disabled={props.disabled} aria-label={props.nombre} title={props.titulo} aria-haspopup="listbox" aria-expanded={open} onClick={toggle} onKeyDown={(e) => {
+      <button type="button" className="picker-trigger" disabled={props.disabled} aria-label={props.nombre ?? props.etiqueta} title={props.titulo} aria-haspopup="listbox" aria-expanded={open} onClick={toggle} onKeyDown={(e) => {
         if (!open && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) { e.preventDefault(); toggle() }
       }}>
         {props.label}
@@ -540,7 +565,7 @@ export function Picker(props: {
           // En el buscador, Inicio y Fin mueven el cursor por lo escrito.
           if (e.target instanceof HTMLInputElement && (e.key === 'Home' || e.key === 'End')) return
           e.preventDefault()
-          const opciones = Array.from(menu.current?.querySelectorAll<HTMLButtonElement>('.picker-option') ?? [])
+          const opciones = Array.from(menu.current?.querySelectorAll<HTMLButtonElement>('.picker-option, .picker-info') ?? [])
           const actual = opciones.indexOf(document.activeElement as HTMLButtonElement)
           const siguiente = e.key === 'Home' ? 0 : e.key === 'End' ? opciones.length - 1 : (actual + (e.key === 'ArrowDown' ? 1 : -1) + opciones.length) % opciones.length
           opciones[siguiente]?.focus()
@@ -559,30 +584,57 @@ export function Picker(props: {
           {groups.map((g) => (
             <div key={g.label} className="picker-group" data-proveedor={g.proveedor}>
               <span className="picker-label">{g.proveedor && <Logo de={g.proveedor} chico />}{g.label}</span>
-              {g.options.map((o) => (
-                <button
-                  type="button"
-                  key={o.value}
-                  role="option"
-                  aria-selected={o.value === props.value}
-                  className={`picker-option ${o.value === props.value ? 'on' : ''}`}
-                  onClick={() => {
-                    setOpen(false)
-                    if (o.value !== props.value) props.onChange(o.value)
-                  }}
-                >
-                  {o.label}
-                  {o.detalle && <span className="picker-detalle">{o.detalle}</span>}
-                  {o.value === props.value && (
-                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M20 6 9 17l-5-5" />
-                    </svg>
-                  )}
-                </button>
-              ))}
+              {g.options.map((o) => {
+                const opcion = (
+                  <button
+                    type="button"
+                    key={o.value}
+                    role="option"
+                    aria-selected={o.value === props.value}
+                    className={`picker-option ${o.value === props.value ? 'on' : ''}`}
+                    onClick={() => {
+                      setOpen(false)
+                      if (o.value !== props.value) props.onChange(o.value)
+                    }}
+                  >
+                    {o.logo ? <span className="picker-modelo-logo"><Logo de={o.logo} chico />{o.label}</span> : o.label}
+                    {o.detalle && <span className="picker-detalle">{o.detalle}</span>}
+                    {o.value === props.value && (
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M20 6 9 17l-5-5" />
+                      </svg>
+                    )}
+                  </button>
+                )
+                const ayuda = props.ayuda?.etiqueta(o.value)
+                if (!ayuda) return opcion
+                return (
+                  <div className="picker-fila-info" key={o.value}>
+                    {opcion}
+                    <button
+                      type="button"
+                      className="picker-info"
+                      aria-label={`Información: ${ayuda}`}
+                      aria-describedby={vista?.valor === o.value ? idVista : undefined}
+                      onPointerEnter={(e) => e.pointerType !== 'touch' && mostrarVista(o.value, e.currentTarget)}
+                      onPointerLeave={ocultarVista}
+                      onFocus={(e) => e.currentTarget.matches(':focus-visible') && mostrarVista(o.value, e.currentTarget)}
+                      onBlur={ocultarVista}
+                      onClick={(e) => mostrarVista(o.value, e.currentTarget)}
+                    >
+                      <Icono de="informacion" />
+                    </button>
+                  </div>
+                )
+              })}
             </div>
           ))}
         </div>
+      )}
+      {open && vista && menu.current && props.ayuda && (
+        <VistaAyuda id={idVista} ancla={vista.ancla} menu={menu.current} mantener={mantenerVista} ocultar={ocultarVista}>
+          {props.ayuda.vista(vista.valor)}
+        </VistaAyuda>
       )}
     </div>
   )

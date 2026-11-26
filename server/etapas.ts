@@ -262,7 +262,7 @@ function otraVersion(meta: SessionMeta, sessions: Sessions): { antes: string; nu
   while (usadas.has(`${base}-v${k}`.toLowerCase())) k++
   const nueva = `${base}-v${k}`
   mkdirSync(join(meta.cwd, nueva), { recursive: true })
-  sessions.setCarpeta(meta.id, nueva)
+  sessions.setCarpeta(meta.id, nueva, true)
   return { antes, nueva }
 }
 

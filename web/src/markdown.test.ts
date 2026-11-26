@@ -33,3 +33,15 @@ test('Markdown: una imagen del disco se pide al servidor del hilo; sin hilo, que
   assert.equal(markdown('![Perro](C:\\v\\perro.jpg)'), '<p>Perro</p>\n')
   assert.match(bloquesDeMarkdown('![web](https://x.example/a.png)', pedir)[0], /src="https:\/\/x\.example\/a\.png"/)
 })
+
+test('en el editor 3D omite el enlace de entrega a la ficha abierta en los mensajes antiguos', () => {
+  const ruta = '#/modelos-3d/editar/mario'
+  const actual = 'http://localhost:4848/' + ruta
+  for (const destino of [ruta, actual]) {
+    const enlace = `[Abrir en el editor 3D](${destino})`
+    assert.deepEqual(bloquesDeMarkdown('Modelo guardado.\n\n' + enlace, undefined, actual), ['<p>Modelo guardado.</p>\n'])
+    assert.match(bloquesDeMarkdown(enlace, undefined, actual + '-variante').join(''), /<a href=/)
+    assert.match(bloquesDeMarkdown(enlace).join(''), /<a href=/)
+    assert.match(bloquesDeMarkdown('`' + enlace + '`', undefined, actual).join(''), /<code>\[Abrir en el editor 3D\]/)
+  }
+})

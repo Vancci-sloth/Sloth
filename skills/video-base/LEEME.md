@@ -6,7 +6,9 @@ Lo que comparten los estilos de vídeo: el lote, los errores ya vistos y los scr
 - **La usan:** `reel-collage` y `video-explicativo` (sus scripts, `LOTE.md` y este archivo; `video-explicativo`, también
   las huellas), `video-documental` (el motor, `sloth.py`, `chrome.mjs`, el render, masterizar y comprobar), `frutinovela`
   (`FLOW.md`, `sloth.py`, la hoja, masterizar, comprobar y la portada), los estilos que hace
-  cada quien con `crear-estilo` y los procesos de Python de Sloth (`sloth.py`).
+  cada quien con `crear-estilo` y los procesos de Python de Sloth (`sloth.py`). **`motion-graphics`** usa el motor
+  ([`MOTOR.md`](MOTOR.md), `momentos.py`), `chrome.mjs` y `ffmpeg.mjs` para dibujar, `voz.py`, y `musica.py` (con su
+  `--bpm`), `masterizar.mjs`, `portada.mjs`, `comprobar.mjs` y la hoja; su kit y su director son suyos.
 - **`video-el-diff`** se hace con el motor común ([`MOTOR.md`](MOTOR.md), `scripts/momentos.py`), pero su plantilla y
   su director son suyos: el usuario los afina a mano, y desde aquí no se les mueve nada. Además toma prestados
   `chrome.mjs`, `recorte.py`, la portada (`PORTADA.md`, `portada_sin_ia.mjs`) y `sloth.py` (con su `ffmpeg_h264`), así
@@ -105,6 +107,7 @@ Todos dicen cómo se usan si los corres sin argumentos. Node sin dependencias y 
 | Script | Qué hace |
 |---|---|
 | `masterizar.mjs crudo.wav audio.wav` | −14 LUFS y true peak ≤ −1 dBTP, 48 kHz 24 bits; falla si no lo clava. Usa soxr si FFmpeg lo trae, o su remuestreador de serie si no |
+| `voz.py` (librería) | La voz de los estilos del motor (Low-Poly, Motion Graphics): `conseguir` la genera en AI Studio (`--studio`) o toma la grabación (`--audio`), y `palabras` dice en qué segundo va cada palabra (WhisperX). Ninguna de las dos se repite mientras no cambie el guion o la voz |
 | `musica.py --poner video.mp4 [--pista a.mp3]` | La línea `Música: de fondo`: música sintetizada (libre de derechos) o la `--pista` del usuario bajo la voz del video terminado, que baja sola al hablar; masterizada y sin tocar la imagen. Una segunda vez no hace nada |
 | `comprobar.mjs video.mp4 --duracion 10 --fps 30 --tamano 1080x1920` | Códec, tamaño, fps, fotogramas, audio, sonoridad, pico, faststart, negros, arranque vacío |
 | `hoja.mjs video.mp4 hoja.png [--n 16 \| --cada 0.25 \| --t …] [--zonas] [--recomprimir 3M]` | Hoja de contacto con tiempos; zonas seguras; prueba de recompresión |

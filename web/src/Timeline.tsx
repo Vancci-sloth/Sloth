@@ -1,4 +1,4 @@
-import { Fragment, memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { createContext, Fragment, memo, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { HERRAMIENTA_FLOW, hechoDeFlow, MODELOS_IMAGEN } from '../../shared/flow'
 import { NOMBRE_AGENTE, proveedorDe } from '../../shared/providers'
 import type { AgentEvent } from '../../shared/types'
@@ -64,7 +64,11 @@ function onMarkdownClick(e: React.MouseEvent, sessionId?: string) {
  * en la página tal cual, sin volver a armarlos ni a medirlos, y lo que tengas seleccionado en ellos sigue seleccionado.
  * Van sin envoltorio, como si fueran un solo HTML (el CSS mira a los hijos de `.md`).
  */
+/** La dirección del editor 3D abierto (`Modelos3D.tsx`): su chat no repite el enlace para abrirlo. */
+export const UrlEditor3DActual = createContext<string | undefined>(undefined)
+
 const Markdown = memo(function Markdown({ text, sessionId }: { text: string; sessionId?: string }) {
+  const editorActual = useContext(UrlEditor3DActual)
   const caja = useRef<HTMLDivElement>(null)
   const [grande, setGrande] = useState<string>()
   const pintados = useRef<{ html: string; nodos: ChildNode[] }[]>([])
@@ -72,10 +76,10 @@ const Markdown = memo(function Markdown({ text, sessionId }: { text: string; ses
   const bloques = useMemo(
     () =>
       // Una imagen del disco (`![](C:\…\perro.jpg)`) se pide al servidor, como las que lee el agente.
-      bloquesDeMarkdown(text, sessionId ? (ruta) => `/api/sessions/${sessionId}/imagen?ruta=${encodeURIComponent(ruta)}` : undefined).map((html) =>
+      bloquesDeMarkdown(text, sessionId ? (ruta) => `/api/sessions/${sessionId}/imagen?ruta=${encodeURIComponent(ruta)}` : undefined, editorActual).map((html) =>
         html.replaceAll('<pre>', '<div class="code-block"><button class="copy" type="button">Copiar</button><pre>').replaceAll('</pre>', '</pre></div>')
       ),
-    [text, sessionId]
+    [text, sessionId, editorActual]
   )
   useLayoutEffect(() => {
     const el = caja.current!
@@ -179,10 +183,12 @@ function plegarTrabajo(lista: Item[], acabado: boolean): (Item | Trabajo)[] {
  * la fila que cambió (`Row` va memorizada y `buildTimeline` deja igual lo que no cambió). `relevos`: un modelo de cada
  * otro agente conectado, con los que el hilo sigue si el suyo llega al límite.
  */
-export function Timeline({ running, background, sessionId, proveedor = 'claude', subagente, onSubagente, onResponder, relevos, desdeEvento = 0 }: { running: boolean; background: string[]; sessionId: string; proveedor?: string; subagente?: string; onSubagente?(id: string | null): void; onResponder?(text: string, images?: string[]): Promise<unknown>; relevos?: Choice[]; desdeEvento?: number }) {
+export function Timeline({ running, background, sessionId, proveedor = 'claude', subagente, onSubagente, onResponder, relevos, desdeEvento = 0, anteriores }: { running: boolean; background: string[]; sessionId: string; proveedor?: string; subagente?: string; onSubagente?(id: string | null): void; onResponder?(text: string, images?: string[]): Promise<unknown>; relevos?: Choice[]; desdeEvento?: number; anteriores?: AgentEvent[] }) {
   const events = useEventos(sessionId) ?? SIN_EVENTOS
   const visiblesEnHilo = useMemo(() => desdeEvento ? events.slice(desdeEvento) : events, [events, desdeEvento])
-  const items = buildTimeline(visiblesEnHilo)
+  // `anteriores`: en el editor 3D, lo de los chats de antes del mismo modelo va arriba, como una sola conversación.
+  const conversacion = useMemo(() => (anteriores?.length ? [...anteriores, ...visiblesEnHilo] : visiblesEnHilo), [anteriores, visiblesEnHilo])
+  const items = buildTimeline(conversacion)
   const lanzador = subagente ? items.find((i): i is Extract<Item, { kind: 'tool' }> => i.kind === 'tool' && i.id === subagente && !!i.subagente) : undefined
   const sub = lanzador?.subagente
   // Al volver de un subagente lanzado por otro, se vuelve a ese.
@@ -518,7 +524,14 @@ const Row = memo(function Row({ item, sessionId, anidado, proveedor, onAbrir, on
         <div className="user-msg">
           <div className="bubble">
             <Thumbs images={item.images.map((path) => ({ path, src: imageUrl(path) }))} />
-            <WithQuotes text={item.text} />
+            <WithQuotes
+              text={
+                // El pedido de un modelo nuevo lleva instrucciones para el agente: se ve solo lo que escribiste.
+                item.text.startsWith('Hazme un modelo 3D nuevo para la biblioteca de «Modelos 3D»')
+                  ? item.text.replace(/^[\s\S]*?\nAl guardar, enlaza el resultado con [^\n]+\n\n/, '').replace(/\n\nZona marcada en el visor 3D, en coordenadas normalizadas: [\d., ]+$/, '')
+                  : item.text
+              }
+            />
           </div>
         </div>
       )

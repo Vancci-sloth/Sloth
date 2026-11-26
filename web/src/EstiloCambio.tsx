@@ -21,7 +21,8 @@ type Hecho = { titulo: string; id: string; adaptar: string[] }
  * otra vez a ese estilo (`activa`, la card abierta) o al abrir Sloth. A quien abre Sloth por primera vez, después de la
  * bienvenida. Si cambiaron varios, uno tras otro.
  */
-export function EstiloCambio({ cards, activa, onDesactivar }: { cards: Card[]; activa?: string; onDesactivar(): void }) {
+/** `pausado`: espera mientras se trabaja en el editor 3D, donde el aviso taparía el visor. */
+export function EstiloCambio({ cards, activa, pausado = false, onDesactivar }: { cards: Card[]; activa?: string; pausado?: boolean; onDesactivar(): void }) {
   const [avisos, setAvisos] = useState<Aviso[]>([])
   /** Los que se cerraron sin acabar: vuelven al entrar a su estilo. */
   const [cerrados, setCerrados] = useState<string[]>([])
@@ -37,7 +38,7 @@ export function EstiloCambio({ cards, activa, onDesactivar }: { cards: Card[]; a
   const clave = cambiados.map((c) => `${c.id}:${c.cambio?.fecha}`).join()
 
   useEffect(() => {
-    if (!clave || bienvenida) return
+    if (!clave || bienvenida || pausado) return
     let vivo = true
     const espera = setTimeout(() => {
       void Promise.all(cambiados.map((card) => api<EstiloAnterior | null>(`/api/cards/${card.id}/anterior`).then((a) => (a ? { ...a, card } : null), () => null))).then(
@@ -48,7 +49,7 @@ export function EstiloCambio({ cards, activa, onDesactivar }: { cards: Card[]; a
       vivo = false
       clearTimeout(espera)
     }
-  }, [clave, bienvenida])
+  }, [clave, bienvenida, pausado])
 
   useEffect(() => {
     const alCerrar = () => setBienvenida(false)
@@ -64,7 +65,7 @@ export function EstiloCambio({ cards, activa, onDesactivar }: { cards: Card[]; a
     if (activa) setCerrados((c) => (c.includes(activa) ? c.filter((id) => id !== activa) : c))
   }, [activa])
 
-  const aviso = bienvenida ? undefined : avisos.find((a) => !cerrados.includes(a.card.id))
+  const aviso = bienvenida || pausado ? undefined : avisos.find((a) => !cerrados.includes(a.card.id))
   useEffect(() => {
     if (!aviso) return
     const alPulsar = (e: KeyboardEvent) => {

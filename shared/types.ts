@@ -494,6 +494,13 @@ export interface SessionMeta {
    * la nombrara no tienen.
    */
   carpeta?: string
+  /**
+   * Las carpetas que Sloth creó para este hilo (la de su video, la de cada «Otra versión»): al eliminarlo con sus
+   * archivos, son las únicas que se borran (`server/borrar-hilo.ts`). Un hilo de antes no las tiene.
+   */
+  carpetasGeneradas?: string[]
+  /** Un chat de «Modelos 3D»: el modelo que entrega y, si edita uno, cuál. Se abre en su editor (`web/src/Modelos3D.tsx`). */
+  modelo3d?: import('./modelos3d.ts').TrabajoModelo3D
   /** Cuántas caídas seguidas se retomaron solas (ver `retomar` en sessions.ts). Vuelve a cero cuando un turno acaba bien. */
   retomas?: number
   /** Si su último turno acabó bien: `false` si falló o se cortó. Falta si aún no acabó ninguno. Lo mira el archivado automático. */
@@ -794,6 +801,10 @@ export interface Modelo3D {
   vuelta?: string
   /** Su visor 3D (`visor/`, `modelos.py visor`), si ya está armado con él: la ficha lo gira de verdad. */
   visor?: string
+  /** De dónde sale: un video (lo hizo una skill), lo creó el usuario en «Nuevo modelo», o lo trajo de un archivo .glb. */
+  procedencia?: 'video' | 'creado' | 'importado'
+  /** Si el usuario movió piezas a mano en el visor (`server/modelos3d-ediciones.ts`). */
+  editado?: boolean
 }
 
 /**

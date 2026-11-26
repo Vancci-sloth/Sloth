@@ -521,7 +521,7 @@ export function Comunidad() {
           {yo && (
             <Bienvenida
               yo={yo}
-              onNombre={() => setPerfil({})}
+              onNombre={irAMiPerfil}
               onPresentarse={() => abrirCompositor('general', '¡Hola! Soy…')}
               onComentar={() => irA('hice')}
             />
@@ -614,7 +614,7 @@ export function Comunidad() {
                   ))}
                 </div>
               )}
-              <button className="com-perfil" disabled={!yo} onClick={() => setPerfil({})}>
+              <button className="com-perfil" disabled={!yo} onClick={irAMiPerfil}>
                 <Cara autor={yo} tam="chica" />
                 {yo?.nombre ? 'Tu perfil' : 'Ponte tu nombre'}
               </button>
@@ -656,8 +656,12 @@ export function Comunidad() {
   )
 }
 
+/** De vuelta a la comunidad, y a «Mi perfil» (`MiPerfil.tsx`), que es su propia página. */
+export const irAComunidad = () => void (location.hash = '/comunidad')
+export const irAMiPerfil = () => void (location.hash = '/comunidad/perfil')
+
 /** La cara de alguien: su foto, el logo de Sloth si es el creador sin foto, o su inicial. */
-function Cara({ autor, tam = '' }: { autor?: Autor; tam?: '' | 'chica' | 'grande' }) {
+export function Cara({ autor, tam = '' }: { autor?: Autor; tam?: '' | 'chica' | 'grande' | 'enorme' }) {
   // La de un Fundador o un Donador PRO lleva su aro: se distingue también donde solo sale su cara.
   // (`aro-`, porque `grande` ya es un tamaño de cara.)
   const clase = `com-cara ${tam}${autor?.insignia === 'fundador' || autor?.insignia === 'grande' ? ` aro-${autor.insignia}` : ''}`
@@ -675,7 +679,7 @@ function Cara({ autor, tam = '' }: { autor?: Autor; tam?: '' | 'chica' | 'grande
  * Las insignias, de más a menos. Fundador: corona con joyas y los tres colores de Sloth (coral, ámbar y verde). Donador
  * PRO: lo mismo en oro y crema, con una estrella. Apoya: solo el texto.
  */
-const INSIGNIAS = {
+export const INSIGNIAS = {
   fundador: { texto: 'Fundador', icono: 'corona', colores: ['var(--bad)', 'var(--amber-2)', 'var(--ok)'] },
   grande: { texto: 'Donador PRO', icono: 'estrella', colores: ['var(--amber)', 'color-mix(in srgb, var(--amber-2) 20%, var(--text))', 'var(--amber)'] },
   apoya: { texto: 'Apoya', icono: null, colores: null }
