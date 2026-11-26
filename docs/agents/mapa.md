@@ -24,8 +24,10 @@ Este es el mapa:
   nueva, la de la app o la bajada.
 - Los demás agentes, como en T3 Code (ADR 0012), cada uno con su cuenta y su catálogo en `server/proveedores.ts` y su fila
   en Opciones (`CuentaAgente`): DeepSeek es Claude Code con la API de DeepSeek (`server/deepseek.ts`), y lo mismo
-  OpenRouter (`openrouter.ts`, su catálogo filtrado y con buscador) y FreeLLMAPI (`freellmapi.ts`, el programa gratis que
-  cada quien instala; Sloth lo busca en esta computadora): los tres, en `server/otra-api.ts` (ADR 0021); Grok,
+  OpenRouter (`openrouter.ts`, su catálogo filtrado y con buscador), FreeLLMAPI (`freellmapi.ts`, el programa gratis que
+  cada quien instala; Sloth lo busca en esta computadora) y Ollama (`ollama.ts`, los modelos que cada quien corre en su
+  computadora o en la nube de Ollama; sin llave, y antes de cada mensaje comprueba que el modelo se cargó con contexto
+  para un hilo, ADR 0029): los cuatro, en `server/otra-api.ts` (ADR 0021); Grok,
   Antigravity, Gemini CLI y omp hablan ACP (`server/acp.ts`, `grok.ts`, `antigravity.ts`, `gemini.ts`, `omp.ts`; Antigravity, con las cuentas de Google que conectes y un proceso por cuenta para todos sus hilos: al acabarse la cuota de una, el hilo sigue con la siguiente; la cuota es la del plan de Google de cada cuenta, gratis o Google AI Pro/Ultra, que Antigravity dice al iniciar sesión y sale en Opciones; Gemini, con llave de API, ADR 0013; omp, con lo que se conecte en su `~/.omp`, y si ya hay un omp instalado se usa ese, sin bajar el de GitHub); Cursor corre su SDK en un puente aparte
   (`cursor.ts`, `cursor-puente.mjs`); Muse Code, su MSP (`muse.ts`); Pi, su RPC con una extensión que le pasa los MCP de
   Sloth (`pi.ts`). Lo que comparten (las instrucciones, la skill por su ruta, los MCP del hilo) está en

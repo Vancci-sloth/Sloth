@@ -444,7 +444,7 @@ function reiniciar() {
 }
 
 /**
- * Los modelos se preguntan a cada agente que ya se bajó (`server/agentes.ts`), y a DeepSeek, OpenRouter y FreeLLMAPI con su llave. La
+ * Los modelos se preguntan a cada agente que ya se bajó (`server/agentes.ts`), a DeepSeek, OpenRouter y FreeLLMAPI con su llave y a Ollama donde esté. La
  * interfaz no los espera para enseñar cards y hilos: le llegan por el WebSocket. Se piden al arrancar, al bajar un agente
  * y, si fallaron, otra vez cuando alguien abre la app.
  *
@@ -739,7 +739,7 @@ async function api(req: IncomingMessage, res: ServerResponse, url: URL): Promise
   }
 
   // Pagar con la cuenta o con una llave de API (`server/acceso.ts`). Devuelve la cuenta como queda.
-  const acceso = /^\/api\/(claude|codex|deepseek|openrouter|freellmapi|gemini)\/acceso$/.exec(path)
+  const acceso = /^\/api\/(claude|codex|deepseek|openrouter|freellmapi|ollama|gemini)\/acceso$/.exec(path)
   if (acceso && method === 'POST') {
     const { api, llave, direccion } = await body<{ api: boolean; llave?: string | null; direccion?: string }>(req)
     const p = acceso[1] as Proveedor

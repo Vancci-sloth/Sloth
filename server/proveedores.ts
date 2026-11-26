@@ -9,6 +9,7 @@ import { cuentaFreeLLMAPI, modelosFreeLLMAPI } from './freellmapi.ts'
 import { cuentaGemini, modelosGemini, startGemini } from './gemini.ts'
 import { cuentaGrok, modelosGrok, startGrok } from './grok.ts'
 import { cuentaMuse, modelosMuse, startMuse } from './muse.ts'
+import { cuentaOllama, modelosOllama } from './ollama.ts'
 import { cuentaOmp, modelosOmp, startOmp } from './omp.ts'
 import { cuentaOpenRouter, modelosOpenRouter } from './openrouter.ts'
 import { cuentaPi, llavesPi, modelosPi, salirPi, startPi } from './pi.ts'
@@ -21,7 +22,7 @@ import { cuentaPi, llavesPi, modelosPi, salirPi, startPi } from './pi.ts'
  *
  * `como` dice cómo se conecta, para que Opciones lo explique: en una ventana del agente (`ventana`), en el navegador con
  * un enlace (`navegador`) o pegando una llave de API (`llave`: DeepSeek, OpenRouter, FreeLLMAPI y Gemini; se guarda con
- * `/api/<agente>/acceso`).
+ * `/api/<agente>/acceso`). Ollama va como los de llave, aunque no la tiene: lo que se guarda es dónde está.
  */
 export interface Otro {
   como: 'ventana' | 'navegador' | 'llave'
@@ -44,6 +45,7 @@ export const OTROS: Partial<Record<Proveedor, Otro>> = {
   deepseek: { como: 'llave', start: startClaude, cuenta: cuentaDeepSeek, modelos: deepseekModels },
   openrouter: { como: 'llave', start: startClaude, cuenta: cuentaOpenRouter, modelos: modelosOpenRouter },
   freellmapi: { como: 'llave', start: startClaude, cuenta: cuentaFreeLLMAPI, modelos: modelosFreeLLMAPI },
+  ollama: { como: 'llave', start: startClaude, cuenta: cuentaOllama, modelos: modelosOllama },
   grok: { como: 'ventana', start: startGrok, ...cuentaGrok, modelos: modelosGrok },
   antigravity: { como: 'navegador', start: startAntigravity, cuenta: cuentaAntigravity, conectar: conectarAntigravity, cancelar: cancelarAntigravity, salir: salirAntigravity, usar: usarAntigravity, quitar: quitarAntigravity, conectando: conectandoAntigravity, modelos: modelosAntigravity },
   gemini: { como: 'llave', start: startGemini, cuenta: cuentaGemini, modelos: modelosGemini },

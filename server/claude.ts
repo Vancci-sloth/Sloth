@@ -125,7 +125,7 @@ export const SOLO_LEER = {
  */
 export function startClaude(opts: AgentOptions): AgentRun {
   const inbox = new Inbox<SDKUserMessage>()
-  // DeepSeek, OpenRouter y FreeLLMAPI son el mismo Claude Code contra otra API (`server/otra-api.ts`), que piensa a su manera.
+  // DeepSeek, OpenRouter, FreeLLMAPI y Ollama son el mismo Claude Code contra otra API (`server/otra-api.ts`), que piensa a su manera.
   const otra = otraApi(opts.model)
   if (otra && !llaveGuardada(proveedorDe(opts.model))) return sinArrancar(opts, otra.sinLlave)
   const agentes = sitiosDeAgente()
@@ -199,7 +199,7 @@ export function startClaude(opts: AgentOptions): AgentRun {
   const emit = juntarTrozos(opts.onEvent)
   // Con otra API, los dólares de Claude Code serían los de un modelo de Claude: se cuentan con los precios de esa API. Los
   // de DeepSeek son de hora valle, y el turno que acaba en hora pico cuesta el doble (`tarifa`). Su error lleva qué hacer.
-  const conLoSuyo = (e: Extract<AgentEvent, { t: 'turn_end' }>) => ({ ...e, ...(e.costUsd && otra?.tarifa ? { costUsd: e.costUsd * otra.tarifa() } : {}), ...(e.error ? { error: conConsejo(e.error) } : {}) })
+  const conLoSuyo = (e: Extract<AgentEvent, { t: 'turn_end' }>) => ({ ...e, ...(e.costUsd && otra?.tarifa ? { costUsd: e.costUsd * otra.tarifa() } : {}), ...(e.error ? { error: conConsejo(e.error, opts.model) } : {}) })
   const read = otra
     ? reader({ ...opts, onEvent: (e) => emit(e.t === 'turn_end' ? conLoSuyo(e) : e) }, state, otra.dolares)
     : reader({ ...opts, onEvent: emit }, state)
@@ -254,14 +254,38 @@ export function startClaude(opts: AgentOptions): AgentRun {
     run.close()
   }
 
+  /**
+   * Lo que esa API no avisaría (Ollama recorta sin decirlo lo que no le cabe) se comprueba antes de gastar el turno
+   * (`OtraApi.antes`), y lo que se mande mientras tanto espera en `cola`. Si falta algo, el turno acaba diciendo qué hacer
+   * y no se manda nada; detenerlo hace lo mismo sin esperar a la comprobación.
+   */
+  let previa: { cola: (() => void)[]; acabar(error?: string): void } | undefined
+
   return {
     send(text: string, skill?: SkillRef, images: string[] = []) {
       state.idle = false
-      push(skill ? `/${skill.name} ${text}` : text, images)
+      const mandar = () => push(skill ? `/${skill.name} ${text}` : text, images)
+      if (!otra?.antes) return mandar()
+      const esta = (previa = {
+        cola: [mandar],
+        acabar(error?: string) {
+          if (previa !== esta) return
+          previa = undefined
+          if (error === undefined) return esta.cola.forEach((m) => m())
+          state.idle = true
+          emit({ t: 'turn_end', at: Date.now(), ok: false, error })
+        }
+      })
+      void otra.antes(opts.model).then(
+        () => esta.acabar(),
+        (e) => esta.acabar(e instanceof Error ? e.message : String(e))
+      )
     },
     // `next`: Claude Code lo mete en el turno entre una herramienta y la siguiente. Si el turno ya acababa, abre otro.
     steer(text: string, images: string[] = []) {
-      push(text, images, 'next')
+      const mandar = () => push(text, images, 'next')
+      if (previa) previa.cola.push(mandar)
+      else mandar()
     },
     // `/compact` es un comando de Claude Code: resume la conversación y acaba con su `result`, como un turno.
     compact() {
@@ -271,6 +295,7 @@ export function startClaude(opts: AgentOptions): AgentRun {
     // Con un turno en curso, se corta el turno. Con el hilo quieto solo queda el segundo plano: se para tarea por tarea y,
     // si el SDK no puede, se cierra el proceso, que se lo lleva todo; el siguiente mensaje lo retoma.
     async interrupt() {
+      if (previa) return previa.acabar('lo detuviste')
       if (!state.idle) state.detenido = true
       if (!state.idle || !state.tareas.length) return void (await run.interrupt())
       try {

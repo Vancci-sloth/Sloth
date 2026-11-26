@@ -26,6 +26,7 @@ import { guardar } from './disco.ts'
  * - Los agentes nuevos no ven estas llaves (`entornoSinLlaves`); a Pi se le pueden prestar en Opciones (`entornoAgente`).
  * - DeepSeek, OpenRouter y FreeLLMAPI solo trabajan con su llave, en el Claude Code de Sloth (`entornoClaudeCon`).
  *   FreeLLMAPI corre en la computadora de cada quien: lleva además su dirección, que se busca sola si no se escribe.
+ *   Ollama, igual, sin llave: se guarda la que su guía manda poner (`LLAVE_OLLAMA`), que es lo que dice que está conectado.
  */
 const ARCHIVO = join(resolve(dirname(fileURLToPath(import.meta.url)), '..'), 'data', 'agentes.json')
 const ENTORNO = { claude: 'ANTHROPIC_API_KEY', codex: 'CODEX_API_KEY' } as const
@@ -114,12 +115,12 @@ function escribir() {
 /** La llave guardada, aunque ahora se pague con la cuenta. DeepSeek, OpenRouter, FreeLLMAPI y Gemini solo trabajan con ella. */
 export const llaveGuardada = (p: Proveedor) => datos[p]?.llave
 
-/** Adónde va la llave, si no es a la API de su marca: el servicio compatible de Claude, o el FreeLLMAPI de cada quien. */
+/** Adónde va la llave, si no es a la API de su marca: el servicio compatible de Claude, o el FreeLLMAPI o el Ollama de cada quien. */
 export const direccionGuardada = (p: Proveedor) => datos[p]?.direccion
 
 /**
  * El entorno con que Claude Code trabaja contra otra API compatible con la de Anthropic (DeepSeek, OpenRouter,
- * FreeLLMAPI). Los alias que piden las skills y sus subagentes (`opus`, `sonnet`, `fable`) van al modelo del hilo, y
+ * FreeLLMAPI, Ollama). Los alias que piden las skills y sus subagentes (`opus`, `sonnet`, `fable`) van al modelo del hilo, y
  * `haiku` (los títulos, lo rápido) a `rapido`, o al mismo. `ventana`: hasta dónde se llena el contexto antes de compactar;
  * sin ella, Claude Code supone 200 000. Sin la llave de Anthropic ni el token de la cuenta de Claude, que irían a esa API.
  */
@@ -169,16 +170,17 @@ export type CodexLlave = NonNullable<ReturnType<typeof codexConLlave>>
 
 /**
  * Cambia cómo paga `p`. `llave`: la nueva (se prueba antes de guardarla), `null` para quitarla (y volver a la cuenta),
- * o nada para usar la que ya estaba. `direccion` (Claude y FreeLLMAPI) va con una llave nueva: vacía, la de Anthropic o,
- * con FreeLLMAPI, el que se encuentre en esta computadora.
+ * o nada para usar la que ya estaba. `direccion` (Claude, FreeLLMAPI y Ollama) va con una llave nueva: vacía, la de
+ * Anthropic o, con FreeLLMAPI y Ollama, el que se encuentre en esta computadora.
  */
 export async function cambiarAcceso(p: Proveedor, api: boolean, llave?: string | null, direccion?: string) {
   const nueva = llave === undefined ? datos[p]?.llave : llave?.trim() || undefined
   if (api && !nueva) throw new Error('Pega primero tu llave de API.')
-  const local = p === 'freellmapi'
+  const local = p === 'freellmapi' || p === 'ollama'
   let dir = p !== 'claude' && !local ? undefined : llave === undefined ? datos[p]?.direccion : normalizarDireccion(direccion, local)
   if (llave && nueva) {
-    if (local && !dir) dir = await buscarFreeLLMAPI(nueva)
+    if (p === 'ollama') dir = await buscarOllama(dir)
+    else if (local && !dir) dir = await buscarFreeLLMAPI(nueva)
     else await probar(p, nueva, dir)
   }
   datos = { ...datos, [p]: { ...(nueva ? { llave: nueva, api, ...(dir ? { direccion: dir } : {}) } : {}), prestar: datos[p]?.prestar } }
@@ -260,4 +262,36 @@ async function buscarFreeLLMAPI(llave: string) {
     }
   }
   throw new Error('No encontré FreeLLMAPI en esta computadora. Ábrelo y vuelve a intentarlo, o escribe su dirección si está en otra.')
+}
+
+/** Dónde escucha Ollama si nadie le puso otra (`OLLAMA_HOST`). */
+const OLLAMA_AQUI = 'http://127.0.0.1:11434'
+/** Desde la 0.30 su lista de modelos dice cuáles usan herramientas y con qué ventana (`server/ollama.ts`); la API de Anthropic llegó en la 0.14. */
+const OLLAMA_MINIMO = [0, 30] as const
+
+/** «0.40.18» da para Sloth; «0.24.0», no. Una que no se sabe leer (compilado a mano) pasa. */
+export function ollamaAlDia(version: string) {
+  const [mayor, menor] = version.split('.').map(Number)
+  if (Number.isNaN(mayor) || Number.isNaN(menor) || (!mayor && !menor)) return true
+  return mayor > OLLAMA_MINIMO[0] || (mayor === OLLAMA_MINIMO[0] && menor >= OLLAMA_MINIMO[1])
+}
+
+/**
+ * Ollama no tiene llave que probar: se comprueba que en esa dirección (sin ella, en esta computadora) contesta él, y con
+ * una versión que Sloth sabe leer.
+ */
+async function buscarOllama(direccion?: string) {
+  const dir = direccion ?? OLLAMA_AQUI
+  const { host } = new URL(dir)
+  let res: Response
+  try {
+    res = await fetch(`${dir}/api/version`, { signal: AbortSignal.timeout(direccion ? 15_000 : 3000) })
+  } catch {
+    throw new Error(direccion ? `No se pudo conectar con ${host}. Revisa la dirección.` : 'No encontré Ollama en esta computadora. Ábrelo y vuelve a intentarlo, o escribe su dirección si está en otra.')
+  }
+  // Otro programa en ese puerto contesta otra cosa, o nada que se pueda leer.
+  const { version } = (res.ok ? await res.json().catch(() => ({})) : {}) as { version?: string }
+  if (!version) throw new Error(`En ${host} no contesta Ollama. Revisa la dirección.`)
+  if (!ollamaAlDia(version)) throw new Error(`Tu Ollama es la versión ${version} y Sloth necesita la ${OLLAMA_MINIMO.join('.')} o una más nueva. Actualízalo y vuelve a intentarlo.`)
+  return dir
 }

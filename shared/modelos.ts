@@ -90,6 +90,7 @@ export function gruposModelos(models: Model[]) {
     { id: 'opencode', label: 'OpenCode · de pago (de tu saldo, por millón de tokens)', pago: true },
     { id: 'deepseek', label: 'DeepSeek · beta' },
     { id: 'freellmapi', label: 'FreeLLMAPI · beta · gratis' },
+    { id: 'ollama', label: 'Ollama · beta' },
     { id: 'openrouter', label: 'OpenRouter · beta · gratis' },
     { id: 'openrouter', label: 'OpenRouter · beta · de pago (de tus créditos, por millón de tokens)', pago: true },
     { id: 'grok', label: 'Grok · beta' },
