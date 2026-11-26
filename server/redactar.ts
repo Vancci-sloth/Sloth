@@ -14,7 +14,7 @@ import { redactarCodexYoutube } from './youtube-redactor.ts'
 /**
  * Una respuesta suelta de un agente, sin herramientas ni sesión que se guarde: la ayuda de «Pedir una mejora»
  * (`server/comunidad.ts`) o el texto de un video para redes (`server/redes/`). Va con el agente de `model`, el de un hilo:
- * con Claude, Sonnet; con DeepSeek, Flash; con OpenRouter y FreeLLMAPI, el del hilo; con Codex, ese modelo con poco
+ * con Claude, Sonnet; con DeepSeek, Flash; con OpenRouter, FreeLLMAPI y Ollama, el del hilo; con Codex, ese modelo con poco
  * esfuerzo y la forma de `esquema`; con OpenCode, el suyo. Grok, Antigravity, Cursor, Muse y Pi no tienen respuesta suelta: se abre uno de un momento, en una carpeta
  * vacía, y se toma lo que escribe en su turno. Sin `model`, el primero que esté bajado: Claude, OpenCode o Codex.
  * Devuelve lo que contestó; el JSON se lee de ahí.
@@ -40,6 +40,7 @@ async function conClaude(prompt: string, instruccion: string, model?: string): P
   const suyo = otra && (otra.rapido ?? model!)
   const nombre = NOMBRE_AGENTE[proveedorDe(model ?? '')]
   if (otra && !llaveGuardada(proveedorDe(model!))) throw new Error(otra.sinLlave)
+  await otra?.antes?.(suyo!)
   // Quien trabaja con otro agente puede no tener aún el programa de Claude: sin él, el SDK solo dice «Native CLI binary
   // for darwin-arm64 not found».
   await asegurarAgente('claude')

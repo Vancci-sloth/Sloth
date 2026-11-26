@@ -2,7 +2,7 @@
  * Los agentes con que trabaja Sloth. Claude va sin prefijo; los demás llevan el suyo en el id del modelo
  * (`codex:gpt-5.6`, `grok:grok-build`) para no mezclar catálogos ni sesiones de proveedores.
  */
-export const PROVEEDORES = ['claude', 'codex', 'opencode', 'deepseek', 'openrouter', 'freellmapi', 'grok', 'antigravity', 'gemini', 'cursor', 'muse', 'pi', 'omp'] as const
+export const PROVEEDORES = ['claude', 'codex', 'opencode', 'deepseek', 'openrouter', 'freellmapi', 'ollama', 'grok', 'antigravity', 'gemini', 'cursor', 'muse', 'pi', 'omp'] as const
 export type Proveedor = (typeof PROVEEDORES)[number]
 
 export const proveedorDe = (model: string): Proveedor => {
@@ -21,6 +21,7 @@ export const NOMBRE_AGENTE: Record<Proveedor, string> = {
   deepseek: 'DeepSeek',
   openrouter: 'OpenRouter',
   freellmapi: 'FreeLLMAPI',
+  ollama: 'Ollama',
   grok: 'Grok',
   antigravity: 'Antigravity',
   gemini: 'Gemini',
@@ -31,8 +32,11 @@ export const NOMBRE_AGENTE: Record<Proveedor, string> = {
 }
 
 /** Los que no traen programa: trabajan en el Claude Code de Sloth, con otra API (`server/otra-api.ts`). */
-const EN_CLAUDE = ['deepseek', 'openrouter', 'freellmapi'] as const
+const EN_CLAUDE = ['deepseek', 'openrouter', 'freellmapi', 'ollama'] as const
 export type Programa = Exclude<Proveedor, (typeof EN_CLAUDE)[number]>
 
-/** El programa que corre a cada agente: DeepSeek, OpenRouter y FreeLLMAPI usan el mismo Claude Code. */
+/** El programa que corre a cada agente: DeepSeek, OpenRouter, FreeLLMAPI y Ollama usan el mismo Claude Code. */
 export const programaDe = (p: Proveedor): Programa => ((EN_CLAUDE as readonly Proveedor[]).includes(p) ? 'claude' : (p as Programa))
+
+/** Ollama no tiene llave: se guarda la que su guía manda poner en `ANTHROPIC_AUTH_TOKEN`, que no mira. */
+export const LLAVE_OLLAMA = 'ollama'

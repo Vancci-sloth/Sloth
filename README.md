@@ -29,11 +29,11 @@ negra: lo ves trabajar paso a paso y le pides cambios con tus palabras.
 
 Es gratis, sin tarjeta, sin créditos y sin límite de videos. Trabaja con la IA que ya tengas, y eliges el modelo:
 Claude, ChatGPT, Google Antigravity (Gemini, gratis o con Google AI Pro y Ultra), OpenCode (que tiene modelos gratis)
-y otras nueve. [Qué pide cada una](https://sloth.vancci.org/ias).
+y otras diez. [Qué pide cada una](https://sloth.vancci.org/ias).
 
 > **In English:** Sloth is a free, open-source (MIT) desktop app for Windows, macOS and Linux that turns a topic or a
 > link into a finished video for TikTok, Reels, Shorts or YouTube. The AI you connect (Claude, ChatGPT/Codex, Google
-> Antigravity/Gemini, OpenCode, DeepSeek, OpenRouter, Grok, Cursor…) researches, scripts, edits and renders it on your
+> Antigravity/Gemini, OpenCode, DeepSeek, OpenRouter, Ollama, Grok, Cursor…) researches, scripts, edits and renders it on your
 > computer. It also publishes to TikTok, Instagram and YouTube, makes images and clips (Google Flow, ChatGPT, Google
 > Vids, Meta Muse), AI voices and free local subtitles. Unlimited videos, no per-video fee. The app is in Spanish.
 
@@ -130,6 +130,7 @@ Necesitas una IA conectada; con una basta. Sloth no cobra por video: lo que gast
 | **Gemini** | Llave de API de Google AI Studio |
 | **Cursor**, **Muse Code** | Tu cuenta |
 | **DeepSeek**, **OpenRouter**, **FreeLLMAPI**, **Grok**, **Pi**, **omp** | En beta: su llave o su cuenta |
+| **Ollama** | En beta: los modelos que tengas en Ollama, en tu computadora o en su nube, con 64k de contexto o más |
 
 **Eliges el modelo:** en «Avanzado» eliges modelo y esfuerzo en cada hilo, entre los que tu IA da a tu cuenta (con
 Antigravity, exactamente los que Google te ofrece: Gemini, Claude y GPT). En «Optimizado», Sloth usa el que midió como

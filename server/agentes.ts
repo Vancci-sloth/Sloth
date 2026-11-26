@@ -21,7 +21,7 @@ import { correr } from './version.ts'
  *
  * Casi todos salen de npm, con el npm que trae Sloth. Muse Code, con el instalador de Meta; Antigravity, del zip que
  * publica Google (como los baja T3 Code), y omp, de su release de GitHub, si no hay ya uno instalado. DeepSeek,
- * OpenRouter y FreeLLMAPI no tienen programa: usan el de Claude Code (`programaDe`).
+ * OpenRouter, FreeLLMAPI y Ollama no tienen programa: usan el de Claude Code (`programaDe`).
  *
  * En el repo (y en las versiones de Sloth que aún lo traían dentro) el programa de Claude, Codex y OpenCode ya está en
  * node_modules de la app, y se usa ese.

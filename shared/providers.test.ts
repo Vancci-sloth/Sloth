@@ -13,12 +13,15 @@ test('proveedorDe: el prefijo dice el agente; sin prefijo, o con uno que no es d
   // Los de OpenRouter también: el prefijo es solo lo de antes del primer `:`.
   assert.equal(proveedorDe('openrouter:thinkingmachines/inkling-2-small:free'), 'openrouter')
   assert.equal(proveedorDe('freellmapi:auto:coding'), 'freellmapi')
+  // Los de Ollama llevan su etiqueta tras otro `:`.
+  assert.equal(proveedorDe('ollama:llama3.2:1b'), 'ollama')
   assert.equal(proveedorDe('otro:modelo'), 'claude')
 })
 
-test('DeepSeek, OpenRouter y FreeLLMAPI corren en Claude Code', () => {
+test('DeepSeek, OpenRouter, FreeLLMAPI y Ollama corren en Claude Code', () => {
   assert.equal(programaDe('deepseek'), 'claude')
   assert.equal(programaDe('openrouter'), 'claude')
   assert.equal(programaDe('freellmapi'), 'claude')
+  assert.equal(programaDe('ollama'), 'claude')
   assert.equal(programaDe('grok'), 'grok')
 })

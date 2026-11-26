@@ -33,7 +33,8 @@ const OPCIONES = [
       ['opencode', 'OpenCode'],
       ['antigravity', 'Antigravity'],
       ['grok', 'Grok'],
-      ['freellmapi', 'FreeLLMAPI']
+      ['freellmapi', 'FreeLLMAPI'],
+      ['ollama', 'Ollama']
     ]
   }
 ]

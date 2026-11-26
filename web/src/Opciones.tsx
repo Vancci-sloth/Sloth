@@ -3,7 +3,7 @@ import { type CuentaClaude as Cuenta, type Opciones as Datos, type EstadoAgente,
 import { api, leerCuenta } from './api'
 import { Arranque } from './Arranque'
 import { ponerTema, TEMAS, type Tema, useTema } from './temas'
-import { NOMBRE_AGENTE, PROVEEDORES, type Proveedor, proveedorDe } from '../../shared/providers'
+import { LLAVE_OLLAMA, NOMBRE_AGENTE, PROVEEDORES, type Proveedor, proveedorDe } from '../../shared/providers'
 import { ActividadAgente } from './ActividadAgente'
 import { AvisoAgentes } from './Actualizar'
 import { CampoAscii } from './CampoAscii'
@@ -836,15 +836,16 @@ export function CuentaOpenCode({ aviso = false, onFalta }: { aviso?: boolean; on
 }
 
 /** Los agentes que llegaron después de Claude, Codex y OpenCode (`server/proveedores.ts`), en el orden de Opciones. */
-export const OTROS_AGENTES = ['deepseek', 'openrouter', 'freellmapi', 'grok', 'antigravity', 'gemini', 'cursor', 'muse', 'pi', 'omp'] as const satisfies readonly Proveedor[]
+export const OTROS_AGENTES = ['deepseek', 'openrouter', 'freellmapi', 'ollama', 'grok', 'antigravity', 'gemini', 'cursor', 'muse', 'pi', 'omp'] as const satisfies readonly Proveedor[]
 type OtroAgente = (typeof OTROS_AGENTES)[number]
 
 /**
  * Cómo se conecta cada uno y qué hay que saber antes, a la vista. `ventana`: el agente abre su propia ventana para
  * iniciar sesión; `navegador`: da un enlace que se autoriza en el navegador; `llave`: se pega una llave de API.
  * `direccion`: con la llave se puede escribir dónde está (FreeLLMAPI en otra computadora); sin ella, se busca en esta.
+ * `sinLlave` (Ollama): no tiene llave que pegar; solo se busca, o se escribe dónde está.
  */
-const OTROS: Record<OtroAgente, { titulo: string; logo: string; como: 'ventana' | 'navegador' | 'llave'; texto: ReactNode; ayuda?: ReactNode; uso?: string; abreSolo?: string; beta?: boolean; direccion?: string }> = {
+const OTROS: Record<OtroAgente, { titulo: string; logo: string; como: 'ventana' | 'navegador' | 'llave'; texto: ReactNode; ayuda?: ReactNode; uso?: string; abreSolo?: string; beta?: boolean; direccion?: string; sinLlave?: boolean }> = {
   deepseek: {
     titulo: 'DeepSeek · con tu llave de API',
     logo: 'deepseek',
@@ -892,6 +893,29 @@ const OTROS: Record<OtroAgente, { titulo: string; logo: string; como: 'ventana' 
         </a>
         , ponle las llaves gratis de sus proveedores y pega aquí su llave única (en su icono de la bandeja, «Copy Key»). Sloth lo busca en esta computadora. Se guarda
         solo en Sloth, en esta computadora.
+      </>
+    )
+  },
+  ollama: {
+    titulo: 'Ollama · modelos en tu computadora',
+    logo: 'ollama',
+    como: 'llave',
+    sinLlave: true,
+    beta: true,
+    direccion: 'Dirección, solo si está en otra computadora',
+    texto: 'Trabaja en el mismo Claude Code de Sloth, con los modelos que tengas en Ollama: los que corren en tu computadora, sin cuenta ni internet, y los de su nube, con tu cuenta de Ollama. Tiene que estar abierto mientras Sloth trabaja.',
+    ayuda: (
+      <>
+        Instala{' '}
+        <a href="https://ollama.com/download" target="_blank" rel="noreferrer">
+          Ollama
+        </a>{' '}
+        y baja un modelo que use herramientas (los hay en{' '}
+        <a href="https://ollama.com/search?c=tools" target="_blank" rel="noreferrer">
+          ollama.com
+        </a>
+        ). En sus ajustes, sube el contexto («Context length») a 64k o más: con menos, un hilo de Sloth no le cabe. Un video pide un modelo capaz; los más chicos se
+        pierden con las herramientas. Sloth lo busca en esta computadora.
       </>
     )
   },
@@ -1027,13 +1051,13 @@ export function CuentaAgente({ p, aviso = false, onFalta }: { p: OtroAgente; avi
               disabled={c.ocupado}
               groups={[
                 {
-                  label: o.como === 'llave' ? 'Llave' : 'Cuenta',
+                  label: o.sinLlave ? 'Conexión' : o.como === 'llave' ? 'Llave' : 'Cuenta',
                   options: [
                     ...(cuenta.uso || o.uso ? [{ value: 'uso', label: o.como === 'llave' ? 'Ver tu saldo ↗' : 'Ver tu uso ↗' }] : []),
-                    { value: 'cambiar', label: o.como === 'llave' ? 'Cambiar de llave' : activa ? 'Conectar otra cuenta' : 'Volver a autorizar' },
+                    { value: 'cambiar', label: o.sinLlave ? 'Buscarlo otra vez o cambiar de dirección' : o.como === 'llave' ? 'Cambiar de llave' : activa ? 'Conectar otra cuenta' : 'Volver a autorizar' },
                     activa && otras.length
                       ? { value: `quitar:${activa.id}`, label: 'Quitar esta cuenta' }
-                      : { value: 'quitar', label: o.como === 'llave' ? 'Quitar la llave' : 'Cerrar sesión' },
+                      : { value: 'quitar', label: o.sinLlave ? 'Desconectar' : o.como === 'llave' ? 'Quitar la llave' : 'Cerrar sesión' },
                   ],
                 },
                 ...(otras.length ? [{ label: 'Cambiar a', options: otras.map((x) => ({ value: `usar:${x.id}`, label: x.quien })) }] : []),
@@ -1059,7 +1083,7 @@ export function CuentaAgente({ p, aviso = false, onFalta }: { p: OtroAgente; avi
           !cuenta.conectada &&
           !pegando && (
             <button className="primary" disabled={c.ocupado} onClick={conectar}>
-              {c.ocupado ? 'Conectando…' : o.como === 'llave' ? 'Añadir llave' : `Conectar con ${o.titulo.split(' ·')[0]}`}
+              {c.ocupado ? 'Conectando…' : o.como === 'llave' && !o.sinLlave ? 'Añadir llave' : `Conectar con ${o.titulo.split(' ·')[0]}`}
             </button>
           )
         )}
@@ -1083,17 +1107,21 @@ export function CuentaAgente({ p, aviso = false, onFalta }: { p: OtroAgente; avi
       {p === 'antigravity' && cuenta?.conectada && !aviso && !espera && <div className="fila-extra"><button type="button" className="boton" onClick={conectar} disabled={c.ocupado}>Agregar cuenta</button></div>}
       {o.beta && <p className="fila-extra muted small">Está en beta: puedes probarlo, pero puede tener errores. Si te topas con uno, repórtalo en la Comunidad, en Ayuda.</p>}
       {pegando && (
-        <form className="fila-extra" onSubmit={(e) => (e.preventDefault(), llave.trim() && void guardarLlave(llave.trim()))}>
+        <form className="fila-extra" onSubmit={(e) => (e.preventDefault(), o.sinLlave ? void guardarLlave(LLAVE_OLLAMA) : llave.trim() && void guardarLlave(llave.trim()))}>
           <div className="opcion-fila">
-            <input type="password" autoFocus placeholder="Pega tu llave de API" value={llave} onChange={(e) => setLlave(e.target.value)} autoComplete="off" />
-            <button className="primary" disabled={c.ocupado || !llave.trim()}>
-              {c.ocupado ? 'Probando…' : 'Guardar'}
+            {o.sinLlave ? (
+              <input type="text" autoFocus placeholder={o.direccion} value={direccion} onChange={(e) => setDireccion(e.target.value)} autoComplete="off" spellCheck={false} />
+            ) : (
+              <input type="password" autoFocus placeholder="Pega tu llave de API" value={llave} onChange={(e) => setLlave(e.target.value)} autoComplete="off" />
+            )}
+            <button className="primary" disabled={c.ocupado || (!o.sinLlave && !llave.trim())}>
+              {o.sinLlave ? (c.ocupado ? 'Buscando…' : 'Conectar') : c.ocupado ? 'Probando…' : 'Guardar'}
             </button>
             <button type="button" className="ghost" onClick={() => (setPegando(false), setLlave(''), setDireccion(''))}>
               Cancelar
             </button>
           </div>
-          {o.direccion && (
+          {o.direccion && !o.sinLlave && (
             <div className="opcion-fila">
               <input type="text" placeholder={o.direccion} value={direccion} onChange={(e) => setDireccion(e.target.value)} autoComplete="off" spellCheck={false} />
             </div>
