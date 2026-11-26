@@ -63,7 +63,7 @@ import { licencia } from './licencia.ts' // suscripción
 import { Sessions, ultimoTexto } from './sessions.ts'
 import { imagenCodex } from './imagen-codex.ts' // estudio de Imágenes
 import { redactar } from './redactar.ts'
-import { carpetasDelHilo, dentroDe, moverProyectos, rutaReal } from './borrar-hilo.ts'
+import { carpetasDelHilo, dentroDe, moverProyectos, pendientes, rutaReal } from './borrar-hilo.ts'
 import { edicionesModelos3d } from './modelos3d-ediciones.ts' // modelos 3D: piezas movidas a mano
 import { quitarFondo } from './flow/recorte.ts'
 import { registroDeImagen } from './flow/hilo-imagen.ts'
@@ -300,6 +300,9 @@ const biblioteca3d = modelos3d(carpetaSkill('modelos-3d') ?? join(APP, 'skills',
 }) // modelos 3D
 // Las piezas que se movieron a mano en el visor, por modelo (`data/modelos3d-ediciones`).
 const ediciones3d = edicionesModelos3d(join(APP, 'data', 'modelos3d-ediciones')) // modelos 3D
+// Lo que al eliminar un hilo estaba en uso y no se pudo borrar (`server/borrar-hilo.ts`): se reintenta al arrancar.
+const porBorrar = pendientes(join(APP, 'data', 'por-borrar.json'))
+void porBorrar.reintentar()
 // «Importar .glb» y «Nuevo modelo», en la misma biblioteca.
 const acciones3d = modelos3dAcciones({
   sessions,
@@ -1018,13 +1021,11 @@ async function api(req: IncomingMessage, res: ServerResponse, url: URL): Promise
         movidas?.restaurar()
         return send(res, 409, { error: error instanceof Error ? error.message : String(error) })
       }
-      try {
-        await movidas?.limpiar()
-        send(res, 200, { ok: true })
-      } catch (error) {
-        console.error('No se pudo completar el borrado de archivos:', error)
-        send(res, 200, { ok: true, aviso: 'El chat se eliminó. Algunos archivos quedaron en una carpeta temporal porque estaban en uso.' })
-      }
+      // Lo que estaba en uso se queda anotado y se borra solo después (`porBorrar`): al abrir Sloth o en el siguiente borrado.
+      const quedan = (await movidas?.limpiar()) ?? []
+      porBorrar.anotar(quedan)
+      void porBorrar.reintentar()
+      send(res, 200, quedan.length ? { ok: true, aviso: 'El chat se eliminó. Algunos archivos estaban en uso: se borran solos en cuanto se suelten.' } : { ok: true })
     } else if (action === 'compactar' && method === 'POST') {
       try {
         sessions.compactar(id)

@@ -50,7 +50,8 @@ Este es el mapa:
   «Actualizar» va por `/api/ventana/…`. La entrada (`licencias/src/web.ts`) ofrece «Abrir Sloth en la nube».
 - `server/sessions.ts`: cada hilo es `data/sessions/<id>.json` (qué es) y `<id>.jsonl` (lo que pasó). «Eliminar» quita
   solo el chat o, con «Eliminar también», sus imágenes y las carpetas de video que Sloth le creó (`carpetasGeneradas`,
-  `server/borrar-hilo.ts`): lo que comparte con otro hilo se queda, y un video en la cola de Redes o YouTube no se borra. Retoma la sesión
+  `server/borrar-hilo.ts`): lo que comparte con otro hilo se queda, y un video en la cola de Redes o YouTube no se borra;
+  lo que estaba en uso se anota en `data/por-borrar.json` y se borra al arrancar o en el siguiente borrado. Retoma la sesión
   del proveedor tras reiniciar, reparte los lotes según la máquina y cierra el proceso de un video del lote al acabar.
   Un chat de Claude, DeepSeek, Codex u OpenCode con su sesión guardada suelta el proceso a la media hora; los demás
   agentes lo conservan hasta comprobar que retoman. `npm run hilo -- <id>` (`scripts/hilo.mjs`) resume un hilo desde esos archivos.

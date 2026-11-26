@@ -996,7 +996,7 @@ function Escena({ visor, listo, modelo, herramientas, barra, cabecera, onPaso, o
   }
   /** El botón de guardar va en la cabecera del editor (no en la barra): así no deja una fila vacía. Guardar es automático. */
   const botonGuardar = (
-          <button type="button" className={`m3d-edicion-guardar${pendientes || fallo ? ' pendiente' : ''}${fallo ? ' fallo' : ''}`} title={fallo ? 'No se pudo guardar: reintenta' : pendientes ? 'Guardar ahora los cambios de este modelo' : 'Todos los cambios están guardados'} disabled={guardando || (!pendientes && !fallo)} onClick={guardarAhora}>
+          <button type="button" className={`m3d-edicion-guardar${pendientes || fallo ? ' pendiente' : ''}${fallo ? ' fallo' : ''}`} title={fallo ? 'No se pudo guardar: reintenta' : `${pendientes ? 'Guardar ahora los cambios de este modelo' : 'Todos los cambios están guardados'}. Las piezas movidas a mano se ven aquí; los videos aún usan el modelo como lo hizo el agente`} disabled={guardando || (!pendientes && !fallo)} onClick={guardarAhora}>
             <Icono de="guardar" /><span>{guardando ? 'Guardando…' : fallo ? 'Reintentar' : pendientes ? 'Guardar cambios' : 'Guardado'}</span>
           </button>
   

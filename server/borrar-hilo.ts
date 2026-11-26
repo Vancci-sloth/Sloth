@@ -1,8 +1,12 @@
 import { randomUUID } from 'node:crypto'
-import { lstatSync, realpathSync, renameSync } from 'node:fs'
+import { lstatSync, readFileSync, realpathSync, renameSync, rmSync } from 'node:fs'
 import { rm } from 'node:fs/promises'
-import { dirname, isAbsolute, join, relative, sep } from 'node:path'
+import { basename, dirname, isAbsolute, join, relative, sep } from 'node:path'
 import type { SessionMeta } from '../shared/types.ts'
+import { guardar } from './disco.ts'
+
+/** El nombre de lo apartado para borrarse (`moverProyectos`). */
+const PREFIJO = '.sloth-borrando-'
 
 export function dentroDe(carpeta: string, ruta: string) {
   const rel = relative(carpeta, ruta)
@@ -43,7 +47,7 @@ export function moverProyectos(carpetas: string[]) {
   }
   try {
     for (const ruta of carpetas) {
-      const temporal = join(dirname(ruta), `.sloth-borrando-${randomUUID()}`)
+      const temporal = join(dirname(ruta), `${PREFIJO}${randomUUID()}`)
       renameSync(ruta, temporal)
       movidas.push({ ruta, temporal })
     }
@@ -53,10 +57,38 @@ export function moverProyectos(carpetas: string[]) {
   }
   return {
     restaurar,
-    async limpiar() {
+    /** Borra lo apartado. Devuelve lo que no se pudo (un archivo en uso): va a `pendientes`, que lo reintenta. */
+    async limpiar(): Promise<string[]> {
       const borradas = await Promise.allSettled(movidas.map(({ temporal }) => rm(temporal, { recursive: true, force: true, maxRetries: 3 })))
-      const fallos = borradas.filter((resultado) => resultado.status === 'rejected')
-      if (fallos.length) throw new AggregateError(fallos.map((fallo) => fallo.reason), 'Quedaron archivos temporales sin eliminar.')
+      return movidas.flatMap(({ temporal }, i) => (borradas[i].status === 'rejected' ? [temporal] : []))
+    }
+  }
+}
+
+/**
+ * Lo apartado que no se pudo borrar (un video abierto en otro programa, un archivo que Windows aún tiene tomado): se anota
+ * en `archivo` y `reintentar` lo vuelve a intentar al arrancar el servidor y en cada borrado, hasta que se va. Solo borra
+ * lo que es de `moverProyectos` (su nombre empieza por `.sloth-borrando-`): un archivo editado a mano no borra nada más.
+ */
+export function pendientes(archivo: string) {
+  const leer = (): string[] => {
+    try {
+      const lista: unknown = JSON.parse(readFileSync(archivo, 'utf8'))
+      return Array.isArray(lista) ? lista.filter((r): r is string => typeof r === 'string' && isAbsolute(r) && basename(r).startsWith(PREFIJO)) : []
+    } catch {
+      return []
+    }
+  }
+  const escribir = (lista: string[]) => (lista.length ? guardar(archivo, `${JSON.stringify(lista, null, 2)}\n`) : rmSync(archivo, { force: true }))
+  return {
+    anotar(rutas: string[]) {
+      if (rutas.length) escribir([...new Set([...leer(), ...rutas])])
+    },
+    async reintentar() {
+      const quedan: string[] = []
+      for (const ruta of leer()) await rm(ruta, { recursive: true, force: true, maxRetries: 3 }).catch(() => quedan.push(ruta))
+      escribir(quedan)
+      return quedan
     }
   }
 }
