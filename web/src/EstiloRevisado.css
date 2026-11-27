@@ -1,0 +1,62 @@
+/* Un estilo tuyo que la revisión leyó y no aprobó (`EstiloRevisado.tsx`): el aviso, la fila del menú, la de la campana
+   y, en su estilo, la lista de lo que le falta. Todo en el rojo de lo que pide que hagas algo. */
+
+/* El aviso a media pantalla. */
+.modal.revisado-aviso { width: min(460px, calc(100vw - 32px)); border-color: color-mix(in srgb, var(--bad) 55%, var(--line)); }
+.revisado-aviso-icono { display: grid; place-items: center; width: 38px; height: 38px; margin-bottom: 12px; border-radius: 12px; background: color-mix(in srgb, var(--bad) 16%, transparent); color: var(--bad); font-size: 20px; }
+.modal.revisado-aviso h2 { font-size: 18px; }
+.revisado-aviso .modal-body p { margin: 0; color: var(--text); font-size: 14.5px; line-height: 1.5; }
+.revisado-aviso .modal-body .revisado-aviso-sigue { margin-top: 8px; color: var(--suave); font-size: 13.5px; }
+.revisado-aviso .modal-actions .ghost { padding: 9px 4px; }
+
+/* En la barra lateral: una fila más del menú, de dos renglones, con el nombre del estilo debajo. */
+.barra-destinos .revisado { align-items: flex-start; min-height: 0; margin-top: 4px; padding-top: 7px; padding-bottom: 7px; background: color-mix(in srgb, var(--bad) 11%, transparent); font-weight: 650; }
+.barra-destinos .revisado:hover { background: color-mix(in srgb, var(--bad) 20%, transparent); color: var(--bad); }
+.barra-destinos .revisado:hover .new-chat-icon { color: var(--bad); }
+.revisado-texto { min-width: 0; display: flex; flex-direction: column; gap: 1px; font-size: 13.5px; line-height: 1.3; }
+.revisado-texto small { color: var(--suave); font-size: 11.5px; font-weight: 450; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Plegada, solo su icono en rojo: el nombre va en su `title`. */
+.plegada .barra-destinos .revisado { align-items: center; min-height: 34px; padding: 0; }
+.plegada .revisado-texto { display: none; }
+
+/* En la campana de arriba: como las demás notificaciones, con su raya roja. */
+.notificaciones-bandeja > .revisado-notificaciones { box-shadow: inset 3px 0 var(--bad); border-bottom: 1px solid var(--line); }
+.revisado-notificaciones .fila { flex-wrap: wrap; }
+.revisado-notificaciones .fila-nombre { flex-basis: 100%; }
+
+/* En la ficha de su estilo, bajo su nombre: la lista de lo que pidió la revisión. Mientras está, la ficha crece hasta
+   donde cabe (si no cabe, hace scroll ella sola, como siempre) y el carrusel de arriba se achica para dejarle sitio: en
+   una ventana baja nada se encima. */
+/* Menos de 170 px y los nombres de los carteles ya no caben en su ancho. */
+.new-session.con-revision { --alto-carrusel: clamp(170px, calc(35vh - 110px), 330px); }
+.con-revision .cards.cards-carrusel { height: var(--alto-carrusel); }
+@media (min-height: 680px) {
+  .con-revision .new-top { min-height: calc(var(--alto-carrusel) + 78px); }
+  .con-revision .new-bottom { flex: 0 1 auto; min-height: 0; }
+  .con-revision .new-bottom > .new-head { flex: 0 1 auto; height: auto; min-height: 110px; }
+}
+/* En una ventana más baja no hay de dónde ceder: la ficha queda de alto fijo, algo más alta que de costumbre, y el
+   compositor no se sale. */
+@media (max-height: 679px) {
+  .con-revision .new-bottom > .new-head { height: 150px; }
+}
+.revisado-panel { margin: 5px 0 10px; padding: 10px 12px; border: 1px solid var(--bad); border-radius: 12px; background: color-mix(in srgb, var(--bad) 9%, var(--panel)); font-size: 13.5px; line-height: 1.45; text-align: left; }
+.revisado-panel header { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 10px; }
+.revisado-panel header > .icon-trazo { flex: none; align-self: flex-start; width: 18px; height: 18px; margin-top: 2px; color: var(--bad); }
+.revisado-panel header > div { flex: 1 1 230px; min-width: 0; }
+.revisado-panel header strong { display: block; color: var(--text); font-size: 14.5px; font-weight: 650; }
+.revisado-panel header span { color: var(--suave); font-size: 12.5px; }
+.revisado-panel header .primary { flex: none; padding: 7px 14px; font-size: 13px; }
+.revisado-lista { margin: 10px 0 0; padding: 0 4px 0 28px; display: flex; flex-direction: column; gap: 6px; color: var(--text); }
+.revisado-lista li::marker { color: var(--bad); font-weight: 700; }
+.revisado-panel details { margin: 9px 0 0 28px; color: var(--suave); font-size: 12.5px; }
+.revisado-panel summary { cursor: pointer; }
+.revisado-panel summary:hover { color: var(--text); }
+.revisado-panel details ul { margin: 6px 0 0; padding-left: 18px; display: flex; flex-direction: column; gap: 4px; }
+.revisado-acciones { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 18px; margin: 8px 0 0 28px; }
+.revisado-acciones .ghost { color: var(--suave); font-size: 12.5px; }
+.revisado-acciones .ghost:hover { color: var(--text); }
+@media (max-width: 700px) {
+  .revisado-lista { padding-left: 20px; }
+  .revisado-panel details, .revisado-acciones { margin-left: 0; }
+}

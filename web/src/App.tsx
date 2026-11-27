@@ -40,6 +40,7 @@ import { abrirPublicacion, Comunidad } from './Comunidad' // comunidad
 import { AyudaCrearVideo } from './AyudaVideo'
 import { MiPerfil } from './MiPerfil' // comunidad: «Mi perfil», su propia página
 import { abrirBorrador, CompartirEstilo, ImportarEstilo, incompletosGuardados, marcarIncompletos } from './Estilos' // estilos compartidos
+import { AvisoDeRevision, LoQueLeFalta, pedirRevisados, RevisadosEnMenu, useRevisado } from './EstiloRevisado' // el estilo que se revisó y no se aprobó
 import { GuiaVista } from './Guia'
 import { PedirMejora } from './PedirMejora' // comunidad
 import { Icono } from './Iconos'
@@ -466,6 +467,7 @@ export function App() {
   useEffect(() => {
     let sabidos = 0
     let pedida = 0
+    let mirados = false
     const pedir = async () => {
       if (document.visibilityState !== 'visible' && Date.now() - pedida < 600_000) return
       pedida = Date.now()
@@ -473,6 +475,10 @@ export function App() {
         const { sinLeer, rifa } = await api<{ sinLeer: number; rifa?: RifaGanada }>('/api/comunidad/avisos?cuenta')
         setAvisosComunidad(sinLeer)
         if (rifa) avisarGanasteRifa(rifa)
+        // Lo que la revisión contesta de un estilo tuyo llega como un aviso más: al abrir y con cada aviso nuevo se mira si
+        // alguno se revisó y no se aprobó, para decirlo donde se ve (`EstiloRevisado.tsx`).
+        if (!mirados || sinLeer > sabidos) pedirRevisados()
+        mirados = true
         if (sinLeer > sabidos) {
           const { avisos } = await api<{ avisos: AvisoComunidad[] }>('/api/comunidad/avisos')
           avisarAnuncio(avisos, abrirPublicacion)
@@ -679,6 +685,7 @@ export function App() {
             </span>
           )}
         </button>
+        <RevisadosEnMenu /> {/* un estilo tuyo que se revisó y no se aprobó */}
         {/* Administrador: solo en la computadora del creador (la que tiene su llave de publicar.txt). */}
         {esCreador && (
           // Con el ratón entra al apretar (ya está armado y oculto), como un menú del sistema; con el dedo o el teclado,
@@ -921,6 +928,7 @@ export function App() {
       {!plegada && <div className="barra-velo" aria-hidden onClick={() => plegar(true)} />}
       <Novedades />
       <GanasteRifa />
+      <AvisoDeRevision />
       {avisosEstilos && <EstiloCambio cards={cards} activa={newCard?.id} pausado={view.kind === 'modelos3d' || (view.kind === 'session' && !!sessions.find((s) => s.id === view.id)?.modelo3d)} onDesactivar={() => setAvisosEstilos(false)} />}
     </div>
   )
@@ -1014,6 +1022,8 @@ function NewSession(props: {
   // El nombre y la descripción del estilo elegido entran al cambiarlo, en los temas con movimiento.
   const cabecera = useRef<HTMLDivElement>(null)
   useEntradaEstilo(cabecera, card.id)
+  // Si la revisión de la comunidad leyó este estilo y no lo aprobó: su ficha dice qué le falta (`EstiloRevisado.tsx`).
+  const revisado = useRevisado(card.tuya ? card.id : undefined)
   // El modelo: «Optimizado» usa lo medido para esta card (el hilo y cada subagente) o, sin medir, lo último que elegiste
   // a mano; «Avanzado», lo que elegiste para ella.
   const [avanzados, setAvanzados] = useStored<Record<string, Avanzado>>('modelos', {})
@@ -1235,7 +1245,7 @@ function NewSession(props: {
   )
 
   return (
-    <div className={`new-session fondo-ramas${enEstilo && card.etapas ? ' viendo-estilo' : ''}`} {...soltar.props}>
+    <div className={`new-session fondo-ramas${enEstilo && card.etapas ? ' viendo-estilo' : ''}${revisado ? ' con-revision' : ''}`} {...soltar.props}>
       <CampoAscii variante="ramas" />
       {soltar.aviso}
       {/* Arriba las skills (o, con un estilo elegido, sus videos), que hacen scroll solas; abajo la skill elegida y el
@@ -1306,6 +1316,8 @@ function NewSession(props: {
             </button>
           )}
           </div>
+          {/* Lo primero de su ficha, bajo su nombre: la lista exacta de lo que pidió la revisión. */}
+          {revisado && <LoQueLeFalta card={card} r={revisado} onCompartir={() => setCompartiendo(card)} />}
           <p>{card.description}</p>
           {!enEstilo && !!videos?.length && <button className="estilo-ver-videos" onClick={() => setEnEstilo(true)}>
             <Icono de="video" /> Ver videos de este estilo ({videos.length})

@@ -344,7 +344,8 @@ const comunidadApi = comunidad(APP, {
   deEstilo: (id) => {
     const card = cards().find((c) => c.id === id)
     return card?.origen?.publicacion ?? card?.deComunidad
-  }
+  },
+  tuyas: () => cards().filter((c) => c.tuya).map(({ id, title }) => ({ id, title }))
 }) // comunidad
 // En la computadora del creador, su Claude lee cada estilo que llega y deja dicho si se puede aprobar y qué le falta.
 // Se abre en el trabajo, fuera de las skills: ahí nadie lo usa. Lo ya leído se apunta junto a su llave, que comparten la

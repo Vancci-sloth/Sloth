@@ -2,7 +2,7 @@ import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { CAMPOS_GUIA, HERRAMIENTAS } from '../shared/guia.ts'
 import { NOMBRE_AGENTE } from '../shared/providers.ts'
-import { REVISION_CARD } from '../shared/revision.ts'
+import { CABEZA_SUGERENCIAS, cabezaDeFalta, REVISION_CARD } from '../shared/revision.ts'
 import type { GuiaEstilo, PruebaEstilo, SessionMeta } from '../shared/types.ts'
 import { guardar } from './disco.ts'
 import { EstiloMalo } from './estilos.ts'
@@ -29,8 +29,9 @@ import { EstiloMalo } from './estilos.ts'
  *   aprueba solo si además Sloth, que no lee texto sino que comprueba (`server/estilos-requisitos.ts`), no encontró
  *   ninguna falla ni ninguna señal de riesgo en lo que su autor añadió. Con una señal, decide el creador.
  * - Se aprueba el paquete que se leyó (`aprobar` lleva su llave): si su autor lo cambió mientras tanto, no.
- * - A su autor se le contesta con un comentario del creador en su publicación, que le llega a la campana: lo que le
- *   falta, o que lo aprueba el creador a mano. Ese texto lo escribe un agente que leyó algo ajeno, pero mientras no se
+ * - A su autor se le contesta con un comentario del creador en su publicación: lo que le falta, o que lo aprueba el
+ *   creador a mano. Su Sloth lee ese comentario y le avisa con la lista, que lo lleva a su estilo (`faltaDeRespuesta`,
+ *   `web/src/EstiloRevisado.tsx`). Ese texto lo escribe un agente que leyó algo ajeno, pero mientras no se
  *   apruebe solo lo ven quien lo mandó y el creador. Del que no se aprobaría no se le dice nada.
  * - El hilo cambia de nombre con cómo acabó (`TITULOS`): es lo que el creador ve en su lista sin abrir nada.
  * - Lo ya leído se apunta en `archivo`, por publicación y con la llave de su paquete, antes de bajarlo: con la Sloth
@@ -247,11 +248,12 @@ export function respuestaAlAutor(desenlace: Desenlace, falta: string[], titulo: 
       ...deMas('Para cuando lo mejores, esto no lo frena:')
     ].join('\n\n')
   if (desenlace !== 'falta') return undefined
+  // La app de su autor lee esta respuesta para avisarle con su lista (`faltaDeRespuesta`): su cabeza y la de las sugerencias no se cambian aquí.
   return [
-    `Revisión automática de Sloth: a «${titulo}» le falta esto para aprobarse:`,
+    cabezaDeFalta(titulo),
     llano(falta),
     'Arréglalo (puedes pegarle esta lista a «Nuevo estilo») y pulsa «Compartir» otra vez en su card: se pone al día esta misma publicación y se vuelve a revisar sola. Con eso arreglado, se aprueba.',
-    ...deMas('De paso, esto no lo frena, pero lo mejora:'),
+    ...deMas(CABEZA_SUGERENCIAS),
     'Si algo de esto no aplica, contesta aquí.'
   ].join('\n\n')
 }

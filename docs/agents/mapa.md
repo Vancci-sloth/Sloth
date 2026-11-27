@@ -90,7 +90,10 @@ Este es el mapa:
   sola (`server/estilos-revision.ts`, ADR 0022): se aprueba el que no falla en lo que frena (ADR 0023: lo demás son
   sugerencias, y los acentos rotos y lo que su prueba demuestra los arregla Sloth, `shared/acentos.ts`) y no añade nada
   de riesgo, a su autor se le contesta en su publicación lo que le falta, y el hilo queda como «Aprobado», «Le falta», «Decide tú» (añade algo
-  que tiene que ver una persona) o «No lo aprobaría»; «Revisar», en la publicación, abre ese hilo. El creador también lo
+  que tiene que ver una persona) o «No lo aprobaría»; «Revisar», en la publicación, abre ese hilo. La app de su autor lee
+  esa respuesta (`faltaDeRespuesta` en `shared/revision.ts`, `GET /api/comunidad/estilo/revisados`) y se lo dice donde lo
+  ve (`web/src/EstiloRevisado.tsx`): un aviso a media pantalla, una fila en el menú y en la campana de arriba y, en la
+  ficha de su estilo, la lista de lo que le falta, hasta que lo vuelve a compartir o se aprueba. El creador también lo
   pre-aprueba (ADR 0024): «Pre-aprobar» lo instala como card suya con un borrador para su agente (la prueba y los
   arreglos), y su «Compartir» lo sube a la publicación del autor como «Pre-aprobado por Sloth» (`aprobada = 2`), que ya
   ve toda la comunidad; su autor lo deja así o manda otro. Mientras se revisa el paquete nuevo de uno que ya estaba a la
