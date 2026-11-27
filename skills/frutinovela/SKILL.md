@@ -101,9 +101,11 @@ Antes de inventar a uno, mira si ya está.
    --tamano <1080x1920 o 1920x1080>`. Listo cuando pasa y cada escena dice lo del guion.
 8. **Portada.** Según [`PORTADA.md`](../video-base/PORTADA.md): el personaje del conflicto, grande y con su cara del
    momento más fuerte, y de 2 a 5 palabras del drama («¡ME ENGAÑÓ!», «LA ADOPTARON»). Van tres cuadros del video de
-   referencia, para que sea el mismo elenco. En vertical va de primer fotograma (`portada.mjs`). Entrega la ruta del
-   video, el guion, los créditos gastados y con qué cuentas, y lo que no revisaste: el audio no lo oyes, solo lo
-   transcribes.
+   referencia, para que sea el mismo elenco. En vertical va de primer fotograma (`portada.mjs`). Antes de entregar,
+   lista la carpeta (`guion.md`, `cuadros/esc-*.jpg`, `clips/esc-*.mp4`, `out/frutinovela-<nombre>.mp4`, `portada.png`)
+   y vuelve a correr `comprobar.mjs` sobre el video: nunca digas que algo quedó si su archivo no está. Si falta algo,
+   dilo con su nombre y sigue con ello. Entrega la ruta del video, el guion, los créditos gastados y con qué cuentas,
+   y lo que no revisaste: el audio no lo oyes, solo lo transcribes.
 
 ## Las imágenes
 

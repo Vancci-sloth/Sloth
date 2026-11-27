@@ -18,6 +18,7 @@ import { startOpenCode } from './opencode.ts'
 import { OTROS } from './proveedores.ts'
 import { guardar } from './disco.ts'
 import { resumenDelHilo } from './relevo.ts'
+import { VIDEOS_SIN_AVISO } from '../shared/limites.ts'
 
 /**
  * Cuántos agentes trabajan a la vez mientras un lote espera: uno por cada 3 hilos de CPU (un render ya abre un Chrome por
@@ -42,6 +43,16 @@ const PREGUNTAS = /AskUserQuestion|request_user_input/i
 const DISCO = 15e9
 /** Cuántas caídas seguidas se retoman solas. Más es que algo se rompe cada vez, y lo decide el usuario. */
 const RETOMAS = 2
+/**
+ * Un error pasajero del proveedor: saturado, un 500, se tardó en contestar. Lo mismo que `errorLlano` (web/src/items.ts)
+ * llama «no respondió». Un límite de uso no lo es: reintentarlo no sirve hasta que se renueve.
+ */
+const PASAJERO = /overload|API Error:? 5\d\d|\b(500|502|503|504|529)\b|ETIMEDOUT|timed? ?out|service unavailable|internal server error|internal error|bad gateway/i
+const LIMITE = /hit your .*limit|usage limit|rate.?limit|out of usage|spend limit|credit balance|quota|\b429\b|\b402\b/i
+/** Lo que espera Sloth antes de cada reintento de un error pasajero: 30 s el primero, 60 s el segundo. */
+const ESPERA_REINTENTO = 30_000
+/** Lo que se le manda al agente al retomar, igual que «Reintentar» (`REINTENTAR` de web/src/items.ts). */
+const SIGUE = 'Sigue donde te quedaste.'
 /**
  * Cuánto espera el proceso de un video del lote, tras un turno que acabó bien, antes de cerrarse (cada uno ocupa cientos
  * de MB). Con margen: al acabar el turno, Claude Code aún puede abrir otro él solo, por una tarea en segundo plano que
@@ -345,6 +356,21 @@ export class Sessions {
     return metas
   }
 
+  /**
+   * Un video suelto a la cola, en vez de arrancarlo con otros dos trabajando (el aviso de `AvisoVideos.tsx`): su primer
+   * mensaje ya a la vista, y `repartir` lo arranca cuando trabajen menos de `VIDEOS_SIN_AVISO`.
+   */
+  encolar(id: string, text: string, skill?: SkillRef, images: string[] = []) {
+    const meta = this.metas.get(id)
+    if (!meta) return
+    if (skill) meta.skill = skill.name
+    meta.enCola = true
+    meta.pendiente = { text, ...(images.length ? { images } : {}) }
+    this.emit(id, { t: 'user', text, at: Date.now(), ...(images.length ? { images } : {}) })
+    this.save(meta)
+    this.repartir()
+  }
+
   /** «Empezar ya»: el video no espera su turno. */
   empezarYa(id: string) {
     const meta = this.metas.get(id)
@@ -365,6 +391,7 @@ export class Sessions {
     const p = meta.pendiente
     if (!p) return
     delete meta.pendiente
+    delete meta.enCola
     if (meta.lote) delete meta.lote.pausa
     this.turno(meta, p.text, undefined, p.images)
   }
@@ -377,8 +404,16 @@ export class Sessions {
     const todos = [...this.metas.values()]
     let trabajan = todos.filter((m) => m.running || m.background?.length).length
     const esperan = todos.filter((m) => m.pendiente && !m.lote?.pausa).sort((a, b) => a.createdAt - b.createdAt || (a.lote?.n ?? 0) - (b.lote?.n ?? 0))
-    // Los sueltos arrancan siempre, y cuentan: un lote no arranca si con ellos ya no cabe.
-    for (const meta of esperan.filter((m) => !m.lote)) {
+    // Los sueltos arrancan siempre, y cuentan: un lote no arranca si con ellos ya no cabe. Los que se pusieron en la cola,
+    // uno a uno, mientras trabajen menos videos de los que van sin aviso.
+    for (const meta of esperan.filter((m) => !m.lote && !m.enCola)) {
+      trabajan++
+      this.empezar(meta)
+    }
+    let videos = this.videosTrabajando()
+    for (const meta of esperan.filter((m) => m.enCola)) {
+      if (videos >= VIDEOS_SIN_AVISO) break
+      videos++
       trabajan++
       this.empezar(meta)
     }
@@ -395,8 +430,9 @@ export class Sessions {
 
   /**
    * Lo que una caída (del servidor o del proceso del agente) dejó a medias. Lo que le escribiste y el agente no llegó a
-   * leer se le vuelve a mandar. Un video de un lote, que nadie mira mientras trabaja, además sigue solo donde se quedó.
-   * Espera su turno como cualquier video del lote; un hilo suelto arranca ya.
+   * leer se le vuelve a mandar. Un turno cortado sigue solo donde se quedó, en un lote o en un hilo suelto: perder dos
+   * horas de trabajo por una caída y tener que pedirle que siga era la queja de la comunidad. Lo de un lote también sigue
+   * si solo se cortó lo de segundo plano. Espera su turno como cualquier video del lote; un hilo suelto arranca ya.
    */
   private retomar(meta: SessionMeta, mensajes: Mensaje[], cortado: boolean, tareas: string[]) {
     if ((meta.retomas ?? 0) >= RETOMAS) return
@@ -404,7 +440,7 @@ export class Sessions {
     if (mensajes.length) {
       const varios = mensajes.length > 1
       text = `(Sloth se cerró antes de que leyeras ${varios ? 'estos mensajes' : 'este mensaje'}. Te ${varios ? 'los' : 'lo'} vuelvo a mandar.)\n\n${mensajes.map((m) => m.text).join('\n\n')}`
-    } else if (meta.lote && (cortado || tareas.length)) {
+    } else if (cortado || (meta.lote && tareas.length)) {
       const muerto = tareas.length ? `, y se cortó lo que corría en segundo plano (${tareas.join('; ')})` : ''
       text = `(Sloth se cerró a mitad de tu trabajo${muerto}.) Continúa donde te quedaste. Antes, mira en tu carpeta qué quedó a medias: un render o un subagente cortado no terminó.`
     }
@@ -414,6 +450,31 @@ export class Sessions {
     meta.pendiente = { text, ...(images.length ? { images } : {}) }
     this.save(meta)
     setTimeout(() => this.repartir())
+  }
+
+  /**
+   * Tras un error pasajero del proveedor, Sloth le pide que siga, como «Reintentar», tras un rato que crece con cada
+   * intento. No si mientras tanto le escribiste o ya volvió a trabajar: ya siguió con eso.
+   */
+  private reintentar(meta: SessionMeta, cierre: number) {
+    const n = (meta.retomas ?? 0) + 1
+    const espera = ESPERA_REINTENTO * n
+    meta.retomas = n
+    this.save(meta)
+    this.emit(meta.id, { t: 'info', text: `Suele ser pasajero: Sloth lo reintenta sola en ${espera / 1000} segundos (intento ${n} de ${RETOMAS}).` })
+    clearTimeout(this.reintentos.get(meta.id))
+    const reloj = setTimeout(() => {
+      this.reintentos.delete(meta.id)
+      const m = this.metas.get(meta.id)
+      if (!m || m.running || m.pendiente) return
+      const ultimo = this.load(m.id).findLast((e) => e.t === 'user' || e.t === 'turn_end')
+      if (ultimo?.t !== 'turn_end' || ultimo.at !== cierre) return
+      m.pendiente = { text: SIGUE }
+      this.save(m)
+      this.repartir()
+    }, espera)
+    reloj.unref?.()
+    this.reintentos.set(meta.id, reloj)
   }
 
   /**
@@ -510,6 +571,14 @@ export class Sessions {
       meta.resumir = true
       this.emit(id, { t: 'info', text: `El hilo pasa de ${NOMBRE_AGENTE[antes]} a ${NOMBRE_AGENTE[ahora]}: tu próximo mensaje le lleva lo hablado, la carpeta y la skill.` })
     }
+    this.save(meta)
+  }
+
+  /** Lo mete en una carpeta de «Proyectos» de la barra lateral; sin nombre, lo saca. No cambia su fecha. */
+  aProyecto(id: string, proyecto: string) {
+    const meta = this.metas.get(id)
+    if (!meta) return
+    meta.proyecto = proyecto || undefined
     this.save(meta)
   }
 
@@ -625,6 +694,8 @@ export class Sessions {
   private relojes = new Map<string, ReturnType<typeof setTimeout>>()
   /** Los que dejaron un despertador (ScheduleWakeup, CronCreate): vive dentro del proceso, y cerrarlo lo perdería. */
   private despertadores = new Set<string>()
+  /** Los reintentos solos que esperan su rato, por hilo (`reintentar`). */
+  private reintentos = new Map<string, ReturnType<typeof setTimeout>>()
 
   /**
    * Cuando lo de segundo plano (subagentes, comandos, un Monitor) termina con el turno ya acabado, el hilo lo dice: el
@@ -848,8 +919,13 @@ export class Sessions {
         catch (error) { this.emit(id, { t: 'info', text: `No se pudo compactar: ${error instanceof Error ? error.message : String(error)}` }) }
       })
     }
-    // Una caída es de este hilo y se retoma sola; un error del proveedor (un límite de uso) le pasaría a todos.
-    if (event.t === 'turn_end' && !event.ok && !event.caida && meta.lote) this.pausar(meta.lote.id, `«${meta.title}»: ${event.error ?? 'se detuvo'}`)
+    // Una caída es de este hilo y se retoma sola, y un error pasajero se reintenta solo; otro error del proveedor (un
+    // límite de uso) le pasaría a todos los del lote.
+    if (event.t === 'turn_end' && !event.ok && !event.caida) {
+      const error = event.error ?? ''
+      if (PASAJERO.test(error) && !LIMITE.test(error) && (meta.retomas ?? 0) < RETOMAS) this.reintentar(meta, event.at)
+      else if (meta.lote) this.pausar(meta.lote.id, `«${meta.title}»: ${error || 'se detuvo'}`)
+    }
     // Los lotes liberan pronto su proceso; un chat lo conserva para volver y se cierra tras un reposo más largo.
     this.ocioso(id, meta, event)
     this.avisarFondo(id, meta, event, habia)

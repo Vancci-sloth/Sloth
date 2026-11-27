@@ -3,7 +3,7 @@ import type { AdjuntoComunidad, Autor, AvisoComunidad, CategoriaComunidad, Comen
 import { api, ErrorApi } from './api'
 import { abiertaGuardada, BORRADA, buscarAqui, conocidas, consulta as consultaDe, guardado, guardar as guardarVista, guardarAbierta, indiceListo, olvidar, olvidarTodo, palabrasDe, pedir, pedirIndice, pedirPublicacion, precargarPublicacion, precargarVista, recordar, ultimoFeed } from './comunidadDatos'
 import { Confirm } from './Confirm'
-import { Escribir, type Escrito, subirImagen } from './Escribir'
+import { Ampliada, Escribir, type Escrito, subirImagen } from './Escribir'
 import { TarjetasEnlaces } from './Enlaces'
 import { abrirBorrador, abrirHilo, CompartirTuyo, type Instalado, TrasInstalar } from './Estilos'
 import { LINK } from './etiquetas'
@@ -1293,11 +1293,7 @@ function Abierta(props: {
         )}
       </div>
 
-      {ampliada && (
-        <div className="lightbox" onClick={() => setAmpliada(null)}>
-          <img src={ampliada} alt="" />
-        </div>
-      )}
+      {ampliada && <Ampliada src={ampliada} onCerrar={() => setAmpliada(null)} />}
       {reportando && p && (
         <Reportar
           que={reportando.que}
@@ -1443,6 +1439,7 @@ function Comentar(props: {
   const [encima, setEncima] = useState(false)
   const [ocupado, setOcupado] = useState(false)
   const [error, setError] = useState('')
+  const [ampliada, setAmpliada] = useState<string | null>(null)
   const ref = useRef<HTMLTextAreaElement>(null)
   const elegir = useRef<HTMLInputElement>(null)
   useLayoutEffect(() => {
@@ -1555,7 +1552,7 @@ function Comentar(props: {
         <div className="esc-fotos com-comentar-fotos">
           {fotos.map((a) => (
             <div key={a.llave} className="esc-miniatura">
-              <img src={a.url} alt="" />
+              <img src={a.url} alt="" title="Ver en grande" onClick={() => setAmpliada(a.url)} />
               <button title="Quitar" onClick={() => setFotos((l) => l.filter((x) => x !== a))}>
                 ×
               </button>
@@ -1567,6 +1564,7 @@ function Comentar(props: {
         </div>
       )}
       {error && <div className="com-comentar-error">{error}</div>}
+      {ampliada && <Ampliada src={ampliada} onCerrar={() => setAmpliada(null)} />}
     </div>
   )
 }

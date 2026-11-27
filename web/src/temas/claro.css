@@ -1,0 +1,26 @@
+/*
+ * El tema Claro (`web/src/temas.ts`): la paleta de Sloth de día. Fondo de papel cálido, tarjetas casi blancas y el ámbar
+ * oscurecido para que se lea como texto (4,5:1 sobre el fondo) y sostenga letra clara encima. Todo el texto pasa 4,5:1
+ * sobre los tres fondos. Lo demás sale solo de las variables, igual que en el tema Sloth: aquí solo va lo que daba por
+ * hecho un fondo oscuro.
+ */
+:root[data-tema='claro'] {
+  --bg: #f6f3ed;
+  --panel: #fffdfa;
+  --panel-2: #eee8de;
+  --line: #e2dacd;
+  --line-hover: #c6bba8;
+  --text: #1e1912;
+  --muted: #685e4f;
+  --amber: #a65c06;
+  --amber-2: #8c4d04;
+  --sobre-ambar: #fffaf2;
+  --ok: #3a7424;
+  --bad: #b23c26;
+  color-scheme: light;
+
+  /* El texto de la rejilla de Mis videos va aclarado sobre el fondo oscuro; aquí, el de siempre. */
+  .mis-videos .videos { --claro: var(--text); }
+  /* Los logos blancos que van sobre el fondo (`Logos.tsx`), en su cuadrito negro como los de su marca. */
+  .logo:is(.logo-pi, .logo-omp, .logo-fish) { background: #000; box-shadow: none; }
+}

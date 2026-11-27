@@ -60,3 +60,19 @@ test('solo pregunta lo que pone a trabajar un video más', (t) => {
   assert.equal(h.sessions.sumaVideo(otro), false)
   h.fondo(deFondo, [])
 })
+
+test('un video puesto en la cola espera a que acabe uno de los que trabajan', async (t) => {
+  const h = preparar(t)
+  const [a, b, c] = [h.hilo(), h.hilo(), h.hilo()]
+  h.sessions.send(a.id, 'uno')
+  h.sessions.send(b.id, 'dos')
+  h.sessions.encolar(c.id, 'tres')
+  assert.equal(h.recibido.get(c.id), undefined)
+  assert.equal(h.sessions.meta(c.id)?.enCola, true)
+
+  h.acaba(a)
+  await new Promise((r) => setTimeout(r, 10))
+  assert.deepEqual(h.recibido.get(c.id), ['tres'])
+  assert.equal(h.sessions.meta(c.id)?.enCola, undefined)
+  assert.equal(h.sessions.meta(c.id)?.pendiente, undefined)
+})

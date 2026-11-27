@@ -7,7 +7,18 @@ import { createPortal } from 'react-dom'
  * dentro de otro bloque heredaría sus estilos (en `.pie`, los botones salían grises). `otraAccion` es un segundo botón de
  * acción (eliminar el chat y además sus archivos); mientras una trabaja, no se cierra.
  */
-export function Confirm(props: { title: string; children: ReactNode; action: string; danger?: boolean; enfocarCancelar?: boolean; otraAccion?: { etiqueta: string; ejecutar(): Promise<unknown> }; onConfirm(): Promise<unknown>; onClose(): void }) {
+export function Confirm(props: {
+  title: string
+  children: ReactNode
+  action: string
+  danger?: boolean
+  enfocarCancelar?: boolean
+  /** Una segunda salida, entre «Cancelar» y la acción («Ponerlo en cola» en `AvisoVideos.tsx`). */
+  otra?: { texto: string; title?: string; onClick(): void }
+  otraAccion?: { etiqueta: string; ejecutar(): Promise<unknown> }
+  onConfirm(): Promise<unknown>
+  onClose(): void
+}) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
 
@@ -44,6 +55,11 @@ export function Confirm(props: { title: string; children: ReactNode; action: str
           <button className="ghost" disabled={busy} onClick={props.onClose} autoFocus={props.enfocarCancelar}>
             Cancelar
           </button>
+          {props.otra && (
+            <button className="ghost" title={props.otra.title} disabled={busy} onClick={props.otra.onClick}>
+              {props.otra.texto}
+            </button>
+          )}
           <button className={props.danger ? 'primary danger' : 'primary'} disabled={busy} onClick={() => void confirm(props.onConfirm)} autoFocus={!props.enfocarCancelar}>
             {props.action}
           </button>

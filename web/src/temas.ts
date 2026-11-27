@@ -12,6 +12,7 @@ import { useSyncExternalStore } from 'react'
  */
 export const TEMAS = {
   sloth: { nombre: 'Sloth', descripcion: 'Oscuro cálido con acento ámbar, el de siempre.', fondos: false, movimiento: false },
+  claro: { nombre: 'Claro', descripcion: 'Fondo claro y cálido con acento ámbar, para trabajar de día.', fondos: false, movimiento: false },
   cristal: { nombre: 'Cristal', descripcion: 'Grises neutros, controles de cristal con el color de cada agente, fondos de signos que siguen al puntero y transiciones suaves.', fondos: true, movimiento: true }
 } as const
 
@@ -35,6 +36,8 @@ const quienes = new Set<() => void>()
 export function aplicarTema(tema: Tema = actual) {
   if (tema === 'sloth') delete document.documentElement.dataset.tema
   else document.documentElement.dataset.tema = tema
+  // La barra de título y el fondo de la ventana (electron/main.ts), del color del tema.
+  window.sloth?.pintar?.(getComputedStyle(document.documentElement).getPropertyValue('--bg').trim(), tema === 'claro')
 }
 
 /** Cambia de tema al instante y lo recuerda. */
