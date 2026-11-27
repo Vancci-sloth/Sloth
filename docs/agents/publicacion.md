@@ -91,7 +91,9 @@ salen para todos (`[para todos]`) son de dos clases, y el aviso dice cuál es (p
    `web/public/novedades/0.5.0.html`, que reemplaza a la de antes), que sale una vez al abrirla a quien actualizó. Su
    número en `Novedades.tsx` debe ser el que saldrá: `version-venta.mjs` sube solo la última cifra de la publicada, y un
    salto (0.5.0) se pone a mano en `package.json`.
-2. Comprueba el diff completo entre `origin/venta` y `main`: se publicará todo lo que haya entrado a `main`. Guarda la
+2. Comprueba el diff completo entre `origin/venta` y `main`: se publicará todo lo que haya entrado a `main`. Mira
+   también las PR abiertas y `node scripts/mejoras.mjs`: lo que en la comunidad ya se contestó con «sale en la
+   siguiente actualización» debe estar en `main` antes del push (la 0.5.2 iba a salir sin la #48, que traía 17). Guarda la
    lista de sus commits (`git log --no-merges --format="%s%n%b" origin/venta..main`): de ahí sale el anuncio del paso 5,
    y después del push ya no se puede sacar así. Si en ese diff hay cambios de `licencias/` que esperan esta versión
    (desde el 7 de noviembre de 2026, los mensajes de las voces con «Sloth» en vez del socio), despliega el cobro después
