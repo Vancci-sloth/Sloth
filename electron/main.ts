@@ -64,6 +64,9 @@ const LUGAR = join(APP, 'data', 'ventana.json')
 const SIN_AVISO = join(APP, 'data', 'sin-aviso-al-cerrar.json')
 /** --bg de web/src/styles.css: el fondo mientras carga y el de la barra de título. */
 const FONDO = '#0f0e0c'
+/** El fondo del tema de la interfaz (`web/src/temas.ts`) y si es claro: la ventana se abre ya de ese color. */
+const PINTURA = join(APP, 'data', 'tema-ventana.json')
+const COLOR = /^#[0-9a-f]{6}$/i
 /** Cada cuánto se pregunta si hay versión nueva. */
 const CADA = 6 * 3600_000
 /**
@@ -105,7 +108,7 @@ const servidorListo = new Promise<void>((ok) => (avisarListo = ok))
 // Su propio nombre ante Windows: la ventana se junta con el acceso anclado y los avisos salen a nombre de Sloth.
 app.setAppUserModelId(SOLO_VENTANA ? 'Sloth.Dev' : 'Sloth.App')
 app.setPath('userData', join(APP, 'data', 'ventana'))
-nativeTheme.themeSource = 'dark'
+nativeTheme.themeSource = pintura().claro ? 'light' : 'dark'
 
 if (!app.requestSingleInstanceLock()) app.quit()
 else {
@@ -120,6 +123,7 @@ else {
     detener()
   })
   ipcMain.on('traer', () => ventana && traer(ventana))
+  ipcMain.on('pintar', (_e, fondo: unknown, claro: unknown) => pintar(fondo, claro === true))
   ipcMain.handle('actualizacion', async () => {
     await primera
     return actualizacion
@@ -176,14 +180,15 @@ async function iniciar() {
 function abrir() {
   if (ventana) return traer(ventana)
   const { maximizada, ...medidas } = lugar()
+  const { fondo } = pintura()
   const v = new BrowserWindow({
     ...medidas,
     title: 'Sloth',
     show: false,
-    backgroundColor: FONDO,
+    backgroundColor: fondo,
     // En Windows 11, la barra de título y el borde del color de Sloth (Electron los vuelve a pintar al enfocarla). En
     // Windows 10 solo se oscurecen.
-    accentColor: FONDO,
+    accentColor: fondo,
     // La compilada lleva el logo en Sloth.exe y en Sloth.app; en el repo es electron.exe, con el suyo. Linux lo pide siempre.
     icon: MAC || (WINDOWS && app.isPackaged) ? undefined : app.isPackaged ? join(process.resourcesPath, 'icon.png') : join(APP, 'assets', WINDOWS ? 'icon.ico' : 'icon.png'),
     webPreferences: { preload: join(__dirname, 'preload.cjs'), sandbox: true, autoplayPolicy: 'no-user-gesture-required' }
@@ -271,6 +276,33 @@ function lugar(): { x?: number; y?: number; width: number; height: number; maxim
   }
   const { width, height } = screen.getPrimaryDisplay().workAreaSize
   return { width: Math.round((width * 4) / 5), height: Math.round((height * 5) / 6) }
+}
+
+function pintura(): { fondo: string; claro: boolean } {
+  try {
+    const p = JSON.parse(readFileSync(PINTURA, 'utf8'))
+    if (COLOR.test(p.fondo)) return { fondo: p.fondo, claro: p.claro === true }
+  } catch {
+    // Con el tema de siempre.
+  }
+  return { fondo: FONDO, claro: false }
+}
+
+/** La interfaz cambió de tema: la barra de título, el borde y lo que se ve antes de cargar, de su color. */
+function pintar(fondo: unknown, claro: boolean) {
+  if (typeof fondo !== 'string' || !COLOR.test(fondo)) return
+  nativeTheme.themeSource = claro ? 'light' : 'dark'
+  if (ventana) {
+    ventana.setBackgroundColor(fondo)
+    if (WINDOWS) ventana.setAccentColor(fondo)
+  }
+  const antes = pintura()
+  if (antes.fondo === fondo && antes.claro === claro) return
+  try {
+    guardar(PINTURA, JSON.stringify({ fondo, claro }))
+  } catch {
+    // La siguiente vez abre oscura un instante.
+  }
 }
 
 function guardarLugar(v: BrowserWindow) {

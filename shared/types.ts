@@ -481,6 +481,8 @@ export interface SessionMeta {
   running: boolean
   /** Fuera de la lista de la barra lateral, sin borrarse. */
   archived?: boolean
+  /** La carpeta de «Proyectos» donde va en la barra lateral, por su nombre. Sin ella, va por fecha. */
+  proyecto?: string
   /** El chat de una imagen del estudio (`server/flow/hilo-imagen.ts`), por su imagen de partida: no se le escribe. */
   imagenEstudio?: string
   /** Las tareas en segundo plano que siguen vivas, por su descripción. */
@@ -516,6 +518,8 @@ export interface SessionMeta {
   skill?: string
   /** El primer mensaje de un video del lote que aún no empieza: espera a que haya sitio en la máquina. */
   pendiente?: { text: string; images?: string[] }
+  /** Un video suelto puesto en la cola (el aviso de más de dos a la vez): arranca cuando trabajen menos de dos. */
+  enCola?: boolean
 }
 
 export interface Lote {
@@ -1729,6 +1733,8 @@ export interface PuenteSloth {
   actualizar(): Promise<ActualizacionSloth>
   /** La ventana al frente (al pulsar un aviso). */
   traer(): void
+  /** La barra de título y el fondo de la ventana, del color del tema (`web/src/temas.ts`). No está en una ventana de antes. */
+  pintar?(fondo: string, claro: boolean): void
   /** Si Sloth está anclada a la barra de tareas; `null` donde no se puede ofrecer (fuera de la app instalada en Windows). */
   anclada(): Promise<boolean | null>
   /** Pide a Windows anclarla, que pregunta en su ventana. `windows`: Windows no dejó pedirlo. */

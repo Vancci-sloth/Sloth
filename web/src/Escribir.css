@@ -30,6 +30,9 @@
 .esc-elegir-estilo > .picker-trigger { height: 30px; padding: 0 9px; border-radius: 999px; }
 .esc-elegir-estilo > .picker-trigger:hover:not(:disabled), .esc-elegir-estilo.open > .picker-trigger { background: var(--line); color: var(--text); }
 .esc-miniatura img, .esc-miniatura video { width: 100%; height: 100%; object-fit: cover; display: block; }
+.esc-miniatura img[title] { cursor: zoom-in; }
+/* La imagen en grande de la comunidad va encima de la publicación abierta (su velo es z-index 70). */
+.lightbox.encima { z-index: 80; }
 .esc-miniatura button { position: absolute; top: 4px; right: 4px; width: 20px; height: 20px; display: grid; place-items: center; border-radius: 50%; background: color-mix(in srgb, var(--bg) 82%, transparent); color: var(--text); font-size: 13px; line-height: 1; opacity: 0; transition: opacity 0.15s; }
 .esc-miniatura:hover button, .esc-miniatura button:focus-visible { opacity: 1; }
 .esc-miniatura button:hover { color: var(--bad); }

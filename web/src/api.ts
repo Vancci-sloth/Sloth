@@ -16,8 +16,11 @@ export function leerCuenta<T>(ruta: string): Promise<T> {
   return lectura
 }
 
-/** Quien le pregunta al usuario si sigue, cuando el servidor pide confirmar (`AvisoVideos.tsx`). */
-let preguntar: ((aviso: string) => Promise<boolean>) | undefined
+/**
+ * Quien le pregunta al usuario si sigue, cuando el servidor pide confirmar (`AvisoVideos.tsx`). Con `cola`, también puede
+ * ponerlo en la cola: contesta «cola».
+ */
+let preguntar: ((aviso: string, cola: boolean) => Promise<boolean | 'cola'>) | undefined
 export const alPreguntar = (f: typeof preguntar) => void (preguntar = f)
 
 /**
@@ -48,7 +51,8 @@ export async function api<T = any>(path: string, body?: unknown): Promise<T> {
   })
   // Con un error vacío, quien llamó no enseña nada y el texto sigue en el campo: decir que no, no es un fallo.
   if (data.confirmar && preguntar) {
-    if (await preguntar(data.error)) return api<T>(path, { ...(body as object), masDeDos: true })
+    const sigue = await preguntar(data.error, !!data.cola)
+    if (sigue) return api<T>(path, { ...(body as object), masDeDos: true, ...(sigue === 'cola' ? { enCola: true } : {}) })
     throw new ErrorApi('', res.status)
   }
   if (!res.ok) throw new ErrorApi(data.error ?? res.statusText, res.status)
