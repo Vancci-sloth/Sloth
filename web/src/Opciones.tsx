@@ -199,7 +199,7 @@ type Apartado = readonly [id: string, titulo: string, icono: NombreIcono]
 
 const CREACION = [
   ['google', 'Google AI Studio', 'microfono'], ['sloth', 'Voces de Sloth', 'sonido'], ['externos', 'Proveedores externos', 'globo'],
-  ['flow', 'Google Flow', 'imagen'], ['privacidad', 'Privacidad de Flow', 'escudo'], ['meta', 'Meta Muse', 'imagen']
+  ['flow', 'Google Flow y Vids', 'imagen'], ['privacidad', 'Privacidad de Flow', 'escudo'], ['meta', 'Meta Muse', 'imagen']
 ] as const satisfies readonly Apartado[]
 
 const EQUIPO = [
@@ -227,7 +227,7 @@ function OpcionesCreacion({ apartado }: { apartado?: string }) {
       {activa === 'google' && <p>Conecta tu cuenta de Google para generar narraciones. También puedes usarla en Google Flow.</p>}
       {activa === 'sloth' && <p>Gestiona tu clave, tus créditos y las voces que aparecen en el compositor.</p>}
       {activa === 'externos' && <p>Conecta un proveedor con su llave de API para añadir sus voces al selector.</p>}
-      {activa === 'flow' && <p>Gestiona las cuentas y los créditos para generar imágenes con Nano Banana y clips con Veo.</p>}
+      {activa === 'flow' && <p>Gestiona las cuentas y los créditos para generar imágenes con Nano Banana y clips con Veo. Google Vids hace clips con estas mismas cuentas, con su propio cupo y sin gastar créditos.</p>}
       {activa === 'privacidad' && <p>Decide si Flow puede usar tus generaciones para mejorar sus productos y si puedes enviar imágenes de referencia.</p>}
       {activa === 'meta' && <p>Agrega tus cuentas de Meta para generar imágenes y videos con Muse; Sloth reparte los pedidos entre ellas.</p>}
     </header>
