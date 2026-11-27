@@ -1395,6 +1395,25 @@ export interface ComentarioComunidad {
   reportes?: number
 }
 
+/**
+ * Un estilo tuyo que la revisión de la comunidad ya leyó y no aprobó, con lo que te contestó de la versión que mandaste
+ * (`GET /api/comunidad/estilo/revisados`, `revisadoDe` en `server/comunidad.ts`). Deja de serlo cuando lo vuelves a
+ * compartir o se aprueba. Sloth lo dice en el menú, en un aviso y en su estilo (`web/src/EstiloRevisado.tsx`).
+ */
+export interface EstiloRevisado {
+  /** Su card en esta computadora. Sin ella (se compartió desde otra, o ya la borraste) se abre su publicación. */
+  cardId?: string
+  titulo: string
+  publicacion: string
+  /** El comentario con la respuesta: por él se recuerda que ya viste el aviso. */
+  comentario: string
+  cuando: string
+  /** Lo que tiene que arreglar para aprobarse, cada cosa como la dijo la revisión. */
+  falta: string[]
+  /** Lo que lo mejoraría y no lo frena. */
+  sugerencias: string[]
+}
+
 /** Lo que le pasó a lo tuyo en la comunidad: te comentaron, te respondieron, te dieron me gusta… */
 export interface AvisoComunidad {
   id: string

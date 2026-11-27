@@ -3,11 +3,11 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { test } from 'node:test'
-import { REVISION_CARD } from '../shared/revision.ts'
+import { faltaDeRespuesta, REVISION_CARD } from '../shared/revision.ts'
 import type { SessionMeta } from '../shared/types.ts'
 import { SOLO_LEER } from './claude.ts'
 import { EstiloMalo } from './estilos.ts'
-import { desenlaceDe, mensaje, revisionDeEstilos, veredictoDe } from './estilos-revision.ts'
+import { desenlaceDe, mensaje, respuestaAlAutor, revisionDeEstilos, veredictoDe } from './estilos-revision.ts'
 
 interface Caso {
   creador?: boolean
@@ -223,6 +223,8 @@ test('lo que le falta según quien lo leyó se le contesta a su autor, una vez; 
     await c.acaba('h1', { veredicto: 'falta', resumen: 'Casi.', falta: ['Di en SKILL.md cómo se acomoda en horizontal.', 'Su guía promete 30 segundos y hace dos minutos: corrige una.'] })
     assert.equal(c.hilos[0].title, 'Le falta: Estilo pub1')
     assert.match(c.comentarios[0].texto, /- Di en SKILL\.md cómo se acomoda en horizontal\.\n- Su guía promete 30 segundos/)
+    // La app de su autor saca de ese comentario la lista que le enseña en su estilo.
+    assert.deepEqual(faltaDeRespuesta(c.comentarios[0].texto)?.falta, ['Di en SKILL.md cómo se acomoda en horizontal.', 'Su guía promete 30 segundos y hace dos minutos: corrige una.'])
     await c.r.alAcabar('h1')
     assert.equal(c.comentarios.length, 1)
     await c.r.ronda()
@@ -401,4 +403,18 @@ test('antes de pre-aprobar uno, Sloth lo vuelve a comprobar y junta lo que su re
   } finally {
     c.fin()
   }
+})
+
+test('lo que se le contesta a su autor se vuelve a leer igual: lo que frena, lo que no, y solo cuando le falta algo', () => {
+  const falta = ['En `SKILL.md`, el paso 3 no dice qué hacer en Mac.', 'Su card no tiene la etapa «Revisión».']
+  const sugerencias = ['Nombra la línea `Imágenes:`.']
+  // Los acentos graves del código no viajan: los comentarios de la comunidad son texto llano.
+  assert.deepEqual(faltaDeRespuesta(respuestaAlAutor('falta', falta, 'Recetas', sugerencias)!), {
+    falta: ['En SKILL.md, el paso 3 no dice qué hacer en Mac.', 'Su card no tiene la etapa «Revisión».'],
+    sugerencias: ['Nombra la línea Imágenes:.']
+  })
+  assert.deepEqual(faltaDeRespuesta(respuestaAlAutor('falta', falta, 'Recetas')!)?.sugerencias, [])
+  // Aprobado con sugerencias, o que lo aprueba el creador a mano: no es un «le falta».
+  assert.equal(faltaDeRespuesta(respuestaAlAutor('aprobado', [], 'Recetas', sugerencias)!), undefined)
+  assert.equal(faltaDeRespuesta(respuestaAlAutor('decide', [], 'Recetas', sugerencias)!), undefined)
 })

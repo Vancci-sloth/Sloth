@@ -7,7 +7,8 @@ import { extname, join, resolve, sep } from 'node:path'
 import { promisify } from 'node:util'
 import { guiaDe, TIPO_HILO } from '../shared/guia.ts'
 import { NOMBRE_AGENTE, proveedorDe } from '../shared/providers.ts'
-import type { AdjuntoComunidad, AyudaMejora, GuiaEstilo, OrigenMejora, PruebaEstilo, PublicacionComunidad, ServerPush, TiendaEstilos, VideoHecho } from '../shared/types.ts'
+import { DE_LA_REVISION, faltaDeRespuesta } from '../shared/revision.ts'
+import type { AdjuntoComunidad, AvisoComunidad, AyudaMejora, ComentarioComunidad, EstiloRevisado, GuiaEstilo, OrigenMejora, PruebaEstilo, PublicacionComunidad, ServerPush, TiendaEstilos, VideoHecho } from '../shared/types.ts'
 import { guardar } from './disco.ts'
 import { bytes, cuerpo, json as enviar } from './http.ts'
 import { EstiloMalo, type Instalado, type Manifiesto, PESO as PESO_ESTILO, TIPO as TIPO_ESTILO } from './estilos.ts'
@@ -40,6 +41,10 @@ import { redactar as redactarConAgente } from './redactar.ts'
  *   compartido desde esta computadora (`data/estilos-compartidos.json`), pone al día esa publicación en vez de hacer
  *   otra. `GET /api/comunidad/estilo/compartido?cardId=&titulo=` da esa publicación (`{publicacion}`), si sigue ahí;
  *   la de antes de que se apuntara se busca por el nombre del estilo (`deAntes`).
+ * - `GET /api/comunidad/estilo/revisados`: tus estilos que la revisión ya leyó y no aprobó (`EstiloRevisado[]`), con lo
+ *   que les falta, sacado de lo que te contestó en su publicación (`revisadoDe`). Es lo que la app dice en el menú, en
+ *   un aviso y en el estilo (`web/src/EstiloRevisado.tsx`). Mira los que compartiste desde aquí y los que el creador te
+ *   comentó; al creador no le da ninguno.
  * - `POST /api/comunidad/estilo/prueba` `{ruta}`: la prueba de un video de «Mis videos» (`PruebaEstilo`): con qué agente
  *   se hizo, cuánto costó y cuánto tardó, sacado de su hilo (`server/prueba-estilo.ts`). 404 si su hilo ya no está.
  * - `POST /api/comunidad/estilo/evidencia` `{ruta}`: sube el hilo completo de ese video (`EvidenciaEstilo`) y da su
@@ -119,6 +124,21 @@ interface Opciones {
   antesDePreaprobar(publicacion: string, paquete: Buffer, guia?: GuiaEstilo, prueba?: PruebaEstilo): { riesgos: string[]; fallas: string[]; no: boolean; pide: string[] }
   /** La publicación de Estilos de la que salió el estilo de esa card (su `origen` o su `deComunidad`), si salió de una. */
   deEstilo(cardId: string): string | undefined
+  /** Los estilos tuyos de esta computadora, con su nombre: para saber de cuál es cada publicación. */
+  tuyas(): { id: string; title: string }[]
+}
+
+/**
+ * Lo que la revisión le pidió a un estilo que sigue sin aprobarse: lo último que contestó de la versión de ahora (después
+ * de la última vez que su autor lo mandó o lo cambió). Nada si ya se aprobó, si aún no le contesta, o si lo último que
+ * dijo no fue que le falta algo. Los comentarios llegan del más viejo al más nuevo.
+ */
+export function revisadoDe(p: PublicacionComunidad, comentarios: ComentarioComunidad[]): Pick<EstiloRevisado, 'comentario' | 'cuando' | 'falta' | 'sugerencias'> | undefined {
+  if (!p.porAprobar) return undefined
+  const desde = p.editada ?? p.creada
+  const ultima = comentarios.filter((c) => c.autor.creador && c.creada > desde && c.texto.startsWith(DE_LA_REVISION)).at(-1)
+  const pide = ultima && faltaDeRespuesta(ultima.texto)
+  return pide && { comentario: ultima.id, cuando: ultima.creada, ...pide }
 }
 
 export function comunidad(app: string, o: Opciones) {
@@ -205,6 +225,46 @@ export function comunidad(app: string, o: Opciones) {
     if (!titulo || 'llave' in ((await o.credencial()) ?? {})) return undefined
     const { estilos } = await nubeJson<TiendaEstilos>('/comunidad/estilos?orden=nuevos').catch(() => ({ estilos: [] }) as Pick<TiendaEstilos, 'estilos'>)
     return estilos.find(({ publicacion: p }) => (p.porAprobar || p.incompleto) && p.adjuntos.some((a) => a.tipo === 'estilo' && a.nombre === titulo))?.publicacion.id
+  }
+
+  /**
+   * Las publicaciones que resultaron no ser un estilo (una mejora donde el creador te contestó) o que ya no están: con
+   * cada aviso nuevo se pregunta por tus estilos revisados, y esas no hay por qué bajarlas otra vez.
+   */
+  const sinEstilo = new Set<string>()
+
+  /**
+   * Tus estilos que la revisión ya leyó y no aprobó, del más reciente al más viejo. Se miran las publicaciones donde
+   * compartiste cada estilo desde aquí y las tuyas donde el creador comentó (así entra el que compartiste antes de que
+   * Sloth apuntara dónde, o desde otra computadora): de cada una, lo último que dijo la revisión (`revisadoDe`). Su card
+   * es la apuntada o, si no, la tuya que se llama como el estilo, que queda apuntada.
+   */
+  async function revisados(): Promise<EstiloRevisado[]> {
+    const c = await o.credencial()
+    // Sin cuenta no hay nada compartido; y lo del creador no lo revisa nadie.
+    if (!c || 'llave' in c) return []
+    const apuntadas = compartidos()
+    const { avisos } = await nubeJson<{ avisos: AvisoComunidad[] }>('/comunidad/avisos')
+    const ids = new Set([...Object.values(apuntadas), ...avisos.filter((a) => a.tipo === 'comento' && a.de.creador).map((a) => a.publicacion)])
+    const tuyas = o.tuyas()
+    const lista = await Promise.all(
+      [...ids].filter((id) => /^[a-z0-9]+$/.test(id) && !sinEstilo.has(id)).map(async (id): Promise<EstiloRevisado[]> => {
+        const { publicacion: p, comentarios } = await nubeJson<{ publicacion: PublicacionComunidad; comentarios: ComentarioComunidad[] }>(`/comunidad/p/${id}`).catch((e) => {
+          // La que ya no está (o ya no ves) no tiene nada que decir; sin conexión, sí falla.
+          if (e instanceof Rechazo && (e.status === 404 || e.status === 403)) return { publicacion: undefined, comentarios: [] }
+          throw e
+        })
+        const estilo = p?.categoria === 'estilos' ? p.adjuntos.find((a) => a.tipo === 'estilo') : undefined
+        if (!p || !estilo) return sinEstilo.add(id), []
+        const pide = revisadoDe(p, comentarios)
+        if (!pide) return []
+        const apuntada = Object.keys(apuntadas).find((card) => apuntadas[card] === p.id)
+        const card = tuyas.find((t) => t.id === apuntada) ?? (apuntada ? undefined : tuyas.find((t) => t.title === estilo.nombre && !apuntadas[t.id]))
+        if (card && !apuntada) recordar(card.id, p.id)
+        return [{ ...(card ? { cardId: card.id } : {}), titulo: card?.title ?? estilo.nombre ?? p.titulo, publicacion: p.id, ...pide }]
+      })
+    )
+    return lista.flat().sort((a, b) => b.cuando.localeCompare(a.cuando))
   }
 
   /** El hilo completo de una prueba, tal como se subió (JSON): lo bajan quien lo subió y el creador. Nada si ya no está. */
@@ -406,6 +466,7 @@ export function comunidad(app: string, o: Opciones) {
         recordar(cardId, p?.id)
         return enviar(res, 200, p ? { publicacion: p } : {})
       }
+      if (ruta === '/api/comunidad/estilo/revisados' && metodo === 'GET') return enviar(res, 200, await revisados())
       if (ruta === '/api/comunidad/estilo/prueba' && metodo === 'POST') {
         const v = o.video(String((await cuerpo<{ ruta?: string }>(req)).ruta ?? ''))
         const hilo = v?.sessionId ? o.sessions.get(v.sessionId) : null

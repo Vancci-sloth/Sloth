@@ -144,7 +144,7 @@ const EL_MISMO = ':el-mismo'
  *   decía, y se vuelve a revisar. Así se arregla lo que le faltaba sin perder sus comentarios ni sus números.
  * - Su evidencia es el hilo completo de ese video, que lee el creador: sube al publicar, y solo si marca que lo comparte.
  * - Al terminar, los pasos que siguen: Sloth lo lee solo (`server/estilos-revision.ts`); si le falta algo se lo dice en
- *   su publicación, y si cumple todo se aprueba.
+ *   su publicación y su Sloth le avisa con la lista (`EstiloRevisado.tsx`), y si cumple todo se aprueba.
  * - Al creador que manda el estilo de otro (lo instaló con «Pre-aprobar», ADR 0024) le pone al día esa publicación y la
  *   deja «Pre-aprobado por Sloth» (`server/comunidad.ts`). Dice qué le cambió (`cambios`), y eso le llega a su autor en
  *   un comentario.
@@ -337,7 +337,8 @@ export function CompartirEstilo({ card, onCerrar }: { card: Card; onCerrar(): vo
             <li>
               <Icono de="claqueta" className="icon-trazo" />
               <span>
-                <strong>Si le falta algo,</strong> te lo dice en los comentarios de tu publicación. Lo arreglas y pulsas «Compartir» otra vez en su card: se pone al día esta misma publicación.
+                <strong>Si le falta algo, Sloth te avisa</strong> y te lleva a tu estilo, con la lista de lo que hay que arreglar. Lo arreglas y pulsas «Compartir» otra vez en su card: se pone al día esta misma
+                publicación.
               </span>
             </li>
             <li>

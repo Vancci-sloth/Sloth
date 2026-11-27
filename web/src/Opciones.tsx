@@ -15,6 +15,7 @@ import { EspacioDisco } from './Espacio' // espacio en disco
 import { discoLleno } from './items'
 import { TuEquipo } from './Equipo' // tu equipo
 import { TuCelular } from './Celular' // tu celular
+import { RevisadosEnNotificaciones, useCuantosRevisados } from './EstiloRevisado'
 import { Icono, type NombreIcono } from './Iconos'
 import { SuscripcionOpciones, VersionYApoyo } from './Licencia' // apoyo
 import { RespaldoOpciones } from './Respaldo' // tu Sloth en otra computadora
@@ -1370,6 +1371,8 @@ export function Notificaciones({ skill }: { skill?: string }) {
   const hayDescargas = pendientes.some((r) => !r.listo && r.instalable && !r.estado)
   const bandeja = useRef<HTMLDivElement>(null)
   const [aviso, setAviso] = useState(false)
+  // Los estilos tuyos que la revisión no aprobó también son una notificación (`EstiloRevisado.tsx`).
+  const revisados = useCuantosRevisados()
 
   useEffect(() => {
     if (!hayDescargas || sessionStorage.getItem('aviso-requisitos')) return
@@ -1389,17 +1392,18 @@ export function Notificaciones({ skill }: { skill?: string }) {
   }
 
   return <>
-    <button className="notificaciones-boton" title="Notificaciones" aria-label={pendientes.length ? 'Notificaciones pendientes' : 'Notificaciones'}
+    <button className="notificaciones-boton" title="Notificaciones" aria-label={pendientes.length || revisados ? 'Notificaciones pendientes' : 'Notificaciones'}
       popoverTarget="notificaciones" onClick={abrir}>
       <Icono de="campana" />
-      {pendientes.length > 0 && <span aria-hidden="true" />}
+      {(pendientes.length > 0 || revisados > 0) && <span aria-hidden="true" />}
     </button>
     <div className="notificaciones-bandeja" id="notificaciones" popover="auto" ref={bandeja} role="region" aria-label="Notificaciones">
       <header>
         <strong>Notificaciones</strong>
         <button title="Cerrar notificaciones" aria-label="Cerrar notificaciones" popoverTarget="notificaciones" popoverTargetAction="hide"><Icono de="cerrar" /></button>
       </header>
-      {pendientes.length > 0 || error ? <RequisitosPendientes req={req} /> : <div className="notificaciones-vacias superficie-ascii">
+      <RevisadosEnNotificaciones alIr={() => bandeja.current?.hidePopover()} />
+      {pendientes.length > 0 || error ? <RequisitosPendientes req={req} /> : !revisados && <div className="notificaciones-vacias superficie-ascii">
         {lista && <CampoAscii variante="orbita" />}
         <p>{lista ? 'Estás al día.' : 'Consultando notificaciones…'}</p>
       </div>}
