@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import type { Env } from './index.ts'
-import { MAX_LETRAS, idDe, juntas, laDeMasSaldo, llavesDe, mensajeDe, pedidoTts } from './voz.ts'
+import { MAX_LETRAS, datosDe, errorDe, idDe, juntas, laDeMasSaldo, llavesDe, mensajeDe, pedidoTts } from './voz.ts'
 
 test('la Administrador de antes ve todas las llaves como una sola cuenta', () => {
   const r = (datos: Record<string, unknown>, status = 200) => ({ status, datos })
@@ -66,9 +66,27 @@ test('cada error de las voces se dice en español y con qué hacer', () => {
   assert.match(de(401), /no aceptaron su llave/)
   assert.match(de(403), /suspendido/)
   assert.match(de(500), /respondieron 500/)
+  // Lo suyo va en el mensaje aunque no lo llame `error`.
+  assert.match(mensajeDe({ status: 500, datos: { message: 'Upstream TTS failed' } }), /respondieron 500: Upstream TTS failed/)
+  // Una voz clonada con la que no puede hablar (502) pide clonarla otra vez; otra voz, o sin conexión, no.
+  assert.match(mensajeDe({ status: 502, datos: {} }, 'clone_2746891'), /clónala otra vez/)
+  assert.match(mensajeDe({ status: 502, datos: {} }, 'elevenlabs_abc'), /respondieron 502\./)
+  assert.match(mensajeDe({ status: 502, datos: { code: 'sin_conexion' } }, 'clone_1'), /No hubo conexión/)
 })
 
-test('un regalo de créditos da una cuenta gratis a quien no tiene, suma una sola vez por motivo y manda su clave', async () => {
+test('de un fallo se guarda lo que respondió Voices Cloning, aunque no traiga `error` o no sea JSON', () => {
+  assert.deepEqual(datosDe('{"error":"x","code":"y"}'), { error: 'x', code: 'y' })
+  assert.deepEqual(datosDe('[1]'), { valor: [1] })
+  assert.deepEqual(datosDe('<html>502 Bad Gateway</html>'), { texto: '<html>502 Bad Gateway</html>' })
+  assert.equal(errorDe({ error: 'Saldo insuficiente', code: 'insufficient_credits' }), 'Saldo insuficiente')
+  assert.equal(errorDe({ detail: 'voice not ready' }), 'voice not ready')
+  assert.equal(errorDe({}), '{}')
+  assert.equal(errorDe({ texto: 'Bad Gateway' }), '{"texto":"Bad Gateway"}')
+  assert.equal(errorDe({ texto: 'x'.repeat(900) }).length, 500)
+})
+
+/** El cobro con una base de verdad (SQLite con las migraciones), R2 en memoria y la llave del creador `admin`. */
+async function cobro() {
   const { DatabaseSync } = await import('node:sqlite')
   const { readdirSync, readFileSync } = await import('node:fs')
   const { default: worker } = await import('./index.ts')
@@ -96,6 +114,39 @@ test('un regalo de créditos da una cuenta gratis a quien no tiene, suma una sol
     CORREO_RESPUESTA: 'soporte@x.com',
     RESEND_API_KEY: 're_x'
   }
+  // Lo que se deja para después de responder (el registro) se espera con `pendiente`.
+  const pendientes: Promise<unknown>[] = []
+  const ctx = { waitUntil: (p: Promise<unknown>) => void pendientes.push(p), passThroughOnException: () => {} } as never
+  return { db, env, ctx, worker, pendiente: () => Promise.all(pendientes) }
+}
+
+test('una voz clonada que da 502 dice que la clones otra vez, y el registro guarda lo que respondió', async () => {
+  const { db, env, ctx, worker, pendiente } = await cobro()
+  const antes = globalThis.fetch
+  globalThis.fetch = (async (url: string) => {
+    const u = String(url)
+    if (u.endsWith('/api/partner/v1/users/creador')) return new Response('{"credits":100}')
+    if (u.endsWith('/api/v1/tts')) return new Response('<html>502 Bad Gateway</html>', { status: 502 })
+    return new Response('{"error":"no"}', { status: 404 })
+  }) as typeof fetch
+  try {
+    const r = await worker.fetch(
+      new Request('https://cobro.x/voz/tts', { method: 'POST', headers: { authorization: 'Bearer admin', 'content-type': 'application/json' }, body: JSON.stringify({ text: 'Hola.', voice_id: 'clone_1' }) }),
+      env as never,
+      ctx
+    )
+    assert.equal(r.status, 502)
+    assert.match(((await r.json()) as { error: string }).error, /clónala otra vez/)
+    await pendiente()
+    const fila = db.prepare("SELECT voz, status, error FROM voz_registro WHERE accion = 'tts'").get()
+    assert.deepEqual({ ...fila }, { voz: 'clone_1', status: 502, error: '{"texto":"<html>502 Bad Gateway</html>"}' })
+  } finally {
+    globalThis.fetch = antes
+  }
+})
+
+test('un regalo de créditos da una cuenta gratis a quien no tiene, suma una sola vez por motivo y manda su clave', async () => {
+  const { db, env, ctx, worker } = await cobro()
   const sumas: number[] = []
   const correos: { to: string[]; subject: string; text: string }[] = []
   const antes = globalThis.fetch
@@ -108,7 +159,6 @@ test('un regalo de créditos da una cuenta gratis a quien no tiene, suma una sol
     return new Response('{"error":"no"}', { status: 404 })
   }) as typeof fetch
   try {
-    const ctx = { waitUntil: () => {}, passThroughOnException: () => {} } as never
     const regalar = (email: string) =>
       worker
         .fetch(

@@ -24,6 +24,10 @@ import { COBRO } from '../licencia.ts'
  * bits que dan los demás motores, así que las skills no cambian. Si un trozo tarda de más (504 con `task_id`), se espera
  * su tarea; si hay mucha demanda (429), lo que diga `Retry-After`.
  *
+ * Una voz recién clonada se prueba con una frase corta (`sirve`, unos 30 créditos). Voices Cloning guarda cualquier
+ * grabación, pero con algunas no puede hablar: responden 502 cada vez. Esa no entra al menú, se anota en `rotas` (y no
+ * sale en tu catálogo) y se pide otra grabación, en vez de fallar después, a media voz de un video.
+ *
  * Y la sección Administrador del creador (`/api/admin*`, `web/src/Admin.tsx`): pasa al cobro tal cual, solo con su
  * llave. En cualquier otra computadora no existe.
  */
@@ -40,6 +44,9 @@ const RESPIRO = 0.3
 const ESPERA_TAREA = 10 * 60_000
 const SIN_CUENTA = 'Para usar las voces de Sloth, crea tu cuenta gratis de Sloth (Opciones → Apoyo).'
 const SIN_CONEXION = 'No hay conexión con Sloth para pedir sus voces. Revisa tu internet.'
+/** Con lo que se prueba una voz recién clonada. */
+const PRUEBA = 'Hola, así suena mi voz.'
+const ROTA = 'Se clonó, pero las voces de Sloth no pueden hablar con esa grabación. Graba o sube otra: de 30 s a un minuto, tú solo, sin música ni ruido de fondo.'
 /** Su API, la que usa su ventana, con el pase de sesión (`Authorization: Bearer et_…`). */
 const VC = 'https://www.voicescloning.art'
 /** Los proveedores que tiene dentro (`/api/v1/providers`), y lo que se puede pedir de su catálogo. */
@@ -103,14 +110,18 @@ export interface CambioAdmin {
 export function voicesCloning(carpeta: string, o: { credencial(): Credencial | undefined | Promise<Credencial | undefined>; creador(): { llave: string } | undefined }) {
   const archivo = join(carpeta, 'voices-cloning.json')
   let voces: VozApi[] = []
+  /** Las clonadas con las que Voices Cloning no puede hablar (`sirve`): siguen allá, pero no se ofrecen. */
+  let rotas: string[] = []
   try {
-    voces = (JSON.parse(readFileSync(archivo, 'utf8')) as { voces?: VozApi[] }).voces ?? []
+    const guardado = JSON.parse(readFileSync(archivo, 'utf8')) as { voces?: VozApi[]; rotas?: string[] }
+    voces = guardado.voces ?? []
+    rotas = guardado.rotas ?? []
   } catch {
     // Aún no has elegido ninguna.
   }
   let info: Omit<EstadoVoicesCloning, 'voces' | 'disponible'> & { configurado: boolean } = { configurado: false, creador: false }
   let error = ''
-  const guardarVoces = () => (mkdirSync(carpeta, { recursive: true }), guardar(archivo, JSON.stringify({ voces }, null, 1)))
+  const guardarVoces = () => (mkdirSync(carpeta, { recursive: true }), guardar(archivo, JSON.stringify({ voces, ...(rotas.length ? { rotas } : {}) }, null, 1)))
 
   async function pedir<T>(ruta: string, init: { metodo?: string; json?: unknown; con?: Credencial; espera?: number } = {}): Promise<Respuesta<T>> {
     const c = init.con ?? (await o.credencial())
@@ -332,6 +343,19 @@ export function voicesCloning(carpeta: string, o: { credencial(): Credencial | u
     }
   }
 
+  /**
+   * Si Voices Cloning puede hablar con una voz recién clonada: una frase corta. Solo un 502 dos veces seguidas (lo que da
+   * una grabación que no sirve) dice que no; sin créditos, sin conexión o si tarda, no se sabe y se da por buena.
+   */
+  async function sirve(id: string): Promise<boolean> {
+    for (let intento = 0; intento < 2; intento++) {
+      if (intento) await espera(3000)
+      const r = await pedir('/voz/tts', { json: { text: PRUEBA, voice_id: id }, espera: 2 * 60_000 }).catch(() => undefined)
+      if (r?.status !== 502 || r.datos.code === 'sin_conexion') return true
+    }
+    return false
+  }
+
   /** Una tarea que tardó: se consulta cada 4 s hasta que acaba. Si falla (502, no se cobra), `undefined` para pedirla otra vez. */
   async function tarea(id: string) {
     const hasta = Date.now() + ESPERA_TAREA
@@ -500,7 +524,8 @@ export function voicesCloning(carpeta: string, o: { credencial(): Credencial | u
             ...(v.preview_url ? { muestra: v.preview_url } : {}),
             ...(v.provider ? { de: v.provider } : {})
           })
-          return enviar(res, 200, { voces: (d.voices ?? []).map(voz), mas: !!d.has_more, total: d.total ?? 0 })
+          const lista = (d.voices ?? []).filter((v) => !rotas.includes(v.voice_id))
+          return enviar(res, 200, { voces: lista.map(voz), mas: !!d.has_more, total: Math.max(0, (d.total ?? 0) - ((d.voices?.length ?? 0) - lista.length)) })
         } catch (e) {
           return enviar(res, e instanceof Fallo && e.status < 500 ? e.status : 502, { error: mensaje(e) })
         }
@@ -516,6 +541,11 @@ export function voicesCloning(carpeta: string, o: { credencial(): Credencial | u
           f.set('name', q.get('nombre')?.trim().slice(0, 80) || 'Mi voz')
           f.set('audio_file', new Blob([audio as Uint8Array<ArrayBuffer>], { type: String(req.headers['content-type'] ?? 'audio/webm') }), q.get('archivo') || 'voz.webm')
           const d = await suApi<{ voice_id?: string; name?: string }>('/api/v1/voices/clone', { form: f })
+          if (d.voice_id && !(await sirve(String(d.voice_id)))) {
+            rotas = [...rotas, String(d.voice_id)].slice(-100)
+            guardarVoces()
+            return enviar(res, 422, { error: ROTA })
+          }
           this.elegida({ voice_id: d.voice_id, name: d.name ?? f.get('name') }, true)
           void refrescar()
           return enviar(res, 200, estadoVoz())

@@ -1059,7 +1059,7 @@ function Clonar({ voz, onListo, onVolver }: { voz: UsoVoz; onListo(v?: string): 
       {error && <p className="bad small">{error}</p>}
       <div className="voz-clonar-pie">
         <button className="primary" disabled={ocupado || grabando || !archivo || !nombre.trim() || sinClonar(destino)} onClick={() => void clonar()}>
-          {ocupado ? 'Clonando…' : 'Clonar y usarla'}
+          {ocupado ? (destino === 'vc' ? 'Clonando y probando…' : 'Clonando…') : 'Clonar y usarla'}
         </button>
       </div>
     </div>

@@ -40,7 +40,11 @@
  *   correo con su clave (`{clave}` en los párrafos); sin cuenta, se le hace una gratis.
  *
  * Cada llamada queda en `voz_registro` (migración 0020), con su llave: quién, qué, cuántas letras y créditos, y si
- * falló, por qué. El cron borra lo de más de `GUARDAR_DIAS`.
+ * falló, por qué: su `error` o, si no lo dio, lo que respondió tal cual (`{}` si llegó vacío, `texto` si no era JSON).
+ * El cron borra lo de más de `GUARDAR_DIAS`.
+ *
+ * Una voz clonada (`clone_…`) que responde 502 es casi siempre una grabación con la que no puede hablar: se guardó al
+ * clonar, pero falla cada vez. El mensaje dice que la clone otra vez (`mensajeDe` con la voz).
  *
  * Con `VOZ_SOLO_CREADOR` en `"1"`, nadie más que el creador la usa, aunque tenga créditos: a los demás `GET /voz` les
  * dice que no está, lo demás responde 403 y Administrador no da de alta a nadie, hasta publicar la actualización con
@@ -138,7 +142,7 @@ export async function voz(req: Request, env: Env, ctx: ExecutionContext, url: UR
     anotar(env, ctx, { externo: q.externo, accion: 'tts', llave: en, voz: pedido.voice_id, letras: pedido.text.length, creditos: numero(r.datos.credits_used), ms: Date.now() - t, r })
     // Lo clonado no se muda con la persona: esa voz se quedó en la cuenta de antes.
     if (en.id !== llave.id && r.status === 404) throw new Rechazo(409, 'Tus voces de Sloth pasaron a otra cuenta y esta se quedó en la anterior. Elige o clona otra en el menú «Voz».')
-    return responder(r)
+    return responder(r, pedido.voice_id)
   }
   const tarea = /^\/voz\/tareas\/([^/]+)$/.exec(ruta)?.[1]
   if (req.method === 'GET' && tarea) {
@@ -559,21 +563,37 @@ async function vc(llave: Llave, metodo: string, ruta: string, o: { usuario?: str
   } catch {
     return { status: 502, datos: { error: 'No hubo conexión con las voces de Sloth.', code: 'sin_conexion' } }
   }
-  const datos = (await r.json().catch(() => null)) as unknown
-  return { status: r.status, datos: datos && typeof datos === 'object' && !Array.isArray(datos) ? (datos as Record<string, unknown>) : { valor: datos }, espera: r.headers.get('retry-after') ?? undefined }
+  return { status: r.status, datos: datosDe(await r.text().catch(() => '')), espera: r.headers.get('retry-after') ?? undefined }
 }
 
+/** Su cuerpo como objeto: el JSON que dio, `valor` si no era un objeto o, si no era JSON (una página de error), su `texto`. */
+export function datosDe(texto: string): Record<string, unknown> {
+  let datos: unknown
+  try {
+    datos = JSON.parse(texto)
+  } catch {
+    return { texto: texto.trim().slice(0, 300) }
+  }
+  return datos && typeof datos === 'object' && !Array.isArray(datos) ? (datos as Record<string, unknown>) : { valor: datos }
+}
+
+/** Lo que Voices Cloning dijo del fallo, en el campo donde lo diga. */
+const suyoDe = (d: Record<string, unknown>) => [d.error, d.message, d.detail].find((v): v is string => typeof v === 'string' && v.trim() !== '') ?? ''
+
+/** Por qué falló, para `voz_registro`: lo que dijo o, si no dijo nada, lo que respondió tal cual. */
+export const errorDe = (d: Record<string, unknown>) => (suyoDe(d) || JSON.stringify(d)).slice(0, 500)
+
 /** Lo que respondió, para la app: igual, salvo que un error se dice en español y lo suyo queda en `detalle`. */
-function responder(r: Respuesta): Response {
-  const datos = r.status >= 400 ? { ...r.datos, error: mensajeDe(r), detalle: r.datos.error ?? null } : r.datos
+function responder(r: Respuesta, voz?: string): Response {
+  const datos = r.status >= 400 ? { ...r.datos, error: mensajeDe(r, voz), detalle: suyoDe(r.datos) || null } : r.datos
   // Su 401 es que la llave del socio no sirve: para la app no es que falte su cuenta.
   return json(datos, r.status === 401 ? 502 : r.status, r.espera ? { 'retry-after': r.espera } : {})
 }
 
-/** Por qué no salió, dicho para quien usa Sloth (y su agente). */
-export function mensajeDe(r: Pick<Respuesta, 'status' | 'datos' | 'espera'>): string {
+/** Por qué no salió, dicho para quien usa Sloth (y su agente). `voz`: la que se pidió, si fue generar. */
+export function mensajeDe(r: Pick<Respuesta, 'status' | 'datos' | 'espera'>, voz?: string): string {
   const codigo = String(r.datos.code ?? '')
-  const suyo = typeof r.datos.error === 'string' ? r.datos.error : ''
+  const suyo = suyoDe(r.datos)
   if (codigo === 'insufficient_credits') return 'Se te acabaron los créditos de voz de Sloth. Pídele más al creador de Sloth o usa otra voz.'
   if (codigo === 'partner_balance_empty') return 'Las voces de Sloth no están disponibles ahora: se acabó su saldo. El creador ya puede verlo; mientras, usa otra voz.'
   if (codigo === 'partner_daily_limit') return 'Se llegó al tope del día de las voces de Sloth. Se libera a medianoche, hora de Lima (las 23:00 en la Ciudad de México).'
@@ -584,6 +604,8 @@ export function mensajeDe(r: Pick<Respuesta, 'status' | 'datos' | 'espera'>): st
   if (r.status === 404) return suyo ? `Las voces de Sloth no lo encontraron: ${suyo}` : 'Las voces de Sloth no tienen eso (¿la voz existe?).'
   if (codigo === 'invalid_body' || r.status === 400) return `Las voces de Sloth no aceptaron el pedido${suyo ? `: ${suyo}` : '.'}`
   if (codigo === 'sin_conexion') return 'No hubo conexión con las voces de Sloth. Intenta otra vez en un momento.'
+  if (r.status === 502 && voz?.startsWith('clone_'))
+    return 'Las voces de Sloth no pueden hablar con tu voz clonada (no se gastaron créditos). Suele ser la grabación con que se clonó: clónala otra vez en el menú «Voz», de 30 s a un minuto, tú solo, sin música ni ruido, o usa otra voz.'
   return `Las voces de Sloth respondieron ${r.status}${suyo ? `: ${suyo}` : '.'}`
 }
 
@@ -606,7 +628,7 @@ function anotar(env: Env, ctx: ExecutionContext, a: Anotacion) {
         typeof d.task_id === 'string' || typeof d.task_id === 'number' ? String(d.task_id) : null,
         a.r.status,
         fallo && d.code ? String(d.code) : null,
-        fallo ? String(d.error ?? '').slice(0, 500) || null : null,
+        fallo ? errorDe(d) : null,
         a.ms
       )
       .run()
