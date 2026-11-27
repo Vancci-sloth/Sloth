@@ -82,7 +82,9 @@ function saldos(e) {
   const ahora = Date.now()
   const renglones = e.cuentas.map((c) => {
     const s = c.saldo
-    const cuanto = !s ? 'aún no se sabe cuánto le queda' : s.renueva && s.renueva <= ahora ? `ya se le renovaron los créditos (a las ${hora(s.renueva)})` : `${s.creditos} créditos${s.renueva ? `, se renuevan a las ${hora(s.renueva)}` : ''}`
+    // Una cuenta de pago: los 50 de cada día y los de su plan van en un solo número, y Flow solo dice cuándo vuelven los del plan.
+    const delMes = s?.delMes > ahora ? ` (los de su plan se renuevan el ${fecha(s.delMes)}; además le llegan 50 cada día)` : ''
+    const cuanto = !s ? 'aún no se sabe cuánto le queda' : s.renueva && s.renueva <= ahora ? `ya se le renovaron los créditos (a las ${hora(s.renueva)})` : `${s.creditos} créditos${s.renueva ? `, se renuevan a las ${hora(s.renueva)}` : delMes}`
     const descansa = `${c.descansa ? `; no genera videos hasta las ${hora(c.descansa.hasta)}` : ''}${c.descansaVids ? `; en Google Vids, no hasta el ${fecha(c.descansaVids.hasta)}` : ''}`
     return `- ${c.correo}: ${cuanto}${descansa}. Hoy, ${c.hoy.videos} ${c.hoy.videos === 1 ? 'video' : 'videos'}.`
   })

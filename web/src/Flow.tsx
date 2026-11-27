@@ -66,7 +66,9 @@ function cuantoLeQueda(c: CuentaEnFlow): string {
   const s = c.saldo
   if (!s) return 'créditos sin leer'
   if (s.renueva && s.renueva <= Date.now()) return `créditos renovados a las ${hora(s.renueva)}`
-  return `${s.creditos} créditos${s.renueva ? ` · se renuevan a las ${hora(s.renueva)}` : ''}`
+  // Una cuenta de pago: los 50 de cada día y los de su plan van juntos, y Flow solo dice cuándo vuelven los del plan.
+  const delMes = s.delMes && s.delMes > Date.now() ? ` · los del mes se renuevan el ${dia(s.delMes)}` : ''
+  return `${s.creditos} créditos${s.renueva ? ` · se renuevan a las ${hora(s.renueva)}` : delMes}`
 }
 
 /** Cómo está una cuenta, y la clase de su punto (`.estado`). */

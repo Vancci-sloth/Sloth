@@ -186,6 +186,44 @@ test('lo que le queda a una cuenta se lee de su menú, con la hora en que se ren
   assert.equal(saldoDe('Créditos de Google Flow', ahora), null)
 })
 
+test('una cuenta con más que los 50 de cada día suma sus créditos de IA, que Flow gasta cuando se acaban los de Flow', () => {
+  const ahora = new Date(2026, 10, 3, 15, 0).getTime()
+  const manana = new Date(2026, 10, 4, 12, 2).getTime()
+  const deIA = '120 créditos de IA\nSe usan cuando te quedas sin créditos de Google Flow'
+  // Gratis, con créditos de IA comprados: los dos renglones. Los de cada día se renuevan; los de IA, no.
+  assert.deepEqual(saldoDe(`movie_filter_auto\n50 créditos de Google Flow\nLos créditos se actualizan todos los días a la(s) 12:02 p.m.\n${deIA}`, ahora), { creditos: 170, renueva: manana })
+  // Sin los de cada día, sigue pudiendo con los de IA.
+  assert.deepEqual(saldoDe(`movie_filter_auto\n0 créditos de Google Flow\nLos créditos se actualizan todos los días a la(s) 12:02 p.m.\n${deIA}`, ahora), { creditos: 120, renueva: manana })
+  // Los miles van con coma, punto o espacio según el idioma.
+  assert.deepEqual(saldoDe(`movie_filter_auto\n1,000 créditos de Google Flow\n${deIA}`, ahora), { creditos: 1120 })
+  assert.deepEqual(saldoDe('12.500 puntos de IA', ahora), { creditos: 12500 })
+  assert.deepEqual(saldoDe('1 000 crédits Google Flow\n1 crédit d’IA', ahora), { creditos: 1001 })
+  // En inglés la palabra no va pegada al número.
+  const ingles = saldoDe("movie_filter_auto\n50 Google Flow credits\nCredits refresh daily at 12:02 PM\n1,200 AI credits\nUsed when you're out of Google Flow credits", ahora)
+  assert.deepEqual(ingles, { creditos: 1250, renueva: manana })
+  assert.deepEqual(saldoDe('25,000 AI credits', ahora), { creditos: 25000 })
+})
+
+test('una cuenta de pago dice cuándo vuelven los de su plan, no cuándo vuelve a tener: los 50 de cada día le llegan antes', () => {
+  const ahora = new Date(2026, 10, 27, 0, 29).getTime()
+  const el24 = new Date(2026, 11, 24, 15, 55).getTime()
+  // Leído de una cuenta Plus (50 al día y 200 al mes, en un solo número), en el español de España.
+  const plus = 'movie_filter_auto\n238 puntos de Google Flow\nSe restablece el 24 dic a las 15:55'
+  assert.deepEqual(saldoDe(plus, ahora), { creditos: 238, delMes: el24 })
+  // Sin `renueva`, sin créditos descansa lo de siempre y vuelve a probar: no espera a su fecha.
+  assert.equal(descansoNuevo('creditos', ahora, undefined, saldoDe(plus, ahora)?.renueva).hasta, ahora + DESCANSO.creditos)
+  // En los demás idiomas, como lo escribe Flow en cada uno.
+  assert.deepEqual(saldoDe('238 créditos de Google Flow\nSe restablece el 24 dic a la(s) 3:55 p.m.\n120 créditos de IA', ahora), { creditos: 358, delMes: el24 })
+  assert.deepEqual(saldoDe('238 Google Flow credits\nResets Dec 24 at 3:55 PM', ahora), { creditos: 238, delMes: el24 })
+  assert.deepEqual(saldoDe('238 créditos do Google Flow\nRedefinição do limite de uso: 24 de dez., 15:55', ahora), { creditos: 238, delMes: el24 })
+  assert.deepEqual(saldoDe('238 crédits Google Flow\nRéinitialisation le 24 déc. à 15:55', ahora), { creditos: 238, delMes: el24 })
+  // El día entero («4 dic» no es el 24), y en enero ya es el año que viene.
+  assert.equal(saldoDe('9 puntos de Google Flow\nSe restablece el 4 dic a las 9:05', ahora)?.delMes, new Date(2026, 11, 4, 9, 5).getTime())
+  assert.equal(saldoDe('9 puntos de Google Flow\nSe restablece el 24 ene a las 15:55', new Date(2026, 11, 28).getTime())?.delMes, new Date(2027, 0, 24, 15, 55).getTime())
+  // Una fecha que ya pasó (la página se quedó vieja) no dice cuándo.
+  assert.deepEqual(saldoDe('9 puntos de Google Flow\nSe restablece el 27 nov a las 0:10', ahora), { creditos: 9 })
+})
+
 test('sin la sesión de Flow, Google manda a entrar o a la página pública; el inicio y los proyectos sí la tienen', () => {
   assert.ok(sinSesion('https://accounts.google.com/ServiceLogin?continue=https://flow.google.com/'))
   assert.ok(sinSesion('https://flow.google.com/about'))

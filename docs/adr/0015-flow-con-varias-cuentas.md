@@ -38,6 +38,19 @@ Ese mismo día, en la página de Flow:
   hasta esa hora; con menos de 6 (el video más barato), descansa sin probar. Una cuenta que aún no gastó dice la hora de
   ahora, y esa no cuenta. Los videos hechos y sus créditos se apuntan por día y por cuenta (62 días), para ver en
   Opciones lo de hoy y lo del mes. Los agentes lo ven con `estado_flow` sin `id`.
+- **El saldo suma los dos renglones de ese menú** (desde el 26 de noviembre de 2026): los créditos de Google Flow (los
+  50 de cada día, o los del mes en una cuenta de pago) y los «créditos de IA», comprados o de un plan, que Flow gasta
+  cuando se acaban los primeros y que solo enseña a quien los tiene. Leyendo solo el primero, una cuenta con más que
+  los 50 de cada día parecía tener 50, descansaba «sin créditos» con los de IA sin tocar, y un video rechazado que se
+  cobró de ellos parecía no haber gastado. Una cuenta de pago sin créditos de Flow solo tiene el segundo renglón, con
+  otro icono, y no se leía. El menú no está a la vista sin una cuenta así: su forma se sacó del código de la página
+  (`flow-account-panel`, en el bundle público de `flow.google.com/about`), que también da sus textos en cada idioma.
+- **Una cuenta de pago tiene los 50 de cada día y además los de su plan** (200 al mes en Plus, 1.000 en Pro; la ayuda
+  de Google: «con o sin suscripción, recibes 50 créditos de Google Flow por día»). Flow los enseña en un solo número y
+  debajo solo dice cuándo vuelven los del plan: «238 puntos de Google Flow» y «Se restablece el 24 dic a las 15:55»
+  (leído el 27 de noviembre de 2026 en una Plus). Esa fecha es `delMes` y solo se enseña («los del mes se renuevan el
+  24 dic»). No es `renueva`: sin créditos, la cuenta descansa 3 h y vuelve a probar, porque los de cada día le llegan
+  mucho antes que esa fecha y Flow no dice a qué hora.
 - **En el chat**, «Uso» tiene su sección de Google Flow (lo que queda entre todas y a las cinco cuentas con más), y cada
   clip dice en su fila lo que costó y con qué cuenta. La barra de arriba suma lo que gastó ese chat. Eso se lee de lo que
   respondió el MCP en el hilo (`hechoDeFlow`), sin que el servidor apunte de qué chat es cada pedido. La respuesta lleva

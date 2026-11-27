@@ -26,7 +26,9 @@ test('el MCP de Flow pide el video, dice lo gastado y explica por qué no gener�
     if (req.url === '/api/flow') {
       const cuentas = [
         { correo: 'una@gmail.com', deLaVoz: true, generando: false, saldo: { creditos: 40, renueva: Date.now() + 3_600_000, leido: Date.now() }, hoy: { videos: 1, creditos: 10 } },
-        { correo: 'otra@gmail.com', deLaVoz: false, generando: false, hoy: { videos: 0, creditos: 0 } }
+        { correo: 'otra@gmail.com', deLaVoz: false, generando: false, hoy: { videos: 0, creditos: 0 } },
+        // De pago: los 50 de cada día y los de su plan, en un solo número.
+        { correo: 'de-pago@gmail.com', deLaVoz: false, generando: false, saldo: { creditos: 238, delMes: Date.now() + 27 * 86_400_000, leido: Date.now() }, hoy: { videos: 0, creditos: 0 } }
       ]
       return res.end(JSON.stringify({ cuentas, quedan: 40, uso: { hoy: { videos: 1, creditos: 10 }, mes: { videos: 4, creditos: 40 } } }))
     }
@@ -67,5 +69,6 @@ test('el MCP de Flow pide el video, dice lo gastado y explica por qué no gener�
   const saldos = (await llamar('tools/call', { name: 'estado_flow', arguments: {} })).result.content[0].text
   assert.match(saldos, /- una@gmail\.com: 40 créditos, se renuevan a las .+\. Hoy, 1 video\./)
   assert.match(saldos, /- otra@gmail\.com: aún no se sabe cuánto le queda\./)
+  assert.match(saldos, /- de-pago@gmail\.com: 238 créditos \(los de su plan se renuevan el \d+ \S+, .+; además le llegan 50 cada día\)\. Hoy, 0 videos\./)
   assert.match(saldos, /quedan 40 créditos\. Hoy van 1 videos \(10 créditos\); este mes, 4 \(40\)\./)
 })

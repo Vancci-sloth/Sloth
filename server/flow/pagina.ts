@@ -155,19 +155,29 @@ async function aportar(page: Page, quiere: boolean) {
 
 /**
  * Lo que le queda a la cuenta, del menú que abre su botón arriba a la derecha («Detalles de la cuenta»), en la página que
- * esté (el inicio o un proyecto). Su renglón lleva el icono `movie_filter_auto`. `null` si no lo dice.
+ * esté (el inicio o un proyecto). Son hasta dos renglones, cada uno con su icono: los créditos de Google Flow
+ * (`movie_filter_auto`) y los de IA (la ficha, una imagen `credit-token-img`), que solo sale en la cuenta que los tiene.
+ * Se leen los dos, y `saldoDe` los suma: con solo el primero, una cuenta con más que los 50 de cada día parecía tener
+ * 50, y una de pago sin créditos de Flow (solo la ficha) no se leía. `null` si no lo dice.
  */
 export async function leerSaldo(page: Page): Promise<Saldo | null> {
   await page.locator('.header-user-button').first().click({ timeout: 15_000 })
-  const suyo = page.locator('mat-icon:text-is("movie_filter_auto")').first()
+  const suyo = page.locator('mat-icon:text-is("movie_filter_auto"), img.credit-token-img').first()
   if (!(await suyo.waitFor({ timeout: 10_000 }).then(() => true, () => false))) {
     await page.keyboard.press('Escape').catch(() => {})
     return null
   }
   const texto = await suyo.evaluate((d) => {
-    let e = d as HTMLElement
-    for (let i = 0; i < 4 && e.parentElement && !/\d.*\n.*\d/.test(e.innerText); i++) e = e.parentElement
-    return e.innerText
+    // Los iconos del mismo menú, y de cada uno su renglón: sube hasta dar con el número.
+    const menu = d.closest('[role=dialog]') ?? document.body
+    const iconos = [...menu.querySelectorAll<HTMLElement>('mat-icon, img.credit-token-img')].filter((i) => i.tagName === 'IMG' || i.textContent?.trim() === 'movie_filter_auto')
+    const renglones = new Set<HTMLElement>()
+    for (const icono of iconos) {
+      let e = icono
+      for (let i = 0; i < 2 && e.parentElement && !/\d/.test(e.innerText); i++) e = e.parentElement
+      renglones.add(e)
+    }
+    return [...renglones].map((e) => e.innerText).join('\n')
   })
   await page.keyboard.press('Escape').catch(() => {})
   return saldoDe(texto, Date.now())
