@@ -1928,11 +1928,13 @@ export interface CuentaEnFlow {
 
 /**
  * Los créditos que le quedaban a una cuenta en Flow, cuándo se leyeron y, si se renuevan cada día, cuándo (todo en ms).
+ * `delMes`: en una cuenta de pago, cuándo vuelven los de su plan; los 50 de cada día le llegan aparte (`Saldo`).
  * `maximo`: lo más que se le ha leído, para dibujar cuánto le queda (Flow no dice de cuánto).
  */
 export interface SaldoFlow {
   creditos: number
   renueva?: number
+  delMes?: number
   leido: number
   maximo?: number
 }

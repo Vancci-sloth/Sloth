@@ -98,33 +98,69 @@ export function creditosDe(texto: string): number | null {
   return n === undefined ? null : Number(n)
 }
 
-/** Lo que le queda a una cuenta, del menú de su cuenta en Flow: sus créditos y, si se renuevan cada día, cuándo (ms). */
+/**
+ * Lo que le queda a una cuenta, del menú de su cuenta en Flow: sus créditos (los de Google Flow más los de IA) y cuándo
+ * vuelven (ms). `renueva`: los 50 de cada día, en una cuenta gratis. `delMes`: los de su plan, en una de pago (200 al
+ * mes en Plus, 1.000 en Pro); a esa también le llegan los 50 de cada día, pero Flow no le dice a qué hora.
+ */
 export interface Saldo {
   creditos: number
   renueva?: number
+  delMes?: number
 }
 
 /** Lo que puede separar la hora que dice Flow de la de ahora en una cuenta sin gastar (redondeo de minutos). */
 const HOLGURA = 5 * 60_000
 
+/** Los idiomas en que se busca la fecha de «Se restablece el 24 dic a las 15:55»: Flow la escribe con `Intl`, día y mes corto. */
+const FECHAS = ['es', 'en', 'pt-BR', 'pt-PT', 'fr'].map((l) => new Intl.DateTimeFormat(l, { month: 'short', day: 'numeric' }))
+
+/** El día que dice el renglón, de hoy a un año: el primero que, escrito como lo escribe Flow, está en él. */
+function diaDe(renglon: string, ahora: number): Date | null {
+  for (let i = 0; i <= 366; i++) {
+    const d = new Date(ahora)
+    d.setDate(d.getDate() + i)
+    // Entero: «4 dic» no es el «24 dic».
+    const esta = (f: Intl.DateTimeFormat) => new RegExp(`(?<!\\d)${f.format(d).replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/g, '\\s+')}(?!\\d)`, 'i').test(renglon)
+    if (FECHAS.some(esta)) return d
+  }
+  return null
+}
+
 /**
- * El saldo, del texto del menú de la cuenta (visto el 3 de noviembre de 2026): «20 créditos de Google Flow» y «Los
- * créditos se actualizan todos los días a la(s) 12:02 p.m.», o en el español de España «50 puntos de Google Flow» y «…a
- * diario a las 17:11». La hora es la del equipo, como la de Edge: `renueva` es la próxima vez que llega. Una cuenta que
- * aún no gastó dice la hora de ahora (se leyó dos veces, y la hora cambió con el reloj): entonces no hay `renueva`.
- * `null` si no dice cuántos quedan.
+ * El saldo, del texto de los renglones de créditos del menú de la cuenta. Son hasta dos, y se suman, porque Flow gasta
+ * de los dos (así salen en su página el 26 de noviembre de 2026):
+ * - Los de Google Flow: «20 créditos de Google Flow» y cuándo se renuevan. En una cuenta gratis, «Los créditos se
+ *   actualizan todos los días a la(s) 12:02 p.m.» (los 50 de cada día): eso es `renueva`. Una de pago tiene esos 50 y
+ *   los de su plan en un solo número, y debajo solo la fecha de los del plan: «238 puntos de Google Flow» y «Se
+ *   restablece el 24 dic a las 15:55» (leído el 27 de noviembre de 2026 en una Plus, 50 al día más 200 al mes). Eso es
+ *   `delMes`, y no dice cuándo vuelve a tener créditos: los de cada día le llegan antes.
+ * - Los de IA, comprados: «120 créditos de IA» y «Se usan cuando te quedas sin créditos de Google Flow». Una cuenta de
+ *   pago sin créditos de Flow solo tiene este renglón, con todo lo suyo.
+ *
+ * Va en el idioma de la cuenta: «50 puntos de Google Flow» y «…a diario a las 17:11» en el español de España, «50 Google
+ * Flow credits» y «1,000 AI credits» en inglés (la palabra no va pegada al número), y los miles como los escribe cada
+ * uno («1,000», «1.000», «1 000»). La hora es la del equipo, como la de Edge: `renueva` es la próxima vez que llega. Una
+ * cuenta gratis que aún no gastó dice la hora de ahora (se leyó dos veces, y la hora cambió con el reloj): entonces no
+ * hay `renueva`. `null` si no dice cuántos quedan.
  */
 export function saldoDe(texto: string, ahora: number): Saldo | null {
   const renglones = texto.split('\n')
-  const i = renglones.findIndex((r) => /^\s*\d[\d.,]*\s+(cr[eé]ditos?|puntos?|credits?|points?)\b/i.test(r))
+  // Un renglón que dice cuántos empieza con el número; los demás («Los créditos se actualizan…»), con una palabra.
+  const cuantos = renglones.map((r) => (PALABRA_CREDITOS.test(r) ? r.match(/^\s*(\d[\d.,\s]*)/)?.[1] : undefined))
+  const i = cuantos.findIndex((c) => c !== undefined)
   if (i < 0) return null
-  const creditos = Number(renglones[i].match(/\d[\d.,]*/)![0].replace(/[.,]/g, ''))
-  const diario = renglones.slice(i + 1, i + 3).find((r) => /d[ií]a|diari|daily|day/i.test(r))
-  const h = diario?.match(/(\d{1,2}):(\d{2})\s*(?:([ap])\.?\s*m\.?)?/i)
+  const creditos = cuantos.reduce((n, c) => n + (c ? Number(c.replace(/\D/g, '')) : 0), 0)
+  // Cuándo se renuevan va bajo el primer renglón, el de los de Flow: los de IA no se renuevan.
+  const bajo = renglones.slice(i + 1, i + 3)
+  const diario = bajo.find((r) => /d[ií]a|diari|daily|day|quotidien/i.test(r))
+  const conFecha = diario ? undefined : bajo.map((r) => ({ r, dia: diaDe(r, ahora) })).find((x) => x.dia)
+  const h = (diario ?? conFecha?.r)?.match(/(\d{1,2}):(\d{2})\s*(?:([ap])\.?\s*m\.?)?/i)
   if (!h) return { creditos }
   const hora = h[3] ? (Number(h[1]) % 12) + (h[3].toLowerCase() === 'p' ? 12 : 0) : Number(h[1])
-  const d = new Date(ahora)
+  const d = new Date(conFecha?.dia ?? ahora)
   d.setHours(hora, Number(h[2]), 0, 0)
+  if (conFecha) return d.getTime() > ahora ? { creditos, delMes: d.getTime() } : { creditos }
   if (d.getTime() <= ahora) d.setDate(d.getDate() + 1)
   const falta = d.getTime() - ahora
   return falta < HOLGURA || falta > 24 * 60 * 60_000 - HOLGURA ? { creditos } : { creditos, renueva: d.getTime() }

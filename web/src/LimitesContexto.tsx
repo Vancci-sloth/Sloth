@@ -98,7 +98,9 @@ function CuentaFlow({ c, ahora }: { c: CuentaEnFlow; ahora: number }) {
         ? `↻ Se renovaron a las ${horaFlow(s!.renueva!)}: actualiza para verlos`
         : s?.renueva
           ? `↻ Se renuevan a las ${horaFlow(s.renueva)}`
-          : ''
+          : s?.delMes && s.delMes > ahora
+            ? `↻ Los del mes se renuevan el ${new Date(s.delMes).toLocaleDateString('es-MX', { day: 'numeric', month: 'short' })}`
+            : ''
   return (
     <span className={`context-limit ${c.descansa || (s && !renovados && s.creditos < LITE) ? 'agotandose' : ''}`}>
       <span className="context-limit-heading" title={c.correo}>
